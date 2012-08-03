@@ -637,7 +637,6 @@ errorout:
  * with syscalls other than open and expect this to be PVFS.
  */
 int iocommon_lookup(char *path,
-                    int dirflag,
                     int followflag,
                     PVFS_object_ref *pref,
                     PVFS_object_ref *fref,
@@ -654,7 +653,7 @@ int iocommon_lookup(char *path,
     int flags = O_RDONLY;
     int mode = 0644;
 
-    rc = split_pathname(path, dirflag, &parentdir, &file);
+    rc = split_pathname(path, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
 
     if (fref && !pref)
@@ -822,13 +821,13 @@ pvfs_descriptor *iocommon_open(const char *path,
     /* else this was called with a plain path */
 
     /* Split the path into a directory and file */
-    rc = split_pathname(path, 1, &directory, &filename);
+    rc = split_pathname(path, &directory, &filename);
     if (rc < 0 && errno == EISDIR)
     {
         /* clear error */
         rc = 0;
         errno = 0;
-        open_dir = 1; /* we are opening a direcotry filename is null */
+        open_dir = 1; /* we are opening a directory filename is null */
     }
     IOCOMMON_RETURN_ERR(rc);
 
@@ -1224,7 +1223,6 @@ int iocommon_remove (const char *path,
 
     /* open path needs to be nofollow */
     rc = iocommon_lookup((char *)path,
-                         dirflag,
                          PVFS2_LOOKUP_LINK_NO_FOLLOW,
                          &parent_ref,
                          &file_ref,
@@ -1305,7 +1303,6 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     iocommon_cred(&creds);
     /* open oldpath */
     rc = iocommon_lookup((char *)oldpath,
-                         0,
                          PVFS2_LOOKUP_LINK_FOLLOW,
                          &oldref, /* parent */
                          NULL,
@@ -1315,7 +1312,6 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
 
     /* open newpath */
     rc = iocommon_lookup((char *)newpath,
-                         0,
                          PVFS2_LOOKUP_LINK_FOLLOW,
                          &newref, /* parent */
                          NULL,
@@ -2229,7 +2225,6 @@ int iocommon_make_directory(const char *pvfs_path,
 
     /* lookup parent */
     rc = iocommon_lookup((char *)pvfs_path,
-                         0,
                          PVFS2_LOOKUP_LINK_FOLLOW,
                          &parent_ref,
                          NULL,
@@ -2317,7 +2312,6 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
 
     /* lookup parent */
     rc = iocommon_lookup((char *)pvfs_path,
-                         0,
                          PVFS2_LOOKUP_LINK_FOLLOW,
                          &parent_ref,
                          NULL,
@@ -2564,7 +2558,6 @@ int iocommon_access(const char *pvfs_path,
 
     /* lookup parent */
     rc = iocommon_lookup((char *)pvfs_path,
-                         0,
                          followflag,
                          NULL,
                          &file_ref,
