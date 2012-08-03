@@ -58,7 +58,9 @@ struct PINT_aio_io_cb
 
 struct PINT_aio_open_cb
 {
-    const char *path;               /* in */
+    char *path;                     /* in */
+    char *directory;                /* in */
+    char *filename;                 /* in */
     int flags;                      /* in */
     PVFS_hint file_creation_param;  /* in */
     int mode;                       /* in */

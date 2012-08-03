@@ -576,7 +576,7 @@ struct PINT_client_mgmt_get_uid_list_sm
 /* AIO scratch areas */
 struct PINT_client_aio_open_sm
 {
-    const char *path;
+    char *path;
     int flags;
     PVFS_hint file_creation_param;
     mode_t mode;

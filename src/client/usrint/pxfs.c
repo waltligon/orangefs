@@ -36,16 +36,37 @@ static int pxfs_rdwrv(int fd,
  *
  **/
 
+/**
+ * pxfs_open
+ */
 extern int pxfs_open(const char *path, int flags, int *fd,
                      pxfs_cb cb, void *cdat, ...)
 {
+    int rc;
     va_list ap;
+    char *newpath;
     struct pvfs_aiocb *open_acb = NULL;
 
     if (!path || !fd)
     {
         errno = EINVAL;
         return -1;
+    }
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+    if (newpath == path)
+    {
+        newpath = malloc(strlen(path) + 1);
+        if (!newpath)
+        {
+            errno = ENOMEM;
+            return -1;
+        }
+        strcpy(newpath, path);
     }
 
     /* alloc a pvfs_cb for use with aio_open */
@@ -68,9 +89,16 @@ extern int pxfs_open(const char *path, int flags, int *fd,
         open_acb->u.open.file_creation_param = PVFS_HINT_NULL;
     va_end(ap);
 
+    rc = split_pathname(newpath, 0, &(open_acb->u.open.directory),
+                        &(open_acb->u.open.filename));
+    if (rc < 0)
+    {
+        return -1;
+    }   
+
     open_acb->hints = PVFS_HINT_NULL;
     open_acb->op_code = PVFS_AIO_OPEN_OP;
-    open_acb->u.open.path = path;
+    open_acb->u.open.path = newpath;
     open_acb->u.open.flags = flags;
     open_acb->u.open.pdir = NULL;
     open_acb->u.open.fd = fd;
@@ -79,9 +107,17 @@ extern int pxfs_open(const char *path, int flags, int *fd,
 
     aiocommon_submit_op(open_acb);
 
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+
     return 0;
 }
 
+/**
+ * pxfs_open64
+ */
 extern int pxfs_open64(const char *path, int flags, int *fd,
                        pxfs_cb cb, void *cdat, ...)
 {
@@ -109,79 +145,13 @@ extern int pxfs_open64(const char *path, int flags, int *fd,
     return pxfs_open(path, flags, fd, cb, cdat, mode);
 }
 
+/*
 extern int pxfs_openat(int dirfd, const char *path, int flags, int *fd,
                        pxfs_cb cb, void *cdat, ...)
 {
-    va_list ap;
-    int mode;
-    PVFS_hint hints;
-    int rc;
-    struct pvfs_aiocb *open_acb = NULL;
-
-    if (!path || !fd)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
-    va_start(ap, cdat);
-    if (flags & O_CREAT)
-        mode = va_arg(ap, int);
-    else
-        mode = 0777;
-    if (flags & O_HINTS)
-        hints = va_arg(ap, PVFS_hint);
-    else
-        hints = PVFS_HINT_NULL;
-    va_end(ap);
-
-    if (path[0] == '/' || dirfd == AT_FDCWD)
-    {
-        rc = pxfs_open(path, flags, fd, cb, cdat, mode);
-    }
-    else
-    {
-        if (dirfd < 0)
-        {
-            errno = EBADF;
-            return -1;
-        }
-
-        /* alloc a pvfs_cb for use with aio_open */
-        open_acb = malloc(sizeof(struct pvfs_aiocb));
-        if (!open_acb)
-        {
-            errno = ENOMEM;
-            return -1;
-        }
-        memset(open_acb, 0, sizeof(struct pvfs_aiocb));
-
-        open_acb->u.open.pdir = pvfs_find_descriptor(dirfd);
-        if (!(open_acb->u.open.pdir))
-        {
-            free(open_acb);
-            return -1;
-        }
-
-        open_acb->hints = PVFS_HINT_NULL;
-        open_acb->op_code = PVFS_AIO_OPEN_OP;
-        open_acb->u.open.mode = mode;
-        open_acb->u.open.file_creation_param = hints;
-        open_acb->u.open.path = path;
-        open_acb->u.open.flags = flags;
-        open_acb->u.open.fd = fd;
-        open_acb->call_back_fn = cb;
-        open_acb->call_back_dat = cdat;
-
-        aiocommon_submit_op(open_acb);
-
-        return 0;
-    }
-
-    return rc;
+    return 0;
 }
 
-/* TODO: TEST */
 extern int pxfs_openat64(int dirfd, const char *path, int flags, int *fd,
                          pxfs_cb cb, void *cdat, ...)
 {
@@ -214,13 +184,20 @@ extern int pxfs_openat64(int dirfd, const char *path, int flags, int *fd,
 
     return pxfs_openat(dirfd, path, flags, fd, cb, cdat, mode);
 }
+*/
 
+/**
+ * pxfs_creat
+ */
 extern int pxfs_creat(const char *path, mode_t mode, int *fd,
                       pxfs_cb cb, void *cdat, ...)
 {
     return pxfs_open(path, O_RDWR | O_CREAT | O_EXCL, fd, cb, cdat, mode);
 }
 
+/**
+ * pxfs_creat64
+ */
 extern int pxfs_creat64(const char *path, mode_t mode, int *fd,
                         pxfs_cb cb, void *cdat, ...)
 {

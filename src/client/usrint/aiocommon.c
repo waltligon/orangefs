@@ -170,6 +170,8 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
         {
             rc = PVFS_iaio_open(&(p_cb->u.open.pd),
                                 p_cb->u.open.path,
+                                p_cb->u.open.directory,
+                                p_cb->u.open.filename,
                                 p_cb->u.open.flags, 
                                 p_cb->u.open.file_creation_param,
                                 p_cb->u.open.mode,

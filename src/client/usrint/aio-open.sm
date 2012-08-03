@@ -33,12 +33,6 @@ static int initialize_context(
     char *pathname,
     PVFS_object_ref ctx_starting_refn);
 
-static PVFS_error split_path(
-    const char *path,
-    int dirflag,
-    char **directory,
-    char **filename);
-
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
@@ -489,91 +483,6 @@ static int initialize_context(
     return ret;
 }
 
-static PVFS_error split_path(
-    const char *path,
-    int dirflag,
-    char **directory,
-    char **filename)
-{
-    int i, fnlen, slashes = 0;
-    int length = strlen("pvfs2");
-
-    if (!path || !directory || !filename)
-    {
-        return -PVFS_EINVAL;
-    }
-    /* chop off pvfs2 prefix */
-    if (strncmp(path, "pvfs2:", length) == 0)
-    {
-        path = &path[length];
-    }
-    /* Split path into a directory and filename */
-    length = strnlen(path, PVFS_PATH_MAX);
-    if (length == PVFS_PATH_MAX)
-    {
-        return -PVFS_ENAMETOOLONG;
-    }
-    i = length - 1;
-    if (dirflag)
-    {
-        /* skip any trailing slashes */
-        for(; i >= 0 && path[i] == '/'; i--)
-        {
-            slashes++;
-        }
-    }
-    for (; i >= 0; i--)
-    {
-        if (path[i] == '/')
-        {
-            /* parse the directory */
-            *directory = malloc(i + 1);
-            if (!*directory)
-            {
-                return -PVFS_EIO;
-            }
-            strncpy(*directory, path, i);
-            (*directory)[i] = '\0';
-            break;
-        }
-    }
-    if (i == -1)
-    {
-        /* found no '/' path is all filename */
-        *directory = NULL;
-    }
-    i++;
-    /* copy the filename */
-    fnlen = length - i - slashes;
-    if (fnlen == 0)
-    {
-        filename = NULL;
-        if (!directory)
-        {
-            return -PVFS_EISDIR;
-        }
-        else
-        {
-            return -PVFS_ENOENT;
-        }
-    }
-    /* check flag to see if there are slashes to skip */
-    *filename = malloc(fnlen + 1);
-    if (!*filename)
-    {
-        if (*directory)
-        {
-            free(*directory);
-        }
-        *directory = NULL;
-        *filename = NULL;
-        return -PVFS_EIO;
-    }
-    strncpy(*filename, path + i, length - i);
-    (*filename)[length - i] = '\0';
-    return 0;
-}
-
 /**
  * Returns the default distribution, or NULL if the distribution could not
  * be created.  The default distribution is read from the server
@@ -653,7 +562,9 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
 
 PVFS_error PVFS_iaio_open(
     pvfs_descriptor **fildes,
-    const char *path,
+    char *path,
+    char *directory,
+    char *filename,
     int flags,
     PVFS_hint file_creation_param,
     mode_t mode,
@@ -666,36 +577,12 @@ PVFS_error PVFS_iaio_open(
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    char *directory = NULL;
-    char *filename = NULL;
-    char *newpath = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_open entered\n");
 
-    if (fildes == NULL || path == NULL)
+    if (fildes == NULL || directory == NULL || filename == NULL)
     {
         gossip_err("invalid (NULL) required arguments\n");
-        return ret;
-    }
-
-    newpath = pvfs_qualify_path(path);
-    if (!newpath)
-    {
-        return ret;
-    }
-    if (newpath == path)
-    {
-        newpath = malloc(strlen(path) + 1);
-        if (!newpath)
-        {
-            return -PVFS_ENOMEM;
-        }
-        strcpy(newpath, path);
-    }
-
-    ret = split_path(path, 0, &directory, &filename);
-    if (ret < 0)
-    {
         return ret;
     }
 
@@ -711,7 +598,6 @@ PVFS_error PVFS_iaio_open(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_sysint_credential(sm_p->cred_p, credential);
-    sm_p->u.aio_open.path = newpath;
     sm_p->u.aio_open.directory = directory;
     sm_p->u.aio_open.filename = filename;
     sm_p->u.aio_open.flags = flags;
@@ -727,7 +613,9 @@ PVFS_error PVFS_iaio_open(
 
 PVFS_error PVFS_aio_open(
     pvfs_descriptor **fildes,
-    const char *path,
+    char *path,
+    char *directory,
+    char *filename,
     int flags, 
     PVFS_hint file_creation_param,
     mode_t mode,
@@ -740,8 +628,9 @@ PVFS_error PVFS_aio_open(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_aio_open entered\n");
 
-    ret = PVFS_iaio_open(fildes, path, flags, file_creation_param,
-                         mode, pdir, credential, &op_id, hints, NULL);
+    ret = PVFS_iaio_open(fildes, path, directory, filename, flags,
+                         file_creation_param, mode, pdir, credential,
+                         &op_id, hints, NULL);
 
     if (ret)
     {
@@ -772,7 +661,11 @@ static PINT_sm_action open_init(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: init\n");
 
     memset(&sm_p->u.aio_open.file_ref, 0, sizeof(PVFS_object_ref));
-    memset(&sm_p->u.aio_open.parent_ref, 0, sizeof(PVFS_object_ref)); 
+    memset(&sm_p->u.aio_open.parent_ref, 0, sizeof(PVFS_object_ref));
+    memset(&sm_p->u.aio_open.lookup_resp, 0, sizeof(PVFS_sysresp_lookup));
+    memset(&sm_p->u.aio_open.getattr_resp, 0, sizeof(PVFS_sysresp_getattr));
+    memset(&sm_p->u.aio_open.create_resp, 0, sizeof(PVFS_sysresp_create));
+    memset(&sm_p->u.aio_open.readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
     sm_p->u.aio_open.current_seg_path = NULL;
 
     /* Check the flags to determine if links are followed */
@@ -938,14 +831,7 @@ static PINT_sm_action open_pdir_lookup_given(
                 sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
             }
         }
-/*        
-        char current_seg_path[PVFS_NAME_MAX];
-        memset(current_seg_path, 0, PVFS_NAME_MAX);
-        strncpy(current_seg_path, sm_p->u.aio_open.start,
-                sm_p->u.aio_open.cur - sm_p->u.aio_open.start + 1);
-        sm_p->u.aio_open.start = sm_p->u.aio_open.cur;
-        sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
-*/
+
         sm_p->u.aio_open.current_seg_path = (char *)malloc(PVFS_NAME_MAX);
         if (sm_p->u.aio_open.current_seg_path == NULL)
         {
@@ -1071,14 +957,6 @@ static PINT_sm_action open_pdir_ref_lookup_rel_setup_next(
                 sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
             }
         }
-/*
-        char current_seg_path[PVFS_NAME_MAX];
-        memset(current_seg_path, 0, PVFS_NAME_MAX);
-        strncpy(current_seg_path, sm_p->u.aio_open.start,
-                sm_p->u.aio_open.cur - sm_p->u.aio_open.start + 1);
-        sm_p->u.aio_open.start = sm_p->u.aio_open.cur;
-        sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
-*/
 
         memset(sm_p->u.aio_open.current_seg_path, 0, PVFS_NAME_MAX);
         strncpy(sm_p->u.aio_open.current_seg_path, sm_p->u.aio_open.start,
@@ -1107,7 +985,7 @@ static PINT_sm_action open_pdir_ref_lookup_rel_setup_next(
             lookup_frame->u.lookup.contexts[0].total_segments == 0)
         {
             free(lookup_frame);
-            sm_p->u.aio_open.parent_ref.fs_id = sm_p->u.aio_open.pdir->s->pvfs_ref.fs_id;
+            sm_p->u.aio_open.parent_ref.fs_id = sm_p->u.aio_open.lookup_resp.ref.fs_id;
             sm_p->u.aio_open.parent_ref.handle = sm_p->u.aio_open.lookup_resp.ref.handle;
             js_p->error_code = OPEN_FIND_FILE;
         }
@@ -2017,7 +1895,7 @@ static PINT_sm_action open_cleanup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: cleanup\n");
 
-    free((char *)sm_p->u.aio_open.path);
+    free(sm_p->u.aio_open.path);
     if (sm_p->u.aio_open.directory)
         free(sm_p->u.aio_open.directory);
     if (sm_p->u.aio_open.filename)
