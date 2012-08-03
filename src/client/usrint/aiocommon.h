@@ -35,10 +35,10 @@ typedef enum
     PVFS_AIO_IOV_OP,
     PVFS_AIO_OPEN_OP,
     PVFS_AIO_RENAME_OP,
+    PVFS_AIO_TRUNC_OP,
     PVFS_AIO_STAT_OP,
     PVFS_AIO_STAT64_OP,
 } PVFS_aio_op_code;
-
 
 /* the following structures contain operation dependent data for aio calls */
 struct PINT_aio_io_cb
@@ -79,6 +79,12 @@ struct PINT_aio_rename_cb
     char *newname;              /* in */
 };
 
+struct PINT_aio_trunc_cb
+{
+    pvfs_descriptor *pd;    /* in */
+    off64_t length;         /* in */
+};
+
 struct PINT_aio_stat_cb
 {
     pvfs_descriptor *pd;        /* in */
@@ -107,6 +113,7 @@ struct pvfs_aiocb
         struct PINT_aio_io_cb io;
         struct PINT_aio_open_cb open;
         struct PINT_aio_rename_cb rename;
+        struct PINT_aio_trunc_cb trunc;
         struct PINT_aio_stat_cb stat;
     } u;
 };

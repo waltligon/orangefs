@@ -532,9 +532,54 @@ extern int pxfs_fallocate(int fd, off_t offset, off_t length,
                           pxfs_cb cb, void *cdat);
 */
 
-//extern int pxfs_ftruncate (int fd, off_t length, pxfs_cb cb, void *cdat);
+/**
+ * pxfs_ftruncate
+ */
+extern int pxfs_ftruncate(int fd, off_t length, pxfs_cb cb, void *cdat)
+{
+    return pxfs_ftruncate64(fd, (off64_t)length, cb, cdat);
+}
 
-//extern int pxfs_ftruncate64 (int fd, off64_t length, pxfs_cb cb, void *cdat);
+/**
+ * pxfs_ftruncate64
+ */
+extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *truncate_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    truncate_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!truncate_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(truncate_acb, 0, sizeof(struct pvfs_aiocb));
+
+    truncate_acb->hints = PVFS_HINT_NULL;
+    truncate_acb->op_code = PVFS_AIO_TRUNC_OP;
+    truncate_acb->u.trunc.pd = pd;
+    truncate_acb->u.trunc.length = length;
+    truncate_acb->call_back_fn = cb;
+    truncate_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(truncate_acb);
+
+    return 0;
+}
 
 /*
 extern int pxfs_close( int fd , pxfs_cb cb, void *cdat);

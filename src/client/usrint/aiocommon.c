@@ -196,6 +196,16 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                                   (void *)p_cb);
             break;
         }
+        case PVFS_AIO_TRUNC_OP:
+        {
+            rc = PVFS_isys_truncate(p_cb->u.trunc.pd->s->pvfs_ref,
+                                    p_cb->u.trunc.length,
+                                    cred,
+                                    &(p_cb->op_id),
+                                    p_cb->hints,
+                                    (void *)p_cb); 
+            break;
+        }
         case PVFS_AIO_STAT_OP:
         {   
             rc = PVFS_isys_getattr(p_cb->u.stat.pd->s->pvfs_ref,
@@ -308,6 +318,10 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
             free(p_cb->u.rename.oldname);
             free(p_cb->u.rename.newdir);
             free(p_cb->u.rename.newname);
+            break;
+        }
+        case PVFS_AIO_TRUNC_OP:
+        {
             break;
         }
         case PVFS_AIO_STAT_OP:
