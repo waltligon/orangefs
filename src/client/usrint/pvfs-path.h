@@ -139,7 +139,6 @@ char *PVFS_expand_path(const char *path);
 int is_pvfs_path(const char **path);
 
 int split_pathname( const char *path,
-                    int dirflag,
                     char **directory,
                     char **filename);
 
