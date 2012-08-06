@@ -2431,7 +2431,8 @@ int pvfs_chdir(const char *path)
         return -1;
     }
     /* we really need to resolve this to a cannonical path */
-    newpath = PVFS_qualify_path(path);
+    /* jump to expand path right away */
+    newpath = PVFS_expand_path(path);
     if (!newpath)
     {
         return -1;

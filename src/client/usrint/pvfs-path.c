@@ -176,7 +176,7 @@ char *PVFS_expand_path(const char *path)
     opath = Ppath->orig_path;
     npath = Ppath->expanded_path;
 
-    /* if we need to start over at expand clear flags first */
+    /* if we need to start over at expand, clear flags first */
     /* OK to expand a qualified path */
     if (PATH_EXPANDED(Ppath))
     {
@@ -195,7 +195,7 @@ char *PVFS_expand_path(const char *path)
     memset(link_path, 0, PVFS_PATH_MAX + 1);
     /* as we expand the path we will be resolving and looking up
      * each segment, each segment is considered qualified as we
-     * go so we se the qualified flag
+     * go so we set the qualified flag
      */
     SET_QUALIFIED(Ppath);
     /* now expand the path */
