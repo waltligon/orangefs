@@ -16,6 +16,7 @@
 #include <pvfs2-types.h>
 #include <pvfs2-request.h>
 #include <pvfs2-debug.h>
+#include <pvfs-path.h>
 
 /* Define GNU's O_NOFOLLOW flag to be false if its not set */
 #ifndef O_NOFOLLOW
@@ -62,6 +63,18 @@ void iocommon_ensure_init(void);
 void iocommon_cred(PVFS_credentials **credentials);
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
+
+int iocommon_expand_path (PVFS_path_t *Ppath,
+                          int flags,
+                          mode_t mode,
+                          pvfs_descriptor **pdp);
+
+int iocommon_lookup(char *path,
+                    int followflag,
+                    PVFS_object_ref *pref,
+                    PVFS_object_ref *fref,
+                    char **filename,
+                    PVFS_object_ref *pdir);
 
 /*
  * Find the PVFS handle to an object (file, dir sym) 
