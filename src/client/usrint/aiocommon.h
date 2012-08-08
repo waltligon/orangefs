@@ -36,8 +36,13 @@ typedef enum
     PVFS_AIO_OPEN_OP,
     PVFS_AIO_RENAME_OP,
     PVFS_AIO_TRUNC_OP,
+    PVFS_AIO_CLOSE_OP,
     PVFS_AIO_STAT_OP,
     PVFS_AIO_STAT64_OP,
+    PVFS_AIO_CHOWN_OP,
+    PVFS_AIO_CHMOD_OP,
+    PVFS_AIO_MKDIR_OP,
+    PVFS_AIO_REMOVE_OP,
 } PVFS_aio_op_code;
 
 /* the following structures contain operation dependent data for aio calls */
@@ -93,6 +98,34 @@ struct PINT_aio_stat_cb
     void  *buf;           /* out */
 };
 
+struct PINT_aio_chown_cb
+{
+    pvfs_descriptor *pd;    /* in */
+    PVFS_sys_attr attr;     /* in */
+};
+
+struct PINT_aio_chmod_cb
+{
+    pvfs_descriptor *pd;    /* in */
+    PVFS_sys_attr attr;     /* in */
+};
+
+struct PINT_aio_mkdir_cb
+{
+    char *directory;        /* in */
+    char *filename;         /* in */
+    PVFS_object_ref *pdir;  /* in */
+    mode_t mode;            /* in */
+};
+
+struct PINT_aio_remove_cb
+{
+    char *directory;        /* in */
+    char *filename;         /* in */
+    PVFS_object_ref *pdir;  /* in */
+    int dirflag;            /* in */
+};
+
 /* a pvfs async control block, used for keeping track of async
  * operations outstanding in the filesystem
  */
@@ -115,6 +148,10 @@ struct pvfs_aiocb
         struct PINT_aio_rename_cb rename;
         struct PINT_aio_trunc_cb trunc;
         struct PINT_aio_stat_cb stat;
+        struct PINT_aio_chown_cb chown;
+        struct PINT_aio_chmod_cb chmod;
+        struct PINT_aio_mkdir_cb mkdir;
+        struct PINT_aio_remove_cb remove;
     } u;
 };
 

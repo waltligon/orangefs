@@ -19,9 +19,6 @@
 #include "iocommon.h"
 #include "aiocommon.h"
 
-#define PVFS_ATTR_DEFAULT_MASK \
-(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
-
 typedef int (*pxfs_cb)(void *cdat, int status);
 
 /* define FD flags unique to PXFS here */

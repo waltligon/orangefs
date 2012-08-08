@@ -1312,6 +1312,8 @@ static PINT_sm_action rename_cleanup(
     if (sm_p->u.aio_rename.current_seg_path)
         free(sm_p->u.aio_rename.current_seg_path);
 
+    sm_p->error_code = js_p->error_code;
+
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

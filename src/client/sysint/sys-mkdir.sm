@@ -44,7 +44,7 @@ static int mkdir_delete_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_mkdir_sm
+nested machine pvfs2_client_mkdir_sm
 {
     state init
     {
@@ -157,6 +157,21 @@ machine pvfs2_client_mkdir_sm
     {
         run mkdir_cleanup;
         MKDIR_RETRY => init;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_mkdir_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_mkdir_sm;
+        default => mkdir_terminate;
+    }
+
+    state mkdir_terminate
+    {
+        run mkdir_terminate;
         default => terminate;
     }
 }
@@ -579,6 +594,12 @@ static PINT_sm_action mkdir_cleanup(
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mkdir_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

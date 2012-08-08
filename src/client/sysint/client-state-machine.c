@@ -345,9 +345,9 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 /* this array must be ordered to match the enum in client-state-machine.h */ 
 struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
 {
-    {&pvfs2_client_remove_sm},
+    {&pvfs2_client_sysint_remove_sm},
     {&pvfs2_client_sysint_create_sm},
-    {&pvfs2_client_mkdir_sm},
+    {&pvfs2_client_sysint_mkdir_sm},
     {&pvfs2_client_symlink_sm},
     {&pvfs2_client_sysint_getattr_sm},
     {&pvfs2_client_io_sm},
@@ -387,6 +387,8 @@ struct PINT_client_op_entry_s PINT_client_sm_aio_table[] =
 {
     {&pvfs2_client_aio_open_sm},
     {&pvfs2_client_aio_rename_sm},
+    {&pvfs2_client_aio_mkdir_sm},
+    {&pvfs2_client_aio_remove_sm},
 };
 
 /* This function allows the generic state-machine-fns.c locate function
@@ -1234,6 +1236,8 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
         { PVFS_AIO_OPEN, "PVFS_AIO_OPEN" },
         { PVFS_AIO_RENAME, "PVFS_AIO_RENAME" },
+        { PVFS_AIO_MKDIR, "PVFS_AIO_MKDIR" },
+        { PVFS_AIO_REMOVE, "PVFS_AIO_REMOVE" },
         { 0, "UNKNOWN" }
     };
 

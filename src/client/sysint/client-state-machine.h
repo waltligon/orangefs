@@ -617,6 +617,40 @@ struct PINT_client_aio_rename_sm
     PVFS_sysresp_lookup lookup_resp;
 };
 
+struct PINT_client_aio_mkdir_sm
+{
+    const char *directory;
+    const char *filename;
+    PVFS_object_ref *pdir;
+    mode_t mode;
+    PVFS_object_ref parent_ref;
+
+    /* fields needed for relative lookups */
+    char *cur, *last, *start, *current_seg_path;
+
+    /* nested sm responses */
+    PVFS_sysresp_lookup lookup_resp;
+    PVFS_sysresp_mkdir mkdir_resp;
+};
+
+struct PINT_client_aio_remove_sm
+{
+    const char *directory;
+    const char *filename;
+    PVFS_object_ref *pdir;
+    int dirflag;
+    PVFS_object_ref parent_ref;
+    PVFS_object_ref file_ref;
+    PVFS_object_attr attr;
+
+    /* fields needed for relative lookups */
+    char *cur, *last, *start, *current_seg_path;
+
+    /*nested sm responses */
+    PVFS_sysresp_lookup lookup_resp;
+    PVFS_sysresp_getattr getattr_resp;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -697,6 +731,8 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
         struct PINT_client_aio_open_sm aio_open;
         struct PINT_client_aio_rename_sm aio_rename;
+        struct PINT_client_aio_mkdir_sm aio_mkdir;
+        struct PINT_client_aio_remove_sm aio_remove;
     } u;
 } PINT_client_sm;
 
@@ -799,6 +835,8 @@ enum
     PVFS_DEV_UNEXPECTED            = 400,
     PVFS_AIO_OPEN                  = 500,
     PVFS_AIO_RENAME                = 501,
+    PVFS_AIO_MKDIR                 = 502,
+    PVFS_AIO_REMOVE                = 503,
 };
 
 #define PVFS_OP_SYS_MAXVALID  21
@@ -871,9 +909,11 @@ extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 extern struct PINT_client_op_entry_s PINT_client_sm_aio_table[];
 
 /* system interface function state machines */
+extern struct PINT_state_machine_s pvfs2_client_sysint_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
@@ -917,6 +957,8 @@ extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_uid_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_open_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_rename_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_remove_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

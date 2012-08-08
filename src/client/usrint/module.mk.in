@@ -28,7 +28,9 @@ USRC := \
 # usrint state machine generation
 CLIENT_SMCGEN := \
 	$(DIR)/aio-open.c \
-	$(DIR)/aio-rename.c 
+	$(DIR)/aio-rename.c \
+	$(DIR)/aio-mkdir.c \
+	$(DIR)/aio-remove.c
 
 SMCGEN += $(CLIENT_SMCGEN)
 

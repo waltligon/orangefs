@@ -12,6 +12,11 @@
 
 #include "pxfs.h"
 
+#define PVFS_ATTR_DEFAULT_MASK \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
+
+static mode_t mask_val = 0022; /* implements umask for pvfs library */
+
 /* actual implementations of the read/write functions */
 
 static int pxfs_rdwr64(int fd,
@@ -521,7 +526,12 @@ static int pxfs_rdwrv(int fd,
 
     return 0;
 }
+
 /*
+extern int pxfs_lseek(int fd, off_t offset, int whence, off_t *offset_out);
+
+extern int pxfs_lseek64(int fd, off64_t offset, int whence, off_t *offset_out);
+
 extern int pxfs_truncate(const char *path, off_t length,
                          pxfs_cb cb, void *cdat);
 
@@ -582,7 +592,8 @@ extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
 }
 
 /*
-extern int pxfs_close( int fd , pxfs_cb cb, void *cdat);
+extern int pxfs_close( int fd , pxfs_cb cb, void *cdat)
+
 
 extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
 
@@ -716,6 +727,255 @@ extern int pxfs_lstat64(const char *path, struct stat64 *buf,
 
 extern int pxfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask,
                            pxfs_cb cb, void *cdat);
+*/
+
+/*
+
+extern int pxfs_futimesat(int dirfd, const char *path,
+                          const struct timeval times[2],
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_utimes(const char *path, const struct timeval times[2],
+                       pxfs_cb cb, void *cdat);
+
+extern int pxfs_utime(const char *path, const struct utimbuf *buf,
+                      pxfs_cb cb, void *cdat);
+
+extern int pxfs_futimes(int fd, const struct timeval times[2],
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_dup(int oldfd, int *newfd);
+
+extern int pxfs_dup2(int oldfd, int newfd);
+
+extern int pxfs_chown (const char *path, uid_t owner, gid_t group,
+                       pxfs_cb cb, void *cdat);
+*/
+
+extern int pxfs_fchown (int fd, uid_t owner, gid_t group,
+                        pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *chown_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    chown_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!chown_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(chown_acb, 0, sizeof(struct pvfs_aiocb));
+
+    if (owner != -1)
+    {
+        chown_acb->u.chown.attr.owner = owner;
+        chown_acb->u.chown.attr.mask |= PVFS_ATTR_SYS_UID;
+    }
+    if (group != -1)
+    {
+        chown_acb->u.chown.attr.group = group;
+        chown_acb->u.chown.attr.mask |= PVFS_ATTR_SYS_GID;
+    }
+
+    chown_acb->hints = PVFS_HINT_NULL;
+    chown_acb->op_code = PVFS_AIO_CHOWN_OP;
+    chown_acb->u.chown.pd = pd;
+    chown_acb->call_back_fn = cb;
+    chown_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(chown_acb);
+
+    return 0;
+}
+
+/*
+extern int pxfs_fchownat(int fd, const char *path, uid_t owner, gid_t group,
+                         int flag, pxfs_cb, void *cdat);
+
+extern int pxfs_lchown (const char *path, uid_t owner, gid_t group,
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_chmod (const char *path, mode_t mode, pxfs_cb cb, void *cdat);
+*/
+
+extern int pxfs_fchmod (int fd, mode_t mode, pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *chmod_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    chmod_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!chmod_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(chmod_acb, 0, sizeof(struct pvfs_aiocb));
+
+    chmod_acb->hints = PVFS_HINT_NULL;
+    chmod_acb->op_code = PVFS_AIO_CHMOD_OP;
+    chmod_acb->u.chmod.pd = pd;
+    chmod_acb->u.chmod.attr.perms = mode & 07777; /* mask off any stray bits */
+    chmod_acb->u.chmod.attr.mask = PVFS_ATTR_SYS_PERM;
+    chmod_acb->call_back_fn = cb;
+    chmod_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(chmod_acb);
+
+    return 0;
+}
+
+/*
+extern int pxfs_fchmodat(int fd, const char *path, mode_t mode, int flag,
+                         pxfs_cb cb, void *cdat);
+*/
+
+/**
+ * pxfs_mkdir
+ */
+extern int pxfs_mkdir(const char *path, mode_t mode, pxfs_cb cb, void *cdat)
+{
+    char *newpath;
+    int rc;
+    struct pvfs_aiocb *mkdir_acb = NULL;
+
+    mkdir_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!mkdir_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(mkdir_acb, 0, sizeof(struct pvfs_aiocb));
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+
+    /* strip any trailing slashes */
+    int tmp_len = strlen(newpath);
+    while (tmp_len > 1 && newpath[tmp_len - 1] == '/')
+    {
+        newpath[tmp_len - 1] = '\0';
+        tmp_len--;
+    }
+
+    rc = split_pathname(newpath, 1, &mkdir_acb->u.mkdir.directory,
+                        &mkdir_acb->u.mkdir.filename);
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    mkdir_acb->hints = PVFS_HINT_NULL;
+    mkdir_acb->op_code = PVFS_AIO_MKDIR_OP;
+    mkdir_acb->u.mkdir.mode = (mode & ~mask_val & 0777);
+    mkdir_acb->u.mkdir.pdir = NULL;
+    mkdir_acb->call_back_fn = cb;
+    mkdir_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(mkdir_acb);
+
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+    
+    return 0;
+}
+
+/*
+extern int pxfs_mkdirat(int dirfd, const char *path, mode_t mode,
+                        pxfs_cb cb, void *cdat);
+*/
+
+/**
+ * pxfs_rmdir
+ */
+extern int pxfs_rmdir(const char *path, pxfs_cb cb, void *cdat)
+{
+    char *newpath;
+    int rc;
+    struct pvfs_aiocb *rmdir_acb = NULL;
+
+    rmdir_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!rmdir_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(rmdir_acb, 0, sizeof(struct pvfs_aiocb));
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+
+    /* strip any trailing slashes */
+    int tmp_len = strlen(newpath);
+    while (tmp_len > 1 && newpath[tmp_len - 1] == '/')
+    {
+        newpath[tmp_len - 1] = '\0';
+        tmp_len--;
+    }
+
+    rc = split_pathname(newpath, 1, &rmdir_acb->u.remove.directory,
+                        &rmdir_acb->u.remove.filename);
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    rmdir_acb->hints = PVFS_HINT_NULL;
+    rmdir_acb->op_code = PVFS_AIO_REMOVE_OP;
+    rmdir_acb->u.remove.pdir = NULL;
+    rmdir_acb->u.remove.dirflag = 1;
+    rmdir_acb->call_back_fn = cb;
+    rmdir_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(rmdir_acb);
+
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+
+    return 0;
+}
+
+/*
+extern int pxfs_readlink(const char *path, char *buf, size_t bufsiz,
+                         ssize_t *bcnt, pxfs_cb cb, void *cdat);
+
+extern int pxfs_readlinkat(int dirfd, const char *path, char *buf,
+                           size_t bufsiz, ssize_t *bcnt,
+                           pxfs_cb cb, void *cdat);
+
 */
 
 /*

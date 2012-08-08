@@ -62,7 +62,7 @@ do {                                                                  \
 
 %%
 
-machine pvfs2_client_remove_sm
+nested machine pvfs2_client_remove_sm
 {
     state init
     {
@@ -148,6 +148,21 @@ machine pvfs2_client_remove_sm
     state cleanup
     {
         run remove_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_remove_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_remove_sm;
+        default => remove_terminate;
+    }
+
+    state remove_terminate
+    {
+        run remove_terminate;
         default => terminate;
     }
 }
@@ -465,6 +480,12 @@ static PINT_sm_action remove_cleanup(
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

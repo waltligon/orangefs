@@ -228,6 +228,50 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                                    (void *)p_cb);
             break;
         }
+        case PVFS_AIO_CHOWN_OP:
+        {
+            rc = PVFS_isys_setattr(p_cb->u.chown.pd->s->pvfs_ref,
+                                   p_cb->u.chown.attr,
+                                   cred,
+                                   &(p_cb->op_id),
+                                   p_cb->hints,
+                                   (void *)p_cb);
+            break;
+        }
+        case PVFS_AIO_CHMOD_OP:
+        {
+            rc = PVFS_isys_setattr(p_cb->u.chmod.pd->s->pvfs_ref,
+                                   p_cb->u.chmod.attr,
+                                   cred,
+                                   &(p_cb->op_id),
+                                   p_cb->hints,
+                                   (void *)p_cb);
+            break;
+        }
+        case PVFS_AIO_MKDIR_OP:
+        {
+            rc = PVFS_iaio_mkdir(p_cb->u.mkdir.directory,
+                                 p_cb->u.mkdir.filename,
+                                 p_cb->u.mkdir.pdir,
+                                 p_cb->u.mkdir.mode,
+                                 cred,
+                                 &(p_cb->op_id),
+                                 p_cb->hints,
+                                 (void *)p_cb);
+            break;
+        }
+        case PVFS_AIO_REMOVE_OP:
+        {
+            rc = PVFS_iaio_remove(p_cb->u.remove.directory,
+                                  p_cb->u.remove.filename,
+                                  p_cb->u.remove.pdir,
+                                  p_cb->u.remove.dirflag,
+                                  cred,
+                                  &(p_cb->op_id),
+                                  p_cb->hints,
+                                  (void *)p_cb);
+            break;
+        }
         default:
         {
             rc = -PVFS_EINVAL;
@@ -392,6 +436,26 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
             buf->st_atime = attr.atime;
             buf->st_mtime = attr.mtime;
             buf->st_ctime = attr.ctime;
+            break;
+        }
+        case PVFS_AIO_CHOWN_OP:
+        {
+            break;
+        }
+        case PVFS_AIO_CHMOD_OP:
+        {
+            break;
+        }
+        case PVFS_AIO_MKDIR_OP:
+        {
+            free(p_cb->u.mkdir.directory);
+            free(p_cb->u.mkdir.filename);
+            break;
+        }
+        case PVFS_AIO_REMOVE_OP:
+        {
+            free(p_cb->u.remove.directory);
+            free(p_cb->u.remove.filename);
             break;
         }
         default:
