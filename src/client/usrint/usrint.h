@@ -243,7 +243,7 @@ extern int pvfs_convert_iovec(const struct iovec *vector,
 
 /* debugging */
 
-//#define USRINT_DEBUG
+//#define PVFS_USRINT_DEBUG
 #ifdef  PVFS_USRINT_DEBUG
 #define debug(s,v) fprintf(stderr,s,v)
 #else

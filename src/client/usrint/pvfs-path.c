@@ -15,18 +15,18 @@
 #ifndef SYS_readdir
 #define SYS_readdir 89
 #endif
-#include "posix-ops.h"
+//#include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
-#include "posix-pvfs.h"
+//#include "posix-pvfs.h"
 #include "pvfs-path.h"
-#ifdef PVFS_AIO_ENABLE
-#include "aiocommon.h"
-#endif
+//#ifdef PVFS_AIO_ENABLE
+//#include "aiocommon.h"
+//#endif
 
-#if PVFS_UCACHE_ENABLE
-#include "ucache.h"
-#endif
+//#if PVFS_UCACHE_ENABLE
+//#include "ucache.h"
+//#endif
 
 /* 
  * Takes a path that may be relative to the working dir and
@@ -607,8 +607,9 @@ int split_pathname( const char *path,
                     char **directory,
                     char **filename)
 {
-    int i, fnlen/*, slashes = 0*/;
-    int length = strlen("pvfs2:");/* shouldn't this have a colon? */
+    int i = 0;
+    int fnlen = 0;
+    int length = 0;
 
     if (!path || !directory || !filename)
     {
@@ -628,13 +629,14 @@ int split_pathname( const char *path,
         if (path[i] == '/')
         {
             /* parse the directory */
-            *directory = malloc(i + 1);
+            *directory = (char *)malloc(i + 1);
             if (!*directory)
             {
                 return -1;
             }
+            memset(*directory, 0, (i + 1));
             strncpy(*directory, path, i);
-            (*directory)[i] = '\0';
+            (*directory)[i] = 0;
             break;
         }
     }
@@ -653,12 +655,14 @@ int split_pathname( const char *path,
         /* set the EISDIR so iocommon_open will know it is */
         /* everything */
         free(*directory);
-        *directory = malloc(length + 1);
+        *directory = (char *)malloc(length + 1);
         if (!*directory)
         {
             return -1;
         }
+        memset(*directory, 0, (length + 1));
         strncpy(*directory, path, length);
+        (*directory)[length] = 0;
         *filename = NULL;
         errno = EISDIR;
         return -1;
@@ -679,7 +683,7 @@ int split_pathname( const char *path,
         }
         return -1;
     }
-    *filename = malloc(fnlen + 1);
+    *filename = (char *)malloc(fnlen + 1);
     if (!*filename)
     {
         if (*directory)
@@ -690,8 +694,9 @@ int split_pathname( const char *path,
         *filename = NULL;
         return -1;
     }
+    memset(*filename, 0, (fnlen + 1));
     strncpy(*filename, path + i, fnlen);
-    (*filename)[fnlen] = '\0';
+    (*filename)[fnlen] = 0;
     return 0;
 }
 

@@ -586,8 +586,12 @@ int pvfs_descriptor_table_size(void)
  {
     int newfd, flags = 0; 
     pvfs_descriptor *pd;
+    /* insure one thread at a time is in */
+    /* fd setup section */
+    static gen_mutex_t lock = GEN_MUTEX_INITIALIZER;
 
     pvfs_sys_init();
+    debug("pvfs_alloc_descriptor called with %d\n", fd);
     if (fsops == NULL)
     {
         errno = EINVAL;
@@ -607,26 +611,33 @@ int pvfs_descriptor_table_size(void)
         {
             return NULL;
         }
+    }
+
+    gen_mutex_lock(&lock);
+    {
         if (descriptor_table[newfd] != NULL)
         {
             errno = EINVAL;
+            gen_mutex_unlock(&lock);
             return NULL;
         }
+
+        /* allocate new descriptor */
+	    descriptor_table_count++;
+        pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    
+        if (!pd)
+        {
+            gen_mutex_unlock(&lock);
+            return NULL;
+        }
+        memset(pd, 0, sizeof(pvfs_descriptor));
+    
+        gen_mutex_init(&pd->lock);
+        gen_mutex_lock(&pd->lock);
+        descriptor_table[newfd] = pd;
     }
-
-    /* allocate new descriptor */
-	descriptor_table_count++;
-    pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
-
-    if (!pd)
-    {
-        return NULL;
-    }
-    memset(pd, 0, sizeof(pvfs_descriptor));
-
-    gen_mutex_init(&pd->lock);
-    gen_mutex_lock(&pd->lock);
-    descriptor_table[newfd] = pd;
+    gen_mutex_unlock(&lock);
 
     pd->s = (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
     if (!pd->s)
@@ -690,6 +701,7 @@ int pvfs_descriptor_table_size(void)
 #endif /* PVFS_UCACHE_ENABLE */
 
     /* NEW PD IS STILL LOCKED */
+    debug("\tpvfs_alloc_descriptor returns with %d\n", pd->fd);
     return pd;
 }
 
@@ -886,8 +898,8 @@ int pvfs_free_descriptor(int fd)
         }
 #endif /* PVFS_UCACHE_ENABLE */
 
-	/* free descriptor status - wipe memory first */
-	memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+	    /* free descriptor status - wipe memory first */
+	    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
 
         /* first 3 descriptors not malloc'd */
         if (fd > 2)
@@ -903,7 +915,7 @@ int pvfs_free_descriptor(int fd)
 	    free(pd);
     }
 
-    debug("pvfs_free_descriptor returns %d\n", 0);
+    debug("\tpvfs_free_descriptor returns %d\n", 0);
 	return 0;
 }
 

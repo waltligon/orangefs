@@ -611,6 +611,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         rc = (*glibc_ops.open)(path, flags & 01777777, mode);
         IOCOMMON_RETURN_ERR(rc);
 
+        /* create a usrint file descriptor for it */
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -633,8 +634,14 @@ errorout:
 
 /**
  * This is done in many of the iocommon calls so this is just a helper
- * function to keep amount of redundant code down.  THis routine is used
- * with syscalls other than open and expect this to be PVFS.
+ * function to keep amount of redundant code down.  This routine is used
+ * with syscalls other than open and expect the path to be PVFS.
+ *
+ * pref and fref return object refs to parent and file if the pointer
+ * is not NULL.  Some calls only need one or the other.  If filename
+ * is not NULL the file name string is returned and must be freed by
+ * the caller.  If pdir is not NULL, it is used for a relative lookup
+ * otherwise path should be absolute.
  */
 int iocommon_lookup(char *path,
                     int followflag,
@@ -652,6 +659,9 @@ int iocommon_lookup(char *path,
     PVFS_path_t *Ppath = NULL;
     int flags = O_RDONLY;
     int mode = 0644;
+    char error_path[PVFS_NAME_MAX];
+
+    memset(error_path, 0, sizeof(error_path));
 
     rc = split_pathname(path, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
@@ -679,8 +689,8 @@ int iocommon_lookup(char *path,
             rc = iocommon_lookup_absolute(dir,
                                           internal_follow,
                                           pref,
-                                          NULL,
-                                          0);
+                                          error_path,
+                                          sizeof(error_path));
         }
         else
         {
@@ -691,8 +701,8 @@ int iocommon_lookup(char *path,
                                               *pdir,
                                               internal_follow,
                                               pref,
-                                              NULL,
-                                              0);
+                                              error_path,
+                                              sizeof(error_path));
             }
             else
             { 
@@ -708,8 +718,8 @@ int iocommon_lookup(char *path,
                                       *pref,
                                       followflag,
                                       fref,
-                                      NULL,
-                                      0);
+                                      error_path,
+                                      sizeof(error_path));
     }
     /* check to see if we need to expand the path */
     if (rc < 0 && errno == EIO &&
@@ -775,7 +785,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     int open_dir = 0;
     char *directory = NULL;
     char *filename = NULL;
-    char error_path[256];
+    char error_path[PVFS_NAME_MAX];
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
@@ -848,14 +858,16 @@ pvfs_descriptor *iocommon_open(const char *path,
         rc = iocommon_lookup_absolute(directory,
                                       PVFS2_LOOKUP_LINK_FOLLOW,
                                       &parent_ref,
-                                      NULL,
-                                      0);
+                                      error_path,
+                                      sizeof(error_path));
         if (rc < 0)
         {
-            if (errno == ESTALE)
+            if (errno == ESTALE && !open_dir)
             {
                 /* special case we are opening the root dir of PVFS */
                 /* which had better exist or we have a problem */
+                /* if open_dir mount point is in root dir so */
+                /* filename is NULL, so there is an error */
                 char *fullpath;
 
                 fullpath = (char *)malloc(strlen(directory) +
@@ -867,8 +879,8 @@ pvfs_descriptor *iocommon_open(const char *path,
                 rc = iocommon_lookup_absolute(fullpath,
                                               PVFS2_LOOKUP_LINK_FOLLOW,
                                               &file_ref,
-                                              NULL,
-                                              0);
+                                              error_path,
+                                              sizeof(error_path));
                 /* in this case we don't need to look up anything else */
                 /* jump right to found the file code */
                 free(fullpath);
@@ -878,6 +890,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                     pvfs_errno == PVFS_ENOTPVFS &&
                     !PATH_EXPANDED(Ppath))
             {
+                /* we think we might be able to expand symlinks */
                 /* last chance to get it open */
                 rc = iocommon_expand_path(Ppath, flags, mode, &pd);
                 if (rc < 0 || pd)
@@ -888,6 +901,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                 file_ref.handle = Ppath->handle;
                 goto foundfile;
             }
+            /* no special cases caught it must be a real error */
             IOCOMMON_RETURN_ERR(rc);
         }
     }
@@ -900,8 +914,8 @@ pvfs_descriptor *iocommon_open(const char *path,
                                           pdir->s->pvfs_ref,
                                           follow_links,
                                           &parent_ref,
-                                          NULL,
-                                          0);
+                                          error_path,
+                                          sizeof(error_path));
             if (rc < 0 && errno == EIO &&
                     pvfs_errno == PVFS_ENOTPVFS &&
                     !PATH_EXPANDED(Ppath))
