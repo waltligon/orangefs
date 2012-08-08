@@ -523,7 +523,12 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
+ifdef TARGET_OS_DARWIN
+LIBRARIES_STATIC := lib/libpvfs2.a
+LIBRARIES_LIBTOOL := lib/liborange.la
+else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborange.a
+endif
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborange.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
@@ -871,6 +876,11 @@ lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 lib/liborange.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
 	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.a
+
+lib/liborange.la: lib/libpvfs2.a
+	$(Q) "  VLIB		$@"
+	$(E)glibtool --mode=link --tag=CC gcc -o lib/libpvfs2.la $^ -lcrypto -lssl -static
+	mv lib/libpvfs2.la $@
 
 lib/liborange.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
