@@ -53,7 +53,6 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
 
 #elif HAVE_FSTAB_H
-#include "openfile-util.h"
 
 #include <fstab.h>
 #define PINT_fstab_t FILE
