@@ -115,7 +115,7 @@ extern int pxfs_ftruncate (int fd, off_t length, pxfs_cb cb, void *cdat);
 extern int pxfs_ftruncate64 (int fd, off64_t length, pxfs_cb cb, void *cdat);
 
 /* If caching could cause writeback */
-extern int pxfs_close( int fd , pxfs_cb cb, void *cdat);
+extern int pxfs_close(int fd, pxfs_cb cb, void *cdat);
 
 extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
 
@@ -209,13 +209,13 @@ extern int pxfs_symlinkat (const char *oldpath, int newdirfd,
                            const char *newpath, pxfs_cb cb, void *cdat);
 
 /* PVFS does not have hard links */
-extern int pxfs_link (const char *oldpath, const char *newpath,
-                      pxfs_cb cb, void *cdat);
+extern int pxfs_link(const char *oldpath, const char *newpath,
+                     pxfs_cb cb, void *cdat);
 
 /* PVFS does not have hard links */
-extern int pxfs_linkat (int olddirfd, const char *oldpath,
-                        int newdirfd, const char *newpath, int flags,
-                        pxfs_cb cb, void *cdat);
+extern int pxfs_linkat(int olddirfd, const char *oldpath,
+                       int newdirfd, const char *newpath, int flags,
+                       pxfs_cb cb, void *cdat);
 
 /* this reads exactly one dirent, count is ignored */
 extern int pxfs_readdir(unsigned int fd, struct dirent *dirp,
@@ -228,10 +228,10 @@ extern int pxfs_getdents(unsigned int fd, struct dirent *dirp,
 extern int pxfs_getdents64(unsigned int fd, struct dirent64 *dirp,
                            unsigned int count, pxfs_cb, void *cdat);
 
-extern int pxfs_access (const char * path, int mode, pxfs_cb, void *cdat);
+extern int pxfs_access(const char *path, int mode, pxfs_cb, void *cdat);
 
-extern int pxfs_faccessat (int dirfd, const char * path, int mode, int flags,
-                           pxfs_cb cb, void *cdat);
+extern int pxfs_faccessat(int dirfd, const char *path, int mode, int flags,
+                          pxfs_cb cb, void *cdat);
 
 extern int pxfs_flock(int fd, int op, pxfs_cb, void *cdat);
 

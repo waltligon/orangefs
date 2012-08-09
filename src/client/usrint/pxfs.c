@@ -38,8 +38,8 @@ static int pxfs_rdwrv(int fd,
                       int which);
 
 /**
- *
- **/
+ ***
+  **/
 
 /**
  * pxfs_open
@@ -209,8 +209,52 @@ extern int pxfs_creat64(const char *path, mode_t mode, int *fd,
     return pxfs_open64(path, O_RDWR | O_CREAT | O_EXCL, fd, cb, cdat, mode);
 }
 
+extern int pxfs_unlink(const char *path, pxfs_cb cb, void *cdat)
+{
+    char *newpath;
+    int rc;
+    struct pvfs_aiocb *unlink_acb;
+
+    unlink_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!unlink_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(unlink_acb, 0, sizeof(struct pvfs_aiocb));
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+
+    rc = split_pathname(newpath, 0, &unlink_acb->u.remove.directory,
+                        &unlink_acb->u.remove.filename);
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    unlink_acb->hints = PVFS_HINT_NULL;
+    unlink_acb->op_code = PVFS_AIO_REMOVE_OP;
+    unlink_acb->u.remove.pdir = NULL;
+    unlink_acb->u.remove.dirflag = 0;
+    unlink_acb->call_back_fn = cb;
+    unlink_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(unlink_acb);
+
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+
+    return 0;
+}
+
 /*
-extern int pxfs_unlink (const char *path, pxfs_cb cb, void *cdat);
+
 
 extern int pxfs_unlinkat (int dirfd, const char *path, int flags,
                           pxfs_cb cb, void *cdat);
@@ -592,7 +636,7 @@ extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
 }
 
 /*
-extern int pxfs_close( int fd , pxfs_cb cb, void *cdat)
+extern int pxfs_close(int fd, pxfs_cb cb, void *cdat)
 
 
 extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
@@ -748,12 +792,12 @@ extern int pxfs_dup(int oldfd, int *newfd);
 
 extern int pxfs_dup2(int oldfd, int newfd);
 
-extern int pxfs_chown (const char *path, uid_t owner, gid_t group,
-                       pxfs_cb cb, void *cdat);
+extern int pxfs_chown(const char *path, uid_t owner, gid_t group,
+                      pxfs_cb cb, void *cdat);
 */
 
-extern int pxfs_fchown (int fd, uid_t owner, gid_t group,
-                        pxfs_cb cb, void *cdat)
+extern int pxfs_fchown(int fd, uid_t owner, gid_t group,
+                       pxfs_cb cb, void *cdat)
 {
     pvfs_descriptor *pd;
     struct pvfs_aiocb *chown_acb = NULL;
@@ -804,13 +848,16 @@ extern int pxfs_fchown (int fd, uid_t owner, gid_t group,
 extern int pxfs_fchownat(int fd, const char *path, uid_t owner, gid_t group,
                          int flag, pxfs_cb, void *cdat);
 
-extern int pxfs_lchown (const char *path, uid_t owner, gid_t group,
-                        pxfs_cb cb, void *cdat);
+extern int pxfs_lchown(const char *path, uid_t owner, gid_t group,
+                       pxfs_cb cb, void *cdat);
 
-extern int pxfs_chmod (const char *path, mode_t mode, pxfs_cb cb, void *cdat);
+extern int pxfs_chmod(const char *path, mode_t mode, pxfs_cb cb, void *cdat);
 */
 
-extern int pxfs_fchmod (int fd, mode_t mode, pxfs_cb cb, void *cdat)
+/**
+ * pxfs_fchmod
+ */
+extern int pxfs_fchmod(int fd, mode_t mode, pxfs_cb cb, void *cdat)
 {
     pvfs_descriptor *pd;
     struct pvfs_aiocb *chmod_acb = NULL;
@@ -976,7 +1023,35 @@ extern int pxfs_readlinkat(int dirfd, const char *path, char *buf,
                            size_t bufsiz, ssize_t *bcnt,
                            pxfs_cb cb, void *cdat);
 
+extern int pxfs_symlink (const char *oldpath, const char *newpath,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_symlinkat (const char *oldpath, int newdirfd,
+                           const char *newpath, pxfs_cb cb, void *cdat);
 */
+
+/**
+ * PVFS does not have hard links
+ */
+extern int pxfs_link(const char *oldpath, const char *newpath,
+                     pxfs_cb cb, void *cdat)
+{
+    fprintf(stderr, "pxfs_link not implemented\n");
+    errno = ENOSYS;
+    return 1;
+}
+
+/**
+ * PVFS does not have hard links
+ */
+extern int pxfs_linkat(int olddirfd, const char *oldpath,
+                       int newdirfd, const char *newpath, int flags,
+                       pxfs_cb cb, void *cdat)
+{
+    fprintf(stderr, "pxfs_linkat not implemented\n");
+    errno = ENOSYS;
+    return -1;
+}
 
 /*
  * Local variables:

@@ -1613,12 +1613,15 @@ static PINT_sm_action open_getattr_inspect(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int frame_id, frames_remaining;
     pvfs_descriptor *fildes_out = *(sm_p->u.aio_open.pd);
+    PVFS_object_attr attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: fildes_getattr_inspect\n");
 
     struct PINT_client_sm *getattr_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
+
+    attr = getattr_frame->getattr.attr;
 
     js_p->error_code = getattr_frame->error_code;
     free(getattr_frame);
@@ -1627,13 +1630,13 @@ static PINT_sm_action open_getattr_inspect(
         return SM_ACTION_COMPLETE;
     }
 
-    fildes_out->s->mode = sm_p->u.aio_open.getattr_resp.attr.perms;
+    fildes_out->s->mode = attr.perms;
 
-    if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_METAFILE)
+    if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         fildes_out->s->mode |= S_IFREG;
     }
-    if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY)
+    if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         fildes_out->s->mode |= S_IFDIR;
         if (sm_p->u.aio_open.pdir)
@@ -1649,7 +1652,7 @@ static PINT_sm_action open_getattr_inspect(
             strcpy(fildes_out->s->dpath, sm_p->u.aio_open.path);
         }
     }
-    if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_SYMLINK)
+    if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         fildes_out->s->mode |= S_IFLNK;
     }
@@ -1785,15 +1788,23 @@ static PINT_sm_action open_file_append_getattr_inspect(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+
     js_p->error_code = getattr_frame->error_code;
-    free(getattr_frame);
     if (js_p->error_code < 0)
     {
         gen_mutex_unlock(&(fildes_out->s->lock));
         return SM_ACTION_COMPLETE;
     }
 
-    fildes_out->s->file_pointer = sm_p->u.aio_open.getattr_resp.attr.size;
+    if (getattr_frame->getattr.attr.objtype == PVFS_TYPE_DATAFILE)
+    {
+        fildes_out->s->file_pointer = getattr_frame->getattr.attr.u.data.size;
+    }
+    else
+    {
+        fildes_out->s->file_pointer = getattr_frame->getattr.size;
+    }
+    free(getattr_frame);
 
     if (S_ISDIR(fildes_out->s->mode))
     {
