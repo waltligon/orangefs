@@ -43,6 +43,7 @@ typedef enum
     PVFS_AIO_CHMOD_OP,
     PVFS_AIO_MKDIR_OP,
     PVFS_AIO_REMOVE_OP,
+    PVFS_AIO_SYMLINK_OP,
 } PVFS_aio_op_code;
 
 /* the following structures contain operation dependent data for aio calls */
@@ -126,6 +127,14 @@ struct PINT_aio_remove_cb
     int dirflag;            /* in */
 };
 
+struct PINT_aio_symlink_cb
+{
+    char *new_directory;        /* in */
+    char *new_filename;         /* in */
+    const char *link_target;    /* in */
+    PVFS_object_ref *pdir;      /* in */
+};
+
 /* a pvfs async control block, used for keeping track of async
  * operations outstanding in the filesystem
  */
@@ -152,6 +161,7 @@ struct pvfs_aiocb
         struct PINT_aio_chmod_cb chmod;
         struct PINT_aio_mkdir_cb mkdir;
         struct PINT_aio_remove_cb remove;
+        struct PINT_aio_symlink_cb symlink;
     } u;
 };
 

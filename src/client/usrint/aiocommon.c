@@ -272,6 +272,18 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                                   (void *)p_cb);
             break;
         }
+        case PVFS_AIO_SYMLINK_OP:
+        {
+            rc = PVFS_iaio_symlink(p_cb->u.symlink.new_directory,
+                                   p_cb->u.symlink.new_filename,
+                                   p_cb->u.symlink.link_target,
+                                   p_cb->u.symlink.pdir,
+                                   cred,
+                                   &(p_cb->op_id),
+                                   p_cb->hints,
+                                   (void *)p_cb);
+            break;
+        }
         default:
         {
             rc = -PVFS_EINVAL;
@@ -354,6 +366,9 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
             {
                 *(p_cb->u.open.fd) = p_cb->u.open.pd->fd;
             }
+            free(p_cb->u.open.path);
+            free(p_cb->u.open.directory);
+            free(p_cb->u.open.filename);
             break;
         }
         case PVFS_AIO_RENAME_OP:
@@ -456,6 +471,12 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
         {
             free(p_cb->u.remove.directory);
             free(p_cb->u.remove.filename);
+            break;
+        }
+        case PVFS_AIO_SYMLINK_OP:
+        {
+            free(p_cb->u.symlink.new_directory);
+            free(p_cb->u.symlink.new_filename);
             break;
         }
         default:

@@ -1,0 +1,919 @@
+/* 
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include "pvfs2-aio.h"
+#include "client-state-machine.h"
+#include "str-utils.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    SYMLINK_PDIR_NULL = 675,
+    SYMLINK_REF_FOUND,
+    SYMLINK_LOOKUP_SM
+};
+
+/* helper function prototypes */
+static int initialize_context(
+    struct PINT_client_lookup_sm * lookup_sm,
+    char *pathname,
+    PVFS_object_ref ctx_starting_refn);
+
+%%
+
+machine pvfs2_client_aio_symlink_sm
+{
+    state init
+    {
+        run symlink_init;
+        SYMLINK_PDIR_NULL => parent_ref_abs_lookup_setup;
+        SYMLINK_REF_FOUND => sm_setup;
+        default => parent_ref_rel_lookup_setup;
+    }
+
+    state parent_ref_abs_lookup_setup
+    {
+        run symlink_parent_ref_abs_lookup_setup;
+        SYMLINK_LOOKUP_SM => parent_ref_abs_lookup;
+        SYMLINK_REF_FOUND => sm_setup;
+        default => cleanup;
+    }
+
+    state parent_ref_abs_lookup
+    {
+        jump pvfs2_client_lookup_sm;
+        default => parent_ref_abs_lookup_inspect;
+    }
+
+    state parent_ref_abs_lookup_inspect
+    {
+        run symlink_parent_ref_abs_lookup_inspect;
+        success => sm_setup;
+        default => cleanup;
+    }
+
+    state parent_ref_rel_lookup_setup
+    {
+        run symlink_parent_ref_rel_lookup_setup;
+        SYMLINK_REF_FOUND => sm_setup;
+        SYMLINK_LOOKUP_SM => parent_ref_rel_lookup;
+        default => cleanup;
+    }
+
+    state parent_ref_rel_lookup
+    {
+        jump pvfs2_client_lookup_sm;
+        default => parent_ref_rel_lookup_inspect;
+    }
+
+    state parent_ref_rel_lookup_inspect
+    {
+        run symlink_parent_ref_rel_lookup_inspect;
+        SYMLINK_LOOKUP_SM => parent_ref_rel_lookup;
+        SYMLINK_REF_FOUND => sm_setup;
+        default => cleanup;
+    }
+
+    state sm_setup
+    {
+        run symlink_sm_setup;
+        success => sm_run;
+        default => cleanup;
+    }
+
+    state sm_run
+    {
+        jump pvfs2_client_symlink_sm;
+        default => sm_inspect;
+    }
+
+    state sm_inspect
+    {
+        run symlink_sm_inspect;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run symlink_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int initialize_context(
+    struct PINT_client_lookup_sm * lookup_sm,
+    char *pathname,
+    PVFS_object_ref ctx_starting_refn)
+{
+    int i, ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
+    void *state = NULL;
+    int cur_seg_index = 0, prev_ctx_index = 0;
+    char *cur_seg_name = NULL;
+    char *orig_pathname = NULL, *seg_remaining = NULL, *slash_str = NULL;
+    PINT_client_lookup_sm_segment *cur_seg = NULL;
+    int num_consecutive_prev_ctx_dot_dots = 0;
+    PINT_client_lookup_sm_ctx *ctx = NULL;
+    PINT_client_lookup_sm_ctx *prev_ctx = NULL;
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "initialize_context called\n");
+
+    assert(lookup_sm->current_context <= lookup_sm->context_count);
+
+    if(lookup_sm->current_context == lookup_sm->context_count)
+    {
+        /* we have used the last available context */
+        lookup_sm->context_count++;
+        if(lookup_sm->context_count == 1)
+        {
+            lookup_sm->contexts = malloc(sizeof(PINT_client_lookup_sm_ctx));
+            if(!lookup_sm->contexts)
+            {
+                return -PVFS_ENOMEM;
+            }
+        }
+        else
+        {
+            /* not the first one, so realloc to get one more */
+            lookup_sm->contexts = realloc(lookup_sm->contexts,
+                                          sizeof(PINT_client_lookup_sm_ctx) *
+                                          lookup_sm->context_count);
+            if(!lookup_sm->contexts)
+            {
+                return -PVFS_ENOMEM;
+            }
+        }
+    }
+
+    if (pathname && (lookup_sm->current_context > -1))
+    {
+        ctx = &lookup_sm->contexts[lookup_sm->current_context];
+        assert(ctx);
+
+        prev_ctx_index = (lookup_sm->current_context - 1);
+
+        pathlen = strlen(pathname);
+        num_segments = PINT_string_count_segments(pathname);
+
+        if ((pathlen == 0) || (num_segments == 0))
+        {
+            return ret;
+        }
+
+        if ((pathlen > (PVFS_REQ_LIMIT_PATH_NAME_BYTES - 1)) ||
+            (num_segments > MAX_LOOKUP_SEGMENTS))
+        {
+            gossip_err("Filename %s is too long\n", pathname);
+            return -PVFS_ENAMETOOLONG;
+        }
+
+        memset(ctx, 0, sizeof(PINT_client_lookup_sm_ctx));
+
+        ctx->current_segment = 0;
+        ctx->total_segments = 0;
+        ctx->ctx_starting_refn = ctx_starting_refn;
+
+        /* initialize all segments within the context */
+        orig_pathname = strdup(pathname);
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, " original pathname is: %s\n",
+                     orig_pathname);
+        while(!PINT_string_next_segment(pathname,&cur_seg_name,&state))
+        {
+            /* grab the next segment in the context to fill in */
+            cur_seg = &(ctx->segments[cur_seg_index]);
+            assert(cur_seg);
+            memset(cur_seg, 0, sizeof(PINT_client_lookup_sm_segment));
+
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, " cur_seg_name[%d]: %s\n",
+                         cur_seg_index, cur_seg_name);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, " pathname is: %s\n",
+                         pathname);
+
+            if (strcmp(cur_seg_name,".") == 0)
+            {
+                /* reset the count of consecutive dot dot segments */
+                num_consecutive_prev_ctx_dot_dots = 0;
+
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             " ignoring useless segment\n");
+                continue;
+            }
+            else if (strcmp(cur_seg_name,"..") == 0)
+            {
+                /*
+                   if this isn't true, we need to
+                   grab the previous context's previous segment
+
+                   if this weren't true, we'd normally:
+                   assert(cur_seg_index > 0);
+                */
+                if ((cur_seg_index < 1) ||
+                    (num_consecutive_prev_ctx_dot_dots > 0))
+                {
+                    PINT_client_lookup_sm_segment *prev_ctx_prev_seg;
+
+                    gossip_debug(
+                        GOSSIP_LOOKUP_DEBUG, "  got a '..' segment that "
+                        "requires attention of the previous context\n");
+
+                  init_next_prev_segment:
+                    /*
+                      grab the previous context to access the segments
+                      within it, assuming a previous context is
+                      available
+                    */
+                    if (prev_ctx_index < 0)
+                    {
+                        gossip_debug(GOSSIP_LOOKUP_DEBUG, "there are no "
+                                     "more previous contexts available: "
+                                     "failing lookup\n");
+                        free(orig_pathname);
+                        return -PVFS_ENOENT;
+                    }
+
+                    prev_ctx = &lookup_sm->contexts[prev_ctx_index];
+                    assert(prev_ctx);
+                    assert(prev_ctx->current_segment > 0);
+
+                    num_consecutive_prev_ctx_dot_dots++;
+                    gossip_debug(
+                        GOSSIP_LOOKUP_DEBUG, "num consecutive '..' "
+                        "segments requiring the previous segment "
+                        "is now %d\n", num_consecutive_prev_ctx_dot_dots);
+
+                    /*
+                      further, if we have a number of consecutive '..'
+                      segments, we may need to keep backing up into
+                      the previous contexts' space
+                    */
+                    if (prev_ctx->current_segment -
+                        num_consecutive_prev_ctx_dot_dots < 0)
+                    {
+                        /* skip to next previous context, if any */
+                        if (prev_ctx_index > -1)
+                        {
+                            /*
+                              bump down dot dot count since it wasn't
+                              used yet if we got here
+                            */
+                            num_consecutive_prev_ctx_dot_dots--;
+                            prev_ctx_index--;
+                            goto init_next_prev_segment;
+                        }
+                        gossip_debug(
+                            GOSSIP_LOOKUP_DEBUG, "there are no more segments "
+                            "in the previous context: failing lookup\n");
+                        free(orig_pathname);
+                        return -PVFS_ENOENT;
+                    }
+
+                    prev_ctx_prev_seg = &prev_ctx->segments[
+                        prev_ctx->current_segment -
+                        num_consecutive_prev_ctx_dot_dots];
+                    assert(prev_ctx_prev_seg);
+
+                    /*
+                      instead of decrementing the seg index and
+                      continuing, we need to replace the last segment
+                      copied from the last context in this case.  (so
+                      we drop through to segment init)
+                    */
+                    ctx_starting_refn =
+                        prev_ctx_prev_seg->seg_starting_refn;
+                    cur_seg_name = prev_ctx_prev_seg->seg_name;
+                    gossip_debug(
+                        GOSSIP_LOOKUP_DEBUG,
+                        "using previous segment: %s\n", cur_seg_name);
+
+                    cur_seg_index--;
+                }
+                else
+                {
+                    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                                 "  got a '..' segment\n");
+                    cur_seg_index--;
+                    continue;
+                }
+            }
+            else
+            {
+                /* reset the count of consecutive dot dot segments */
+                num_consecutive_prev_ctx_dot_dots = 0;
+            }
+
+            /*
+              fill in the current segment now.  the first segment
+              MUST have the same starting refn as the context
+            */
+            if (cur_seg_index == 0)
+            {
+                cur_seg->seg_starting_refn = ctx_starting_refn;
+            }
+            if (cur_seg->seg_name)
+            {
+                free(cur_seg->seg_name);
+            }
+            cur_seg->seg_name = strdup(cur_seg_name);
+            assert(cur_seg->seg_name);
+
+            slash_str = orig_pathname;
+            for (i = 0; i < cur_seg_index; i++) {
+                slash_str = strchr(slash_str, '/');
+                if (slash_str == NULL) {
+                    break;
+                }
+                slash_str++;
+            }
+            /* seg_remaining = strstr(orig_pathname, cur_seg_name); */
+            seg_remaining = slash_str;
+            if (seg_remaining)
+            {
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             " *seg_remaining is: %s\n", seg_remaining);
+
+                cur_seg->seg_remaining = strdup(seg_remaining);
+                assert(cur_seg->seg_remaining);
+            }
+            else
+            {
+                cur_seg->seg_remaining = NULL;
+            }
+
+            cur_seg_index++;
+        }
+        free(orig_pathname);
+
+#if 0
+    /* DEBUGGING ONLY */
+    {
+        int i = 0;
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Processed context path is:\n");
+        for(i = 0; i < cur_seg_index; i++)
+        {
+            assert(ctx->segments[i].seg_name);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s", 
+                         ctx->segments[i].seg_name);
+        }
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "\n");
+    }
+#endif
+
+        ctx->total_segments = cur_seg_index;
+        assert(ctx->current_segment == 0);
+        ret = 0;
+    }
+    return ret;
+}
+
+/*********************************************************/
+
+PVFS_error PVFS_iaio_symlink(
+    const char *new_dir,
+    const char *new_name,
+    const char *target,
+    PVFS_object_ref *pdir,
+    const PVFS_credential *credential,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    int ret = -PVFS_EINVAL; 
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_symlink entered\n");
+
+    if (!new_dir || !new_name || !target)
+    {
+        gossip_err("invalid (NULL) required arguments\n");
+        return ret;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_AIO_SYMLINK, sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
+    PVFS_hint_copy(hints, &(sm_p->hints));
+    sm_p->u.aio_symlink.new_directory = new_dir;
+    sm_p->u.aio_symlink.new_filename = new_name;
+    sm_p->u.aio_symlink.link_target = target;
+    sm_p->u.aio_symlink.pdir = pdir;
+
+    return PINT_client_state_machine_post(
+        smcb, op_id, user_ptr);
+}
+
+PVFS_error PVFS_aio_symlink(
+    const char *new_dir,
+    const char *new_name,
+    const char *target,
+    PVFS_object_ref *pdir,
+    const PVFS_credential *credential,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_aio_symlink entered\n");
+
+    ret = PVFS_iaio_symlink(new_dir, new_name, target, pdir, credential, &op_id,
+                          hints, NULL);
+
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_iaio_symlink call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "aio_symlink", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/*******************************************************************/
+
+static PINT_sm_action symlink_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: init\n");
+    
+    memset(&sm_p->u.aio_symlink.parent_ref, 0, sizeof(PVFS_object_ref));
+    memset(&sm_p->u.aio_symlink.lookup_resp, 0, sizeof(PVFS_sysresp_lookup));
+    memset(&sm_p->u.aio_symlink.symlink_resp, 0, sizeof(PVFS_sysresp_symlink));
+
+    if (!(sm_p->u.aio_symlink.pdir))
+    {
+        js_p->error_code = SYMLINK_PDIR_NULL;
+    }
+    else
+    {
+        if (sm_p->u.aio_symlink.new_directory)
+        {
+            js_p->error_code = 0;
+        }
+        else
+        {
+            sm_p->u.aio_symlink.parent_ref = *(sm_p->u.aio_symlink.pdir);
+            js_p->error_code = SYMLINK_REF_FOUND;
+        }
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    PVFS_fs_id lookup_fs_id;
+    char pvfs_path[PVFS_PATH_MAX];
+    PVFS_object_ref parent;
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: "
+                 "parent_ref_abs_lookup_setup\n");
+
+    ret = PVFS_util_resolve(sm_p->u.aio_symlink.new_directory, &lookup_fs_id,
+                            pvfs_path, PVFS_PATH_MAX);
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    parent.handle = 0;
+    parent.fs_id = lookup_fs_id;
+
+    ret = PINT_cached_config_get_root_handle(parent.fs_id, &(parent.handle));
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (strcmp(pvfs_path, "/") == 0)
+    {
+        sm_p->u.aio_symlink.parent_ref.handle = parent.handle;
+        sm_p->u.aio_symlink.parent_ref.fs_id = lookup_fs_id;
+        js_p->error_code = SYMLINK_REF_FOUND;
+    }
+    else
+    {
+        PINT_client_sm *lookup_frame = malloc(sizeof(PINT_client_sm));
+        if (lookup_frame == NULL)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(lookup_frame, 0, sizeof(PINT_client_sm));
+
+        char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
+
+        PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
+        lookup_frame->u.lookup.orig_pathname = path;
+        lookup_frame->u.lookup.starting_refn = parent;
+        lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_symlink.lookup_resp);
+        lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
+        lookup_frame->u.lookup.current_context = 0;
+        PVFS_hint_copy(sm_p->hints, &(lookup_frame->hints));
+        PVFS_hint_add(&(lookup_frame->hints), PVFS_HINT_HANDLE_NAME,
+                      sizeof(PVFS_handle), &(parent.handle));
+
+        ret = initialize_context(&lookup_frame->u.lookup, path, parent);
+        if (ret != 0)
+        {
+            gossip_err("aio-symlink: failed to init context (path = %s)\n", path);
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if (lookup_frame->u.lookup.current_context == 0 &&
+                lookup_frame->u.lookup.contexts[0].total_segments == 0)
+        {
+            free(lookup_frame);
+            sm_p->u.aio_symlink.parent_ref.fs_id = lookup_fs_id;
+            sm_p->u.aio_symlink.parent_ref.handle = parent.handle;
+            js_p->error_code = SYMLINK_REF_FOUND;
+        }
+        else
+        {
+            PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+            js_p->error_code = SYMLINK_LOOKUP_SM;
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         path, llu(parent.handle));
+        }
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_parent_ref_abs_lookup_inspect(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: parent_ref_abs_lookup_inspect"                  "\n");
+
+    struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+                                 smcb, &frame_id, &js_p->error_code,
+                                 &frames_remaining);
+    js_p->error_code = lookup_frame->error_code;
+    if (js_p->error_code < 0)
+    {
+        free(lookup_frame);
+        return SM_ACTION_COMPLETE;
+    }
+
+    sm_p->u.aio_symlink.parent_ref = sm_p->u.aio_symlink.lookup_resp.ref;
+    free(lookup_frame);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_parent_ref_rel_lookup_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: parent_ref_rel_lookup_setup\n");
+
+    sm_p->u.aio_symlink.cur = (char *)sm_p->u.aio_symlink.new_directory;
+    sm_p->u.aio_symlink.last = (char *)sm_p->u.aio_symlink.new_directory;
+    sm_p->u.aio_symlink.start = (char *)sm_p->u.aio_symlink.new_directory;
+
+    /* loop over chars to find a complete path segment */
+    /* that is no longer than PVFS_NAME_MAX chars */
+    while (*(sm_p->u.aio_symlink.cur))
+    {
+        /* find next path seperator / */
+        /* cur either points to a slash */
+        /* or the first char of the path */
+        /* there must be at least one */
+        /* so n either case increment it first */
+        for(sm_p->u.aio_symlink.cur++;
+            (*sm_p->u.aio_symlink.cur && *sm_p->u.aio_symlink.cur != '/');
+            sm_p->u.aio_symlink.cur++);
+        if (sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start > PVFS_NAME_MAX-1)
+        {
+            /* we over-shot the limit go back to last */
+            sm_p->u.aio_symlink.cur = sm_p->u.aio_symlink.last;
+            if (sm_p->u.aio_symlink.cur == sm_p->u.aio_symlink.start)
+            {
+                js_p->error_code = -PVFS_ENAMETOOLONG;
+                return SM_ACTION_COMPLETE;
+            }
+            break;
+        }
+        else
+        {
+            /* set up to add the next path segment */
+            sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+        }
+    }
+
+    sm_p->u.aio_symlink.current_seg_path = malloc(PVFS_NAME_MAX);
+    if (sm_p->u.aio_symlink.current_seg_path == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    memset(sm_p->u.aio_symlink.current_seg_path, 0, PVFS_NAME_MAX);
+    strncpy(sm_p->u.aio_symlink.current_seg_path, sm_p->u.aio_symlink.start,
+            sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start + 2);
+    sm_p->u.aio_symlink.start = sm_p->u.aio_symlink.cur;
+    sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+
+    PINT_client_sm *lookup_frame = malloc(sizeof(PINT_client_sm));
+    if (lookup_frame == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(lookup_frame, 0, sizeof(PINT_client_sm));
+
+    PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_symlink.pdir->fs_id);
+    PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
+    lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_symlink.current_seg_path;
+    lookup_frame->u.lookup.starting_refn = *(sm_p->u.aio_symlink.pdir);
+    lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_symlink.lookup_resp);
+    lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
+    lookup_frame->u.lookup.current_context = 0;
+    PVFS_hint_copy(sm_p->hints, &(lookup_frame->hints));
+    PVFS_hint_add(&(lookup_frame->hints), PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &(sm_p->u.aio_symlink.pdir->handle));
+
+    ret = initialize_context(&(lookup_frame->u.lookup),
+                             sm_p->u.aio_symlink.current_seg_path,
+                             *(sm_p->u.aio_symlink.pdir));
+    if (ret != 0)
+    {
+        gossip_err("aio-symlink: failed to init context (path = %s)\n",
+                   sm_p->u.aio_symlink.current_seg_path);
+        free(lookup_frame);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (lookup_frame->u.lookup.current_context == 0 &&
+        lookup_frame->u.lookup.contexts[0].total_segments == 0)
+    {
+        free(lookup_frame);
+        free(sm_p->u.aio_symlink.current_seg_path);
+        sm_p->u.aio_symlink.current_seg_path = NULL;
+        sm_p->u.aio_symlink.parent_ref.fs_id = sm_p->u.aio_symlink.pdir->fs_id;
+        sm_p->u.aio_symlink.parent_ref.handle = sm_p->u.aio_symlink.pdir->handle;
+        js_p->error_code = SYMLINK_REF_FOUND;
+    }
+    else
+    {
+        js_p->error_code = SYMLINK_LOOKUP_SM;
+        PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                     sm_p->u.aio_symlink.current_seg_path,
+                     llu(sm_p->u.aio_symlink.pdir->handle));
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_parent_ref_rel_lookup_inspect(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: parent_ref_rel_lookup_inspect\n");
+
+    struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+                                smcb, &frame_id,
+                                &js_p->error_code, &frames_remaining);
+
+    js_p->error_code = lookup_frame->error_code;
+    if (js_p->error_code)
+    {
+        free(lookup_frame);
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (*(sm_p->u.aio_symlink.cur))
+    {
+        /* loop over chars to find a complete path segment */
+        /* that is no longer than PVFS_NAME_MAX chars */
+        while(*(sm_p->u.aio_symlink.cur))
+        {
+            /* find next path seperator / */
+            /* cur either points to a slash */
+            /* or the first char of the path */
+            /* there must be at least one */
+            /* so n either case increment it first */
+            for(sm_p->u.aio_symlink.cur++;
+                (*sm_p->u.aio_symlink.cur && *sm_p->u.aio_symlink.cur != '/');
+                 sm_p->u.aio_symlink.cur++);
+            if (sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start > PVFS_NAME_MAX-1)
+            {
+                /* we over-shot the limit go back to last */
+                sm_p->u.aio_symlink.cur = sm_p->u.aio_symlink.last;
+                if (sm_p->u.aio_symlink.cur == sm_p->u.aio_symlink.start)
+                {
+                    free(lookup_frame);
+                    js_p->error_code = -PVFS_ENAMETOOLONG;
+                    return SM_ACTION_COMPLETE;
+                }
+                break;
+            }
+            else
+            {
+                /* set up to add the next path segment */
+                sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+            }
+        }
+
+        memset(sm_p->u.aio_symlink.current_seg_path, 0, PVFS_NAME_MAX);
+        strncpy(sm_p->u.aio_symlink.current_seg_path, sm_p->u.aio_symlink.start,
+                sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start + 1);
+        sm_p->u.aio_symlink.start = sm_p->u.aio_symlink.cur;
+        sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+
+        lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_symlink.current_seg_path;
+        lookup_frame->u.lookup.starting_refn = sm_p->u.aio_symlink.lookup_resp.ref;
+        lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
+        lookup_frame->u.lookup.current_context = 0;
+
+        ret = initialize_context(&(lookup_frame->u.lookup),
+                                 sm_p->u.aio_symlink.current_seg_path,
+                                 sm_p->u.aio_symlink.lookup_resp.ref);
+        if (ret != 0)
+        {
+            gossip_err("aio-symlink: failed to init context (path = %s)\n",
+                       sm_p->u.aio_symlink.current_seg_path);
+            free(lookup_frame);
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if (lookup_frame->u.lookup.current_context == 0 &&
+            lookup_frame->u.lookup.contexts[0].total_segments == 0)
+        {
+            free(lookup_frame);
+            free(sm_p->u.aio_symlink.current_seg_path);
+            sm_p->u.aio_symlink.current_seg_path = NULL;
+            js_p->error_code = SYMLINK_REF_FOUND;
+            sm_p->u.aio_symlink.parent_ref.handle = sm_p->u.aio_symlink.lookup_resp.ref.handle;
+            sm_p->u.aio_symlink.parent_ref.fs_id = sm_p->u.aio_symlink.pdir->fs_id;
+        }
+        else
+        {
+            js_p->error_code = SYMLINK_LOOKUP_SM;
+            PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         sm_p->u.aio_symlink.current_seg_path,
+                         llu(sm_p->u.aio_symlink.lookup_resp.ref.handle));
+        }
+    }
+    else
+    {
+        js_p->error_code = SYMLINK_REF_FOUND;
+        sm_p->u.aio_symlink.parent_ref = lookup_frame->u.lookup.lookup_resp->ref;
+        free(lookup_frame);
+        free(sm_p->u.aio_symlink.current_seg_path);
+        sm_p->u.aio_symlink.current_seg_path = NULL;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_sm_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_sys_attr attr;
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: sm_setup\n");
+
+    memset(&attr, 0, sizeof(PVFS_sys_attr));
+    attr.owner = getuid();
+    attr.group = getgid();
+    attr.perms = 0777;
+    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+
+    if ((sm_p->u.aio_symlink.parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (sm_p->u.aio_symlink.parent_ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (((strlen(sm_p->u.aio_symlink.new_filename) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES) ||
+        ((strlen(sm_p->u.aio_symlink.link_target) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES))
+    {
+        js_p->error_code = -PVFS_ENAMETOOLONG;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_client_sm *symlink_frame = malloc(sizeof(PINT_client_sm));
+    if (!symlink_frame)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(symlink_frame, 0, sizeof(PINT_client_sm));
+
+    PINT_init_msgarray_params(symlink_frame, sm_p->u.aio_symlink.parent_ref.fs_id);
+    PINT_init_sysint_credential(symlink_frame->cred_p, sm_p->cred_p);
+    symlink_frame->u.sym.link_name = (char *)sm_p->u.aio_symlink.new_filename;
+    symlink_frame->u.sym.link_target = (char *)sm_p->u.aio_symlink.link_target;
+    symlink_frame->u.sym.sym_resp = &(sm_p->u.aio_symlink.symlink_resp);
+    PVFS_util_copy_sys_attr(&(symlink_frame->u.sym.sys_attr), &attr);
+    symlink_frame->u.sym.stored_error_code = 0;
+    symlink_frame->u.sym.retry_count = 0;
+    symlink_frame->object_ref = sm_p->u.aio_symlink.parent_ref;
+    PVFS_hint_copy(sm_p->hints, &(symlink_frame->hints));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Symlink %s under parent handle %llu "
+                 "on fs %d to %s\n", sm_p->u.aio_symlink.new_filename, 
+                 llu(sm_p->u.aio_symlink.parent_ref.handle),
+                 sm_p->u.aio_symlink.parent_ref.fs_id,
+                 sm_p->u.aio_symlink.link_target);
+
+    PINT_sm_push_frame(smcb, 0, (void *)symlink_frame);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_sm_inspect(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: sm_inspect\n");
+
+    struct PINT_client_sm *symlink_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+                                smcb, &frame_id,
+                                &js_p->error_code, &frames_remaining);
+
+    js_p->error_code = symlink_frame->error_code;
+    free(symlink_frame);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: cleanup\n");
+
+    if (sm_p->u.aio_symlink.current_seg_path)
+        free(sm_p->u.aio_symlink.current_seg_path);
+
+    sm_p->error_code = js_p->error_code;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

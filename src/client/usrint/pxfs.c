@@ -63,7 +63,7 @@ extern int pxfs_open(const char *path, int flags, int *fd,
     {
         return -1;
     }
-    if (newpath == path)
+    if (newpath == path) 
     {
         newpath = malloc(strlen(path) + 1);
         if (!newpath)
@@ -209,11 +209,20 @@ extern int pxfs_creat64(const char *path, mode_t mode, int *fd,
     return pxfs_open64(path, O_RDWR | O_CREAT | O_EXCL, fd, cb, cdat, mode);
 }
 
+/**
+ * pxfs_unlink
+ */
 extern int pxfs_unlink(const char *path, pxfs_cb cb, void *cdat)
 {
     char *newpath;
     int rc;
     struct pvfs_aiocb *unlink_acb;
+
+    if (!path)
+    {
+        errno = EINVAL;
+        return -1;
+    }
 
     unlink_acb = malloc(sizeof(struct pvfs_aiocb));
     if (!unlink_acb)
@@ -254,10 +263,8 @@ extern int pxfs_unlink(const char *path, pxfs_cb cb, void *cdat)
 }
 
 /*
-
-
-extern int pxfs_unlinkat (int dirfd, const char *path, int flags,
-                          pxfs_cb cb, void *cdat);
+extern int pxfs_unlinkat(int dirfd, const char *path, int flags,
+                         pxfs_cb cb, void *cdat);
 */
 
 /**
@@ -512,7 +519,6 @@ static int pxfs_rdwrv(int fd,
                       pxfs_cb  cb,
                       void *cdat,
                       int which)
-
 {
     pvfs_descriptor *pd;
     struct pvfs_aiocb *io_acb = NULL;
@@ -579,8 +585,8 @@ extern int pxfs_lseek64(int fd, off64_t offset, int whence, off_t *offset_out);
 extern int pxfs_truncate(const char *path, off_t length,
                          pxfs_cb cb, void *cdat);
 
-extern int pxfs_truncate64 (const char *path, off64_t length,
-                            pxfs_cb cb, void *cdat);
+extern int pxfs_truncate64(const char *path, off64_t length,
+                           pxfs_cb cb, void *cdat);
 
 extern int pxfs_fallocate(int fd, off_t offset, off_t length,
                           pxfs_cb cb, void *cdat);
@@ -637,7 +643,6 @@ extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
 
 /*
 extern int pxfs_close(int fd, pxfs_cb cb, void *cdat)
-
 
 extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
 
@@ -909,6 +914,12 @@ extern int pxfs_mkdir(const char *path, mode_t mode, pxfs_cb cb, void *cdat)
     int rc;
     struct pvfs_aiocb *mkdir_acb = NULL;
 
+    if (!path)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
     mkdir_acb = malloc(sizeof(struct pvfs_aiocb));
     if (!mkdir_acb)
     {
@@ -969,6 +980,12 @@ extern int pxfs_rmdir(const char *path, pxfs_cb cb, void *cdat)
     int rc;
     struct pvfs_aiocb *rmdir_acb = NULL;
 
+    if (!path)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
     rmdir_acb = malloc(sizeof(struct pvfs_aiocb));
     if (!rmdir_acb)
     {
@@ -1022,12 +1039,65 @@ extern int pxfs_readlink(const char *path, char *buf, size_t bufsiz,
 extern int pxfs_readlinkat(int dirfd, const char *path, char *buf,
                            size_t bufsiz, ssize_t *bcnt,
                            pxfs_cb cb, void *cdat);
+*/
 
-extern int pxfs_symlink (const char *oldpath, const char *newpath,
-                         pxfs_cb cb, void *cdat);
+/**
+ * pxfs_symlink
+ */
+extern int pxfs_symlink(const char *oldpath, const char *newpath,
+                        pxfs_cb cb, void *cdat)
+{
+    int rc;
+    char *abspath;
+    struct pvfs_aiocb *symlink_acb = NULL;
 
-extern int pxfs_symlinkat (const char *oldpath, int newdirfd,
-                           const char *newpath, pxfs_cb cb, void *cdat);
+    if (!oldpath || !newpath)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    symlink_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!symlink_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(symlink_acb, 0, sizeof(struct pvfs_aiocb));  
+    
+    abspath = pvfs_qualify_path(newpath);
+    if (!abspath)
+    {
+        return -1;
+    }
+
+    rc = split_pathname(abspath, 0, &(symlink_acb->u.symlink.new_directory),
+                        &(symlink_acb->u.symlink.new_filename));
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    symlink_acb->hints = PVFS_HINT_NULL;
+    symlink_acb->op_code = PVFS_AIO_SYMLINK_OP;
+    symlink_acb->u.symlink.link_target = oldpath;
+    symlink_acb->u.symlink.pdir = NULL;
+    symlink_acb->call_back_fn = cb;
+    symlink_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(symlink_acb);
+
+    if (abspath != newpath)
+    {
+        free(abspath);
+    }
+
+    return 0;
+}
+
+/*
+extern int pxfs_symlinkat(const char *oldpath, int newdirfd,
+                          const char *newpath, pxfs_cb cb, void *cdat);
 */
 
 /**

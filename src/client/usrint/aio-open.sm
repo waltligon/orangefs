@@ -1906,12 +1906,6 @@ static PINT_sm_action open_cleanup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: cleanup\n");
 
-    free(sm_p->u.aio_open.path);
-    if (sm_p->u.aio_open.directory)
-        free(sm_p->u.aio_open.directory);
-    if (sm_p->u.aio_open.filename)
-        free(sm_p->u.aio_open.filename);
-
     sm_p->error_code = js_p->error_code;
     if (js_p->error_code < 0)
     {

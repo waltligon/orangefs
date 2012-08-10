@@ -646,9 +646,25 @@ struct PINT_client_aio_remove_sm
     /* fields needed for relative lookups */
     char *cur, *last, *start, *current_seg_path;
 
-    /*nested sm responses */
+    /* nested sm responses */
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
+};
+
+struct PINT_client_aio_symlink_sm
+{
+    const char *new_directory;
+    const char *new_filename;
+    const char *link_target;
+    PVFS_object_ref *pdir;
+    PVFS_object_ref parent_ref;
+
+    /* fields needed for relative lookups */
+    char *cur, *last, *start, *current_seg_path;
+
+    /* nested sm responses */
+    PVFS_sysresp_lookup lookup_resp;
+    PVFS_sysresp_symlink symlink_resp;
 };
 
 typedef struct 
@@ -733,6 +749,7 @@ typedef struct PINT_client_sm
         struct PINT_client_aio_rename_sm aio_rename;
         struct PINT_client_aio_mkdir_sm aio_mkdir;
         struct PINT_client_aio_remove_sm aio_remove;
+        struct PINT_client_aio_symlink_sm aio_symlink;
     } u;
 } PINT_client_sm;
 
@@ -837,6 +854,7 @@ enum
     PVFS_AIO_RENAME                = 501,
     PVFS_AIO_MKDIR                 = 502,
     PVFS_AIO_REMOVE                = 503,
+    PVFS_AIO_SYMLINK               = 504,
 };
 
 #define PVFS_OP_SYS_MAXVALID  21
@@ -915,6 +933,7 @@ extern struct PINT_state_machine_s pvfs2_client_sysint_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
@@ -959,6 +978,7 @@ extern struct PINT_state_machine_s pvfs2_client_aio_open_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_remove_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_symlink_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

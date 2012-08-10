@@ -348,7 +348,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_sysint_remove_sm},
     {&pvfs2_client_sysint_create_sm},
     {&pvfs2_client_sysint_mkdir_sm},
-    {&pvfs2_client_symlink_sm},
+    {&pvfs2_client_sysint_symlink_sm},
     {&pvfs2_client_sysint_getattr_sm},
     {&pvfs2_client_io_sm},
     {&pvfs2_client_flush_sm},
@@ -389,6 +389,7 @@ struct PINT_client_op_entry_s PINT_client_sm_aio_table[] =
     {&pvfs2_client_aio_rename_sm},
     {&pvfs2_client_aio_mkdir_sm},
     {&pvfs2_client_aio_remove_sm},
+    {&pvfs2_client_aio_symlink_sm}
 };
 
 /* This function allows the generic state-machine-fns.c locate function
@@ -1238,6 +1239,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_AIO_RENAME, "PVFS_AIO_RENAME" },
         { PVFS_AIO_MKDIR, "PVFS_AIO_MKDIR" },
         { PVFS_AIO_REMOVE, "PVFS_AIO_REMOVE" },
+        { PVFS_AIO_SYMLINK, "PVFS_AIO_SYMLINK" },
         { 0, "UNKNOWN" }
     };
 

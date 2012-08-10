@@ -42,7 +42,7 @@ static int symlink_delete_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_symlink_sm
+nested machine pvfs2_client_symlink_sm
 {
     state init
     {
@@ -163,6 +163,21 @@ machine pvfs2_client_symlink_sm
     {
         run symlink_cleanup;
         SYMLINK_RETRY => init;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_symlink_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_symlink_sm;
+        default => symlink_terminate;
+    }
+
+    state symlink_terminate
+    {
+        run symlink_terminate;
         default => terminate;
     }
 }
@@ -681,6 +696,12 @@ static PINT_sm_action symlink_cleanup(
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action symlink_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
