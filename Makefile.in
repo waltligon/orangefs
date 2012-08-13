@@ -1273,6 +1273,7 @@ endif
 	install -m 755 $(ADMINTOOLS) $(bindir)
 	install -m 755 $(USERTOOLS) $(bindir)
 ifdef BUILD_UCACHE
+	install -d $(sbindir)
 	install -m 755 $(UCACHEDTOOLS) $(sbindir)
 endif
 	# for compatibility in case anyone really wants "lsplus"
