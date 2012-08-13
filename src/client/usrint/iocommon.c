@@ -95,6 +95,8 @@ int iocommon_lookup_absolute(const char *abs_path,
     PVFS_sysresp_lookup resp_lookup;
     PVFS_path_t *Ppath;
 
+    debug("iocommon_lookup_absolute: called with %s\n", abs_path);
+
     /* Initialize any variables */
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
@@ -238,6 +240,8 @@ int iocommon_lookup_relative(const char *rel_path,
     char *cur, *last, *start;
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
+
+    debug("iocommon_lookup_relative: called with %s\n", rel_path);
 
     /* Initialize any variables */
     pvfs_sys_init();
@@ -423,6 +427,8 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
+    debug("iocommon_create_file: called with %s\n", filename);
+
     /* Initialize */
     pvfs_sys_init();
     memset(&attr, 0, sizeof(attr));
@@ -596,6 +602,8 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
     char *path = NULL;
     pvfs_descriptor *pd = NULL;
 
+    debug("iocommon_expand_path: called with %s\n", Ppath->expanded_path);
+
     path = PVFS_expand_path(Ppath->expanded_path);
     if (PATH_LOOKEDUP(Ppath))
     {
@@ -612,6 +620,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         IOCOMMON_RETURN_ERR(rc);
 
         /* create a usrint file descriptor for it */
+        debug("iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -660,6 +669,8 @@ int iocommon_lookup(char *path,
     int flags = O_RDONLY;
     int mode = 0644;
     char error_path[PVFS_NAME_MAX];
+
+    debug("iocommon_lookup: called with %s\n", path);
 
     memset(error_path, 0, sizeof(error_path));
 
@@ -792,6 +803,8 @@ pvfs_descriptor *iocommon_open(const char *path,
     PVFS_sysresp_getattr attributes_resp;
     PVFS_credentials *credentials;
     PVFS_path_t *Ppath;
+
+    debug("iocommon_open: called with %s\n", path);
 
     /* Initialize */
     memset(&file_ref, 0, sizeof(file_ref));
@@ -1022,6 +1035,7 @@ foundfile:
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
+    debug("iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
     pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, 0);
     if (!pd)
     {
@@ -1225,6 +1239,8 @@ int iocommon_remove (const char *path,
     PVFS_object_ref parent_ref, file_ref;
     PVFS_credentials *credentials;
     PVFS_sys_attr attr;
+
+    debug("iocommon_remove: called with %s\n", path);
 
     /* Initialize */
     memset(&parent_ref, 0, sizeof(parent_ref));
@@ -1871,6 +1887,8 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
+    debug("iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
+
     if (!por)
     {
         errno = EBADF;
@@ -2009,6 +2027,8 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     PVFS_credentials *credentials;
     PVFS_sysresp_getattr getattr_response;
 
+    debug("iocommon_getattr: called with %d\n", (int)obj.handle);
+
     /* Initialize */
     memset(&getattr_response, 0, sizeof(getattr_response));
 
@@ -2045,6 +2065,8 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     int rc = 0;
     int orig_errno = errno;
     PVFS_credentials *credentials;
+
+    debug("iocommon_setattr: called with %d\n", (int)obj.handle);
 
     /* check credentials */
     iocommon_cred(&credentials);

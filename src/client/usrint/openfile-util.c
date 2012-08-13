@@ -713,6 +713,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     int rc = 0;
     pvfs_descriptor *pd;
 
+    debug("pvfs_dup_descriptor: called with %d\n", oldfd);
     pvfs_sys_init();
     if (oldfd < 0 || oldfd >= descriptor_table_size)
     {
@@ -724,6 +725,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
         newfd = glibc_ops.dup(logfile);
         if (newfd < 0)
         {
+            debug("\npvfs_dup_descriptor: returns with %d\n", newfd);
             return newfd;
         }
     }
@@ -735,12 +737,14 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
             /* check for special case */
             if (newfd == oldfd)
             {
+                debug("\tpvfs_dup_descriptor: returns with %d\n", oldfd);
                 return oldfd;
             }
             /* close old file in new slot */
             rc = pvfs_free_descriptor(newfd);
             if (rc < 0)
             {
+                debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
                 return rc;
             }
         }
@@ -748,6 +752,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
         rc = glibc_ops.dup2(oldfd, newfd);
         if (rc < 0)
         {
+            debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
             return rc;
         }
     }
@@ -756,6 +761,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
     if (!pd)
     {
+        debug("\tpvfs_dup_descriptor: returns with %d\n", -1);
         return -1;
     }
     memset(pd, 0, sizeof(pvfs_descriptor));
@@ -773,7 +779,8 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     pd->s->dup_cnt++;
     gen_mutex_unlock(&pd->s->lock);
     gen_mutex_unlock(&pd->lock);
-    return 0;
+    debug("\tpvfs_dup_descriptor: returns with %d\n", newfd);
+    return newfd;
 }
 
 /*
@@ -813,6 +820,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
         gen_mutex_init(&pd->lock);
         gen_mutex_lock(&pd->lock);
         descriptor_table[fd] = pd;
+        debug("pvfs_find_descriptor: implicit alloc of descriptor %d\n", fd);
 
         pd->s =
              (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
@@ -865,6 +873,7 @@ int pvfs_free_descriptor(int fd)
     pd = pvfs_find_descriptor(fd);
     if (pd == NULL)
     {
+        debug("\tpvfs_free_descriptor returns %d\n", -1);
         return -1;
     }
 
@@ -893,6 +902,7 @@ int pvfs_free_descriptor(int fd)
             rc = ucache_close_file(pd->s->fent);
             if(rc == -1)
             {
+                debug("\tpvfs_free_descriptor returns %d\n", rc);
                 return rc;
             }
         }
