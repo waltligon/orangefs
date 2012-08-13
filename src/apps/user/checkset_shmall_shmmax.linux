@@ -43,7 +43,7 @@ LockMemoryRequirement=`echo "$NumLocks * $LockSize" | bc`
 
 #UCACHE_STATS_64=3
 #UCACHE_STATS_16=2
-UCACHE_AUX_SIZE=`echo "$LockMemoryRequirement + ($UCACHE_STATS_64 * 64) + ($UCACHE_STATS_16 * 16)" | bc`
+UCACHE_AUX_SIZE=`echo "$LockMemoryRequirement + ($UCACHE_STATS_64 * 8) + ($UCACHE_STATS_16 * 2)" | bc`
 
 ShmemTotalB=`echo "$UcacheSizeB + $UCACHE_AUX_SIZE" | bc`
 ShmemTotalMB=`echo "scale=4; $ShmemTotalB / (1024 * 1024)" | bc`
