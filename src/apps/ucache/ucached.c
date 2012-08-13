@@ -205,15 +205,10 @@ static int execute_cmd(char cmd)
         }
         /* Close Daemon */
         case 'x': 
-            writefd = open(FIFO2, O_WRONLY); 
-            rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
-            while(rc <= 0)
-            {
-                rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
-            }
-            remove(UCACHED_STARTED);
             close(writefd);
             close(readfd);
+            remove(UCACHED_STARTED);
+            printf("SUCCESS\tExiting ucached\n");
             exit(EXIT_SUCCESS);
             break;
         default:
