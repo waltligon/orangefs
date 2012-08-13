@@ -52,7 +52,7 @@
 
 
 #ifndef DBG
-#define DBG 0   
+#define DBG 0 
 #endif
 
 #ifndef UCACHE_LOG_FILE
@@ -86,8 +86,8 @@
 #define UCACHE_STATS_64 3
 #define UCACHE_STATS_16 2
 /* This is the size of the ucache_aux auxilliary shared mem segment */
-#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 64) + \
-    (UCACHE_STATS_16 * 16))
+#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 8) + \
+    (UCACHE_STATS_16 * 2))
 
 /* Globals */
 extern FILE * out;

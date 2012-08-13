@@ -327,6 +327,7 @@ int ucache_open_file(PVFS_fs_id *fs_id,
         {
             /* File Inserted */
             mtbl->ref_cnt = 1;
+            ucache_stats->file_count++;
             rc = 0;
             goto done;
         }
@@ -350,6 +351,10 @@ done:
 inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, 
                                          uint16_t *block_ndx)
 {
+    if(DBG)
+    {
+        printf("offset = %lu\n", offset);
+    }
     void *retVal = (void *) NIL;
     if(fent)
     {
@@ -454,8 +459,10 @@ int ucache_flush_file(struct file_ent_s *fent)
 int flush_file(struct file_ent_s *fent)
 {
     int rc = 0;
+    //uint64_t flushed = 0;
 
     struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
 
     uint16_t i;
     uint16_t temp_next = NIL16;
@@ -474,16 +481,17 @@ int flush_file(struct file_ent_s *fent)
         temp_next = mtbl->mem[i].dirty_next;
         mtbl->mem[i].dirty_next = NIL16; 
 
-        PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
-        
-        /** If this is the last block needing flushing, then check the file,
-         * size, so that we know how much of the last block to write to disk.
-         */
-        struct iovec vector = 
+        struct iovec vector =
         {
             &(ucache->b[ment->item].mblk[0]),
             0
         };
+
+        /** Check the file size , so that we know how much to write to disk.
+         */
+        /* Determine how much data is left to flush based on file size */
+        //uint64_t left_to_flush = fent->size - flushed;
+        //if(left_to_flush >= CACHE_BLOCK_SIZE_K * 1024)
         if((fent->size - ment->tag) < (CACHE_BLOCK_SIZE_K * 1024))
         {
             vector.iov_len = fent->size - ment->tag;
@@ -566,6 +574,10 @@ int ucache_close_file(struct file_ent_s *fent)
     int rc = 0;
     rc = lock_lock(ucache_lock);
     rc = remove_file(fent);
+    if(rc == 0)
+    {
+        ucache_stats->file_count--;
+    }
     lock_unlock(ucache_lock);
     return rc;
 }
@@ -639,7 +651,7 @@ int ucache_info(FILE *out, char *flags)
     unsigned char show_free = 0;
 
     int char_ndx;
-    for (char_ndx=0; char_ndx<strlen(flags); char_ndx++)
+    for (char_ndx = 0; char_ndx < strlen(flags); char_ndx++)
     {
         char c = flags[char_ndx];
         switch(c)

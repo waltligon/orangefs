@@ -1223,6 +1223,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          size_t iovec_count,
                          const struct iovec *vector)
 {
+
     int rc = 0;
 #if PVFS_UCACHE_ENABLE
     if(ucache_enabled)
@@ -1267,6 +1268,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     {
         return 0;
     }
+    //printf("iocommon_readorwrite: offset = %lu\treq_size = %lu\n", offset, req_size);
 
     struct file_ent_s *fent = pd->s->fent;
     struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
@@ -1356,7 +1358,12 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /* Loop over ureq structure and perform reads on misses */
         for(i = 0; i < req_blk_cnt; i++)
         {
-            if(ureq[i].ublk_hit == 0)
+            if(ureq[i].ublk_hit == 1)
+            {
+                read_so_far += CACHE_BLOCK_SIZE;
+                //if(fent->size < read_so_far && (fent->size % CACHE_BLOCK_SIZE) != 0)
+            }
+            else
             {
                 /* Perform read */
                 /* read single block from fs and write into ucache */
@@ -1370,6 +1377,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 read_so_far += rc;
                 if(rc < CACHE_BLOCK_SIZE)
                 {
+                    //printf("read less than a full block! %d\n", i);
                     /* We read less than a full block */
                     req_size = read_so_far;
                     req_blk_cnt = calc_req_blk_cnt(offset, req_size);
@@ -1465,7 +1473,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     if(fent->size < (offset + transfered))
     {
         fent->size = offset + transfered;
-    }     
+    } 
+    printf("fent->size = %lu MB\n", fent->size / (1024 * 1024));    
 
     rc = transfered;
 #endif /* PVFS_UCACHE_ENABLE */
