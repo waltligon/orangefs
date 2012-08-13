@@ -17,7 +17,7 @@
 #include <sys/shm.h>
 
 #define MEM_TABLE_ENTRY_COUNT 679
-#define FILE_TABLE_ENTRY_COUNT 682
+#define FILE_TABLE_ENTRY_COUNT 512 
 #define CACHE_BLOCK_SIZE_K 256
 #define CACHE_BLOCK_SIZE (CACHE_BLOCK_SIZE_K * 1024)
 #define MEM_TABLE_HASH_MAX 31
@@ -52,7 +52,7 @@
 
 
 #ifndef DBG
-#define DBG 0   
+#define DBG 0 
 #endif
 
 #ifndef UCACHE_LOG_FILE
@@ -86,8 +86,8 @@
 #define UCACHE_STATS_64 3
 #define UCACHE_STATS_16 2
 /* This is the size of the ucache_aux auxilliary shared mem segment */
-#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 64) + \
-    (UCACHE_STATS_16 * 16))
+#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 8) + \
+    (UCACHE_STATS_16 * 2))
 
 /* Globals */
 extern FILE * out;
@@ -167,7 +167,7 @@ union cache_block_u
 /** A link for one file in the top level hash table
  *
  */
-/* 24 bytes */
+/* 32 bytes */
 struct file_ent_s
 {
     uint64_t tag_handle;    /* PVFS_handle */
@@ -176,6 +176,7 @@ struct file_ent_s
     uint16_t mtbl_ent;      /* entry index of this mtbl */
     uint16_t next;          /* next fent in chain */
     uint16_t index;         /* fent index in ftbl */
+    uint64_t size;          /* cache maintenance of file size */
     char pad[4];
 };
 
