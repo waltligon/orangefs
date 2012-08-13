@@ -1474,7 +1474,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     {
         fent->size = offset + transfered;
     } 
-    printf("fent->size = %lu MB\n", fent->size / (1024 * 1024));    
+    //printf("fent->size = %lu MB\n", fent->size / (1024 * 1024));    
 
     rc = transfered;
 #endif /* PVFS_UCACHE_ENABLE */
