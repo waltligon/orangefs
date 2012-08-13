@@ -1090,7 +1090,7 @@ clean::
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
-        $(E)rm -f $(STATECOMPGEN)
+	$(E)rm -f $(STATECOMPGEN)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
