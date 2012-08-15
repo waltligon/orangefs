@@ -144,7 +144,7 @@ int iocommon_lookup_absolute(const char *abs_path,
                 char *ret;
                 /* try fully expanding the path looking up each segment */
                 /* this also should not allocate a PVFS_path */
-                ret = PVFS_expand_path(abs_path);
+                ret = PVFS_expand_path(abs_path, !follow_links);
                 if (ret && PATH_LOOKEDUP(Ppath))
                 {
                     /* the expanding process looks up the final path */
@@ -594,6 +594,7 @@ errorout:
  * get to this.
  */
 int iocommon_expand_path (PVFS_path_t *Ppath,
+                          int follow_flag,
                           int flags,
                           mode_t mode,
                           pvfs_descriptor **pdp)
@@ -604,7 +605,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
 
     debug("iocommon_expand_path: called with %s\n", Ppath->expanded_path);
 
-    path = PVFS_expand_path(Ppath->expanded_path);
+    path = PVFS_expand_path(Ppath->expanded_path, !follow_flag);
     if (PATH_LOOKEDUP(Ppath))
     {
         /* we're done */
@@ -745,7 +746,7 @@ int iocommon_lookup(char *path,
             rc = -1;
             goto errorout;
         }
-        rc = iocommon_expand_path(Ppath, flags, mode, &pd);
+        rc = iocommon_expand_path(Ppath, internal_follow, flags, mode, &pd);
         if (pd)
         {
             /* opened a glibc file - just close it */       
@@ -905,7 +906,7 @@ pvfs_descriptor *iocommon_open(const char *path,
             {
                 /* we think we might be able to expand symlinks */
                 /* last chance to get it open */
-                rc = iocommon_expand_path(Ppath, flags, mode, &pd);
+                rc = iocommon_expand_path(Ppath, 1, flags, mode, &pd);
                 if (rc < 0 || pd)
                 {
                     goto errorout;
@@ -934,7 +935,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                     !PATH_EXPANDED(Ppath))
             {
                 /* last chance to get it open */
-                rc = iocommon_expand_path(Ppath, flags, mode, &pd);
+                rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
                 if (rc < 0 || pd)
                 {
                     goto errorout;
@@ -968,7 +969,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                 !PATH_EXPANDED(Ppath))
         {
             /* last chance to get it open */
-            rc = iocommon_expand_path(Ppath, flags, mode, &pd);
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
             if (rc < 0 || pd)
             {
                 goto errorout;

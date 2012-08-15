@@ -63,7 +63,7 @@ int open(const char *path, int flags, ...)
         debug("\tposix.c open: returns with %d\n", -1);
         return -1;
     }
-    if (is_pvfs_path(&path))
+    if (is_pvfs_path(&path,0))
     {
         /* this handles setup of the descriptor */
         rc = pvfs_open(path, flags, mode, hints);
@@ -199,7 +199,7 @@ int unlink(const char *path)
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(&path))
+    if (is_pvfs_path(&path,0))
     {
         rc = pvfs_ops.unlink(path);
     }
@@ -253,8 +253,8 @@ int rename (const char *old, const char *new)
         errno = EFAULT;
         return -1;
     }
-    oldp = is_pvfs_path(&old);
-    newp = is_pvfs_path(&new);
+    oldp = is_pvfs_path(&old,0);
+    newp = is_pvfs_path(&new,0);
     if(oldp && newp)
     { 
         rc = pvfs_rename(old, new);
@@ -524,7 +524,7 @@ int truncate(const char *path, off_t length)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_truncate(path, length);
     }
@@ -544,7 +544,7 @@ int truncate64(const char *path, off64_t length)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_truncate64(path, length);
     }
@@ -654,7 +654,7 @@ int stat(const char *path, struct stat *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_stat(path, buf);
     }
@@ -679,7 +679,7 @@ int stat64(const char *path, struct stat64 *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_stat64(path, buf);
     }
@@ -824,7 +824,7 @@ int lstat(const char *path, struct stat *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc =  pvfs_lstat(path, buf);
     }
@@ -849,7 +849,7 @@ int lstat64(const char *path, struct stat64 *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_lstat64(path, buf);
     }
@@ -899,7 +899,7 @@ int utimes(const char *path, const struct timeval times[2])
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_utimes(path, times);
     }
@@ -919,7 +919,7 @@ int utime(const char *path, const struct utimbuf *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_utime(path, buf);
     }
@@ -993,7 +993,7 @@ int chown(const char *path, uid_t owner, gid_t group)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_chown(path, owner, group);
     }
@@ -1056,7 +1056,7 @@ int lchown(const char *path, uid_t owner, gid_t group)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_lchown(path, owner, group);
     }
@@ -1076,7 +1076,7 @@ int chmod(const char *path, mode_t mode)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_chmod(path, mode);
     }
@@ -1144,7 +1144,7 @@ int mkdir(const char *path, mode_t mode)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_mkdir(path, mode);
     }
@@ -1194,7 +1194,7 @@ int rmdir(const char *path)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_rmdir(path);
     }
@@ -1218,7 +1218,7 @@ int readlink(const char *path, char *buf, size_t bufsiz)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_readlink(path, buf, bufsiz);
     }
@@ -1268,7 +1268,7 @@ int symlink(const char *oldpath, const char *newpath)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&newpath))
+    if(is_pvfs_path(&newpath,0))
     { 
         rc = pvfs_symlink(oldpath, newpath);
     }
@@ -1318,7 +1318,7 @@ int link(const char *oldpath, const char *newpath)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&oldpath))
+    if(is_pvfs_path(&oldpath,0))
     { 
         rc = pvfs_link(oldpath, newpath);
     }
@@ -1449,7 +1449,7 @@ int access(const char *path, int mode)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_access(path, mode);
     }
@@ -1657,7 +1657,7 @@ int statfs(const char *path, struct statfs *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_statfs(path, buf);
     }
@@ -1677,7 +1677,7 @@ int statfs64(const char *path, struct statfs64 *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_statfs64(path, buf);
     }
@@ -1743,7 +1743,7 @@ int statvfs(const char *path, struct statvfs *buf)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_statvfs(path, buf);
     }
@@ -1786,7 +1786,7 @@ int mknod(const char *path, mode_t mode, dev_t dev)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_mknod(path, mode, dev);
     }
@@ -1862,7 +1862,7 @@ int setxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_setxattr(path, name, value, size, flags);
     }
@@ -1895,7 +1895,7 @@ int lsetxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_lsetxattr(path, name, value, size, flags);
     }
@@ -1955,7 +1955,7 @@ ssize_t getxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(&path))
+    if (is_pvfs_path(&path,0))
     { 
         rc = pvfs_getxattr(path, name, value, size);
     }
@@ -1988,7 +1988,7 @@ ssize_t lgetxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_lgetxattr(path, name, value, size);
     }
@@ -2047,7 +2047,7 @@ ssize_t listxattr(const char *path, char *list, size_t size)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_listxattr(path, list, size);
     }
@@ -2079,7 +2079,7 @@ ssize_t llistxattr(const char *path, char *list, size_t size)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_llistxattr(path, list, size);
     }
@@ -2137,7 +2137,7 @@ int removexattr(const char *path, const char *name)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,0))
     { 
         rc = pvfs_removexattr(path, name);
     }
@@ -2169,7 +2169,7 @@ int lremovexattr(const char *path, const char *name)
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path))
+    if(is_pvfs_path(&path,1))
     { 
         rc = pvfs_lremovexattr(path, name);
     }

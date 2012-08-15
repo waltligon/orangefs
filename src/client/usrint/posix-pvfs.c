@@ -1172,15 +1172,22 @@ int pvfs_futimesat(int dirfd,
     PVFS_sys_attr attr;
 
     debug("pvfs_futimesat: called with %s\n", path);
-    if (dirfd < 0)
+    if (path[0] == '/' || dirfd == AT_FDCWD)
     {
-        errno = EBADF;
-        return -1;
+        pd = NULL;
     }
-    pd = pvfs_find_descriptor(dirfd);
-    if (!pd)
+    else
     {
-        return -1;
+        if (dirfd < 0)
+        {
+            errno = EBADF;
+            return -1;
+        }
+        pd = pvfs_find_descriptor(dirfd);
+        if (!pd)
+        {
+            return -1;
+        }
     }
     if (path)
     {
@@ -1188,6 +1195,7 @@ int pvfs_futimesat(int dirfd,
     }
     else
     {
+        errno = EINVAL;
         pd2 = pd; /* allow null path to work */
     }
     if (!pd2)
@@ -2484,7 +2492,7 @@ int pvfs_fremovexattr(int fd,
  * working directory given than the kernel may not
  * be aware of PVFS virtual mounts
  */
-int pvfs_cwd_init()
+int pvfs_cwd_init(int expand)
 {
     int rc = 0;
     int plen = 0;
@@ -2514,7 +2522,17 @@ int pvfs_cwd_init()
             exit(-1);
         }
     }
-    rv = PVFS_qualify_path(buf);
+    if (expand)
+    {
+        /* shells might not resolve symlinks */
+        /* but PVFS must be up for this to work */
+        rv = PVFS_expand_path(buf,0);
+    }
+    else
+    {
+        /* need something to return before PVFS gets up */
+        rv = PVFS_qualify_path(buf);
+    }
     /* basic path length check */
     plen = strnlen(rv, PVFS_PATH_MAX);
     if (plen >= PVFS_PATH_MAX)
@@ -2547,7 +2565,7 @@ int pvfs_chdir(const char *path)
     }
     /* we really need to resolve this to a cannonical path */
     /* jump to expand path right away */
-    newpath = PVFS_expand_path(path);
+    newpath = PVFS_expand_path(path, 0);
     if (!newpath)
     {
         return -1;

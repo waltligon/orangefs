@@ -488,7 +488,7 @@ void pvfs_sys_init_doit(void) {
     atexit(usrint_cleanup);
 
     /* set up current working dir */
-    pvfs_cwd_init();
+    pvfs_cwd_init(0); /* do not expand */
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
@@ -536,6 +536,9 @@ void pvfs_sys_init_doit(void) {
     {
         errno = 0;
     }
+
+    /* set up current working dir - need this one and previous one */
+    pvfs_cwd_init(1); /* expand sym links*/
 
     /* call other initialization routines */
 

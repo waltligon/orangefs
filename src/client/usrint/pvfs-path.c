@@ -38,7 +38,7 @@
  * 08/08/2012, remember to make changes to PVFS_qualify_path()
  * in pvfs-qualify-path.c
  */
-char *PVFS_expand_path(const char *path)
+char *PVFS_expand_path(const char *path, int skip_last_lookup)
 {
     int ret = 0;
     int is_a_link = 0;
@@ -162,9 +162,41 @@ char *PVFS_expand_path(const char *path)
 
         /* this must assume clean path */
         /* this will set RESOLVED and MNTPOINT flags */
-        if (!PVFS_util_resolve_absolute(Ppath->expanded_path))
+        ret = PVFS_util_resolve_absolute(Ppath->expanded_path);
+        /* if this is a no-follow situation then we skip */
+        /* resolving the last segment, so see if this is */
+        /* the last segment */
+        if (skip_last_lookup)
         {
-            /* this is for PVFS space */
+            char *p;
+            p = opath;
+            while(*p)
+            {
+                if (*p== '/')
+                {
+                    p += 1;
+                    continue;
+                }
+                if (*p == '.' && *(p+1) == '0')
+                {
+                    p += 1;
+                    continue;
+                }
+                if (*p == '.' && *(p+1) == '/')
+                {
+                    p += 2;
+                    continue;
+                }
+                break;
+            }
+            if (!*p)
+            {
+                continue; /* returns to main loop */
+            }
+        }
+        if (!ret)
+        {
+            /* this is for PVFS space lookups */
             PVFS_sys_attr attr;
 
             /* this must assume clean path */
@@ -362,7 +394,7 @@ err:
  * returns 1 if PVFS 0 otherwise
  */
 
-int is_pvfs_path(const char **path)
+int is_pvfs_path(const char **path, int skip_last_lookup)
 {
     int rc = 0;
     PVFS_path_t *Ppath;
@@ -457,7 +489,7 @@ int is_pvfs_path(const char **path)
              * won't have to do much later, just use the results.
              * Newpath doesn't actually change.
              */
-            newpath = PVFS_expand_path(*path);
+            newpath = PVFS_expand_path(*path, skip_last_lookup);
             if (!newpath)
             {
                 return 0; /* an error returned - let glibc deal with it */

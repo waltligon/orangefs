@@ -65,6 +65,7 @@ void iocommon_cred(PVFS_credentials **credentials);
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
 
 int iocommon_expand_path (PVFS_path_t *Ppath,
+                          int follow_flag, 
                           int flags,
                           mode_t mode,
                           pvfs_descriptor **pdp);

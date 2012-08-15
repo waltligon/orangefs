@@ -134,9 +134,9 @@ static __inline__ void PVFS_free_expanded(const char *path)
 
 char *PVFS_qualify_path(const char *path);
 
-char *PVFS_expand_path(const char *path);
+char *PVFS_expand_path(const char *path, int skip_last_lookup);
 
-int is_pvfs_path(const char **path);
+int is_pvfs_path(const char **path, int skip_last_lookup);
 
 int split_pathname( const char *path,
                     char **directory,
