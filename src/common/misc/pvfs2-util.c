@@ -1526,7 +1526,7 @@ int PVFS_util_resolve(
                 return(-PVFS_ENOMEM);
             }
             /* find size of basename so we can reserve space for it */
-            /* note: basename() and dirname() modifiy args, thus the strcpy */
+            /* note: basename() and dirname() modify args, thus the strcpy */
             strcpy(parent_path, local_path);
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
@@ -2283,7 +2283,7 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
  * determine what the fsid and fs relative path is. Makes no attempt
  * to canonicalize the path.
  *
- * returns 0 on succees, -PVFS_error on failure
+ * returns 0 on success, -PVFS_error on failure
  */
 int PVFS_util_resolve_absolute(const char *local_path,
                                PVFS_fs_id *out_fs_id,

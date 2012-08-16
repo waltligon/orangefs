@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 
     for(i = 0; i < user_opts.numdirs; i++)
     {
-        pvfs_path[i] = (char *)calloc(PVFS_NAME_MAX, sizeof(char));
+        pvfs_path[i] = (char *)calloc(PVFS_PATH_MAX, sizeof(char));
         if(pvfs_path[i] == NULL)
         {
             fprintf(stderr, "Unable to allocate memory\n");
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
         ret = PVFS_util_resolve(user_opts.dir_array[i], 
                                 &pfs_id[i], 
                                 pvfs_path[i], 
-                                PVFS_NAME_MAX);
+                                PVFS_PATH_MAX-1);
  
         if (ret < 0)
         {
@@ -195,9 +195,9 @@ static int make_directory(PVFS_credential      * credentials,
                           const int              verbose)
 {
     int ret = 0;
-    char parent_dir[PVFS_NAME_MAX] = "";
-    char base[PVFS_NAME_MAX]  = "";
-    char realpath[PVFS_NAME_MAX]  = "";
+    char parent_dir[PVFS_PATH_MAX] = "";
+    char base[PVFS_PATH_MAX]  = "";
+    char realpath[PVFS_PATH_MAX]  = "";
     char * parentdir_ptr = NULL;
     char * basename_ptr = NULL;
     PVFS_sys_attr       attr;

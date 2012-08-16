@@ -254,7 +254,8 @@ Global
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.MemLeaks|x64.Build.0 = MemLeaks|x64
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|Win32.ActiveCfg = Release|Win32
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|Win32.Build.0 = Release|Win32
-		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|x64.ActiveCfg = Release|Win32
+		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|x64.ActiveCfg = Release|x64
+		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

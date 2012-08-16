@@ -13,10 +13,6 @@
 
 #ifdef WIN32
 #include "wincommon.h"
-
-#define index(s, c)    strchr(s, c)
-#define snprintf(b, c, f, ...)    _snprintf(b, c, f, __VA_ARGS__)
-#define strdup(s)    _strdup(s)
 #endif
 
 #include "str-utils.h"

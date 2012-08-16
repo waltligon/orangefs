@@ -12,7 +12,7 @@
 /* #undef BERKDB_ERROR_REPORTING */
 
 /* Define if robust security is enabled */
-#define ENABLE_SECURITY 0
+/* #undef ENABLE_SECURITY */
 
 /* Define if kernel has aio support */
 /* #define HAVE_AIO 1*/

@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\cert.c" />
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\config.c" />
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\cred.c" />
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\ldap-support.c" />
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\user-cache.c" />
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\dokan-interface.c" />
@@ -40,6 +41,7 @@
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\cert.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\client-service.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\config.h" />
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\cred.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\ldap-support.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\messages.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\user-cache.h" />
@@ -147,7 +149,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib;..\..\..\ldap\Win32\lib\mscvc;..\..\..\openssl\lib\debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>
@@ -162,7 +164,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib;..\..\..\ldap\Win32\lib\mscvc;..\..\..\openssl\lib\debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>
@@ -176,7 +178,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib64;..\..\..\ldap\Win64\lib;..\..\..\openssl\lib64\debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>
@@ -191,7 +193,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib64;..\..\..\ldap\Win64\lib;..\..\..\openssl\lib64\debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>
@@ -209,7 +211,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib;..\..\..\ldap\Win32\lib\mscvc;..\..\..\openssl\lib\release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>
@@ -227,7 +229,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib64;..\..\..\ldap\Win64\lib;..\..\..\openssl\lib64\release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>

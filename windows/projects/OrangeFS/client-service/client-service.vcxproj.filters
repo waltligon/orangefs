@@ -15,60 +15,66 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\service-main.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\cert.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\fs.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\config.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\dokan-interface.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\ldap-support.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\config.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\user-cache.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\cert.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\dokan-interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\user-cache.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\fs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\client\windows\client-service\ldap-support.c">
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\service-main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\cred.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\fs.h">
+    <ClInclude Include="..\..\..\..\include\windows\memleaks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\client-service.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\cert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\config.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\client-service.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\cert.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\user-cache.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\ldap-support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\include\windows\memleaks.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\messages.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\ldap-support.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\user-cache.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\client\windows\client-service\messages.h">
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\fs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\cred.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\..\..\src\client\windows\client-service\messages.rc">
+    <ResourceCompile Include="..\..\..\..\src\client\windows\client-service\messages.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\..\..\src\client\windows\client-service\messages.mc" />
+    <CustomBuild Include="..\..\..\..\src\client\windows\client-service\messages.mc" />
   </ItemGroup>
 </Project>

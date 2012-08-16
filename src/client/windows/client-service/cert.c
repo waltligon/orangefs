@@ -5,7 +5,7 @@
  */
 
 /*
- *  Certificate functions - credentials are loaded from a 
+ *  Certificate functions - credential are loaded from a 
  *  certificate in the user's profile directory or a configured
  *  directory. The (proxy) certificate contains the OrangeFS UID/GID
  *  in its policy data field. A CA certificate is used to verify
@@ -26,6 +26,7 @@
 
 #include "cert.h"
 #include "user-cache.h"
+#include "cred.h"
 
 #define OPENSSL_CERT_ERROR    0xFFFF
 
@@ -92,7 +93,7 @@ static int get_proxy_auth_ex_data_cred()
         CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
         if (idx < 0)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "credentials", NULL, NULL,
+            idx = X509_STORE_CTX_get_ex_new_index(0, "credential", NULL, NULL,
                 NULL);
         }
         CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
@@ -119,7 +120,7 @@ static int get_proxy_auth_ex_data_userid()
 }
 
 /* parse the credential string uid/gid from credstr */
-static int parse_credentials(char *credstr, PVFS_uid *uid, PVFS_gid *gid)
+static int parse_credential(char *credstr, PVFS_uid *uid, PVFS_gid *gid)
 {
     char *p, uidstr[16], gidstr[16];
     int i, ret = 0;
@@ -176,7 +177,9 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
     X509 *xs;
     PROXY_CERT_INFO_EXTENSION *pci;
     char *credstr;
-    PVFS_credentials *credentials;
+    PVFS_credential *credential;
+    PVFS_uid uid;
+    PVFS_gid gid;
     char error_msg[256];
     int ret;
 
@@ -187,22 +190,29 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
         xs = ctx->current_cert;
         if (xs->ex_flags & EXFLAG_PROXY)
         {
-            /* get userid for error logging */
+            /* get Windows userid for error logging */
             userid = (char *) X509_STORE_CTX_get_ex_data(ctx, 
                 get_proxy_auth_ex_data_userid());
             
-            /* get credentials in {UID}/{GID} form from cert policy */
+            /* get credential in {UID}/{GID} form from cert policy */
             pci = (PROXY_CERT_INFO_EXTENSION *) 
                     X509_get_ext_d2i(xs, NID_proxyCertInfo, NULL, NULL);
 
             if (pci->proxyPolicy->policy != NULL && pci->proxyPolicy->policy->length > 0)
             {
                 credstr = (char *) pci->proxyPolicy->policy->data;
-                credentials = (PVFS_credentials *) X509_STORE_CTX_get_ex_data(
+                credential = (PVFS_credential *) X509_STORE_CTX_get_ex_data(
                     ctx, get_proxy_auth_ex_data_cred());
-                ret = parse_credentials(credstr, &credentials->uid, 
-                                        &credentials->gid);
-                if (ret != 0)
+                ret = parse_credential(credstr, &uid, &gid);
+                if (ret == 0)
+                {
+                    /* initialize and fill in credential */
+                    init_credential(credential);
+                    credential->userid = uid;
+                    credential_add_group(credential, gid);
+                    credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+                }
+                else
                 {
                     _snprintf(error_msg, sizeof(error_msg), "User %s: proxy "
                         "certificate contains invalid credential policy", 
@@ -232,7 +242,7 @@ static unsigned long verify_cert(char *userid,
                                  X509 *cert, 
                                  X509 *ca_cert,
                                  STACK_OF(X509) *chain,
-                                 PVFS_credentials *credentials)
+                                 PVFS_credential *credential)
 {
     X509_STORE *trust_store;
     X509_STORE_CTX *ctx;
@@ -273,7 +283,7 @@ static unsigned long verify_cert(char *userid,
     /* set up verify callback */
     save_verify_cb = ctx->verify_cb;
     X509_STORE_CTX_set_verify_cb(ctx, verify_callback);
-    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_cred(), credentials);
+    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_cred(), credential);
     X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_userid(), userid);
     X509_STORE_CTX_set_flags(ctx, X509_V_FLAG_ALLOW_PROXY_CERTS);
 
@@ -285,7 +295,7 @@ static unsigned long verify_cert(char *userid,
     
 verify_cert_exit:
 
-    /* print error... for non-verify errors, get_cert_credentials
+    /* print error... for non-verify errors, get_cert_credential
        will print errors */
     if (verify_flag && ret == OPENSSL_CERT_ERROR && ctx->error != 0)
     {
@@ -321,10 +331,10 @@ static unsigned int get_profile_dir(HANDLE huser,
     return 0;
 }
 
-/* retrieve OrangeFS credentials from cert */
-int get_cert_credentials(HANDLE huser,
+/* retrieve OrangeFS credential from cert */
+int get_cert_credential(HANDLE huser,
                          char *userid,
-                         PVFS_credentials *credentials,
+                         PVFS_credential *credential,
                          ASN1_UTCTIME **expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
@@ -338,11 +348,11 @@ int get_cert_credentials(HANDLE huser,
     size_t err_size;
     char error_msg[256], errstr[256];
 
-    DbgPrint("   get_cert_credentials: enter\n");
+    DbgPrint("   get_cert_credential: enter\n");
     
-    if (userid == NULL || credentials == NULL || expires == NULL)
+    if (userid == NULL || credential == NULL || expires == NULL)
     {
-        DbgPrint("   get_cert_credentials: invalid parameter\n");
+        DbgPrint("   get_cert_credential: invalid parameter\n");
         return -1;
     }
 
@@ -400,7 +410,7 @@ int get_cert_credentials(HANDLE huser,
             userid, cert_dir);
         report_cert_error(error_msg);
         ret = -1;
-        goto get_cert_credentials_exit;
+        goto get_cert_credential_exit;
     }
 
     do
@@ -439,7 +449,7 @@ int get_cert_credentials(HANDLE huser,
     }
     
     if (ret != 0)
-        goto get_cert_credentials_exit;
+        goto get_cert_credential_exit;
 
     /* load CA cert */
     ret = load_cert_from_file(goptions->ca_path, &ca_cert);
@@ -449,18 +459,18 @@ int get_cert_credentials(HANDLE huser,
             "certificate %s. See subsequent log messages for details", 
             userid, goptions->ca_path);
         report_cert_error(error_msg);
-        goto get_cert_credentials_exit;
+        goto get_cert_credential_exit;
     }
 
-    /* read and cache credentials from certificate */
-    ret = verify_cert(userid, cert, ca_cert, chain, credentials);
+    /* read and cache credential from certificate */
+    ret = verify_cert(userid, cert, ca_cert, chain, credential);
 
     if (ret == 0)
     {        
         *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));        
     }
 
-get_cert_credentials_exit:
+get_cert_credential_exit:
 
     /* error handling */
     if (ret == OPENSSL_CERT_ERROR)
@@ -491,7 +501,7 @@ get_cert_credentials_exit:
     if (ca_cert != NULL)
         X509_free(ca_cert);
 
-    DbgPrint("   get_cert_credentials: exit\n");
+    DbgPrint("   get_cert_credential: exit\n");
 
     return ret;
 }

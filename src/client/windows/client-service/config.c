@@ -14,9 +14,13 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "pvfs2-types.h"
+#include "security-util.h"
+
 #include "client-service.h"
 #include "config.h"
 #include "user-cache.h"
+#include "cred.h"
 
 extern struct qhash_table user_cache;
 
@@ -98,7 +102,7 @@ static int parse_user()
     char user_name[256];
     char uid[16], gid[16];
     int i, ret = 0;
-    PVFS_credentials credentials;
+    PVFS_credential credential;
 
     /* assume current string being parsed */
     token = strtok(NULL, " \t");
@@ -163,10 +167,13 @@ static int parse_user()
     if (ret == 0)
     {
         /* add user to cache with no expiration */
-        credentials.uid = atoi(uid);
-        credentials.gid = atoi(gid);
+        init_credential(&credential);
+        credential.userid = atoi(uid);
+        credential_add_group(&credential, atoi(gid));
         
-        add_user(user_name, &credentials, NULL);
+        add_cache_user(user_name, &credential, NULL);
+
+        PINT_cleanup_credential(&credential);
     }
 
     return ret;

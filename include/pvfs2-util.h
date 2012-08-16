@@ -42,6 +42,9 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(
 
 void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
+/* Windows uses different credential generation functions */
+#ifndef WIN32
+
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred);
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred);
@@ -51,6 +54,8 @@ int PVFS_util_refresh_credential(PVFS_credential *cred);
  * For new code use PVFS_util_gen_credential_defaults.
  */
 #define PVFS_util_gen_credentials(cred) PVFS_util_gen_credential_defaults(cred)
+
+#endif /* WIN32 */
 
 int PVFS_util_copy_sys_attr(
     PVFS_sys_attr *dest_attr,

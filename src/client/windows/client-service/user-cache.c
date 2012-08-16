@@ -6,7 +6,7 @@
    
 /*
  * User cache functions - to speed credential lookup, the 
- * OrangeFS credentials (UID/GID) are cached with the username.
+ * OrangeFS credential (UID/GID) are cached with the username.
  * Cache entries from certificates expire when the certificate 
  * expires.
  */
@@ -16,10 +16,13 @@
 #include <string.h>
 #include <time.h>
 
+#include "pvfs2-types.h"
 #include "gen-locks.h"
+#include "security-util.h"
 
 #include "client-service.h"
 #include "user-cache.h"
+#include "cred.h"
 
 /* amount of time cache mgmt thread sleeps (ms) */
 #define USER_THREAD_SLEEP_TIME    60000
@@ -36,8 +39,8 @@ int user_compare(void *key,
     return !stricmp((char *) key, entry->user_name);
 }
 
-int add_user(char *user_name, 
-             PVFS_credentials *credentials,
+int add_cache_user(char *user_name, 
+             PVFS_credential *credential,
              ASN1_UTCTIME *expires)
 {
     struct qhash_head *link;
@@ -48,7 +51,7 @@ int add_user(char *user_name,
     link = qhash_search(user_cache, user_name);
     if (link != NULL)
     {        
-        DbgPrint("   add_user: deleting user %s\n", user_name);
+        DbgPrint("   add_cache_user: deleting user %s\n", user_name);
         qhash_del(link);
         free(qhash_entry(link, struct user_entry, hash_link));
     }
@@ -58,28 +61,27 @@ int add_user(char *user_name,
     entry = (struct user_entry *) calloc(1, sizeof(struct user_entry));
     if (entry == NULL)
     {
-        DbgPrint("   add_user: out of memory\n");
+        DbgPrint("   add_cache_user: out of memory\n");
         return -1;
     }
             
     /* add to hash table */
     strncpy(entry->user_name, user_name, 256);
-    entry->credentials.uid = credentials->uid;
-    entry->credentials.gid = credentials->gid;
+    PINT_copy_credential(credential, &(entry->credential));
     entry->expires = expires;
 
     gen_mutex_lock(&user_cache_mutex);
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
-    DbgPrint("   add_user: adding user %s (%u:%u) expires %s\n", 
-        user_name, credentials->uid, credentials->gid, 
+    DbgPrint("   add_cache_user: adding user %s (%u:%u) expires %s\n", 
+        user_name, credential->userid, credential->group_array[0], 
         expires != NULL ? expires->data : "never");
     gen_mutex_unlock(&user_cache_mutex);
 
     return 0;
 }
 
-int get_cached_user(char *user_name, 
-                    PVFS_credentials *credentials)
+int get_cache_user(char *user_name, 
+                    PVFS_credential *credential)
 {
     struct qhash_head *link;
     struct user_entry *entry;
@@ -89,13 +91,13 @@ int get_cached_user(char *user_name,
     link = qhash_search(user_cache, user_name);
     if (link != NULL)
     {
-        /* if cache hit -- return credentials */
+        /* if cache hit -- return credential */
         entry = qhash_entry(link, struct user_entry, hash_link);
-        credentials->uid = entry->credentials.uid;
-        credentials->gid = entry->credentials.gid;
-
-        DbgPrint("   get_cached_user: hit for %s (%u:%u)\n", user_name,
-            credentials->uid, credentials->gid);
+        PINT_copy_credential(&(entry->credential), credential);
+        /* Update timeout */
+        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+        DbgPrint("   get_cache_user: hit for %s (%u:%u)\n", user_name,
+            credential->userid, credential->group_array[0]);
 
         gen_mutex_unlock(&user_cache_mutex);
 
@@ -153,6 +155,7 @@ unsigned int user_cache_thread(void *options)
                 {   
                     DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
                     qhash_del(head);
+                    PINT_cleanup_credential(&(entry->credential));
                     free(entry);
                 }
             }

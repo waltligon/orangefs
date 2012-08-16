@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -32,6 +33,7 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "security-util.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -179,10 +181,239 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     free(mntent->pvfs_config_servers[0]);
     free(mntent->pvfs_config_servers);
     free(mntent->pvfs_fs_name);
+    mntent->pvfs_fs_name = NULL;
     free(mntent);
     return;
 }
 
+/**** not used on Windows ****/
+#if 0
+/* PVFS_util_gen_credential_defaults
+ * 
+ * Generate a signed credential for the current user, with a 
+ * default timeout.
+ */
+int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
+{
+    return PVFS_util_gen_credential(NULL, NULL, 
+                                    PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
+                                    NULL, cred);
+}
+
+#ifdef ENABLE_SECURITY
+/*** TODO: Windows security code ***/
+
+/* PVFS_util_gen_credential
+ * 
+ * Generate signed credential object using external app pvfs2-gencred.
+ *
+ * user - string representation of numeric uid
+ * group - string representation of numeric gid
+ * timeout - in seconds; value of 0 will result in default (1 hour)
+ * keypath - path to client private key file
+ * cred - the credential object
+ */
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+{
+    struct sigaction newsa, oldsa;
+    pid_t pid;
+    int filedes[2], errordes[2];
+    int ret;
+
+    if (!keypath && getenv("PVFS2KEY_FILE"))
+    {
+        keypath = getenv("PVFS2KEY_FILE");
+    }
+
+    memset(&newsa, 0, sizeof(newsa));
+    newsa.sa_handler = SIG_DFL;
+    sigaction(SIGCHLD, &newsa, &oldsa);
+
+    /* pipe to read credential from stdout of pvfs2-gencred */
+    ret = pipe(filedes);
+    if (ret == -1)
+    {
+        return -PVFS_errno_to_error(errno);
+    }
+    /* pipe to read any error messages from stderr of pvfs2-gencred */
+    ret = pipe(errordes);
+    if (ret == -1)
+    {
+        return -PVFS_errno_to_error(errno);
+    }
+
+    pid = fork();
+    if (pid == 0)
+    {
+        char *args[7];
+        char **ptr = args;
+        char timearg[16];
+        char *envp[] = { NULL };
+
+        close(STDERR_FILENO);
+        dup(errordes[1]);
+        close(STDOUT_FILENO);
+        dup(filedes[1]);
+        close(STDIN_FILENO);
+
+        *ptr++ = BINDIR"/pvfs2-gencred";
+
+        if (user)
+        {
+            *ptr++ = "-u";
+            *ptr++ = (char*)user;
+        }
+        if (group)
+        {
+            *ptr++ = "-g";
+            *ptr++ = (char*)group;
+        }
+        if (timeout != 0 && 
+            timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
+        {
+           snprintf(timearg, sizeof(timearg), "%u", timeout);
+           *ptr++ = "-t";
+           *ptr++ = timearg;
+        }
+        if (keypath)
+        {
+            *ptr++ = "-k";
+            *ptr++ = (char*)keypath;
+        }
+        *ptr++ = NULL;
+        execve(BINDIR"/pvfs2-gencred", args, envp);
+
+        _exit(100);
+    }
+    else if (pid == -1)
+    {
+        close(filedes[1]);
+        close(errordes[1]);
+        ret = -PVFS_errno_to_error(errno);
+    }
+    else
+    {
+        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential],
+             ebuf[512];
+        ssize_t total = 0, etotal = 0;
+        ssize_t cnt, ecnt;
+
+        /* close write end so we get EOF when child exits */
+        close(errordes[1]);
+        close(filedes[1]);
+
+        /* read credential */
+        do
+        {
+            do
+            {
+                cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
+            } while (cnt == -1 && errno == EINTR);
+            total += cnt;
+        } while (cnt > 0);
+        
+        if (cnt == -1)
+        {
+            ret = -PVFS_errno_to_error(errno);
+        }
+        else
+        {
+            int rc;
+
+            waitpid(pid, &rc, 0);
+            if (WIFEXITED(rc) && !WEXITSTATUS(rc))
+            {
+                char *ptr = buf;
+                PVFS_credential tmp;
+
+                decode_PVFS_credential(&ptr, &tmp);
+                ret = PINT_copy_credential(&tmp, cred);
+            }
+            else if (WIFEXITED(rc))
+            {                
+                /* error code from pvfs2_gencred */
+                ret = -PVFS_errno_to_error(WEXITSTATUS(rc));
+            }
+            else
+            {
+                /* catch-all error */
+                ret = -PVFS_EINVAL;
+            }
+
+            /* read errors and warnings */
+            do
+            {
+                do
+                {
+                    ecnt = read(errordes[0], ebuf+etotal, 
+                                (sizeof(ebuf) - etotal));
+                } while (ecnt == -1 && errno == EINTR);
+                etotal += ecnt;
+            } while (ecnt > 0 && etotal < sizeof(ebuf));
+            /* null terminate */
+            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
+
+            /* print errors */
+            if (etotal > 0)
+            {
+                char gbuf[600];
+                snprintf(gbuf, sizeof(gbuf), "pvfs2_gencred: %s", ebuf);
+                gossip_err(gbuf);
+            }
+        }
+    }
+
+    close(filedes[0]);
+    close(errordes[0]);
+    sigaction(SIGCHLD, &oldsa, NULL);
+
+    return ret;
+}
+#else /* ENABLE_SECURITY */
+/*
+ * This function generates an unsigned credential for use when
+ * robust security is disabled.
+ */
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+{
+    if (cred == NULL)
+    {
+        gossip_lerr("PVFS_util_gen_credential: credential is null\n");
+        return -PVFS_EINVAL;
+    }
+
+    memset(cred, 0, sizeof(cred));
+
+    return PVFS_gen_unsigned_credential(user, group, timeout, cred);
+}
+#endif /* ENABLE_SECURITY */
+
+/*
+ * This function checks to see if the credential is still valid
+ * and is not about to time out - if so then it does nothing,
+ * otherwise it calls PVFS_util_gen_credential_defaults to make a
+ * fresh one. Call this before running any system call.
+ */
+int PVFS_util_refresh_credential(PVFS_credential *cred)
+{
+    int ret;
+
+    /* if the credential is valid for at least an hour */
+    if (PINT_util_get_current_time() <= cred->timeout - 3600)
+    {
+        ret = 0;
+    }
+    else
+    {
+        PINT_cleanup_credential(cred);
+        ret = PVFS_util_gen_credential_defaults(cred);
+    }
+
+    return ret;
+}
+#endif /* #if 0 */
 
 int PVFS_util_get_umask(void)
 {
@@ -195,32 +426,6 @@ int PVFS_util_get_umask(void)
         set = 1;
     }
     return mask;
-}
-
-
-PVFS_credentials *PVFS_util_dup_credentials(
-    const PVFS_credentials *credentials)
-{
-    PVFS_credentials *ret = NULL;
-
-    if (credentials)
-    {
-        ret = (PVFS_credentials *) malloc(sizeof(PVFS_credentials));
-        if (ret)
-        {
-            memcpy(ret, credentials, sizeof(PVFS_credentials));
-        }
-    }
-    return ret;
-}
-
-void PVFS_util_release_credentials(
-    PVFS_credentials *credentials)
-{
-    if (credentials)
-    {
-        free(credentials);
-    }
 }
 
 int PVFS_util_copy_sys_attr(
@@ -822,6 +1027,8 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             {
                 return -PVFS_ENOMEM;
             }
+            /* should this be PVFS_PATH_MAX? - WBL */
+            /* need to find def of this field (tabfile_name) first */
             strncpy(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].tabfile_name,
                     PVFS2_DYNAMIC_TAB_NAME, PVFS_NAME_MAX);
         }
@@ -1028,6 +1235,23 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
             }
         }
     }
+
+    /* check the dynamic region if we haven't found a match yet */
+    for (i = 0; i < s_stat_tab_array[
+             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+    {
+        struct PVFS_sys_mntent *mnt_iter;
+        mnt_iter = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
+                     mntent_array[i]);
+
+        if (mnt_iter->fs_id == fs_id)
+        {
+            PVFS_util_copy_mntent(out_mntent, mnt_iter);
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return 0;
+        }
+    }
+
     gen_mutex_unlock(&s_stat_tab_mutex);
     return -PVFS_EINVAL;
 }
@@ -1119,7 +1343,7 @@ int PVFS_util_resolve(
     char* parent_path = NULL;
     int base_len = 0;
 
-    if(strlen(local_path) > (PVFS_NAME_MAX-1))
+    if(strlen(local_path) > (PVFS_PATH_MAX-1))
     {
         gossip_err("Error: PVFS_util_resolve() input path too long.\n");
         return(-PVFS_ENAMETOOLONG);
@@ -1128,8 +1352,10 @@ int PVFS_util_resolve(
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-    ret = PINT_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
-        out_fs_path_max);
+    ret = PVFS_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
+                                     out_fs_path_max);
+/* TODO: for now exit */
+#if 0
     if(ret == 0)
     {
         /* done */
@@ -1140,20 +1366,20 @@ int PVFS_util_resolve(
         /* if the path wasn't found, try canonicalizing the path in case it
          * refers to a relative path on a mounted volume or contains symlinks
          */
-        tmp_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+        tmp_path = (char*)malloc(PVFS_PATH_MAX * sizeof(char));
         if(!tmp_path)
         {
             return(-PVFS_ENOMEM);
         }
-        memset(tmp_path, 0, PVFS_NAME_MAX*sizeof(char));
-        ret = PINT_realpath(local_path, tmp_path, (PVFS_NAME_MAX-1));
+        memset(tmp_path, 0, PVFS_PATH_MAX * sizeof(char));
+        ret = PINT_realpath(local_path, tmp_path, (PVFS_PATH_MAX - 1));
         if(ret == -PVFS_EINVAL)
         {
             /* one more try; canonicalize the parent in case this function
              * is called before object creation; the basename
              * doesn't yet exist but we still need to find the PVFS volume
              */
-            parent_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+            parent_path = (char *)malloc(PVFS_PATH_MAX * sizeof(char));
             if(!parent_path)
             {
                 free(tmp_path);
@@ -1165,7 +1391,7 @@ int PVFS_util_resolve(
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
             ret = PINT_realpath(dirname(parent_path), tmp_path,
-                (PVFS_NAME_MAX-base_len-2));
+                      (PVFS_PATH_MAX - base_len - 2));
             if(ret < 0)
             {
                 free(tmp_path);
@@ -1186,13 +1412,13 @@ int PVFS_util_resolve(
             return(-PVFS_ENOENT);
         }
 
-        ret = PINT_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
+        ret = PVFS_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
             out_fs_path_max);
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
     }
-
+#endif
     return(ret);
 }
 
@@ -1446,8 +1672,18 @@ void PVFS_util_free_mntent(
         {
             int j;
             for (j=0; j<mntent->num_pvfs_config_servers; j++)
+            {            
                 if (mntent->pvfs_config_servers[j])
+                {
+                    if (mntent->pvfs_config_servers[j] == 
+                        mntent->the_pvfs_config_server)
+                    {
+                        /* don't free further down */
+                        mntent->the_pvfs_config_server = NULL;
+                    }
                     free(mntent->pvfs_config_servers[j]);
+                }
+            }
             free(mntent->pvfs_config_servers);
             mntent->pvfs_config_servers = NULL;
             mntent->num_pvfs_config_servers = 0;
@@ -1466,6 +1702,11 @@ void PVFS_util_free_mntent(
         {
             free(mntent->mnt_opts);
             mntent->mnt_opts = NULL;
+        }
+        if (mntent->the_pvfs_config_server)           
+        {
+            free(mntent->the_pvfs_config_server);
+            mntent->the_pvfs_config_server = NULL;
         }
 
         mntent->flowproto = 0;
@@ -1508,6 +1749,14 @@ int PVFS_util_copy_mntent(
                 ret = -PVFS_ENOMEM;
                 goto error_exit;
             }
+        }
+
+        dest_mntent->the_pvfs_config_server = 
+            strdup(src_mntent->the_pvfs_config_server);
+        if (!dest_mntent->the_pvfs_config_server)
+        {
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
         }
 
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
@@ -1652,7 +1901,7 @@ void PINT_release_pvfstab(void)
     int i, j;
 
     gen_mutex_lock(&s_stat_tab_mutex);
-    for(i=0; i<s_stat_tab_count; i++)
+    for(i = 0; i < s_stat_tab_count; i++)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
@@ -1734,6 +1983,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
     if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
     {
         attrmask |= PVFS_ATTR_META_DIST;
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
+    {
+        attrmask |= PVFS_ATTR_CAPABILITY;
     }
 
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
@@ -1823,6 +2077,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
     }
+    if (obj_mask & PVFS_ATTR_CAPABILITY)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
+    }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
      * outside of the system interface
@@ -1879,33 +2137,33 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
     return 0;
 }
 
-/* PINT_util_resolve_absolute()
+/* PVFS_util_resolve_absolute()
  *
  * given a local path of a file that may reside on a pvfs2 volume,
  * determine what the fsid and fs relative path is. Makes no attempt
  * to canonicalize the path.
  *
- * returns 0 on succees, -PVFS_error on failure
+ * returns 0 on success, -PVFS_error on failure
  */
-static int PINT_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max)
+int PVFS_util_resolve_absolute(const char *local_path,
+                               PVFS_fs_id *out_fs_id,
+                               char *out_fs_path,
+                               int out_fs_path_max)
 {
     int i = 0, j = 0;
     int ret = -PVFS_EINVAL;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for(i=0; i < s_stat_tab_count; i++)
+    for(i = 0; i < s_stat_tab_count; i++)
     {
-        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
-                local_path, 
-                s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                out_fs_path, out_fs_path_max);
+                           local_path, 
+                           s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                           out_fs_path,
+                           out_fs_path_max);
             if(ret == 0)
             {
                 *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
@@ -1924,17 +2182,17 @@ static int PINT_util_resolve_absolute(
     }
 
     /* check the dynamic tab area if we haven't resolved anything yet */
-    for(j = 0; j < s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
         ret = PINT_remove_dir_prefix(
-            local_path, s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-            out_fs_path, out_fs_path_max);
+             local_path,
+             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
+             out_fs_path,
+             out_fs_path_max);
         if (ret == 0)
         {
-            *out_fs_id = s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            *out_fs_id =
+                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
             if(*out_fs_id == PVFS_FS_ID_NULL)
             {
                 gossip_err("Error: %s resides on a PVFS2 file system "
@@ -1955,27 +2213,27 @@ static int PINT_util_resolve_absolute(
 
 #ifdef DEFINE_MY_GET_NEXT_FSENT
 
-static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab)
+static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
 {
     char linestr[500];
     int linelen = 0;
-    char * strtok_ctx;
-    char * nexttok; 
-    PINT_fstab_entry_t * fsentry;
-    if(!fgets(linestr, 500, tab))
+    char *strtok_ctx;
+    char *nexttok; 
+    PINT_fstab_entry_t *fsentry;
+    if (!fgets(linestr, 500, tab))
     {
         return NULL;
     }
 
     fsentry = malloc(sizeof(PINT_fstab_entry_t));
-    if(!fsentry)
+    if (!fsentry)
     {
         return NULL;
     }
     memset(fsentry, 0, sizeof(PINT_fstab_entry_t));
 
     linelen = strlen(linestr);
-    if(linestr[linelen - 1] == '\n')
+    if (linestr[linelen - 1] == '\n')
     {
         linestr[linelen - 1] = 0;
     }
@@ -2099,12 +2357,6 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
     }
     return ret;
 #undef NUM_MODES
-}
-
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    PINT_util_gen_credentials(credentials);
 }
 
 /*
