@@ -54,7 +54,6 @@ void check_rc(int rc)
 /** Function to be run upon successful termination from an exit call */
 static void clean_up(void)
 {
-    int rc = 0;
     /* Only the parent process should execute these lines.
      * Must check the pid since the atexit function registered 
      * clean_up. This registration is passed on to any child
@@ -65,12 +64,12 @@ static void clean_up(void)
     {
         if(DEST_AT_EXIT)
         {
-            rc = destroy_ucache_shmem(1, 1);
+            destroy_ucache_shmem(1, 1);
         }
         gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: ucached exiting...PID=%d\n", pid);
-        rc = unlink(FIFO1);
-        rc = unlink(FIFO2);
+        unlink(FIFO1);
+        unlink(FIFO2);
     }
 }
 
@@ -205,6 +204,13 @@ static int execute_cmd(char cmd)
         }
         /* Close Daemon */
         case 'x': 
+            writefd = open(FIFO2, O_WRONLY);
+            /*
+            if(writefd)
+            {
+                rc = write(writefd, "", BUFF_SIZE);
+            }
+            */
             close(writefd);
             close(readfd);
             remove(UCACHED_STARTED);

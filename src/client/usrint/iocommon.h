@@ -35,7 +35,6 @@
 struct ucache_req_s
 {
     uint64_t ublk_tag; /* ucache block tag (byte index into file) */
-    unsigned char ublk_hit; /* boolean indicating 'block found in cache' */
     void *ublk_ptr; /* where in ucache memory to read block from or write to */
     uint16_t ublk_index; /* index of ucache block in shared memory segment */
 };
@@ -45,7 +44,6 @@ struct ucache_copy_s
     void * cache_pos;
     void * buff_pos;
     size_t size;
-    unsigned char hit;
     uint16_t blk_index;
 };
 

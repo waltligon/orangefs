@@ -429,8 +429,6 @@ int pvfs_sys_init(void)
     static int pvfs_lib_lock_initialized = 0; /* recursive lock init flag */
     static int pvfs_lib_init_flag = 0;
 
-    int rc = 0;
-
     /* Mutex protecting initialization of recursive mutex */
     static gen_mutex_t mutex_mutex = GEN_MUTEX_INITIALIZER;
     /* The recursive mutex */
@@ -441,24 +439,24 @@ int pvfs_sys_init(void)
 
     if(!pvfs_lib_lock_initialized)
     {
-        rc = gen_mutex_lock(&mutex_mutex);
+        gen_mutex_lock(&mutex_mutex);
         if(!pvfs_lib_lock_initialized)
         {
             //init recursive mutex
             pthread_mutexattr_t rec_attr;
-            rc = pthread_mutexattr_init(&rec_attr);
-            rc = pthread_mutexattr_settype(&rec_attr, PTHREAD_MUTEX_RECURSIVE);
-            rc = pthread_mutex_init(&rec_mutex, &rec_attr);
-            rc = pthread_mutexattr_destroy(&rec_attr);
+            pthread_mutexattr_init(&rec_attr);
+            pthread_mutexattr_settype(&rec_attr, PTHREAD_MUTEX_RECURSIVE);
+            pthread_mutex_init(&rec_mutex, &rec_attr);
+            pthread_mutexattr_destroy(&rec_attr);
             pvfs_lib_lock_initialized = 1;
         }
-        rc = gen_mutex_unlock(&mutex_mutex);
+        gen_mutex_unlock(&mutex_mutex);
     }
 
-    rc = pthread_mutex_lock(&rec_mutex);
+    pthread_mutex_lock(&rec_mutex);
     if(pvfs_lib_init_flag || pvfs_initializing_flag)
     {
-        rc = pthread_mutex_unlock(&rec_mutex);
+        pthread_mutex_unlock(&rec_mutex);
         return 1;
     }
 
@@ -469,7 +467,7 @@ int pvfs_sys_init(void)
     pvfs_sys_init_doit();
     pvfs_initializing_flag = 0;
     pvfs_lib_init_flag = 1;
-    rc = pthread_mutex_unlock(&rec_mutex);
+    pthread_mutex_unlock(&rec_mutex);
     return 0;
 }
 

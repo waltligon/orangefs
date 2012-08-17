@@ -35,8 +35,12 @@
 #define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
 
+#ifndef UCACHE_MAX_BLK_REQ 
+#define UCACHE_MAX_BLK_REQ MEM_TABLE_ENTRY_COUNT
+#endif
+
 #ifndef UCACHE_MAX_REQ 
-#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * MEM_TABLE_ENTRY_COUNT)
+#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * UCACHE_MAX_BLK_REQ)
 #endif 
 
 /* Define multiple NILS to there's no need to cast for different types */
@@ -216,7 +220,7 @@ int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct file_ent_s **fent);
 int ucache_close_file(struct file_ent_s *fent);
-inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
+inline struct mem_table_s *ucache_get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
 inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
 inline void *ucache_insert(struct file_ent_s *fent, 
                     uint64_t offset, 
