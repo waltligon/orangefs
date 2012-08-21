@@ -952,6 +952,23 @@ AC_SUBST(BUILD_UCACHE)],
     [Should we enable user interface data cache.])
 AC_SUBST(BUILD_UCACHE)])
 
+dnl Method to enable JNI prefixed stdio and posix calls
+BUILD_JNI=
+AC_ARG_ENABLE(jni,
+[  --enable-jni         Enable PVFS Client JNI.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_JNI_ENABLE, 1,
+      [Should we enable PVFS Client JNI.])
+   BUILD_JNI=1
+else
+   AC_DEFINE(PVFS_JNI_ENABLE, 0,
+      [Should we enable PVFS Client JNI.])
+fi
+AC_SUBST(BUILD_JNI)],
+[AC_DEFINE(PVFS_JNI_ENABLE, 0,
+    [Should we enable PVFS Client JNI.])
+AC_SUBST(BUILD_JNI)])
+
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
 AC_MSG_CHECKING(for user acl includes sys/acl.h acl/libacl.h)
@@ -1570,6 +1587,13 @@ if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
+
+fi
+
+if test "x$BUILD_JNI" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
+else
+   AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
 
 fi
 

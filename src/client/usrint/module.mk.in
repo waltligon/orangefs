@@ -18,7 +18,13 @@ SRC := \
 
 USRC := \
  	$(DIR)/posix.c \
- 	$(DIR)/stdio.c \
+ 	$(DIR)/stdio.c 
+
+ifdef BUILD_JNI
+USRC += \
+    $(DIR)/jni_posix.c \
+    $(DIR)/jni_stdio.c 
+endif # BUILD_JNI
 
 #   these routines do no need to use the pvfs descriptor
 #   and will probably be removed
