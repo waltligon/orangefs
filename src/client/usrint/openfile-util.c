@@ -423,7 +423,7 @@ int pvfs_sys_init(void)
         rc = gen_mutex_lock(&mutex_mutex);
         if(!pvfs_lib_lock_initialized)
         {
-            //init recursive mutex
+            /* Init recursive mutex */
             pthread_mutexattr_t rec_attr;
             rc = pthread_mutexattr_init(&rec_attr);
             rc = pthread_mutexattr_settype(&rec_attr, PTHREAD_MUTEX_RECURSIVE);
@@ -444,7 +444,7 @@ int pvfs_sys_init(void)
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
     pvfs_initializing_flag = 1;
 
-    //Perform Init
+    /* Perform Init */
     pvfs_sys_init_doit();
     pvfs_initializing_flag = 0;
     pvfs_lib_init_flag = 1;
