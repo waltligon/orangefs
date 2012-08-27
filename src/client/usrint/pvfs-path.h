@@ -84,13 +84,13 @@
 
 typedef struct PVFS_path_s
 {
-    uint64_t magic;    /* contains a magic to id the struct a flags */
     int rc;            /* return code of internal functions */
     char *orig_path;   /* this is the original unmodified path */
     char *pvfs_path;   /* if we resove, this points to the pvfs portion */
     PVFS_fs_id fs_id;  /* if we resolve this is the fs_id */
     PVFS_handle handle;/* if we look up a pvfs object, this is the last one */
     char *filename;    /* this is the path left after the object */
+    uint64_t magic;    /* contains a magic to id the struct a flags */
     char expanded_path[PVFS_PATH_MAX + 1]; /* modified path is here */
 } PVFS_path_t;
 
