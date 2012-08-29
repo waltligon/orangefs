@@ -1824,8 +1824,6 @@ int PVFS_util_resolve_absolute(const char* local_path)
     Ppath = PVFS_path_from_expanded((char *)local_path);
     if (!VALID_PATH_MAGIC(Ppath))
     {
-        gossip_err("Error: PVFS_util_resolve_absolute only"
-                   " works on PVFS_path structures\n");
         gen_mutex_unlock(&s_stat_tab_mutex);
         return ret;
     }
