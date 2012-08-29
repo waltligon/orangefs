@@ -71,8 +71,8 @@ int main(int argc, char **argv)
         int rc;
         int num_segs;
         char *working_file = user_opts->filenames[i];
-        char directory[PVFS_NAME_MAX];
-        char filename[PVFS_SEGMENT_MAX];
+        char directory[PVFS_NAME_MAX] = {0};
+        char filename[PVFS_SEGMENT_MAX] = {0};
 
         layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
         layout.server_list.count = 0;
@@ -90,21 +90,9 @@ int main(int argc, char **argv)
         PVFS_object_ref parent_ref;
         PVFS_sys_attr attr;
 
-        /* Translate path into pvfs2 relative path */
-        rc = PINT_get_base_dir(working_file, directory, PVFS_NAME_MAX);
-        num_segs = PINT_string_count_segments(working_file);
-        rc = PINT_get_path_element(working_file, num_segs - 1,
-                                   filename, PVFS_SEGMENT_MAX);
 
-        if (rc)
-        {
-            fprintf(stderr, "Unknown path format: %s\n", working_file);
-            ret = -1;
-            break;
-        }
-
-        rc = PVFS_util_resolve(directory, &cur_fs,
-                               pvfs_path, PVFS_NAME_MAX);
+        /* Translate the working file into a pvfs2 relative path*/
+        rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path, PVFS_NAME_MAX);
         if (rc)
         {
             PVFS_perror("PVFS_util_resolve", rc);
@@ -112,10 +100,25 @@ int main(int argc, char **argv)
             break;
         }
 
+        /* Get the parent directory of the working file */
+        rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
+
+        /* Determine the filename from the working */
+        num_segs = PINT_string_count_segments(working_file);
+        rc = PINT_get_path_element(working_file, num_segs - 1,
+                                   filename, PVFS_SEGMENT_MAX);
+        if (rc)
+        {
+            fprintf(stderr, "Unknown path format: %s\n", working_file);
+            ret = -1;
+            break;
+        }
+
+
         PVFS_util_gen_credentials(&credentials);
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+        rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (rc)
         {
@@ -171,7 +174,9 @@ int main(int argc, char **argv)
                 assert(tmp_server_index < layout.server_list.count);
                 
                 /* TODO: is there a way to do this without internal BMI
-                 * functions?
+                 * functions? The address lookups should be done within the create
+                 * state machine.  This program should only have to send in
+                 * a list of server aliases from the config file.
                  */
                 rc = BMI_addr_lookup(
                     &layout.server_list.servers[tmp_server_index],
