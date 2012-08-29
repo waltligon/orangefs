@@ -1655,8 +1655,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             ureq_index++;
         }
     }
-    #endif /* PVFS_UCACHE_ENABLE */
     return transfered;
+    #endif /* PVFS_UCACHE_ENABLE */
 }
 
 /** do a blocking read or write from an iovec
