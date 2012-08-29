@@ -126,6 +126,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    if ( pvfs_path[0] == '\0' )
+    {
+       /* When pvfs_path is returned NULL from PVFS_util_resolve, the assumption is that the 
+        * original start path WAS the mount point.
+        */
+       strcpy(pvfs_path,"/");
+    }
+
+
     if (fsck_options->check_stranded_objects && (strcmp(pvfs_path, "/") != 0))
     {
         fprintf(stderr, "Error: -d must specify the pvfs2 root directory when utilizing the -c option.\n");
