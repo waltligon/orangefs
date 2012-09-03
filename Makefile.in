@@ -525,11 +525,11 @@ endif
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
 ifdef TARGET_OS_DARWIN
 LIBRARIES_STATIC := lib/libpvfs2.a
-LIBRARIES_LIBTOOL := lib/liborange.la
+LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
-LIBRARIES_STATIC := lib/libpvfs2.a lib/liborange.a
+LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
 endif
-LIBRARIES_SHARED := lib/libpvfs2.so lib/liborange.so
+LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
 
@@ -540,8 +540,8 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifdef BUILD_USRINT
-LIBRARIES_STATIC += lib/libofs.a lib/liborangeposix.a
-LIBRARIES_SHARED += lib/libofs.so lib/liborangeposix.so
+LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
 LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
 LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
@@ -861,38 +861,38 @@ lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
 	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
 
 # rule for building the shared ofs library
-lib/libofs.so: $(ULIBPICOBJS)
+lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the shared ofs _multithreaded_ library
-lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
+lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rules for building virtual libraries
-lib/liborange.a: lib/libpvfs2.a
+lib/liborangefs.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.a
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.a
 
-lib/liborange.la: lib/libpvfs2.a
+lib/liborangefs.la: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
 	$(E)glibtool --mode=link --tag=CC gcc -o lib/libpvfs2.la $^ -lcrypto -lssl -static
 	mv lib/libpvfs2.la $@
 
-lib/liborange.so: lib/libpvfs2.so
+lib/liborangefs.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.so
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.so
 
-lib/liborangeposix.a: lib/libpvfs2.a
+lib/liborangefsposix.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangeposix.a
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.a
 
-lib/liborangeposix.so: lib/libpvfs2.so
+lib/liborangefsposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangeposix.so
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
