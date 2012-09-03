@@ -38,6 +38,12 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
 static void clean_up(void);
 static int ucached_lockchk(void);
 
+/* Prototypes */
+
+void check_rc(int rc);
+
+
+
 void check_rc(int rc)
 {
     memset(buffer, 0, BUFF_SIZE);

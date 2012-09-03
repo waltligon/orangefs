@@ -60,6 +60,30 @@ void iocommon_ensure_init(void);
 
 void iocommon_cred(PVFS_credentials **credentials);
 
+
+void calc_copy_ops( off64_t offset,
+                    size_t req_size,
+                    struct ucache_req_s *ureq,
+                    struct ucache_copy_s *ucop,
+                    int copy_count,
+                    const struct iovec *vector
+);
+
+int calc_req_blk_cnt(uint64_t offset, size_t req_size);
+
+
+size_t sum_iovec_lengths(size_t iovec_count, const struct iovec *vector);
+
+
+unsigned char read_full_block_into_ucache( pvfs_descriptor *pd, 
+                                           PVFS_size offset, 
+                                           struct ucache_req_s *req, 
+                                           int req_index, 
+                                           uint64_t * fent_size, 
+                                           size_t * req_size, 
+                                           int * req_blk_cnt 
+);
+
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
 
 int iocommon_expand_path (PVFS_path_t *Ppath,
