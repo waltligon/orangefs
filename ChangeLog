@@ -3,6 +3,15 @@ OrangeFS Release ChangeLog
 -----------------------
 Stable
 
+Revs 9399 thru 9470
+* Defects corrected for usrint library and ucache system.
+* Changes to Makefile:
+*   - Using glibtool instead of glib on MAC-Darwin OS when making libpvfs2.a
+*   - Ensure that sbin dir is creatd before moving ucache system into it.
+*   - Added lib/libpvfs2.so as a dependency when making libofs.so to allow
+*     make with the -j option to operate correctly.
+*   - Renamed liborange to liborangefs.
+
 * New Feature: added human readable times to pvfs2-db-display.  Rev 9366.
 
 * New Feature:  when setting the mode (admin or normal) of a filesystem 
@@ -10,7 +19,7 @@ Stable
 * to this change, the mode was set for all the servers within a particular 
 * filesystem.
 
-orangefs-2.8.6
+orangefs-2.8.6 (Rev v2.8.6)
 
 * New Feature: users can now specify at configure time how they want the
 * kernel module to handle the file pointer when an error occurs.  The
