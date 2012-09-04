@@ -76,14 +76,14 @@ static unsigned long load_cert_from_file(char *path,
         return errno;
 
     *cert = PEM_read_X509(f, NULL, NULL, NULL);
-    if (*cert == NULL)
-        return OPENSSL_CERT_ERROR;
 
     fclose(f);
 
+    if (*cert == NULL)
+        return OPENSSL_CERT_ERROR;
+
     return 0;
 }
-
 
 static int get_proxy_auth_ex_data_cred()
 {
