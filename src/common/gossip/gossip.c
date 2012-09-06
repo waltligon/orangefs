@@ -537,6 +537,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
             bptr += 8;
+            bsize -= 8;
 #ifdef WIN32
             temp_size = sprintf(bptr, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
                            GetThreadId(GetCurrentThread()));
@@ -557,12 +558,20 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
         default:
             break;
     }
-
+    
+#ifndef WIN32
     ret = vsnprintf(bptr, bsize, format, ap);
     if (ret < 0)
     {
         return -errno;
     }
+#else
+    ret = vsnprintf_s(bptr, bsize, _TRUNCATE, format, ap);
+    if (ret == -1 && errno != 0)
+    {
+        return -errno;
+    }
+#endif
 
     ret = fprintf(fp, "%s", buffer);
     if (ret < 0)

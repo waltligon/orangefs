@@ -197,6 +197,11 @@ int __gossip_debug(
     char prefix,
     const char *format,
     ...);
+int __gossip_debug_va(
+    uint64_t mask,
+    char prefix,
+    const char *format,
+    va_list ap);
 int __gossip_debug_stub(
     uint64_t mask,
     char prefix,

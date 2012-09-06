@@ -13,7 +13,12 @@
 #define PATH_H 1
 
 #include <stdio.h>
-#include <pvfs2.h>
+
+#include "pvfs2.h"
+
+#ifdef WIN32
+#include "wincommon.h"
+#endif
 
 #define PVFS_PATH_MAGIC (0xfafbfcfdfefff000)
 #define PVFS_PATH_QUALIFIED (0x001)

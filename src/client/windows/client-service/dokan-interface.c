@@ -90,16 +90,18 @@ void DbgInit()
 }
 #endif
 
+#define DEBUG_BUF_SIZE    8192
 void DbgPrint(char *format, ...)
 {
     if (g_DebugMode) 
     {
-        char buffer[GOSSIP_BUF_SIZE];
-        /* SYSTEMTIME sys_time; */
-            
+        char buffer[DEBUG_BUF_SIZE];        
+        /* SYSTEMTIME sys_time; */            
         va_list argp;
+
         va_start(argp, format);
-        vsprintf_s(buffer, sizeof(buffer), format, argp);
+        vsnprintf_s(buffer, sizeof(buffer), _TRUNCATE, format, argp);
+        buffer[DEBUG_BUF_SIZE-1] = '\0';
         va_end(argp);
 
 #ifdef _DEBUG
@@ -117,7 +119,7 @@ void DbgPrint(char *format, ...)
         */
         
         /* use gossip to debug to file or stderr (set in config file) */
-        gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, buffer);
+        gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, "%s", buffer);
     }
 }
 
@@ -370,9 +372,9 @@ static char *get_fs_path(const wchar_t *local_path)
     }
 
     /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
+    fs_path = (char *) malloc(PVFS_PATH_MAX + 4);
     MALLOC_CHECK_N(fs_path);
-    ret = fs_resolve_path(mb_path, fs_path, MAX_PATH);
+    ret = fs_resolve_path(mb_path, fs_path, PVFS_PATH_MAX);
     if (ret != 0)
     {
         DbgPrint("   fs_resolve_path returned %d\n", ret);
@@ -674,6 +676,78 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
     }
 
     return ret;
+}
+
+/* convert OrangeFS attributes to Windows info */
+static int PVFS_sys_attr_to_file_info(char *filename,
+                                      PVFS_credentials *credentials,
+                                      PVFS_sys_attr *attr, 
+                                      LPBY_HANDLE_FILE_INFORMATION phFileInfo)
+{
+
+    if (filename == NULL || credentials == NULL || attr == NULL || 
+        phFileInfo == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    phFileInfo->dwFileAttributes = 0;
+    
+    if (attr->objtype & PVFS_TYPE_DIRECTORY) {
+        phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
+    }
+
+    /* check for hidden file */
+    /*
+    filename = (char *) malloc(strlen(fs_path) + 1);
+    MALLOC_CHECK(filename);
+    ret = PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);
+    */
+    if (strcmp(filename, ".") != 0 &&
+        strcmp(filename, "..") != 0 &&
+        filename[0] == '.')
+    {
+        phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+    }
+    /*
+    free(filename);
+    ret = 0;
+    */
+        
+    /* Check perms for READONLY */
+    if (!check_perm(attr, credentials, PERM_WRITE))
+    {
+        phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_READONLY;        
+    }
+
+    /* check for temporary file */
+    /*
+    if (DokanFileInfo->DeleteOnClose)
+    {
+        phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
+        strcat(info, "TEMP ");
+    }
+    */
+
+    /* normal file */
+    if (phFileInfo->dwFileAttributes == 0)
+    {
+        phFileInfo->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;        
+    }
+        
+    /* links */
+    phFileInfo->nNumberOfLinks = 1;
+
+    /* file times */
+    convert_pvfstime(attr->ctime, &phFileInfo->ftCreationTime);
+    convert_pvfstime(attr->atime, &phFileInfo->ftLastAccessTime);
+    convert_pvfstime(attr->mtime, &phFileInfo->ftLastWriteTime);
+
+    /* file size */
+    phFileInfo->nFileSizeHigh = (attr->size & 0x7FFFFFFF00000000LL) >> 32;
+    phFileInfo->nFileSizeLow = (attr->size & 0xFFFFFFFFLL);
+
+    return 0;
 }
 
 static ULONG64 gen_context()
@@ -1245,60 +1319,50 @@ PVFS_Dokan_get_file_information(
     ret = fs_getattr(fs_path, &credentials, &attr);
 
     if (ret == 0)
-    {        
-        strcpy(info, "   ");
-        /* convert to Windows attributes */
-        HandleFileInformation->dwFileAttributes = 0;
-        if (attr.objtype & PVFS_TYPE_DIRECTORY) {
-            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
-            strcat(info, "DIR ");
-        }
-
-        /* check for hidden file */
+    {       
         filename = (char *) malloc(strlen(fs_path) + 1);
         MALLOC_CHECK(filename);
-        ret = PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);
-        if (ret == 0 && filename[0] == '.')
-        {
-            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            strcat(info, "HIDDEN ");
-        }
+        PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);        
+        
+        ret = PVFS_sys_attr_to_file_info(filename, &credentials, &attr, 
+            HandleFileInformation);
+        
         free(filename);
-        ret = 0;
+
+        if (ret == 0) 
+        {
+            strcpy(info, "   ");
+            /* temporary file */
+            if (DokanFileInfo->DeleteOnClose)
+            {
+                HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
+                strcat(info, "TEMP ");
+            }
+
+            /* debugging */
+            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            {
+                strcat(info, "DIR ");
+            }
         
-        /* Check perms for READONLY */
-        if (!check_perm(&attr, &credentials, PERM_WRITE))
-        {
-            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_READONLY;
-            strcat(info, "READONLY ");
-        }
-
-        /* check for temporary file */
-        if (DokanFileInfo->DeleteOnClose)
-        {
-            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
-            strcat(info, "TEMP ");
-        }
-
-        /* normal file */
-        if (HandleFileInformation->dwFileAttributes == 0)
-        {
-            HandleFileInformation->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
-            strcat(info, "NORMAL");
-        }
-        DbgPrint("%s\n", info);
+            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+            {
+                strcat(info, "HIDDEN ");
+            }
+            
+            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+            {
+                strcat(info, "READONLY ");
+            }
+         
+            /* normal file */
+            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_NORMAL)
+            {            
+                strcat(info, "NORMAL");
+            }
         
-        /* links */
-        HandleFileInformation->nNumberOfLinks = 1;
-
-        /* file times */
-        convert_pvfstime(attr.ctime, &HandleFileInformation->ftCreationTime);
-        convert_pvfstime(attr.atime, &HandleFileInformation->ftLastAccessTime);
-        convert_pvfstime(attr.mtime, &HandleFileInformation->ftLastWriteTime);
-
-        /* file size */
-        HandleFileInformation->nFileSizeHigh = (attr.size & 0x7FFFFFFF00000000LL) >> 32;
-        HandleFileInformation->nFileSizeLow = (attr.size & 0xFFFFFFFFLL);
+            DbgPrint("%s\n", info);
+        }
 
         FREE_ATTR_BUFS(attr);
     }    
@@ -1379,6 +1443,106 @@ PVFS_Dokan_set_file_attributes(
 }
 
 
+/* add . and .. entries to directory listing */
+static int add_dir_entries(
+    char *fs_path,
+    PVFS_credentials *credentials,
+    PFillFindData FillFindData,
+    PDOKAN_FILE_INFO DokanFileInfo)
+{
+    int ret;
+    PVFS_sys_attr attr1, attr2;
+    char parent_path[PVFS_PATH_MAX+8];
+    WIN32_FIND_DATAW find_data;
+    BY_HANDLE_FILE_INFORMATION hfile_info;
+
+    /* get attributes of current directory */
+    ret = fs_getattr(fs_path, credentials, &attr1);
+    if (ret != 0)
+    {
+        DbgPrint("   add_dir_entries: fs_getattr (1) returned %d\n", ret);
+        return ret;
+    }
+
+    /* determine parent path */
+    memset(parent_path, 0, sizeof(parent_path));
+    if (strcmp(fs_path, "/") == 0)
+    {
+        /* just use current path for root */
+        memcpy(&attr2, &attr1, sizeof(PVFS_sys_attr));
+    }
+    else
+    {
+        /* get attrs of parent for .. entry */
+        ret = PINT_get_base_dir(fs_path, parent_path, PVFS_PATH_MAX);
+        if (ret == -1)
+        {
+            return -PVFS_EINVAL;
+        }
+        
+        ret = fs_getattr(parent_path, credentials, &attr2);
+        if (ret != 0)
+        {
+            DbgPrint("   add_dir_entries: fs_getattr (2) returned %d\n", ret);
+            return ret;
+        }
+    }
+
+    /* convert attributes of . entry */
+    memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
+    ret = PVFS_sys_attr_to_file_info(".", credentials, &attr1, &hfile_info);
+    if (ret != 0)
+    {
+        DbgPrint("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
+        return -PVFS_EINVAL;
+    }
+        
+    /* attributes */
+    find_data.dwFileAttributes = hfile_info.dwFileAttributes;
+    memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
+            sizeof(FILETIME));
+    memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
+            sizeof(FILETIME));
+    memcpy(&find_data.ftLastWriteTime, &hfile_info.ftLastWriteTime,
+            sizeof(FILETIME));
+    find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
+    find_data.nFileSizeLow = hfile_info.nFileSizeLow;
+        
+    /* filename */        
+    wcscpy(find_data.cFileName, L".");
+
+    /* Dokan callback function */
+    FillFindData(&find_data, DokanFileInfo);
+
+    /* convert attributes of .. entry */
+    memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
+    ret = PVFS_sys_attr_to_file_info("..", credentials, &attr2, &hfile_info);
+    if (ret != 0)
+    {
+        DbgPrint("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
+        return -PVFS_EINVAL;
+    }
+        
+    /* attributes */
+    find_data.dwFileAttributes = hfile_info.dwFileAttributes;
+    memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
+            sizeof(FILETIME));
+    memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
+            sizeof(FILETIME));
+    memcpy(&find_data.ftLastWriteTime, &hfile_info.ftLastWriteTime,
+            sizeof(FILETIME));
+    find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
+    find_data.nFileSizeLow = hfile_info.nFileSizeLow;
+        
+    /* filename */        
+    wcscpy(find_data.cFileName, L"..");
+
+    /* Dokan callback function */
+    FillFindData(&find_data, DokanFileInfo);
+
+    return 0;
+}
+
 static int __stdcall
 PVFS_Dokan_find_files_with_pattern(
     LPCWSTR          PathName,
@@ -1386,14 +1550,15 @@ PVFS_Dokan_find_files_with_pattern(
     PFillFindData    FillFindData, // function pointer
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *fs_path,
-         filename[PVFS_NAME_MAX], *full_path;
-    int ret, err, count = 0;
+    char *fs_path, **filename_array;
+    int ret, err, count = 0, i, incount, outcount;
     PVFS_ds_position token;
     PVFS_credentials credentials;
+    PVFS_sys_attr *attr_array;
     WIN32_FIND_DATAW find_data;
-    wchar_t *wpath, *wfilename;
+    wchar_t *wfilename = NULL;
     BY_HANDLE_FILE_INFORMATION hfile_info;
+    int match_flag;
     
     DbgPrint("FindFilesWithPattern: %S\n", PathName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1408,84 +1573,120 @@ PVFS_Dokan_find_files_with_pattern(
     if (fs_path == NULL)
         return -1;
 
-    /* find the first file */
-    ret = fs_find_first_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
-    if (ret != 0)
-        goto find_files_exit;
+    /* TODO: make configurable */
+    incount = 256;
 
-    while (strlen(filename) > 0)
-    {        
-        DbgPrint("   File found: %s\n", filename);
+    /* allocate filename buffers */
+    filename_array = (char **) malloc(incount * sizeof(char *));
+    MALLOC_CHECK(filename_array);
+    for (i = 0; i < incount; i++)
+    {
+        filename_array[i] = (char *) malloc(PVFS_NAME_MAX + 8);
+        MALLOC_CHECK(filename_array[i]);
+    }
 
-        /* match file against search pattern */
-        wfilename = convert_mbstring(filename);
-        if (!DokanIsNameInExpression(SearchPattern, wfilename, FALSE))
+    /* allocate attr buffer */
+    attr_array = (PVFS_sys_attr *) malloc(incount * sizeof(PVFS_sys_attr));
+    MALLOC_CHECK(attr_array);
+
+    /* no need to match if pattern is "*" (all files) */
+    match_flag = wcscmp(SearchPattern, L"*");
+
+    /* if we have a * (all files) pattern, add . and .. entries */
+    if (!match_flag)
+    {
+        ret = add_dir_entries(fs_path, &credentials, FillFindData, DokanFileInfo);
+        if (ret != 0)
         {
-            DbgPrint("   File doesn't match\n");
-            goto find_files_no_match;
-        }
-        count++;
-        /* append the filename to the dir path */
-        full_path = (char *) malloc(strlen(fs_path) + strlen(filename) + 2);
-        MALLOC_CHECK(full_path);
-        strcpy(full_path, fs_path);
-        if (full_path[strlen(full_path)-1] != '/') 
-            strcat(full_path, "/");
-        strcat(full_path, filename);
-        DbgPrint("   Full path: %s\n", full_path);
-
-        /* get file information */
-        memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
-        wpath = convert_mbstring(full_path);        
-        ret = PVFS_Dokan_get_file_information(wpath, &hfile_info, DokanFileInfo);
-        /* a file may have been deleted, or there is a link with an 
-           invalid target -- just continue listing files */        
-        if (ret == -ERROR_FILE_NOT_FOUND)        
-            goto find_files_continue;
-        else if (ret != 0) 
-        {
-            free(full_path);
-            cleanup_string(wpath);
-            cleanup_string(wfilename);
             goto find_files_exit;
         }
-        find_data.dwFileAttributes = hfile_info.dwFileAttributes;
-        memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
-               sizeof(FILETIME));
-        memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
-               sizeof(FILETIME));
-        memcpy(&find_data.ftLastWriteTime, &hfile_info.ftLastWriteTime,
-               sizeof(FILETIME));
-        find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
-        find_data.nFileSizeLow = hfile_info.nFileSizeLow;
+    }
+
+    token = PVFS_READDIR_START;
+
+    /* loop until all files are returned */
+    do
+    {   
+        /* Dokan timeout */
+        DokanResetTimeout(30000, DokanFileInfo);
+
+        /* request up to incount files from file system */
+        ret = fs_find_files(fs_path, &credentials, &token, incount, &outcount, 
+                            filename_array, attr_array);
+        if (ret != 0)
+        {
+            DbgPrint("   fs_find_files returned %d\n", ret);
+            goto find_files_exit;
+        }
+
+        /* loop through files */
+        for (i = 0; i < outcount; i++)
+        {
+            DbgPrint("   File found: %s\n", filename_array[i]);
+
+            wfilename = convert_mbstring(filename_array[i]);
+            
+            /* match file against search pattern */
+            if (match_flag)
+            {                
+                if (!DokanIsNameInExpression(SearchPattern, wfilename, FALSE))
+                {
+                    DbgPrint("   File doesn't match\n");
+                    goto find_files_no_match;
+                }
+            }
+            
+            count++;
+            
+            /* convert file information */
+            memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
+            ret = PVFS_sys_attr_to_file_info(filename_array[i], &credentials, 
+                &attr_array[i], &hfile_info);
+            if (ret != 0)
+            {
+                DbgPrint("   PVFS_sys_attr_to_file_info returned %d\n", ret);
+                cleanup_string(wfilename);
+                goto find_files_exit;
+            }
+            
+
+            find_data.dwFileAttributes = hfile_info.dwFileAttributes;
+            memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
+                   sizeof(FILETIME));
+            memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
+                   sizeof(FILETIME));
+            memcpy(&find_data.ftLastWriteTime, &hfile_info.ftLastWriteTime,
+                   sizeof(FILETIME));
+            find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
+            find_data.nFileSizeLow = hfile_info.nFileSizeLow;
         
-        /* copy filename */        
-        wcscpy(find_data.cFileName, wfilename);
+            /* copy filename */        
+            wcscpy(find_data.cFileName, wfilename);
 
-        /* Dokan callback function */
-        FillFindData(&find_data, DokanFileInfo);
-
-find_files_continue:
-        free(full_path);
-        cleanup_string(wpath);
+            /* Dokan callback function */
+            FillFindData(&find_data, DokanFileInfo);
 
 find_files_no_match:
-        cleanup_string(wfilename);
+            if (wfilename)
+            {
+                cleanup_string(wfilename);
+                wfilename = NULL;
+            }
 
-        /* reset timeout to 30 sec. */
-        if (count % 100 == 0)
-            DokanResetTimeout(30000, DokanFileInfo);
+        } /* for */         
 
-        /* find next file */
-        ret = fs_find_next_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
-        
-        if (ret != 0)
-            goto find_files_exit;
-    }
+    } while (outcount && (incount == outcount));
 
 find_files_exit:    
 
-    DbgPrint("   fs_find_xxxx_file returns: %d\n", ret);
+    /* free filenames */
+    for (i = 0; i < incount; i++)
+    {
+        free(filename_array[i]);
+    }
+    free(filename_array);
+
+    free(attr_array);
 
     free(fs_path);
 

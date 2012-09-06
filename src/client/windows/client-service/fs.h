@@ -82,17 +82,21 @@ int fs_io(enum PVFS_io_type io_type,
 int fs_flush(char *fs_path,
              PVFS_credentials *credentials);
 
+/*
 int fs_find_first_file(char *fs_path,
                        PVFS_ds_position *token,
-                       PVFS_credentials *credentials,
+                       PVFS_credential *credential,
                        char *filename,
                        size_t max_name_len);
+*/
 
-int fs_find_next_file(char *fs_path, 
-                      PVFS_ds_position *token,
-                      PVFS_credentials *credentials,
-                      char *filename,
-                      size_t max_name_len);
+int fs_find_files(char *fs_path, 
+                  PVFS_credentials *credentials,              
+                  PVFS_ds_position *token,
+                  int32_t incount,
+                  int32_t *outcount,
+                  char **filename_array,
+                  PVFS_sys_attr *attr_array);
 
 int fs_get_diskfreespace(PVFS_credentials *credentials,
                          PVFS_size *free_bytes, 
