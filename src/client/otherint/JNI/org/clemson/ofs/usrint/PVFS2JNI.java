@@ -1,4 +1,6 @@
 
+package org.clemson.ofs.usrint;
+
 public class PVFS2JNI {
 
     /* from unistd.h whence "*seek*" */

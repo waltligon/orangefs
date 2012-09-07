@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+package org.clemson.ofs.usrint;
+
 public class PVFS2STDIOJNI {
 
     public native long Malloc(long size);
