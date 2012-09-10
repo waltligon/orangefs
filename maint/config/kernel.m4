@@ -172,6 +172,22 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
 	)
 
+        AC_MSG_CHECKING(for d_set_d_op function in kernel)
+        dnl if this test passes, the kernel does not have it
+        dnl if this test fails, the kernel already defined it
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+                loff_t d_set_d_op(struct dentry *dentry, const struct dentry_operations *op)
+                {
+                        return 0;
+                }
+        ], [],
+                AC_MSG_RESULT(no),
+                AC_MSG_RESULT(yes)
+                AC_DEFINE(HAVE_D_SET_D_OP, 1, Define if kernel has d_set_d_op),
+        )
+
 	dnl Check if the kernel defines the xtvec structure.
 	dnl This is part of a POSIX extension.
 	AC_MSG_CHECKING(for struct xtvec in kernel)
