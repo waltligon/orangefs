@@ -53,6 +53,8 @@ static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
 static DOTCONF_CB(enter_storage_hints_context);
+static DOTCONF_CB(enter_replication_context);
+static DOTCONF_CB(exit_replication_context);
 static DOTCONF_CB(exit_storage_hints_context);
 static DOTCONF_CB(enter_export_options_context);
 static DOTCONF_CB(exit_export_options_context);
@@ -92,6 +94,10 @@ static DOTCONF_CB(get_read_only);
 static DOTCONF_CB(get_all_squash);
 static DOTCONF_CB(get_anon_gid);
 static DOTCONF_CB(get_anon_uid);
+
+static DOTCONF_CB(get_replication_switch);
+static DOTCONF_CB(get_layout_algorithm);
+static DOTCONF_CB(get_number_of_replicas);
 
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
 static DOTCONF_CB(get_flow_buffer_size_bytes);
@@ -387,6 +393,17 @@ static const configoption_t options[] =
      */
     {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,
         CTX_STORAGEHINTS,NULL},
+
+    /* This groups the options specific to file replication and are specific to a
+     * particular filesystem.
+     */
+    {"<Replication>",ARG_NONE, enter_replication_context, NULL,
+       CTX_FILESYSTEM, NULL},
+
+    /* Specifies the end-tag of the Replication context.
+     */
+    {"</Replication>",ARG_NONE, exit_replication_context, NULL,
+        CTX_REPLICATION, NULL},
 
     /* This context groups together the Range options that define valid values
      * for meta handles on a per-host basis for this filesystem.
@@ -935,6 +952,22 @@ static const configoption_t options[] =
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
 
+    /* Is replication turned on for this filesystem?  Default is "off".
+     */
+    {"ReplicationSwitch", ARG_STR, get_replication_switch, NULL,
+        CTX_REPLICATION, "off"},
+
+    /* How many replicas do you want?  Default is 1.
+     */
+    {"NumberOfReplicas", ARG_INT, get_number_of_replicas, NULL,
+        CTX_REPLICATION, "1"},
+
+    /* What is the layout algorithm for the replicas?  The default is
+     * "ROUND_ROBIN".
+     */
+    {"LayoutAlgorithm",ARG_STR, get_layout_algorithm, NULL,
+        CTX_REPLICATION, "ROUND_ROBIN"},
+
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
      * followed by a Value option.
@@ -1447,6 +1480,24 @@ DOTCONF_CB(enter_storage_hints_context)
 }
 
 DOTCONF_CB(exit_storage_hints_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_FILESYSTEM;
+    return NULL;
+}
+
+DOTCONF_CB(enter_replication_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_REPLICATION;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile, CTX_REPLICATION);
+}
+
+DOTCONF_CB(exit_replication_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -2582,6 +2633,76 @@ DOTCONF_CB(get_trove_sync_meta)
 
     return NULL;
 }
+
+DOTCONF_CB(get_replication_switch)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if(strcasecmp(cmd->data.str, "on") == 0)
+    {
+        fs_conf->replication_switch = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "off") == 0)
+    {
+        fs_conf->replication_switch = 0;
+    }
+    else
+    {
+        return("ReplicationSwitch value must be 'on' or 'off'.\n");
+    }
+
+    gossip_err("fs_conf->replication_switch:%d.\n",fs_conf->replication_switch);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_layout_algorithm)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if(strcasecmp(cmd->data.str, "ROUND_ROBIN") == 0)
+    {
+        fs_conf->replication_layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+    }
+    else
+    {
+        return("Given LayoutAlgorithm is currently unsupported.\n");
+    }
+
+    gossip_err("Value of fs_conf->replication_layout.algorithm:%d.\n"
+               ,(int)fs_conf->replication_layout.algorithm);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_number_of_replicas)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    fs_conf->replication_number_of_copies = cmd->data.value;
+    gossip_err("Value of fs_conf->replication_number_of_copies:%d.\n"
+               ,fs_conf->replication_number_of_copies);
+    return NULL;
+}
+
 
 DOTCONF_CB(get_trove_sync_data)
 {

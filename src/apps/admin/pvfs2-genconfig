@@ -361,6 +361,12 @@ sub emit_filesystem
 
     print $target "\t</StorageHints>\n";
 
+    print $target "\t<Replication>\n";
+    print $target "\t\tReplicationSwitch off\n";
+    print $target "\t\tNumberOfReplicas 1\n";
+    print $target "\t\tLayoutAlgorithm  round_robin\n";
+    print $target "\t</Replication>\n";
+
     if($opt_gen_key ne "0")
     {
         emit_fs_key($target);

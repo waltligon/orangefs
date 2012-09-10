@@ -28,6 +28,7 @@ enum
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
+    CTX_REPLICATION      = (1 << 12),
 };
 
 typedef struct phys_server_desc
@@ -122,6 +123,11 @@ typedef struct filesystem_configuration_s
     int32_t directio_thread_num;
     int32_t directio_ops_per_queue;
     int32_t directio_timeout;
+
+    /* Replication options */
+    uint32_t        replication_switch;
+    PVFS_sys_layout replication_layout;
+    uint32_t        replication_number_of_copies;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
