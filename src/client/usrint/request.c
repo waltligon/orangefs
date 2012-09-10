@@ -89,7 +89,7 @@ int pvfs_check_vector(const struct iovec *iov,
             if(vlen == 1)
             {
                 /* two blocks of equal size are a vector of two */
-                stride = iov[i].iov_base - iov[i - 1].iov_base;
+                stride = (u_char *)iov[i].iov_base - (u_char *)iov[i - 1].iov_base;
                 if (stride < bsz)
                 {
                     /* overlapping blocks and negative strides are problems */
@@ -97,7 +97,7 @@ int pvfs_check_vector(const struct iovec *iov,
                 }
                 vlen++;
             }
-            else if ((iov[i].iov_base - iov[i - 1].iov_base) == stride)
+            else if (((u_char *)iov[i].iov_base - (u_char *)iov[i - 1].iov_base) == stride)
             {
                 /* to add more blocks, stride must match */
                 vlen++;
@@ -112,7 +112,7 @@ int pvfs_check_vector(const struct iovec *iov,
         {
             /* trivial conversion */
             bsz_array[rblk] = iov[vstart].iov_len;
-            disp_array[rblk] = (PVFS_size)(iov[vstart].iov_base - *buf);
+            disp_array[rblk] = (PVFS_size)((u_char *)iov[vstart].iov_base - (u_char *)*buf);
             req_array[rblk] = PVFS_BYTE;
             rblk++;
         }
@@ -120,7 +120,7 @@ int pvfs_check_vector(const struct iovec *iov,
         {
             /* found a vector */
             bsz_array[rblk] = 1;
-            disp_array[rblk] = (PVFS_size)(iov[vstart].iov_base - *buf);
+            disp_array[rblk] = (PVFS_size)((u_char *)iov[vstart].iov_base - (u_char *)*buf);
             PVFS_Request_vector(vlen, bsz, stride, PVFS_BYTE, &req_array[rblk]);
             rblk++;
         }
