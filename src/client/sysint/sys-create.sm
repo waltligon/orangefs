@@ -279,6 +279,10 @@ PVFS_error PVFS_isys_create(
             PINT_smcb_free(smcb);
             return -PVFS_ENOMEM;
         }
+        if (dist->params)
+        {
+           sm_p->u.create.dist->params = dist->params;
+        }
     }
 
     gossip_debug(
