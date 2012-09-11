@@ -261,8 +261,10 @@ PVFS_error PVFS_isys_create(
 
     sm_p->object_ref = parent_ref;
 
-    /* If the user specifies a distribution use that
-       else, use the default distribution */
+    /* If the user specifies a distribution, use that.  If not, then
+     * we'll check the parent directory in another step to see if it has 
+     * a distribution defined.  Otherwise, we will use the default.
+     */ 
     if (dist)
     {
         if (!dist->name)
@@ -272,18 +274,6 @@ PVFS_error PVFS_isys_create(
         }
 
         sm_p->u.create.dist = PINT_dist_create(dist->name);
-        if (!sm_p->u.create.dist)
-        {
-            PINT_smcb_free(smcb);
-            return -PVFS_ENOMEM;
-        }
-        sm_p->u.create.dist->params = dist->params;
-    }
-    else
-    {
-        /* Get the default distribution */
-        sm_p->u.create.dist =
-            get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
         {
             PINT_smcb_free(smcb);
@@ -676,7 +666,6 @@ static PINT_sm_action create_parent_getattr_inspect(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
-    PINT_dist *current_dist; 
     int ret = 0;
     int num_dfiles_requested = 0;
 
@@ -706,123 +695,122 @@ static PINT_sm_action create_parent_getattr_inspect(
         attr->u.dir.hint.dist_name_len,
         attr->u.dir.hint.dist_params_len);
 
-    current_dist = sm_p->u.create.dist;
-    /* We have an overriding distribution name for this directory.. honor that */
-    if (attr->u.dir.hint.dist_name_len > 0)
+    /* We have an overriding distribution name for this directory.. honor that 
+     * IFF the user did not specify a distribution on the PVFS_sys_create() call.
+     */
+    if (sm_p->u.create.dist)
     {
-        /* switch it only if it is different! */
-        if (strcmp(attr->u.dir.hint.dist_name, current_dist->dist_name))
-        {
-            PINT_dist *new_dist = NULL;
-            new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
-            if (new_dist)
-            {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                             "Overridding distribution name to %s instead of %s\n",
-                    attr->u.dir.hint.dist_name,
-                    current_dist->dist_name);
-                PINT_dist_free(current_dist);
-                sm_p->u.create.dist = new_dist;
-                current_dist = new_dist;
-            }
-            else
-            {
-                gossip_debug(
-                    GOSSIP_CLIENT_DEBUG,
-                    "Could not override distribution name with %s instead of %s\n",
-                    attr->u.dir.hint.dist_name,
-                    current_dist->dist_name);
-            }
-        }
-        else {
-            gossip_debug(
-                GOSSIP_CLIENT_DEBUG,
-                "retaining current distribution name %s\n",
-                current_dist->dist_name);
-        }
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"Using the user-specified distribution:%s.\n"
+                                        ,sm_p->u.create.dist->dist_name);
     }
-
-    /* okay, we might need to override some dist params as well */
-    if (attr->u.dir.hint.dist_params_len > 0)
+    if (!sm_p->u.create.dist && attr->u.dir.hint.dist_name_len > 0)
     {
-        /* We have a series of comma separated key:val strings */
-        char **key, **val;
-        int64_t tmp_val;
-        int nparams = 0;
-
-        if (strncmp(current_dist->dist_name, 
-            PVFS_DIST_VARSTRIP_NAME, 
-            PVFS_DIST_VARSTRIP_NAME_SIZE) == 0) 
+        PINT_dist *new_dist = NULL;
+        new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
+        if (new_dist)
         {
-            /* varstrip parameters are a special case; we can't use the
-             * normal split_keyvals function because the : separater is also
-             * used within paramers that only varstrip can parse
-             */ 
-
-            /* look for a "strips:" prefix */
-            if(strstr(attr->u.dir.hint.dist_params, "strips:") 
-                != attr->u.dir.hint.dist_params)
-            {
-                gossip_err("Error: failed to parse directory hints for varstrip distribution.\n");
-                js_p->error_code = -PVFS_EINVAL;
-                return SM_ACTION_COMPLETE;
-            }
-            if(current_dist->methods->set_param(current_dist->dist_name,
-                current_dist->params,
-                "strips",
-                &attr->u.dir.hint.dist_params[strlen("strips:")]))
-            {
-                gossip_err("Error: failed to set directory hints for varstrip distribution.\n");
-                js_p->error_code = -PVFS_EINVAL;
-                return SM_ACTION_COMPLETE;
-            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "Using the parent's distribution: %s\n",
+                          attr->u.dir.hint.dist_name);
+            sm_p->u.create.dist = new_dist;
         }
-        /* ignore parse errors! */
-        /* TODO: why should we ignore parsing errors? */
-        else if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
-            &nparams, &key, &val) == 0)
+        else
         {
-            int i;
-            for (i = 0; i < nparams; i++)
+            gossip_err("Unable to allocate a distribution structure.\n");
+            return (-PVFS_ENOMEM);
+        }
+
+        /* okay, we might need to override some dist params as well */
+        if (attr->u.dir.hint.dist_params_len > 0)
+        {
+            /* We have a series of comma separated key:val strings */
+            char **key, **val;
+            int64_t tmp_val;
+            int nparams = 0;
+
+            if (strncmp(sm_p->u.create.dist->dist_name, 
+                PVFS_DIST_VARSTRIP_NAME, 
+                PVFS_DIST_VARSTRIP_NAME_SIZE) == 0) 
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                             "distribution parameter %s, value %s\n",
-                             key[i], val[i]);
-                /* NOTE: just as in server-config.c when parsing "Param" and
-                 * "Value" fields, we will assume that all values are 64 bit
-                 * integers.  The only difference here is that we scan
-                 * directly into a 64 bit integer, rather than converting
-                 * from the int format that dotconf supports.
-                 */
-                ret = sscanf(val[i], SCANF_lld, &tmp_val);
-                if(ret != 1)
-                {
-                    gossip_err(
-                        "Error: unsupported type for distribution parameter %s, "
-                        "value %s found in directory hints.\n", 
-                        key[i], val[i]);
-                    gossip_err("Error: continuing anyway.\n");
+                /* varstrip parameters are a special case; we can't use the
+                 * normal split_keyvals function because the : separater is also
+                 * used within paramers that only varstrip can parse
+                 */ 
+
+                /* look for a "strips:" prefix */
+                if(strstr(attr->u.dir.hint.dist_params, "strips:") 
+                    != attr->u.dir.hint.dist_params)
+                {  
+                    gossip_err("Error: failed to parse directory hints for varstrip distribution.\n");
+                    js_p->error_code = -PVFS_EINVAL;
+                    return SM_ACTION_COMPLETE;
                 }
-                else
+                if(sm_p->u.create.dist->methods->set_param(sm_p->u.create.dist->dist_name,
+                    sm_p->u.create.dist->params,
+                    "strips",
+                    &attr->u.dir.hint.dist_params[strlen("strips:")]))
                 {
-                    if(current_dist->methods->set_param(current_dist->dist_name,
-                        current_dist->params,
-                        key[i],
-                        &tmp_val))
+                    gossip_err("Error: failed to set directory hints for varstrip distribution.\n");
+                    js_p->error_code = -PVFS_EINVAL;
+                    return SM_ACTION_COMPLETE;
+                }
+            }  
+            /* ignore parse errors! */
+            /* TODO: why should we ignore parsing errors? */
+            else if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
+                &nparams, &key, &val) == 0)
+            {
+                int i;
+                for (i = 0; i < nparams; i++)
+                {
+                    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                                 "distribution parameter %s, value %s\n",
+                                 key[i], val[i]);
+                    /* NOTE: just as in server-config.c when parsing "Param" and
+                     * "Value" fields, we will assume that all values are 64 bit
+                     * integers.  The only difference here is that we scan
+                     * directly into a 64 bit integer, rather than converting
+                     * from the int format that dotconf supports.
+                     */
+                    ret = sscanf(val[i], SCANF_lld, &tmp_val);
+                    if(ret != 1)
                     {
-
                         gossip_err(
-                            "Error: could not override hinted distribution "
-                            "parameter %s, value %s found in directory hints\n",
+                            "Error: unsupported type for distribution parameter %s, "
+                            "value %s found in directory hints.\n", 
                             key[i], val[i]);
-                    }
-                 }
-                 free(key[i]);
-                 free(val[i]);
+                        gossip_err("Error: continuing anyway.\n");
+                    } 
+                    else
+                    {
+                        if(sm_p->u.create.dist->methods->set_param(sm_p->u.create.dist->dist_name,
+                            sm_p->u.create.dist->params,
+                            key[i],
+                            &tmp_val))
+                        {
+ 
+                            gossip_err(
+                                "Error: could not override hinted distribution "
+                                "parameter %s, value %s found in directory hints\n",
+                                key[i], val[i]);
+                        }
+                     }
+                     free(key[i]);
+                     free(val[i]);
+                }
+                free(key);
+                free(val);
             }
-            free(key);
-            free(val);
         }
+    }/*end if !sm_p->u.create.dist*/
+
+    if (!sm_p->u.create.dist)
+    {
+        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
+        if (!sm_p->u.create.dist)
+            return(-PVFS_ENOMEM);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"Using the default distribution:%s.\n"
+                                        ,sm_p->u.create.dist->dist_name);
     }
 
     /* priority for determining user's preference for number of data files:

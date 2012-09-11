@@ -32,6 +32,7 @@ struct options
     char* server_list;
     uint32_t num_files;
     char **filenames;
+    PVFS_sys_dist *dist;
 };
 
 static struct options *parse_args(int argc, char **argv);
@@ -197,11 +198,12 @@ int main(int argc, char **argv)
             }
         }
 
+
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,
                              &credentials,
-                             NULL,
+                             user_opts->dist,
                              &resp_create,
                              &layout,
                              NULL);
@@ -236,7 +238,7 @@ int main(int argc, char **argv)
 static struct options* parse_args(int argc, char **argv)
 {
     int one_opt = 0;
-    char flags[] = "l:r?";
+    char flags[] = "d:l:r?";
     struct options *tmp_opts = NULL;
 
     tmp_opts = (struct options *)malloc(sizeof(struct options));
@@ -268,8 +270,27 @@ static struct options* parse_args(int argc, char **argv)
             case('r'):
                 tmp_opts->random = 1;
                 break;
+            case('d'):
+                tmp_opts->dist = calloc(1,sizeof(tmp_opts->dist));
+                if (!tmp_opts->dist)
+                {
+                   perror("calloc");
+                   exit(EXIT_FAILURE);
+                }
+                tmp_opts->dist->name = strdup(optarg);
+                if (strcmp(tmp_opts->dist->name,"simple_stripe") &&
+                    strcmp(tmp_opts->dist->name,"basic_dist")    &&
+                    strcmp(tmp_opts->dist->name,"varstrip_dist") &&
+                    strcmp(tmp_opts->dist->name,"twod_stripe") )
+                {    
+                    fprintf(stderr, "Error:  invalid distribution\n");
+                    exit(EXIT_FAILURE);
+                }
+                break;
 	}
     }
+
+
 
     if(tmp_opts->random && tmp_opts->server_list)
     {
@@ -304,6 +325,8 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "   optional arguments:\n");
     fprintf(stderr, "   -l   use list layout (requires comma separated list of servers)\n");
     fprintf(stderr, "   -r   use random layout\n");
+    fprintf(stderr, "   -d   use distribution (simple_stripe,varstrip_dist,twod_stripe,"
+                    "basic_dist)\n");
 }
 
 /*
