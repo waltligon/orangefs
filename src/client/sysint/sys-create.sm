@@ -672,6 +672,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     PVFS_object_attr *attr = NULL;
     int ret = 0;
     int num_dfiles_requested = 0;
+    replication_s replication = {0};
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 
@@ -865,6 +866,60 @@ static PINT_sm_action create_parent_getattr_inspect(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
         sm_p->u.create.num_data_files, num_dfiles_requested);
+
+    /* Determine state of replication */
+    struct server_configuration_s *server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+    filesystem_configuration_s *fs = PINT_config_find_fs_id(server_config,sm_p->object_ref.fs_id);
+
+    if (fs)
+    {
+       PVFS_sys_layout *dest_layout, *src_layout;
+       struct PVFS_sys_server_list *dest_server_list, *src_server_list;
+
+       replication.replication_switch = fs->replication_switch;
+       replication.replication_number_of_copies = fs->replication_number_of_copies;
+
+
+       dest_layout = &replication.replication_layout;
+       src_layout  = &fs->replication_layout;
+
+       dest_server_list = &dest_layout->server_list;
+       src_server_list  = &src_layout->server_list;
+
+       dest_layout->algorithm = src_layout->algorithm;
+       dest_server_list->count = src_server_list->count;
+
+       if (src_server_list-> count != 0)
+       {
+           dest_server_list->servers = 
+               calloc(src_server_list->count,sizeof(*src_server_list->servers));
+           if (!dest_server_list->servers)
+           {
+              return(-PVFS_ENOMEM);
+           }
+           memcpy(dest_server_list->servers,
+                  src_server_list->servers,
+                  src_server_list->count * sizeof(*src_server_list->servers));
+       }
+       gossip_debug(GOSSIP_CLIENT_DEBUG,"\nreplication switch : %d.\n"
+                                        "         algorithm : %u.\n"
+                                        "  number of copies : %d.\n",
+               replication.replication_switch,
+               replication.replication_layout.algorithm,
+               replication.replication_number_of_copies);
+       if (replication.replication_layout.server_list.count != 0)
+       {
+           int i;
+           for (i=0; i<replication.replication_layout.server_list.count; i++)
+               gossip_debug(GOSSIP_CLIENT_DEBUG,"replication server[%d] : %d\n"
+                         ,i
+                         ,(int)replication.replication_layout.server_list.servers[i]);
+       }
+    }
+
+    PINT_put_server_config_struct(server_config);
+
+
 
     return SM_ACTION_COMPLETE;
 }

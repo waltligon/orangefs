@@ -130,6 +130,14 @@ typedef struct filesystem_configuration_s
     uint32_t        replication_number_of_copies;
 } filesystem_configuration_s;
 
+typedef struct replication_s
+{
+    uint32_t         replication_switch;
+    PVFS_sys_layout  replication_layout;
+    uint32_t         replication_number_of_copies;
+} replication_s;
+
+
 typedef struct distribution_param_configuration_s
 {
     char* name;

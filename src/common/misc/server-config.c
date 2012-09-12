@@ -3820,6 +3820,44 @@ static void copy_filesystem(
 
         dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
         dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
+
+        /* copy replication values */
+        PVFS_sys_layout *dest_layout, *src_layout;
+        struct PVFS_sys_server_list *dest_server_list, *src_server_list;
+
+        dest_fs->replication_switch           = src_fs->replication_switch;
+        dest_fs->replication_number_of_copies = src_fs->replication_number_of_copies;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"copy_filesystems: dest_fs->replication_switch : %d.\n"
+                                        ,dest_fs->replication_switch);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"copy_filesystems: dest_fs->replication_number_of_copies : %d.\n"
+                                        ,dest_fs->replication_number_of_copies);
+        
+
+        dest_layout = &dest_fs->replication_layout;
+        src_layout = &src_fs->replication_layout;
+
+        dest_layout->algorithm = src_layout->algorithm;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"copy_filesystems: dest_layout->algorithm : %d.\n",dest_layout->algorithm);
+
+        dest_server_list = &dest_layout->server_list;
+        src_server_list = &src_layout->server_list;
+
+        dest_server_list->count = src_server_list->count;
+        if (src_server_list->count != 0)
+        {
+            dest_server_list->servers = calloc(src_server_list->count,sizeof(*src_server_list->servers));
+            memcpy(dest_server_list->servers, 
+                   src_server_list->servers, 
+                   src_server_list->count * sizeof(*src_server_list->servers));
+            gossip_debug(GOSSIP_CLIENT_DEBUG,"copy_filesystems: dest_server_list->count : %d.\n",dest_server_list->count);
+            int i;
+            for (i=0; i<dest_server_list->count; i++)
+                gossip_debug(GOSSIP_CLIENT_DEBUG,"copy_filesystems: dest_server_list->server[%d] : %d.\n"
+                                                ,i
+                                                ,(int)dest_server_list->servers[i]);
+        }
     }
 }
 
