@@ -17,6 +17,7 @@
 #include "posix-ops.h"
 #include "posix-pvfs.h"
 #include "openfile-util.h"
+#include "pvfs-path.h"
 
 /**
  * function prototypes not defined in libc, though it is a linux
@@ -37,11 +38,13 @@ int fadvise64(int, off64_t, off64_t, int);
  */ 
 int open(const char *path, int flags, ...)
 {
+    int rc = 0;
     va_list ap; 
     mode_t mode = 0; 
     PVFS_hint hints;  /* need to figure out how to set default */
     pvfs_descriptor *pd;
     
+    debug("posix.c open: called with %s\n", path);
     va_start(ap, flags); 
     if (flags & O_CREAT)
         mode = va_arg(ap, mode_t); 
@@ -57,29 +60,29 @@ int open(const char *path, int flags, ...)
     if (!path)
     {
         errno = EFAULT;
+        debug("\tposix.c open: returns with %d\n", -1);
         return -1;
     }
-    if (is_pvfs_path(path))
+    if (is_pvfs_path(&path,0))
     {
         /* this handles setup of the descriptor */
-        flags |= O_NOTPVFS; /* try to open non-pvfs files too */
-        return pvfs_open(path, flags, mode, hints);
+        rc = pvfs_open(path, flags, mode, hints);
     }
     else
     {
-        int rc;
         struct stat sbuf;
         /* path unknown to FS so open with glibc */
         rc = glibc_ops.open(path, flags & 01777777, mode);
         if (rc < 0)
         {
-            return rc;
+            goto errorout;
         }
         /* set up the descriptor manually */
+        debug("posix.c open calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         if (!pd)
         {
-            return -1;
+            goto errorout;
         }
         pd->is_in_use = PVFS_FS;
         pd->s->flags = flags;
@@ -87,8 +90,15 @@ int open(const char *path, int flags, ...)
         pd->s->mode = sbuf.st_mode;
         gen_mutex_unlock(&pd->s->lock);
         gen_mutex_unlock(&pd->lock);
-        return pd->fd; 
+        rc = pd->fd; 
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    debug("\tposix.c open: returns with %d\n", rc);
+    return rc;
 }
 
 /*
@@ -182,20 +192,23 @@ int creat64(const char *path, mode_t mode)
  * unlink wrapper 
  */
 int unlink(const char *path)
-{
+{   
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(path))
+    if (is_pvfs_path(&path,0))
     {
-        return pvfs_ops.unlink(path);
+        rc = pvfs_ops.unlink(path);
     }
     else
     {
-        return glibc_ops.unlink(path);
+        rc = glibc_ops.unlink(path);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int unlinkat(int dirfd, const char *path, int flag)
@@ -233,27 +246,35 @@ int unlinkat(int dirfd, const char *path, int flag)
  */
 int rename (const char *old, const char *new)
 {
+    int rc = 0;
     int oldp, newp;
     if (!old || !new)
     {
         errno = EFAULT;
         return -1;
     }
-    oldp = is_pvfs_path(old);
-    newp = is_pvfs_path(new);
+    oldp = is_pvfs_path(&old,0);
+    newp = is_pvfs_path(&new,0);
     if(oldp && newp)
     { 
-        return pvfs_rename(old, new);
+        rc = pvfs_rename(old, new);
     }
     else if (!oldp && !newp)
     {
-        return glibc_ops.rename(old, new);
+        rc = glibc_ops.rename(old, new);
     }
     else
     {
         errno = EXDEV;
-        return -1;
+        goto errorout;
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(old);
+    PVFS_free_expanded(new);
+    return rc;
 }
 
 int renameat (int oldfd, const char *old, int newfd, const char *new)
@@ -497,36 +518,42 @@ off64_t lseek64(int fd, off64_t offset, int whence)
 
 int truncate(const char *path, off_t length)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_truncate(path, length);
+        rc = pvfs_truncate(path, length);
     }
     else
     {
-        return glibc_ops.truncate(path, length);
+        rc = glibc_ops.truncate(path, length);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int truncate64(const char *path, off64_t length)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_truncate64(path, length);
+        rc = pvfs_truncate64(path, length);
     }
     else
     {
-        return glibc_ops.truncate64(path, length);
+        rc = glibc_ops.truncate64(path, length);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int ftruncate(int fd, off_t length)
@@ -591,8 +618,10 @@ int posix_fallocate(int fd, off_t offset, off_t length)
 int close(int fd)
 {
     int rc = 0;
+    debug("posix.c close: called with %d\n", fd);
     
     rc = pvfs_free_descriptor(fd);
+    debug("\tposix.c close: returns %d\n", rc);
     return rc;
 }
 
@@ -619,19 +648,22 @@ int flush(int fd)
 /* various flavors of stat */
 int stat(const char *path, struct stat *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_stat(path, buf);
+        rc = pvfs_stat(path, buf);
     }
     else
     {
-        return glibc_ops.stat(path, buf);
+        rc = glibc_ops.stat(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int __xstat(int ver, const char *path, struct stat *buf)
@@ -641,19 +673,22 @@ int __xstat(int ver, const char *path, struct stat *buf)
 
 int stat64(const char *path, struct stat64 *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_stat64(path, buf);
+        rc = pvfs_stat64(path, buf);
     }
     else
     {
-        return glibc_ops.stat64(path, buf);
+        rc = glibc_ops.stat64(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int __xstat64(int ver, const char *path, struct stat64 *buf)
@@ -783,19 +818,22 @@ int __fxstatat64(int ver, int fd, const char *path, struct stat64 *buf, int flag
 
 int lstat(const char *path, struct stat *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lstat(path, buf);
+        rc =  pvfs_lstat(path, buf);
     }
     else
     {
-        return glibc_ops.lstat(path, buf);
+        rc = glibc_ops.lstat(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int __lxstat(int ver, const char *path, struct stat *buf)
@@ -805,19 +843,22 @@ int __lxstat(int ver, const char *path, struct stat *buf)
 
 int lstat64(const char *path, struct stat64 *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lstat64(path, buf);
+        rc = pvfs_lstat64(path, buf);
     }
     else
     {
-        return glibc_ops.lstat64(path, buf);
+        rc = glibc_ops.lstat64(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int __lxstat64(int ver, const char *path, struct stat64 *buf)
@@ -852,36 +893,42 @@ int futimesat(int dirfd, const char *path, const struct timeval times[2])
 
 int utimes(const char *path, const struct timeval times[2])
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_utimes(path, times);
+        rc = pvfs_utimes(path, times);
     }
     else
     {
-        return glibc_ops.utimes(path, times);
+        rc = glibc_ops.utimes(path, times);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int utime(const char *path, const struct utimbuf *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_utime(path, buf);
+        rc = pvfs_utime(path, buf);
     }
     else
     {
-        return glibc_ops.utime(path, buf);
+        rc = glibc_ops.utime(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int futimes(int fd, const struct timeval times[2])
@@ -940,19 +987,22 @@ int dup2(int oldfd, int newfd)
 
 int chown(const char *path, uid_t owner, gid_t group)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_chown(path, owner, group);
+        rc = pvfs_chown(path, owner, group);
     }
     else
     {
-        return glibc_ops.chown(path, owner, group);
+        rc = glibc_ops.chown(path, owner, group);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fchown(int fd, uid_t owner, gid_t group)
@@ -1000,36 +1050,42 @@ int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flag)
 
 int lchown(const char *path, uid_t owner, gid_t group)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lchown(path, owner, group);
+        rc = pvfs_lchown(path, owner, group);
     }
     else
     {
-        return glibc_ops.lchown(path, owner, group);
+        rc = glibc_ops.lchown(path, owner, group);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int chmod(const char *path, mode_t mode)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_chmod(path, mode);
+        rc = pvfs_chmod(path, mode);
     }
     else
     {
-        return glibc_ops.chmod(path, mode);
+        rc = glibc_ops.chmod(path, mode);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fchmod(int fd, mode_t mode)
@@ -1082,19 +1138,22 @@ int fchmodat(int dirfd, const char *path, mode_t mode, int flag)
 
 int mkdir(const char *path, mode_t mode)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_mkdir(path, mode);
+        rc = pvfs_mkdir(path, mode);
     }
     else
     {
-        return glibc_ops.mkdir(path, mode);
+        rc = glibc_ops.mkdir(path, mode);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int mkdirat(int dirfd, const char *path, mode_t mode)
@@ -1129,19 +1188,22 @@ int mkdirat(int dirfd, const char *path, mode_t mode)
 
 int rmdir(const char *path)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_rmdir(path);
+        rc = pvfs_rmdir(path);
     }
     else
     {
-        return glibc_ops.rmdir(path);
+        rc = glibc_ops.rmdir(path);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 #if __GLIBC_PREREQ (2,5)
@@ -1150,19 +1212,22 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz)
 int readlink(const char *path, char *buf, size_t bufsiz)
 #endif
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_readlink(path, buf, bufsiz);
+        rc = pvfs_readlink(path, buf, bufsiz);
     }
     else
     {
-        return glibc_ops.readlink(path, buf, bufsiz);
+        rc = glibc_ops.readlink(path, buf, bufsiz);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
@@ -1197,19 +1262,22 @@ ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
 
 int symlink(const char *oldpath, const char *newpath)
 {
+    int rc = 0;
     if (!oldpath || !newpath)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(newpath))
+    if(is_pvfs_path(&newpath,0))
     { 
-        return pvfs_symlink(oldpath, newpath);
+        rc = pvfs_symlink(oldpath, newpath);
     }
     else
     {
-        return glibc_ops.symlink(oldpath, newpath);
+        rc = glibc_ops.symlink(oldpath, newpath);
     }
+    PVFS_free_expanded(newpath);
+    return rc;
 }
 
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
@@ -1244,20 +1312,22 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 
 int link(const char *oldpath, const char *newpath)
 {
+    int rc = 0;
     if (!oldpath || !newpath)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(oldpath))
+    if(is_pvfs_path(&oldpath,0))
     { 
-        return pvfs_link(oldpath, newpath);
+        rc = pvfs_link(oldpath, newpath);
     }
     else
     {
-        return glibc_ops.link(oldpath, newpath);
+        rc = glibc_ops.link(oldpath, newpath);
     }
-    return -1;
+    PVFS_free_expanded(oldpath);
+    return rc;
 }
 
 int linkat(int olddirfd, const char *old,
@@ -1293,7 +1363,7 @@ int linkat(int olddirfd, const char *old,
  */
 int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     if (!dirp)
@@ -1373,19 +1443,22 @@ int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 
 int access(const char *path, int mode)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_access(path, mode);
+        rc = pvfs_access(path, mode);
     }
     else
     {
-        return glibc_ops.access(path, mode);
+        rc = glibc_ops.access(path, mode);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int faccessat(int dirfd, const char *path, int mode, int flags)
@@ -1578,36 +1651,42 @@ int fadvise64(int fd, off64_t offset, off64_t len, int advice)
 
 int statfs(const char *path, struct statfs *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_statfs(path, buf);
+        rc = pvfs_statfs(path, buf);
     }
     else
     {
-        return glibc_ops.statfs(path, buf);
+        rc = glibc_ops.statfs(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int statfs64(const char *path, struct statfs64 *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_statfs64(path, buf);
+        rc = pvfs_statfs64(path, buf);
     }
     else
     {
-        return glibc_ops.statfs64(path, buf);
+        rc = glibc_ops.statfs64(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fstatfs(int fd, struct statfs *buf)
@@ -1658,19 +1737,22 @@ int fstatfs64(int fd, struct statfs64 *buf)
 
 int statvfs(const char *path, struct statvfs *buf)
 {
+    int rc = 0;
     if (!path || !buf)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_statvfs(path, buf);
+        rc = pvfs_statvfs(path, buf);
     }
     else
     {
-        return glibc_ops.statvfs(path, buf);
+        rc = glibc_ops.statvfs(path, buf);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fstatvfs(int fd, struct statvfs *buf)
@@ -1698,19 +1780,22 @@ int fstatvfs(int fd, struct statvfs *buf)
 
 int mknod(const char *path, mode_t mode, dev_t dev)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_mknod(path, mode, dev);
+        rc = pvfs_mknod(path, mode, dev);
     }
     else
     {
-        return glibc_ops.mknod(path, mode, dev);
+        rc = glibc_ops.mknod(path, mode, dev);
     }
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
@@ -1771,53 +1856,67 @@ ssize_t sendfile64(int outfd, int infd, off64_t *offset, size_t count)
 int setxattr(const char *path, const char *name,
              const void *value, size_t size, int flags)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_setxattr(path, name, value, size, flags);
+        rc = pvfs_setxattr(path, name, value, size, flags);
     }
     else
     {
         if (glibc_ops.setxattr)
         {
-            return glibc_ops.setxattr(path, name, value, size, flags);
+            rc = glibc_ops.setxattr(path, name, value, size, flags);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int lsetxattr(const char *path, const char *name,
               const void *value, size_t size, int flags)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lsetxattr(path, name, value, size, flags);
+        rc = pvfs_lsetxattr(path, name, value, size, flags);
     }
     else
     {
         if (glibc_ops.lsetxattr)
         {
-            return glibc_ops.lsetxattr(path, name, value, size, flags);
+            rc = glibc_ops.lsetxattr(path, name, value, size, flags);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fsetxattr(int fd, const char *name,
@@ -1850,53 +1949,67 @@ int fsetxattr(int fd, const char *name,
 ssize_t getxattr(const char *path, const char *name,
              void *value, size_t size)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(path))
+    if (is_pvfs_path(&path,0))
     { 
-        return pvfs_getxattr(path, name, value, size);
+        rc = pvfs_getxattr(path, name, value, size);
     }
     else
     {
         if (glibc_ops.getxattr)
         {
-            return glibc_ops.getxattr(path, name, value, size);
+            rc = glibc_ops.getxattr(path, name, value, size);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 ssize_t lgetxattr(const char *path, const char *name,
               void *value, size_t size)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lgetxattr(path, name, value, size);
+        rc = pvfs_lgetxattr(path, name, value, size);
     }
     else
     {
         if (glibc_ops.lgetxattr)
         {
-            return glibc_ops.lgetxattr(path, name, value, size);
+            rc = glibc_ops.lgetxattr(path, name, value, size);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 ssize_t fgetxattr(int fd, const char *name, void *value,
@@ -1928,52 +2041,66 @@ ssize_t fgetxattr(int fd, const char *name, void *value,
 
 ssize_t listxattr(const char *path, char *list, size_t size)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_listxattr(path, list, size);
+        rc = pvfs_listxattr(path, list, size);
     }
     else
     {
         if (glibc_ops.listxattr)
         {
-            return glibc_ops.listxattr(path, list, size);
+            rc = glibc_ops.listxattr(path, list, size);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 ssize_t llistxattr(const char *path, char *list, size_t size)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_llistxattr(path, list, size);
+        rc = pvfs_llistxattr(path, list, size);
     }
     else
     {
         if (glibc_ops.llistxattr)
         {
-            return glibc_ops.llistxattr(path, list, size);
+            rc = glibc_ops.llistxattr(path, list, size);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 ssize_t flistxattr(int fd, char *list, size_t size)
@@ -2004,52 +2131,66 @@ ssize_t flistxattr(int fd, char *list, size_t size)
 
 int removexattr(const char *path, const char *name)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,0))
     { 
-        return pvfs_removexattr(path, name);
+        rc = pvfs_removexattr(path, name);
     }
     else
     {
         if (glibc_ops.removexattr)
         {
-            return glibc_ops.removexattr(path, name);
+            rc = glibc_ops.removexattr(path, name);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int lremovexattr(const char *path, const char *name)
 {
+    int rc = 0;
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(path))
+    if(is_pvfs_path(&path,1))
     { 
-        return pvfs_lremovexattr(path, name);
+        rc = pvfs_lremovexattr(path, name);
     }
     else
     {
         if (glibc_ops.lremovexattr)
         {
-            return glibc_ops.lremovexattr(path, name);
+            rc = glibc_ops.lremovexattr(path, name);
         }
         else
         {
             errno = ENOPKG;
-            return -1;
+            goto errorout;
         }
     }
+    goto cleanup;
+errorout:
+    rc = -1;
+cleanup:
+    PVFS_free_expanded(path);
+    return rc;
 }
 
 int fremovexattr(int fd, const char *name)

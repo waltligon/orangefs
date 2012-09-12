@@ -380,8 +380,9 @@ typedef struct
     PVFS_object_ref seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
 
-#define PVFS2_MAX_LOOKUP_CONTEXTS    256
-/* 
+#define PVFS2_MAX_LOOKUP_CONTEXTS 256
+
+/*
  * A context is a group of segments that have been looked up
  * on a server.  A server can resolve more than one segment
  * in a single request, and these groupings are maintained

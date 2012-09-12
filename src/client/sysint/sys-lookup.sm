@@ -24,6 +24,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
 #include "security-util.h"
+#include "pvfs-path.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -313,7 +314,19 @@ static int initialize_context(
 
                 prev_ctx = &lookup_sm->contexts[prev_ctx_index];
                 assert(prev_ctx);
-                assert(prev_ctx->current_segment > 0);
+                if (prev_ctx->current_segment > 0)
+                {
+                    /* whoops, we just ran out of back to back over 
+                     * hopefully this is a relative lookup and a higher
+                     * level can work this out.  All we can do is fail
+                     * with a meaningful error code
+                     */
+                    gossip_debug(GOSSIP_LOOKUP_DEBUG, "there are no "
+                                 "more previous segments available: "
+                                 "failing lookup\n");
+                    free(orig_pathname);
+                    return -PVFS_ENOENT;
+                }
 
                 num_consecutive_prev_ctx_dot_dots++;
                 gossip_debug(GOSSIP_LOOKUP_DEBUG, "num consecutive '..' "
@@ -347,8 +360,8 @@ static int initialize_context(
                 }
 
                 prev_ctx_prev_seg = &prev_ctx->segments[
-                    prev_ctx->current_segment -
-                    num_consecutive_prev_ctx_dot_dots];
+                        prev_ctx->current_segment -
+                        num_consecutive_prev_ctx_dot_dots];
                 assert(prev_ctx_prev_seg);
 
                 /*
@@ -357,8 +370,7 @@ static int initialize_context(
                   copied from the last context in this case.  (so
                   we drop through to segment init)
                 */
-                ctx_starting_refn =
-                    prev_ctx_prev_seg->seg_starting_refn;
+                ctx_starting_refn = prev_ctx_prev_seg->seg_starting_refn;
                 cur_seg_name = prev_ctx_prev_seg->seg_name;
                 gossip_debug(GOSSIP_LOOKUP_DEBUG,
                              "using previous segment: %s\n", cur_seg_name);
@@ -754,7 +766,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     }
     return SM_ACTION_COMPLETE;
 }
-
+  
 static PINT_sm_action lookup_segment_setup_parent_getattr(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -776,7 +788,7 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
-
+   
 /*
  * This is called if the ncache lookup failed.  It builds the msgpair
  * so that the next state can jump into xfer msgpair.
@@ -1037,12 +1049,16 @@ static PINT_sm_action lookup_segment_handle_relative_link(
                              cur_seg->seg_starting_refn);
     if (ret)
     {
+        /* we tried to resolve the symlink but failed */
+        /* we will punt and expand the path externally */
+        /* this will look up segments one at a time */
         if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
         {
             /* copy out error path */
             strncpy(sm_p->u.lookup.lookup_resp->error_path,
                     relative_symlink_target,
                     sm_p->u.lookup.lookup_resp->error_path_size);
+            ret = -PVFS_ENOTPVFS;
         }
         js_p->error_code = ret;
     }
@@ -1055,9 +1071,10 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-    char absolute_symlink_target[PVFS_NAME_MAX] = {0};
+#if 0
+    char absolute_symlink_target[PVFS_PATH_MAX] = {0};
     PVFS_object_ref root_refn;
-    PVFS_fs_id fs_id;
+#endif
 
     /*
       NOTE: if we have an absolute link, we need to essentially
@@ -1074,29 +1091,25 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    ret = PVFS_util_resolve(cur_seg->seg_attr.u.sym.target_path,
-                            &fs_id,
-                            absolute_symlink_target,
-                            PVFS_NAME_MAX);
-    if (ret < 0)
+    /* if we have an absolute link just bail out and expand the path */
+    /* from outside of the SM then rerun the SM if it is still PVFS */
+    ret = -PVFS_ENOENT; /* this forces the if */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_util_resolve returned %d on %s\n",
+                 ret, cur_seg->seg_attr.u.sym.target_path);
+    if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "PVFS_util_resolve returned %d on %s\n",
-                     ret, cur_seg->seg_attr.u.sym.target_path);
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
-        {
-            /* copy out error path */
-            strncpy(sm_p->u.lookup.lookup_resp->error_path,
-                    cur_seg->seg_attr.u.sym.target_path,
-                    /*absolute_symlink_target,*/
-                    sm_p->u.lookup.lookup_resp->error_path_size);
-            /* set special error code */
-            ret = -PVFS_ENOTPVFS;
-        }
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+        /* copy out error path */
+        strncpy(sm_p->u.lookup.lookup_resp->error_path,
+                cur_seg->seg_attr.u.sym.target_path,
+                /*absolute_symlink_target,*/
+                sm_p->u.lookup.lookup_resp->error_path_size);
+        /* set special error code */
+        ret = -PVFS_ENOTPVFS;
     }
-
+    js_p->error_code = ret;
+    return SM_ACTION_COMPLETE;
+#if 0
     sm_p->u.lookup.current_context++;
 
     /*
@@ -1126,6 +1139,7 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
         js_p->error_code = ret;
     }
     return SM_ACTION_COMPLETE;
+#endif
 }
 
 static PINT_sm_action lookup_context_check_completion(
