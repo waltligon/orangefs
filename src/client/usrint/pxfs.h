@@ -59,10 +59,10 @@ extern int pxfs_creat(const char *path, mode_t mode, int *fd,
 extern int pxfs_creat64(const char *path, mode_t mode, int *fd,
                         pxfs_cb cb, void *cdat, ...);
 
-extern int pxfs_unlink (const char *path, pxfs_cb cb, void *cdat);
+extern int pxfs_unlink(const char *path, pxfs_cb cb, void *cdat);
 
-extern int pxfs_unlinkat (int dirfd, const char *path, int flags,
-                          pxfs_cb cb, void *cdat);
+extern int pxfs_unlinkat(int dirfd, const char *path, int flags,
+                         pxfs_cb cb, void *cdat);
 
 extern int pxfs_rename(const char *oldpath, const char *newpath,
                        pxfs_cb cb, void *cdat);
@@ -95,11 +95,11 @@ extern int pxfs_pwrite64(int fd, const void *buf, size_t count,
                          off64_t offset, ssize_t *bcnt,
                          pxfs_cb cb, void *cdat);
 
-/* Local Function */
-extern int pxfs_lseek(int fd, off_t offset, int whence, off_t *offset_out);
+extern int pxfs_lseek(int fd, off_t offset, int whence, off_t *offset_out,
+                      pxfs_cb cb, void *cdat);
 
-/* Local Function */
-extern int pxfs_lseek64(int fd, off64_t offset, int whence, off_t *offset_out);
+extern int pxfs_lseek64(int fd, off64_t offset, int whence, off64_t *offset_out, 
+                        pxfs_cb cb, void *cdat);
 
 extern int pxfs_truncate(const char *path, off_t length,
                          pxfs_cb cb, void *cdat);
@@ -163,11 +163,9 @@ extern int pxfs_utime(const char *path, const struct utimbuf *buf,
 extern int pxfs_futimes(int fd, const struct timeval times[2],
                         pxfs_cb cb, void *cdat);
 
-/* Local function */
-extern int pxfs_dup(int oldfd, int *newfd);
+extern int pxfs_dup(int oldfd, int *newfd, pxfs_cb cb, void *cdat);
 
-/* Local function */
-extern int pxfs_dup2(int oldfd, int newfd);
+extern int pxfs_dup2(int oldfd, int newfd, pxfs_cb cb, void *cdat);
 
 extern int pxfs_chown (const char *path, uid_t owner, gid_t group,
                        pxfs_cb cb, void *cdat);

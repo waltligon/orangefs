@@ -1,0 +1,215 @@
+/* 
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include "pvfs2-aio.h"
+#include "client-state-machine.h"
+#include "str-utils.h"
+#include "pvfs2-internal.h"
+#include "openfile-util.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    CLOSE_FLUSH_FD = 601
+};
+
+%%
+
+machine pvfs2_client_aio_close_sm
+{
+    state init
+    {
+        run close_init;
+        CLOSE_FLUSH_FD => flush_fd;
+        default => cleanup;
+    }
+
+    state flush_fd
+    {
+        jump pvfs2_client_flush_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run close_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*********************************************************/
+
+PVFS_error PVFS_iaio_close(
+    pvfs_descriptor *pd,
+    const PVFS_credential *credential,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_close entered\n");
+
+    if (!pd)
+    {
+        gossip_err("invalid (NULL) required arguments\n");
+        return ret;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_AIO_CLOSE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
+    PVFS_hint_copy(hints, &(sm_p->hints));
+    sm_p->u.aio_close.pd = pd;
+
+    return PINT_client_state_machine_post(
+        smcb, op_id, user_ptr);
+}
+
+PVFS_error PVFS_aio_close(
+    pvfs_descriptor *pd,
+    const PVFS_credential *credential,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_aio_close entered\n");
+
+    ret = PVFS_iaio_close(pd, credential, &op_id, hints, NULL);
+    
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_iaio_close call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "aio_close", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/*******************************************************************/
+
+static PINT_sm_action close_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_close state: init\n");
+
+    if (S_ISREG(sm_p->u.aio_close.pd->s->mode))
+    {
+        /* flush file buffers */
+        PINT_client_sm *close_frame = malloc(sizeof(PINT_client_sm));
+        if (close_frame == NULL)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }       
+        memset(close_frame, 0, sizeof(PINT_client_sm));
+
+        if((sm_p->u.aio_close.pd->s->pvfs_ref.fs_id == PVFS_FS_ID_NULL) ||
+           (sm_p->u.aio_close.pd->s->pvfs_ref.handle == PVFS_HANDLE_NULL))
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+
+        PINT_init_msgarray_params(close_frame,
+                                  sm_p->u.aio_close.pd->s->pvfs_ref.fs_id);
+        PINT_init_sysint_credential(close_frame->cred_p, sm_p->cred_p);
+        close_frame->object_ref = sm_p->u.aio_close.pd->s->pvfs_ref;
+        PVFS_hint_copy(sm_p->hints, &(close_frame->hints));
+        PVFS_hint_add(&(close_frame->hints), PVFS_HINT_HANDLE_NAME,
+                      sizeof(PVFS_handle),
+                      &(sm_p->u.aio_close.pd->s->pvfs_ref.handle));    
+
+        PINT_SM_GETATTR_STATE_FILL(
+            close_frame->getattr,
+            sm_p->u.aio_close.pd->s->pvfs_ref,
+            PVFS_ATTR_META_ALL | PVFS_ATTR_COMMON_TYPE,
+            PVFS_TYPE_METAFILE,
+            0);
+
+        PINT_sm_push_frame(smcb, 0, (void *)close_frame);
+        js_p->error_code = CLOSE_FLUSH_FD;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_close: flushing fd %d\n",
+                     sm_p->u.aio_close.pd->fd);
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action close_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_close state: cleanup\n");
+
+    if (js_p->error_code >= 0)
+    {
+        if (S_ISREG(sm_p->u.aio_close.pd->s->mode))
+        {
+            /* check the flush sm */
+            struct PINT_client_sm *close_frame;
+            int frame_id, frames_remaining;
+
+            close_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+                                        smcb, &frame_id,
+                                        &js_p->error_code, &frames_remaining);
+            js_p->error_code = close_frame->error_code;
+            free(close_frame);
+        }
+
+        /* free the descriptor */
+        pvfs_free_descriptor(sm_p->u.aio_close.pd->fd);
+    }
+
+    sm_p->error_code = js_p->error_code;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

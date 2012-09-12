@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "pvfs2-types.h"
+#include "pvfs2-internal.h"
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"
@@ -31,30 +32,33 @@ enum
 
 typedef enum
 {
-    PVFS_AIO_IO_OP = 1,
-    PVFS_AIO_IOV_OP,
+    PVFS_AIO_IO_OP = 0,
     PVFS_AIO_OPEN_OP,
     PVFS_AIO_RENAME_OP,
+    PVFS_AIO_LSEEK_OP,
     PVFS_AIO_TRUNC_OP,
     PVFS_AIO_CLOSE_OP,
     PVFS_AIO_STAT_OP,
-    PVFS_AIO_STAT64_OP,
     PVFS_AIO_CHOWN_OP,
     PVFS_AIO_CHMOD_OP,
     PVFS_AIO_MKDIR_OP,
     PVFS_AIO_REMOVE_OP,
     PVFS_AIO_SYMLINK_OP,
+    PVFS_AIO_FSYNC_OP,
 } PVFS_aio_op_code;
 
 /* the following structures contain operation dependent data for aio calls */
+
 struct PINT_aio_io_cb
 {
     struct iovec *vector;       /* in */
-    int count;                  /* in (readv writev )*/
+    int count;                  /* in */
     pvfs_descriptor *pd;        /* in */
     enum PVFS_io_type which;    /* in */
+    int append;                 /* in */
     off64_t offset;             /* in */
     int advance_fp;             /* in */
+    int vec;                    /* in */
     void *sys_buf;              
     PVFS_Request mem_req;       
     PVFS_Request file_req;      
@@ -85,18 +89,34 @@ struct PINT_aio_rename_cb
     char *newname;              /* in */
 };
 
+struct PINT_aio_lseek_cb
+{
+    pvfs_descriptor *pd;    /* in */
+    off64_t offset;         /* in */
+    int whence;             /* in */
+    int lseek64;            /* in */
+    void *offset_out;       /* out */
+    PVFS_sysresp_getattr attr_resp;
+};
+
 struct PINT_aio_trunc_cb
 {
     pvfs_descriptor *pd;    /* in */
     off64_t length;         /* in */
 };
 
+struct PINT_aio_close_cb
+{
+    pvfs_descriptor *pd;    /* in */
+};
+
 struct PINT_aio_stat_cb
 {
     pvfs_descriptor *pd;        /* in */
     uint32_t mask;              /* in */
+    int stat64;                 /* in */
     PVFS_sysresp_getattr getattr_resp;
-    void  *buf;           /* out */
+    void  *buf;           /* in/out */
 };
 
 struct PINT_aio_chown_cb
@@ -135,6 +155,11 @@ struct PINT_aio_symlink_cb
     PVFS_object_ref *pdir;      /* in */
 };
 
+struct PINT_aio_fsync_cb
+{
+    pvfs_descriptor *pd;    /* in */
+};
+
 /* a pvfs async control block, used for keeping track of async
  * operations outstanding in the filesystem
  */
@@ -142,6 +167,7 @@ struct pvfs_aiocb
 {
     PVFS_sys_op_id op_id; 
     PVFS_hint hints;
+    PVFS_credential *cred;
 
     PVFS_aio_op_code op_code;
     PVFS_error error_code;
@@ -155,13 +181,16 @@ struct pvfs_aiocb
         struct PINT_aio_io_cb io;
         struct PINT_aio_open_cb open;
         struct PINT_aio_rename_cb rename;
+        struct PINT_aio_lseek_cb lseek;
         struct PINT_aio_trunc_cb trunc;
+        struct PINT_aio_close_cb close;
         struct PINT_aio_stat_cb stat;
         struct PINT_aio_chown_cb chown;
         struct PINT_aio_chmod_cb chmod;
         struct PINT_aio_mkdir_cb mkdir;
         struct PINT_aio_remove_cb remove;
         struct PINT_aio_symlink_cb symlink;
+        struct PINT_aio_fsync_cb fsync;
     } u;
 };
 

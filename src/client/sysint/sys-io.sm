@@ -290,6 +290,7 @@ PVFS_error PVFS_isys_io(
     const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
+    int append_mode,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr)
@@ -351,6 +352,7 @@ PVFS_error PVFS_isys_io(
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.io.io_type = io_type;
+    sm_p->u.io.append = append_mode;
     sm_p->u.io.file_req = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;
     sm_p->u.io.io_resp_p = resp_p;
@@ -387,6 +389,7 @@ PVFS_error PVFS_sys_io(
     const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
+    int append_mode,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -395,7 +398,8 @@ PVFS_error PVFS_sys_io(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
 
     ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
-                       credential, resp_p, io_type, &op_id, hints, NULL);
+                       credential, resp_p, io_type, append_mode,
+                       &op_id, hints, NULL);
     if (ret == 1)
         return 0;
     else if (ret < 0)
@@ -433,7 +437,7 @@ static PINT_sm_action io_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        IO_ATTR_MASKS, 
+        IO_ATTR_MASKS | PVFS_ATTR_DATA_SIZE, 
         PVFS_TYPE_METAFILE,
         0);
        
@@ -473,6 +477,13 @@ static PINT_sm_action io_inspect_attr(
     {
         js_p->error_code = -PVFS_ECANCEL;
         return SM_ACTION_COMPLETE;
+    }
+
+    if ((sm_p->u.io.append))
+    {
+        sm_p->u.io.file_req_offset = sm_p->getattr.size;
+        gossip_debug(GOSSIP_IO_DEBUG, "io offset changed to %llu (append)\n",
+                     llu(sm_p->u.io.file_req_offset));
     }
 
     /* determine if we need to unstuff or not to service this request */

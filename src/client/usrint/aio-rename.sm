@@ -1298,7 +1298,7 @@ static PINT_sm_action rename_inspect_sm(
     struct PINT_client_sm *rename_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                 smcb, &frame_id,
                                 &js_p->error_code, &frames_remaining);
-
+    js_p->error_code = rename_frame->error_code;
     free(rename_frame);
 
     return SM_ACTION_COMPLETE;

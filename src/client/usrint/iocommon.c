@@ -1519,6 +1519,7 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
                      creds,
                      &io_resp,
                      which,
+                     0,
                      PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
     return io_resp.total_completed;
@@ -1614,6 +1615,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                       credential,
                       ret_resp,
                       which,
+                      0,
                       ret_op_id,
                       PVFS_HINT_NULL,
                       NULL);

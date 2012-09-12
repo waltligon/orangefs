@@ -27,6 +27,7 @@ static int pxfs_rdwr64(int fd,
                        pxfs_cb cb,
                        void *cdat,
                        int which,
+                       int append_mode,
                        int advance_fp);
 
 static int pxfs_rdwrv(int fd,
@@ -268,7 +269,7 @@ extern int pxfs_unlinkat(int dirfd, const char *path, int flags,
 */
 
 /**
- * pxfs_rename
+ * pxfx_rename
  */
 extern int pxfs_rename(const char *oldpath, const char *newpath,
                        pxfs_cb cb, void *cdat)
@@ -345,6 +346,9 @@ extern int pxfs_renameat(int olddirfd, const char *oldpath, int newdirfd,
 }
 */
 
+/**
+ * pxfs_read
+ */
 extern int pxfs_read(int fd, const void *buf, size_t count, ssize_t *bcnt,
                      pxfs_cb cb, void *cdat)
 {
@@ -364,33 +368,46 @@ extern int pxfs_read(int fd, const void *buf, size_t count, ssize_t *bcnt,
     }    
 
     return pxfs_rdwr64(fd, (void *)buf, count, pd->s->file_pointer, bcnt,
-                        cb, cdat, PVFS_IO_READ, 1);
+                       cb, cdat, PVFS_IO_READ, 0, 1);
 }
 
+/**
+ * pxfs_pread
+ */
 extern int pxfs_pread(int fd, const void *buf, size_t count, off_t offset,
                       ssize_t *bcnt, pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwr64(fd, (void *)buf, count, (off64_t)offset, bcnt,
-                        cb, cdat, PVFS_IO_READ, 0);
+                       cb, cdat, PVFS_IO_READ, 0, 0);
 }
 
+/**
+ * pxfs_readv
+ */
 extern int pxfs_readv(int fd, const struct iovec *vector, int count,
                       ssize_t *bcnt, pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwrv(fd, vector, count, bcnt, cb, cdat, PVFS_IO_READ);
 }
 
+/**
+ * pxfs_pread64
+ */
 extern int pxfs_pread64(int fd, const void *buf, size_t count, off64_t offset,
                         ssize_t *bcnt, pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwr64(fd, (void *)buf, count, offset, bcnt, cb,
-                       cdat, PVFS_IO_READ, 0);
+                       cdat, PVFS_IO_READ, 0, 0);
 }
 
+/**
+ * pxfs_write
+ */
 extern int pxfs_write(int fd, const void *buf, size_t count, ssize_t *bcnt,
                       pxfs_cb cb, void *cdat)
 {
     pvfs_descriptor *pd = NULL;
+    int append_mode = 0;
 
     if (fd < 0)
     {
@@ -404,40 +421,49 @@ extern int pxfs_write(int fd, const void *buf, size_t count, ssize_t *bcnt,
         errno = EBADF;
         return -1;
     }
-    /* check for append mode */
+
     if (pd->s->flags & O_APPEND)
     {
-        /* WHAT */
-        return 0;
+        append_mode = 1;
     }
-    else
-    {
-        return pxfs_rdwr64(fd, (void *)buf, count, pd->s->file_pointer, bcnt,
-                           cb, cdat, PVFS_IO_WRITE, 0);
-    }
+
+    return pxfs_rdwr64(fd, (void *)buf, count, pd->s->file_pointer, bcnt, 
+                       cb, cdat, PVFS_IO_WRITE, append_mode, 1);
 }
 
+/**
+ * pxfs_pwrite
+ */
 extern int pxfs_pwrite(int fd, const void *buf, size_t count, off_t offset,
                        ssize_t *bcnt, pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwr64(fd, (void *)buf, count, (off64_t)offset, bcnt,
-                        cb, cdat, PVFS_IO_WRITE, 0);
+                        cb, cdat, PVFS_IO_WRITE, 0, 0);
 }
 
+/**
+ * pxfs_writev
+ */
 extern int pxfs_writev(int fd, const struct iovec *vector, int count,
                        ssize_t *bcnt , pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwrv(fd, vector, count, bcnt, cb, cdat, PVFS_IO_WRITE);
 }
 
+/**
+ * pxfs_pwrite64
+ */
 extern int pxfs_pwrite64(int fd, const void *buf, size_t count,
                          off64_t offset, ssize_t *bcnt,
                          pxfs_cb cb, void *cdat)
 {
     return pxfs_rdwr64(fd, (void *)buf, count, offset, bcnt, cb,
-                       cdat, PVFS_IO_WRITE, 0);
+                       cdat, PVFS_IO_WRITE, 0, 0);
 }
 
+/**
+ * pxfs_rdwr64 - implements pxfs read and write operations
+ */
 static int pxfs_rdwr64(int fd,
                        void *buf,
                        size_t size,
@@ -446,6 +472,7 @@ static int pxfs_rdwr64(int fd,
                        pxfs_cb cb, 
                        void *cdat,
                        int which,
+                       int append_mode, /* 1 for append writes */
                        int advance_fp)
 {
     pvfs_descriptor *pd;
@@ -499,9 +526,12 @@ static int pxfs_rdwr64(int fd,
     io_acb->op_code = PVFS_AIO_IO_OP;
     io_acb->u.io.vector->iov_len = size;
     io_acb->u.io.vector->iov_base = (void *)buf;
+    io_acb->u.io.count = 1;
     io_acb->u.io.pd = pd;
     io_acb->u.io.which = which;
+    io_acb->u.io.append = append_mode;
     io_acb->u.io.advance_fp = advance_fp;
+    io_acb->u.io.vec = 0;
     io_acb->u.io.offset = offset;
     io_acb->u.io.bcnt = bcnt;
     io_acb->call_back_fn = cb;
@@ -512,11 +542,14 @@ static int pxfs_rdwr64(int fd,
     return 0;
 }
 
+/**
+ * pxfs_rdwrv - implements pxfs read and write vector operations 
+ */
 static int pxfs_rdwrv(int fd,
                       const struct iovec *vector,
                       int count,
                       ssize_t *bcnt,
-                      pxfs_cb  cb,
+                      pxfs_cb cb,
                       void *cdat,
                       int which)
 {
@@ -562,11 +595,13 @@ static int pxfs_rdwrv(int fd,
     memset(io_acb, 0, sizeof(struct pvfs_aiocb));
 
     io_acb->hints = PVFS_HINT_NULL;
-    io_acb->op_code = PVFS_AIO_IOV_OP;
+    io_acb->op_code = PVFS_AIO_IO_OP;
     io_acb->u.io.vector = (struct iovec *)vector;
     io_acb->u.io.count = count;
     io_acb->u.io.pd = pd;
     io_acb->u.io.which = which;
+    io_acb->u.io.advance_fp = 1;
+    io_acb->u.io.vec = 1;
     io_acb->u.io.offset = pd->s->file_pointer;
     io_acb->u.io.bcnt = bcnt;
     io_acb->call_back_fn = cb;
@@ -577,11 +612,97 @@ static int pxfs_rdwrv(int fd,
     return 0;
 }
 
+/**
+ * pxfs_lseek
+ */
+extern int pxfs_lseek(int fd, off_t offset, int whence, off_t *offset_out,
+                      pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *lseek_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    lseek_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!lseek_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(lseek_acb, 0, sizeof(struct pvfs_aiocb));
+
+    lseek_acb->hints = PVFS_HINT_NULL;
+    lseek_acb->op_code = PVFS_AIO_LSEEK_OP;
+    lseek_acb->u.lseek.pd = pd;
+    lseek_acb->u.lseek.offset = (off64_t)offset;
+    lseek_acb->u.lseek.whence = whence;
+    lseek_acb->u.lseek.lseek64 = 0;
+    lseek_acb->u.lseek.offset_out = (void *)offset_out;
+    lseek_acb->call_back_fn = cb;
+    lseek_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(lseek_acb);
+
+    return 0;
+}
+
+/**
+ * pxfs_lseek64
+ */
+extern int pxfs_lseek64(int fd, off64_t offset, int whence, off64_t *offset_out,
+                        pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *lseek_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    lseek_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!lseek_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(lseek_acb, 0, sizeof(struct pvfs_aiocb));
+
+    lseek_acb->hints = PVFS_HINT_NULL;
+    lseek_acb->op_code = PVFS_AIO_LSEEK_OP;
+    lseek_acb->u.lseek.pd = pd;
+    lseek_acb->u.lseek.offset = offset;
+    lseek_acb->u.lseek.whence = whence;
+    lseek_acb->u.lseek.lseek64 = 1;
+    lseek_acb->u.lseek.offset_out = (void *)offset_out;
+    lseek_acb->call_back_fn = cb;
+    lseek_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(lseek_acb);
+
+    return 0;
+}
+
 /*
-extern int pxfs_lseek(int fd, off_t offset, int whence, off_t *offset_out);
-
-extern int pxfs_lseek64(int fd, off64_t offset, int whence, off_t *offset_out);
-
 extern int pxfs_truncate(const char *path, off_t length,
                          pxfs_cb cb, void *cdat);
 
@@ -615,7 +736,7 @@ extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
     }
 
     pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
@@ -641,11 +762,49 @@ extern int pxfs_ftruncate64(int fd, off64_t length, pxfs_cb cb, void *cdat)
     return 0;
 }
 
-/*
+/**
+ * pxfs_close
+ */
 extern int pxfs_close(int fd, pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *close_acb = NULL;
 
-extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
 
+    close_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!close_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(close_acb, 0, sizeof(struct pvfs_aiocb));
+
+    close_acb->hints = PVFS_HINT_NULL;
+    close_acb->op_code = PVFS_AIO_CLOSE_OP;
+    close_acb->u.close.pd = pd;
+    close_acb->call_back_fn = cb;
+    close_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(close_acb);
+
+    return 0;
+}
+
+//extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);  /* TODO: implemented? */
+
+/*
 extern int pxfs_stat(const char *path, struct stat *buf,
                      pxfs_cb cb, void *cdat);
 
@@ -698,10 +857,11 @@ extern int pxfs_fstat64(int fd, struct stat64 *buf, pxfs_cb cb, void *cdat)
     memset(stat_acb, 0, sizeof(struct pvfs_aiocb));
 
     stat_acb->hints = PVFS_HINT_NULL;
-    stat_acb->op_code = PVFS_AIO_STAT64_OP;
+    stat_acb->op_code = PVFS_AIO_STAT_OP;
     stat_acb->u.stat.pd = pd;
     stat_acb->u.stat.buf = (void *)buf;
     stat_acb->u.stat.mask = PVFS_ATTR_DEFAULT_MASK;
+    stat_acb->u.stat.stat64 = 1;
     stat_acb->call_back_fn = cb;
     stat_acb->call_back_dat = cdat;
 
@@ -744,8 +904,6 @@ extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
         return -1;
     }
 
-    mask &= PVFS_ATTR_DEFAULT_MASK;
-
     stat_acb = malloc(sizeof(struct pvfs_aiocb));
     if (!stat_acb)
     {
@@ -758,7 +916,8 @@ extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
     stat_acb->op_code = PVFS_AIO_STAT_OP;
     stat_acb->u.stat.pd = pd;
     stat_acb->u.stat.buf = (void *)buf;
-    stat_acb->u.stat.mask = mask;
+    stat_acb->u.stat.mask = mask & PVFS_ATTR_DEFAULT_MASK;
+    stat_acb->u.stat.stat64 = 0;
     stat_acb->call_back_fn = cb;
     stat_acb->call_back_dat = cdat;
 
@@ -1032,10 +1191,14 @@ extern int pxfs_rmdir(const char *path, pxfs_cb cb, void *cdat)
     return 0;
 }
 
-/*
 extern int pxfs_readlink(const char *path, char *buf, size_t bufsiz,
-                         ssize_t *bcnt, pxfs_cb cb, void *cdat);
+                         ssize_t *bcnt, pxfs_cb cb, void *cdat)
+{
 
+    return 0;
+}
+
+/*
 extern int pxfs_readlinkat(int dirfd, const char *path, char *buf,
                            size_t bufsiz, ssize_t *bcnt,
                            pxfs_cb cb, void *cdat);
@@ -1108,7 +1271,7 @@ extern int pxfs_link(const char *oldpath, const char *newpath,
 {
     fprintf(stderr, "pxfs_link not implemented\n");
     errno = ENOSYS;
-    return 1;
+    return -1;
 }
 
 /**
@@ -1122,6 +1285,182 @@ extern int pxfs_linkat(int olddirfd, const char *oldpath,
     errno = ENOSYS;
     return -1;
 }
+
+/*
+extern int pxfs_readdir(unsigned int fd, struct dirent *dirp,
+                        unsigned int count, pxfs_cb, void *cdat);
+
+extern int pxfs_getdents(unsigned int fd, struct dirent *dirp,
+                         unsigned int count, pxfs_cb, void *cdat);
+
+extern int pxfs_getdents64(unsigned int fd, struct dirent64 *dirp,
+                           unsigned int count, pxfs_cb, void *cdat);
+
+extern int pxfs_access(const char *path, int mode, pxfs_cb, void *cdat);
+
+extern int pxfs_faccessat(int dirfd, const char *path, int mode, int flags,
+                          pxfs_cb cb, void *cdat);
+*/
+
+/*
+ * PVFS does not implement flocks
+ */
+extern int pxfs_flock(int fd, int op, pxfs_cb cb, void *cdat)
+{
+    errno = ENOSYS;
+    fprintf(stderr, "pxfs_flock not implemented\n");
+    return -1;
+}
+
+/*
+extern int pxfs_fcntl(int fd, int cmd, pxfs_cb, void *cdat, ...);
+
+extern int pxfs_sync(pxfs_cb, void *cdat);
+*/
+
+/**
+ * pxfs_fsync
+ */
+extern int pxfs_fsync(int fd, pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *fsync_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    fsync_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!fsync_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(fsync_acb, 0, sizeof(struct pvfs_aiocb));
+
+    fsync_acb->hints = PVFS_HINT_NULL;
+    fsync_acb->op_code = PVFS_AIO_FSYNC_OP;
+    fsync_acb->u.fsync.pd = pd;
+    fsync_acb->call_back_fn = cb;
+    fsync_acb->call_back_dat = cdat;
+    
+    aiocommon_submit_op(fsync_acb);
+
+    return 0;
+}
+
+/*
+extern int pxfs_fdatasync(int fd, pxfs_cb cb, void *cdat);
+*/
+
+/*
+extern int pxfs_fadvise(int fd, off_t offset, off_t len, int advice,
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_fadvise64(int fd, off64_t offset, off64_t len, int advice,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_statfs(const char *path, struct statfs *buf,
+                       pxfs_cb cb, void *cdat);
+
+extern int pxfs_statfs64(const char *path, struct statfs64 *buf,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_fstatfs(int fd, struct statfs *buf, pxfs_cb cb, void *cdat);
+
+extern int pxfs_fstatfs64(int fd, struct statfs64 *buf,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_statvfs(const char *path, struct statvfs *buf,
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_fstatvfs(int fd, struct statvfs *buf,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_mknod(const char *path, mode_t mode, dev_t dev,
+                      pxfs_cb cb, void *cdat);
+
+extern int pxfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev,
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_sendfile(int outfd, int infd, off_t *offset,
+                         size_t count, ssize_t *bcnt,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_sendfile64(int outfd, int infd, off64_t *offset,
+                           size_t count, ssize_t *bcnt,
+                           pxfs_cb cb, void *cdat);
+*/
+/*
+extern int pxfs_setxattr(const char *path, const char *name,
+                          const void *value, size_t size, int flags,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_lsetxattr(const char *path, const char *name,
+                          const void *value, size_t size, int flags,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_fsetxattr(int fd, const char *name,
+                          const void *value, size_t size, int flags,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_getxattr(const char *path, const char *name,
+                         void *value, size_t size, ssize_t *bcnt,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_lgetxattr(const char *path, const char *name,
+                          void *value, size_t size, ssize_t *bcnt,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_fgetxattr(int fd, const char *name,
+                          void *value, size_t size, ssize_t *bcnt,
+                          pxfs_cb cb, void *cdat);
+
+extern int pxfs_listxattr(const char *path, char *list, size_t size,
+                          ssize_t *bcnt, pxfs_cb cb, void *cdat);
+
+extern int pxfs_llistxattr(const char *path, char *list, size_t size,
+                           ssize_t *bcnt, pxfs_cb cb, void *cdat);
+
+extern int pxfs_flistxattr(int fd, char *list, size_t size, ssize_t *bcnt,
+                           pxfs_cb cb, void *cdat);
+
+extern int pxfs_removexattr(const char *path, const char *name,
+                            pxfs_cb cb, void *cdat);
+
+extern int pxfs_lremovexattr(const char *path, const char *name,
+                             pxfs_cb cb, void *cdat);
+
+extern int pxfs_fremovexattr(int fd, const char *name,
+                             pxfs_cb cb, void *cdat);
+
+extern int pxfs_chdir(const char *path);
+
+extern int pxfs_fchdir(int fd);
+
+extern int pxfs_cwd_init(const char *buf, size_t size);
+
+extern char *pxfs_getcwd(char *buf, size_t size);
+
+extern char *pxfs_get_current_dir_name(void);
+
+extern char *pxfs_getwd(char *buf);
+
+extern mode_t pxfs_umask(mode_t mask);
+
+extern mode_t pxfs_getumask(void);
+
+extern int pxfs_getdtablesize(void);
+*/
 
 /*
  * Local variables:

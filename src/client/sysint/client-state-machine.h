@@ -299,6 +299,7 @@ struct PINT_client_io_sm
 {
     /* input parameters */
     enum PVFS_io_type io_type;
+    int append;     /* 1 for append mode writes */
     PVFS_Request file_req;
     PVFS_offset file_req_offset;
     void *buffer;
@@ -574,6 +575,7 @@ struct PINT_client_mgmt_get_uid_list_sm
 };
 
 /* AIO scratch areas */
+
 struct PINT_client_aio_open_sm
 {
     char *path;
@@ -667,6 +669,22 @@ struct PINT_client_aio_symlink_sm
     PVFS_sysresp_symlink symlink_resp;
 };
 
+struct PINT_client_aio_lseek_sm
+{
+    pvfs_descriptor *pd;
+    off64_t offset;
+    int whence;
+
+    /* nested sm responses */
+    PVFS_sysresp_getattr getattr_resp;
+    PVFS_sysresp_readdir readdir_resp;
+};
+
+struct PINT_client_aio_close_sm
+{
+    pvfs_descriptor *pd;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -750,6 +768,8 @@ typedef struct PINT_client_sm
         struct PINT_client_aio_mkdir_sm aio_mkdir;
         struct PINT_client_aio_remove_sm aio_remove;
         struct PINT_client_aio_symlink_sm aio_symlink;
+        struct PINT_client_aio_lseek_sm aio_lseek;
+        struct PINT_client_aio_close_sm aio_close;
     } u;
 } PINT_client_sm;
 
@@ -855,6 +875,8 @@ enum
     PVFS_AIO_MKDIR                 = 502,
     PVFS_AIO_REMOVE                = 503,
     PVFS_AIO_SYMLINK               = 504,
+    PVFS_AIO_LSEEK                 = 505,
+    PVFS_AIO_CLOSE                 = 506,
 };
 
 #define PVFS_OP_SYS_MAXVALID  21
@@ -941,6 +963,7 @@ extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
@@ -979,6 +1002,8 @@ extern struct PINT_state_machine_s pvfs2_client_aio_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_aio_symlink_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_lseek_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_close_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

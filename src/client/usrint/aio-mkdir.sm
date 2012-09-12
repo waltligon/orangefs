@@ -878,6 +878,7 @@ static PINT_sm_action mkdir_sm_inspect(
     struct PINT_client_sm *mkdir_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                             smcb, &frame_id, &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = mkdir_frame->error_code;
     free(mkdir_frame);
 
     return SM_ACTION_COMPLETE;

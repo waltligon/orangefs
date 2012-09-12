@@ -456,17 +456,18 @@ PVFS_error PVFS_isys_io(
     const PVFS_credential *credential,
     PVFS_sysresp_io *resp,
     enum PVFS_io_type type,
+    int append_mode,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr);
 
 /** Macro for convenience read is a call to io */
 #define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
-PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8,x9)
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,0,x7,x8,x9)
 
 /** Macro for convenience write is a call to io */
 #define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
-PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,x7,x8,x9)
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,0,x7,x8,x9)
 
 PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,
@@ -477,15 +478,16 @@ PVFS_error PVFS_sys_io(
     const PVFS_credential *credential,
     PVFS_sysresp_io *resp,
     enum PVFS_io_type type,
+    int append_mode,
     PVFS_hint hints);
 
 /** Macro for convenience read is a call to io */
 #define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y,z) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,0,z)
 
 /** Macro for convenience write is a call to io */
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,z)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,0,z)
 
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,

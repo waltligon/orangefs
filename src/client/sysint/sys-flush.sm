@@ -28,7 +28,7 @@ extern job_context_id pint_client_sm_context;
 
 %%
 
-machine pvfs2_client_flush_sm
+nested machine pvfs2_client_flush_sm
 {
     state flush_getattr
     {
@@ -60,6 +60,21 @@ machine pvfs2_client_flush_sm
     state cleanup
     {
         run flush_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_flush_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_flush_sm;
+        default => flush_terminate;
+    }
+
+    state flush_terminate
+    {
+        run flush_terminate;
         default => terminate;
     }
 }
@@ -269,6 +284,12 @@ static int flush_cleanup(
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
+    return SM_ACTION_COMPLETE;
+}
+
+static int flush_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

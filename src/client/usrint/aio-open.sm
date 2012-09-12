@@ -1763,8 +1763,7 @@ static PINT_sm_action open_file_append_check(
         PINT_SM_GETATTR_STATE_FILL(
             getattr_frame->getattr,
             fildes_out->s->pvfs_ref,
-            PVFS_util_sys_to_object_attr_mask(
-                PVFS_ATTR_SYS_SIZE),
+            PVFS_ATTR_DATA_SIZE,
             PVFS_TYPE_NONE,
             0);
 
@@ -1796,14 +1795,7 @@ static PINT_sm_action open_file_append_getattr_inspect(
         return SM_ACTION_COMPLETE;
     }
 
-    if (getattr_frame->getattr.attr.objtype == PVFS_TYPE_DATAFILE)
-    {
-        fildes_out->s->file_pointer = getattr_frame->getattr.attr.u.data.size;
-    }
-    else
-    {
-        fildes_out->s->file_pointer = getattr_frame->getattr.size;
-    }
+    fildes_out->s->file_pointer = getattr_frame->getattr.size;
     free(getattr_frame);
 
     if (S_ISDIR(fildes_out->s->mode))

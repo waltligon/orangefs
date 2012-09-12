@@ -1218,12 +1218,12 @@ static PINT_sm_action remove_sm_inspect(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_remove: sm_inspect\n");
 
-    struct PINT_client_sm *getattr_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+    struct PINT_client_sm *remove_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                 smcb, &frame_id,
                                 &js_p->error_code, &frames_remaining);
 
-    js_p->error_code = getattr_frame->error_code;
-    free(getattr_frame);
+    js_p->error_code = remove_frame->error_code;
+    free(remove_frame);
 
     return SM_ACTION_COMPLETE;
 }

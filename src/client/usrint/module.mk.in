@@ -31,7 +31,9 @@ CLIENT_SMCGEN := \
 	$(DIR)/aio-rename.c \
 	$(DIR)/aio-mkdir.c \
 	$(DIR)/aio-remove.c \
-	$(DIR)/aio-symlink.c
+	$(DIR)/aio-symlink.c \
+	$(DIR)/aio-lseek.c \
+	$(DIR)/aio-close.c
 
 SMCGEN += $(CLIENT_SMCGEN)
 
