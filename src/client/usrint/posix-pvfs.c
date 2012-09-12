@@ -11,13 +11,16 @@
  */
 #define USRINT_SOURCE 1
 #include "usrint.h"
+#include <sys/syscall.h>
 #include "posix-ops.h"
 #include "posix-pvfs.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#include "pvfs-path.h"
 
 #define PVFS_ATTR_DEFAULT_MASK \
-(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
+        (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE |\
+         PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET)
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
 static char pvfs_cwd[PVFS_PATH_MAX];
@@ -35,6 +38,11 @@ static ssize_t pvfs_rdwrv(int fd,
                           size_t count,
                           int which);
 
+static int my_glibc_getcwd(char *buf, unsigned long size)
+{
+    return syscall(SYS_getcwd, buf, size);
+}
+
 /**
  *  pvfs_open
  */
@@ -50,6 +58,7 @@ int pvfs_open(const char *path, int flags, ...)
     if (!path)
     {
         errno = EINVAL;
+        debug("\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -64,22 +73,26 @@ int pvfs_open(const char *path, int flags, ...)
     va_end(ap);
 
     /* fully qualify pathname */
-    newpath = pvfs_qualify_path(path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
+        debug("\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     pd = iocommon_open(newpath, flags, hints, mode, NULL);
     if (newpath != path)
     {
-        free(newpath);
+        /* this should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     if (!pd)
     {
+        debug("\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     else
     {
+        debug("\tpvfs_open: return with %d\n", pd->fd);
         return pd->fd;
     }
 }
@@ -93,9 +106,11 @@ int pvfs_open64(const char *path, int flags, ...)
     int mode;
     PVFS_hint hints;
 
+    debug("pvfs_open64: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
+        debug("\tpvfs_open64: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -130,9 +145,11 @@ int pvfs_openat(int dirfd, const char *path, int flags, ...)
     PVFS_hint hints;
     pvfs_descriptor *dpd, *fpd;
 
+    debug("pvfs_openat: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
+        debug("\tpvfs_openat: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -162,16 +179,19 @@ int pvfs_openat(int dirfd, const char *path, int flags, ...)
         if (dirfd < 0)
         {
             errno = EBADF;
+            debug("\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         dpd = pvfs_find_descriptor(dirfd);
         if (!dpd)
         {
+            debug("\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         fpd = iocommon_open(path, flags, hints, mode, dpd);
         if (!fpd)
         {
+            debug("\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         return fpd->fd;
@@ -187,9 +207,11 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
     int mode;
     PVFS_hint hints;
 
+    debug("pvfs_openat64: called with %s\n", path);
     if (dirfd < 0)
     {
         errno = EBADF;
+        debug("\tpvfs_openat64: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -219,6 +241,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
  */
 int pvfs_creat(const char *path, mode_t mode, ...)
 {
+    debug("pvfs_creat: called with %s\n", path);
     return pvfs_open(path, O_RDWR | O_CREAT | O_EXCL, mode);
 }
 
@@ -227,6 +250,7 @@ int pvfs_creat(const char *path, mode_t mode, ...)
  */
 int pvfs_creat64(const char *path, mode_t mode, ...)
 {
+    debug("pvfs_creat64: called with %s\n", path);
     return pvfs_open64(path, O_RDWR | O_CREAT | O_EXCL, mode);
 }
 
@@ -238,16 +262,20 @@ int pvfs_unlink(const char *path)
     int rc = 0;
     char *newpath;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_unlink: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
+        debug("\tpvfs_unlink: return with %d\n", -1);
         return -1;
     }
     rc = iocommon_unlink(path, NULL);
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
+    debug("\tpvfs_unlink: return with %d\n", rc);
     return rc;
 }
 
@@ -259,6 +287,7 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
     int rc;
     pvfs_descriptor *pd;
 
+    debug("pvfs_unlinkat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
         rc = iocommon_unlink(path, NULL);
@@ -285,6 +314,7 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
             rc = iocommon_unlink(path, &pd->s->pvfs_ref);
         }
     }
+    debug("\tpvfs_unlinkat: return with %d\n", rc);
     return rc;
 }
 
@@ -296,25 +326,29 @@ int pvfs_rename(const char *oldpath, const char *newpath)
     int rc;
     char *absoldpath, *absnewpath;
 
-    absoldpath = pvfs_qualify_path(oldpath);
+    debug("pvfs_rename: called with %s\n", oldpath);
+    absoldpath = PVFS_qualify_path(oldpath);
     if (!absoldpath)
     {
         return -1;
     }
-    absnewpath = pvfs_qualify_path(newpath);
-    if (!absnewpath)
+    absnewpath = PVFS_qualify_path(newpath);
+    if (!absnewpath && (oldpath != absoldpath))
     {
-        free(absoldpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(absoldpath);
         return -1;
     }
     rc = iocommon_rename(NULL, absoldpath, NULL, absnewpath);
     if (oldpath != absoldpath)
     {
-        free(absoldpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(absoldpath);
     }
     if (newpath != absnewpath)
     {
-        free(absnewpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(absnewpath);
     }
     return rc;
 }
@@ -330,6 +364,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     PVFS_object_ref *olddirref, *newdirref;
     char *absoldpath, *absnewpath;
 
+    debug("pvfs_renameat: called with %s\n", oldpath);
     if (!oldpath || !newpath)
     {
         errno = EINVAL;
@@ -338,7 +373,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     if (oldpath[0] == '/' || olddirfd == AT_FDCWD)
     {
         olddirref = NULL;
-        absoldpath = pvfs_qualify_path(oldpath);
+        absoldpath = PVFS_qualify_path(oldpath);
         if (!absoldpath)
         {
             return -1;
@@ -363,7 +398,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     if (oldpath[0] == '/' || newdirfd == AT_FDCWD)
     {
         newdirref = NULL;
-        absnewpath = pvfs_qualify_path(newpath);
+        absnewpath = PVFS_qualify_path(newpath);
         if (!absnewpath)
         {
             return -1;
@@ -388,11 +423,13 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     rc = iocommon_rename(olddirref, absoldpath, newdirref, absnewpath);
     if (oldpath != absoldpath)
     {
-        free(absoldpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(absoldpath);
     }
     if (newpath != absnewpath)
     {
-        free(absnewpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(absnewpath);
     }
     return rc;
 }
@@ -404,6 +441,7 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
 {
     int rc;
 
+    debug("pvfs_read: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -430,6 +468,7 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
  */
 ssize_t pvfs_pread(int fd, void *buf, size_t count, off_t offset)
 {
+    debug("pvfs_pread: called with %d\n", fd);
     return pvfs_prdwr64(fd, buf, count, (off64_t) offset, PVFS_IO_READ);
 }
 
@@ -438,6 +477,7 @@ ssize_t pvfs_pread(int fd, void *buf, size_t count, off_t offset)
  */
 ssize_t pvfs_readv(int fd, const struct iovec *vector, int count)
 {
+    debug("pvfs_readv: called with %d\n", fd);
     return pvfs_rdwrv(fd, vector, count, PVFS_IO_READ);
 }
 
@@ -446,6 +486,7 @@ ssize_t pvfs_readv(int fd, const struct iovec *vector, int count)
  */
 ssize_t pvfs_pread64( int fd, void *buf, size_t count, off64_t offset )
 {
+    debug("pvfs_pread64: called with %d\n", fd);
     return pvfs_prdwr64(fd, buf, count, offset, PVFS_IO_READ);
 }
 
@@ -457,6 +498,7 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
     int rc;
     off64_t offset;
 
+    debug("pvfs_write: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -494,6 +536,7 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
  */
 ssize_t pvfs_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
+    debug("pvfs_pwrite: called with %d\n", fd);
     return pvfs_prdwr64(fd, (void *)buf, count, (off64_t)offset, PVFS_IO_WRITE);
 }
 
@@ -502,6 +545,7 @@ ssize_t pvfs_pwrite(int fd, const void *buf, size_t count, off_t offset)
  */
 ssize_t pvfs_writev(int fd, const struct iovec *vector, int count)
 {
+    debug("pvfs_writev: called with %d\n", fd);
     return pvfs_rdwrv(fd, vector, count, PVFS_IO_WRITE);
 }
 
@@ -510,6 +554,7 @@ ssize_t pvfs_writev(int fd, const struct iovec *vector, int count)
  */
 ssize_t pvfs_pwrite64(int fd, const void *buf, size_t count, off64_t offset)
 {
+    debug("pvfs_pwrite64: called with %d\n", fd);
     return pvfs_prdwr64(fd, (void *)buf, count, offset, PVFS_IO_WRITE);
 }
 
@@ -600,6 +645,7 @@ static ssize_t pvfs_rdwrv(int fd,
  */
 off_t pvfs_lseek(int fd, off_t offset, int whence)
 {
+    debug("pvfs_lseek: called with %d\n", fd);
     return (off_t) pvfs_lseek64(fd, (off64_t)offset, whence);
 }
 
@@ -610,6 +656,7 @@ off64_t pvfs_lseek64(int fd, off64_t offset, int whence)
 {
     pvfs_descriptor* pd;
 
+    debug("pvfs_lseek64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -633,6 +680,7 @@ off64_t pvfs_lseek64(int fd, off64_t offset, int whence)
  */
 int pvfs_truncate(const char *path, off_t length)
 {
+    debug("pvfs_truncate: called with %s\n", path);
     return pvfs_truncate64(path, (off64_t) length);
 }
 
@@ -642,20 +690,39 @@ int pvfs_truncate(const char *path, off_t length)
 int pvfs_truncate64(const char *path, off64_t length)
 {
     int rc;
+    char *newpath;
     pvfs_descriptor *pd;
 
-    if (!path)
+    debug("pvfs_truncate64: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
+    if (!newpath)
     {
         errno = EINVAL;
         return -1;
     }
-    pd = iocommon_open(path, O_WRONLY, PVFS_HINT_NULL, 0 , NULL);
-    if (!pd)
+    pd = iocommon_open(newpath, O_WRONLY, PVFS_HINT_NULL, 0 , NULL);
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        return -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.truncate(newpath, length);
+        pvfs_free_descriptor(pd->fd);
+        goto errorout;
     }
     rc = iocommon_truncate(pd->s->pvfs_ref, length);
     pvfs_close(pd->fd);
+
+errorout:
+    if (newpath != path)
+    {
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
+    }
     return rc;
 }
 
@@ -663,8 +730,8 @@ int pvfs_truncate64(const char *path, off64_t length)
  * pvfs_allocate wrapper
  *
  * This isn't right but we dont' have a syscall to match this.
- * Best effort is to tuncate to thex size, which should guarantee
- * spaceis available starting at beginning (let alone offset)
+ * Best effort is to tuncate to the size, which should guarantee
+ * space is available starting at beginning (let alone offset)
  * extending to offset+length.
  *
  * Our truncate doesn't always allocate blocks either, since
@@ -672,6 +739,7 @@ int pvfs_truncate64(const char *path, off64_t length)
  */
 int pvfs_fallocate(int fd, off_t offset, off_t length)
 {
+    debug("pvfs_fallocate: called with %d\n", fd);
     if (offset < 0 || length < 0)
     {
         errno = EINVAL;
@@ -688,6 +756,7 @@ int pvfs_fallocate(int fd, off_t offset, off_t length)
  */
 int pvfs_ftruncate(int fd, off_t length)
 {
+    debug("pvfs_ftruncate: called with %d\n", fd);
     return pvfs_ftruncate64(fd, (off64_t) length);
 }
 
@@ -696,6 +765,7 @@ int pvfs_ftruncate(int fd, off_t length)
  */
 int pvfs_ftruncate64(int fd, off64_t length)
 {
+    debug("pvfs_ftruncate64: called with %d\n", fd);
     pvfs_descriptor *pd;
     
     if (fd < 0)
@@ -735,14 +805,20 @@ int pvfs_close(int fd)
         errno = EBADF;
         return PVFS_FD_FAILURE;
     }
-
-    /* flush buffers */
-    if (S_ISREG(pd->s->mode))
+    /* This was supposed to be a PVFS file
+     * but it isn't - we didn't write to it
+     * so don't try to sync it
+     */
+    if (!(pd->s->fsops == &glibc_ops))
     {
-        rc = iocommon_fsync(pd);
-        if (rc < 0)
+        /* flush buffers */
+        if (S_ISREG(pd->s->mode))
         {
-            return -1;
+            rc = iocommon_fsync(pd);
+            if (rc < 0)
+            {
+                return -1;
+            }
         }
     }
 
@@ -763,6 +839,7 @@ int pvfs_close(int fd)
  */
 int pvfs_stat(const char *path, struct stat *buf)
 {
+    debug("pvfs_stat: called with %s\n", path);
     return pvfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
@@ -772,15 +849,24 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_stat_mask: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.stat(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     mask &= PVFS_ATTR_DEFAULT_MASK;
@@ -790,7 +876,8 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -804,15 +891,24 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_stat64: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.stat64(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
@@ -821,7 +917,8 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -831,11 +928,13 @@ errorout:
  */
 int pvfs_fstat(int fd, struct stat *buf)
 {
+    debug("pvfs_fstat: called with %d\n", fd);
     return pvfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
 {
+    debug("pvfs_fstat_mask: called with %d\n", fd);
     pvfs_descriptor *pd;
 
     if (fd < 0)
@@ -858,6 +957,7 @@ int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
  */
 int pvfs_fstat64(int fd, struct stat64 *buf)
 {
+    debug("pvfs_fstat64: called with %d\n", fd);
     pvfs_descriptor *pd;
 
     if (fd < 0)
@@ -882,6 +982,7 @@ int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
+    debug("pvfs_fstatat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -929,6 +1030,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
+    debug("pvfs_fstatat64: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -974,6 +1076,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
  */
 int pvfs_lstat(const char *path, struct stat *buf)
 {
+    debug("pvfs_lstat: called with %s\n", path);
     return pvfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
@@ -983,15 +1086,24 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_lstat_mask: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.lstat(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     mask &= PVFS_ATTR_DEFAULT_MASK;
@@ -1001,7 +1113,8 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
 errorout:
     if (newpath != path)
     {
-       free(newpath);
+       /* This should only happen if path was not a PVFS_path */
+       PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1015,15 +1128,24 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_lstat64: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.lstat64(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
@@ -1032,7 +1154,8 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1048,15 +1171,23 @@ int pvfs_futimesat(int dirfd,
     pvfs_descriptor *pd=NULL, *pd2=NULL;
     PVFS_sys_attr attr;
 
-    if (dirfd < 0)
+    debug("pvfs_futimesat: called with %s\n", path);
+    if (path[0] == '/' || dirfd == AT_FDCWD)
     {
-        errno = EBADF;
-        return -1;
+        pd = NULL;
     }
-    pd = pvfs_find_descriptor(dirfd);
-    if (!pd)
+    else
     {
-        return -1;
+        if (dirfd < 0)
+        {
+            errno = EBADF;
+            return -1;
+        }
+        pd = pvfs_find_descriptor(dirfd);
+        if (!pd)
+        {
+            return -1;
+        }
     }
     if (path)
     {
@@ -1064,6 +1195,7 @@ int pvfs_futimesat(int dirfd,
     }
     else
     {
+        errno = EINVAL;
         pd2 = pd; /* allow null path to work */
     }
     if (!pd2)
@@ -1094,12 +1226,14 @@ int pvfs_futimesat(int dirfd,
 
 int pvfs_utimes(const char *path, const struct timeval times[2])
 {
+    debug("pvfs_utimes: called with %s\n", path);
     return pvfs_futimesat(AT_FDCWD, path, times);
 }
 
 int pvfs_utime(const char *path, const struct utimbuf *buf)
 {
     struct timeval times[2];
+    debug("pvfs_utime: called with %s\n", path);
     times[0].tv_sec = buf->actime;
     times[0].tv_usec = 0;
     times[1].tv_sec = buf->modtime;
@@ -1113,6 +1247,7 @@ int pvfs_futimes(int fd, const struct timeval times[2])
     pvfs_descriptor *pd=NULL;
     PVFS_sys_attr attr;
 
+    debug("pvfs_futimes: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1147,6 +1282,7 @@ int pvfs_futimes(int fd, const struct timeval times[2])
  */
 int pvfs_dup(int oldfd)
 {
+    debug("pvfs_dup: called with %d\n", oldfd);
     return pvfs_dup_descriptor(oldfd, -1);
 }
 
@@ -1155,6 +1291,7 @@ int pvfs_dup(int oldfd)
  */
 int pvfs_dup2(int oldfd, int newfd)
 {
+    debug("pvfs_dup2: called with %d\n", oldfd);
     return pvfs_dup_descriptor(oldfd, newfd);
 }
 
@@ -1167,15 +1304,24 @@ int pvfs_chown(const char *path, uid_t owner, gid_t group)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_chown: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.chown(newpath, owner, group);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_chown(pd, owner, group);
@@ -1184,7 +1330,8 @@ int pvfs_chown(const char *path, uid_t owner, gid_t group)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1196,6 +1343,7 @@ int pvfs_fchown(int fd, uid_t owner, gid_t group)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fchown: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1218,6 +1366,7 @@ int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
+    debug("pvfs_chown: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -1266,15 +1415,24 @@ int pvfs_lchown(const char *path, uid_t owner, gid_t group)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_lchown: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.lchown(newpath, owner, group);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_chown(pd, owner, group);
@@ -1283,7 +1441,8 @@ int pvfs_lchown(const char *path, uid_t owner, gid_t group)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1297,15 +1456,24 @@ int pvfs_chmod(const char *path, mode_t mode)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_chmod: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.chmod(newpath, mode);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_chmod(pd, mode);
@@ -1314,7 +1482,8 @@ int pvfs_chmod(const char *path, mode_t mode)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1326,6 +1495,7 @@ int pvfs_fchmod(int fd, mode_t mode)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fchmod: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1348,6 +1518,7 @@ int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
+    debug("pvfs_fchmodat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         rc = pvfs_chmod(path, mode);
@@ -1384,7 +1555,8 @@ int pvfs_mkdir(const char *path, mode_t mode)
     int rc;
     char *newpath;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_mkdir: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
@@ -1392,7 +1564,8 @@ int pvfs_mkdir(const char *path, mode_t mode)
     rc = iocommon_make_directory(newpath, (mode & ~mask_val & 0777), NULL);
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1405,6 +1578,7 @@ int pvfs_mkdirat(int dirfd, const char *path, mode_t mode)
     int rc;
     pvfs_descriptor *pd;
 
+    debug("pvfs_mkdirat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
         rc = pvfs_mkdir(path, mode);
@@ -1437,7 +1611,8 @@ int pvfs_rmdir(const char *path)
     int rc;
     char *newpath;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_rmdir: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
@@ -1445,7 +1620,8 @@ int pvfs_rmdir(const char *path)
     rc = iocommon_rmdir(newpath, NULL);
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1460,15 +1636,24 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_readlink: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY | O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.readlink(newpath, buf, bufsiz);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     debug("pvfs_readlink mode is %o\n", pd->s->mode);
@@ -1480,7 +1665,8 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
 errorout:
     if (newpath != path)
     {
-       free(newpath);
+       /* This should only happen if path was not a PVFS_path */
+       PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1490,6 +1676,7 @@ ssize_t pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
+    debug("pvfs_readlinkat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         rc = pvfs_readlink(path, buf, bufsiz);
@@ -1522,7 +1709,9 @@ int pvfs_symlink(const char *oldpath, const char *newpath)
 {
     int rc = 0;
     char *abspath;
-    abspath = pvfs_qualify_path(newpath);
+
+    debug("pvfs_symlink: called with %s\n", oldpath);
+    abspath = PVFS_qualify_path(newpath);
     if (!abspath)
     {
         return -1;
@@ -1530,7 +1719,8 @@ int pvfs_symlink(const char *oldpath, const char *newpath)
     rc = iocommon_symlink(abspath, oldpath, NULL);
     if (abspath != newpath)
     {
-       free(abspath);
+       /* This should only happen if path was not a PVFS_path */
+       PVFS_free_expanded(abspath);
     }
     return rc;
 }
@@ -1539,6 +1729,7 @@ int pvfs_symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_symlinkat: called with %s\n", oldpath);
     if (newpath[0] == '/' || newdirfd == AT_FDCWD)
     {
         return pvfs_symlink(oldpath, newpath);
@@ -1586,6 +1777,7 @@ int pvfs_linkat(int olddirfd, const char *oldpath,
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
+    debug("pvfs_readdir: called with %d\n", fd);
     return pvfs_getdents(fd, dirp, 1);
 }
 
@@ -1598,6 +1790,7 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_getdents: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1616,6 +1809,7 @@ int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_getdents64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1634,7 +1828,9 @@ int pvfs_access(const char *path, int mode)
 {
     int rc = 0;
     char *newpath;
-    newpath = pvfs_qualify_path(path);
+
+    debug("pvfs_access: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
@@ -1642,7 +1838,8 @@ int pvfs_access(const char *path, int mode)
     rc = iocommon_access(path, mode, 0, NULL);
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1651,6 +1848,7 @@ int pvfs_faccessat(int fd, const char *path, int mode, int flags)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_faccessat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         return pvfs_access(path, mode);
@@ -1687,6 +1885,7 @@ int pvfs_fcntl(int fd, int cmd, ...)
     struct flock *lock;
     pvfs_descriptor *pd;
 
+    debug("pvfs_fcntl: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -1763,6 +1962,14 @@ int pvfs_fsync(int fd)
         errno = EBADF;
         return -1;
     }
+    if (pd->s->fsops == &glibc_ops)
+    {
+        /* this was supposed to be PVFS but isn't */
+        /* just skip the sync because we almost */
+        /* certainly didn't write to it */
+        return rc;
+    }
+        
 
     /* tell the server to flush data to disk */
     rc = iocommon_fsync(pd);
@@ -1775,6 +1982,7 @@ int pvfs_fdatasync(int fd)
 {
     int rc = 0;
 
+    debug("pvfs_fdatasync: called with %d\n", fd);
     rc = pvfs_fsync(fd); /* as close as we have for now */
     return rc;
 }
@@ -1790,6 +1998,7 @@ int pvfs_fadvise(int fd, off_t offset, off_t len, int advice)
  */
 int pvfs_fadvise64(int fd, off64_t offset, off64_t len, int advice)
 {
+    debug("pvfs_fadvise64: called with %d\n", fd);
     switch (advice)
     {
     case POSIX_FADV_NORMAL:
@@ -1812,15 +2021,24 @@ int pvfs_statfs(const char *path, struct statfs *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_statfs: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.statfs(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_statfs(pd, buf);
@@ -1829,7 +2047,8 @@ int pvfs_statfs(const char *path, struct statfs *buf)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1840,15 +2059,24 @@ int pvfs_statfs64(const char *path, struct statfs64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_statfs64: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.statfs64(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_statfs64(pd, buf);
@@ -1857,7 +2085,8 @@ int pvfs_statfs64(const char *path, struct statfs64 *buf)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1866,6 +2095,7 @@ int pvfs_fstatfs(int fd, struct statfs *buf)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fstatfs: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1884,6 +2114,7 @@ int pvfs_fstatfs64(int fd, struct statfs64 *buf)
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fstatfs64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1905,15 +2136,24 @@ int pvfs_statvfs(const char *path, struct statvfs *buf)
     struct statfs buf2;
     char *newpath;
 
-    newpath = pvfs_qualify_path(path);
+    debug("pvfs_statvfs: called with %s\n", path);
+    newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
         return -1;
     }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
-    if (!pd)
+    if (!pd || (pd->s->fsops == &glibc_ops))
     {
-        rc = -1;
+        if (!pd)
+        {
+            /* this is an error on open */
+            rc = -1;
+            goto errorout;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.statvfs(newpath, buf);
+        pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
     rc = iocommon_statfs(pd, &buf2);
@@ -1937,7 +2177,8 @@ int pvfs_statvfs(const char *path, struct statvfs *buf)
 errorout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -1948,6 +2189,7 @@ int pvfs_fstatvfs(int fd, struct statvfs *buf)
     pvfs_descriptor *pd;
     struct statfs buf2;
 
+    debug("pvfs_fstatvfs: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1980,6 +2222,7 @@ int pvfs_fstatvfs(int fd, struct statvfs *buf)
 
 int pvfs_mknod(const char *path, mode_t mode, dev_t dev)
 {
+    debug("pvfs_mknod: called with %s\n", path);
     return pvfs_mknodat(AT_FDCWD, path, mode, dev);
 }
 
@@ -1988,6 +2231,7 @@ int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
     int fd;
     /* int s_type = mode & S_IFMT; */
     
+    debug("pvfs_mknod: called with %s\n", path);
     switch (dev)
     {
     case S_IFREG:
@@ -2011,6 +2255,7 @@ int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
 
 ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count)
 {
+    debug("pvfs_sendfile: called with %d\n", outfd);
     return pvfs_sendfile64(outfd, infd, (off64_t *)offset, count);
 }
                  
@@ -2018,6 +2263,7 @@ ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count)
 {
     pvfs_descriptor *inpd, *outpd;
 
+    debug("pvfs_sendfile64: called with %d\n", outfd);
     inpd = pvfs_find_descriptor(infd);
     outpd = pvfs_find_descriptor(outfd);  /* this should be  a socket */
     if (!inpd || !outpd)
@@ -2036,6 +2282,7 @@ int pvfs_setxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_setxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2054,6 +2301,7 @@ int pvfs_lsetxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_lsetxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2073,6 +2321,7 @@ int pvfs_fsetxattr(int fd,
     int rc = 0;
     pvfs_descriptor *pd;
 
+    debug("pvfs_fsetxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2090,6 +2339,7 @@ ssize_t pvfs_getxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_getxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2107,6 +2357,7 @@ ssize_t pvfs_lgetxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_lgetxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2124,6 +2375,7 @@ ssize_t pvfs_fgetxattr(int fd,
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fgetxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2139,6 +2391,7 @@ ssize_t pvfs_listxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_listxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2155,6 +2408,7 @@ ssize_t pvfs_llistxattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_llistxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2172,6 +2426,7 @@ ssize_t pvfs_flistxattr(int fd,
     int retsize, rc = 0;
     pvfs_descriptor *pd;
 
+    debug("pvfs_flistxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2191,6 +2446,7 @@ int pvfs_removexattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_removexattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2206,6 +2462,7 @@ int pvfs_lremovexattr(const char *path,
 {
     int fd, rc = 0;
 
+    debug("pvfs_lremovexattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2221,6 +2478,7 @@ int pvfs_fremovexattr(int fd,
 {
     pvfs_descriptor *pd;
 
+    debug("pvfs_fremovexattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2234,16 +2492,60 @@ int pvfs_fremovexattr(int fd,
  * working directory given than the kernel may not
  * be aware of PVFS virtual mounts
  */
-int pvfs_cwd_init(const char *buf, size_t size)
+int pvfs_cwd_init(int expand)
 {
-    char *rv;
+    int rc = 0;
+    int plen = 0;
+    char *rv, buf[PVFS_PATH_MAX];
+    memset(buf, 0, PVFS_PATH_MAX);
     memset(pvfs_cwd, 0, PVFS_PATH_MAX);
-    rv = strncpy(pvfs_cwd, buf, PVFS_util_min(size, PVFS_PATH_MAX));
+    /* use env to start path - only thing we can depend on
+     * if the kernel is not aware of PVFS paths
+     */
+    rv = getenv("PWD");
     if (!rv)
     {
-        return -1;
+        /* fall back to the kernel if env has no PWD */
+        rc = my_glibc_getcwd(buf, PVFS_PATH_MAX);
+        if (rc < 0)
+        {
+            perror("failed to get CWD from kernel");
+            exit(-1);
+        }
     }
-    return 0;
+    else
+    {
+        rv = strncpy(buf, rv, PVFS_PATH_MAX);
+        if (!rv)
+        {
+            perror("string copy failed");
+            exit(-1);
+        }
+    }
+    if (expand)
+    {
+        /* shells might not resolve symlinks */
+        /* but PVFS must be up for this to work */
+        rv = PVFS_expand_path(buf,0);
+    }
+    else
+    {
+        /* need something to return before PVFS gets up */
+        rv = PVFS_qualify_path(buf);
+    }
+    /* basic path length check */
+    plen = strnlen(rv, PVFS_PATH_MAX);
+    if (plen >= PVFS_PATH_MAX)
+    {
+        errno = ENAMETOOLONG;
+        rc = -1;
+    }
+    else
+    {
+        strncpy(pvfs_cwd, rv, PVFS_PATH_MAX);
+    }
+    PVFS_free_expanded(rv);
+    return rc;
 }
 
 /**
@@ -2255,20 +2557,22 @@ int pvfs_chdir(const char *path)
     struct stat sbuf;
     char *newpath = NULL;
 
+    debug("pvfs_chdir: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
         return -1;
     }
     /* we really need to resolve this to a cannonical path */
-    newpath = pvfs_qualify_path(path);
+    /* jump to expand path right away */
+    newpath = PVFS_expand_path(path, 0);
     if (!newpath)
     {
         return -1;
     }
     /* basic path length check */
-    plen = strlen(newpath);
-    if (plen > PVFS_PATH_MAX)
+    plen = strnlen(newpath, PVFS_PATH_MAX);
+    if (plen >= PVFS_PATH_MAX)
     {
         errno = ENAMETOOLONG;
         rc = -1;
@@ -2295,7 +2599,8 @@ int pvfs_chdir(const char *path)
 errout:
     if (newpath != path)
     {
-        free(newpath);
+        /* This should only happen if path was not a PVFS_path */
+        PVFS_free_expanded(newpath);
     }
     return rc;
 }
@@ -2305,6 +2610,7 @@ int pvfs_fchdir(int fd)
     int plen;
     pvfs_descriptor *pd;
 
+    debug("pvfs_fchdir: called with %d\n", fd);
     /* path is already opened, make sure it is a dir */
     pd = pvfs_find_descriptor(fd);
     if (!pd || !S_ISDIR(pd->s->mode) || !pd->s->dpath)
@@ -2319,6 +2625,7 @@ int pvfs_fchdir(int fd)
         errno = ENAMETOOLONG;
         return -1;
     }
+    debug("\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
     /* we will keep a copy and keep one in the environment */
     strncpy(pvfs_cwd, pd->s->dpath, PVFS_PATH_MAX);
     setenv("PWD", pd->s->dpath, 1);

@@ -7,6 +7,7 @@
 #define _XOPEN_SOURCE 600
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -54,7 +55,11 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
         ret = errno;
     }
 #else
+    /* bash uses its own malloc implementation without */
+    /* posix_memalign - for the moment want to support bash */
     ret = posix_memalign(&ptr, alignment, size);
+    /* ptr = memalign(alignment, size); */
+    /* ptr = malloc(size); */
 #endif
     if(ret != 0)
     {

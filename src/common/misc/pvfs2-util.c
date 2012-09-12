@@ -45,6 +45,7 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "pvfs-path.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -63,6 +64,7 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
 
 #elif HAVE_FSTAB_H
+#include "openfile-util.h"
 
 #include <fstab.h>
 #define PINT_fstab_t FILE
@@ -1236,6 +1238,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                     sizeof(struct PVFS_sys_mntent));
             if (!s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
             /* should this be PVFS_PATH_MAX? - WBL */
@@ -1250,6 +1253,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                 ((new_index + 1) * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
 
@@ -1344,6 +1348,7 @@ int PVFS_util_remove_internal_mntent(
       mntent_found:
         if (!found)
         {
+            gen_mutex_unlock(&s_stat_tab_mutex);
             return -PVFS_EINVAL;
         }
 
@@ -1365,6 +1370,7 @@ int PVFS_util_remove_internal_mntent(
                 (new_count * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
 
@@ -1469,6 +1475,11 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
 
 /* PVFS_util_resolve()
  *
+ * This function is quasi-obsolete.  It should still work and for now
+ * it is called by the pvfs2-xxx utils.  Most everything else calls
+ * PVFS_util_resolve_absolute directly and uses the new PVFS_path
+ * structure to keep up with paths and their modifications/expansions
+ *
  * given a local path of a file that resides on a pvfs2 volume,
  * determine what the fsid and fs relative path is.  
  *
@@ -1484,6 +1495,8 @@ int PVFS_util_resolve(
     char* tmp_path = NULL;
     char* parent_path = NULL;
     int base_len = 0;
+    PVFS_path_t *Ppath;
+    int ppath_local = 0;
 
     if(strlen(local_path) > (PVFS_PATH_MAX-1))
     {
@@ -1491,14 +1504,36 @@ int PVFS_util_resolve(
         return(-PVFS_ENAMETOOLONG);
     }
 
+    Ppath = PVFS_path_from_expanded((char *)local_path);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        /* this allocates a PVFS_path that must be freed before return */
+        Ppath = PVFS_new_path(local_path);
+        local_path = Ppath->expanded_path;
+        ppath_local = 1; /* this Ppath created locally */
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        /* this saves a copy of the original path and returns */
+        /* a pointer to the modified path */
+        /* this will not allocated PVFS_path) */
+        local_path = PVFS_qualify_path(local_path);
+    }
+
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-    ret = PVFS_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
-                                     out_fs_path_max);
+    ret = PVFS_util_resolve_absolute(local_path);
     if(ret == 0)
     {
         /* done */
+        strncpy(out_fs_path, Ppath->pvfs_path, out_fs_path_max);
+        *out_fs_id = Ppath->fs_id;
+        if (ppath_local)
+        {
+            PVFS_free_path(Ppath);
+        }
         return(0);
     }
     if(ret == -PVFS_ENOENT)
@@ -1552,8 +1587,17 @@ int PVFS_util_resolve(
             return(-PVFS_ENOENT);
         }
 
-        ret = PVFS_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
-                                         out_fs_path_max);
+        ret = PVFS_util_resolve_absolute(tmp_path);
+        if (!ret)
+        {
+            /* done */
+            strncpy(out_fs_path, Ppath->pvfs_path, out_fs_path_max);
+            *out_fs_id = Ppath->fs_id;
+            if (ppath_local)
+            {
+                PVFS_free_path(Ppath);
+            }
+        }
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
@@ -2283,31 +2327,48 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
  * determine what the fsid and fs relative path is. Makes no attempt
  * to canonicalize the path.
  *
- * returns 0 on success, -PVFS_error on failure
+ * result is returned through the PVFS_path type now
+ *
+ * returns 0 on succees, -PVFS_error on failure
  */
-int PVFS_util_resolve_absolute(const char *local_path,
-                               PVFS_fs_id *out_fs_id,
-                               char *out_fs_path,
-                               int out_fs_path_max)
+int PVFS_util_resolve_absolute(const char* local_path)
 {
     int i = 0, j = 0;
     int ret = -PVFS_EINVAL;
+    PVFS_path_t *Ppath;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for(i = 0; i < s_stat_tab_count; i++)
+    Ppath = PVFS_path_from_expanded((char *)local_path);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        gossip_err("Error: PVFS_util_resolve_absolute only"
+                   " works on PVFS_path structures\n");
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return ret;
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        gossip_err("Error: PVFS_util_resolve_absolute only"
+                   " works on qualified or expanded paths\n");
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return ret;
+    }
+
+    CLEAR_RESOLVED(Ppath);
+
+    for(i=0; i < s_stat_tab_count; i++)
     {
         for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
-                           local_path, 
-                           s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                           out_fs_path,
-                           out_fs_path_max);
+                        local_path, 
+                        s_stat_tab_array[i].mntent_array[j].mnt_dir);
             if(ret == 0)
             {
-                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
-                if(*out_fs_id == PVFS_FS_ID_NULL)
+                Ppath->fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                if(Ppath->fs_id == PVFS_FS_ID_NULL)
                 {
                     gossip_err("Error: %s resides on a PVFS2 file system "
                     "that has not yet been initialized.\n", local_path);
@@ -2315,6 +2376,7 @@ int PVFS_util_resolve_absolute(const char *local_path,
                     gen_mutex_unlock(&s_stat_tab_mutex);
                     return(-PVFS_ENXIO);
                 }
+                SET_RESOLVED(Ppath);
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return(0);
             }
@@ -2325,15 +2387,13 @@ int PVFS_util_resolve_absolute(const char *local_path,
     for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
         ret = PINT_remove_dir_prefix(
-             local_path,
-             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-             out_fs_path,
-             out_fs_path_max);
+                    local_path, s_stat_tab_array[
+                    PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir);
         if (ret == 0)
         {
-            *out_fs_id =
-                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
-            if(*out_fs_id == PVFS_FS_ID_NULL)
+            Ppath->fs_id = s_stat_tab_array[
+                        PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            if(Ppath->fs_id == PVFS_FS_ID_NULL)
             {
                 gossip_err("Error: %s resides on a PVFS2 file system "
                            "that has not yet been initialized.\n",
@@ -2342,6 +2402,7 @@ int PVFS_util_resolve_absolute(const char *local_path,
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return(-PVFS_ENXIO);
             }
+            SET_RESOLVED(Ppath);
             gen_mutex_unlock(&s_stat_tab_mutex);
             return(0);
         }

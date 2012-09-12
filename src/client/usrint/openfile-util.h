@@ -18,18 +18,9 @@
 #define PVFS_FD_SUCCESS 0
 #define PVFS_FD_FAILURE -1
 
-extern int split_pathname(const char *path, 
-		   int dirflag,
-		   char **directory,
-		   char **filename);
-
 int pvfs_ucache_enabled(void);
 
 extern int pvfs_sys_init(void); 
-
-extern char *pvfs_qualify_path(const char *path);
-
-extern int is_pvfs_path(const char *path); 
 
 extern void pvfs_debug(char *fmt, ...); 
 

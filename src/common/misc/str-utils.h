@@ -45,9 +45,7 @@ int PINT_remove_base_dir(
     int out_max_len);
 int PINT_remove_dir_prefix(
     const char *pathname,
-    const char *prefix,
-    char *out_path,
-    int out_max_len);
+    const char *prefix);
 char *PINT_merge_handle_range_strs(
     char *range1,
     char *range2);

@@ -3,14 +3,15 @@ ifdef BUILD_USRINT
 DIR := src/client/usrint
 
 SRC := \
- 	$(DIR)/posix-pvfs.c \
- 	$(DIR)/request.c \
- 	$(DIR)/iocommon.c \
- 	$(DIR)/openfile-util.c \
- 	$(DIR)/ucache.c \
- 	$(DIR)/mmap.c \
+	$(DIR)/posix-pvfs.c \
+	$(DIR)/request.c \
+	$(DIR)/iocommon.c \
+	$(DIR)/openfile-util.c \
+	$(DIR)/ucache.c \
+    $(DIR)/mmap.c \
 	$(DIR)/aiocommon.c \
-	$(DIR)/aio-pvfs.c
+	$(DIR)/aio-pvfs.c \
+    $(DIR)/pvfs-path.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed

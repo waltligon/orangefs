@@ -84,7 +84,6 @@ int PINT_realpath(
     char *resolved_path,
     int maxreslth)
 {
-    PVFS_fs_id fs_id;
     int readlinks = 0;
     char *npath;
     char link_path[PATH_MAX + 1];
@@ -158,8 +157,7 @@ int PINT_realpath(
 
 #ifndef BUILD_USRINT
         /* see if this part of the path has a PVFS mount point */
-        ret = PVFS_util_resolve_absolute(resolved_path, &fs_id,
-                                         link_path, PATH_MAX);
+        ret = PVFS_util_resolve_absolute(resolved_path);
         /* we don't care about the output of resolve */
         /* link_path was just a placeholder */
         memset(link_path, 0, PATH_MAX);

@@ -16,6 +16,7 @@
 #endif
 
 #include "str-utils.h"
+#include "pvfs-path.h"
 
 /* PINT_string_count_segments()
  *
@@ -539,8 +540,7 @@ int PINT_remove_base_dir(
  * Parameters:
  * pathname     - pointer to directory string (absolute)
  * prefix       - pointer to prefix dir string (absolute)
- * out_path     - pointer to output dir string
- * max_out_len  - max length of out_base_dir buffer
+ * out_path_p   - pointer to output dir string in pathname
  *
  * All incoming arguments must be valid and non-zero
  *
@@ -570,27 +570,45 @@ int PINT_remove_base_dir(
  */
 int PINT_remove_dir_prefix(
     const char *pathname,
-    const char *prefix,
-    char *out_path,
-    int out_max_len)
+    const char *prefix)
 {
     int ret = -PVFS_EINVAL;
     int prefix_len, pathname_len;
     int cut_index;
+    PVFS_path_t *Ppath;
 
-    if (!pathname || !prefix || !out_path || !out_max_len)
+    if (!pathname || !prefix)
     {
         return ret;
     }
 
-    /* make sure we are given absolute paths */
+    /* see if this is a PVFS path if not make one */
+    Ppath = PVFS_path_from_expanded((char *)pathname);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        /* we only work on qualified or expanded paths */
+        return ret;
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        /* we only work on qualified or expanded paths */
+        return ret;
+    }
+
+    /* make sure we are given absolute paths - just to be sure */
     if ((pathname[0] != '/') || (prefix[0] != '/'))
     {
         return ret;
     }
 
+    /* be sure we don't get confused with old results */
+    Ppath->pvfs_path = NULL;
+
     while (pathname[1] == '/')
+    {
         pathname++;
+    }
 
     prefix_len = strlen(prefix);
     pathname_len = strlen(pathname);
@@ -613,7 +631,9 @@ int PINT_remove_dir_prefix(
 
         /* make sure prefix would fit in pathname */
         if (prefix_len > (pathname_len + 1))
+        {
             return (-PVFS_ENOENT);
+        }
 
         /* see if we can find prefix at beginning of path */
         if (strncmp(prefix, pathname, prefix_len) == 0)
@@ -621,7 +641,9 @@ int PINT_remove_dir_prefix(
             /* apparent match; see if next element is a slash */
             if ((pathname[prefix_len] != '/') &&
                 (pathname[prefix_len] != '\0'))
+            {
                 return (-PVFS_ENOENT);
+            }
 
             /* this was indeed a match */
             /* in the case of no trailing slash cut_index will point to the end
@@ -636,19 +658,22 @@ int PINT_remove_dir_prefix(
 
     /* if we hit this point, then we were successful */
 
-    /* is the buffer large enough? */
-    if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
-        return (-PVFS_ENAMETOOLONG);
-
     /* try to handle the case of no trailing slash */
-    if (pathname[cut_index] == '\0')
+    if (pathname[cut_index] == '\0' ||
+            (pathname[cut_index] == '/' && pathname[cut_index + 1] == '\0'))
     {
-        out_path[0] = '/';
-        out_path[1] = '\0';
+        SET_MNTPOINT(Ppath);
     }
     else
-        /* copy out appropriate part of pathname */
-        strcpy(out_path, &(pathname[cut_index]));
+    {
+        /* this flag indicates looked up string is exactly */
+        /* the mount point - RESOLVED flag indicates mount */
+        /* point is somewhere in the path */
+        CLEAR_MNTPOINT(Ppath);
+    }
+
+    /* this is the output of the function */
+    Ppath->pvfs_path = (char *)&(pathname[cut_index]);
 
     return (0);
 }
