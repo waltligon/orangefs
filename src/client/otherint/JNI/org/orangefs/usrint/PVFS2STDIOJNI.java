@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-package org.clemson.ofs.usrint;
+package org.orangefs.usrint;
 
 public class PVFS2STDIOJNI {
 
@@ -93,6 +93,13 @@ public class PVFS2STDIOJNI {
     public PVFS2STDIOJNI() {}   
 
     static {
-        System.loadLibrary("PVFS2STDIOJNI");
+        try {
+            System.loadLibrary("PVFS2STDIOJNI");
+        } catch (UnsatisfiedLinkError error) {
+            error.printStackTrace();
+            System.err.println("Couldn't load libPVFS2STDIOJNI.so.");
+            System.err.println("java.library.path = " + System.getProperty("java.library.path"));
+            System.exit(-1);
+        }
     }
 }

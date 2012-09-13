@@ -17,21 +17,22 @@ USRINT_DIR=$(PVFS2_TOP_PREFIX)/ofs/src/client/usrint
 JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
 
 #For use with package
-ORGDIR = org/clemson/ofs/usrint
-ORGDOT = org.clemson.ofs.usrint
-ORGUNDER = org_clemson_ofs_usrint
+ORGDIR = org/orangefs/usrint
+ORGDOT = org.orangefs.usrint
+ORGUNDER = org_orangefs_usrint
 #------------------------------------------------------------------------------
 
 #Build both libraries and move to OrangeFS lib directory
 libs : libPVFS2STDIOJNI.so libPVFS2JNI.so
+	touch libs
 
-jar : libPVFS2STDIOJNI.so libPVFS2JNI.so
+ofs_jni.jar : libs
 	jar cf ofs_jni.jar \
 	  $(ORGDIR)/*.class
-	cp *.jar $(PVFS2_TOP_PREFIX)/lib
 
-install : libPVFS2STDIOJNI.so libPVFS2JNI.so
+install : ofs_jni.jar
 	cp *.so $(PVFS2_TOP_PREFIX)/lib
+	cp ofs_jni.jar $(PVFS2_TOP_PREFIX)/lib
 
 #Link
 libPVFS2STDIOJNI.so : PVFS2STDIOJNI.class $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJNI.o
@@ -96,7 +97,8 @@ libPVFS2JNI.o : libPVFS2JNI.c $(ORGDIR)/PVFS2JNI.java $(ORGUNDER)_PVFS2JNI.h \
       $<
 
 clean :
-	rm -f *.o *.so *.h *.jar org/clemson/ofs/usrint/*.class \
+	rm -f *.o *.so *.h *.jar org/orangefs/usrint/*.class \
 		$(PVFS2_TOP_PREFIX)/lib/libPVFS2STDIOJNI.so \
-		$(PVFS2_TOP_PREFIX)/lib/libPVFS2JNI.so
+		$(PVFS2_TOP_PREFIX)/lib/libPVFS2JNI.so \
+	    libs
 
