@@ -8,13 +8,14 @@ SRC := \
 	$(DIR)/iocommon.c \
 	$(DIR)/openfile-util.c \
 	$(DIR)/ucache.c \
-        $(DIR)/mmap.c \
-        $(DIR)/pvfs-path.c \
-        $(DIR)/pvfs-qualify-path.c
+	$(DIR)/mmap.c \
+	$(DIR)/pvfs-path.c \
+	$(DIR)/pvfs-qualify-path.c
 
 USRC := \
 	$(DIR)/posix.c \
-	$(DIR)/stdio.c 
+	$(DIR)/stdio.c \
+	$(DIR)/fts.c 
 
 # list of all .c files (generated or otherwise) that belong in library
 LIBSRC += $(SRC)

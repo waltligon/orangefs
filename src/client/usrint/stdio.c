@@ -2334,6 +2334,9 @@ DIR *fdopendir (int fd)
     DIR *dstr;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "fdopendir %d\n", fd);
+    /* TODO: need to check validity of fd, requiers call to
+     * pvfs_find_descriptor
+     */
     dstr = (DIR *)malloc(sizeof(DIR));
     if (dstr == NULL)
     {
