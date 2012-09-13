@@ -787,6 +787,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
 pvfs_descriptor *pvfs_find_descriptor(int fd)
 {
     pvfs_descriptor *pd = NULL;
+    struct stat sbuf;
 
     pvfs_sys_init();
     if (fd < 0 || fd >= descriptor_table_size)
@@ -838,10 +839,35 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->pvfs_ref.fs_id = 0;
 	    pd->s->pvfs_ref.handle = 0LL;
 	    pd->s->flags = flags;
+	    pd->s->dpath = NULL;
+        glibc_ops.fstat(fd, &sbuf);
+        pd->s->mode = sbuf.st_mode;
+        if (S_ISDIR(sbuf.st_mode))
+        {
+            /* need to get path for this fd from /proc */
+            /* we will use glibc to open /proc/self/# which */
+            /* is a symbolic link, and then read the link */
+            /* to get the path */
+            char procpath[50];
+            char dirpath[PVFS_PATH_MAX];
+            int len;
+
+            memset(procpath, 0, 50);
+            memset(dirpath, 0, PVFS_PATH_MAX);
+            sprintf(procpath, "/proc/self/%d", fd);
+            len = glibc_ops.readlink(procpath, dirpath, PVFS_PATH_MAX);
+            if (len < 0)
+            {
+                /* error reading link */
+            }
+            /* stash the path */
+            pd->s->dpath = (char *)malloc(len + 1);
+            memset(pd->s->dpath, 0, len + 1);
+            memcpy(pd->s->dpath, procpath, len);
+        }
 	    pd->s->mode = 0;
 	    pd->s->file_pointer = 0;
 	    pd->s->token = 0;
-	    pd->s->dpath = NULL;
         pd->s->fent = NULL; /* not caching if left NULL */
     }
     else

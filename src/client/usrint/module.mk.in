@@ -19,7 +19,8 @@ SRC := \
 
 USRC := \
  	$(DIR)/posix.c \
- 	$(DIR)/stdio.c 
+ 	$(DIR)/stdio.c \
+ 	$(DIR)/fts.c 
 
 ifdef BUILD_JNI
 USRC += \
