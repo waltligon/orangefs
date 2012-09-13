@@ -702,16 +702,124 @@ extern int pxfs_lseek64(int fd, off64_t offset, int whence, off64_t *offset_out,
     return 0;
 }
 
+/**
+ * pxfs datatypes and callback prototypes for truncate64 function
+ */
+
+typedef struct {
+    int fd;
+    off64_t length;
+    int status;
+    pxfs_cb cb;
+    void *cdat;
+} pxfs_trunc_dat;
+    
+static int pxfs_trunc_open_cb(void *cdat, int status);
+static int pxfs_trunc_cb(void *cdat, int status);
+static int pxfs_trunc_close_cb(void *cdat, int status);
+
+static int pxfs_trunc_open_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_trunc_dat *trunc = (pxfs_trunc_dat *)cdat;
+
+    if (status)
+    {
+        (*trunc->cb)(trunc->cdat, status);
+        free(trunc);
+    }
+    else
+    {
+        rc = pxfs_ftruncate64(trunc->fd, trunc->length, &pxfs_trunc_cb, trunc);
+        if (rc < 0)
+        {
+            pxfs_trunc_cb(trunc, errno);
+        }
+    }
+
+    return 0;
+}
+
+static int pxfs_trunc_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_trunc_dat *trunc = (pxfs_trunc_dat *)cdat;
+
+    if (status) trunc->status = status;
+    else trunc->status = 0;
+
+    rc = pxfs_close(trunc->fd, &pxfs_trunc_close_cb, trunc);
+    if (rc < 0)
+    {
+        (*trunc->cb)(trunc->cdat, errno);
+        free(trunc);
+    }
+
+    return 0;
+}
+
+static int pxfs_trunc_close_cb(void *cdat, int status)
+{
+    pxfs_trunc_dat *trunc = (pxfs_trunc_dat *)cdat;
+
+    if (trunc->status)
+    {
+        (*trunc->cb)(trunc->cdat, trunc->status);
+    }
+    else
+    {
+        (*trunc->cb)(trunc->cdat, status);
+    }
+    free(trunc);
+    return 0;
+}
+
 /*
+ *
+ **/
+
+/**
+ * pxfs_truncate
+ */
 extern int pxfs_truncate(const char *path, off_t length,
-                         pxfs_cb cb, void *cdat);
+                         pxfs_cb cb, void *cdat)
+{
+    return pxfs_truncate64(path, (off64_t)length, cb, cdat);
+}
 
+/**
+ * pxfs_truncate64
+ */
 extern int pxfs_truncate64(const char *path, off64_t length,
-                           pxfs_cb cb, void *cdat);
+                           pxfs_cb cb, void *cdat)
+{
+    pxfs_trunc_dat *trunc = malloc(sizeof(pxfs_trunc_dat));
+    if(!trunc)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
 
+    trunc->length = length;
+    trunc->cb = cb;
+    trunc->cdat = cdat;
+    return pxfs_open(path, O_WRONLY, &trunc->fd, &pxfs_trunc_open_cb, trunc);
+}
+
+/**
+ * pxfs_fallocate
+ */
 extern int pxfs_fallocate(int fd, off_t offset, off_t length,
-                          pxfs_cb cb, void *cdat);
-*/
+                          pxfs_cb cb, void *cdat)
+{
+    if (offset < 0 || length < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    return pxfs_ftruncate64(fd, (off64_t)(offset) + (off64_t)(length), cb, cdat);
+}
 
 /**
  * pxfs_ftruncate
@@ -804,16 +912,130 @@ extern int pxfs_close(int fd, pxfs_cb cb, void *cdat)
 
 //extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);  /* TODO: implemented? */
 
+/**
+ * pxfs datatypes and callbacks for stat(64) functions
+ */
+
+typedef struct {
+    int fd;
+    void *buf;
+    uint32_t mask;
+    int stat64;
+    int status;
+    pxfs_cb cb;
+    void *cdat;
+} pxfs_stat_dat;
+
+static int pxfs_stat_open_cb(void *cdat, int status);
+static int pxfs_stat_cb(void *cdat, int status);
+static int pxfs_stat_close_cb(void *cdat, int status);
+
+static int pxfs_stat_open_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_stat_dat *stat = (pxfs_stat_dat *)cdat;
+
+    if (status)
+    {
+        (*stat->cb)(stat->cdat, status);
+        free(stat);
+    }
+    else
+    {
+        if (stat->stat64)
+        {
+            rc = pxfs_fstat64(stat->fd, (struct stat64 *)stat->buf,
+                              &pxfs_stat_cb, stat);
+        }
+        else
+        {
+            rc = pxfs_fstat_mask(stat->fd, (struct stat *)stat->buf, 
+                                 stat->mask, &pxfs_stat_cb, stat);
+        }
+        if (rc < 0)
+        {
+            pxfs_stat_cb(stat, errno);
+        }
+    }
+
+    return 0;
+}
+
+static int pxfs_stat_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_stat_dat *stat = (pxfs_stat_dat *)cdat;
+
+    if (status) stat->status = status;
+    else stat->status = 0;
+
+    rc = pxfs_close(stat->fd, &pxfs_stat_close_cb, stat);
+    if (rc < 0)
+    {
+        (*stat->cb)(stat->cdat, errno);
+        free(stat);
+    }
+
+    return 0;
+}
+
+static int pxfs_stat_close_cb(void *cdat, int status)
+{
+    pxfs_stat_dat *stat = (pxfs_stat_dat *)cdat;
+
+    if (stat->status)
+    {
+        (*stat->cb)(stat->cdat, stat->status);
+    }
+    else
+    {
+        (*stat->cb)(stat->cdat, status);
+    }
+    free(stat);
+    return 0;
+}
+
 /*
+ *
+ **/
+
+/**
+ * pxfs_stat
+ */
 extern int pxfs_stat(const char *path, struct stat *buf,
-                     pxfs_cb cb, void *cdat);
+                     pxfs_cb cb, void *cdat)
+{
+    return pxfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+}
 
+/**
+ * pxfs_stat64
+ */
 extern int pxfs_stat64(const char *path, struct stat64 *buf,
-                       pxfs_cb cb, void *cdat);
+                       pxfs_cb cb, void *cdat)
+{
+    pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    stat->buf = (void *)buf;
+    stat->stat64 = 1;
+    stat->cb = cb;
+    stat->cdat = cdat;
+    return pxfs_open(path, O_RDONLY, &stat->fd, &pxfs_stat_open_cb, stat);
+}
 
+/**
+ * pxfs_stat_mask
+ */
 extern int pxfs_stat_mask(const char *path, struct stat *buf,
-                          uint32_t mask, pxfs_cb cb, void *cdat);
-*/
+                          uint32_t mask, pxfs_cb cb, void *cdat)
+{
+    pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    stat->buf = (void *)buf;
+    stat->stat64 = 0;
+    stat->mask = mask;
+    stat->cb = cb;
+    stat->cdat = cdat;
+    return pxfs_open(path, O_RDONLY, &stat->fd, &pxfs_stat_open_cb, stat);
+}
 
 /**
  * pxfs_fstat
