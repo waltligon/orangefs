@@ -1,5 +1,6 @@
+package org.orangefs.usrint;
 
-package org.clemson.ofs.usrint;
+import java.lang.reflect.Field;
 
 public class PVFS2JNI {
 
@@ -114,7 +115,7 @@ public class PVFS2JNI {
     //public native long pvfsWritev(int fd, Iovec [] vector, int count);
     
     //fuctions using the structure stat
-    public native int pvfsStat(long x, String path);/* 06/26/2012 (STRUCTURE TESTED) */
+    public native PVFS2JNI.Stat pvfsStat(String path);/* 06/26/2012 (STRUCTURE TESTED) */
     public native int pvfsStatMask(long x, String path, long mask); /* 06/27/2012 (STRUCTURE TESTED) */
     public native int pvfsFstat(long x, int fd); /* 06/27/2012 (STRUCTURE TESTED) */
     public native int pvfsFstatMask(long x, int fd, long mask); /* 06/27/2012 (STRUCTURE TESTED) */
@@ -124,8 +125,7 @@ public class PVFS2JNI {
     
     //fuctions using the structure stat64
     public native int pvfsStat64(long x, String path); /* 06/28/2012  (STRUCTURE TESTED) */
-    public native int pvfsFstat64(long x, int fd);
-    public native int pvfsFstatat64(long x, int fd, String path, int flag);
+    public native int pvfsFstat64(long x, int fd); public native int pvfsFstatat64(long x, int fd, String path, int flag);
     public native int pvfsLstat64(long x, String path);
     
     //fuctions using the structure statfs
@@ -170,7 +170,7 @@ public class PVFS2JNI {
     public native long pvfsGetumask();
     public native int pvfsGetdtablesize();
     public native void pvfsSync();
-    
+/* 
     public native long FillStat64(Stat64 t);
     public native long FillStat(Stat t);
     public native long FillDirent(Dirent t);
@@ -194,6 +194,7 @@ public class PVFS2JNI {
     public native long UseUtimbuf(long x);
     public native long UseTimeval(long x, long y);
     public native long UseFsid(long x);
+*/
     /* ========== PVFS2JNI Native Methods END ========== */
     
     public PVFS2JNI()
@@ -202,25 +203,60 @@ public class PVFS2JNI {
     }
     
     static {
-        System.loadLibrary("PVFS2JNI");
+        try {
+            System.loadLibrary("PVFS2JNI");
+        } catch (UnsatisfiedLinkError error) {
+            error.printStackTrace();
+            System.err.println("Couldn't load libPVFS2JNI.so.");
+            System.err.println("java.library.path = " + System.getProperty("java.library.path"));
+            System.exit(-1);
+        }
     }
 
     /* Custom Classes representing C structs */
     public class Stat
     {
-        long st_dev;
-        long st_ino;
-        int st_mode;
-        int st_nlink;
-        long st_uid;
-        long st_gid;
-        long st_rdev;
-        long st_size;
-        int st_blksize;
-        long st_blocks;
-        long st_atime;
-        long st_mtime;
-        long st_ctime;
+        public long st_dev;
+        public long st_ino;
+        public int st_mode;
+        public int st_nlink;
+        public long st_uid;
+        public long st_gid;
+        public long st_rdev;
+        public long st_size;
+        public int st_blksize;
+        public long st_blocks;
+        public long st_atime;
+        public long st_mtime;
+        public long st_ctime;
+
+        /* Constructor */
+        Stat(){}
+
+        public String toString() {
+            StringBuilder result = new StringBuilder();
+            String newLine = System.getProperty("line.separator");
+
+            result.append(this.getClass().getName());
+            result.append(" Object {");
+            result.append(newLine);
+
+            Field[] fields = this.getClass().getDeclaredFields();
+
+            for(Field field : fields ) {
+                result.append("  ");
+                try {
+                    result.append(field.getName());
+                    result.append(": ");
+                    result.append(field.get(this));
+                } catch(IllegalAccessException ex) {
+                    System.out.println(ex);
+                }
+                result.append(newLine);
+            }
+            result.append("}");
+            return result.toString();
+        }
     }
     
     public class Stat64{

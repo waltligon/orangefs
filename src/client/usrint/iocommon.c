@@ -536,6 +536,13 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         gen_mutex_unlock(&pd->lock); /* must release before fstat */
         fstat(rc, &sbuf);
         pd->s->mode = sbuf.st_mode;
+        if (S_ISDIR(sbuf.st_mode))
+        {
+            /* we assume path was qualified by PVFS_expand_path() */
+            int len = strnlen(path, PVFS_PATH_MAX);
+            pd->s->dpath = (char *)malloc(len + 1);
+            strncpy(pd->s->dpath, path, len);
+        }
         gen_mutex_unlock(&pd->s->lock); /* this is ok after fstat */
 
         *pdp = pd;
