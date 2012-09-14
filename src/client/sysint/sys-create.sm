@@ -867,7 +867,20 @@ static PINT_sm_action create_parent_getattr_inspect(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
         sm_p->u.create.num_data_files, num_dfiles_requested);
 
-    /* Determine state of replication */
+    /* Determine state of replication:
+     *  1. Did the user send in replication information on the PVFS_sys_create() call?
+     *  2. Does the parent directory contain replication information?
+     *  3. What does the fs.conf say?
+     */
+
+
+    /* get replication info from PVFS_sys_create() call */
+
+
+    /* get replication info from parent */
+
+
+    /* check config file for filesystem default */
     struct server_configuration_s *server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
     filesystem_configuration_s *fs = PINT_config_find_fs_id(server_config,sm_p->object_ref.fs_id);
 
