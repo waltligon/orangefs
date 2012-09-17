@@ -39,6 +39,7 @@ static int aio_chown_init(struct pvfs_aiocb *p_cb);
 static int aio_chmod_init(struct pvfs_aiocb *p_cb);
 static int aio_mkdir_init(struct pvfs_aiocb *p_cb);
 static int aio_remove_init(struct pvfs_aiocb *p_cb);
+static int aio_readlink_init(struct pvfs_aiocb *p_cb);
 static int aio_symlink_init(struct pvfs_aiocb *p_cb);
 static int aio_fsync_init(struct pvfs_aiocb *p_cb);
 
@@ -54,6 +55,7 @@ static void aio_chown_fin(struct pvfs_aiocb *p_cb);
 static void aio_chmod_fin(struct pvfs_aiocb *p_cb);
 static void aio_mkdir_fin(struct pvfs_aiocb *p_cb);
 static void aio_remove_fin(struct pvfs_aiocb *p_cb);
+static void aio_readlink_fin(struct pvfs_aiocb *p_cb);
 static void aio_symlink_fin(struct pvfs_aiocb *p_cb);
 static void aio_fsync_fin(struct pvfs_aiocb *p_cb);
 
@@ -71,6 +73,7 @@ int (*aio_op_initializers[])(struct pvfs_aiocb *) =
     &aio_chmod_init,    /* CHMOD OP */
     &aio_mkdir_init,    /* MKDIR OP */
     &aio_remove_init,   /* REMOVE OP */
+    &aio_readlink_init, /* READLINK OP */
     &aio_symlink_init,  /* SYMLINK OP */
     &aio_fsync_init,    /* FSYNC OP */
 };
@@ -89,6 +92,7 @@ void (*aio_op_finalizers[])(struct pvfs_aiocb *) =
     &aio_chmod_fin,     /* CHMOD OP */
     &aio_mkdir_fin,     /* MKDIR OP */
     &aio_remove_fin,    /* REMOVE OP */
+    &aio_readlink_fin,  /* READLINK OP */
     &aio_symlink_fin,   /* SYMLINK OP */
     &aio_fsync_fin,     /* FSYNC OP */
 };
@@ -745,6 +749,55 @@ static void aio_remove_fin(struct pvfs_aiocb *p_cb)
 
     free(p_cb->u.remove.filename);
     free(p_cb->u.remove.directory);
+
+    return;
+}
+
+/* readlink */
+
+static int aio_readlink_init(struct pvfs_aiocb *p_cb)
+{
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "aio_readlink: called with %d\n",
+                 p_cb->u.readlink.pd->fd);
+
+    return PVFS_isys_getattr(p_cb->u.readlink.pd->s->pvfs_ref,
+                             PVFS_ATTR_SYS_TYPE | PVFS_ATTR_SYS_LNK_TARGET,
+                             p_cb->cred,
+                             &(p_cb->u.readlink.getattr_resp),
+                             &(p_cb->op_id),
+                             p_cb->hints,
+                             (void *)p_cb);
+}
+
+static void aio_readlink_fin(struct pvfs_aiocb *p_cb)
+{
+    PVFS_sys_attr attr = p_cb->u.readlink.getattr_resp.attr;
+
+    if (!p_cb->error_code)
+    {
+        if (attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            strncpy(p_cb->u.readlink.buf, attr.link_target,
+                    p_cb->u.readlink.bufsiz);
+            if (strlen(attr.link_target) >=  p_cb->u.readlink.bufsiz - 1)
+            {
+                *(p_cb->u.readlink.bcnt) = p_cb->u.readlink.bufsiz;
+            }
+            else
+            {
+                *(p_cb->u.readlink.bcnt) = strlen(p_cb->u.readlink.buf);
+            }
+        }
+        else
+        {
+            p_cb->error_code = -PVFS_EINVAL;
+            *(p_cb->u.readlink.bcnt) = -1;
+        }
+    }
+
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "aio_readlink: returns %d\n", p_cb->error_code);
 
     return;
 }

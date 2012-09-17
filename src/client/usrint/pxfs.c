@@ -361,7 +361,7 @@ extern int pxfs_read(int fd, const void *buf, size_t count, ssize_t *bcnt,
     }
 
     pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
@@ -416,7 +416,7 @@ extern int pxfs_write(int fd, const void *buf, size_t count, ssize_t *bcnt,
     }
 
     pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
@@ -491,7 +491,7 @@ static int pxfs_rdwr64(int fd,
     }
 
     pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
@@ -570,7 +570,7 @@ static int pxfs_rdwrv(int fd,
 
     /* find the descriptor */
     pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
@@ -1015,6 +1015,12 @@ extern int pxfs_stat64(const char *path, struct stat64 *buf,
                        pxfs_cb cb, void *cdat)
 {
     pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    if (!stat)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+
     stat->buf = (void *)buf;
     stat->stat64 = 1;
     stat->cb = cb;
@@ -1029,6 +1035,12 @@ extern int pxfs_stat_mask(const char *path, struct stat *buf,
                           uint32_t mask, pxfs_cb cb, void *cdat)
 {
     pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    if (!stat)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+
     stat->buf = (void *)buf;
     stat->stat64 = 0;
     stat->mask = mask;
@@ -1148,16 +1160,57 @@ extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
     return 0;    
 }
 
-/*
+/**
+ * pxfs_lstat
+ */
 extern int pxfs_lstat(const char *path, struct stat *buf,
-                      pxfs_cb cb, void *cdat);
+                      pxfs_cb cb, void *cdat)
+{
+    return pxfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+}
 
+/**
+ * pxfs_lstat64
+ */
 extern int pxfs_lstat64(const char *path, struct stat64 *buf,
-                        pxfs_cb cb, void *cdat);
+                        pxfs_cb cb, void *cdat)
+{
+    pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    if (!stat)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
 
+    stat->buf = (void *)buf;
+    stat->stat64 = 1;
+    stat->cb = cb;
+    stat->cdat = cdat;
+    return pxfs_open(path, O_RDONLY | O_NOFOLLOW, &stat->fd,
+                     &pxfs_stat_open_cb, stat);
+}
+
+/**
+ * pxfs_lstat_mask
+ */
 extern int pxfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask,
-                           pxfs_cb cb, void *cdat);
-*/
+                           pxfs_cb cb, void *cdat)
+{
+    pxfs_stat_dat *stat = malloc(sizeof(pxfs_stat_dat));
+    if (!stat)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    stat->buf = (void *)buf;
+    stat->stat64 = 0;
+    stat->mask = mask;
+    stat->cb = cb;
+    stat->cdat = cdat;
+    return pxfs_open(path, O_RDONLY | O_NOFOLLOW, &stat->fd,
+                     &pxfs_stat_open_cb, stat);
+}
 
 /*
 
@@ -1236,9 +1289,101 @@ extern int pxfs_fchownat(int fd, const char *path, uid_t owner, gid_t group,
 
 extern int pxfs_lchown(const char *path, uid_t owner, gid_t group,
                        pxfs_cb cb, void *cdat);
-
-extern int pxfs_chmod(const char *path, mode_t mode, pxfs_cb cb, void *cdat);
 */
+
+/**
+ * pxfs datatypes and callbacks for chmod function
+ */
+
+typedef struct {
+    int fd;
+    mode_t mode;
+    int status;
+    pxfs_cb cb;
+    void *cdat;
+} pxfs_chmod_dat;
+
+static int pxfs_chmod_open_cb(void *cdat, int status);
+static int pxfs_chmod_cb(void *cdat, int status);
+static int pxfs_chmod_close_cb(void *cdat, int status);
+
+static int pxfs_chmod_open_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_chmod_dat *chmod = (pxfs_chmod_dat *)cdat;
+
+    if (status)
+    {
+        (*chmod->cb)(chmod->cdat, status);
+        free(chmod);
+    }
+    else
+    {
+        rc = pxfs_fchmod(chmod->fd, chmod->mode, &pxfs_chmod_cb, chmod);
+        if (rc < 0)
+        {
+            pxfs_chmod_cb(chmod, errno);
+        }
+    }
+
+    return 0;
+}
+
+static int pxfs_chmod_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_chmod_dat *chmod = (pxfs_chmod_dat *)cdat;
+
+    if (status) chmod->status = status;
+    else chmod->status = 0;
+
+    rc = pxfs_close(chmod->fd, &pxfs_chmod_close_cb, chmod);
+    if (rc < 0)
+    {
+        (*chmod->cb)(chmod->cdat, errno);
+        free(chmod);
+    }
+
+    return 0;
+}
+
+static int pxfs_chmod_close_cb(void *cdat, int status)
+{
+    pxfs_chmod_dat *chmod = (pxfs_chmod_dat *)cdat;
+
+    if (chmod->status)
+    {
+        (*chmod->cb)(chmod->cdat, chmod->status);
+    }
+    else
+    {
+        (*chmod->cb)(chmod->cdat, status);
+    }
+    free(chmod);
+    return 0;
+}
+
+/*
+ *
+ **/
+
+/**
+ * pxfs_chmod
+ */
+extern int pxfs_chmod(const char *path, mode_t mode, pxfs_cb cb, void *cdat)
+{
+    pxfs_chmod_dat *chmod = malloc(sizeof(pxfs_chmod_dat));
+    if (!chmod)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    chmod->mode = mode;
+    chmod->cb = cb;
+    chmod->cdat = cdat;
+    return pxfs_open(path, O_RDONLY, &chmod->fd, &pxfs_chmod_open_cb, chmod);    
+}
 
 /**
  * pxfs_fchmod
@@ -1413,11 +1558,146 @@ extern int pxfs_rmdir(const char *path, pxfs_cb cb, void *cdat)
     return 0;
 }
 
+/**
+ * pxfs datatypes and callbacks for readlink function
+ */
+
+typedef struct {
+    int fd;
+    char *buf;
+    size_t bufsiz;
+    ssize_t *bcnt;
+    int status;
+    pxfs_cb cb;
+    void *cdat;
+} pxfs_readlink_dat;
+
+static int pxfs_readlink_open_cb(void *cdat, int status);
+static int pxfs_readlink_cb(void *cdat, int status);
+static int pxfs_readlink_close_cb(void *cdat, int status);
+
+static int pxfs_readlink_open_cb(void *cdat, int status)
+{
+    int rc = 0;
+    pxfs_readlink_dat *readlink = (pxfs_readlink_dat *)cdat;
+    pvfs_descriptor *pd;
+
+    if (status)
+    {
+        (*readlink->cb)(readlink->cdat, status);
+        free(readlink);
+    }
+    else
+    {
+        /* sumbit a readlink aio op */
+        if (!readlink->buf)
+        {
+            errno = EINVAL;
+            rc = -1;
+            goto errorout;
+        }
+        if (readlink->fd < 0)
+        {
+            errno = EBADF;
+            rc = -1;
+            goto errorout;
+        }
+        pd = pvfs_find_descriptor(readlink->fd);
+        if (!pd || pd->is_in_use != PVFS_FS)
+        {
+            errno = EBADF;
+            rc = -1;
+            goto errorout;
+        }
+
+        struct pvfs_aiocb *readlink_acb = malloc(sizeof(struct pvfs_aiocb));
+        if (!readlink_acb)
+        {
+            errno = ENOMEM;
+            rc = -1;
+            goto errorout;
+        }
+        memset(readlink_acb, 0, sizeof(struct pvfs_aiocb));
+
+        readlink_acb->hints = PVFS_HINT_NULL;
+        readlink_acb->op_code = PVFS_AIO_READLINK_OP;
+        readlink_acb->u.readlink.pd = pd;
+        readlink_acb->u.readlink.buf = readlink->buf;
+        readlink_acb->u.readlink.bufsiz = readlink->bufsiz;
+        readlink_acb->u.readlink.bcnt = readlink->bcnt;
+        readlink_acb->call_back_fn = &pxfs_readlink_cb;
+        readlink_acb->call_back_dat = readlink;
+
+        aiocommon_submit_op(readlink_acb);
+
+errorout:
+        if (rc < 0)
+        {
+            pxfs_readlink_cb(readlink, errno);
+        }
+    }
+
+    return 0;
+}
+
+static int pxfs_readlink_cb(void *cdat, int status)
+{
+    int rc;
+    pxfs_readlink_dat *readlink = (pxfs_readlink_dat *)cdat;
+
+    if (status) readlink->status = status;
+    else readlink->status = 0;
+
+    rc = pxfs_close(readlink->fd, &pxfs_readlink_close_cb, readlink);
+    if (rc < 0)
+    {
+        (*readlink->cb)(readlink->cdat, errno);
+        free(readlink);
+    }
+
+    return 0;
+}
+
+static int pxfs_readlink_close_cb(void *cdat, int status)
+{
+    pxfs_readlink_dat *readlink = (pxfs_readlink_dat *)cdat;
+
+    if (readlink->status)
+    {
+        (*readlink->cb)(readlink->cdat, readlink->status);
+    }
+    else
+    {
+        (*readlink->cb)(readlink->cdat, status);
+    }
+    free(readlink);
+    return 0;
+}
+
+/*
+ *
+ **/
+
+/**
+ * pxfs_readlink
+ */
 extern int pxfs_readlink(const char *path, char *buf, size_t bufsiz,
                          ssize_t *bcnt, pxfs_cb cb, void *cdat)
 {
+    pxfs_readlink_dat *readlink = malloc(sizeof(pxfs_readlink_dat));
+    if (!readlink)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
 
-    return 0;
+    readlink->buf = buf;
+    readlink->bufsiz = bufsiz;
+    readlink->bcnt = bcnt;
+    readlink->cb = cb;
+    readlink->cdat = cdat;
+    return pxfs_open(path, O_RDONLY | O_NOFOLLOW, &readlink->fd,
+                     &pxfs_readlink_open_cb, readlink);
 }
 
 /*

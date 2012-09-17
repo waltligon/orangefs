@@ -43,6 +43,7 @@ typedef enum
     PVFS_AIO_CHMOD_OP,
     PVFS_AIO_MKDIR_OP,
     PVFS_AIO_REMOVE_OP,
+    PVFS_AIO_READLINK_OP,
     PVFS_AIO_SYMLINK_OP,
     PVFS_AIO_FSYNC_OP,
 } PVFS_aio_op_code;
@@ -147,6 +148,15 @@ struct PINT_aio_remove_cb
     int dirflag;            /* in */
 };
 
+struct PINT_aio_readlink_cb
+{
+    pvfs_descriptor *pd;    /* in */
+    char *buf;              /* in/out */
+    size_t bufsiz;          /* in */
+    PVFS_sysresp_getattr getattr_resp;
+    ssize_t *bcnt;          /* in/out */      
+};
+
 struct PINT_aio_symlink_cb
 {
     char *new_directory;        /* in */
@@ -189,6 +199,7 @@ struct pvfs_aiocb
         struct PINT_aio_chmod_cb chmod;
         struct PINT_aio_mkdir_cb mkdir;
         struct PINT_aio_remove_cb remove;
+        struct PINT_aio_readlink_cb readlink;
         struct PINT_aio_symlink_cb symlink;
         struct PINT_aio_fsync_cb fsync;
     } u;
