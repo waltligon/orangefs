@@ -12,16 +12,20 @@
 #include "cred.h"
 
 #define MSG_GENERIC_ERROR	0xC0000001L
+
 #define MAX_FILE_REFRESH	256
+
 #define REFRESH_BUTTON		100
 #define FILE_MENU			101
 #define EXIT_BUTTON			102
+#define ADD_FILE_BUTTON		103
+#define FILE_LIST_BOX		104
 
 
 /* globals and prototypes */
 static char windowClass[] = "orangeFSexplorer";
 static char windowTitle[] = "OrangeFS File Explorer";
-static char **fileListing;
+char **fileListing;
 
 ORANGEFS_OPTIONS *goptions;
 
@@ -32,7 +36,6 @@ PVFS_sys_attr *rootSysAttr;
 HINSTANCE mainWindow;
 
 BOOL debug = TRUE;
-BOOL firstRun = TRUE;
 
 HANDLE hevent_log = NULL;
 HANDLE hcache_thread;
@@ -40,6 +43,12 @@ HANDLE hcache_thread;
 int is_running = 0;
 int currFileCount = 0;
 int prevFileCount = 0;
+int numFilesRefreshed = 0;
+int windowX = 0;
+int windowY = 0;
+int cursorX = 0;
+int cursorY = 0;
+int fileClickedIndex = -1;
 
 FILE *debug_log = NULL;
 
@@ -130,17 +139,29 @@ DWORD init_event_log()
 LRESULT CALLBACK windowEventHandler(HWND winHandle, unsigned int message, WPARAM wParam, LPARAM lParam)
 {
   PAINTSTRUCT paintData;
+  PVFS_handle newFile;
   PVFS_ds_position rootToken;
   HDC hdc;
+  HPEN penHandle;
+  HPEN hPenOld;
   HMENU systemMenu;
   HWND refreshButton;
+  HWND addFileButton;
+  HWND fileListBox;
+  HWND fileListingTable;
   MENUITEMINFO *exit;
-  char rootPath = '/';
-  int numFilesRefreshed = 0;
-  int i;
+  RECT cliRect;
+  char *rootPath;
+  char *fileToCreate = "/testingCreate3.txt";
+  int ret = 0;
+  int i, fileSelected, index;
 
   exit = (MENUITEMINFO *)malloc(sizeof(MENUITEMINFO));
   memset(exit, 0, sizeof(MENUITEMINFO));
+
+  rootPath = (char *)malloc(2);
+  rootPath[0] = '/';
+  rootPath[1] = '\0';
 
   exit->cbSize			= sizeof(MENUITEMINFO);
   exit->fMask			= MIIM_STATE | MIIM_ID | MIIM_TYPE;
@@ -174,28 +195,67 @@ LRESULT CALLBACK windowEventHandler(HWND winHandle, unsigned int message, WPARAM
 									 "BUTTON", 
 									 "REFRESH", 
 									 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 
-									 400, 
+									 475, 
 									 10, 
-									 100, 
 									 75, 
+									 30, 
 									 winHandle, 
 									 (HMENU)REFRESH_BUTTON, 
 									 GetModuleHandle(NULL), 
 									 NULL);
 
+	  /* create the add file button */
+	  addFileButton = CreateWindowEx(NULL,
+									 "BUTTON",
+									 "ADD FILE",
+									 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+									 475,
+									 50,
+									 75, 
+									 30,
+									 winHandle,
+									 (HMENU)ADD_FILE_BUTTON,
+									 GetModuleHandle(NULL),
+									 NULL);
+
+	  /* create the file listing box */
+	  fileListBox = CreateWindowEx(NULL,
+								   "LISTBOX",
+								   NULL,
+								   LBS_SORT | LBS_NOTIFY| WS_VISIBLE | ES_AUTOVSCROLL | WM_SETREDRAW,
+								   10,
+								   10,
+								   400,
+								   300,
+								   winHandle,
+								   NULL,
+								   GetModuleHandle(NULL),
+								   NULL);
+
 	  rootToken = PVFS_READDIR_START;
 
 	  /* retrieve all files from PVFS2 server */
-	  fs_find_files(&rootPath, rootCred, &rootToken, MAX_FILE_REFRESH, &numFilesRefreshed, fileListing, rootSysAttr);
-
-	  if (firstRun)
+	  if ((ret = fs_find_files(rootPath, rootCred, &rootToken, MAX_FILE_REFRESH, &numFilesRefreshed, fileListing, rootSysAttr)) != 0)
 	  {
-		  prevFileCount = numFilesRefreshed;
-		  firstRun = FALSE;
+		  DbgPrint("\nError code: %d\nCall to fs_find_files() failed...\n\n", ret);
 	  }
 
-	  /* update current file count to compare with the refreshed file coutn */
-	  currFileCount = numFilesRefreshed;
+	  prevFileCount = currFileCount = numFilesRefreshed;
+	  break;
+
+  case WM_INITDIALOG:
+	  fileListingTable = GetDlgItem(fileListBox, FILE_LIST_BOX);
+	  for (i=0; i < currFileCount; i++)
+	  {
+		  int pos = (int)SendDlgItemMessage(fileListingTable, FILE_LIST_BOX, LB_ADDSTRING, 0, (LPARAM)fileListing[i]);
+
+		  /* set the array index of the player as item data. 
+		   * this allows us to retrieve the item from the array
+		   * even after the items are sorted by the list box. */
+		  SendDlgItemMessage(fileListingTable, FILE_LIST_BOX, LB_SETITEMDATA, (WPARAM)pos, (LPARAM)i);
+	  }
+	  SetFocus(fileListingTable);
+
 	  break;
 
   /* every time a button is clicked or text is typed into a message box, this is called */
@@ -203,9 +263,26 @@ LRESULT CALLBACK windowEventHandler(HWND winHandle, unsigned int message, WPARAM
 	  switch(LOWORD(wParam))
 	  {
 	  case REFRESH_BUTTON:
+		  /* reset the token */
+		  rootToken = PVFS_READDIR_START;
+
+		  /* retrieve all files from PVFS2 server */
+		  if ((ret = fs_find_files(rootPath, rootCred, &rootToken, MAX_FILE_REFRESH, &numFilesRefreshed, fileListing, rootSysAttr)) != 0)
+		  {
+			  DbgPrint("\nError code: %d\nCall to fs_find_files() failed...\n\n", ret);
+		  }
+
+		  currFileCount = numFilesRefreshed;
+
 		  if (currFileCount != prevFileCount)
 		  {
-			  MessageBox(NULL, "New files have arrived!", "Status", MB_ICONINFORMATION);
+			  /* fs_find_files will return 0 new files if nothing happened, but prev 
+			   * count is still representing the initial number of files (non-zero), 
+			   * so check for this specific instance */
+			  if (currFileCount == 0)
+				  MessageBox(NULL, "No new files...", "Status", MB_ICONINFORMATION);
+			  else
+				  MessageBox(NULL, "New files have arrived!", "Status", MB_ICONINFORMATION);
 		  }
 		  else
 		  {
@@ -215,9 +292,37 @@ LRESULT CALLBACK windowEventHandler(HWND winHandle, unsigned int message, WPARAM
 		  prevFileCount = currFileCount;
 		  break;
 
+	  case FILE_LIST_BOX:
+		  switch (HIWORD(wParam))
+		  {
+		  case LBN_SELCHANGE:
+			  fileListingTable = GetDlgItem(fileListBox, FILE_LIST_BOX);
+
+			  /* retrieve the currently selected file name (highlighted) */
+			  fileSelected = (int)SendMessage(fileListingTable, LB_GETCURSEL, 0, 0);
+
+			  /* get the file index we previously sent */
+			  index = (int)SendMessage(fileListingTable, LB_GETITEMDATA, fileSelected, 0);
+
+			  DbgPrint("File selected: %d, with index %d\n", fileSelected, index);
+
+			  break;
+		  }
+
+		  break;
+
+	  case ADD_FILE_BUTTON:
+		  /* create a new file (this is just for testing) */
+		  if ((ret = fs_create(fileToCreate, rootCred, &newFile, goptions->new_file_perms)) != 0)
+		  {
+			  DbgPrint("\nERROR: could not create the specified file: %s\n", fileToCreate);
+		  }
+		  break;
+
 	  case EXIT_BUTTON:
 		  PostQuitMessage(WM_QUIT);
 		  free(exit);
+		  free(rootPath);
 		  break;
 	  }
 	  break;
@@ -234,21 +339,38 @@ LRESULT CALLBACK windowEventHandler(HWND winHandle, unsigned int message, WPARAM
 
   case WM_PAINT:
 	  hdc = BeginPaint(winHandle, &paintData);
-
+	 
 	  /* Here is where the application logic lies */
 	  for (i=0; i < numFilesRefreshed; i++)
 	  {
-		/* TODO: check for files or directories from rootSysAttr->objtype which will be either PVFS_TYPE_NONE, PVFS_TYPE_DATAFILE, PVFS_TYPE_DIRECTORY, PVFS_TYPE_SYMLINK, PVFS_TYPE_DIRDATA, etc */
-		TextOut(hdc, 10, 20*(i+1), fileListing[i], strlen(fileListing[i]));
+		  /* TODO: check for PVFS_TYPE_NONE, PVFS_TYPE_SYMLINK, PVFS_TYPE_DIRDATA, etc... */
+		  if (rootSysAttr[i].objtype == PVFS_TYPE_DIRECTORY)	/* this is a directory object */
+		  {
+			  if (strlen(fileListing[i]) + strlen(" [dir]") < MAX_PATH)	/* make sure we have enough space to append " [dir]" */
+			  {
+				  strcat(fileListing[i], " [dir]");
+				  
+			  }
+			  else	/* not enough allocated space to append " [dir]".... TODO, allocate the extra space here maybe? */
+			  {
+				  
+			  }
+		  }
+		  else /* if (rootSysAttr[i].objtype == PVFS_TYPE_DATAFILE) */	/* just regular data file, print it out */
+		  {
+			  
+		  }
 	  }
+
 	  /* Application specific layout logic ends here */
 
-	  EndPaint(winHandle, &paintData);
+	  EndPaint(winHandle, &paintData); 
 	  break;
 
   case WM_DESTROY:
 	  PostQuitMessage(0);
 	  free(exit);
+	  free(rootPath);
 	  break;
 
   default:
@@ -412,10 +534,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR argv, int
   for (i = 0; i < MAX_FILE_REFRESH; i++)
   {
       fileListing[i] = (char *)malloc(MAX_PATH);
+	  memset(fileListing[i], 0, MAX_PATH);
   }
 
   /* allocate all file sys attributes */
-  rootSysAttr = (PVFS_sys_attr *)malloc(MAX_FILE_REFRESH * sizeof(PVFS_sys_attr));
+  rootSysAttr = (PVFS_sys_attr *)malloc(sizeof(PVFS_sys_attr[MAX_FILE_REFRESH]));
+  memset(rootSysAttr, 0, sizeof(PVFS_sys_attr[MAX_FILE_REFRESH]));
 
   winClass.cbSize			= sizeof(WNDCLASSEX);
   winClass.style			= CS_HREDRAW | CS_VREDRAW;
@@ -460,12 +584,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR argv, int
   */
 
   /* get options from config file */
+  /*
   if (get_config(options, error_msg, 512) != 0)
   {          
       err = 1;
       goto main_exit;
   }
-
+  */
   /* point goptions */
   goptions = options;
 
@@ -553,7 +678,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR argv, int
           report_error_event(error_msg, TRUE);
       }
 
-      qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+/*      qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free); */
 
       close_event_log();
 

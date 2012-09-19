@@ -55,7 +55,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-service", "client-se
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "security", "security\security.vcxproj", "{D8085311-2E2E-466B-A743-B9DF093EEF4E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "explorer-service", "explorer-service\explorer-service.vcxproj", "{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orangefs-client-library", "client-library\client-library.vcxproj", "{334A80F7-0F06-4C17-9A32-975C4ABA30AA}"
 	ProjectSection(ProjectDependencies) = postProject
 		{7506190B-64BE-4D64-95A4-4C22D48E0994} = {7506190B-64BE-4D64-95A4-4C22D48E0994}
 		{9C95DF0D-5B60-4E94-94ED-000861C651B4} = {9C95DF0D-5B60-4E94-94ED-000861C651B4}
@@ -276,16 +276,16 @@ Global
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|Win32.Build.0 = Release|Win32
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|x64.ActiveCfg = Release|x64
 		{D8085311-2E2E-466B-A743-B9DF093EEF4E}.Release|x64.Build.0 = Release|x64
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Debug|Win32.ActiveCfg = Debug|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Debug|Win32.Build.0 = Debug|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Debug|x64.ActiveCfg = Debug|x64
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Debug|x64.Build.0 = Debug|x64
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.MemLeaks|Win32.ActiveCfg = Release|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.MemLeaks|Win32.Build.0 = Release|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.MemLeaks|x64.ActiveCfg = Release|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Release|Win32.ActiveCfg = Release|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Release|Win32.Build.0 = Release|Win32
-		{BA509E43-FB77-4B29-AF4F-C9865CFB7E30}.Release|x64.ActiveCfg = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Debug|Win32.Build.0 = Debug|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Debug|x64.ActiveCfg = Debug|x64
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Debug|x64.Build.0 = Debug|x64
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.MemLeaks|Win32.ActiveCfg = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.MemLeaks|Win32.Build.0 = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.MemLeaks|x64.ActiveCfg = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|Win32.ActiveCfg = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|Win32.Build.0 = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
