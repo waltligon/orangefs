@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\src\client\cp-library\client-library-win.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\src\client\cp-library\orangefs-client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
