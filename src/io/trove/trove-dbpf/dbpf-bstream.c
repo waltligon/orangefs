@@ -89,7 +89,7 @@ static void aio_progress_notification(union sigval sig)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
-        "with handle %llu (%p)\n", llu(op_p->handle), cur_op);
+        "with handle %s (%p)\n", PVFS_OID_str(&op_p->handle), cur_op);
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -207,7 +207,8 @@ error_in_cleanup:
             int outcount;
 
             gossip_debug(GOSSIP_TROVE_DEBUG, 
-                "aio updating size for handle %llu\n", llu(ref.handle));
+                         "aio updating size for handle %s\n",
+                            PVFS_OID_str(&ref.handle));
 
             /* If we updated the size, then convert cur_op into a setattr.
              * Note that we are not actually going to perform a setattr.
@@ -408,8 +409,8 @@ static void start_delayed_ops_if_any(int dec_first)
         s_dbpf_ios_in_progress++;
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %llu, ret %d))\n", __func__, cur_op,
-                     llu(cur_op->op.handle), ret);
+                     "(handle %s, ret %d))\n", __func__, cur_op,
+                     PVFS_OID_str(&cur_op->op.handle), ret);
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         /*
@@ -512,8 +513,8 @@ static int issue_or_delay_io_operation(
         if ( cur_op )
         {
            gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                        "(handle %llu, ret %d)\n", __func__, cur_op,
-                        llu(cur_op->op.handle), ret);
+                        "(handle %s, ret %d)\n", __func__, cur_op,
+                        PVFS_OID_str(&cur_op->op.handle), ret);
         }
     }
     return 0;

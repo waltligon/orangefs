@@ -4513,8 +4513,8 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
     if(error_code == 0)
     {
         gossip_debug(GOSSIP_JOB_DEBUG,
-            "Got precreated handle: %llu\n",
-            llu(*((PVFS_handle*)tmp_trove->key.buffer)));
+            "Got precreated handle: %s\n",
+            PVFS_OID_str(((PVFS_handle*)tmp_trove->key.buffer)));
     }
 
     trove_pending_count--;
@@ -4691,12 +4691,13 @@ static void precreate_pool_fill_thread_mgr_callback(
         {
             pool = qlist_entry(iterator, struct precreate_pool,
                 list_link);
-            if(pool->pool_handle == jd->u.precreate_pool.precreate_pool)
+            if(!PVFS_OID_cmp(&pool->pool_handle,
+                     &jd->u.precreate_pool.precreate_pool))
             {
                 pool->pool_count += jd->u.precreate_pool.posted_count;
                 gossip_debug(GOSSIP_JOB_DEBUG, 
-                    "Pool count for handle %llu (type %u) incremented to %d\n",
-                    llu(pool->pool_handle), pool->pool_type, 
+                    "Pool count for handle %s (type %u) incremented to %d\n",
+                    PVFS_OID_str(&pool->pool_handle), pool->pool_type, 
                     pool->pool_count);
                 break;
             }
@@ -5657,8 +5658,8 @@ int job_precreate_pool_register_server(
     tmp_pool->pool_count = count;
     tmp_pool->pool_type = type;
     gossip_debug(GOSSIP_JOB_DEBUG, 
-        "Pool count for handle %llu (type %u) initially set to %d\n", 
-        llu(tmp_pool->pool_handle), tmp_pool->pool_type, 
+        "Pool count for handle %s (type %u) initially set to %d\n", 
+        PVFS_OID_str(&tmp_pool->pool_handle), tmp_pool->pool_type, 
         tmp_pool->pool_count);
 
     gossip_debug(GOSSIP_JOB_DEBUG,
@@ -5733,9 +5734,8 @@ int job_precreate_pool_check_level(
 
     qlist_for_each(iterator, &fs->precreate_pool_list)
     {
-        pool = qlist_entry(iterator, struct precreate_pool,
-            list_link);
-        if(pool->pool_handle == precreate_pool)
+        pool = qlist_entry(iterator, struct precreate_pool, list_link);
+        if(!PVFS_OID_cmp(&pool->pool_handle, &precreate_pool))
         {
             if(pool->pool_count < low_threshold)
             {
@@ -5743,7 +5743,8 @@ int job_precreate_pool_check_level(
                 out_status_p->error_code = 0;
                 gen_mutex_unlock(&precreate_pool_mutex);
                 gossip_debug(GOSSIP_JOB_DEBUG, "found pool count low for "
-                             "for pool handle %llu.\n", llu(pool->pool_handle));
+                             "for pool handle %s.\n",
+                             PVFS_OID_str(&pool->pool_handle));
                 return(1);
             }
             else
@@ -5767,7 +5768,7 @@ int job_precreate_pool_check_level(
                 qlist_add(&jd->job_desc_q_link, &precreate_pool_check_level_list);
                 gen_mutex_unlock(&precreate_pool_mutex);
                 gossip_debug(GOSSIP_JOB_DEBUG, "found pool count high for pool "
-                             "handle %llu.\n", llu(pool->pool_handle) );
+                             "handle %s.\n", PVFS_OID_str(&pool->pool_handle) );
                 return(0);
             }
             break;
@@ -5898,8 +5899,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         {
             /* queue up until the count for this pool increases */
             qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", 
-                         llu(pool->pool_handle));
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %s\n", 
+                         PVFS_OID_str(&pool->pool_handle));
             gen_mutex_unlock(&precreate_pool_mutex);
             return;
         }
@@ -6059,8 +6060,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         /* go ahead and decrement count to avoid races with other consumers */
         tmp_trove_array[i].pool->pool_count--;
         gossip_debug(GOSSIP_JOB_DEBUG, 
-            "Pool count for handle %llu (type %u) decremented to %d\n", 
-            llu(tmp_trove_array[i].pool->pool_handle), 
+            "Pool count for handle %s (type %u) decremented to %d\n", 
+            PVFS_OID_str(&tmp_trove_array[i].pool->pool_handle), 
             tmp_trove_array[i].pool->pool_type,
             tmp_trove_array[i].pool->pool_count);
 
@@ -6072,13 +6073,16 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             {
                 jd_checker = qlist_entry(iterator, struct job_desc,
                     job_desc_q_link);
-                if(jd_checker->u.precreate_pool.precreate_pool == 
-                    tmp_trove_array[i].pool->pool_handle &&
+                if(PVFS_OID_cmp(&jd_checker->u.precreate_pool.precreate_pool, 
+                    &tmp_trove_array[i].pool->pool_handle) &&
                     tmp_trove_array[i].pool->pool_count < 
                     jd_checker->u.precreate_pool.low_threshold)
                 {
                     /* the pool level is low */
-                    gossip_debug(GOSSIP_JOB_DEBUG, "Pool count low, waking up waiter for handle %llu.\n", llu(jd_checker->u.precreate_pool.precreate_pool));
+                    gossip_debug(GOSSIP_JOB_DEBUG,
+                            "Pool count low, waking up waiter for "
+                            "handle %s.\n",
+                            PVFS_OID_str(&jd_checker->u.precreate_pool.precreate_pool));
                     qlist_del(&jd_checker->job_desc_q_link);
 
                     /* move waiting job to completion queue */

@@ -1,3 +1,14 @@
 DIR := src/common/sidcache
-LIBSRC += $(DIR)/policyeval.c
-SERVERSRC += $(DIR)/policyeval.c
+
+CSRC := \
+        $(DIR)/policyeval.c \
+        $(DIR)/sidcache.c
+
+CLIENT_PYCGEN := \
+        $(DIR)/example2.c
+
+PYCGEN += $(CLIENT_PYCGEN)
+
+LIBSRC += $(CSRC) $(CLIENT_PYCGEN)
+
+SERVERSRC += $(CSRC) $(CLIENT_PYCGEN)

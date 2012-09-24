@@ -180,7 +180,7 @@ PVFS_error PVFS_isys_getattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getattr entered\n");
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if ((!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL)) ||
         (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
@@ -316,11 +316,14 @@ static PINT_sm_action getattr_acache_lookup(
 
     object_ref = sm_p->getattr.object_ref;
 
-    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(PVFS_OID_cmp(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %llu fsid %d\n",
-      __func__, llu(object_ref.handle), object_ref.fs_id);
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "%s: handle %s fsid %d\n",
+                 __func__,
+                 PVFS_OID_str(&object_ref.handle),
+                 object_ref.fs_id);
 
    
     /* The sys attr mask request is converted to object
@@ -333,23 +336,23 @@ static PINT_sm_action getattr_acache_lookup(
 
     if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
-                    " [%llu]\n",
-                      llu(object_ref.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "acache: forced acache miss: [%s]\n",
+                      PVFS_OID_str(&object_ref.handle));
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
 
     ret = PINT_acache_get_cached_entry(object_ref,
-        &sm_p->getattr.attr,
-        &attr_status,
-        &sm_p->getattr.size,
-        &size_status);
+                                       &sm_p->getattr.attr,
+                                       &attr_status,
+                                       &sm_p->getattr.size,
+                                       &size_status);
     if(ret < 0 || attr_status < 0)
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
-                    " [%llu]\n",
-                      llu(object_ref.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "acache: clean acache miss: [%s]\n",
+                      PVFS_OID_str(&object_ref.handle));
   
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
@@ -369,9 +372,10 @@ static PINT_sm_action getattr_acache_lookup(
         PVFS_time now = PINT_util_get_current_time();
         if (now > (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
         {
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: cache miss due to "
-                         "capability timeout [%llu]\n", 
-                         llu(object_ref.handle));
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "acache: cache miss due to "
+                         "capability timeout [%s]\n", 
+                         PVFS_OID_str(&object_ref.handle));
             js_p->error_code = GETATTR_ACACHE_MISS;
             return SM_ACTION_COMPLETE;
         }
@@ -453,8 +457,9 @@ static PINT_sm_action getattr_acache_lookup(
         (missing_attrs == 0))
     {
         /* nothing's missing, a hit! */
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                     "[%llu]\n", llu(object_ref.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "acache: acache hit [%s]\n",
+                     PVFS_OID_str(&object_ref.handle));
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -484,8 +489,9 @@ static PINT_sm_action getattr_acache_lookup(
              */
 
             js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
-                         "[%llu]\n", llu(object_ref.handle));
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "acache: acache hit, need sizes[%s]\n",
+                         PVFS_OID_str(&object_ref.handle));
             return SM_ACTION_COMPLETE;
         }
     }
@@ -495,9 +501,9 @@ static PINT_sm_action getattr_acache_lookup(
      * overwritten when we request updated information from the server
      */
     PINT_free_object_attr(&sm_p->getattr.attr);
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache miss due to mask: "
-        " [%llu]\n",
-          llu(object_ref.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: acache miss due to mask: [%s]\n",
+                 PVFS_OID_str(&object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return SM_ACTION_COMPLETE;
@@ -525,17 +531,16 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     object_ref = sm_p->getattr.object_ref;
 
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(PVFS_OID_cmp(&object_ref.handle, &PVFS_HANDLE_NULL));
 
     /* setup the msgpair to do a getattr operation */
-    PINT_SERVREQ_GETATTR_FILL(
-        msg_p->req,
-        capability,
-        *sm_p->cred_p,
-        object_ref.fs_id,
-        object_ref.handle,
-        sm_p->getattr.req_attrmask,
-        sm_p->hints);
+    PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+                              capability,
+                              *sm_p->cred_p,
+                              object_ref.fs_id,
+                              object_ref.handle,
+                              sm_p->getattr.req_attrmask,
+                              sm_p->hints);
     
     msg_p->fs_id = object_ref.fs_id;
     msg_p->handle = object_ref.handle;
@@ -843,13 +848,14 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     msg_p->handle = handles[0];
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                            msg_p->handle,
+                                            msg_p->fs_id);
     if (ret)
     {
-        gossip_lerr("Unable to map server address for this handle(%llu) and "
+        gossip_lerr("Unable to map server address for this handle(%s) and "
                     "filesystem(%d)\n"
-                   ,llu(msg_p->handle)
+                   ,PVFS_OID_str(&msg_p->handle)
                    ,msg_p->fs_id);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -912,22 +918,23 @@ static int getattr_datafile_getattr_comp_fn(
           ctx = &(getattr->mir_ctx_array[server_nr]);
           ctx->msg_completed = 1; 
 
-          /*For completed messages, update the size array with the file size
-           *just retrieved.
-          */
+          /* For completed messages, update the size array with the file size
+           * just retrieved.
+           */
           getattr->size_array[server_nr] = resp_p->u.tree_get_file_size.size[i];
-          gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: size[%d]:%lld \thandle:%llu\n"
-                                         ,__func__
-                                         ,i
-                                         ,llu(getattr->size_array[i])
-                                         ,llu(tree->handle_array[i]));
+          gossip_debug(GOSSIP_GETATTR_DEBUG,
+                       "%s: size[%d]:%lld \thandle:%s\n"
+                       ,__func__
+                       ,i
+                       ,llu(getattr->size_array[i])
+                       ,PVFS_OID_str(&tree->handle_array[i]));
        }/*end for*/
     }
     else
     {
      /* if we are NOT mirroring and an error is found for an individual handle, 
       * then we must invalidate the size array and return an error code.
-     */
+      */
        for (i=0; i<resp_p->u.tree_get_file_size.handle_count; i++)
        {
           gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: error[%d]:%d"
@@ -1091,12 +1098,13 @@ static PINT_sm_action getattr_datafile_getattr_retry(
         for (;copies < meta->mirror_copies_count; copies++)
         {
             index = (copies*meta->dfile_count) + server_nr;
-            if (meta->mirror_dfile_array[index] != 0)
+            if (PVFS_OID_cmp(&meta->mirror_dfile_array[index],
+                             &PVFS_HANDLE_NULL))
             {  /* we have found a valid mirrored handle */
-               tmp_handles[j]   = meta->mirror_dfile_array[index];
-               tmp_server_nr[j] = server_nr;
-               j++;
-               break;
+                tmp_handles[j]   = meta->mirror_dfile_array[index];
+                tmp_server_nr[j] = server_nr;
+                j++;
+                break;
             }
         }
 
@@ -1137,9 +1145,9 @@ static PINT_sm_action getattr_datafile_getattr_retry(
                                           ,msg->fs_id);
     if (ret)
     {
-        gossip_lerr("Unable to determine server address for handle(%llu) and "
+        gossip_lerr("Unable to determine server address for handle(%s) and "
                     "file system(%d).\n"
-                   ,llu(msg->handle)
+                   ,PVFS_OID_str(&msg->handle)
                    ,msg->fs_id);
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;

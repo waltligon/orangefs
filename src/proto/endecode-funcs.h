@@ -842,6 +842,7 @@ static void decode_func_##__name__(char **pptr, void *x) \
 }
 #endif
 
+/* union of two types with an enum to select proper type */
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)                         \
 static inline void encode_##name(char **pptr, const struct name *x)           \
 {                                                                             \
@@ -863,6 +864,32 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         default: assert(0);                                                   \
     }                                                                         \
 };
+
+/* union of three types with an enum to select proper type */
+#define encode_enum_union_3_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2, ut3, un3, en3)    \
+static inline void encode_##name(char **pptr, const struct name *x)           \
+{                                                                             \
+    encode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: encode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: encode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: encode_##ut3(pptr, &x->uname.un3); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};                                                                            \
+static inline void decode_##name(char **pptr, struct name *x)                 \
+{                                                                             \
+    decode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: decode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: decode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: decode_##ut3(pptr, &x->uname.un3); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};
+
 /* 3 fields, then an array, then 2 fields, then an array */
 #define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \

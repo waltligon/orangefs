@@ -203,9 +203,9 @@ static int check_stuffed(
     int i;
 
     s_op->resp.u.create.metafile_handle = js_p->handle;
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
-        llu(js_p->handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Metafile handle created: %s\n",
+                 PVFS_OID_str(&js_p->handle));
 
     assert(config);
 
@@ -764,12 +764,16 @@ static PINT_sm_action setattr_setobj_attribs(
      ds_attr = &(s_op->ds_attr);
      PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
-     ret = job_trove_dspace_setattr(
-         s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
-         ds_attr,
-         TROVE_SYNC,
-         smcb, 0, js_p, &j_id, server_job_context,
-         s_op->req->hints);
+     ret = job_trove_dspace_setattr(s_op->req->u.create.fs_id,
+                                    s_op->resp.u.create.metafile_handle,
+                                    ds_attr,
+                                    TROVE_SYNC,
+                                    smcb,
+                                    0,
+                                    js_p,
+                                    &j_id,
+                                    server_job_context,
+                                    s_op->req->hints);
 
      return ret;
 }
@@ -781,9 +785,10 @@ static int setup_resp(
 
     if (js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
-                          "create: new metadata handle: %llu.\n",
-                          llu(s_op->resp.u.create.metafile_handle));
+        PINT_ACCESS_DEBUG(s_op,
+                          GOSSIP_ACCESS_DEBUG,
+                          "create: new metadata handle: %s.\n",
+                          PVFS_OID_str(&s_op->resp.u.create.metafile_handle));
     }
  
     return SM_ACTION_COMPLETE;

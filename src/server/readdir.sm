@@ -114,9 +114,10 @@ static PINT_sm_action readdir_read_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - reading metadata: [%llu,%d], "
+        GOSSIP_READDIR_DEBUG, " - reading metadata: [%s,%d], "
         "key=%s\n\t(sz=%d) val_buf=%p (sz=%d)\n",
-        llu(s_op->req->u.readdir.handle), s_op->req->u.readdir.fs_id,
+        PVFS_OID_str(&s_op->req->u.readdir.handle),
+        s_op->req->u.readdir.fs_id,
         (char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -186,28 +187,37 @@ static PINT_sm_action readdir_iterate_on_entries(
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
 	s_op->key_a[j].buffer =
-            s_op->resp.u.readdir.dirent_array[j].d_name;
+                s_op->resp.u.readdir.dirent_array[j].d_name;
 	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
 	s_op->val_a[j].buffer =
-            &(s_op->resp.u.readdir.dirent_array[j].handle);
+                &(s_op->resp.u.readdir.dirent_array[j].handle);
 	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
     }
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
-        "\n\ttoken=%llu, count=%d\n",
-        llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
-        llu(s_op->req->u.readdir.token),
-        s_op->req->u.readdir.dirent_count);
+                GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%s,%d], "
+                "\n\ttoken=%llu, count=%d\n",
+                PVFS_OID_str(&s_op->u.readdir.dirent_handle),
+                s_op->req->u.readdir.fs_id,
+                llu(s_op->req->u.readdir.token),
+                s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(
-        s_op->req->u.readdir.fs_id, s_op->u.readdir.dirent_handle,
-        s_op->req->u.readdir.token, s_op->key_a, s_op->val_a,
-        s_op->req->u.readdir.dirent_count, 
-        0, 
-        NULL, smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
-
+                s_op->req->u.readdir.fs_id,
+                s_op->u.readdir.dirent_handle,
+                s_op->req->u.readdir.token,
+                s_op->key_a,
+                s_op->val_a,
+                s_op->req->u.readdir.dirent_count, 
+                0, 
+                NULL,
+                smcb,
+                0,
+                js_p,
+                &j_id,
+                server_job_context,
+                s_op->req->hints);
+        
     return ret;
 }
 

@@ -199,7 +199,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     /* check if we got a single specific handle */
     if ((op_p->u.d_create.extent_array.extent_count == 1) &&
-        (cur_extent.first == cur_extent.last))
+        (!PVFS_OID_cmp(&cur_extent.first, &cur_extent.last)))
     {
         /*
           check if we MUST use the exact handle value specified;
@@ -214,17 +214,24 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
               since we know it here, handle it here ?
             */
             new_handle = cur_extent.first;
+/* NEXT */
+#if 0
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-            gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle was FORCED "
-                         "to be %llu\n", llu(new_handle));
+#endif
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "new_handle was FORCED to be %s\n",
+                         PVFS_OID_str(&new_handle));
         }
-        else if (cur_extent.first == TROVE_HANDLE_NULL)
+        else if (!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL))
         {
             /*
               if we got TROVE_HANDLE_NULL, the caller doesn't care
               where the handle comes from
             */
+/* NEXT */
+#if 0
             new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
+#endif
         }
     }
     else
@@ -233,30 +240,37 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
           otherwise, we have to try to allocate a handle from
           the specified range that we're given
         */
+/* NEXT */
+#if 0
         new_handle = trove_handle_alloc_from_range(
             op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
+#endif
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %llu "
-                 "(cur_extent is %llu - %llu)\n",
+    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %s "
+                 "(cur_extent is %s - %s)\n",
                  op_p->u.d_create.extent_array.extent_count,
-                 llu(new_handle), llu(cur_extent.first),
-                 llu(cur_extent.last));
+                 PVFS_OID_str(&new_handle), PVFS_OID_str(&cur_extent.first),
+                 PVFS_OID_str(&cur_extent.last));
     /*
       if we got a zero handle, we're either completely out of handles
       -- or else something terrible has happened
     */
-    if (new_handle == TROVE_HANDLE_NULL)
+    if (!PVFS_OID_cmp(&new_handle, &TROVE_HANDLE_NULL))
     {
         gossip_err("Error: handle allocator returned a zero handle.\n");
         return(-TROVE_ENOSPC);
     }
 
-    ret = dbpf_dspace_create_store_handle(op_p->coll_p, op_p->u.d_create.type,
-        new_handle);
+    ret = dbpf_dspace_create_store_handle(op_p->coll_p,
+                                          op_p->u.d_create.type,
+                                          new_handle);
     if(ret < 0)
     {
+/* NEXT */
+#if 0
         trove_handle_free(op_p->coll_p->coll_id, new_handle);
+#endif
         return(ret);
     }
 
@@ -294,24 +308,23 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     }
 
     if (flags & TROVE_FORCE_REQUESTED_HANDLE ||
-        extent_array->extent_array[0].first == TROVE_HANDLE_NULL)
+        !PVFS_OID_cmp(&extent_array->extent_array[0].first, &TROVE_HANDLE_NULL))
     {
         gossip_err("Error: dbpf_dspace_create_list() does not support forced handles or empty extent specifier.\n");
         return(-TROVE_EINVAL);
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op,
-        &q_op_p,
-        DSPACE_CREATE,
-        coll_p,
-        TROVE_HANDLE_NULL,
-        dbpf_dspace_create_list_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_CREATE,
+                                           coll_p,
+                                           TROVE_HANDLE_NULL,
+                                           dbpf_dspace_create_list_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -373,29 +386,32 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         /*
           try to allocate a handle from the specified range that we're given
         */
+/* NEXT */
+#if 0
         new_handle = trove_handle_alloc_from_range(
             op_p->coll_p->coll_id, &op_p->u.d_create_list.extent_array);
+#endif
 
         /*
           if we got a zero handle, we're either completely out of handles
           -- or else something terrible has happened
         */
-        if (new_handle == TROVE_HANDLE_NULL)
+        if (!PVFS_OID_cmp(&new_handle, &TROVE_HANDLE_NULL))
         {
             gossip_err("Error: handle allocator returned a zero handle.\n");
             return(-TROVE_ENOSPC);
         }
 
         ret = dbpf_dspace_create_store_handle(op_p->coll_p, 
-            op_p->u.d_create.type,
-            new_handle);
+                                              op_p->u.d_create.type,
+                                              new_handle);
         if(ret < 0)
         {
             /* release any handles we grabbed so far */
             for(j=0; j<=i; j++)
             {
-                if(op_p->u.d_create_list.out_handle_array_p[j] 
-                    != TROVE_HANDLE_NULL)
+                if(PVFS_OID_cmp(&op_p->u.d_create_list.out_handle_array_p[j],
+                                &TROVE_HANDLE_NULL))
                 {
                     memset(&key, 0, sizeof(key));
                     key.data = &op_p->u.d_create_list.out_handle_array_p[j];
@@ -403,8 +419,11 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
                     op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, 
                         NULL, &key, 0);
 
+/* NEXT */
+#if 0
                     trove_handle_free(op_p->coll_p->coll_id, 
                         op_p->u.d_create_list.out_handle_array_p[j]);
+#endif
                 }
             }
             return(ret);
@@ -528,13 +547,15 @@ static int remove_one_handle(
 */
             break;
         default:
-            coll_p->ds_db->err(
-                coll_p->ds_db, ret, "dbpf_dspace_remove");
+            coll_p->ds_db->err(coll_p->ds_db,
+                               ret,
+                               "dbpf_dspace_remove");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         case 0:
-            gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %llu\n", llu(ref.handle));
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "removed dataspace with handle %s\n",
+                         PVFS_OID_str(&ref.handle));
             break;
     }
 
@@ -569,7 +590,10 @@ static int remove_one_handle(
     }
 
     /* return handle to free list */
+/* NEXT */
+#if 0
     trove_handle_free(coll_p->coll_id, ref.handle);
+#endif
     return 0;
 
 return_error:
@@ -753,10 +777,14 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * well, so that we can use the same loop below to read the
          * remainder in this or the above case.
          */
+
+        memcpy(&dummy_handle, op_p->u.d_iterate_handles.position_p,
+                sizeof(TROVE_ds_position));
+
         memset(&key, 0, sizeof(key));
-        dummy_handle = *op_p->u.d_iterate_handles.position_p;
-        key.data  = &dummy_handle;
-        key.size  = key.ulen = sizeof(TROVE_handle);
+        key.data = &dummy_handle;
+        key.ulen = sizeof(TROVE_handle);
+        key.size = sizeof(TROVE_ds_position);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
@@ -764,7 +792,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         data.size = data.ulen = sizeof(attr);
         data.flags |= DB_DBT_USERMEM;
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RANGE);
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
         if (ret == DB_NOTFOUND)
         {
             goto return_ok;
@@ -772,13 +800,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
+            gossip_err("failed to set cursor position: %llu\n",
+                       llu(*op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
     else
     {
+        /* start reading at the beginning of the db */
+        /* note: key field is ignored by c_get in this case */
         memset(&key, 0, sizeof(key));
         key.data  = &dummy_handle;
         key.size  = key.ulen = sizeof(TROVE_handle);
@@ -797,8 +827,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
+            gossip_err("failed to set cursor position: %llu\n",
+                       llu(*op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
@@ -899,9 +929,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
             /* check for duplicates */
             memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
-            if(i > 0 && aligned_handle == op_p->u.d_iterate_handles.handle_array[i-1])
+            if(i > 0 && !PVFS_OID_cmp(&aligned_handle,
+                            &op_p->u.d_iterate_handles.handle_array[i-1]))
             {
-                gossip_err("Warning: got duplicate handle %llu.\n", llu(aligned_handle));
+                gossip_err("Warning: got duplicate handle %s.\n",
+                            PVFS_OID_str(&aligned_handle));
                 gossip_err("Warning: skipping entry.\n");
                 i--;
                 continue;
@@ -927,7 +959,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             if(sizeof_handle != sizeof(TROVE_handle) ||
                sizeof_attr != sizeof(attr))
             {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: got invalid handle or "
+                           "key size in dbpf_dspace_iterate_handles().\n");
                 gossip_err("Warning: skipping entry.\n");
             }
             DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
@@ -939,17 +972,42 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             }
 
             memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
-            if(aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+            if(!PVFS_OID_cmp(&aligned_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]))
             {
-                gossip_err("Warning: found duplicate handle: %llu\n", llu(aligned_handle));
+                gossip_err("Warning: found duplicate handle: %s\n",
+                            PVFS_OID_str(&aligned_handle));
                 gossip_err("Warning: skipping entry.\n");
             }
 
         } while (sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr) ||
-           aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]);
+                 sizeof_attr != sizeof(attr) ||
+                 !PVFS_OID_cmp(&aligned_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]));
 
-        *op_p->u.d_iterate_handles.position_p = aligned_handle;
+        /* seek to aligned_handle and then get its recno */
+        memset(&key, 0, sizeof(key));
+        key.data  = &aligned_handle;
+        key.size  = key.ulen = sizeof(TROVE_handle);
+        key.flags |= DB_DBT_USERMEM;
+
+        memset(&data, 0, sizeof(data));
+        data.data = &attr;
+        data.size = data.ulen = sizeof(attr);
+        data.flags |= DB_DBT_USERMEM;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET);
+
+        /* now read the recno */
+        memset(&key, 0, sizeof(key));
+        key.data  = op_p->u.d_iterate_handles.position_p;
+        key.size  = key.ulen = sizeof(TROVE_ds_position);
+        key.flags |= DB_DBT_USERMEM;
+
+        memset(&data, 0, sizeof(data));
+        data.data = &attr;
+        data.size = data.ulen = sizeof(attr);
+        data.flags |= DB_DBT_USERMEM;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
         goto return_ok;
     }
 
@@ -975,18 +1033,30 @@ get_next:
     }
     else if (ret != 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
-                     "failure @ recno\n");
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "iterate -- some other failure @ recno\n");
         ret = -dbpf_db_error_to_trove_error(ret);
     }
     if(*op_p->u.d_iterate_handles.count_p > 0 && 
-        dummy_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+        !PVFS_OID_cmp(&dummy_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]))
     {
-        gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
+        gossip_err("Warning: found duplicate handle: %s\n",
+                   PVFS_OID_str(&dummy_handle));
         gossip_err("Warning: skipping entry.\n");
         (*op_p->u.d_iterate_handles.count_p)--;
     }
-    *op_p->u.d_iterate_handles.position_p = dummy_handle;
+    /* get recno of current record */
+    memset(&key, 0, sizeof(key));
+    key.data  = op_p->u.d_iterate_handles.position_p;
+    key.size  = key.ulen = sizeof(TROVE_ds_position);
+    key.flags |= DB_DBT_USERMEM;
+
+    memset(&data, 0, sizeof(data));
+    data.data = &attr;
+    data.size = data.ulen = sizeof(attr);
+    data.flags |= DB_DBT_USERMEM;
+
+    ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
 
 return_ok:
     if (ret == DB_NOTFOUND)
@@ -1148,7 +1218,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
             (int)ds_attr_p->dist_size);
 #endif
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
-                     "path attr cache hit on %llu\n", llu(handle));
+                     "path attr cache hit on %s\n", PVFS_OID_str(&handle));
         if(ds_attr_p->type == PVFS_TYPE_METAFILE)
         {
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
@@ -1248,11 +1318,14 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                 (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
                 (int)ds_attr_p->dist_size);
 #endif
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "dspace_getattr_list fast "
-                "path attr cache hit on %llu, uid=%d, mode=%d, type=%d\n",
-                llu(handle_array[i]), (int)ds_attr_p[i].uid, (int)ds_attr_p[i].mode,
-                (int)ds_attr_p[i].type);
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "dspace_getattr_list fast path attr cache hit on %s, "
+                         "uid=%d, mode=%d, type=%d\n",
+                         PVFS_OID_str(&handle_array[i]),
+                         (int)ds_attr_p[i].uid,
+                         (int)ds_attr_p[i].mode,
+                         (int)ds_attr_p[i].type);
+
             if(ds_attr_p[i].type == PVFS_TYPE_METAFILE)
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -1461,10 +1534,13 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
         return(-dbpf_db_error_to_trove_error(ret));
     }
 
-    gossip_debug(
-        GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-        "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d\n",
-        llu(ref.handle), (int)attr->uid, (int)attr->mode, (int)attr->type);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
+                 "from DISK for key %s\n\tuid = %d, mode = %d, type = %d\n",
+                 PVFS_OID_str(&ref.handle),
+                 (int)attr->uid,
+                 (int)attr->mode,
+                 (int)attr->type);
+
     if(attr->type == PVFS_TYPE_METAFILE)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -2074,35 +2150,39 @@ static int dbpf_dspace_testsome(
 int PINT_trove_dbpf_ds_attr_compare_reversed(
     DB * dbp, const DBT * a, const DBT * b)
 {
-    TROVE_handle handle_a = 0;
-    TROVE_handle handle_b = 0;
+    int cmpval;
+
+    TROVE_handle handle_a;
+    TROVE_handle handle_b;
 
     memcpy(&handle_a, a->data, sizeof(TROVE_handle));
     memcpy(&handle_b, b->data, sizeof(TROVE_handle));
 
-    if(handle_a == handle_b)
+    if(!(cmpval = PVFS_OID_cmp(&handle_a, &handle_b)))
     {
         return 0;
     }
 
-    return (handle_a < handle_b) ? -1 : 1;
+    return (cmpval < 0) ? -1 : 1;
 }
 
 int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b)
 {
-    TROVE_handle handle_a = 0;
-    TROVE_handle handle_b = 0;
+    int cmpval;
+
+    TROVE_handle handle_a;
+    TROVE_handle handle_b;
 
     memcpy(&handle_a, a->data, sizeof(TROVE_handle));
     memcpy(&handle_b, b->data, sizeof(TROVE_handle));
 
-    if(handle_a == handle_b)
+    if(!(cmpval = PVFS_OID_cmp(&handle_a, &handle_b)))
     {
         return 0;
     }
 
-    return (handle_a > handle_b) ? -1 : 1;
+    return (cmpval > 0) ? -1 : 1;
 }
 
 /* dbpf_dspace_create_store_handle()
@@ -2139,8 +2219,8 @@ static int dbpf_dspace_create_store_handle(
     ret = coll_p->ds_db->get(coll_p->ds_db, NULL, &key, &data, 0);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
-                     llu(new_handle));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%s) already exists.\n",
+                     PVFS_OID_str(&new_handle));
         return(-TROVE_EEXIST);
     }
     else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))
@@ -2154,8 +2234,11 @@ static int dbpf_dspace_create_store_handle(
      * possible if the db gets out of sync with the rest of the collection
      * somehow
      */
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->data_path,
-                              coll_p->coll_id, llu(new_handle));
+    DBPF_GET_BSTREAM_FILENAME(filename,
+                              PATH_MAX,
+                              my_storage_p->data_path,
+                              coll_p->coll_id,
+                              new_handle);
     ret = access(filename, F_OK);
     if(ret == 0)
     {
@@ -2166,10 +2249,11 @@ static int dbpf_dspace_create_store_handle(
                    "moving to stranded-bstreams.\n", 
                    filename);
         
-        DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
+        DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename,
+                                           PATH_MAX,
                                            my_storage_p->data_path, 
                                            coll_p->coll_id,
-                                           llu(new_handle));
+                                           new_handle);
         /* an old file exists.  Move it to the stranded subdirectory */
         ret = rename(filename, new_filename);
         if(ret != 0)

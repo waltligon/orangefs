@@ -64,9 +64,12 @@ static PINT_sm_action statfs_do_statfs(
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* first try to gather handle statistics */
+/* NEXT */
+#if 0
     ret = trove_handle_get_statistics(
         s_op->req->u.statfs.fs_id,
         &s_op->resp.u.statfs.stat.handles_available_count);
+#endif
 
     if (ret < 0)
     {

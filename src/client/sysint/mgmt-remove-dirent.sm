@@ -86,7 +86,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_remove_dirent entered\n");
 
-    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+    if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
@@ -111,8 +111,8 @@ PVFS_error PVFS_imgmt_remove_dirent(
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Trying to remove dirent %s under %llu,%d\n",
-        sm_p->u.mgmt_remove_dirent.entry, llu(parent_ref.handle),
+        GOSSIP_CLIENT_DEBUG, "Trying to remove dirent %s under %s,%d\n",
+        sm_p->u.mgmt_remove_dirent.entry, PVFS_OID_str(&parent_ref.handle),
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
@@ -196,9 +196,11 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
 
-    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing MGMT_REMOVE_DIRENT %s "
-                 "under %llu,%d\n", sm_p->u.mgmt_remove_dirent.entry,
-                 llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+    gossip_debug(GOSSIP_REMOVE_DEBUG,
+                 "- doing MGMT_REMOVE_DIRENT %s under %s,%d\n",
+                 sm_p->u.mgmt_remove_dirent.entry,
+                 PVFS_OID_str(&sm_p->parent_ref.handle),
+                 sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
@@ -235,9 +237,10 @@ static int mgmt_remove_dirent_comp_fn(
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  mgmt_remove_dirent_comp_fn: dirent %s under %llu,%d "
-            "removed\n", sm_p->u.mgmt_remove_dirent.entry,
-            llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+            "  mgmt_remove_dirent_comp_fn: dirent %s under %s,%d removed\n",
+            sm_p->u.mgmt_remove_dirent.entry,
+            PVFS_OID_str(&sm_p->parent_ref.handle),
+            sm_p->parent_ref.fs_id);
     }
     return resp_p->status;
 }

@@ -182,14 +182,18 @@ int main(int argc, char **argv)
     /* TODO: we need a way to get information out about which server fails
      * in error cases here 
      */
-    ret = PVFS_mgmt_setparam_all(
-        cur_fs, &creds, PVFS_SERV_PARAM_FSID_CHECK,
-        &param_value, error_details, NULL);
+    ret = PVFS_mgmt_setparam_all(cur_fs,
+                                 &creds,
+                                 PVFS_SERV_PARAM_FSID_CHECK,
+                                 &param_value,
+                                 error_details,
+                                 NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
-	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
-	    (long)cur_fs);
+	fprintf(stderr,
+                "Failure: not all servers accepted fsid %ld\n", 
+	        (long)cur_fs);
         if (ret == -PVFS_EDETAIL)
             print_error_details(error_details);
         err = 1;
@@ -201,26 +205,32 @@ int main(int argc, char **argv)
 
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
-    ret = PVFS_sys_lookup(cur_fs, "/", &creds,
-                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+    ret = PVFS_sys_lookup(cur_fs,
+                          "/",
+                          &creds,
+                          &resp_lookup,
+                          PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret != 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
+    printf("\n   Root handle: %s\n", PVFS_OID_str(&resp_lookup.ref.handle));
 
-    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-    param_value.u.value = (uint64_t)resp_lookup.ref.handle;
+    param_value.type = PVFS_MGMT_PARAM_TYPE_HANDLE;
+    param_value.u.handle_value = resp_lookup.ref.handle;
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server
      * failed in error cases here
      */
-    ret = PVFS_mgmt_setparam_all(
-        cur_fs, &creds, PVFS_SERV_PARAM_ROOT_CHECK,
-        &param_value, error_details, NULL);
+    ret = PVFS_mgmt_setparam_all(cur_fs,
+                                 &creds,
+                                 PVFS_SERV_PARAM_ROOT_CHECK,
+                                 &param_value,
+                                 error_details,
+                                 NULL);
 
     if(ret < 0)
     {

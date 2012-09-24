@@ -238,6 +238,8 @@ int PINT_cached_config_reinitialize(
     return 0;
 }
 
+/* NEXT handes no longer with servers, but this might be relevant */
+
 /* PINT_cached_config_handle_load_mapping()
  *
  * loads a new mapping of servers to handle into this interface.  This
@@ -285,6 +287,8 @@ int PINT_cached_config_handle_load_mapping(
     return 0;
 }
 
+/* NEXT no more handle ranges this may be on call path */
+
 static struct host_handle_mapping_s *
 PINT_cached_config_find_server(PINT_llist *handle_ranges, const char *addr)
 {
@@ -300,6 +304,8 @@ PINT_cached_config_find_server(PINT_llist *handle_ranges, const char *addr)
     }
     return cur_mapping;
 }
+
+/* NEXT no more extents */
 
 /* PINT_cached_config_get_server()
  *
@@ -368,6 +374,7 @@ int PINT_cached_config_get_server(
     return(0);
 }
 
+/* NEXT becomes SID cache function */
 
 /* PINT_cached_config_get_next_meta()
  *
@@ -456,6 +463,9 @@ int PINT_cached_config_get_next_meta(
     return ret;
 }
 
+/* NEXT no more extents - but this may be call path for getting servers
+ * */
+
 static int PINT_cached_config_get_extents(
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *addr,
@@ -508,6 +518,8 @@ static int PINT_cached_config_get_extents(
     }
     return -PVFS_ENOENT;
 }
+
+/* NEXT becomes SID cache function */
 
 int PINT_cached_config_map_servers(
     PVFS_fs_id fsid,
@@ -687,6 +699,8 @@ int PINT_cached_config_map_servers(
     return 0;
 }
 
+/* NEXT becomes SID cache function */
+
 /* PINT_cached_config_get_next_io()
  *
  * returns the address of a set of servers that should be used to
@@ -800,6 +814,8 @@ int PINT_cached_config_get_next_io(
     return ret;
 }
 
+/* NEXT becomes SID cache funcdtion */
+
 /* PINT_cached_config_map_addr()
  *
  * takes an opaque server address and returns the server type and
@@ -847,6 +863,7 @@ const char *PINT_cached_config_map_addr(
     return NULL;
 }
 
+/* NEXT becomes a SID cache function */
 
 /* PINT_cached_config_check_type()
  *
@@ -892,6 +909,7 @@ int PINT_cached_config_check_type(
     return(-PVFS_EINVAL);
 }
 
+/* NEXT becomes a SID cache function */
 
 /* PINT_cached_config_count_servers()
  *
@@ -1040,6 +1058,8 @@ int PINT_cached_config_get_server_array(
     return ret;
 }
 
+/* NEXT doesn't make sense - SID maps to server */
+
 /* PINT_cached_config_map_to_server()
  *
  * maps from a handle and fsid to a server address
@@ -1057,8 +1077,8 @@ int PINT_cached_config_map_to_server(
 
     if(!tmp_entry)
     {
-        gossip_err("Error: failed to find handle %llu in fs configuration.\n",
-            llu(handle));
+        gossip_err("Error: failed to find handle %s in fs configuration.\n",
+            PVFS_OID_str(&handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1203,6 +1223,8 @@ int PINT_cached_config_get_num_io(PVFS_fs_id fsid, int *num_io)
     return ret;
 }
 
+/* NEXT this won't make sense */
+
 /* PINT_cached_config_get_server_handle_count()
  *
  * counts the number of handles associated with a given server
@@ -1266,12 +1288,13 @@ int PINT_cached_config_get_server_name(
 {
     const struct handle_lookup_entry* tmp_entry;
 
+/* NEXT this isn't going to work in next */
     tmp_entry = find_handle_lookup_entry(handle, fsid);
 
     if(!tmp_entry)
     {
-        gossip_err("Error: failed to find handle %llu in fs configuration.\n",
-            llu(handle));
+        gossip_err("Error: failed to find handle %s in fs configuration.\n",
+            PVFS_OID_str(&handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1636,13 +1659,10 @@ static int handle_lookup_entry_compare(const void *p1, const void *p2)
     const struct handle_lookup_entry* e1  = p1;
     const struct handle_lookup_entry* e2  = p2;
 
-    if(e1->extent.first < e2->extent.first)
-        return(-1);
-    if(e1->extent.first > e2->extent.first)
-        return(1);
-
-    return(0);
+    return PVFS_OID_cmp(&e1->extent.first, &e2->extent.first);
 }
+
+/* NEXT extents going away */
 
 /* find_handle_lookup_entry()
  *
@@ -1680,13 +1700,17 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
     while (low < high) 
     {
         mid = (low + high)/2;
-        if (cur_config_cache->handle_lookup_table[mid].extent.first < handle)
+/*      if (cur_config_cache->handle_lookup_table[mid].extent.first < handle)*/
+        if
+        (PVFS_OID_cmp(&cur_config_cache->handle_lookup_table[mid].extent.first,
+                      &handle) < 0)
             low = mid + 1; 
         else
             high = mid;
     }
     if ((low < cur_config_cache->handle_lookup_table_size) && 
-        (cur_config_cache->handle_lookup_table[low].extent.first == handle))
+        (!PVFS_OID_cmp(&cur_config_cache->handle_lookup_table[low].extent.first,
+                       &handle)))
     {
         /* we happened to locate the first handle in a range */
         table_index = low;
@@ -1708,6 +1732,8 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
     /* no match */
     return(NULL);
 }
+
+/* NEXT extents going away */
 
 /* load_handle_lookup_table()
  *

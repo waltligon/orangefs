@@ -271,9 +271,9 @@ PVFS_error PVFS_isys_rename(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_rename entered\n");
 
     if ((old_entry == NULL) || (new_entry == NULL) ||
-        (old_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        !PVFS_OID_cmp(&old_parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (old_parent_ref.fs_id == PVFS_FS_ID_NULL) ||
-        (new_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        !PVFS_OID_cmp(&new_parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (new_parent_ref.fs_id == PVFS_FS_ID_NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
@@ -281,7 +281,7 @@ PVFS_error PVFS_isys_rename(
     }
 
     /* don't even try to rename a file to itself */
-    if ((old_parent_ref.handle == new_parent_ref.handle) &&
+    if (!PVFS_OID_cmp(&old_parent_ref.handle, &new_parent_ref.handle) &&
         (old_parent_ref.fs_id == new_parent_ref.fs_id) &&
         (strcmp(old_entry, new_entry) == 0))
     {
@@ -335,10 +335,10 @@ PVFS_error PVFS_isys_rename(
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &old_parent_ref.handle);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%llu,%d]\n\t"
-        "to %s (under [%llu,%d])\n", old_entry,
-        llu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
-        llu(new_parent_ref.handle), new_parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%s,%d]\n\t"
+        "to %s (under [%s,%d])\n", old_entry,
+        PVFS_OID_str(&old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
+        PVFS_OID_str(&new_parent_ref.handle), new_parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -450,21 +450,21 @@ static int rename_lookups_comp_fn(
     */
     assert(resp_p->u.lookup_path.handle_count == 1);
     sm_p->u.rename.refns[index].handle =
-        resp_p->u.lookup_path.handle_array[0];
+            resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
-        sm_p->u.rename.parent_refns[index].fs_id;
+            sm_p->u.rename.parent_refns[index].fs_id;
 
     if (index == 0)
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu\n",
-            llu(sm_p->u.rename.refns[index].handle));
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %s\n",
+            PVFS_OID_str(&sm_p->u.rename.refns[index].handle));
     }
     else
     {
         assert(index == 1);
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Looked up new handle %llu\n",
-                     llu(sm_p->u.rename.refns[index].handle));
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Looked up new handle %s\n",
+                     PVFS_OID_str(&sm_p->u.rename.refns[index].handle));
         /*
           flag the fact that we need to do a dirent exchange on the
           existing dirent, rather than creating a new one.  we flag it
@@ -532,8 +532,8 @@ static int rename_rmdirent_comp_fn(void *v_p,
       rmdirent returns handle of removed dirent; make sure it matches
       the handle we asked to have removed (i.e. the 'old' handle)
     */
-    assert(sm_p->u.rename.refns[0].handle ==
-           resp_p->u.rmdirent.entry_handle);
+    assert(!PVFS_OID_cmp(&sm_p->u.rename.refns[0].handle,
+                         &resp_p->u.rmdirent.entry_handle));
 
     return 0;
 }
@@ -560,8 +560,8 @@ static int rename_chdirent_comp_fn(
     sm_p->u.rename.old_dirent_handle =
         resp_p->u.chdirent.old_dirent_handle;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %llu\n",
-                 llu(sm_p->u.rename.old_dirent_handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %s\n",
+                 PVFS_OID_str(&sm_p->u.rename.old_dirent_handle));
 
     return 0;
 }
@@ -573,8 +573,9 @@ static PINT_sm_action rename_getattr_src_parent_setup(
 
     /* We need capabilities for the parent handles. 
      * Here we request one for the source's parent. */
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: requesting capability for %llu\n",
-                 llu(sm_p->u.rename.parent_refns[0].handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename: requesting capability for %s\n",
+                 PVFS_OID_str(&sm_p->u.rename.parent_refns[0].handle));
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     
@@ -597,14 +598,14 @@ static PINT_sm_action rename_getattr_src_parent_interpret(
     PINT_copy_capability(&sm_p->getattr.attr.capability, &sm_p->u.rename.caps[0]);
 
     /* Now request capability for destination's parent */
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: requesting capability for %llu\n",
-                 llu(sm_p->u.rename.parent_refns[1].handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: requesting capability for %s\n",
+                 PVFS_OID_str(&sm_p->u.rename.parent_refns[1].handle));
 
     /* if parents are identical, just copy capability */
     if ((sm_p->u.rename.parent_refns[0].fs_id == 
-           sm_p->u.rename.parent_refns[1].fs_id) &&
-        (sm_p->u.rename.parent_refns[0].handle == 
-           sm_p->u.rename.parent_refns[1].handle))
+               sm_p->u.rename.parent_refns[1].fs_id) &&
+        !PVFS_OID_cmp(&sm_p->u.rename.parent_refns[0].handle,
+               &sm_p->u.rename.parent_refns[1].handle))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: copied identical " 
                      "capability\n");
@@ -662,8 +663,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     {
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "rename: posting lookup[%d] (%lld,%d)\n",
-                     i, llu(sm_p->u.rename.parent_refns[i].handle),
+                     "rename: posting lookup[%d] (%s,%d)\n",
+                     i, PVFS_OID_str(&sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(
@@ -862,7 +863,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest attr mask: %d\n", (int)attr->mask);
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename dest handle %llu\n", llu(sm_p->object_ref.handle));
+                     "rename dest handle %s\n",
+                     PVFS_OID_str(&sm_p->object_ref.handle));
     }
 
     /* if the destination is a directory, is it empty? */
@@ -990,11 +992,11 @@ static PINT_sm_action rename_cleanup(
     else
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "rename state: updating ncache with entry [%s] "
-            "ref.handle=%llu ref.fsid=%d\n",
-            sm_p->u.rename.entries[1],
-            llu(sm_p->u.rename.refns[0].handle),
-            sm_p->u.rename.parent_refns[1].fs_id);
+                     "rename state: updating ncache with entry [%s] "
+                     "ref.handle=%s ref.fsid=%d\n",
+                     sm_p->u.rename.entries[1],
+                     PVFS_OID_str(&sm_p->u.rename.refns[0].handle),
+                     sm_p->u.rename.parent_refns[1].fs_id);
 
         PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
             (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),

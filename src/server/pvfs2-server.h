@@ -619,10 +619,12 @@ typedef struct PINT_server_op
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \
       __s_op->req = &__s_op->decoded.stub_dec.req; \
       PINT_sm_push_frame(__smcb, __task_id, __s_op); \
-      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && __handle) { \
+      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && \
+                             PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL)) { \
         PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
       } \
-      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
+      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || \
+             ( PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL) && ! strcmp(server_config->host_id, server_name)))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
         __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \

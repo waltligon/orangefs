@@ -1,6 +1,7 @@
 DIR := src/common/policycomp
 
 POLICYCOMP := $(DIR)/policycomp
+
 POLICYCOMPSRC := \
     $(DIR)/policycomp.c \
     $(DIR)/codegen.c \

@@ -165,10 +165,10 @@ static PINT_sm_action setup_batch_create_fn(
     int index = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated "
-                 "handles from %s, of type %u, and put store them in %llu.\n",
+                 "handles from %s, of type %u, and put store them in %s.\n",
                 s_op->u.precreate_pool_refiller.host,
                 s_op->u.precreate_pool_refiller.type,
-                llu(s_op->u.precreate_pool_refiller.pool_handle));
+                PVFS_OID_str(&s_op->u.precreate_pool_refiller.pool_handle));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -313,8 +313,8 @@ static int batch_create_comp_fn(void *v_p,
             resp_p->u.batch_create.handle_array[i];
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-            "Got batch created handle: %llu from: %s\n",
-            llu(resp_p->u.batch_create.handle_array[i]),
+            "Got batch created handle: %s from: %s\n",
+            PVFS_OID_str(&resp_p->u.batch_create.handle_array[i]),
             s_op->u.precreate_pool_refiller.host);
     }
 

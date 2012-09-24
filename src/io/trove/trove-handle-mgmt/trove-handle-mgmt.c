@@ -62,7 +62,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     TROVE_ds_state state = 0;
     TROVE_ds_position pos = TROVE_ITERATE_START;
     static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] =
-        {TROVE_HANDLE_NULL};
+        {TROVE_HANDLE_NULL_INIT};
 
     if (extent_list && ledger)
     {
@@ -101,7 +101,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
             }
 
             /* look for special case of a blank fs */
-            if ((count == 1) && (handles[0] == 0))
+            if ((count == 1) && (!PVFS_OID_cmp(&handles[0],
+                                               &TROVE_HANDLE_NULL)))
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
                              "* Trove: Assuming a blank filesystem\n");
@@ -117,8 +118,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                                     handles[i]))
                     {
                         gossip_err(
-                            "Error: handle %llu is invalid "
-                            "(out of bounds)\n", llu(handles[i]));
+                            "Error: handle %s is invalid (out of bounds)\n",
+                            PVFS_OID_str(&handles[i]));
                         return -1;
                     }
 
@@ -128,7 +129,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                     {
 			gossip_err(
                             "WARNING: could not remove "
-                            "handle %llu from ledger; continuing.\n", llu(handles[i]));
+                            "handle %s from ledger; continuing.\n",
+                            PVFS_OID_str(&handles[i]));
 		    }
                 }
                 ret = ((i == count) ? 0 : -1);
@@ -165,7 +167,9 @@ static int trove_map_handle_ranges( PINT_llist *extent_list,
 
 	    /* if, for example, you had a 'first' of 5 and a 'last' of
 	     * 5, the difference is 0, but there is one handle */
-	    total_handles += (cur_extent->last - cur_extent->first + 1);
+/* NEXT handle ranges going away will replace this with 1 */
+	    /*  total_handles += (cur_extent->last - cur_extent->first + 1); */
+	    total_handles += 1;
             cur = PINT_llist_next(cur);
         }
 	trove_handle_ledger_set_threshold(ledger, total_handles);
@@ -400,7 +404,7 @@ TROVE_handle trove_handle_alloc_from_range(
             {
                 handle = trove_ledger_handle_alloc_from_range(
                     ledger->ledger, &(extent_array->extent_array[i]));
-                if (handle != TROVE_HANDLE_NULL)
+                if (PVFS_OID_cmp(&handle, &TROVE_HANDLE_NULL))
                 {
                     break;
                 }

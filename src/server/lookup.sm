@@ -155,12 +155,13 @@ static PINT_sm_action lookup_init(
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
-                 "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)"
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 " STARTING LOOKUP REQUEST "
+                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:%u)"
                  "(# of segments:%u)\n",
                  s_op->req->u.lookup_path.path,
                  s_op->req->u.lookup_path.fs_id,
-                 llu(s_op->req->u.lookup_path.handle),
+                 PVFS_OID_str(&s_op->req->u.lookup_path.handle),
                  s_op->req->u.lookup_path.attrmask,
                  s_op->u.lookup.seg_ct);
     if ((s_op->u.lookup.seg_ct < 0) ||
@@ -377,7 +378,7 @@ static PINT_sm_action lookup_check_perms(
      * return -PVFS_EACCESS 
      */
     if (s_op->target_fs_id == PVFS_FS_ID_NULL
-        || s_op->target_handle == PVFS_HANDLE_NULL)
+        || !PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
@@ -434,7 +435,7 @@ static PINT_sm_action lookup_read_directory_acls(
      * return -PVFS_EACCESS 
      */
     if (s_op->target_fs_id == PVFS_FS_ID_NULL
-        || s_op->target_handle == PVFS_HANDLE_NULL)
+        || !PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
@@ -453,8 +454,9 @@ static PINT_sm_action lookup_read_directory_acls(
     }
     s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  About to retrieve acl keyvals "
-                 "for handle %llu\n", llu(s_op->target_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  About to retrieve acl keyvals for handle %s\n",
+                 PVFS_OID_str(&s_op->target_handle));
 
     /* Read acl keys */
     ret = job_trove_keyval_read(
@@ -558,8 +560,8 @@ static PINT_sm_action lookup_read_directory_entry_handle(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  reading dirent handle value from handle %llu\n",
-                 llu(handle));
+                 "  reading dirent handle value from handle %s\n",
+                 PVFS_OID_str(&handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -599,10 +601,11 @@ static PINT_sm_action lookup_read_directory_entry(
     }
     assert(ret == 0);
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  reading from dirent handle = "
-        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.dirent_handle),
-        s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  reading from dirent handle = %s, segment = %s (len=%d)\n",
+                 PVFS_OID_str(&s_op->u.lookup.dirent_handle),
+                 s_op->u.lookup.segp,
+                 (int) strlen(s_op->u.lookup.segp));
 
     s_op->key.buffer = s_op->u.lookup.segp;
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
@@ -661,11 +664,12 @@ static PINT_sm_action lookup_setup_resp(
 
     if (js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(
-            s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n", 
-            s_op->req->u.lookup_path.path, 
-            llu(s_op->resp.u.lookup_path.handle_array[
-                s_op->resp.u.lookup_path.handle_count-1]));
+        PINT_ACCESS_DEBUG(s_op,
+                          GOSSIP_ACCESS_DEBUG,
+                          "path: %s, handle: %s\n", 
+                          s_op->req->u.lookup_path.path, 
+                          PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[
+                                   s_op->resp.u.lookup_path.handle_count-1]));
     }
     else
     {

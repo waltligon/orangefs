@@ -952,7 +952,8 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         if(sync_required == 1)
         {
             gossip_debug(GOSSIP_DIRECTIO_DEBUG, 
-                "directio updating size for handle %llu\n", llu(ref.handle));
+                         "directio updating size for handle %s\n",
+                         PVFS_OID_str(&ref.handle));
 
             dbpf_open_cache_put(&rw_op->open_ref);
 
@@ -1635,9 +1636,7 @@ static int grow_bstream_handle_release_lock( TROVE_object_ref ref )
  *
  * returns integer offset into table
  */
-static int hash_handle(
-    void *handle,
-    int table_size)
+static int hash_handle(void *handle, int table_size)
 {
     /* TODO: update this later with a better hash function,
      * depending on what handles look like, for now just modding
@@ -1646,7 +1645,7 @@ static int hash_handle(
     unsigned long tmp = 0;
     PVFS_handle *real_handle = handle;
 
-    tmp += (*(real_handle));
+    tmp += PVFS_OID_hash32(real_handle);
     tmp = tmp % table_size;
 
     return ((int) tmp);
@@ -1660,15 +1659,13 @@ static int hash_handle(
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_handle_compare(
-    void *key,
-    struct qlist_head *link)
+static int hash_handle_compare(void *key, struct qlist_head *link)
 {
     struct grow_bstream_handle *my_handle;
     PVFS_handle *real_handle = key;
 
     my_handle = qlist_entry(link, struct grow_bstream_handle, hash_link);
-    if (my_handle->handle == *real_handle)
+    if (!PVFS_OID_cmp(&my_handle->handle, real_handle))
     {
         return (1);
     }

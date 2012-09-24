@@ -1712,7 +1712,8 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
 
     /* copy attributes into standard stat struct */
     buf->st_dev = pd->s->pvfs_ref.fs_id;
-    buf->st_ino = pd->s->pvfs_ref.handle;
+/* NEXT */
+    buf->st_ino = PVFS_OID_hash32(&pd->s->pvfs_ref.handle);
     buf->st_mode = attr.perms;
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -1767,7 +1768,8 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
 
     /* copy attributes into standard stat struct */
     buf->st_dev = pd->s->pvfs_ref.fs_id;
-    buf->st_ino = pd->s->pvfs_ref.handle;
+/* NEXT */
+    buf->st_ino = PVFS_OID_hash64(&pd->s->pvfs_ref.handle);
     buf->st_mode = attr.perms;
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -2105,7 +2107,8 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
         /* copy a PVFS_dirent to a struct dirent */
-        dirp->d_ino = (long)readdir_resp.dirent_array[i].handle;
+/* NEXT */
+        dirp->d_ino = PVFS_OID_hash32(&readdir_resp.dirent_array[i].handle);
         dirp->d_off = pd->s->file_pointer;
         dirp->d_reclen = sizeof(PVFS_dirent);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
@@ -2183,7 +2186,8 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
         /* copy a PVFS_dirent to a struct dirent64 */
-        dirp->d_ino = (uint64_t)readdir_resp.dirent_array[i].handle;
+/* NEXT */
+        dirp->d_ino = PVFS_OID_hash64(&readdir_resp.dirent_array[i].handle);
         dirp->d_off = (off64_t)pd->s->file_pointer;
         dirp->d_reclen = sizeof(struct dirent64);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
@@ -2393,9 +2397,9 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
     /* this is a fudge because they don't line up */
     buf->f_type = PVFS2_SUPER_MAGIC;
     buf->f_bsize = block_size; 
-    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/1024;
-    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/1024;
-    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/1024;
+    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/block_size;
+    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/block_size;
+    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/block_size;
     buf->f_files = statfs_resp.statfs_buf.handles_total_count;
     buf->f_ffree = statfs_resp.statfs_buf.handles_available_count;
     buf->f_fsid.__val[0] = statfs_resp.statfs_buf.fs_id;
@@ -2438,9 +2442,9 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
     /* this is a fudge because they don't line up */
     buf->f_type = PVFS2_SUPER_MAGIC;
     buf->f_bsize = block_size; 
-    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/1024;
-    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/1024;
-    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/1024;
+    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/block_size;
+    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/block_size;
+    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/block_size;
     buf->f_files = statfs_resp.statfs_buf.handles_total_count;
     buf->f_ffree = statfs_resp.statfs_buf.handles_available_count;
     buf->f_fsid.__val[0] = statfs_resp.statfs_buf.fs_id;

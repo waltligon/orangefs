@@ -1,14 +1,18 @@
+/*
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-#include "../quicklist/quicklist.h"
-#include "../quickhash/quickhash.h"
+#include <quicklist.h>
 
-#include "policyeval.h"
-#include "policycomp.h"
+#include <policyeval.h>
+#include <policycomp.h>
 
 #define NAME_BUF_SZ 50
 
@@ -26,10 +30,15 @@ void gen_finalize()
 {
 }
 
+/*
+ * produce array with pointer to func to extract each attribute
+ * next produce and array with the string rep of each attribute
+ */
 void gen_attrib_table()
 {
     int i = 0;
     list_item_t *attr;
+    /* produce SID_extract_key and SID_attr_e */
     fprintf(code, "int (* SID_extract_key[])(DB *pri, "
             "const DBT *pkey, const DBT *pdata, DBT *skey) =\n{\n");
     fprintf(header, "typedef enum SID_attr_e\n{\n");
@@ -43,9 +52,26 @@ void gen_attrib_table()
         fprintf(code, "    SID_get_%s", attr->name);
         fprintf(header, "    SID_%s = %d", attr->name, i++);
     }
-    fprintf(code, "\n}\n\n");
+    fprintf(code, "\n};\n\n");
     fprintf(header, "\n} SID_attr_t;\n\n");
+    fprintf(header, "extern char *SID_attr_map[];\n\n");
+    fprintf(header, "extern int (*SID_extract_key[])"
+            "(DB *pri, const DBT *pkey, const DBT *pdata, DBT *skey);\n\n");
+    /* produce SID_NUM_ATTR */
     fprintf(header, "#define SID_NUM_ATTR %d\n\n", i);
+    /* produce SID_attr_map */
+    i = 0;
+    fprintf(code, "char * SID_attr_map[] =\n{\n");
+    qlist_for_each_entry(attr, &attr_list, link)
+    {
+        if (i != 0)
+        {
+            fprintf(code, ",\n");
+        }
+        fprintf(code, "    \"%s\"", attr->name);
+        i++;
+    }
+    fprintf(code, "\n};\n\n");
 }
 
 void gen_policy_table()
@@ -89,7 +115,7 @@ void gen_save_attr_name(char *name)
     /* generate extractor function */
     fprintf(code, "int SID_get_%s (DB *pri, const DBT *pkey, "
             "const DBT *pdata, DBT *skey)\n{\n    "
-            "SID_get_attr (pri, pkey, pdata, skey, SID_%s);\n}\n\n",
+            "return SID_get_attr (pri, pkey, pdata, skey, SID_%s);\n}\n\n",
             name, name);
 }
 

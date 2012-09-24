@@ -185,8 +185,8 @@ static PINT_sm_action small_io_start_job(
         s_op->u.small_io.result_bytes = result.bytes;
 
         gossip_debug(GOSSIP_IO_DEBUG,
-                    "\tsubmitting job_trove_bstream_read_list for handle %llu\n"
-                    ,llu(s_op->req->u.small_io.handle));
+                    "\tsubmitting job_trove_bstream_read_list for handle %s\n"
+                    ,PVFS_OID_str(&s_op->req->u.small_io.handle));
         ret = job_trove_bstream_read_list(
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,

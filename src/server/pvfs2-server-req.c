@@ -149,8 +149,8 @@ int PINT_server_req_get_object_ref(
 
     if(!PINT_server_req_table[req->op].params->get_object_ref)
     {
-        *fs_id = 0;
-        *handle = 0;
+        *fs_id = PVFS_FS_ID_NULL;
+        *handle = PVFS_HANDLE_NULL;
         return 0;
     }
     else

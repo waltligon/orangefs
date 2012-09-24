@@ -36,7 +36,7 @@ typedef struct
 } options_t;
 
 static int default_verbose = 0;
-static PVFS_handle default_root_handle = PVFS_HANDLE_NULL;
+static PVFS_handle default_root_handle = PVFS_HANDLE_NULL_INIT;
 static int default_collection_only = 0;
 static char default_meta_ranges[PATH_MAX] = "4-2147483650";
 static char default_data_ranges[PATH_MAX] = "2147483651-4294967297";
@@ -165,13 +165,7 @@ static int parse_args(int argc, char **argv, options_t *opts)
 		break;
 	    case 'r':
           do_root_handle:
-#ifdef HAVE_STRTOULL
-		opts->root_handle = (PVFS_handle)
-                    strtoull(optarg, NULL, 10);
-#else
-		opts->root_handle = (PVFS_handle)
-                    strtoul(optarg, NULL, 10);
-#endif
+                PVFS_OID_str2bin(optarg, &opts->root_handle);
 		break;
 	    case 'M':
           do_meta_handle_range:
@@ -214,7 +208,8 @@ static void print_options(options_t *opts)
                (opts->delete_storage ? "yes" : "no"));
         printf("\t   verbose             : %s\n",
                (opts->verbose ? "ON" : "OFF"));
-        printf("\t   root handle         : %llu\n", llu(opts->root_handle));
+        printf("\t   root handle         : %s\n",
+               PVFS_OID_str(&opts->root_handle));
         printf("\t   collection-only mode: %s\n",
                (opts->collection_only ? "ON" : "OFF"));
         printf("\t   collection id       : %d\n", opts->coll_id);

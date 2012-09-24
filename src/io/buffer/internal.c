@@ -749,11 +749,11 @@ static inline struct inode *search_inode_list (PVFS_handle handle)
 	int inode_index;
 	struct inode * cur;
 
-	inode_index = handle % MAX_INODE_NUM;
+	inode_index = PVFS_OID_hash32(&handle) % MAX_INODE_NUM;
 
 	cur = inode_arr[inode_index]; 
 	while ( NULL != cur ) {
-		if ( cur->handle == handle ) return cur;	
+		if ( !PVFS_OID_cmp(&cur->handle, &handle) ) return cur;	
 		cur = cur->next;
 	}	
 
@@ -772,12 +772,15 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 	struct inode *inode;
 	int inode_index;
 
-	inode_index = handle % MAX_INODE_NUM;
+	inode_index = PVFS_OID_hash32(&handle) % MAX_INODE_NUM;
 
 	/* search the inode list with the index of "inode_index" */
 	inode = search_inode_list (handle);
 
-	fprintf(stderr, "handle: %lld, index: %d, inode:%p\n", lld(handle), inode_index, inode);
+	fprintf(stderr, "handle: %s, index: %d, inode:%p\n",
+                    PVFS_OID_str(&handle),
+                    inode_index,
+                    inode);
 
 	if ( NULL == inode ){
 		inode=(struct inode*)malloc(sizeof(struct inode));
@@ -792,7 +795,9 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 		inode->handle = handle;
 		inode->context_id = context_id;
 
-		init_single_radix_tree(&inode->page_tree, NCAC_dev.get_value, NCAC_dev.max_b);
+		init_single_radix_tree(&inode->page_tree,
+                               NCAC_dev.get_value,
+                               NCAC_dev.max_b);
 
 		spin_lock_init(&inode->lock);
 

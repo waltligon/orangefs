@@ -172,8 +172,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         if (! strcmp(server_config->host_id, server_name)) /* this one is local */
         {
             gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "tree_communicate_partition_handles: local handle = %llu\n",
-                     llu(handle_array[i]));
+                     "tree_communicate_partition_handles: local handle = %s\n",
+                     PVFS_OID_str(&handle_array[i]));
             s_op->u.tree_communicate.handle_array_local[
                  s_op->u.tree_communicate.handle_array_local_count] = handle_array[i];
             s_op->u.tree_communicate.local_join_size[
@@ -183,8 +183,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         else
         {
             gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "tree_communicate_partition_handles: remote handle = %llu\n",
-                     llu(handle_array[i]));
+                     "tree_communicate_partition_handles: remote handle = %s\n",
+                     PVFS_OID_str(&handle_array[i]));
             s_op->u.tree_communicate.handle_array_remote[
                  s_op->u.tree_communicate.handle_array_remote_count] = handle_array[i];
             s_op->u.tree_communicate.remote_join_size[

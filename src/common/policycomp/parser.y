@@ -2,7 +2,7 @@
 %{
 
 /*
- * (C) 2001 Clemson University and Omnibond, Inc.
+ * (C) 2012 Clemson University and Omnibond, Inc.
  *
  * See COPYING in top-level directory.
  */
@@ -17,7 +17,7 @@
 #include <stdio.h>
 
 #include <policyeval.h>
-#include "policycomp.h"
+#include <policycomp.h>
 
 #ifdef WIN32
 #define _STDLIB_H  /* mark stdlib.h included */

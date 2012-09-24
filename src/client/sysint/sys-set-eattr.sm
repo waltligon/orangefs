@@ -98,7 +98,7 @@ PVFS_error PVFS_isys_seteattr_list(
         }/*end for*/
     } /*end if*/
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if (!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
     {
         gossip_err("invalid (NULL) required argument\n");

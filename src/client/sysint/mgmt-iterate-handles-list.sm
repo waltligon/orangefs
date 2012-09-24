@@ -139,8 +139,9 @@ PVFS_error PVFS_mgmt_iterate_handles_list(
                  "PVFS_mgmt_iterate_handles_list entered\n");
 
     ret = PVFS_imgmt_iterate_handles_list(
-        fs_id, credential, handle_matrix, handle_count_array,
-        position_array, addr_array, server_count, flags, details, hints, &op_id, NULL);
+                fs_id, credential, handle_matrix, handle_count_array,
+                position_array, addr_array, server_count, flags,
+                details, hints, &op_id, NULL);
 
     if (ret)
     {

@@ -62,40 +62,40 @@ int verbose = 0;
 static void print_help(char *progname);
 static int parse_args(int argc, char **argv, options_t *opts);
 static int src_get_version(
-    char* meta_storage_space, TROVE_coll_id coll_id, char* coll_name,
-    char* ver_string, int ver_string_max);
-static int remove_collection_entry(char* meta_storage_space, char* collname);
+    char *meta_storage_space, TROVE_coll_id coll_id, char *coll_name,
+    char *ver_string, int ver_string_max);
+static int remove_collection_entry(char *meta_storage_space, char *collname);
 
-int migrate_collection(void * config, void * sconfig);
+int migrate_collection(void *config, void *sconfig);
 void fs_config_dummy_free(void *);
-int recursive_rmdir(char* dir);
+int recursive_rmdir(char *dir);
 
 /* functions specific to reading 0.0.1 collections */
 static int src_get_version_0_0_1(
-    char* meta_storage_space, TROVE_coll_id coll_id, 
-    char* ver_string, int ver_string_max);
+    char *meta_storage_space, TROVE_coll_id coll_id, 
+    char *ver_string, int ver_string_max);
 static int translate_0_0_1(
-    char* data_storage_space, char* meta_storage_space, char* old_coll_path, 
-    char* coll_name, TROVE_coll_id coll_id);
+    char *data_storage_space, char *meta_storage_space, char *old_coll_path, 
+    char *coll_name, TROVE_coll_id coll_id);
 static int translate_coll_eattr_0_0_1(
-    char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
+    char *old_coll_path, TROVE_coll_id coll_id, char *coll_name,
     TROVE_context_id trove_context);
 static int translate_dspace_attr_0_0_1(
-    char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
+    char *old_coll_path, TROVE_coll_id coll_id, char *coll_name,
     TROVE_context_id trove_context);
 static int translate_keyvals_0_0_1(
-    char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
+    char *old_coll_path, TROVE_coll_id coll_id, char *coll_name,
     TROVE_context_id trove_context);
 static int translate_bstreams_0_0_1(
-    char* data_storage_space, char* old_coll_path, 
-    TROVE_coll_id coll_id, char* coll_name,
+    char* data_storage_space, char *old_coll_path, 
+    TROVE_coll_id coll_id, char *coll_name,
     TROVE_context_id trove_context);
 static int translate_keyval_db_0_0_1(
-    TROVE_coll_id coll_id, char* full_db_path, 
-    TROVE_handle handle, char* coll_name, 
+    TROVE_coll_id coll_id, char *full_db_path, 
+    TROVE_handle handle, char *coll_name, 
     TROVE_context_id trove_context);
 static int translate_dist_0_0_1(
-    PINT_dist * dist);
+    PINT_dist *dist);
 static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key);
 
 /** number of keyval buckets used in DBPF 0.0.1 */
@@ -316,8 +316,11 @@ int migrate_collection(void * config, void * sconfig)
             /* user asked to remove this old collection instead
              * of creating it
              */
-            if(verbose) printf("VERBOSE Removing old collection at: %s\n",
+            if(verbose)
+            {
+                printf("VERBOSE Removing old collection at: %s\n",
                                old_coll_path);
+            }
             ret = unlink(old_coll_path);
             if(ret < 0)
             {
@@ -334,8 +337,8 @@ int migrate_collection(void * config, void * sconfig)
              * of creating it, but we don't know what the version
              * is anymore
              */
-            DIR * data_storage_dir;
-            DIR * meta_storage_dir;
+            DIR *data_storage_dir;
+            DIR *meta_storage_dir;
             struct dirent * next_dirent;
             char collname[PATH_MAX];
             int collname_length;
@@ -364,8 +367,10 @@ int migrate_collection(void * config, void * sconfig)
 
                     /* found an old version, delete it */
                     if(verbose) 
+                    {
                         printf("VERBOSE Removing old collection at: %s\n",
                                old_coll_path);
+                    }
                     ret = recursive_rmdir(old_coll_path);
                     if(ret < 0)
                     {
@@ -404,8 +409,10 @@ int migrate_collection(void * config, void * sconfig)
 
                          /* found an old version, delete it */
                         if(verbose) 
+                        {
                             printf("VERBOSE Removing old collection at: %s\n",
                                    old_coll_path);
+                        }
                         ret = recursive_rmdir(old_coll_path);
                         if(ret < 0)
                         {
@@ -576,10 +583,10 @@ static void print_help(
  * \return 0 on succes, -1 on failure
  */
 static int src_get_version(
-    char* meta_storage_space,       /**< path to storage space */
+    char *meta_storage_space,       /**< path to storage space */
     TROVE_coll_id coll_id,     /**< collection id */
-    char* coll_name,           /**< collection name */
-    char* ver_string,          /**< version in string format */
+    char *coll_name,           /**< collection name */
+    char *ver_string,          /**< version in string format */
     int ver_string_max)        /**< maximum size of version string */
 {
     int ret = -1;
@@ -605,9 +612,9 @@ static int src_get_version(
  * \return 0 on succes, -1 on failure
  */
 static int src_get_version_0_0_1(
-    char* meta_storage_space,   /**< path to storage space */
+    char *meta_storage_space,   /**< path to storage space */
     TROVE_coll_id coll_id, /**< collection id */
-    char* ver_string,      /**< version in string format */
+    char *ver_string,      /**< version in string format */
     int ver_string_max)    /**< maximum size of version string */
 {
     char coll_db[PATH_MAX];
@@ -679,10 +686,10 @@ static int src_get_version_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_0_0_1(
-    char* data_storage_space,   /**< path to data storage space */
-    char* meta_storage_space, /**< path to metadata storage space */
-    char* old_coll_path,   /**< path to old collection */
-    char* coll_name,       /**< collection name */
+    char *data_storage_space,   /**< path to data storage space */
+    char *meta_storage_space, /**< path to metadata storage space */
+    char *old_coll_path,   /**< path to old collection */
+    char *coll_name,       /**< collection name */
     TROVE_coll_id coll_id) /**< collection id in string format */
 {
     int ret = -1;
@@ -706,7 +713,10 @@ static int translate_0_0_1(
         return -1;
     }
                         
-    if(verbose) printf("VERBOSE Renaming old collection.\n");
+    if(verbose)
+    {
+        printf("VERBOSE Renaming old collection.\n");
+    }
     ret = rename(current_path, old_coll_path);
     if(ret < 0)
     {
@@ -727,7 +737,9 @@ static int translate_0_0_1(
      * later as a normal directory if applicable
      */
     if(verbose) 
+    {
         printf("VERBOSE Creating temporary collection to migrate to.\n");
+    }
     ret = pvfs2_mkspace(
         data_storage_space,
         meta_storage_space,
@@ -846,10 +858,10 @@ static int translate_0_0_1(
     return(0);
 }
 
-static int remove_collection_entry(char* meta_storage_space, char* collname)
+static int remove_collection_entry(char *meta_storage_space, char *collname)
 {
     char collections_db[PATH_MAX];
-    DB * dbp;
+    DB *dbp;
     DBT key, data;
     int ret = 0;
     TROVE_coll_id coll_id;
@@ -930,9 +942,9 @@ static int remove_collection_entry(char* meta_storage_space, char* collname)
  * \return 0 on succes, -1 on failure
  */
 static int translate_coll_eattr_0_0_1(
-    char* old_coll_path,            /**< path to old trove collection */
+    char *old_coll_path,            /**< path to old trove collection */
     TROVE_coll_id coll_id,          /**< collection id in string format */
-    char* coll_name,                /**< name of collection */
+    char *coll_name,                /**< name of collection */
     TROVE_context_id trove_context) /**< open trove context */                
 {
     int ret = -1;
@@ -1070,9 +1082,9 @@ static int translate_coll_eattr_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_dspace_attr_0_0_1(
-    char* old_coll_path,            /**< path to old collection */
+    char *old_coll_path,            /**< path to old collection */
     TROVE_coll_id coll_id,          /**< collection id */
-    char* coll_name,                /**< name of collection */
+    char *coll_name,                /**< name of collection */
     TROVE_context_id trove_context) /**< open trove context */                
 {
     int ret = -1;
@@ -1165,8 +1177,10 @@ static int translate_dspace_attr_0_0_1(
             tmp_handle = ((PVFS_handle*)key.data);
             tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
 
-            if(verbose) printf("VERBOSE Migrating attributes for handle: %llu, type: %d\n", 
-                llu(*tmp_handle), (int)tmp_attr->type);
+            if(verbose) printf("VERBOSE Migrating attributes for handle: "
+                               "%s, type: %d\n", 
+                               PVFS_OID_str(tmp_handle),
+                               (int)tmp_attr->type);
 
             cur_extent.first = cur_extent.last = *tmp_handle;
             extent_array.extent_count = 1;
@@ -1253,16 +1267,16 @@ static int translate_dspace_attr_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_keyvals_0_0_1(
-    char* old_coll_path,            /**< path to old collection */
+    char *old_coll_path,            /**< path to old collection */
     TROVE_coll_id coll_id,          /**< collection id */
-    char* coll_name,                /**< name of collection */
+    char *coll_name,                /**< name of collection */
     TROVE_context_id trove_context) /**< open trove context */                
 {
     char bucket_dir[PATH_MAX];
     char keyval_db[PATH_MAX];
     int i;
-    struct dirent* tmp_ent = NULL;
-    DIR* tmp_dir = NULL;
+    struct dirent *tmp_ent = NULL;
+    DIR *tmp_dir = NULL;
     int ret = -1;
     TROVE_handle tmp_handle;
 
@@ -1283,6 +1297,11 @@ static int translate_keyvals_0_0_1(
         {
             if(strcmp(tmp_ent->d_name, ".") && strcmp(tmp_ent->d_name, ".."))
             {
+/* handle conversion from v2 to v3 cannot be handled by this program */
+/* this program is so old it will most likely not be included in v3 */
+/* users are expected to migrate with an older v2 release before */
+/* migrating to v3 */
+#if 0
                 /* scan the handle value out of the file name */
 #if SIZEOF_LONG_INT == 4
                 ret = sscanf(tmp_ent->d_name, "%llx.keyval",
@@ -1292,6 +1311,7 @@ static int translate_keyvals_0_0_1(
                     &(tmp_handle));
 #else
 #error Unexpected sizeof(long int)
+#endif
 #endif
                 if(ret != 1)
                 {
@@ -1363,9 +1383,9 @@ static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key)
  */
 static int translate_keyval_db_0_0_1(
     TROVE_coll_id coll_id,          /**< collection id */
-    char* full_db_path,             /**< fully resolved path to db file */
+    char *full_db_path,             /**< fully resolved path to db file */
     TROVE_handle handle,            /**< handle of the object */
-    char* coll_name,                /**< name of collection */
+    char *coll_name,                /**< name of collection */
     TROVE_context_id trove_context) /**< open trove context */                
 {
     int ret = -1;
@@ -1379,7 +1399,10 @@ static int translate_keyval_db_0_0_1(
     TROVE_keyval_s t_val;
 
     if(verbose) 
-        printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
+    {
+        printf("VERBOSE Migrating keyvals for handle: %s\n",
+               PVFS_OID_str(&handle));
+    }
 
     ret = db_create(&dbp, NULL, 0);
     if(ret != 0)
@@ -1545,10 +1568,10 @@ static int translate_keyval_db_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_bstreams_0_0_1(
-    char* data_storage_space,            /**< path to trove storage space */
-    char* old_coll_path,            /**< path to old collection */
+    char *data_storage_space,            /**< path to trove storage space */
+    char *old_coll_path,            /**< path to old collection */
     TROVE_coll_id coll_id,          /**< collection id */
-    char* new_name,                 /**< name of collection */
+    char *new_name,                 /**< name of collection */
     TROVE_context_id trove_context) /**< open trove context */                
 {
     char bucket_dir[PATH_MAX];
@@ -1556,7 +1579,7 @@ static int translate_bstreams_0_0_1(
     char new_bstream_file[PATH_MAX];
     int i;
     struct dirent* tmp_ent = NULL;
-    DIR* tmp_dir = NULL;
+    DIR *tmp_dir = NULL;
     int ret = -1;
 
     /* iterate through bucket dirs */
@@ -1621,12 +1644,12 @@ int translate_dist_0_0_1(PINT_dist *dist)
         return 0;
 }
 
-void fs_config_dummy_free(void * dummy) { }
+void fs_config_dummy_free(void *dummy) { }
 
-int recursive_rmdir(char* dir)
+int recursive_rmdir(char *dir)
 {
-    DIR * dirh;
-    struct dirent * dire;
+    DIR *dirh;
+    struct dirent *dire;
     struct stat statbuf;
     char fname[PATH_MAX];
     int ret;

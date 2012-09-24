@@ -107,6 +107,8 @@ AC_CHECK_HEADER([arpa/inet.h],
         [AC_DEFINE(HAVE_ARPA_INET_H, 1, Define if arpa/inet.h exists)])
 AC_CHECK_HEADER([attr/xattr.h],
         [AC_DEFINE(HAVE_ATTR_XATTR_H, 1, Define if attr/xattr.h exists)])
+AC_CHECK_HEADER([uuid/uuid.h],
+        [AC_DEFINE(HAVE_UUID_UUID_H, 1, Define if uuid/uuid.h exists)])
 
 AC_CHECK_SIZEOF([long int])
 
@@ -750,6 +752,28 @@ if test "x$enableval" = "xyes" ; then
 fi
 ],
 )
+
+dnl
+dnl a function to check for uuid
+dnl man page claims this is in e2fsprogs
+dnl so might want to add a check for that
+dnl if this fails
+dnl
+AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+   AC_MSG_CHECKING([for FUSE library])
+   if `pkg-config --exists uuid` ; then
+      AC_MSG_RESULT(yes)
+      UUID_LDFLAGS=`pkg-config --libs uuid`
+      UUID_CFLAGS=`pkg-config --cflags uuid`
+      AC_SUBST(UUID_LDFLAGS)
+      AC_SUBST(UUID_CFLAGS)
+   else
+      AC_MSG_ERROR([UUID: UUID library not found. Check LD_LIBRARY_PATH.])
+   fi
+else
+   AC_MSG_ERROR(UUID: pkg-config not available. Please install pkg-config.)
+fi
 
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
@@ -1419,6 +1443,8 @@ src/common/statecomp/module.mk
 src/common/events/module.mk
 src/common/mgmt/module.mk
 src/common/security/module.mk
+src/common/sidcache/module.mk
+src/common/policycomp/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk

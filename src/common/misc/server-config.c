@@ -2656,7 +2656,7 @@ DOTCONF_CB(get_db_cache_type)
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-    unsigned long long int tmp_var;
+    PVFS_OID tmp_var;
     int ret = -1;
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -2664,7 +2664,8 @@ DOTCONF_CB(get_root_handle)
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
-    ret = sscanf(cmd->data.str, "%llu", &tmp_var);
+    /* ret = sscanf(cmd->data.str, "%llu", &tmp_var); */
+    ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
     if(ret != 1)
     {
         return("RootHandle does not have a long long unsigned value.\n");
@@ -3341,7 +3342,7 @@ static int is_populated_filesystem_configuration(
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
              fs->meta_handle_ranges && fs->data_handle_ranges &&
-             fs->root_handle) ? 1 : 0);
+             PVFS_OID_cmp(&fs->root_handle, &PVFS_HANDLE_NULL)) ? 1 : 0);
 }
     
 static int is_root_handle_in_a_meta_range(
@@ -3410,9 +3411,9 @@ static int is_valid_filesystem_configuration(
     int ret = is_root_handle_in_a_meta_range(config,fs);
     if (ret == 0)
     {
-        gossip_err("RootHandle (%llu) is NOT within the meta handle "
+        gossip_err("RootHandle (%s) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
-                   llu(fs->root_handle),fs->file_system_name);
+                   PVFS_OID_str(&fs->root_handle),fs->file_system_name);
     }
     return ret;
 }
@@ -4690,7 +4691,7 @@ int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config)
 {
     int ret = 1;
-    PVFS_handle root_handle = 0;
+    PVFS_handle root_handle = PVFS_HANDLE_NULL;
     int create_collection_only = 0;
     PINT_llist *cur = NULL;
     char *cur_meta_handle_range, *cur_data_handle_range = NULL;

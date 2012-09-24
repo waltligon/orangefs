@@ -72,9 +72,9 @@ static PINT_sm_action deleattr_verify_eattribs(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_DELEATTR_DEBUG,
-                 "  ext attr delete from handle %llu refers to a %s\n\t"
+                 "  ext attr delete from handle %s refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 llu(s_op->req->u.deleattr.handle),
+                 PVFS_OID_str(&s_op->req->u.deleattr.handle),
                  PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
@@ -152,9 +152,9 @@ static PINT_sm_action deleattr_delobj_eattribs(
 
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
-        "  writing %s [%llu,%d,len %d]\n",
+        "  writing %s [%s,%d,len %d]\n",
         (char *)s_op->key.buffer,
-        llu(s_op->req->u.deleattr.handle),
+        PVFS_OID_str(&s_op->req->u.deleattr.handle),
         s_op->req->u.deleattr.fs_id,
         s_op->val.buffer_sz);
 

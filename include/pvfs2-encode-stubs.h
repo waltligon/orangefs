@@ -74,6 +74,7 @@
 #define endecode_fields_3a2a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1,t4,x4,t5,x5,tn2,n2,ta2,a2) struct endecode_fake_struct
 
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2) struct endecode_fake_struct
+#define encode_enum_union_3_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2, ut3, un3, en3) struct endecode_fake_struct
 
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 

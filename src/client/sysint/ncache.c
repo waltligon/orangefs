@@ -266,7 +266,7 @@ int PINT_ncache_get_cached_entry(
 
     /* copy out entry ref if valid */
     if(tmp_payload->entry_status == 0 && 
-       tmp_payload->parent_ref.handle == parent_ref->handle)
+       !PVFS_OID_cmp(&tmp_payload->parent_ref.handle, &parent_ref->handle))
     {
         gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: copying out ref.\n");
         *entry_ref = tmp_payload->entry_ref;
@@ -357,7 +357,7 @@ int PINT_ncache_update(
     
     gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: update(): name [%s]\n",entry);
   
-    if(!entry_ref->handle)
+    if(!PVFS_OID_cmp(&entry_ref->handle, &PVFS_HANDLE_NULL))
     {
         return(-PVFS_EINVAL);
     }
@@ -472,7 +472,8 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
      *   - parent_ref.fs_id
      *   - entry_name length
      */
-    if( real_key->parent_ref.handle  != tmp_payload->parent_ref.handle ||
+    if( PVFS_OID_cmp(&real_key->parent_ref.handle,
+                     &tmp_payload->parent_ref.handle) ||
         real_key->parent_ref.fs_id   != tmp_payload->parent_ref.fs_id  ||
         strlen(real_key->entry_name) != strlen(tmp_payload->entry_name) )
     {
@@ -506,7 +507,8 @@ static int ncache_hash_key(void* key, int table_size)
         sum += (unsigned int) real_key->entry_name[i];
         i++;
     }
-    sum += real_key->parent_ref.handle + real_key->parent_ref.fs_id;
+    sum += PVFS_OID_hash64(&real_key->parent_ref.handle) +
+            real_key->parent_ref.fs_id;
     tmp_ret =  sum % table_size;
     return(tmp_ret);
 }

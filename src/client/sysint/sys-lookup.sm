@@ -575,8 +575,10 @@ PVFS_error PVFS_isys_ref_lookup(
         return ret;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
-                 relative_pathname, llu(parent.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "lookup got: %s (parent %s)\n",
+                 relative_pathname,
+                 PVFS_OID_str(&parent.handle));
 
     return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
@@ -645,7 +647,7 @@ PVFS_error PVFS_sys_lookup(
 
     if (name && resp)
     {
-        parent.handle = 0;
+        parent.handle = PVFS_HANDLE_NULL;
         parent.fs_id = fs_id;
 
         ret = PINT_cached_config_get_root_handle(parent.fs_id,
@@ -736,8 +738,9 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     if (ret == 0)
     {
         gossip_debug(GOSSIP_NCACHE_DEBUG,
-                     "*** ncache hit on first segment of %s (%llu|%d)\n",
-                     cur_seg->seg_name, llu(object_ref.handle),
+                     "*** ncache hit on first segment of %s (%s|%d)\n",
+                     cur_seg->seg_name,
+                     PVFS_OID_str(&object_ref.handle),
                      object_ref.fs_id);
 
         cur_seg->seg_resolved_refn.handle = object_ref.handle;
@@ -829,8 +832,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
         sm_p->hints);
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle "
-                 "%llu\n", seg_to_lookup, 
-                 llu(cur_seg->seg_starting_refn.handle));
+                 "%s\n", seg_to_lookup, 
+                 PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
 
     msg_p->fs_id = cur_seg->seg_starting_refn.fs_id;
     msg_p->handle = cur_seg->seg_starting_refn.handle;
@@ -1258,8 +1261,8 @@ static PINT_sm_action lookup_cleanup(
     else
     {
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup resolved segment %s "
-                     "to %llu\n", sm_p->u.lookup.orig_pathname,
-                     llu(sm_p->u.lookup.lookup_resp->ref.handle));
+                     "to %s\n", sm_p->u.lookup.orig_pathname,
+                     PVFS_OID_str(&sm_p->u.lookup.lookup_resp->ref.handle));
     }
 
     /* mark operation as complete */
@@ -1335,11 +1338,11 @@ static int lookup_segment_lookup_comp_fn(
         }
         
         gossip_debug(GOSSIP_NCACHE_DEBUG, "*** ncache update on %s target "
-                     "(%llu|%d) parent (%llu|%d)\n",
+                     "(%s|%d) parent (%s|%d)\n",
                      cur_seg->seg_name,
-                     llu(last_resolved_refn.handle),
+                     PVFS_OID_str(&last_resolved_refn.handle),
                      last_resolved_refn.fs_id,
-                     llu(cur_seg->seg_starting_refn.handle),
+                     PVFS_OID_str(&cur_seg->seg_starting_refn.handle),
                      cur_seg->seg_starting_refn.fs_id);
 
         PINT_ncache_update((const char*) cur_seg->seg_name,

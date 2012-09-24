@@ -45,12 +45,14 @@ op=%lld context=%lld count=%d state=%d\n",                      \
 /*
  * Prototypes
  */
+#if 0
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
 static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
+ #endif
 
 /*
  * Migration Table
@@ -73,8 +75,8 @@ struct migration_s
  * associated function. */
 struct migration_s migration_table[] =
 {
-    { 0, 1, 3, migrate_collection_0_1_3 },
-    { 0, 1, 4, migrate_collection_0_1_4 },
+/*    { 0, 1, 3, migrate_collection_0_1_3 },
+    { 0, 1, 4, migrate_collection_0_1_4 }, */
     { 0, 0, 0, NULL }
 };
 
@@ -397,6 +399,10 @@ complete:
     return ret;
 }
 
+/* THESE ARE REMOVED FROM VERSION 10, at least for now */
+/* They require a more substantial porting effort and might */
+/* be better as an external */
+#if 0
 /*
  * migrate_collection_0_1_3
  *   coll_id   - collection id
@@ -897,3 +903,4 @@ complete:
 
     return ret;
 }
+#endif

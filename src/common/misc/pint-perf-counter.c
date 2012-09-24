@@ -468,12 +468,12 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
  * more or less keys in them, and the system might have more or less
  * samples than space in the array.
  *
- * the array is really a 2D Matrix (keys+times vs history) but is treated
+ * The array is really a 2D Matrix (keys+times vs history) but is treated
  * as a 1D array because the sizes aren't well known until runtime, and
  * even then can change.  This results in some 2D indexing (i*max_key+2) 
  * in the loop where
  * data is copied from the samples to the value_array.  Also the location
- * of the time stampls is generally index max_key, and max_key+1
+ * of the time stamples is generally index max_key, and max_key+1
  */
 void PINT_perf_retrieve(
         struct PINT_perf_counter* pc,    /* performance counter */
@@ -512,7 +512,7 @@ void PINT_perf_retrieve(
 
     /* copy data out */
     /* running sample list, and counting at the same time */
-    /* i is the sample index, they keys of each sample stay together */
+    /* i is the sample index, the keys of each sample stay together */
     /* there are max_key+2 spaces in the destination for each sample */
     /* but we will only copy tmp_max_key and the time stamps - which */
     /* should be less than or equal to the space available */

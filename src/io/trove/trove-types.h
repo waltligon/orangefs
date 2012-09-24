@@ -58,6 +58,7 @@ typedef enum
 typedef TROVE_method_id (*TROVE_method_callback)(TROVE_coll_id);
 
 #define TROVE_HANDLE_NULL          PVFS_HANDLE_NULL
+#define TROVE_HANDLE_NULL_INIT     PVFS_HANDLE_NULL_INIT
 #define TROVE_COLL_ID_NULL         PVFS_FS_ID_NULL
 
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored

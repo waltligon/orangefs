@@ -81,25 +81,26 @@ void PINT_dbpf_keyval_pcache_finalize(
     free(cache);
 }
 
-static int dbpf_keyval_pcache_compare(
-    void * key, struct qhash_head * link)
+static int dbpf_keyval_pcache_compare(void * key, struct qhash_head * link)
 {
     struct dbpf_keyval_pcache_key * key_entry = 
-        (struct dbpf_keyval_pcache_key *)key;
+             (struct dbpf_keyval_pcache_key *)key;
     struct dbpf_keyval_pcache_entry * link_entry =
-        (struct dbpf_keyval_pcache_entry *)
-        (qhash_entry(link, struct PINT_tcache_entry, hash_link))->payload;
+             (struct dbpf_keyval_pcache_entry *)
+             (qhash_entry(link, struct PINT_tcache_entry, hash_link))->payload;
 
-    if(key_entry->handle == link_entry->handle &&
-       key_entry->pos == link_entry->pos) 
+    if(!PVFS_OID_cmp(&key_entry->handle, &link_entry->handle) &&
+            key_entry->pos == link_entry->pos) 
+    {
         return 1;
+    }
     return 0;
 }
     
 /* hash from http://burtleburtle.net/bob/hash/evahash.html */
 #define mix(a,b,c) \
 do { \
-  a=a-b;  a=a-c;  a=a^(c>>13); \
+      a=a-b;  a=a-c;  a=a^(c>>13); \
       b=b-c;  b=b-a;  b=b^(a<<8);  \
       c=c-a;  c=c-b;  c=c^(b>>13); \
       a=a-b;  a=a-c;  a=a^(c>>12); \
@@ -110,22 +111,22 @@ do { \
       c=c-a;  c=c-b;  c=c^(b>>15); \
 } while(0)
 
-static int dbpf_keyval_pcache_hash(
-    void * key, int size)
+static int dbpf_keyval_pcache_hash(void * key, int size)
 {
-    struct dbpf_keyval_pcache_entry * key_entry =
-        (struct dbpf_keyval_pcache_entry *)key;
+    struct dbpf_keyval_pcache_entry *key_entry =
+                    (struct dbpf_keyval_pcache_entry *)key;
 
-    uint32_t a = (uint32_t)(key_entry->handle >> 32);
-    uint32_t b = (uint32_t)(key_entry->handle & 0x00000000FFFFFFFF);
+    uint64_t handle = PVFS_OID_hash64(&key_entry->handle);
+
+    uint32_t a = (uint32_t)(handle >> 32);
+    uint32_t b = (uint32_t)(handle & 0x00000000FFFFFFFF);
     uint32_t c = (uint32_t)(key_entry->pos);
 
     mix(a,b,c);
     return (int)(c & (DBPF_KEYVAL_PCACHE_TABLE_SIZE-1));
 }
 
-static int dbpf_keyval_pcache_entry_free(
-    void * entry)
+static int dbpf_keyval_pcache_entry_free(void * entry)
 {
     free(entry);
     return 0;
@@ -153,15 +154,15 @@ int PINT_dbpf_keyval_pcache_lookup(
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
-                         "handle: %llu, pos: %llu\n",
-                         llu(handle), llu(pos));
+                         "handle: %s, pos: %llu\n",
+                         PVFS_OID_str(&handle), llu(pos));
         }
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
-                         "handle: %llu, pos: %llu\n",
-                         ret, llu(handle), llu(pos));
+                         "handle: %s, pos: %llu\n",
+                         ret, PVFS_OID_str(&handle), llu(pos));
         }
 
         gen_mutex_unlock(&pcache->mutex);
@@ -174,8 +175,8 @@ int PINT_dbpf_keyval_pcache_lookup(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
-                 "handle: %llu, pos: %llu\n",
-                 llu(handle), llu(pos));
+                 "handle: %s, pos: %llu\n",
+                 PVFS_OID_str(&handle), llu(pos));
 
     return 0;
 }
@@ -224,8 +225,8 @@ int PINT_dbpf_keyval_pcache_insert(
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
-                     "handle: %llu, pos: %llu\n",
-                     ret, llu(handle), llu(pos));
+                     "handle: %s, pos: %llu\n",
+                     ret, PVFS_OID_str(&handle), llu(pos));
 
         gen_mutex_unlock(&pcache->mutex);
         free(entry);
@@ -235,8 +236,8 @@ int PINT_dbpf_keyval_pcache_insert(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "
-                 "handle: %llu, pos: %llu\n",
-                 llu(handle), llu(pos));
+                 "handle: %s, pos: %llu\n",
+                 PVFS_OID_str(&handle), llu(pos));
 
     return 0;
 }

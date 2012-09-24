@@ -278,8 +278,8 @@ int main(int argc, char ** argv)
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
-        printf("Datafile %d - %s, handle: %llu (%08llx.bstream)\n", i, servers[i],
-            llu(handles[i]), llu(handles[i]));
+        printf("Datafile %d - %s, handle: %s (%s.bstream)\n", i, servers[i],
+            PVFS_OID_str(&handles[i]), PVFS_OID_str(&handles[i]));
         free(servers[i]);
     }
 main_out:

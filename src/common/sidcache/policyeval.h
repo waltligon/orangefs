@@ -8,7 +8,9 @@
 #define POLICYEVAL_H 1
 
 #include <db.h>
-#include "sidcache.h"
+#include <pvfs2-types.h>
+#include <pvfs3-handle.h>
+#include <quicklist.h>
 
 #define SID_OTHERS -1
 
@@ -54,11 +56,22 @@ typedef struct SID_policy_s
 
 typedef struct SID_server_list_s
 {
-    SID server_sid;
-    BMI_addr server_addr;
+    PVFS_SID server_sid;
+    PVFS_BMI_addr_t server_addr;
     char *server_url;
-    struct qlist_head *link;
+    struct qlist_head link;
 } SID_server_list_t;
+
+int SID_get_attr (DB *pri,
+                  const DBT *pkey,
+                  const DBT *pdata,
+                  DBT *skey,
+                  int attr_ix);
+
+int SID_select_servers(SID_policy_t *policy,
+                       int num_servers,
+                       int copies,
+                       SID_server_list_t *sid_list);
 
 #endif
 

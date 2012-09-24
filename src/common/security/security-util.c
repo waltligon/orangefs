@@ -202,15 +202,15 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfsid: %u\n", cap->fsid);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cap->sig_size);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
-                 PINT_util_bytes2str(cap->signature, sig_buf, 4));
+             PINT_util_bytes2str(cap->signature, sig_buf, 4));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n",
-                 (int) cap->timeout);
+             (int) cap->timeout);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\top_mask: %s\n",
-                 PINT_print_op_mask(cap->op_mask, mask_buf));
+             PINT_print_op_mask(cap->op_mask, mask_buf));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tnum_handles: %u\n", 
-                 cap->num_handles);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %llu\n",
-                 cap->num_handles > 0 ? llu(cap->handle_array[0]) : 0LL);
+             cap->num_handles);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %s\n",
+             cap->num_handles > 0 ? PVFS_OID_str(&cap->handle_array[0]) : 0LL);
 
 }
 

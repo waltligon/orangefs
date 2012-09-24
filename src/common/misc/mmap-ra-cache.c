@@ -92,8 +92,8 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
-                     "element %llu, %d of size %llu\n",
-                     llu(cache_elem->refn.handle),
+                     "element %s, %d of size %llu\n",
+                     PVFS_OID_str(&cache_elem->refn.handle),
                      cache_elem->refn.fs_id,
                      llu(cache_elem->data_sz));
 
@@ -197,8 +197,8 @@ int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
             assert(cache_elem->data);
 
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
-                         "element %llu, %d of size %llu\n",
-                         llu(cache_elem->refn.handle),
+                         "element %s, %d of size %llu\n",
+                         PVFS_OID_str(&cache_elem->refn.handle),
                          cache_elem->refn.fs_id,
                          llu(cache_elem->data_sz));
 
@@ -264,7 +264,7 @@ static int hash_key(void *key, int table_size)
     unsigned long tmp = 0;
     PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
-    tmp += ((refn->handle << 2) | (refn->fs_id));
+    tmp += ((PVFS_OID_hash64(&refn->handle) << 2) | (refn->fs_id));
     tmp = (tmp % table_size);
 
     return ((int)tmp);
@@ -285,7 +285,7 @@ static int hash_key_compare(void *key, struct qlist_head *link)
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);
 
-    return (((cache_elem->refn.handle == refn->handle) &&
+    return ((!PVFS_OID_cmp(&cache_elem->refn.handle, &refn->handle) &&
              (cache_elem->refn.fs_id == refn->fs_id)) ? 1 : 0);
 }
 

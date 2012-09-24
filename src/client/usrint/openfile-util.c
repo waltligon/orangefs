@@ -52,8 +52,8 @@ pvfs_descriptor_status pvfs_stdin_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
-    .pvfs_ref.fs_id = 0,
-    .pvfs_ref.handle = 0,
+    .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
+    .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
     .flags = O_RDONLY,
     .mode = 0,
     .file_pointer = 0,
@@ -75,8 +75,8 @@ pvfs_descriptor_status pvfs_stdout_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
-    .pvfs_ref.fs_id = 0,
-    .pvfs_ref.handle = 0,
+    .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
+    .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
     .flags = O_WRONLY | O_APPEND,
     .mode = 0,
     .file_pointer = 0,
@@ -98,8 +98,8 @@ pvfs_descriptor_status pvfs_stderr_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
-    .pvfs_ref.fs_id = 0,
-    .pvfs_ref.handle = 0,
+    .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
+    .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
     .flags = O_WRONLY | O_APPEND,
     .mode = 0,
     .file_pointer = 0,
@@ -646,8 +646,8 @@ int pvfs_descriptor_table_size(void)
     else
     {
         /* if this is not a PVFS file then the file_ref will be NULL */
-	    pd->s->pvfs_ref.fs_id = 0;
-	    pd->s->pvfs_ref.handle = 0LL;
+	    pd->s->pvfs_ref.fs_id = PVFS_FS_ID_NULL;
+	    pd->s->pvfs_ref.handle = PVFS_HANDLE_NULL;
     }
 
     pd->s->flags = flags;
@@ -804,8 +804,8 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->fdflags = 0;
 	    pd->s->dup_cnt = 1;
 	    pd->s->fsops = &glibc_ops;
-	    pd->s->pvfs_ref.fs_id = 0;
-	    pd->s->pvfs_ref.handle = 0LL;
+	    pd->s->pvfs_ref.fs_id = PVFS_FS_ID_NULL;
+	    pd->s->pvfs_ref.handle = PVFS_HANDLE_NULL;
 	    pd->s->flags = flags;
 	    pd->s->mode = 0;
 	    pd->s->file_pointer = 0;

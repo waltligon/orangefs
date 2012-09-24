@@ -99,11 +99,14 @@ int trove_initialize(TROVE_method_id method_id,
         return ret;
     }
 
+/* NEXT */
+#if  0
     ret = trove_handle_mgmt_initialize();
     if (ret == -1)
     {
         return ret;
     }
+#endif
 
     if(!method_callback)
     {
@@ -147,7 +150,10 @@ int trove_finalize(TROVE_method_id method_id)
 
     ret = mgmt_method_table[method_id]->finalize();
 
+/* NEXT */
+#if 0
     ret = trove_handle_mgmt_finalize();
+#endif
 
     gen_mutex_unlock(&trove_init_mutex);
 

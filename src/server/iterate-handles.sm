@@ -89,7 +89,7 @@ static PINT_sm_action iterate_handles_do_work(
     }
     
     s_op->resp.u.mgmt_iterate_handles.position
-	= s_op->req->u.mgmt_iterate_handles.position;
+	    = s_op->req->u.mgmt_iterate_handles.position;
 
     if(s_op->req->u.mgmt_iterate_handles.flags == PVFS_MGMT_RESERVED)
     {

@@ -479,9 +479,9 @@ int PVFS_fsck_check_server_configs(
  */
 int PVFS_fsck_validate_dfile(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
-    const PVFS_handle * handle,                   /**< The dfile handle */
-    const PVFS_fs_id * cur_fs,        /**< The fsid the handle belongs to */
-    const PVFS_credential * cred,   /**< Populated creditials structure */
+    const PVFS_handle *handle,                   /**< The dfile handle */
+    const PVFS_fs_id *cur_fs,        /**< The fsid the handle belongs to */
+    const PVFS_credential *cred,   /**< Populated creditials structure */
     PVFS_size * dfiles_total_size)    /**< Total size of all dfiles */
 {
     int ret = 0;
@@ -495,8 +495,9 @@ int PVFS_fsck_validate_dfile(
     {
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle list while verifying stranded objects\n",
-                    llu(*handle));
+            gossip_err("WARNING: unable to remove handle [%s] "
+                       "from handle list while verifying stranded objects\n",
+                       PVFS_OID_str(handle));
         }
     }
 
@@ -588,8 +589,9 @@ int PVFS_fsck_validate_metafile(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from \
-                handle list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from "
+                       "handle list while verifying stranded objects\n",
+                       PVFS_OID_str(&obj_ref->handle));
         }
     }
 
@@ -708,8 +710,9 @@ int PVFS_fsck_validate_symlink(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle \
-                    list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from handle "
+                       "list while verifying stranded objects\n",
+                       PVFS_OID_str(&obj_ref->handle));
         }
     }
 
@@ -805,9 +808,9 @@ int PVFS_fsck_validate_symlink_target(
  */
 int PVFS_fsck_validate_dirdata(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
-    const PVFS_handle * handle,     /**< The dirdata handle */
-    const PVFS_fs_id * cur_fs,      /**< The fsid the handle belongs to */
-    const PVFS_credential * cred) /**< Populated creditials structure */
+    const PVFS_handle *handle,     /**< The dirdata handle */
+    const PVFS_fs_id *cur_fs,      /**< The fsid the handle belongs to */
+    const PVFS_credential *cred) /**< Populated creditials structure */
 {
     int ret = 0;
     int err = 0;
@@ -823,13 +826,16 @@ int PVFS_fsck_validate_dirdata(
     {
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle \
-                    list while verifying stranded objects\n", llu(*handle));
+            gossip_err("WARNING: unable to remove handle [%s] from handle "
+                       "list while verifying stranded objects\n",
+                       PVFS_OID_str(handle));
         }
     }
 
-    err = PVFS_fsck_get_attributes
-        (fsck_options, &obj_ref, cred, &dirdata_attributes);
+    err = PVFS_fsck_get_attributes(fsck_options,
+                                   &obj_ref,
+                                   cred,
+                                   &dirdata_attributes);
     if(err < 0)
     {
         gossip_err("Error: failed to get attributes for dirdata object\n");
@@ -884,9 +890,9 @@ int PVFS_fsck_validate_dirdata_attr(
  */
 int PVFS_fsck_validate_dir(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
-    const PVFS_object_ref * obj_ref,         /**< DIRECTORY object reference */
-    const PVFS_sysresp_getattr * attributes, /**< DIRECTORY attributes */
-    const PVFS_credential * cred,          /**< populated creditials structure */
+    const PVFS_object_ref *obj_ref,         /**< DIRECTORY object reference */
+    const PVFS_sysresp_getattr *attributes, /**< DIRECTORY attributes */
+    const PVFS_credential *cred,          /**< populated creditials structure */
     PVFS_dirent * directory_entries)         /**< \return readdir response */
 {
     int ret = 0;
@@ -902,8 +908,9 @@ int PVFS_fsck_validate_dir(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from \
-                    handle list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from "
+                       "handle list while verifying stranded objects\n",
+                       PVFS_OID_str(&obj_ref->handle));
         }
     }
 
@@ -1091,23 +1098,33 @@ int PVFS_fsck_get_attributes(
     /* if the gossip fsck debug mask is enabled, then print detailed
      * information about the attributes
      */
-    gossip_debug(GOSSIP_FSCK_DEBUG, "\tFSID        : %d\n", (int) pref->fs_id);
-    gossip_debug(GOSSIP_FSCK_DEBUG, "\tHandle      : %llu\n", llu(pref->handle));
+    gossip_debug(GOSSIP_FSCK_DEBUG,
+                 "\tFSID        : %d\n",
+                 (int) pref->fs_id);
+    gossip_debug(GOSSIP_FSCK_DEBUG,
+                 "\tHandle      : %s\n",
+                 PVFS_OID_str(&pref->handle));
 
     if (getattr_resp->attr.mask & PVFS_ATTR_SYS_COMMON_ALL)
     {
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tuid         : %d\n", getattr_resp->attr.owner);
+                     "\tuid         : %d\n",
+                     getattr_resp->attr.owner);
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tgid         : %d\n", getattr_resp->attr.group);
+                     "\tgid         : %d\n",
+                     getattr_resp->attr.group);
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tperms       : %o\n", getattr_resp->attr.perms);
+                     "\tperms       : %o\n",
+                     getattr_resp->attr.perms);
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tatime       : %s", ctime(&r_atime));
+                     "\tatime       : %s",
+                     ctime(&r_atime));
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tmtime       : %s", ctime(&r_mtime));
+                     "\tmtime       : %s",
+                     ctime(&r_mtime));
         gossip_debug(GOSSIP_FSCK_DEBUG, 
-            "\tctime       : %s", ctime(&r_ctime));
+                     "\tctime       : %s",
+                     ctime(&r_ctime));
 
     }
 
@@ -1538,8 +1555,8 @@ load_handles_success:
  * \retval -PVFS_error on failure
  */
 static int PINT_handle_wrangler_remove_handle(
-    const PVFS_handle * handle,     /**< handle to remove */
-    const PVFS_fs_id * cur_fs)      /**< fs_id */
+    const PVFS_handle *handle,     /**< handle to remove */
+    const PVFS_fs_id *cur_fs)      /**< fs_id */
 {
     int ret = 0;
     int i = 0;
@@ -1552,8 +1569,8 @@ static int PINT_handle_wrangler_remove_handle(
     if(ret < 0)
     {
         PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);
-        gossip_err("Error: could not resolve handle [%llu] to server\n", 
-            llu(*handle));
+        gossip_err("Error: could not resolve handle [%s] to server\n", 
+                   PVFS_OID_str(handle));
         return(ret);
     }
 
@@ -1568,8 +1585,8 @@ static int PINT_handle_wrangler_remove_handle(
     }
     if(!found)
     {
-        gossip_err("Error: could not find matching server for handle [%llu]\n",
-            llu(*handle));
+        gossip_err("Error: could not find matching server for handle [%s]\n",
+                   PVFS_OID_str(handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1577,7 +1594,8 @@ static int PINT_handle_wrangler_remove_handle(
     found = 0;
     for (j = 0; j < PINT_handle_wrangler_handlelist.used_array[i]; j++)
     {
-        if (PINT_handle_wrangler_handlelist.list_array[i][j] == *handle)
+        if (!PVFS_OID_cmp(&PINT_handle_wrangler_handlelist.list_array[i][j],
+                          handle))
         {
             PINT_handle_wrangler_handlelist.list_array_seen[i][j] = 'x';
             PINT_handle_wrangler_handlelist.stranded_array[i]--;
@@ -1587,8 +1605,8 @@ static int PINT_handle_wrangler_remove_handle(
     }
     if(!found)
     {
-        gossip_err("Error: could not find handle [%llu]\n",
-            llu(*handle));
+        gossip_err("Error: could not find handle [%s]\n",
+                   PVFS_OID_str(handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1688,8 +1706,8 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 ret = PVFS_fsck_get_attributes(fsck_options, &pref, cred,
                                          &attributes);
                 
-                printf(" %llu   %d  ",
-                       llu(PINT_handle_wrangler_handlelist.list_array[i][j]),
+                printf(" %s   %d  ",
+                       PVFS_OID_str(&PINT_handle_wrangler_handlelist.list_array[i][j]),
                        *cur_fs);
 
                 if(ret < 0)
@@ -1751,25 +1769,10 @@ static int PINT_handle_wrangler_display_stranded_handles(
  * \retval <0 if handle1 less than handle2
  * \retval >0 if handle1 greater than handle2
  */
-static int compare_handles(
-    const void *handle1,    /**< handle 1*/
-    const void *handle2)    /**< handle 2*/
+static int compare_handles(const void *handle1,    /**< handle 1*/
+                           const void *handle2)    /**< handle 2*/
 {
-    PVFS_size temp_handle =
-        *((PVFS_handle *) handle1) - *((PVFS_handle *) handle2);
-
-    if (temp_handle > 0)
-    {
-        return 1;
-    }
-    else if (temp_handle < 0)
-    {
-        return -1;
-    }
-    else
-    {
-        return 0;
-    }
+    return PVFS_OID_cmp(handle1, handle1);
 }
 
 /**

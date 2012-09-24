@@ -194,7 +194,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
     }
 
-    if (s_op->target_handle != PVFS_HANDLE_NULL && 
+    if (PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL) && 
         !PINT_capability_is_null(cap))
     {
         int index = 0, op_i;
@@ -213,7 +213,8 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             /* ensure we have a capability for the target handle */
             for (index = 0; index < cap->num_handles; index++)
             {
-                if (cap->handle_array[index] == s_op->target_handle)
+                if (!PVFS_OID_cmp(&cap->handle_array[index],
+                                  &s_op->target_handle))
                 {
                     break;
                 }
@@ -228,13 +229,14 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             if (parent_handle == NULL)
             {
                 gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Could not retrieve "
-                             "parent handle for %llu from hint\n", 
-                             llu(s_op->target_handle));
+                             "parent handle for %s from hint\n", 
+                             PVFS_OID_str(&s_op->target_handle));
                 return -PVFS_EACCES;
             }
             for (index = 0; index < cap->num_handles; index++)
             {
-                if (cap->handle_array[index] == *parent_handle)                    
+                if (!PVFS_OID_cmp(&cap->handle_array[index],
+                                  parent_handle))
                 {
                     break;
                 }
@@ -242,10 +244,10 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
         if (index == cap->num_handles)
         {
-            
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
-                         "an operation on target handle %llu that was "
-                         "not in the capability\n", llu(s_op->target_handle));
+                         "an operation on target handle %s that was "
+                         "not in the capability\n",
+                         PVFS_OID_str(&s_op->target_handle));
             return -PVFS_EACCES;
         }
     }

@@ -140,8 +140,9 @@ static PINT_sm_action listattr_setup_getattr(
         if(s_op->u.listattr.errors[i])
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: dspace_getattr_list failed to get attrs for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                    "listattr: dspace_getattr_list failed "
+                    "to get attrs for handle: %s\n", 
+                    PVFS_OID_str(&s_op->req->u.listattr.handles[i]));
             /* skip nested machine for this handle */
             continue;
         }
@@ -151,8 +152,8 @@ static PINT_sm_action listattr_setup_getattr(
         {
             s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                    "listattr: failed to setup nested sm for handle: %s\n", 
+                    PVFS_OID_str(&s_op->req->u.listattr.handles[i]));
             continue;
         }
         memset(getattr_op, 0, sizeof(*getattr_op));
@@ -163,7 +164,7 @@ static PINT_sm_action listattr_setup_getattr(
 
         /* need attrs that the prelude would have read normally */
         PVFS_ds_attr_to_object_attr(&s_op->u.listattr.ds_attr_a[i],
-            &getattr_op->attr);
+                                    &getattr_op->attr);
         getattr_op->attr.mask = PVFS_ATTR_COMMON_ALL;
         getattr_op->ds_attr = s_op->u.listattr.ds_attr_a[i];
         /* need a valid request structure for some generic features like access
@@ -180,8 +181,8 @@ static PINT_sm_action listattr_setup_getattr(
         {
             s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                "listattr: failed to setup nested sm for handle: %s\n", 
+                PVFS_OID_str(&s_op->req->u.listattr.handles[i]));
             continue;
         }
 
@@ -238,7 +239,8 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
         /* match it up with the correct array entry */
         for(j=0; j<s_op->req->u.listattr.nhandles; j++)
         {
-            if(s_op->req->u.listattr.handles[j] == getattr_op->u.getattr.handle)
+            if(!PVFS_OID_cmp(&s_op->req->u.listattr.handles[j],
+                             &getattr_op->u.getattr.handle))
             {
                 s_op->u.listattr.attr_a[j] = getattr_op->resp.u.getattr.attr;
                 s_op->u.listattr.errors[j] = tmp_err;

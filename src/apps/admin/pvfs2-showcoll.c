@@ -174,12 +174,12 @@ int main(int argc, char **argv)
     else {
 	fprintf(stdout,
 		"Storage space %s and %s, collection %s (coll_id = %d, "
-                "root_handle = 0x%08llx):\n",
+                "root_handle = %s):\n",
 		data_path,
 		meta_path,
 		collection,
 		coll_id,
-		llu(root_handle));
+		PVFS_OID_str(&root_handle));
     }
 
     if (got_dspace_handle)
@@ -220,7 +220,7 @@ static int parse_args(int argc, char **argv)
 	    case 'd':
 		/* TODO: USE BIGGER VALUE */
 		got_dspace_handle = 1;
-		dspace_handle = strtol(optarg, NULL, 16);
+                PVFS_OID_str2bin(optarg, &dspace_handle);
                 break;
 	    case 'v':
 		verbose = 1;
@@ -302,23 +302,32 @@ static int print_dspace(TROVE_coll_id coll_id,
 			       NULL /* user ptr */,
                                trove_context,
 			       &op_id, NULL);
-    while (ret == 0) {
+    while (ret == 0)
+    {
 	ret = trove_dspace_test(
             coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
     }
-    if (ret != 1) return -1;
+    if (ret != 1)
+    {
+        return -1;
+    }
 		
     fprintf(stdout,
-	    "\t0x%08llx/%llu (dspace_getattr output: type = %s, b_size = %lld)\n",
-	    llu(handle),llu(handle),
+	    "\t%s (dspace_getattr output: type = %s, b_size = %lld)\n",
+	    PVFS_OID_str(&handle),
 	    type_to_string(ds_attr.type),
-	    (ds_attr.type == PVFS_TYPE_DATAFILE) ? lld(ds_attr.u.datafile.b_size) : 0);
+	    (ds_attr.type == PVFS_TYPE_DATAFILE) ?
+                    lld(ds_attr.u.datafile.b_size) : 0);
 
-    if (print_keyvals) {
+    if (print_keyvals)
+    {
 	ret = print_dspace_keyvals(coll_id, handle,
                                    trove_context, ds_attr.type);
-	if (ret != 0) return -1;
+	if (ret != 0)
+        {
+            return -1;
+        }
     }
 
     return 0;
@@ -381,7 +390,7 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
            free(key.buffer);
         if (val.buffer)
            free(val.buffer);
-        printf("%s: Unable to allocate memory.\n",__func__);
+        printf("%s: Unable to allocate memory.\n", __func__);
         return -1;
     }
 
@@ -389,11 +398,13 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
     pos = TROVE_ITERATE_START;
     count = 1;
 
-    while (count > 0) {
+    while (count > 0)
+    {
 	int opcount;
-        printf("%s:calling trove_keyval_iterate for %llu.\n"
+        printf("%s:calling trove_keyval_iterate for %s.\n"
               ,__func__
-              ,llu(handle));
+              ,PVFS_OID_str(&handle));
+
 	ret = trove_keyval_iterate(coll_id,
 				   handle,
 				   &pos,
@@ -406,14 +417,28 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
                                    trove_context,
 				   &op_id, NULL);
 
-	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
-            TROVE_DEFAULT_TEST_TIMEOUT);
-	if (ret != 1) return -1;
+	while (ret == 0)
+        {
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &opcount,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+	if (ret != 1)
+        {
+            return -1;
+        }
 
-        printf("%s: count=%d\n",__func__,count);
+        printf("%s: count=%d\n", __func__, count);
 
-	if (count > 0) print_keyval_pair(&key, &val, type, 65536);
+	if (count > 0)
+        {
+            print_keyval_pair(&key, &val, type, 65536);
+        }
 
         /* re-initialize key val */
         memset(key.buffer,0,256);
@@ -440,15 +465,23 @@ static void print_object_attributes(struct PVFS_object_attr *a_p)
 	    type_to_string(a_p->objtype));
 }
 
-static void print_datafile_handles(PVFS_handle *h_p,
-				   int count)
+static void print_datafile_handles(PVFS_handle *h_p, int count)
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t0x%08llx(%llu)", llu(h_p[i]), llu(h_p[i]));
+    for (i = 0; i < count && i < 10; i++)
+    {
+        fprintf(stdout, "\n\t\t\t\t%s", PVFS_OID_str(&h_p[i]));
+    }
 
-    if (i == 10) fprintf(stdout, "...\n");
-    else fprintf(stdout, "\n");
+    if (i == 10)
+    {
+        fprintf(stdout, "...\n");
+    }
+    else
+    {
+        fprintf(stdout, "\n");
+    }
 }
 
 static int print_keyval_pair(TROVE_keyval_s *key_p,
@@ -471,7 +504,9 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
         memset(&((char *)key_p->buffer)[64],0,1);
     }
 
-    if (!strncmp(key_p->buffer, "metadata", 9) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
+    if (!strncmp(key_p->buffer, "metadata", 9) &&
+        val_p->read_sz == sizeof(struct PVFS_object_attr))
+    {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as PVFS_object_attr = ",
 		(char *) key_p->buffer,
@@ -480,35 +515,40 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		val_p->read_sz);
 	print_object_attributes((struct PVFS_object_attr *) val_p->buffer);
     }
-    else if (!strncmp(key_p->buffer, "dh", 17) && val_p->read_sz % sizeof(PVFS_handle) == 0) {
+    else if (!strncmp(key_p->buffer, "dh", 17) &&
+             val_p->read_sz % sizeof(PVFS_handle) == 0)
+    {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as handles = ",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		val_printable ? (char *) val_p->buffer : "",
 		val_p->read_sz);
-	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
+	print_datafile_handles((PVFS_handle *) val_p->buffer,
+                              val_p->read_sz / sizeof(PVFS_handle));
     }
-    else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3)) {
+    else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3))
+    {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx(%llu)\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = %s\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		val_printable ? (char *) val_p->buffer : "",
-		val_p->read_sz,
-		llu(*(TROVE_handle *) val_p->buffer),
-                llu(*(TROVE_handle *) val_p->buffer));
+		                val_p->read_sz,
+                PVFS_OID_str((TROVE_handle *) val_p->buffer));
     }
-    else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
+    else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8)
+    {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = %s\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		llu(*(TROVE_handle *) val_p->buffer));
+		PVFS_OID_str((TROVE_handle *) val_p->buffer));
     }
-    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.meta_hint",20))
+    else if (key_printable && !strncmp((char *)key_p->buffer,
+                                       "user.pvfs2.meta_hint",20))
     {
         fprintf(stdout,
                 "\t\t'%s' (%d): 0x%08llX (%d)\n"
@@ -517,7 +557,8 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
                 ,*(unsigned long long *)val_p->buffer
                 ,(int)sizeof(unsigned long));
     }
-    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.mode",22))
+    else if (key_printable && !strncmp((char *)key_p->buffer,
+                                       "user.pvfs2.mirror.mode",22))
     {
         fprintf(stdout,
                 "\t\t'%s' (%d): %d (%d)\n"
@@ -526,7 +567,8 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
                 ,*(unsigned int *)val_p->buffer
                 ,(int)sizeof(unsigned int));
     }
-    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.copies",24))
+    else if (key_printable && !strncmp((char *)key_p->buffer,
+                                       "user.pvfs2.mirror.copies",24))
     {
         fprintf(stdout,
                 "\t\t'%s' (%d): %d (%d)\n"
@@ -535,16 +577,19 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
                 ,*(unsigned int *)val_p->buffer
                 ,(int)sizeof(unsigned int));
     }
-    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.handles",25))
+    else if (key_printable && !strncmp((char *)key_p->buffer,
+                                       "user.pvfs2.mirror.handles",25))
     {
         fprintf(stdout,
                 "\t\t'%s' (%d): '' (%d) as handles:"
                 ,(char *)key_p->buffer
                 ,(int)strlen((char*)key_p->buffer)
                 ,(int)val_p->read_sz);
-	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
+	print_datafile_handles((PVFS_handle *) val_p->buffer,
+                               val_p->read_sz / sizeof(PVFS_handle));
     }
-    else if (key_printable && val_printable) {
+    else if (key_printable && val_printable)
+    {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d)\n",
 		(char *) key_p->buffer,
@@ -552,14 +597,16 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		(char *) val_p->buffer,
 		val_p->read_sz);
     }
-    else if (key_printable && !val_printable) {
+    else if (key_printable && !val_printable)
+    {
 	fprintf(stdout,
 		"\t\t'%s' (%d): <data> (%d)\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		val_p->read_sz);
     }
-    else {
+    else
+    {
 	fprintf(stdout,
 		"\t\t<data> (%d): <data> (%d)\n",
 		key_p->read_sz,

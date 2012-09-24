@@ -226,13 +226,21 @@ int PINT_parse_handle_ranges(
        *endptr  (and  returns 0).  In particular, if *nptr is not
        `\0' but **endptr is `\0' on return, the entire string  is
        valid.  */ 
-    out_extent->first = out_extent->last =
+
+/* THis is modified for the UUID handles - we will not be parsing
+ * handle ranges under this system, so this code should just go
+ * away, but just in case it is here ... for now
+ */
+    PVFS_OID_str2bin(p, &out_extent->last);  /* this does not set endchar */
+    out_extent->first = out_extent->last;
+#if 0
 #if defined(WIN32)
         (PVFS_handle)_strtoui64(p, &endchar, 0);
 #elif defined(HAVE_STRTOULL)
         (PVFS_handle)strtoull(p, &endchar, 0);
 #else
         (PVFS_handle)strtoul(p, &endchar, 0);
+#endif
 #endif
     if ( p == endchar )  /* all done */
 	return 0; 
@@ -244,12 +252,15 @@ int PINT_parse_handle_ranges(
 
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
+    PVFS_OID_str2bin(p, &out_extent->last);  /* this does not set endchar */
+#if 0
 #if defined(WIN32)
         out_extent->last = (PVFS_handle)_strtoui64(p, &endchar, 0);
 #elif defined(HAVE_STRTOULL)
 	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
 #else
 	    out_extent->last = (PVFS_handle)strtoul(p, &endchar, 0);
+#endif
 #endif
 	    /* again, skip trailing space ...*/
 	    while (isspace(*endchar)) endchar++;

@@ -28,10 +28,12 @@
 
 static char *lost_and_found_string = "lost+found";
 
+/* NEXT remove this struct and all references to it */
+
 static TROVE_handle s_used_handles[4] =
 {
-    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL,
-    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL
+    TROVE_HANDLE_NULL_INIT, TROVE_HANDLE_NULL_INIT,
+    TROVE_HANDLE_NULL_INIT, TROVE_HANDLE_NULL_INIT
 };
 
 #define mkspace_print(v, format, f...)              \
@@ -42,6 +44,8 @@ do {                                                \
    fprintf(stderr,format, ##f);                     \
 } while(0)
 
+/* NEXT remove this func and all references to it */
+#if 0
 static int handle_is_excluded(
     TROVE_handle handle, TROVE_handle *handles_to_exclude,
     int num_handles_to_exclude)
@@ -50,7 +54,7 @@ static int handle_is_excluded(
 
     while((num_handles_to_exclude - 1) > -1)
     {
-        if (handle == handles_to_exclude[num_handles_to_exclude-1])
+        if (!PVFS_OID_cmp(&handle, &handles_to_exclude[num_handles_to_exclude-1]))
         {
             excluded = 1;
             break;
@@ -59,6 +63,9 @@ static int handle_is_excluded(
     }
     return excluded;
 }
+#endif
+
+/* NEXT remove this func and all refersnce to it */
 
 static void get_handle_extent_from_ranges(
     char *handle_ranges, TROVE_handle_extent *out_extent,
@@ -92,12 +99,18 @@ static void get_handle_extent_from_ranges(
                   was previously allocated (i.e. in the specified
                   excluded list)
                 */
+/* this range stuff is going away anyway so for now I'm just making
+ * this if true - WBL
+ */
+#if 0
                 if (((tmp_extent->last - tmp_extent->first) > 0) ||
                     ((tmp_extent->last > 0) &&
                      (tmp_extent->last == tmp_extent->first) &&
                      !handle_is_excluded(
                          tmp_extent->last, handles_to_exclude,
                          num_handles_to_exclude)))
+#endif
+if (1)
                 {
                     out_extent->first = tmp_extent->first;
                     out_extent->last = tmp_extent->last;
@@ -139,7 +152,7 @@ int pvfs2_mkspace(
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
-    mkspace_print(verbose,"Root Handle  : %llu\n",llu(root_handle));
+    mkspace_print(verbose,"Root Handle  : %s\n",PVFS_OID_str(&root_handle));
     mkspace_print(verbose,"Meta Handles : %s\n",
                   (meta_handle_ranges && strlen(meta_handle_ranges) ?
                    meta_handle_ranges : "NONE"));
@@ -233,6 +246,8 @@ int pvfs2_mkspace(
         return -1;
     }
 
+/* NEXT handle range stuff to remove */
+
     /* merge the specified ranges to pass to the handle allocator */
     if ((meta_handle_ranges && strlen(meta_handle_ranges)) &&
         (data_handle_ranges && strlen(data_handle_ranges)))
@@ -282,7 +297,7 @@ int pvfs2_mkspace(
       root directory 2) create the dspace for dir entries, 3) set
       attributes on the dspace
     */
-    if (new_root_handle != TROVE_HANDLE_NULL)
+    if (PVFS_OID_cmp(&new_root_handle, &TROVE_HANDLE_NULL))
     {
         cur_extent.first = cur_extent.last = new_root_handle;
         extent_array.extent_count = 1;
@@ -309,7 +324,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created root directory "
-                      "with handle %llu.\n", llu(new_root_handle));
+                      "with handle %s.\n", PVFS_OID_str(&new_root_handle));
         s_used_handles[0] = new_root_handle;
 
         /* set collection attribute for root handle */
@@ -375,8 +390,8 @@ int pvfs2_mkspace(
             get_handle_extent_from_ranges(
                 meta_handle_ranges, &cur_extent, s_used_handles, 1);
 
-            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
-                (cur_extent.last == TROVE_HANDLE_NULL))
+            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
+                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
             {
                 gossip_err("No valid meta handle ranges available! "
                            "Using a default\n");
@@ -384,9 +399,9 @@ int pvfs2_mkspace(
             else
             {
                 mkspace_print(
-                    verbose, "info: using meta handle range %llu-%llu for "
-                    "root dirent dspace\n", llu(cur_extent.first),
-                    llu(cur_extent.last));
+                    verbose, "info: using meta handle range %s-%s for "
+                    "root dirent dspace\n", PVFS_OID_str(&cur_extent.first),
+                    PVFS_OID_str(&cur_extent.last));
             }
         }
 
@@ -412,7 +427,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose, "info: created dspace for dirents "
-                      "with handle %llu\n", llu(root_dirdata_handle));
+                      "with handle %s\n", PVFS_OID_str(&root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
@@ -452,18 +467,19 @@ int pvfs2_mkspace(
             get_handle_extent_from_ranges(
                 meta_handle_ranges, &cur_extent, s_used_handles, 2);
 
-            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
-                (cur_extent.last == TROVE_HANDLE_NULL))
+            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
+                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
             {
                 gossip_err("No valid meta handle ranges available! "
                            "Using a default\n");
             }
             else
             {
-                mkspace_print(
-                    verbose, "info: using meta handle range %llu-%llu for "
-                    "lost+found directory dspace\n", llu(cur_extent.first),
-                    llu(cur_extent.last));
+                mkspace_print(verbose,
+                        "info: using meta handle range %s-%s for "
+                        "lost+found directory dspace\n",
+                        PVFS_OID_str(&cur_extent.first),
+                        PVFS_OID_str(&cur_extent.last));
             }
         }
         extent_array.extent_count = 1;
@@ -489,7 +505,8 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created lost+found directory "
-                      "with handle %llu.\n", llu(lost_and_found_handle));
+                      "with handle %s.\n",
+                      PVFS_OID_str(&lost_and_found_handle));
         s_used_handles[2] = lost_and_found_handle;
 
         /* set lost+found directory dspace attributes */
@@ -526,18 +543,19 @@ int pvfs2_mkspace(
             get_handle_extent_from_ranges(
                 meta_handle_ranges, &cur_extent, s_used_handles, 3);
 
-            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
-                (cur_extent.last == TROVE_HANDLE_NULL))
+            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
+                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
             {
                 gossip_err("No valid meta handle ranges available! "
                            "Using a default\n");
             }
             else
             {
-                mkspace_print(
-                    verbose, "info: using meta handle range %llu-%llu for "
-                    "lost+found dirent dspace\n", llu(cur_extent.first),
-                    llu(cur_extent.last));
+                mkspace_print(verbose,
+                        "info: using meta handle range %s-%s for "
+                        "lost+found dirent dspace\n",
+                        PVFS_OID_str(&cur_extent.first),
+                        PVFS_OID_str(&cur_extent.last));
             }
         }
         extent_array.extent_count = 1;
@@ -561,9 +579,9 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        mkspace_print(
-            verbose, "info: created dspace for dirents "
-            "with handle %llu\n", llu(lost_and_found_dirdata_handle));
+        mkspace_print(verbose,
+                "info: created dspace for dirents with handle %s\n",
+                PVFS_OID_str(&lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
@@ -634,9 +652,11 @@ int pvfs2_mkspace(
     trove_finalize(TROVE_METHOD_DBPF);
 
     mkspace_print(verbose, "collection created:\n"
-                  "\troot handle = %llu, coll id = %d, "
+                  "\troot handle = %s, coll id = %d, "
                   "root string = \"%s\"\n",
-                  llu(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
+                  PVFS_OID_str(&root_handle),
+                  coll_id,
+                  ROOT_HANDLE_KEYSTR);
     return 0;
 }
 

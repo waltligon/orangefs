@@ -116,7 +116,7 @@ PVFS_error PVFS_isys_truncate(
     PINT_client_sm *sm_p = NULL;
 
     if ((ref.fs_id == PVFS_FS_ID_NULL) ||
-        (ref.handle == PVFS_HANDLE_NULL))
+        !PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
         return ret;
@@ -246,9 +246,9 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
                 sm_p->u.truncate.size);
        
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "  %s: client requests %lld: resizing %lld to %lld bytes\n",
+            "  %s: client requests %lld: resizing %s to %lld bytes\n",
             __func__, lld(sm_p->u.truncate.size),
-            llu(attr->u.meta.dfile_array[i]), lld(new_dfile_size));
+            PVFS_OID_str(&attr->u.meta.dfile_array[i]), lld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,

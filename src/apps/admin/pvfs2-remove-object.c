@@ -132,13 +132,11 @@ static options_t *parse_args(int argc, char **argv)
 	    case 'o':
           do_object:
                 tmp_opts->remove_object_only = 1;
-                tmp_opts->object_handle =
-                    (PVFS_handle)strtoull(optarg, NULL,10);
+                PVFS_OID_str2bin(optarg, &tmp_opts->object_handle);
 		break;
 	    case 'p':
           do_parent:
-                tmp_opts->parent_handle =
-                    (PVFS_handle)strtoull(optarg, NULL,10);
+                PVFS_OID_str2bin(optarg, &tmp_opts->object_handle);
 		break;
             case 'd':
           do_dirent:
@@ -175,29 +173,29 @@ int main(int argc, char **argv)
     if (user_opts->remove_object_only)
     {
         ref.handle = user_opts->object_handle;
-        if ((ref.handle == PVFS_HANDLE_NULL) ||
+        if (!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL) ||
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid object reference specified: "
-                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
+                    "%s,%d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
             return ret;
         }
     }
     else
     {
         ref.handle = user_opts->parent_handle;
-        if ((ref.handle == PVFS_HANDLE_NULL) ||
+        if (!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL) ||
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid parent reference specified: "
-                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
+                    "%s,%d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
             return ret;
         }
 
         if (!user_opts->dirent_name)
         {
             fprintf(stderr, "No dirent name specified under parent "
-                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
+                    "%s,%d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
             return ret;
         }
     }
@@ -218,8 +216,10 @@ int main(int argc, char **argv)
 
     if (user_opts->remove_object_only)
     {
-        fprintf(stderr,"Attempting to remove object %llu,%d\n",
-                llu(ref.handle), ref.fs_id);
+        fprintf(stderr,
+                "Attempting to remove object %s,%d\n",
+                PVFS_OID_str(&ref.handle),
+                ref.fs_id);
 
         ret = PVFS_mgmt_remove_object(ref, &credentials, NULL);
         if (ret)
@@ -229,11 +229,17 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr,"Attempting to remove dirent \"%s\" under %llu,%d"
-                "\n", user_opts->dirent_name, llu(ref.handle), ref.fs_id);
+        fprintf(stderr,
+                "Attempting to remove dirent \"%s\" under %s,%d\n",
+                user_opts->dirent_name,
+                PVFS_OID_str(&ref.handle),
+                ref.fs_id);
 
-        ret = PVFS_mgmt_remove_dirent(
-            ref, user_opts->dirent_name, &credentials, NULL);
+        ret = PVFS_mgmt_remove_dirent(ref,
+                                      user_opts->dirent_name,
+                                      &credentials,
+                                      NULL);
+
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_dirent", ret);

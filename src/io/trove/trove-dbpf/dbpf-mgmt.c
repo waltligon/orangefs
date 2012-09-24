@@ -378,8 +378,11 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - Setting collection handle "
                          "ranges to %s\n", 
                          (int) coll_id, (char *)parameter);
+/* NEXT */
+#if 0
             ret = trove_set_handle_ranges(
                 coll_id, context_id, (char *)parameter);
+#endif 
             break;
         case TROVE_COLLECTION_HANDLE_TIMEOUT:
             gossip_debug(GOSSIP_TROVE_DEBUG, 
@@ -388,8 +391,11 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          (int) coll_id, 
                          (long)((((struct timeval *)parameter)->tv_sec * 1e6) +
                                 ((struct timeval *)parameter)->tv_usec));
+/* NEXT */
+#if 0
             ret = trove_set_handle_timeout(
                 coll_id, context_id, (struct timeval *)parameter);
+#endif
             break;
         case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
             gossip_debug(GOSSIP_TROVE_DEBUG, 
@@ -1231,7 +1237,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(path_name, NULL, 0);
+        ret = dbpf_db_create(path_name, NULL, DB_RECNUM);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);

@@ -75,7 +75,7 @@ PVFS_error PVFS_isys_geteattr_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_isys_geteattr entered\n");
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if (!PVFS_OID_cmp(&ref.handle, & PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
     {
         gossip_err("invalid (NULL) required argument\n");

@@ -66,7 +66,7 @@ extern "C" {
 #define DBPF_BSTREAM_MAX_NUM_BUCKETS  64
 
 #define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
-((__handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
+(PVFS_OID_hash32(&(__handle)) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
 #define DBPF_GET_DATA_DIRNAME(__buf, __path_max, __base)                 \
 do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
@@ -121,20 +121,21 @@ do {                                                                     \
     } while(0)
 
 /* arguments are: buf, path_max, base, collid, handle */
-#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __base, __cid, __handle)     \
-do {                                                                      \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                \
-           __base, __cid, BSTREAM_DIRNAME,                                \
-           llu(DBPF_BSTREAM_GET_BUCKET(__handle)), llu(__handle));        \
+#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __base, __cid, __handle) \
+do {                                                                  \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%s.bstream",                \
+           __base, __cid, BSTREAM_DIRNAME,                            \
+           llu(DBPF_BSTREAM_GET_BUCKET(__handle)),                    \
+           PVFS_OID_str(&(__handle)));                                \
 } while (0)
 
 /* arguments are: buf, path_max, base, collid, handle */
 #define DBPF_GET_STRANDED_BSTREAM_FILENAME(                  \
         __b, __pm, __base, __cid, __handle)                  \
     do {                                                     \
-        snprintf(__b, __pm, "/%s/%08x/%s/%08llx.bstream",    \
+        snprintf(__b, __pm, "/%s/%08x/%s/%s.bstream",        \
                  __base, __cid, STRANDED_BSTREAM_DIRNAME,    \
-                 llu(__handle));                             \
+                 PVFS_OID_str(&(__handle)));                 \
     } while(0)
 
 /* arguments are: buf, path_max, base, collid */

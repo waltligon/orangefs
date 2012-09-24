@@ -1,5 +1,5 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2012 Clemson University
  *
  * See COPYING in top-level directory.
  */
@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #ifndef WIN32
 #include <unistd.h>
 #endif
@@ -47,7 +48,9 @@ int yyparse (void);
 extern int yyparse();
 #endif
 
+#ifdef YYDEBUG
 extern int yydebug; /* for debugging the parser */
+#endif
 
 /*
  * Global Variables
@@ -61,6 +64,7 @@ const char *in_file_name;
 
 static const char *progname;
 static char *header_name;
+static char *header_base;
 static char *code_name;
 static char *code2_name;
 
@@ -70,7 +74,9 @@ static void finalize(void);
 int main(int argc, char **argv)
 {
     int retval;
+#ifdef YYDEBUG
     yydebug = 0; /* set to 1 to debug */
+#endif
     parse_args(argc, argv);
     retval = yyparse();
     switch (retval)
@@ -103,7 +109,7 @@ static void usage(void)
 
 static void parse_args(int argc, char **argv)
 {
-    int len;
+    int len, i;
     const char *cp;
 
     for (cp=progname=argv[0]; *cp; cp++)
@@ -140,14 +146,14 @@ static void parse_args(int argc, char **argv)
         code_name = estrdup(in_file_name);
         code_name[len-6] = 'c';
         code_name[len-5] = 0;
-
-        /* construct 2nd output file name from input file name */
-        code2_name = estrdup(in_file_name);
-        code2_name[len-6] = '2';
-        code2_name[len-5] = '.';
-        code2_name[len-4] = 'c';
-        code2_name[len-3] = 0;
     }
+
+    /* construct 2nd output file name from input file name */
+    code2_name = estrdup(in_file_name);
+    code2_name[len-6] = '2';
+    code2_name[len-5] = '.';
+    code2_name[len-4] = 'c';
+    code2_name[len-3] = 0;
 
     /* construct header file name from code file name */
     header_name = estrdup(code_name);
@@ -163,15 +169,19 @@ static void parse_args(int argc, char **argv)
         exit(1);
     }
 
+    header_base = basename(header_name);
+
     /* dump header comment and bp into code file */
     fprintf(code, "/* WARNING: THIS FILE IS AUTOMATICALLY "
             "GENERATED FROM A .POLICY FILE.\n");
     fprintf(code, " * Changes made here will certainly "
             "be overwritten.\n");
     fprintf(code, " */\n\n");
-    fprintf(code, "#include <policyeval.h>\n");
-    fprintf(code, "#include <%s>\n", header_name);
     fprintf(code, "#include <db.h>\n");
+    fprintf(code, "#include <%s>\n", header_base);
+    fprintf(code, "#include <policyeval.h>\n");
+    fprintf(code, "#include <sidcacheval.h>\n");
+    fprintf(code, "#include <%s>\n", basename(code2_name));
     fprintf(code, "\n");
 
     /* open 2nd code file */
@@ -188,9 +198,6 @@ static void parse_args(int argc, char **argv)
     fprintf(code2, " * Changes made here will certainly "
             "be overwritten.\n");
     fprintf(code2, " */\n\n");
-    fprintf(code2, "#include <policyeval.h>\n");
-    fprintf(code2, "#include <%s>\n", header_name);
-    fprintf(code2, "#include <db.h>\n");
     fprintf(code2, "\n");
 
     /* open header file */
@@ -201,14 +208,29 @@ static void parse_args(int argc, char **argv)
         exit(1);
     }
 
+    /* turn header base name to all caps */
+    len = strlen(header_base);
+    for (i = 0; i < len; i++)
+    {
+        if (header_base[i] >= 'a' && header_base[i] <= 'z')
+        {
+            header_base[i] = (header_base[i] - 'a') + 'A';
+        }
+        if (header_base[i] == '.')
+        {
+            header_base[i] = '_';
+        }
+    }
+
     /* dump header comment into header file */
     fprintf(header, "/* WARNING: THIS FILE IS AUTOMATICALLY "
             "GENERATED FROM A .POLICY FILE.\n");
     fprintf(header, " * Changes made here will certainly "
             "be overwritten.\n");
     fprintf(header, " */\n\n");
-    fprintf(header, "#ifndef POLICY_DEF_H\n");
-    fprintf(header, "#define POLICY_DEF_H 1\n");
+    fprintf(header, "#ifndef %s\n", header_base);
+    fprintf(header, "#define %s 1\n", header_base);
+    fprintf(header, "#include <db.h>\n");
     fprintf(header, "\n");
 }
 
@@ -223,11 +245,13 @@ void yyerror(char *s)
 {
     fprintf(stderr, "%s: %s:%d: %s\n", progname, in_file_name,
             line, s);
+#ifdef YYDEBUG
     if (!yydebug)
     {
         unlink(code_name);
         unlink(header_name); 
     }
+#endif
     exit(1);
 }
 

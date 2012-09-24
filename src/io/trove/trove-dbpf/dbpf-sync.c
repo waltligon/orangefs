@@ -128,8 +128,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: sync_coalesce called, "
-                 "handle: %llu, cid: %d\n",
-                 llu(qop_p->op.handle), cid);
+                 "handle: %s, cid: %d\n",
+                 PVFS_OID_str(&qop_p->op.handle), cid);
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
@@ -139,8 +139,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
          */
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: sync not needed, "
-                     "moving to completion queue: %llu\n",
-                     llu(qop_p->op.handle));
+                     "moving to completion queue: %s\n",
+                     PVFS_OID_str(&qop_p->op.handle));
         dbpf_queued_op_complete(qop_p, OP_COMPLETED);
         return 0;
     }
@@ -224,9 +224,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
+                     "[SYNC_COALESCE]: moving op: %p, handle: %s , type: %d "
                      "to completion queue\n",
-                     qop_p, llu(qop_p->op.handle), qop_p->op.type);
+                     qop_p, PVFS_OID_str(&qop_p->op.handle), qop_p->op.type);
 
         if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
         {
@@ -260,9 +260,11 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
             }
 
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                         "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
-                         "to completion queue\n",
-                         ready_op, llu(ready_op->op.handle), ready_op->op.type);
+                      "[SYNC_COALESCE]: moving op: %p, handle: %s , type: %d "
+                      "to completion queue\n",
+                      ready_op,
+                      PVFS_OID_str(&ready_op->op.handle),
+                      ready_op->op.type);
 
             dbpf_op_queue_remove(ready_op);
             DBPF_COMPLETION_ADD(ready_op, OP_COMPLETED);
@@ -278,10 +280,11 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\tcoalescing type: %d "
-                     "coalesce_counter: %d, sync_counter: %d, handle %llu\n", 
-                     sync_context_type, sync_context->coalesce_counter,
+                     "coalesce_counter: %d, sync_counter: %d, handle %s\n", 
+                     sync_context_type,
+                     sync_context->coalesce_counter,
                      sync_context->sync_counter,
-                     llu(qop_p->op.handle));
+                     PVFS_OID_str(&qop_p->op.handle));
 
         dbpf_op_queue_add(
             sync_context->sync_queue, qop_p);

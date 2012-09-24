@@ -390,7 +390,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  File Name     : %s\n",  pszName);
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
-   fprintf(stdout, "  Handle        : %llu\n", llu(ref->handle));
+   fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
    fprintf(stdout, "  Mask          : %o\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {

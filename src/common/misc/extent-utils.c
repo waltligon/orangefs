@@ -69,8 +69,8 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
             (handle < ext->last+1)); 
     */
     /* ext->last may be max, 2^64 - 1 */    
-    return ((handle >= ext->first) &&
-            (handle <= ext->last));
+    return ((PVFS_OID_cmp(&handle, &ext->first) >= 0) &&
+            (PVFS_OID_cmp(&handle, &ext->last) <= 0));
 }
 
 /* PINT_handle_in_extent_array()
@@ -155,8 +155,11 @@ uint64_t PINT_extent_array_count_total(
 
     for(i = 0; i < extent_array->extent_count; ++i)
     {
+/* Can't convert this - anyway meaningless with UUIDs
+ * This should be going away - WBL
         count += (extent_array->extent_array[i].last -
                   extent_array->extent_array[i].first + 1);
+ */
     }
     return count;
 }

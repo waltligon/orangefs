@@ -8,11 +8,11 @@
 #define SIDCACHE_H 1
 
 #include <db.h>
-#include <uuid/uuid.h>
 #include <string.h>
 #include <stdlib.h>
-#include <policy.h>
-#include "sidcacheval.h"
+#include <sidcacheval.h>
+#include <pvfs2-types.h>
+#include <pvfs3-handle.h>
 
 /* these are defines just to temporarily allow compile */
 //typedef int BMI_addr;
@@ -35,10 +35,6 @@ extern DB     *SID_attr_index[SID_NUM_ATTR];
 /* cursor for each secondary DB */
 extern DBC    *SID_attr_cursor[SID_NUM_ATTR];
 
-/* type of a SID */
-typedef uuid_t SID;
-
-
 /* <===================== GLOBAL DATABASE DEFINES =====================> */
 /* Used to set the in cache memory size for DB environment*/
 #define CACHE_SIZE_GB (0)
@@ -56,8 +52,8 @@ typedef uuid_t SID;
 /* Minimum size of bulk retrieve in bytes. Must be page size. */
 #define BULK_MIN_SIZE (KILOBYTE * 8)
 
-/* Size of string representation of UUID */
-#define UUID_STR_LEN (37)
+/* Size of string representation of SID */
+#define SID_STR_LEN (37)
 
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*
@@ -73,33 +69,41 @@ void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
  * 
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name, 
-        int *db_records);
+int SID_load_sid_cache_from_file(DB **dbp,
+                                 FILE *inpfile,
+                                 const char *file_name, 
+                                 int *db_records);
 
 /*
  * This function stores the sid into the sid cache
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cacheval_t, 
-        int *db_records);
+int SID_store_sid_into_sid_cache(DB **dbp,
+                                 PVFS_SID *sid_server,
+                                 SID_cacheval_t *cacheval_t, 
+                                 int *db_records);
 
 /*
- * This function searches for a sid in the sid cache. The sid (uuid_t) value
+ * This function searches for a sid in the sid cache. The sid  value
  * (sid_server parameter) must be initialized before this function is
  * used. The SID_cacheval_t will malloced and set to the values of the attibutes
  * in the database for the sid if it is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_retrieve_sid_from_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t **cacheval_t);
+int SID_retrieve_sid_from_sid_cache(DB **dbp,
+                                    PVFS_SID *sid_server,
+                                    SID_cacheval_t **cacheval_t);
 
 /*
  * This function searches for a sid in the sid cache, retrieves the struct,
  * malloc's the char * passed in, and copies the bmi address of the retrieved
  * struct into that char *.
  */
-int SID_bmi_lookup_from_sid_cache(DB **dbp, SID search_sid, char **bmi_addr);
+int SID_bmi_lookup_from_sid_cache(DB **dbp,
+                                  PVFS_SID *search_sid,
+                                  char **bmi_addr);
 
 /*
  * This function packs up the data for the SID_cacheval_t to store in the
@@ -117,47 +121,57 @@ void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data);
 /*
  * This function updates the sid in the sid cache to all the new values 
  * (attributes, bmi address, and url) that are in the SID_cacheval_t parameter
- * to this function if a sid with a matching uuid_t as the sid_server parameter
+ * to this function if a sid with a matching as the sid_server parameter
  * is found in the sid cache
  *
  * Returns 0 on success, otherwise returns an error 
 */
-int SID_update_sid_in_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *new_attrs);
+int SID_update_sid_in_sid_cache(DB **dbp,
+                                PVFS_SID *sid_server,
+                                SID_cacheval_t *new_attrs);
 
 /*
  * This function updates the attributes for a sid in the database if a sid
- * with a matching uuid (sid_server parameter) is found in the database
+ * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_update_attributes_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t *current_sid_attrs, 
-        int new_attr[]);
+int SID_update_attributes_in_sid(DB **dbp,
+                                 PVFS_SID *sid_server,
+                                 SID_cacheval_t *current_sid_attrs, 
+                                 int new_attr[]);
 
 /*
  * This function updates the bmi address for a sid in the database if a sid
- * with a matching uuid (sid_server parameter) is found in the database
+ * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_update_bmi_address_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t *current_sid_attrs, 
-       BMI_addr new_bmi_addr);
+int SID_update_bmi_address_in_sid(DB **dbp,
+                                  PVFS_SID *sid_server,
+                                  SID_cacheval_t *current_sid_attrs, 
+                                  BMI_addr new_bmi_addr);
 
 /*
  * This function updates the url address for a sid in the database if a sid
- * with a matching uuid (sid_server parameter) is found in the database
+ * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_update_url_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t **current_sid_attrs, 
-        char *new_url);
+int SID_update_url_in_sid(DB **dbp,
+                          PVFS_SID *sid_server,
+                          SID_cacheval_t **current_sid_attrs, 
+                          char *new_url);
 
 /*
  * This function deletes a record from the sid cache if a sid with a matching
- * uuid (sid_server parameter) is found in the database
+ * sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code 
 */
-int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records);
+int SID_delete_sid_from_sid_cache(DB **dbp,
+                                  PVFS_SID *sid_server,
+                                  int *db_records);
 
 /*
  * This function creates a SID_cacheval_t struct with the attributes that are passed to
@@ -166,8 +180,10 @@ int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records);
  *
  * Returns 0 on success, otherwise -1 is returned
 */
-int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t, int sid_attributes[], 
-        BMI_addr sid_bmi, char *sid_url);
+int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t,
+                              int sid_attributes[], 
+                              BMI_addr sid_bmi,
+                              char *sid_url);
 
 /*
  * This function clean up a SID_cacheval_t struct by freeing the dynamically
@@ -181,7 +197,10 @@ void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t);
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_records);
+int SID_dump_sid_cache(DB **dbp,
+                       const char *file_name,
+                       FILE *outpfile,
+                       int db_records);
 
 /*
  * This function retrieves entries from a primary database and stores them into a
@@ -198,8 +217,11 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
  * If the cache is larger than the buffer, the entry that does not fit is saved in
  * bulk_next_key global variable.
 */
-int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrieve_mb, 
-        DB *dbp, DBC **dbcursorp, DBT *output);
+int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb,
+                                     int size_of_retrieve_mb, 
+                                     DB *dbp,
+                                     DBC **dbcursorp,
+                                     DBT *output);
 
 /*
  * This function inserts entries from the input bulk buffer DBT into a database.
@@ -253,8 +275,14 @@ int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_create_open_assoc_sec_dbs(DB_ENV *envp, DB *dbp, DB *secondary_dbs[], 
-        int (* secdbs_callback_functions[])(DB *pri, const DBT *pkey, const DBT *pdata, DBT *skey));
+int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
+                                  DB *dbp,
+                                  DB *secondary_dbs[], 
+                                  int (* secdbs_callback_functions[])(
+                                                     DB *pri,
+                                                     const DBT *pkey,
+                                                     const DBT *pdata,
+                                                     DBT *skey));
 
 /*
  * This function creates and opens the database cursors set to the secondary

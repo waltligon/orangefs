@@ -111,7 +111,7 @@ PVFS_error PVFS_isys_readdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if (!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL) ||
         (ref.fs_id == PVFS_FS_ID_NULL) ||
         (resp == NULL))
     {
@@ -154,7 +154,7 @@ PVFS_error PVFS_isys_readdir(
     sm_p->readdir.dirent_limit = sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
-                 "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
+                 "%s on fs %d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -209,12 +209,11 @@ static PINT_sm_action readdir_init(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY,
-        PVFS_TYPE_DIRECTORY,
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_DIRECTORY,
+                               0);
     
     assert(js_p->error_code == 0);
 
@@ -239,33 +238,32 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
-    gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %llu | limit is %d\n",
-        llu(sm_p->object_ref.handle),
-        sm_p->object_ref.fs_id,
-        llu(sm_p->readdir.pos_token),
-        sm_p->readdir.dirent_limit);
+    gossip_debug(GOSSIP_READDIR_DEBUG,
+                 "%s|%d | token is %llu | limit is %d\n",
+                 PVFS_OID_str(&sm_p->object_ref.handle),
+                 sm_p->object_ref.fs_id,
+                 llu(sm_p->readdir.pos_token),
+                 sm_p->readdir.dirent_limit);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_READDIR_FILL(
-        msg_p->req,
-        sm_p->getattr.attr.capability,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        sm_p->u.readdir.pos_token,
-        sm_p->u.readdir.dirent_limit,
-        sm_p->hints);
+    PINT_SERVREQ_READDIR_FILL(msg_p->req,
+                               sm_p->getattr.attr.capability,
+                               sm_p->object_ref.fs_id,
+                               sm_p->object_ref.handle,
+                               sm_p->u.readdir.pos_token,
+                               sm_p->u.readdir.dirent_limit,
+                               sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                           sm_p->object_ref.handle,
+                                           sm_p->object_ref.fs_id);
 
     if (ret)
     {

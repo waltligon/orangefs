@@ -76,27 +76,27 @@ struct acache_payload
     uint64_t msecs_dynamic;  /**< Time when the dynamic attrs were refreshed. */
 };
  
-static struct PINT_tcache* acache = NULL;
+static struct PINT_tcache *acache = NULL;
 static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
   
-static int acache_compare_key_entry(void* key, struct qhash_head* link);
-static int acache_free_payload(void* payload);
+static int acache_compare_key_entry(void *key, struct qhash_head *link);
+static int acache_free_payload(void *payload);
 
-static int acache_hash_key(void* key, int table_size);
-static struct PINT_perf_counter* acache_pc = NULL;
+static int acache_hash_key(void *key, int table_size);
+static struct PINT_perf_counter *acache_pc = NULL;
 
-static int set_tcache_defaults(struct PINT_tcache* instance);
+static int set_tcache_defaults(struct PINT_tcache *instance);
 
-static void load_payload(struct PINT_tcache* instance, 
-    PVFS_object_ref refn,
-    void* payload,
-    struct PINT_perf_counter* pc);
+static void load_payload(struct PINT_tcache *instance, 
+        PVFS_object_ref refn,
+        void *payload,
+        struct PINT_perf_counter* pc);
 
 /**
  * Enables perf counter instrumentation of the acache
  */
 void PINT_acache_enable_perf_counter(
-    struct PINT_perf_counter* pc_in) /**< counter for cache fields */
+        struct PINT_perf_counter *pc_in) /**< counter for cache fields */
 {
     gen_mutex_lock(&acache_mutex);
 
@@ -104,12 +104,18 @@ void PINT_acache_enable_perf_counter(
     assert(acache_pc);
 
     /* set initial values */
-    PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-        acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-        acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-        acache->enable, PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_SOFT_LIMIT,
+                    acache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_HARD_LIMIT,
+                    acache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_ENABLED,
+                    acache->enable,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -136,7 +142,8 @@ int PINT_acache_initialize(void)
         return(-PVFS_ENOMEM);
     }
  
-    ret = PINT_tcache_set_info(acache, TCACHE_TIMEOUT_MSECS,
+    ret = PINT_tcache_set_info(acache,
+                               TCACHE_TIMEOUT_MSECS,
                                STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS);
     if(ret < 0)
     {
@@ -225,28 +232,44 @@ int PINT_acache_set_info(
         ret = PINT_tcache_set_info(acache, option, arg);
 
         /* record any parameter changes that may have resulted*/
-        PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-            acache->soft_limit, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-            acache->hard_limit, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-            acache->enable, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-            acache->num_entries, PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_SOFT_LIMIT,
+                        acache->soft_limit,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_HARD_LIMIT,
+                        acache->hard_limit,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_ENABLED,
+                        acache->enable,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_NUM_ENTRIES,
+                        acache->num_entries,
+                        PINT_PERF_SET);
     }
     else
     {
         ret = PINT_tcache_set_info(acache, option, arg);
 
         /* record any parameter changes that may have resulted*/
-        PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-            acache->soft_limit, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-            acache->hard_limit, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-            acache->enable, PINT_PERF_SET);
-        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-            acache->num_entries, PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_SOFT_LIMIT,
+                        acache->soft_limit,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_HARD_LIMIT,
+                        acache->hard_limit,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_ENABLED,
+                        acache->enable,
+                        PINT_PERF_SET);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_NUM_ENTRIES,
+                        acache->num_entries,
+                        PINT_PERF_SET);
     }
 
     gen_mutex_unlock(&acache_mutex);
@@ -263,14 +286,14 @@ int PINT_acache_set_info(
  */
 int PINT_acache_get_cached_entry(
     PVFS_object_ref refn,  /**< PVFS2 object to look up */
-    PVFS_object_attr* attr,/**< attributes of the object */
-    int* attr_status,      /**< indicates if the attributes are expired or not */
-    PVFS_size* size,       /**< logical size of the object (only valid for files) */
-    int* size_status)      /**< indicates if the size has expired or not */
+    PVFS_object_attr *attr,/**< attributes of the object */
+    int *attr_status,  /**< indicates if the attributes are expired or not */
+    PVFS_size *size,   /**< logical size of the object (only valid for files) */
+    int *size_status)  /**< indicates if the size has expired or not */
 {
     int ret = -1;
-    struct PINT_tcache_entry* tmp_entry;
-    struct acache_payload* tmp_payload;
+    struct PINT_tcache_entry *tmp_entry;
+    struct acache_payload *tmp_payload;
     int status;
     /* Storage of current time */
     struct timeval current_time = { 0, 0};
@@ -279,8 +302,9 @@ int PINT_acache_get_cached_entry(
     /* unsigned char capabilities_expired = 0; */
     unsigned char dynamic_attrs_expired = 0;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: get_cached_entry(): H=%s\n",
+                 PVFS_OID_str(&refn.handle));
   
     /* assume everything is timed out for starters */
     *attr_status = -PVFS_ETIME;
@@ -294,8 +318,9 @@ int PINT_acache_get_cached_entry(
     if(ret < 0 || status != 0)
     {
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss: H=%llu\n",
-                     llu(refn.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "acache: miss: H=%s\n",
+                     PVFS_OID_str(&refn.handle));
         tmp_payload = NULL;
     }
     else
@@ -388,25 +413,30 @@ int PINT_acache_get_cached_entry(
         if(tmp_payload->mask & PVFS_ATTR_META_DFILES)
         {
             if(attr->u.meta.dfile_array)
+            {
                 free(attr->u.meta.dfile_array);
+            }
             attr->u.meta.dfile_array = 
-                malloc(tmp_payload->dfile_count*sizeof(PVFS_handle));
+                    malloc(tmp_payload->dfile_count * sizeof(PVFS_handle));
             if(!attr->u.meta.dfile_array)
             {
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
             }
-            memcpy(attr->u.meta.dfile_array, tmp_payload->dfile_array,
-                tmp_payload->dfile_count*sizeof(PVFS_handle));
+            memcpy(attr->u.meta.dfile_array,
+                   tmp_payload->dfile_array,
+                   tmp_payload->dfile_count * sizeof(PVFS_handle));
             attr->u.meta.dfile_count = tmp_payload->dfile_count;
         }
         
         if(tmp_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             if(attr->u.meta.mirror_dfile_array)
+            {
                 free(attr->u.meta.mirror_dfile_array);
+            }
             attr->u.meta.mirror_dfile_array = 
-                malloc(tmp_payload->dfile_count*sizeof(PVFS_handle)*
+                malloc(tmp_payload->dfile_count * sizeof(PVFS_handle) *
                        tmp_payload->mirror_copies_count);
 		
             if(!attr->u.meta.mirror_dfile_array)
@@ -417,7 +447,7 @@ int PINT_acache_get_cached_entry(
             
             memcpy(attr->u.meta.mirror_dfile_array
                   ,tmp_payload->mirror_dfile_array
-                  ,tmp_payload->dfile_count*sizeof(PVFS_handle)*
+                  ,tmp_payload->dfile_count * sizeof(PVFS_handle) *
                    tmp_payload->mirror_copies_count);
             attr->u.meta.mirror_copies_count = 
                      tmp_payload->mirror_copies_count;
@@ -431,7 +461,9 @@ int PINT_acache_get_cached_entry(
             if(!attr->u.meta.dist)
             {
                 if(attr->u.meta.dfile_array)
+                {
                     free(attr->u.meta.dfile_array);
+                }
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
             }
@@ -443,9 +475,10 @@ int PINT_acache_get_cached_entry(
     gen_mutex_unlock(&acache_mutex);
   
     gossip_debug(GOSSIP_ACACHE_DEBUG, 
-                 "acache: hit: H=%llu, "
-                 "size_status=%d, attr_status=%d\n",
-                 llu(refn.handle), *size_status, *attr_status);
+                 "acache: hit: H=%s, size_status=%d, attr_status=%d\n",
+                 PVFS_OID_str(&refn.handle),
+                 *size_status,
+                 *attr_status);
   
     if(*size_status == 0 || *attr_status == 0) /* TODO what about the static attrs? */
     {
@@ -459,15 +492,15 @@ int PINT_acache_get_cached_entry(
 /**
  * Invalidates a cache entry (if present)
  */
-void PINT_acache_invalidate(
-    PVFS_object_ref refn)
+void PINT_acache_invalidate(PVFS_object_ref refn)
 {
     int ret = -1;
-    struct PINT_tcache_entry* tmp_entry;
+    struct PINT_tcache_entry *tmp_entry;
     int tmp_status;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: invalidate(): H=%s\n",
+                 PVFS_OID_str(&refn.handle));
   
     gen_mutex_lock(&acache_mutex);
   
@@ -479,13 +512,17 @@ void PINT_acache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(acache, tmp_entry);
-        PINT_perf_count(acache_pc, PERF_ACACHE_DELETIONS, 1,
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
     }
   
     /* set the new current number of entries */
-    PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-                    acache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    acache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -495,16 +532,16 @@ void PINT_acache_invalidate(
 /**
  * Invalidates only the logical size assocated with an entry (if present)
  */
-void PINT_acache_invalidate_size(
-    PVFS_object_ref refn)
+void PINT_acache_invalidate_size(PVFS_object_ref refn)
 {
     int ret = -1;
-    struct PINT_tcache_entry* tmp_entry;
-    struct acache_payload* tmp_payload;
+    struct PINT_tcache_entry *tmp_entry;
+    struct acache_payload *tmp_payload;
     int tmp_status;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate_size(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: invalidate_size(): H=%s\n",
+                 PVFS_OID_str(&refn.handle));
   
     gen_mutex_lock(&acache_mutex);
 
@@ -520,8 +557,10 @@ void PINT_acache_invalidate_size(
         tmp_payload->size_status = -PVFS_ETIME;
     }
   
-    PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-                    acache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    acache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -541,14 +580,15 @@ void PINT_acache_invalidate_size(
 int PINT_acache_update(
     PVFS_object_ref refn,   /**< object to update */
     PVFS_object_attr *attr, /**< attributes to copy into cache */
-    PVFS_size* size)        /**< logical file size (NULL if not available) */
+    PVFS_size *size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
     uint32_t old_mask;
     int ret = -1;
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: update(): H=%s\n",
+                 PVFS_OID_str(&refn.handle));
   
     if(!attr && !size)
     {
@@ -559,7 +599,7 @@ int PINT_acache_update(
     if(attr && (attr->mask & PVFS_STATIC_ATTR_MASK))
     {
         tmp_payload = 
-            (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
+                (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
         if(!tmp_payload)
         {
             ret = -PVFS_ENOMEM;
@@ -575,14 +615,15 @@ int PINT_acache_update(
         if(attr->mask & PVFS_ATTR_META_DFILES)
         {
             tmp_payload->dfile_array = 
-                malloc(attr->u.meta.dfile_count*sizeof(PVFS_handle));
+                    malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle));
             if(!tmp_payload->dfile_array)
             {
                 ret = -PVFS_ENOMEM;
                 goto err;
             }
-            memcpy(tmp_payload->dfile_array, attr->u.meta.dfile_array,
-                attr->u.meta.dfile_count*sizeof(PVFS_handle));
+            memcpy(tmp_payload->dfile_array,
+                   attr->u.meta.dfile_array,
+                   attr->u.meta.dfile_count * sizeof(PVFS_handle));
             tmp_payload->dfile_count = attr->u.meta.dfile_count;
         }
         if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
@@ -702,9 +743,9 @@ err:
  *
  * returns 1 on match, 0 otherwise
  */
-static int acache_compare_key_entry(void* key, struct qhash_head* link)
+static int acache_compare_key_entry(void *key, struct qhash_head *link)
 {
-    PVFS_object_ref* real_key = (PVFS_object_ref*)key;
+    PVFS_object_ref *real_key = (PVFS_object_ref*)key;
     struct acache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
@@ -712,7 +753,7 @@ static int acache_compare_key_entry(void* key, struct qhash_head* link)
     assert(tmp_entry);
   
     tmp_payload = (struct acache_payload*)tmp_entry->payload;
-    if(real_key->handle == tmp_payload->refn.handle &&
+    if(!PVFS_OID_cmp(&real_key->handle, &tmp_payload->refn.handle) &&
        real_key->fs_id == tmp_payload->refn.fs_id)
     {
         return(1);
@@ -727,12 +768,12 @@ static int acache_compare_key_entry(void* key, struct qhash_head* link)
  *
  * returns hash index 
  */
-static int acache_hash_key(void* key, int table_size)
+static int acache_hash_key(void *key, int table_size)
 {
-    PVFS_object_ref* real_key = (PVFS_object_ref*)key;
+    PVFS_object_ref *real_key = (PVFS_object_ref *)key;
     int tmp_ret = 0;
 
-    tmp_ret = (real_key->handle)%table_size;
+    tmp_ret = (PVFS_OID_hash64(&real_key->handle)) % table_size;
     return(tmp_ret);
 }
   
@@ -742,12 +783,14 @@ static int acache_hash_key(void* key, int table_size)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int acache_free_payload(void* payload)
+static int acache_free_payload(void *payload)
 {
-    struct acache_payload* tmp_payload = (struct acache_payload*)payload;
+    struct acache_payload *tmp_payload = (struct acache_payload *)payload;
   
     if(&tmp_payload->attr)
-      PINT_free_object_attr(&tmp_payload->attr);
+    {
+        PINT_free_object_attr(&tmp_payload->attr);
+    }
     
     if(tmp_payload->dfile_array)
     {
@@ -767,23 +810,26 @@ static int acache_free_payload(void* payload)
 
 }
 
-static int set_tcache_defaults(struct PINT_tcache* instance)
+static int set_tcache_defaults(struct PINT_tcache *instance)
 {
     int ret;
 
-    ret = PINT_tcache_set_info(instance, TCACHE_HARD_LIMIT, 
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_HARD_LIMIT, 
                                ACACHE_DEFAULT_HARD_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_SOFT_LIMIT, 
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_SOFT_LIMIT, 
                                ACACHE_DEFAULT_SOFT_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_RECLAIM_PERCENTAGE,
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_RECLAIM_PERCENTAGE,
                                ACACHE_DEFAULT_RECLAIM_PERCENTAGE);
     if(ret < 0)
     {
@@ -793,14 +839,14 @@ static int set_tcache_defaults(struct PINT_tcache* instance)
     return(0);
 }
 
-static void load_payload(struct PINT_tcache* instance, 
+static void load_payload(struct PINT_tcache *instance, 
     PVFS_object_ref refn,
     void* payload,
     struct PINT_perf_counter* pc)
 {
     int status;
     int purged;
-    struct PINT_tcache_entry* tmp_entry;
+    struct PINT_tcache_entry *tmp_entry;
     int ret;
     /* Storage of current time */
     struct timeval current_time = { 0, 0};
@@ -845,7 +891,9 @@ static void load_payload(struct PINT_tcache* instance,
 
         /* not found in cache; insert new payload*/
         ret = PINT_tcache_insert_entry(instance, 
-            &refn, payload, &purged);
+                                       &refn,
+                                       payload,
+                                       &purged);
         /* the purged variable indicates how many entries had to be purged
          * from the tcache to make room for this new one
          */
@@ -854,8 +902,10 @@ static void load_payload(struct PINT_tcache* instance,
             /* since only one item was purged, we count this as one item being
              * replaced rather than as a purge and an insert 
              */
-            PINT_perf_count(pc, PERF_ACACHE_REPLACEMENTS, purged, 
-                PINT_PERF_ADD);
+            PINT_perf_count(pc,
+                            PERF_ACACHE_REPLACEMENTS,
+                            purged, 
+                            PINT_PERF_ADD);
         }
         else
         {
@@ -863,12 +913,16 @@ static void load_payload(struct PINT_tcache* instance,
             /* if we didn't purge anything, then the "purged" variable will
              * be zero and this counter call won't do anything.
              */
-            PINT_perf_count(pc, PERF_ACACHE_PURGES, purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(pc,
+                            PERF_ACACHE_PURGES,
+                            purged,
+                            PINT_PERF_ADD);
         }
     }
-    PINT_perf_count(pc, PERF_ACACHE_NUM_ENTRIES,
-        instance->num_entries, PINT_PERF_SET);
+    PINT_perf_count(pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    instance->num_entries,
+                    PINT_PERF_SET);
     return;
 }
 

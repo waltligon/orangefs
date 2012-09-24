@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <errno.h>
 #endif
+#include <pvfs3-handle.h>
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
@@ -143,7 +144,16 @@ enum PVFS_encoding_type
 /* basic types used by storage subsystem */
 
 /** Unique identifier for an object on a PVFS2 file system. */
-typedef uint64_t PVFS_handle;
+/*typedef uint64_t PVFS_handle;*/
+
+/*#define encode_PVFS_handle encode_uint64_t*/
+/*#define decode_PVFS_handle decode_uint64_t*/
+
+/** Unique identifier for an object on a PVFS3 file system */
+typedef PVFS_OID PVFS_handle;       /* 128-bit */
+
+#define encode_PVFS_handle encode_PVFS_OID
+#define decode_PVFS_handle decode_PVFS_OID
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -153,9 +163,6 @@ typedef int32_t PVFS_fs_id;
 typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 
-
-#define encode_PVFS_handle encode_uint64_t
-#define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
 #define decode_PVFS_ds_position decode_uint64_t
@@ -258,15 +265,15 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 #endif
 
 /* predefined special values for types */
-#define PVFS_CONTEXT_NULL    ((PVFS_context_id)-1)
-#define PVFS_HANDLE_NULL     ((PVFS_handle)0)
-#define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
-#define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
-#define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
-#define PVFS_ITERATE_START    (INT32_MAX - 1)
-#define PVFS_ITERATE_END      (INT32_MAX - 2)
-#define PVFS_READDIR_START PVFS_ITERATE_START
-#define PVFS_READDIR_END   PVFS_ITERATE_END
+#define PVFS_CONTEXT_NULL   ((PVFS_context_id)-1)
+/*#define PVFS_HANDLE_NULL  ((PVFS_handle)0)*/  /* moved to pvfs2-handle.h */
+#define PVFS_FS_ID_NULL     ((PVFS_fs_id)0)
+#define PVFS_OP_NULL        ((PVFS_id_gen_t)0)
+#define PVFS_BMI_ADDR_NULL  ((PVFS_BMI_addr_t)0)
+#define PVFS_ITERATE_START  (INT32_MAX - 1)
+#define PVFS_ITERATE_END    (INT32_MAX - 2)
+#define PVFS_READDIR_START  PVFS_ITERATE_START
+#define PVFS_READDIR_END    PVFS_ITERATE_END
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -560,7 +567,8 @@ enum PVFS_server_param
 enum PVFS_mgmt_param_type
 {
     PVFS_MGMT_PARAM_TYPE_UINT64,
-    PVFS_MGMT_PARAM_TYPE_STRING
+    PVFS_MGMT_PARAM_TYPE_STRING,
+    PVFS_MGMT_PARAM_TYPE_HANDLE
 } ;
 
 struct PVFS_mgmt_setparam_value
@@ -570,14 +578,15 @@ struct PVFS_mgmt_setparam_value
     {
         uint64_t value;
         char *string_value;
+        PVFS_handle handle_value;
     } u;
 };
 
-encode_enum_union_2_struct(
-    PVFS_mgmt_setparam_value,
-    type, u,
-    uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
+encode_enum_union_3_struct(
+    PVFS_mgmt_setparam_value, type, u,
+    uint64_t,    value,        PVFS_MGMT_PARAM_TYPE_UINT64,
+    string,      string_value, PVFS_MGMT_PARAM_TYPE_STRING,
+    PVFS_handle, handle_value, PVFS_MGMT_PARAM_TYPE_HANDLE);
 
 enum PVFS_server_mode
 {

@@ -1,11 +1,18 @@
+/*
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+*/
 
 #include <stdlib.h>
 #include <string.h>
 #include <db.h>
 
+#include <policy.h>
 #include <sidcache.h>
 #include <policyeval.h>
 #include <sidcacheval.h>
+#include <quicklist.h>
 
 static int first_cursor_end = 0;
 
@@ -80,12 +87,16 @@ int SID_join_count(DBC *join_curs, int *count)
     *count = 0;
     while ((ret = join_curs->get(join_curs, &DBkey, &DBval, 0)) == 0)
     {
-        *count++;
+        (*count)++;
     }
-    return 0;
-
-err:
-    return -1;
+    if (ret < 0)
+    {
+        return -1;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 int SID_first_record(SID_policy_t *policy,
@@ -101,7 +112,7 @@ int SID_first_record(SID_policy_t *policy,
     /* random select the first one */
     if ((ret = SID_join_count(*join_curs, &num_rec)) != 0)
         goto err;
-    first = PVFS_random(num_rec);
+    first = rand() % num_rec;
     /* must reset the join after a count */
     SID_do_join(policy, join_curs);
     for (i = 0; i < first; i++)
@@ -247,13 +258,13 @@ int SID_add_query_list(SID_server_list_t *sid_list,
     }
     INIT_QLIST_HEAD(&new->link);
     qlist_add_tail(&new->link, &sid_list->link);
-    memcpy(&new->server_sid, key->data, sizeof(SID));
+    memcpy(&new->server_sid, key->data, sizeof(PVFS_SID));
     new->server_addr = ((SID_cacheval_t *)value->data)->bmi_addr;
     url_len = strlen(((SID_cacheval_t *)value->data)->url) + 1;
     new->server_url = (char *)malloc(url_len);
     if (!new->server_url)
     {
-        qlist_del(new);
+        qlist_del(&new->link);
         free(new);
         return -1; /* ENOMEM should be set */
     }
@@ -268,19 +279,14 @@ int SID_select_servers(SID_policy_t *policy,
 {
     int i;
     int set;
-    int ret;
     DBC *join_curs;
     DBT DBkey_s, DBval_s;
     DBT *DBkey = &DBkey_s;
     DBT *DBval = &DBval_s; /* more convenient to have pointers */
-    int val;
-    int c = 0;
-    DBC *carray[SID_NUM_ATTR+1]; /* might not use all */
 
     policy->layout = PVFS_LAYOUT_ROUND_ROBIN;
 
     policy->carray = (DBC **)malloc(sizeof(DBC *) * policy->join_count);
-    memset(carray, 0, (sizeof(DBC *) * policy->join_count));
 
     /* each attr used by this policy is copied to carray */
     for (i = 0; i < policy->join_count; i++)
@@ -342,6 +348,7 @@ int SID_select_servers(SID_policy_t *policy,
             }
         }
     }
+    return 0;
 }
 
 

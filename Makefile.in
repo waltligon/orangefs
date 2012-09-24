@@ -150,6 +150,7 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
+    src/common/sidcache \
     src/client/usrint
 GENINCLUDES := \
 	include
@@ -163,6 +164,7 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
+    src/common/sidcache \
     src/common/security \
     src/client/usrint \
     src/io/trove \
@@ -186,14 +188,15 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-BUILD_CFLAGS = @BUILD_CFLAGS@
+BUILD_CFLAGS = @BUILD_CFLAGS@ -I$(srcdir)/src/common/sidcache
+BUILD_CFLAGS += -I$(srcdir)/include -I$(srcdir)/src/common/quicklist
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @UUID_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
@@ -354,11 +357,13 @@ SERVERLIBS += -lpthread
 # though it's not recommended unless *required*.
 #
 # run ./configure --help for information on how to do this cleanly.
-LIBCFLAGS=@LIBCFLAGS@ @OPENSSL_CPPFLAGS@ -D__PVFS2_CLIENT__
-LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
-LIBS += @THREAD_LIB@ @OPENSSL_LIB@
+LIBCFLAGS = @LIBCFLAGS@ @OPENSSL_CPPFLAGS@ @DB_CFLAGS@ @UUID_CFLAGS@
+LIBCFLAGS += -D__PVFS2_CLIENT__
+LIBTHREADEDCFLAGS = @DB_CFLAGS@ -D__GEN_POSIX_LOCKING__ 
+LIBTHREADEDCFLAGS += -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
+LIBS += @THREAD_LIB@ @OPENSSL_LIB@ @DB_LIB@ @UUID_LDFLAGS@
 DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
-LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
+LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@ @DB_LIB@ @UUID_LDFLAGS@
 
 ################################################################
 # build BMI TCP?
@@ -505,6 +510,8 @@ KERNAPPTHRSRC :=
 MISCSRC := 
 # c files generated from state machines
 SMCGEN :=
+# c files generated from policy files
+PYCGEN :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
 
@@ -690,6 +697,11 @@ FUSEDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FUSESRC)))
 STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
 STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
 
+# policy compiler, generate for build machine not
+# host machine, in the case of cross-compilation
+POLICYCOMPOBJS := $(patsubst %.c,%.o,$(POLICYCOMPSRC))
+POLICYCOMPDEPS := $(patsubst %.c,%.d,$(POLICYCOMPSRC))
+
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
 DOCSPDF := $(patsubst %.tex,%.pdf, $(filter %.tex,$(DOCSRC)))
@@ -719,7 +731,8 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) )
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
+    $(POLICYCOMPDEPS) )
 endif
 
 ####################################################################
@@ -747,7 +760,10 @@ kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 # this is needed for the make dist
 statecompgen: $(STATECOMPGEN)
 
-# target for builging development tools
+# this is needed for the make dist
+policycompgen: $(POLICYCOMPGEN)
+
+# target for building development tools
 develtools: $(DEVELTOOLS)
 
 # Build linux-2.6 kernel module if requested.
@@ -969,7 +985,7 @@ $(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # bison and yacc
-%.c: %.y
+%.c %.h: %.y
 	$(Q) "  BISON		$@"
 	$(E)$(BISON) -d $< -o $@
 
@@ -1012,6 +1028,15 @@ $(STATECOMPOBJS): %.o: %.c
 $(STATECOMP): $(STATECOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
 	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
+
+# special rules to build policy compiler using build host compiler
+$(POLICYCOMPOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(POLICYCOMP): $(POLICYCOMPOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(POLICYCOMPOBJS) $(call modldflags,$<)
 
 # rule for generating cscope information
 cscope:
@@ -1058,24 +1083,29 @@ endif
 clean:: 
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
-	    $(ULIBOBJS) $(ULIBTHREADEDOBJS) \
-		$(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
-		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-        $(USERTOOLS) $(USEROBJS) \
-        $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
-		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
-        $(BMILIBRARIES) $(FUSEOBJS) \
-		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
-		$(STATECOMP) $(STATECOMPOBJS) \
-		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma src/apps/fuse/pvfs2fuse
+                $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
+                $(ULIBOBJS) $(ULIBTHREADEDOBJS) \
+                $(ULIBPICOBJS) $(ULIBDEPENDS) $(ULIBTHREADEDOBJS) \
+                $(ULIBTHREADEDPICOBJS) $(ULIBTHREADEDDEPENDS) \
+                $(UCACHEDTOOLS) $(UCACHEDOBJS) \
+                $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
+                $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
+                $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
+                $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+                $(USERTOOLS) $(USEROBJS) \
+                $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
+                $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
+                $(VISMISCDEPENDS) $(KARMAOBJS) \
+                $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
+                $(BMILIBRARIES) $(FUSEOBJS) \
+                $(VISMISCDEPENDS) $(KARMAOBJS) \
+                $(STATECOMP) $(STATECOMPOBJS) \
+                $(POLICYCOMP) $(POLICYCOMPOBJS) \
+                src/server/pvfs2-server-server.o \
+                src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
+	$(E)rm -f $(POLICYCOMPGEN) 
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
@@ -1089,7 +1119,7 @@ clean::
 endif
 
 # builds a tarball of the source tree suitable for distribution
-dist: $(SMCGEN) cleaner
+dist: $(SMCGEN) $(PYCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 ifdef BUILD_BMI_ONLY
@@ -1125,6 +1155,7 @@ distclean: cleaner docsclean
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
+	rm -f $(PYCGEN)
 endif
 
 # this is where we include all of our automatic dependencies.
@@ -1159,6 +1190,11 @@ nodep:; @:
 %.c: %.sm $(STATECOMP)
 	$(Q) "  SMC		$@"
 	$(E)$(STATECOMP) $< $@
+
+# rule for automatically generated source files
+%.c %.h: %.policy $(POLICYCOMP)
+	$(Q) "  PYC		$@"
+	$(E)$(POLICYCOMP) $< $@
 
 # if this is not a distribution tarball, then drop some example
 # config files in the server build directory with good defaults for

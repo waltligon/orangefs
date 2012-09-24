@@ -473,8 +473,10 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             {
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent I/O, handle: %llu\n", llu(handle));
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                             "REQ SCHED allowing "
+                             "concurrent I/O, handle: %s\n",
+                             PVFS_OID_str(&handle));
             }
             else
             {
@@ -506,8 +508,10 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             {
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent read only, handle: %llu\n", llu(handle));
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                             "REQ SCHED allowing "
+                             "concurrent read only, handle: %s\n",
+                             PVFS_OID_str(&handle));
             }
             else
             {
@@ -526,9 +530,10 @@ int PINT_req_sched_post(enum PVFS_server_op op,
              */
             tmp_element->state = REQ_SCHEDULED;
             tmp_element->access_type = PINT_SERVER_REQ_READONLY;
-            gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                         "concurrent dirent op, handle: %llu\n", 
-                         llu(handle));
+            gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                         "REQ SCHED allowing "
+                         "concurrent dirent op, handle: %s\n", 
+                         PVFS_OID_str(&handle));
             ret = 1;
         }
 	else
@@ -543,14 +548,16 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-                 llu(handle), tmp_element);
+		 "REQ SCHED POSTING, handle: %s, queue_element: %p\n",
+                 PVFS_OID_str(&handle),
+                 tmp_element);
 
     if (ret == 1)
     {
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-		     llu(handle), tmp_element);
+                     "handle: %s, queue_element: %p\n",
+		     PVFS_OID_str(&handle),
+                     tmp_element);
     }
     sched_count++;
     return (ret);
@@ -723,8 +730,8 @@ int PINT_req_sched_unpost(
 			{
 			    gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED "
-                                "allowing concurrent I/O, handle: %llu\n",
-                                llu(next_element->handle));
+                                "allowing concurrent I/O, handle: %s\n",
+                                PVFS_OID_str(&next_element->handle));
 			    next_element->state = REQ_READY_TO_SCHEDULE;
 			    qlist_add_tail(&(next_element->ready_link),
 					   &ready_queue);
@@ -828,10 +835,11 @@ int PINT_req_sched_release(
                         if (next_element &&
                             (next_element->op == PVFS_SERV_IO))
                         {
-                            gossip_debug(
-                                GOSSIP_REQ_SCHED_DEBUG,
-                                "REQ SCHED allowing concurrent I/O (release time), "
-                                "handle: %llu\n", llu(next_element->handle));
+                            gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                                         "REQ SCHED allowing concurrent "
+                                         "I/O (release time), "
+                                         "handle: %s\n",
+                                         PVFS_OID_str(&next_element->handle));
                             assert(next_element->state == REQ_QUEUED);
                             next_element->state = REQ_READY_TO_SCHEDULE;
                             qlist_add_tail(
@@ -855,10 +863,11 @@ int PINT_req_sched_release(
                         if (next_element &&
                             (next_element->access_type == PINT_SERVER_REQ_READONLY))
                         {
-                            gossip_debug(
-                                GOSSIP_REQ_SCHED_DEBUG,
-                                "REQ SCHED allowing concurrent read only (release time), "
-                                "handle: %llu\n", llu(next_element->handle));
+                            gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                                         "REQ SCHED allowing concurrent "
+                                         "read only (release time), "
+                                         "handle: %s\n",
+                                         PVFS_OID_str(&next_element->handle));
                             assert(next_element->state == REQ_QUEUED);
                             next_element->state = REQ_READY_TO_SCHEDULE;
                             qlist_add_tail(
@@ -872,8 +881,9 @@ int PINT_req_sched_release(
     }
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED RELEASING, handle: %llu, queue_element: %p\n",
-		 llu(tmp_element->handle), tmp_element);
+		 "REQ SCHED RELEASING, handle: %s, queue_element: %p\n",
+		 PVFS_OID_str(&tmp_element->handle),
+                 tmp_element);
 
     /* destroy the released request element */
     free(tmp_element);
@@ -925,9 +935,11 @@ int PINT_req_sched_test(
 	}
 	*out_count_p = 1;
 	*out_status = 0;
-	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-                     llu(tmp_element->handle), tmp_element);
+	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
+                     "REQ SCHED SCHEDULING, "
+                     "handle: %s, queue_element: %p\n",
+                     PVFS_OID_str(&tmp_element->handle),
+                     tmp_element);
 
         PINT_req_sched_do_change_mode(tmp_element);
         return (1);
@@ -1020,9 +1032,10 @@ int PINT_req_sched_testsome(
 	    out_status_array[*inout_count_p] = 0;
 	    (*inout_count_p)++;
 	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-			 "REQ SCHED SCHEDULING, handle: %llu, "
+			 "REQ SCHED SCHEDULING, handle: %s, "
                          "queue_element: %p\n",
-			 llu(tmp_element->handle), tmp_element);
+			 PVFS_OID_str(&tmp_element->handle),
+                         tmp_element);
             PINT_req_sched_do_change_mode(tmp_element);
 	}
 	else if(tmp_element->state == REQ_TIMING)
@@ -1128,8 +1141,9 @@ int PINT_req_sched_testworld(
 	(*inout_count_p)++;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-		     llu(tmp_element->handle), tmp_element);
+                     "handle: %s, queue_element: %p\n",
+		     PVFS_OID_str(&tmp_element->handle),
+                     tmp_element);
         PINT_req_sched_do_change_mode(tmp_element);
     }
     if (*inout_count_p > 0)
@@ -1155,7 +1169,7 @@ static int hash_handle(
     unsigned long tmp = 0;
     PVFS_handle *real_handle = handle;
 
-    tmp += (*(real_handle));
+    tmp += (PVFS_OID_hash32(real_handle));
     tmp = tmp % table_size;
 
     return ((int) tmp);
@@ -1175,9 +1189,8 @@ static int hash_handle_compare(
     struct req_sched_list *my_list;
     PVFS_handle *real_handle = key;
 
-    my_list = qlist_entry(link, struct req_sched_list,
-			  hash_link);
-    if (my_list->handle == *real_handle)
+    my_list = qlist_entry(link, struct req_sched_list, hash_link);
+    if (!PVFS_OID_cmp(&my_list->handle, real_handle))
     {
 	return (1);
     }

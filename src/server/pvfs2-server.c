@@ -2347,9 +2347,9 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         if (strlen(s_op->req->capability.issuer) == 0)
         {
             snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-                "null@%s H=%llu S=%p: %s: %s",
+                "null@%s H=%s S=%p: %s: %s",
                 BMI_addr_rev_lookup_unexpected(s_op->addr),
-                llu(s_op->target_handle),
+                PVFS_OID_str(&s_op->target_handle),
                 s_op,
                 PINT_map_server_op_to_string(s_op->req->op),
                 format);
@@ -2357,13 +2357,13 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         else
         {
             snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-                "%s@%s %s sig=%s H=%llu S=%p: %s: %s",
+                "%s@%s %s sig=%s H=%s S=%p: %s: %s",
                 s_op->req->capability.issuer,
                 BMI_addr_rev_lookup_unexpected(s_op->addr),
                 PINT_print_op_mask(s_op->req->capability.op_mask, mask_buf),
                 PINT_util_bytes2str(s_op->req->capability.signature, 
                                     sig_buf, 4),
-                llu(s_op->target_handle),
+                PVFS_OID_str(&s_op->target_handle),
                 s_op,
                 PINT_map_server_op_to_string(s_op->req->op),
                 format);                
@@ -2550,10 +2550,10 @@ static int precreate_pool_initialize(int server_index)
                     }
 
                     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
-                                 "%s, type: %u, fs_id: %llu, handle: %llu\n",
+                                 "%s, type: %u, fs_id: %llu, handle: %s\n",
                                  __func__, host, t, 
                                  (long long unsigned int)cur_fs->coll_id, 
-                                 llu(pool_handle));
+                                 PVFS_OID_str(&pool_handle));
                     ret = precreate_pool_setup_server(host, t, 
                         cur_fs->coll_id, &pool_handle);
                     if(ret < 0)
@@ -2734,16 +2734,16 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
             free(key.buffer);
             return(ret < 0 ? ret : js.error_code);
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool created handle %llu "
-                     "for %s, type %s.\n", llu(*pool_handle), host, 
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool created handle %s "
+                     "for %s, type %s.\n", PVFS_OID_str(pool_handle), host, 
                      type_string);
 
     }
     else
     {
         /* handle already exists */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool found handle %llu "
-                     "for %s, type %s.\n", llu(*pool_handle), host, 
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool found handle %s "
+                     "for %s, type %s.\n", PVFS_OID_str(pool_handle), host, 
                      type_string);
     }
     free(key.buffer);
@@ -2819,8 +2819,8 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     if( user_opts->precreate_batch_size[index] == 0 )
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "%s: NOT launching refiller for "
-                     "host %s, type %d, pool: %llu, batch_size is 0\n",
-                     __func__, host, type, llu(pool_handle));
+                     "host %s, type %d, pool: %s, batch_size is 0\n",
+                     __func__, host, type, PVFS_OID_str(&pool_handle));
         return 0;
     }
 
@@ -2855,9 +2855,12 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: launching refiller for host %s, "
-                 "type %d, pool: %llu, batch size %d (index %d)\n", __func__, 
-                 s_op->u.precreate_pool_refiller.host, type, llu(pool_handle),
-                 user_opts->precreate_batch_size[index], index);
+                 "type %d, pool: %s, batch size %d (index %d)\n", __func__, 
+                 s_op->u.precreate_pool_refiller.host,
+                 type,
+                 PVFS_OID_str(&pool_handle),
+                 user_opts->precreate_batch_size[index],
+                 index);
 
     s_op->u.precreate_pool_refiller.pool_handle = pool_handle;
     s_op->u.precreate_pool_refiller.fsid = fsid;

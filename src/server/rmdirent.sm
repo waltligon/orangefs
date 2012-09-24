@@ -94,7 +94,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     job_id_t i;
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
-        s_op->req->u.rmdirent.entry);
+                s_op->req->u.rmdirent.entry);
 
     /* set up key and value structures to read directory entry */
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -107,10 +107,10 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
-        "  reading dirdata handle (coll_id = 0x%x, handle = %llu, "
+        "  reading dirdata handle (coll_id = 0x%x, handle = %s, "
         "key = %s (%d), val_buf = %p (%d))\n",
         s_op->req->u.rmdirent.fs_id,
-        llu(s_op->req->u.rmdirent.handle),
+        PVFS_OID_str(&s_op->req->u.rmdirent.handle),
         (char *)s_op->key.buffer,
         s_op->key.buffer_sz,
         s_op->val.buffer,
@@ -127,7 +127,8 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         0,
         js_p,
         &i,
-        server_job_context, s_op->req->hints);
+        server_job_context,
+        s_op->req->hints);
 
     return ret;
 }
@@ -155,8 +156,8 @@ static int rmdirent_remove_directory_entry(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
-                 "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
-                 llu(s_op->u.rmdirent.dirdata_handle));
+                 "object (handle = %s)\n", s_op->req->u.rmdirent.entry,
+                 PVFS_OID_str(&s_op->u.rmdirent.dirdata_handle));
 
     /* set the sync flag */
     flags = TROVE_SYNC;
@@ -167,11 +168,18 @@ static int rmdirent_remove_directory_entry(
     flags |= TROVE_KEYVAL_HANDLE_COUNT;
 
     ret = job_trove_keyval_remove(
-        s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
+        s_op->req->u.rmdirent.fs_id,
+        s_op->u.rmdirent.dirdata_handle,
         &s_op->key, 
         &s_op->val,
         flags,
-        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
 
     /* 
      * Removing an entry causes an update of directory timestamps
@@ -271,8 +279,8 @@ static PINT_sm_action rmdirent_setup_resp(
 	s_op->resp.u.rmdirent.entry_handle =
             s_op->u.rmdirent.entry_handle;
 	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  succeeded; returning handle %llu in response\n",
-		     llu(s_op->resp.u.rmdirent.entry_handle));
+		     "  succeeded; returning handle %s in response\n",
+		     PVFS_OID_str(&s_op->resp.u.rmdirent.entry_handle));
     }
     else
     {
