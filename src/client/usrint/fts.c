@@ -94,7 +94,7 @@ fts_open(argv, options, compar)
 	register FTSENT *p, *root;
 	register int nitems;
 	FTSENT *parent = NULL;
-	FTSENT *tmp;
+	FTSENT *tmp = NULL;
 
 	/* Options check. */
 	if (options & ~FTS_OPTIONMASK) {

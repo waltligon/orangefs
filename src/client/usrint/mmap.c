@@ -148,7 +148,7 @@ int pvfs_msync(void *start, size_t length, int flags)
     }
     qlist_for_each_entry_safe(mapl, temp, &maplist, link)
     {
-        if (mapl->mst <= start && mapl->mst + mapl->mlen >= start + length)
+        if (mapl->mst <= start && (char *)mapl->mst + mapl->mlen >= (char *)start + length)
         {
             break;
         }
@@ -163,7 +163,7 @@ int pvfs_msync(void *start, size_t length, int flags)
         /* the diff between start and mst is distance from */
         /* start of buffer, and distnace from original offset */
         rc = pvfs_pwrite(mapl->mfd, start, length,
-                          mapl->moff + (start - mapl->mst));
+                          mapl->moff + ((char *)start - (char *)mapl->mst));
     }
     return rc;
 }

@@ -22,6 +22,18 @@
 #include <errno.h>
 #include <pint-cached-config.h>
 
+int iocommon_ireadorwrite(enum PVFS_io_type which,
+                          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+                          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req
+);
+
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
