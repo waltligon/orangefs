@@ -186,6 +186,9 @@ struct PINT_client_create_sm
     PVFS_object_attr store_attr;
 
     PVFS_handle handles[2];
+
+    /* replication information */
+    replication_s replication;
 };
 
 struct PINT_client_mkdir_sm
