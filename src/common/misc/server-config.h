@@ -28,6 +28,8 @@ enum
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
+    CTX_ROOTSERVERS      = (1 << 12),
+    CTX_PRIMESERVERS     = (1 << 13),
 };
 
 typedef struct phys_server_desc
@@ -42,6 +44,17 @@ typedef struct host_alias_s
     char *host_alias;
     char *bmi_address;
 } host_alias_s;
+
+typedef struct prime_server_s
+{
+    char *host_alias;
+    char *bmi_address;
+} prime_server_s;
+
+typedef struct root_server_s
+{
+    char *host_alias;
+} root_server_s;
 
 typedef struct host_handle_mapping_s
 {
@@ -64,11 +77,14 @@ typedef struct filesystem_configuration_s
     PVFS_handle  root_handle;
     int default_num_dfiles;
 
-    /* ptrs are type host_handle_mapping_s* */
+    /* ptrs are type host_handle_mapping_s */
     PINT_llist *meta_handle_ranges;
 
-    /* ptrs are type host_handle_mapping_s* */
+    /* ptrs are type host_handle_mapping_s */
     PINT_llist *data_handle_ranges;
+
+    /* ptrs are type root_server_s */
+    PINT_llist *root_servers;
 
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
@@ -187,6 +203,7 @@ typedef struct server_configuration_s
 #endif /* USE_TRUSTED */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
+    PINT_llist *prime_servers;      /* ptrs are type prime_server_s     */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
     distribution_configuration default_dist_config;  /* distribution conf */

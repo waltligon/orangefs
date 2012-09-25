@@ -125,50 +125,42 @@ extern "C"
     typedef void context_t;
     typedef void info_t;
 
-    typedef const char *(
-    *dotconf_callback_t) (
-    command_t *,
-    context_t *);
-    typedef int (
-    *dotconf_errorhandler_t) (
-    configfile_t *,
-    int,
-    unsigned long,
-    const char *);
-    typedef const char *(
-    *dotconf_contextchecker_t) (
-    command_t *,
-    unsigned long);
+    typedef const char *(*dotconf_callback_t) (command_t *, context_t *);
+
+    typedef int (*dotconf_errorhandler_t) (configfile_t *,
+                                           int,
+                                           unsigned long,
+                                           const char *);
+
+    typedef const char *(*dotconf_contextchecker_t) (command_t *,
+                                                     unsigned long);
 
     struct configfile_t
     {
-	/* ------ the fields in configfile_t are provided to the app via command_t's ; READ ONLY! --- */
+	/* ------ the fields in configfile_t are provided
+         * to the app via command_t's ; READ ONLY! --- */
 
 	FILE *stream;
-	char eof;		/* end of file reached ? */
-	size_t size;		/* file size; cached on-demand for here-documents */
+	char eof;	/* end of file reached ? */
+	size_t size;	/* file size; cached on-demand for here-documents */
 
 	context_t *context;
 
 	configoption_t const **config_options;
 	int config_option_count;
 
-	/* ------ misc read-only fields ------------------------------------------------------------- */
+	/* ------ misc read-only fields ----------------------------------- */
 	char *filename;		/* name of file this option was found in */
 	unsigned long line;	/* line number we're currently at */
 	unsigned long flags;	/* runtime flags given to dotconf_open */
 
 	char *includepath;
 
-	/* ------ some callbacks for interactivity -------------------------------------------------- */
+	/* ------ some callbacks for interactivity ------------------------ */
 	dotconf_errorhandler_t errorhandler;
 	dotconf_contextchecker_t contextchecker;
 
-	int (
-    *cmp_func) (
-    const char *,
-    const char *,
-    size_t);
+	int (*cmp_func) (const char *, const char *, size_t);
     };
 
     struct configoption_t
@@ -183,10 +175,10 @@ extern "C"
 
     struct command_t
     {
-	const char *name;	/* name of the command */
-	const configoption_t *option;	/* the option as given in the app; READ ONLY */
+	const char *name;	     /* name of the command */
+	const configoption_t *option;/* the option as given in the app; READ ONLY */
 
-	/* ------ argument data filled in for each line / command ----------------------------------- */
+	/* ------ argument data filled in for each line / command ---------- */
 	struct
 	{
 	    long value;		/* ARG_INT, ARG_TOGGLE */
@@ -196,151 +188,144 @@ extern "C"
 	int arg_count;		/* number of arguments (in data.list) */
         int error;              /* set to non-zero if parsing error */
 
-	/* ------ misc context information ---------------------------------------------------------- */
+	/* ------ misc context information --------------------------------- */
 	configfile_t *configfile;
 	context_t *context;
     };
 
-/* ------ PINT_dotconf_create() - create the configfile_t needed for further dot.conf fun ------------ */
-    configfile_t *PINT_dotconf_create(
-    char *,
-    const configoption_t *,
-    context_t *,
-    unsigned long);
+/* ------ PINT_dotconf_create() -
+ * create the configfile_t needed for further dot.conf fun ------------ */
+    configfile_t *PINT_dotconf_create(char *,
+                                      const configoption_t *,
+                                      context_t *,
+                                      unsigned long);
 
-/* ------ PINT_dotconf_cleanup() - tidy up behind PINT_dotconf_create and the parser dust ----------------- */
-    void PINT_dotconf_cleanup(
-    configfile_t * configfile);
+/* ------ PINT_dotconf_cleanup() - 
+ * tidy up behind PINT_dotconf_create and the parser dust ----------------- */
+    void PINT_dotconf_cleanup(configfile_t *configfile);
 
-/* ------ PINT_dotconf_command_loop() - iterate through each line of file and handle the commands ---- */
-    int PINT_dotconf_command_loop(
-    configfile_t * configfile);
+/* ------ PINT_dotconf_command_loop() - 
+ * iterate through each line of file and handle the commands ---- */
+    int PINT_dotconf_command_loop(configfile_t *configfile);
 
-/* ------ PINT_dotconf_command_loop_until_error() - like continue_line but return on the first error - */
-    const char *PINT_dotconf_command_loop_until_error(
-    configfile_t * configfile);
+/* ------ PINT_dotconf_command_loop_until_error() - 
+ * like continue_line but return on the first error - */
+    const char *PINT_dotconf_command_loop_until_error(configfile_t *configfile);
 
-/* ------ PINT_dotconf_continue_line() - check if line continuation is to be handled ----------------- */
-    int PINT_dotconf_continue_line(
-    char *buffer,
-    size_t length);
+/* ------ PINT_dotconf_continue_line() - 
+ * check if line continuation is to be handled ----------------- */
+    int PINT_dotconf_continue_line(char *buffer, size_t length);
 
-/* ------ PINT_dotconf_get_next_line() - read in the next line of the configfile_t ------------------- */
-    int PINT_dotconf_get_next_line(
-    char *buffer,
-    size_t bufsize,
-    configfile_t * configfile);
+/* ------ PINT_dotconf_get_next_line() - 
+ * read in the next line of the configfile_t ------------------- */
+    int PINT_dotconf_get_next_line(char *buffer,
+                                   size_t bufsize,
+                                   configfile_t *configfile);
 
-/* ------ PINT_dotconf_get_here_document() - read the here document until delimit is found ----------- */
-    char *PINT_dotconf_get_here_document(
-    configfile_t * configfile,
-    const char *delimit);
+/* ------ PINT_dotconf_get_here_document() -
+ * read the here document until delimit is found ----------- */
+    char *PINT_dotconf_get_here_document(configfile_t *configfile,
+                                         const char *delimit);
 
-/* ------ PINT_dotconf_invoke_command() - call the callback for command_t ---------------------------- */
-    const char *PINT_dotconf_invoke_command(
-    configfile_t * configfile,
-    command_t * cmd);
+/* ------ PINT_dotconf_invoke_command() - 
+ * call the callback for command_t ---------------------------- */
+    const char *PINT_dotconf_invoke_command(configfile_t *configfile,
+                                            command_t *cmd);
 
-    const char *PINT_dotconf_set_defaults(
-    configfile_t * configfile,
-    unsigned long context);
+    const char *PINT_dotconf_set_defaults(configfile_t *configfile,
+                                          unsigned long context);
 
-/* ------ PINT_dotconf_read_arg() - read one argument from the line handling quoting and escaping ---- */
-/*
-	side effects: the char* returned by PINT_dotconf_read_arg is malloc() before, hence that pointer
-                  will have to be free()ed later.
-*/
-    char *PINT_dotconf_read_arg(
-    configfile_t * configfile,
-    const char **line);
+/* ------ PINT_dotconf_read_arg() - 
+ * read one argument from the line handling quoting and escaping ---- */
+/* side effects: the char* returned by PINT_dotconf_read_arg is 
+ * malloc() before, hence that pointer will have to be free()ed later.
+ */
+    char *PINT_dotconf_read_arg(configfile_t *configfile,
+                                const char **line);
 
-/* ------ PINT_dotconf_handle_command() - parse, substitute, find, invoke the command found in buffer  */
-    const char *PINT_dotconf_handle_command(
-    configfile_t * configfile,
-    char *buffer);
+/* ------ PINT_dotconf_handle_command() - 
+ * parse, substitute, find, invoke the command found in buffer  */
+    const char *PINT_dotconf_handle_command(configfile_t *configfile,
+                                            char *buffer);
 
-/* ------ dotconf_register_option() - add a new option table to the list of commands ------------ */
-    void PINT_dotconf_register_options(
-    configfile_t * configfile,
-    const configoption_t * options);
+/* ------ dotconf_register_option() - 
+ * add a new option table to the list of commands ------------ */
+    void PINT_dotconf_register_options(configfile_t *configfile,
+                                       const configoption_t * options);
 
-/* ------ PINT_dotconf_warning() - handle the dispatch of error messages of various levels ----------- */
-    int PINT_dotconf_warning(
-    configfile_t * configfile,
-    int level,
-    unsigned long errnum,
-    const char *,
-    ...);
+/* ------ PINT_dotconf_warning() - 
+ * handle the dispatch of error messages of various levels ----------- */
+    int PINT_dotconf_warning(configfile_t *configfile,
+                             int level,
+                             unsigned long errnum,
+                             const char *,
+                             ...);
 
-/* ------ PINT_dotconf_callback() - register a special callback -------------------------------------- */
-    void PINT_dotconf_callback(
-    configfile_t * configfile,
-    callback_types type,
-    dotconf_callback_t);
+/* ------ PINT_dotconf_callback() - 
+ * register a special callback -------------------------------------- */
+    void PINT_dotconf_callback(configfile_t *configfile,
+                               callback_types type,
+                               dotconf_callback_t);
 
-/* ------ PINT_dotconf_substitute_env() - handle the substitution on environment variables ----------- */
-    char *PINT_dotconf_substitute_env(
-    configfile_t *,
-    char *);
+/* ------ PINT_dotconf_substitute_env() - 
+ * handle the substitution on environment variables ----------- */
+    char *PINT_dotconf_substitute_env(configfile_t *,
+                                      char *);
 
-/* ------ internal utility function that verifies if a character is in the WILDCARDS list -- */
-    int PINT_dotconf_is_wild_card(
-    char value);
+/* ------ internal utility function that verifies if a character 
+ * is in the WILDCARDS list -- */
+    int PINT_dotconf_is_wild_card(char value);
 
-/* ------ internal utility function that calls the appropriate routine for the wildcard passed in -- */
-    int PINT_dotconf_handle_wild_card(
-    command_t * cmd,
-    char wild_card,
-    char *path,
-    char *pre,
-    char *ext);
+/* ------ internal utility function that calls the appropriate 
+ * routine for the wildcard passed in -- */
+    int PINT_dotconf_handle_wild_card(command_t *cmd,
+                                      char wild_card,
+                                      char *path,
+                                      char *pre,
+                                      char *ext);
 
-/* ------ internal utility function that frees allocated memory from dotcont_find_wild_card -- */
-    void PINT_dotconf_wild_card_cleanup(
-    char *path,
-    char *pre);
+/* ------ internal utility function that frees allocated memory 
+ * from dotcont_find_wild_card -- */
+    void PINT_dotconf_wild_card_cleanup(char *path, char *pre);
 
 /* ------ internal utility function to check for wild cards in file path -- */
-/* ------ path and pre must be freed by the developer ( PINT_dotconf_wild_card_cleanup) -- */
-    int PINT_dotconf_find_wild_card(
-    char *filename,
-    char *wildcard,
-    char **path,
-    char **pre,
-    char **ext);
+/* ------ path and pre must be freed by the developer
+ * (PINT_dotconf_wild_card_cleanup) -- */
+    int PINT_dotconf_find_wild_card(char *filename,
+                                    char *wildcard,
+                                    char **path,
+                                    char **pre,
+                                    char **ext);
+                                
+/* ------ internal utility function that compares two stings 
+ * from back to front -- */
+    int PINT_dotconf_strcmp_from_back(const char *s1, const char *s2);
 
-/* ------ internal utility function that compares two stings from back to front -- */
-    int PINT_dotconf_strcmp_from_back(
-    const char *s1,
-    const char *s2);
+/* ------ internal utility function that determins if a 
+ * string matches the '?' criteria -- */
+    int PINT_dotconf_question_mark_match(char *dir_name, char *pre, char *ext);
 
-/* ------ internal utility function that determins if a string matches the '?' criteria -- */
-    int PINT_dotconf_question_mark_match(
-    char *dir_name,
-    char *pre,
-    char *ext);
+/* ------ internal utility function that determins if a 
+ * string matches the '*' criteria -- */
+    int PINT_dotconf_star_match(char *dir_name, char *pre, char *ext);
 
-/* ------ internal utility function that determins if a string matches the '*' criteria -- */
-    int PINT_dotconf_star_match(
-    char *dir_name,
-    char *pre,
-    char *ext);
+/* ------ internal utility function that determins 
+ * matches for filenames with   -- */
+/* ------ a '?' in name and calls the Internal 
+ * Include function on that filename -- */
+    int PINT_dotconf_handle_question_mark(command_t *cmd,
+                                          char *path,
+                                          char *pre,
+                                          char *ext);
 
-/* ------ internal utility function that determins matches for filenames with   -- */
-/* ------ a '?' in name and calls the Internal Include function on that filename -- */
-    int PINT_dotconf_handle_question_mark(
-    command_t * cmd,
-    char *path,
-    char *pre,
-    char *ext);
-
-/* ------ internal utility function that determins matches for filenames with   -- */
-/* ------ a '*' in name and calls the Internal Include function on that filename -- */
-    int PINT_dotconf_handle_star(
-    command_t * cmd,
-    char *path,
-    char *pre,
-    char *ext);
+/* ------ internal utility function that determins 
+ * matches for filenames with   -- */
+/* ------ a '*' in name and calls the Internal Include 
+ * function on that filename -- */
+    int PINT_dotconf_handle_star(command_t *cmd,
+                                 char *path,
+                                 char *pre,
+                                 char *ext);
 
 
 

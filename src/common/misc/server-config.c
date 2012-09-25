@@ -50,8 +50,12 @@ static DOTCONF_CB(exit_security_context);
 #endif
 static DOTCONF_CB(enter_aliases_context);
 static DOTCONF_CB(exit_aliases_context);
+static DOTCONF_CB(enter_primesrvs_context);
+static DOTCONF_CB(exit_primesrvs_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
+static DOTCONF_CB(enter_rootsrvs_context);
+static DOTCONF_CB(exit_rootsrvs_context);
 static DOTCONF_CB(enter_storage_hints_context);
 static DOTCONF_CB(exit_storage_hints_context);
 static DOTCONF_CB(enter_export_options_context);
@@ -69,6 +73,8 @@ static DOTCONF_CB(get_tcp_buffer_send);
 static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
+static DOTCONF_CB(get_primesrv);
+static DOTCONF_CB(get_rootsrv);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
@@ -140,39 +146,35 @@ static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
-static void copy_filesystem(
-    struct filesystem_configuration_s *dest_fs,
-    struct filesystem_configuration_s *src_fs);
-static int cache_config_files(
-    struct server_configuration_s *config_s,
-    char *global_config_filename);
+static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
+                            struct filesystem_configuration_s *src_fs);
+static int cache_config_files(struct server_configuration_s *config_s,
+                              char *global_config_filename);
 static int is_populated_filesystem_configuration(
-    struct filesystem_configuration_s *fs);
+                    struct filesystem_configuration_s *fs);
 static int is_root_handle_in_a_meta_range(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
+                    struct server_configuration_s *config_s,
+                    struct filesystem_configuration_s *fs);
 static int is_valid_filesystem_configuration(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-static char *get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs,
-    int meta_handle_range);
+                    struct server_configuration_s *config_s,
+                    struct filesystem_configuration_s *fs);
+static char *get_handle_range_str(struct server_configuration_s *config_s,
+                                  struct filesystem_configuration_s *fs,
+                                  int meta_handle_range);
 static host_alias_s *find_host_alias_ptr_by_alias(
-    struct server_configuration_s *config_s,
-    char *alias,
-    int *index);
+                    struct server_configuration_s *config_s,
+                    char *alias,
+                    int *index);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    PINT_llist *list,
-    char *alias);
-static int build_extent_array(
-    char *handle_range_str,
-    PVFS_handle_extent_array *handle_extent_array);
+                    PINT_llist *list,
+                    char *alias);
+static int build_extent_array(char *handle_range_str,
+                              PVFS_handle_extent_array *handle_extent_array);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
+                    struct server_configuration_s *config_s,
+                    struct filesystem_configuration_s *fs);
 #endif
 
 /* PVFS2 servers are deployed using configuration files that provide information
@@ -304,8 +306,18 @@ static const configoption_t options[] =
      * As an example:
      *
      * Alias mynode1 tcp://hostname1.clustername1.domainname:12345
+     *
+     * Note: beginning with V3 Aliases specify a SID rather than a
+     * BMI_addr. SIDs are UUIDs (36 character string representing
+     * a 16 byte array plus 4 separators).  SID to BMI_addr mapping
+     * is handled by the SID cache, and typically loaded from a distinct
+     * text file and ten updated online.
+     *
+     * example:
+     *
+     * Alias mynode1 12345678-90ab-4cde-8f12-34567890abcd
      */
-    {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
+    {"Alias", ARG_LIST, get_alias_list, NULL, CTX_ALIASES, NULL},
 
     /* Defines the server alias for the server specific options that
      * are to be set within the ServerOptions context.
@@ -347,6 +359,31 @@ static const configoption_t options[] =
      */
     {"</ServerOptions>",ARG_NONE,exit_server_options_context,NULL,
         CTX_SERVER_OPTIONS,NULL},
+
+    /* Open a context for specifying prime servers for SID mgmt
+     *
+     */
+    {"PrimeServers", ARG_NONE, enter_primesrvs_context, NULL,
+            CTX_GLOBAL, NULL},
+
+    /* Close a context for specifying prime servers for SID mgmt
+     *
+     */
+    {"/PrimeServers", ARG_NONE, exit_primesrvs_context, NULL,
+            CTX_PRIMESERVERS, NULL},
+
+    /* Specifies the SID and BMI address of a Prime Server that is
+     * used to manage SID mappings.
+     *
+     * Format is PrimeServer {SID} {BMI_addr}
+     *
+     * Where {SID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     *
+     * {BMI_addr} is <protocol>://<address>:<port_number>
+     *
+     */
+    {"PrimeServer", ARG_LIST, get_primesrv, NULL,
+            CTX_PRIMESERVERS, NULL},
 
     /* This groups options specific to a filesystem.  A pvfs2 server may manage
      * more than one filesystem, so a config file may have more than
@@ -466,19 +503,41 @@ static const configoption_t options[] =
     {"Range",ARG_LIST, get_range_list,NULL,
         CTX_METAHANDLERANGES|CTX_DATAHANDLERANGES,NULL},
 
+    /* Opens a context for describing the root metadata
+     *
+     */
+    {"RootServers", ARG_NONE, enter_rootsrvs_context, NULL,
+            CTX_FILESYSTEM, NULL},
+
+    /* Closes a context for describing the root metadata
+     *
+     */
+    {"/RootServers", ARG_NONE, exit_rootsrvs_context, NULL,
+            CTX_ROOTSERVERS, NULL},
+
+    /* Specifies the SID of a server that holds a copy of the
+     * filesystem root object.  The format is:
+     *
+     * RootServer {SID}
+     *
+     * Where {SID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     *
+     */
+    {"RootServer", ARG_STR, get_rootsrv, NULL,
+            CTX_ROOTSERVERS, NULL},
+
     /* Specifies the handle value for the root of the Filesystem.  This
      * is a required option in the Filesystem context.  The format is:
      *
-     * RootHandle {handle value}
+     * RootHandle {OID}
      *
-     * Where {handle value} is a positive integer no greater than 
-     * 18446744073709551615 (UIN64_MAX).
+     * Where {OID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
      *
      * In general its best to let the pvfs-genconfig script specify a
      * RootHandle value for the filesystem.
      */
-    {"RootHandle",ARG_STR, get_root_handle,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"RootHandle", ARG_STR, get_root_handle, NULL,
+            CTX_ROOTSERVERS, NULL},
 
     /* This option specifies the name of the particular filesystem or
      * distribution that its defined in.  It is a required option in
@@ -1128,14 +1187,16 @@ int PINT_parse_config(
     if (server_alias_name) 
     {
         struct host_alias_s *halias;
-        halias = find_host_alias_ptr_by_alias(
-                                config_s, server_alias_name, &config_s->host_index);
+        halias = find_host_alias_ptr_by_alias(config_s,
+                                              server_alias_name,
+                                              &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
             if (server_flag)
             {
                 gossip_err("Configuration file error. "
-                       "No host ID specified for alias %s.\n", server_alias_name);
+                           "No host ID specified for alias %s.\n",
+                           server_alias_name);
                 return 1;
             }
         }
@@ -1149,14 +1210,16 @@ int PINT_parse_config(
     if (server_flag && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
-                   "No data storage path specified for alias %s.\n", server_alias_name);
+                   "No data storage path specified for alias %s.\n",
+                   server_alias_name);
         return 1;
     }
 
     if (server_flag && !config_s->meta_path)
     {
         gossip_err("Configuration file error. "
-                   "No metadata storage path specified for alias %s.\n", server_alias_name);
+                   "No metadata storage path specified for alias %s.\n",
+                   server_alias_name);
         return 1;
     }
 
@@ -1216,14 +1279,14 @@ const char *contextchecker(command_t *cmd, unsigned long mask)
 FUNC_ERRORHANDLER(errorhandler)
 {
     gossip_err("Error: %s line %ld: %s", configfile->filename,
-        configfile->line, msg);
+               configfile->line, msg);
     return(1);
 }
 
 DOTCONF_CB(get_logstamp)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1258,7 +1321,7 @@ DOTCONF_CB(get_logstamp)
 DOTCONF_CB(get_storage_path)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1275,17 +1338,15 @@ DOTCONF_CB(get_storage_path)
         free(config_s->meta_path);
     }
 
-    config_s->data_path =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
-    config_s->meta_path =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->data_path = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
 DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1296,15 +1357,14 @@ DOTCONF_CB(get_data_path)
         free(config_s->data_path);
     }
 
-    config_s->data_path =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->data_path = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
 DOTCONF_CB(get_meta_path)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1315,25 +1375,23 @@ DOTCONF_CB(get_meta_path)
         free(config_s->meta_path);
     }
 
-    config_s->meta_path =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
 DOTCONF_CB(enter_defaults_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_DEFAULTS;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile, CTX_DEFAULTS);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_DEFAULTS);
 }
 
 DOTCONF_CB(exit_defaults_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
@@ -1342,7 +1400,7 @@ DOTCONF_CB(exit_defaults_context)
 DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SECURITY;
     return NULL;
 }
@@ -1350,7 +1408,7 @@ DOTCONF_CB(enter_security_context)
 DOTCONF_CB(exit_security_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
@@ -1359,7 +1417,7 @@ DOTCONF_CB(exit_security_context)
 DOTCONF_CB(enter_aliases_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_ALIASES;
     return NULL;
 }
@@ -1367,7 +1425,23 @@ DOTCONF_CB(enter_aliases_context)
 DOTCONF_CB(exit_aliases_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_GLOBAL;
+    return NULL;
+}
+
+DOTCONF_CB(enter_primesrvs_context)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_PRIMESERVERS;
+    return NULL;
+}
+
+DOTCONF_CB(exit_primesrvs_context)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
@@ -1375,7 +1449,7 @@ DOTCONF_CB(exit_aliases_context)
 DOTCONF_CB(enter_filesystem_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     if (config_s->host_aliases == NULL)
@@ -1385,8 +1459,8 @@ DOTCONF_CB(enter_filesystem_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-        malloc(sizeof(struct filesystem_configuration_s));
-    assert(fs_conf);
+            malloc(sizeof(struct filesystem_configuration_s));
+    assert(fs_conf); /* TODO: replace this with error handleing */
     memset(fs_conf,0,sizeof(struct filesystem_configuration_s));
 
     /* fill any fs defaults here */
@@ -1406,19 +1480,17 @@ DOTCONF_CB(enter_filesystem_context)
     assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
     config_s->configuration_context = CTX_FILESYSTEM;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile,
-        CTX_FILESYSTEM);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_FILESYSTEM);
 }
 
 DOTCONF_CB(exit_filesystem_context)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     /*
@@ -1436,20 +1508,35 @@ DOTCONF_CB(exit_filesystem_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_rootsrvs_context)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_ROOTSERVERS;
+    return NULL;
+}
+
+DOTCONF_CB(exit_rootsrvs_context)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_FILESYSTEM;
+    return NULL;
+}
+
 DOTCONF_CB(enter_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_STORAGEHINTS;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile, CTX_STORAGEHINTS);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_STORAGEHINTS);
 }
 
 DOTCONF_CB(exit_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
@@ -1457,17 +1544,16 @@ DOTCONF_CB(exit_storage_hints_context)
 DOTCONF_CB(enter_export_options_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_EXPORT;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile, CTX_EXPORT);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_EXPORT);
 }
 
 DOTCONF_CB(exit_export_options_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
@@ -1475,17 +1561,16 @@ DOTCONF_CB(exit_export_options_context)
 DOTCONF_CB(enter_server_options_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER_OPTIONS;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile, CTX_SERVER_OPTIONS);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_SERVER_OPTIONS);
 }
 
 DOTCONF_CB(exit_server_options_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     config_s->my_server_options = 0;
     return NULL;
@@ -1494,7 +1579,7 @@ DOTCONF_CB(exit_server_options_context)
 DOTCONF_CB(check_this_server)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     if(is_valid_alias(config_s->host_aliases, cmd->data.str))
     {
@@ -1517,7 +1602,7 @@ DOTCONF_CB(check_this_server)
 DOTCONF_CB(enter_mhranges_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_METAHANDLERANGES;
     return NULL;
 }
@@ -1525,11 +1610,11 @@ DOTCONF_CB(enter_mhranges_context)
 DOTCONF_CB(exit_mhranges_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if (!fs_conf->meta_handle_ranges)
@@ -1543,7 +1628,7 @@ DOTCONF_CB(exit_mhranges_context)
 DOTCONF_CB(enter_dhranges_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_DATAHANDLERANGES;
     return NULL;
 }
@@ -1551,12 +1636,12 @@ DOTCONF_CB(enter_dhranges_context)
 DOTCONF_CB(exit_dhranges_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
 
     if (!fs_conf->data_handle_ranges)
     {
@@ -1569,7 +1654,7 @@ DOTCONF_CB(exit_dhranges_context)
 DOTCONF_CB(enter_distribution_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_DISTRIBUTION;
     return NULL;
 }
@@ -1577,7 +1662,7 @@ DOTCONF_CB(enter_distribution_context)
 DOTCONF_CB(exit_distribution_context)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
@@ -1585,7 +1670,7 @@ DOTCONF_CB(exit_distribution_context)
 DOTCONF_CB(get_unexp_req)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1598,7 +1683,7 @@ DOTCONF_CB(get_unexp_req)
 DOTCONF_CB(get_tcp_buffer_receive)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->tcp_buffer_size_receive = cmd->data.value;
     return NULL;
 }
@@ -1606,7 +1691,7 @@ DOTCONF_CB(get_tcp_buffer_receive)
 DOTCONF_CB(get_tcp_buffer_send)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->tcp_buffer_size_send = cmd->data.value;
     return NULL;
 }
@@ -1617,7 +1702,7 @@ DOTCONF_CB(get_tcp_buffer_send)
 DOTCONF_CB(get_tcp_bind_specific)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1643,7 +1728,7 @@ DOTCONF_CB(get_tcp_bind_specific)
 DOTCONF_CB(get_server_job_bmi_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1656,7 +1741,7 @@ DOTCONF_CB(get_server_job_bmi_timeout)
 DOTCONF_CB(get_precreate_batch_size)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
     char **tokens;
 
@@ -1712,7 +1797,7 @@ DOTCONF_CB(get_precreate_batch_size)
 DOTCONF_CB(get_precreate_low_threshold)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
     char **tokens;
 
@@ -1748,7 +1833,7 @@ DOTCONF_CB(get_precreate_low_threshold)
     }
 
     config_s->precreate_low_threshold = 
-        calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
+            calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
     if( config_s->precreate_low_threshold == NULL )
     {
         return "PrecreateLowThreshold malloc failure";
@@ -1765,7 +1850,7 @@ DOTCONF_CB(get_precreate_low_threshold)
 DOTCONF_CB(get_server_job_flow_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1778,7 +1863,7 @@ DOTCONF_CB(get_server_job_flow_timeout)
 DOTCONF_CB(get_client_job_bmi_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     config_s->client_job_bmi_timeout = cmd->data.value;
     return NULL;
 }
@@ -1786,7 +1871,7 @@ DOTCONF_CB(get_client_job_bmi_timeout)
 DOTCONF_CB(get_client_job_flow_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     config_s->client_job_flow_timeout = cmd->data.value;
     return NULL;
 }
@@ -1794,7 +1879,7 @@ DOTCONF_CB(get_client_job_flow_timeout)
 DOTCONF_CB(get_client_retry_limit)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     config_s->client_retry_limit = cmd->data.value;
     return NULL;
 }
@@ -1802,7 +1887,7 @@ DOTCONF_CB(get_client_retry_limit)
 DOTCONF_CB(get_client_retry_delay)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     config_s->client_retry_delay_ms = cmd->data.value;
     return NULL;
 }
@@ -1810,7 +1895,7 @@ DOTCONF_CB(get_client_retry_delay)
 DOTCONF_CB(get_perf_update_interval)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     config_s->perf_update_interval = cmd->data.value;
     return NULL;
 }
@@ -1818,7 +1903,7 @@ DOTCONF_CB(get_perf_update_interval)
 DOTCONF_CB(get_logfile)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     /* free whatever was added in set_defaults phase */
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1826,7 +1911,9 @@ DOTCONF_CB(get_logfile)
         return NULL;
     }
     if (config_s->logfile)
+    {
         free(config_s->logfile);
+    }
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1834,7 +1921,7 @@ DOTCONF_CB(get_logfile)
 DOTCONF_CB(get_logtype)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
     /* free whatever was added in set_defaults phase */
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1842,7 +1929,9 @@ DOTCONF_CB(get_logtype)
         return NULL;
     }
     if (config_s->logtype)
+    {
         free(config_s->logtype);
+    }
     config_s->logtype = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1851,7 +1940,7 @@ DOTCONF_CB(get_logtype)
 DOTCONF_CB(get_event_logging_list)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     int i = 0, len = 0;
     char buf[512] = {0};
     char *ptr = buf;
@@ -1878,7 +1967,7 @@ DOTCONF_CB(get_event_logging_list)
 DOTCONF_CB(get_event_tracing)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1902,7 +1991,7 @@ DOTCONF_CB(get_flow_module_list)
     char *ptr = buf;
 
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     if (config_s->flow_modules != NULL)
     {
@@ -2001,9 +2090,13 @@ static int setup_netmasks(int count, char **bmi_address, int *netmasks)
         {
             special_char = strchr(bmi_address[i], '*');
             if (special_char == NULL)
+            {
                 netmasks[i] = 32;
+            }
             else
+            {
                 netmasks[i] = -1;
+            }
         }
         else
         {
@@ -2011,9 +2104,12 @@ static int setup_netmasks(int count, char **bmi_address, int *netmasks)
             netmasks[i] = strtol(special_char + 1, &ptr, 10);
             if (*ptr != '\0' || netmasks[i] < 0
                     || netmasks[i] > 32)
+            {
                 return -1;
+            }
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %s:%d\n", bmi_address[i], netmasks[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %s:%d\n",
+                     bmi_address[i], netmasks[i]);
     }
     return 0;
 }
@@ -2022,11 +2118,11 @@ DOTCONF_CB(get_root_squash)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
 
     if (cmd->arg_count == 0)
     {
@@ -2035,7 +2131,8 @@ DOTCONF_CB(get_root_squash)
     else 
     {
         fs_conf->exp_flags |= TROVE_EXP_ROOT_SQUASH;
-        fs_conf->root_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        fs_conf->root_squash_netmasks = 
+                    (int *) calloc(cmd->arg_count, sizeof(int));
         if (fs_conf->root_squash_netmasks == NULL)
         {
             fs_conf->root_squash_count = 0;
@@ -2051,17 +2148,20 @@ DOTCONF_CB(get_root_squash)
         }
         fs_conf->root_squash_count = cmd->arg_count;
         /* Setup the netmasks */
-        if (setup_netmasks(fs_conf->root_squash_count, fs_conf->root_squash_hosts, 
-                    fs_conf->root_squash_netmasks) < 0)
+        if (setup_netmasks(fs_conf->root_squash_count,
+                           fs_conf->root_squash_hosts, 
+                           fs_conf->root_squash_netmasks) < 0)
         {
             free(fs_conf->root_squash_netmasks);
             fs_conf->root_squash_netmasks = NULL;
-            free_list_of_strings(fs_conf->root_squash_count, &fs_conf->root_squash_hosts);
+            free_list_of_strings(fs_conf->root_squash_count,
+                                &fs_conf->root_squash_hosts);
             fs_conf->root_squash_count = 0;
             return("Could not setup netmasks for root_squash_hosts\n");
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquash wildcard entries\n",
-                cmd->arg_count);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Parsed %d RootSquash wildcard entries\n",
+                     cmd->arg_count);
     }
     return NULL;
 }
@@ -2070,19 +2170,21 @@ DOTCONF_CB(get_root_squash_exceptions)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
 
     if (cmd->arg_count != 0)
     {
-        fs_conf->root_squash_exceptions_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        fs_conf->root_squash_exceptions_netmasks =
+                      (int *) calloc(cmd->arg_count, sizeof(int));
         if (fs_conf->root_squash_exceptions_netmasks == NULL)
         {
             fs_conf->root_squash_exceptions_count = 0;
-            return("Could not allocate memory for root_squash_exceptions_netmasks\n");
+            return("Could not allocate memory for "
+                   "root_squash_exceptions_netmasks\n");
         }
         if (get_list_of_strings(cmd->arg_count, cmd->data.list,
                     &fs_conf->root_squash_exceptions_hosts) < 0)
@@ -2090,21 +2192,26 @@ DOTCONF_CB(get_root_squash_exceptions)
             free(fs_conf->root_squash_exceptions_netmasks);
             fs_conf->root_squash_exceptions_netmasks = NULL;
             fs_conf->root_squash_exceptions_count = 0;
-            return("Could not allocate memory for root_squash_exceptions_hosts\n");
+            return("Could not allocate memory for "
+                   "root_squash_exceptions_hosts\n");
         }
         fs_conf->root_squash_exceptions_count = cmd->arg_count;
         /* Setup the netmasks */
-        if (setup_netmasks(fs_conf->root_squash_exceptions_count, fs_conf->root_squash_exceptions_hosts, 
-                    fs_conf->root_squash_exceptions_netmasks) < 0)
+        if (setup_netmasks(fs_conf->root_squash_exceptions_count,
+                           fs_conf->root_squash_exceptions_hosts, 
+                           fs_conf->root_squash_exceptions_netmasks) < 0)
         {
             free(fs_conf->root_squash_exceptions_netmasks);
             fs_conf->root_squash_exceptions_netmasks = NULL;
-            free_list_of_strings(fs_conf->root_squash_exceptions_count, &fs_conf->root_squash_exceptions_hosts);
+            free_list_of_strings(fs_conf->root_squash_exceptions_count,
+                                 &fs_conf->root_squash_exceptions_hosts);
             fs_conf->root_squash_exceptions_count = 0;
-            return("Could not setup netmasks for root_squash_exceptions_hosts\n");
+            return("Could not setup netmasks for "
+                   "root_squash_exceptions_hosts\n");
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquashExceptions wildcard entries\n",
-                cmd->arg_count);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Parsed %d RootSquashExceptions wildcard entries\n",
+                     cmd->arg_count);
     }
     return NULL;
 }
@@ -2114,11 +2221,11 @@ DOTCONF_CB(get_read_only)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
     
     if (cmd->arg_count == 0)
     {
@@ -2133,8 +2240,9 @@ DOTCONF_CB(get_read_only)
             fs_conf->ro_count = 0;
             return("Could not allocate memory for ro_netmasks\n");
         }
-        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
-                    &fs_conf->ro_hosts) < 0)
+        if (get_list_of_strings(cmd->arg_count,
+                                cmd->data.list,
+                                &fs_conf->ro_hosts) < 0)
         {
             free(fs_conf->ro_netmasks);
             fs_conf->ro_netmasks = NULL;
@@ -2142,7 +2250,9 @@ DOTCONF_CB(get_read_only)
             return("Could not allocate memory for ro_hosts\n");
         }
         fs_conf->ro_count  = cmd->arg_count;
-        if (setup_netmasks(fs_conf->ro_count, fs_conf->ro_hosts, fs_conf->ro_netmasks) < 0)
+        if (setup_netmasks(fs_conf->ro_count,
+                           fs_conf->ro_hosts,
+                           fs_conf->ro_netmasks) < 0)
         {
             free(fs_conf->ro_netmasks);
             fs_conf->ro_netmasks = NULL;
@@ -2151,7 +2261,7 @@ DOTCONF_CB(get_read_only)
             return("Could not setup netmasks for ro_netmasks\n");
         }
         gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d ro wildcard entries\n",
-                cmd->arg_count);
+                     cmd->arg_count);
     }
     return NULL;
 }
@@ -2160,10 +2270,10 @@ DOTCONF_CB(get_all_squash)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+             PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if (cmd->arg_count == 0)
@@ -2173,14 +2283,16 @@ DOTCONF_CB(get_all_squash)
     else 
     {
         fs_conf->exp_flags |= TROVE_EXP_ALL_SQUASH;
-        fs_conf->all_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        fs_conf->all_squash_netmasks =
+                   (int *) calloc(cmd->arg_count, sizeof(int));
         if (fs_conf->all_squash_netmasks == NULL)
         {
             fs_conf->all_squash_count = 0;
             return("Could not allocate memory for all_squash_netmasks\n");
         }
-        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
-                    &fs_conf->all_squash_hosts) < 0)
+        if (get_list_of_strings(cmd->arg_count,
+                                cmd->data.list,
+                                &fs_conf->all_squash_hosts) < 0)
         {
             free(fs_conf->all_squash_netmasks);
             fs_conf->all_squash_netmasks = NULL;
@@ -2188,17 +2300,20 @@ DOTCONF_CB(get_all_squash)
             return("Could not allocate memory for all_squash_hosts\n");
         }
         fs_conf->all_squash_count = cmd->arg_count;
-        if (setup_netmasks(fs_conf->all_squash_count, fs_conf->all_squash_hosts, 
-                    fs_conf->all_squash_netmasks) < 0)
+        if (setup_netmasks(fs_conf->all_squash_count,
+                           fs_conf->all_squash_hosts, 
+                           fs_conf->all_squash_netmasks) < 0)
         {
             free(fs_conf->all_squash_netmasks);
             fs_conf->all_squash_netmasks = NULL;
-            free_list_of_strings(fs_conf->all_squash_count, &fs_conf->all_squash_hosts);
+            free_list_of_strings(fs_conf->all_squash_count,
+                                 &fs_conf->all_squash_hosts);
             fs_conf->all_squash_count = 0;
             return("Could not setup netmasks for all_squash_hosts\n");
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d AllSquash wildcard entries\n", 
-                cmd->arg_count);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Parsed %d AllSquash wildcard entries\n", 
+                     cmd->arg_count);
     }
     return NULL;
 }
@@ -2209,10 +2324,10 @@ DOTCONF_CB(get_anon_uid)
     unsigned int tmp_var;
     int ret = -1;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+             PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
     ret = sscanf(cmd->data.str, "%u", &tmp_var);
     if(ret != 1)
@@ -2229,10 +2344,10 @@ DOTCONF_CB(get_anon_gid)
     unsigned int tmp_var;
     int ret = -1;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+             PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
     ret = sscanf(cmd->data.str, "%u", &tmp_var);
     if(ret != 1)
@@ -2250,7 +2365,7 @@ DOTCONF_CB(get_bmi_module_list)
     char *ptr = buf;
 
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     if (config_s->bmi_modules != NULL)
     {
@@ -2273,7 +2388,7 @@ DOTCONF_CB(get_trusted_portlist)
     long port1, port2;
     char *separator = NULL, *option = NULL, *endptr = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     option = strdup(cmd->data.str);
     if (option == NULL)
@@ -2315,11 +2430,11 @@ DOTCONF_CB(get_trusted_portlist)
 DOTCONF_CB(get_trusted_network)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+             (struct server_configuration_s *)cmd->context;
 
     if (cmd->arg_count == 0)
     {
-      return NULL; 
+        return NULL; 
     }
 
     config_s->allowed_masks = (int *) calloc(cmd->arg_count, sizeof(int));
@@ -2328,8 +2443,9 @@ DOTCONF_CB(get_trusted_network)
         config_s->allowed_networks_count = 0;
         return("Could not allocate memory for allowed netmasks\n");
     }
-    if (get_list_of_strings(cmd->arg_count, cmd->data.list,
-                &config_s->allowed_networks) < 0)
+    if (get_list_of_strings(cmd->arg_count,
+                            cmd->data.list,
+                            &config_s->allowed_networks) < 0)
     {
         free(config_s->allowed_masks);
         config_s->allowed_masks = NULL;
@@ -2338,12 +2454,14 @@ DOTCONF_CB(get_trusted_network)
     }
     config_s->allowed_networks_count = cmd->arg_count;
     /* Setup netmasks */
-    if (setup_netmasks(config_s->allowed_networks_count, config_s->allowed_networks,
-                config_s->allowed_masks) < 0)
+    if (setup_netmasks(config_s->allowed_networks_count,
+                       config_s->allowed_networks,
+                       config_s->allowed_masks) < 0)
     {
         free(config_s->allowed_masks);
         config_s->allowed_masks = NULL;
-        free_list_of_strings(config_s->allowed_networks_count, &config_s->allowed_networks);
+        free_list_of_strings(config_s->allowed_networks_count,
+                             &config_s->allowed_networks);
         config_s->allowed_networks_count = 0;
         return("Parse error in netmask specification\n");
     }
@@ -2359,10 +2477,10 @@ DOTCONF_CB(get_handle_recycle_timeout_seconds)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     fs_conf->handle_recycle_timeout_sec.tv_sec = (int)cmd->data.value;
@@ -2399,10 +2517,10 @@ DOTCONF_CB(get_flow_buffer_size_bytes)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     fs_conf->fp_buffer_size = cmd->data.value;
     return NULL;
 }
@@ -2411,10 +2529,10 @@ DOTCONF_CB(get_flow_buffers_per_flow)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     fs_conf->fp_buffers_per_flow = cmd->data.value;
     if(fs_conf->fp_buffers_per_flow < 2)
     {
@@ -2433,19 +2551,19 @@ DOTCONF_CB(get_attr_cache_keywords_list)
     struct filesystem_configuration_s *fs_conf = NULL;
 
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
 
     if (fs_conf->attr_cache_keywords != NULL)
     {
         char ** tokens;
         int token_count, j;
         
-        token_count = PINT_split_string_list(
-            &tokens, fs_conf->attr_cache_keywords);
+        token_count = PINT_split_string_list(&tokens,
+                                             fs_conf->attr_cache_keywords);
 
         for(j = 0; j < token_count; ++j)
         {
@@ -2468,8 +2586,7 @@ DOTCONF_CB(get_attr_cache_keywords_list)
         char ** tokens;
         int token_count, j;
         
-        token_count = PINT_split_string_list(
-            &tokens, cmd->data.list[i]);
+        token_count = PINT_split_string_list(&tokens, cmd->data.list[i]);
 
         for(j = 0; j < token_count; ++j)
         {
@@ -2496,10 +2613,10 @@ DOTCONF_CB(get_attr_cache_size)
     struct filesystem_configuration_s *fs_conf = NULL;
 
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     fs_conf->attr_cache_size = (int)cmd->data.value;
@@ -2510,10 +2627,10 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     fs_conf->attr_cache_max_num_elems = (int)cmd->data.value;
@@ -2524,10 +2641,10 @@ DOTCONF_CB(get_file_stuffing)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if(strcasecmp(cmd->data.str, "yes") == 0)
@@ -2551,10 +2668,10 @@ DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if(strcasecmp(cmd->data.str, "yes") == 0)
@@ -2587,10 +2704,10 @@ DOTCONF_CB(get_trove_sync_data)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if(strcasecmp(cmd->data.str, "yes") == 0)
@@ -2612,7 +2729,7 @@ DOTCONF_CB(get_trove_sync_data)
 DOTCONF_CB(get_db_cache_size_bytes)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->db_cache_size_bytes = cmd->data.value;
     return NULL;
 }
@@ -2620,7 +2737,7 @@ DOTCONF_CB(get_db_cache_size_bytes)
 DOTCONF_CB(get_trove_max_concurrent_io)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -2634,7 +2751,7 @@ DOTCONF_CB(get_trove_max_concurrent_io)
 DOTCONF_CB(get_db_cache_type)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     
     if(strcmp(cmd->data.str, "sys") && strcmp(cmd->data.str, "mmap"))
     {
@@ -2643,7 +2760,9 @@ DOTCONF_CB(get_db_cache_type)
     }
 
     if (config_s->db_cache_type)
+    {
         free(config_s->db_cache_type);
+    }
     config_s->db_cache_type = strdup(cmd->data.str);
     if(!config_s->db_cache_type)
     {
@@ -2653,17 +2772,53 @@ DOTCONF_CB(get_db_cache_type)
     return NULL;
 }
 
+DOTCONF_CB(get_rootsrv)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    struct root_server_s *cur_server = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
+
+    if (cmd->arg_count != 1)
+    {
+        return "Error: root server must include at one alias";
+    }
+
+    /* malloc new server */
+    cur_server = (root_server_s *)malloc(sizeof(root_server_s));
+
+    /* fill in new server */
+    cur_server->host_alias = strdup(cmd->data.list[0]);
+
+    /* should we look up alias to verify? */
+    /* could also check for dups */
+
+    /* check if list initialized */
+    if (!fs_conf->root_servers)
+    {
+        fs_conf->root_servers = PINT_llist_new();
+    }
+    
+    PINT_llist_add_to_tail(fs_conf->root_servers, (void *)cur_server);
+    return NULL;
+}
+
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     PVFS_OID tmp_var;
     int ret = -1;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
+
     /* ret = sscanf(cmd->data.str, "%llu", &tmp_var); */
     ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
     if(ret != 1)
@@ -2677,27 +2832,27 @@ DOTCONF_CB(get_root_handle)
 DOTCONF_CB(get_name)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     if (config_s->configuration_context == CTX_FILESYSTEM)
     {
         struct filesystem_configuration_s *fs_conf = NULL;
 
         fs_conf = (struct filesystem_configuration_s *)
-            PINT_llist_head(config_s->file_systems);
+                PINT_llist_head(config_s->file_systems);
         if (fs_conf->file_system_name)
         {
             gossip_err("WARNING: Overwriting %s with %s\n",
                        fs_conf->file_system_name,cmd->data.str);
         }
         fs_conf->file_system_name =
-            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
     else if (config_s->configuration_context == CTX_DISTRIBUTION)
     {
         if (0 == config_s->default_dist_config.name)
         {
             config_s->default_dist_config.name =
-                (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                    (cmd->data.str ? strdup(cmd->data.str) : NULL);
             config_s->default_dist_config.param_list = PINT_llist_new();
         }
         else
@@ -2712,10 +2867,10 @@ DOTCONF_CB(get_filesystem_collid)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
     {
         gossip_err("WARNING: Overwriting %d with %d\n",
@@ -2737,35 +2892,37 @@ static int compare_aliases(void * vkey,
 DOTCONF_CB(get_alias_list)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct host_alias_s *cur_alias = NULL;
     int i = 0;
     int len = 0;
     char *ptr;
 
-    if (cmd->arg_count < 2) {
+    if (cmd->arg_count < 2)
+    {
         return "Error: alias must include at least one bmi address";
     }
 
     /* prevent users from adding the same alias twice */
     if(config_s->host_aliases &&
        PINT_llist_search(config_s->host_aliases, 
-                      (void *)cmd->data.list[0],
-                      compare_aliases))
+                         (void *)cmd->data.list[0],
+                         compare_aliases))
     {
         return "Error: alias already defined";
     }
 
-    cur_alias = (host_alias_s *)
-        malloc(sizeof(host_alias_s));
+    cur_alias = (host_alias_s *)malloc(sizeof(host_alias_s));
     cur_alias->host_alias = strdup(cmd->data.list[0]);
 
     cur_alias->bmi_address = (char *)calloc(1, 2048);
     ptr = cur_alias->bmi_address;
-    for (i=1; i < cmd->arg_count; i++) {
+    for (i = 1; i < cmd->arg_count; i++)
+    {
 	strncat(ptr, cmd->data.list[i], 2048 - len);
  	len += strlen(cmd->data.list[i]);
-        if (i+1 < cmd->arg_count) {
+        if (i + 1 < cmd->arg_count)
+        {
             strncat(ptr, ",", 2048 - len);
         }
  	len++;
@@ -2780,6 +2937,54 @@ DOTCONF_CB(get_alias_list)
     return NULL;
 }
 
+DOTCONF_CB(get_primesrv)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    struct prime_server_s *cur_server = NULL;
+    int i = 0;
+    int len = 0;
+    char *ptr;
+
+    /* check num args is 2 or more (Alias and 1 or more BMI_addr) */
+    if (cmd->arg_count < 2)
+    {
+        return "Error: prime server must include at least one bmi address";
+    }
+
+    /* malloc new server */
+    cur_server = (prime_server_s *)malloc(sizeof(prime_server_s));
+
+    /* fill in new server */
+    cur_server->host_alias = strdup(cmd->data.list[0]);
+
+    /* should we look up alias to verify? */
+    /* could also check for dups */
+    /* could allow a direct SID instead of alias */
+
+    cur_server->bmi_address = (char *)calloc(1, 2048);
+    ptr = cur_server->bmi_address;
+    for (i = 1; i < cmd->arg_count; i++)
+    {
+	strncat(ptr, cmd->data.list[i], 2048 - len);
+ 	len += strlen(cmd->data.list[i]);
+        if (i + 1 < cmd->arg_count)
+        {
+            strncat(ptr, ",", 2048 - len);
+        }
+ 	len++;
+    }
+
+    /* check if list initialized */
+    if (!config_s->prime_servers)
+    {
+        config_s->prime_servers = PINT_llist_new();
+    }
+    
+    PINT_llist_add_to_tail(config_s->prime_servers, (void *)cur_server);
+    return NULL;
+}
+
 DOTCONF_CB(get_range_list)
 {
     int i = 0, is_new_handle_mapping = 0;
@@ -2787,10 +2992,10 @@ DOTCONF_CB(get_range_list)
     struct host_handle_mapping_s *handle_mapping = NULL;
     PINT_llist **handle_range_list = NULL;
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     handle_range_list = ((config_s->configuration_context ==
@@ -2813,7 +3018,7 @@ DOTCONF_CB(get_range_list)
             if (is_valid_handle_range_description(cmd->data.list[i]))
             {
                 handle_mapping = get_or_add_handle_mapping(
-                    *handle_range_list, cmd->data.list[i-1]);
+                        *handle_range_list, cmd->data.list[i-1]);
                 if (!handle_mapping)
                 {
                     return("Error: Alias allocation failed; "
@@ -2824,29 +3029,29 @@ DOTCONF_CB(get_range_list)
                 {
                     is_new_handle_mapping = 1;
                     handle_mapping->alias_mapping =
-                        find_host_alias_ptr_by_alias(
+                            find_host_alias_ptr_by_alias(
                             config_s, cmd->data.list[i-1], NULL);
                 }
 
                 assert(handle_mapping->alias_mapping ==
-                       find_host_alias_ptr_by_alias(
+                           find_host_alias_ptr_by_alias(
                            config_s, cmd->data.list[i-1], NULL));
 
                 if (!handle_mapping->handle_range &&
                     !handle_mapping->handle_extent_array.extent_array)
                 {
                     handle_mapping->handle_range =
-                        strdup(cmd->data.list[i]);
+                            strdup(cmd->data.list[i]);
 
                     /* build the extent array, based on range */
-                    build_extent_array(
-                        handle_mapping->handle_range,
-                        &handle_mapping->handle_extent_array);
+                    build_extent_array(handle_mapping->handle_range,
+                                       &handle_mapping->handle_extent_array);
                 }
                 else
                 {
                     char *new_handle_range = PINT_merge_handle_range_strs(
-                        handle_mapping->handle_range, cmd->data.list[i]);
+                            handle_mapping->handle_range,
+                            cmd->data.list[i]);
                     free(handle_mapping->handle_range);
                     handle_mapping->handle_range = new_handle_range;
 
@@ -2859,7 +3064,7 @@ DOTCONF_CB(get_range_list)
                 if (is_new_handle_mapping)
                 {
                     PINT_llist_add_to_tail(*handle_range_list,
-                                      (void *)handle_mapping);
+                                           (void *)handle_mapping);
                 }
             }
             else
@@ -2878,9 +3083,9 @@ DOTCONF_CB(get_range_list)
 DOTCONF_CB(get_param)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     distribution_param_configuration* param =
-        malloc(sizeof(distribution_param_configuration));
+            malloc(sizeof(distribution_param_configuration));
 
     if (NULL != param)
     {
@@ -2895,10 +3100,10 @@ DOTCONF_CB(get_param)
 DOTCONF_CB(get_value)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     distribution_param_configuration* param;
     param = (distribution_param_configuration*)PINT_llist_tail(
-        config_s->default_dist_config.param_list);
+            config_s->default_dist_config.param_list);
     if (NULL != param)
     {
         param->value = (PVFS_size)cmd->data.value;
@@ -2909,11 +3114,11 @@ DOTCONF_CB(get_value)
 DOTCONF_CB(get_default_num_dfiles)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
     if(fs_conf->default_num_dfiles < 0)
@@ -2926,11 +3131,11 @@ DOTCONF_CB(get_default_num_dfiles)
 DOTCONF_CB(get_secret_key)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->secret_key = strdup(cmd->data.str);
     return NULL;
@@ -2939,11 +3144,11 @@ DOTCONF_CB(get_secret_key)
 DOTCONF_CB(get_immediate_completion)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
 
     if(!strcmp((char *)cmd->data.str, "yes"))
     {
@@ -2960,11 +3165,11 @@ DOTCONF_CB(get_immediate_completion)
 DOTCONF_CB(get_coalescing_high_watermark)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
 
     if(!strcmp((char *)cmd->data.str, "infinity"))
     {
@@ -2980,11 +3185,11 @@ DOTCONF_CB(get_coalescing_high_watermark)
 DOTCONF_CB(get_coalescing_low_watermark)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->coalescing_low_watermark = cmd->data.value;
     return NULL;
@@ -2994,15 +3199,15 @@ DOTCONF_CB(get_trove_method)
 {
     int * method;
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     method = &config_s->trove_method;
     if(config_s->configuration_context == CTX_STORAGEHINTS)
     {
         /* we must be in a storagehints inside a filesystem context */
         struct filesystem_configuration_s *fs_conf =
-            (struct filesystem_configuration_s *)
-            PINT_llist_head(config_s->file_systems);
+                (struct filesystem_configuration_s *)
+                PINT_llist_head(config_s->file_systems);
 
         method = &fs_conf->trove_method; 
     }
@@ -3033,11 +3238,12 @@ DOTCONF_CB(get_trove_method)
 DOTCONF_CB(get_small_file_size)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     /* we must be in a storagehints inside a filesystem context */
     struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *) PINT_llist_head(config_s->file_systems);
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->small_file_size = cmd->data.value;
     return NULL;
@@ -3046,11 +3252,11 @@ DOTCONF_CB(get_small_file_size)
 DOTCONF_CB(directio_thread_num)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->directio_thread_num = cmd->data.value;
 
@@ -3060,11 +3266,11 @@ DOTCONF_CB(directio_thread_num)
 DOTCONF_CB(directio_ops_per_queue)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->directio_ops_per_queue = cmd->data.value;
 
@@ -3074,11 +3280,11 @@ DOTCONF_CB(directio_ops_per_queue)
 DOTCONF_CB(directio_timeout)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
 
     fs_conf->directio_timeout = cmd->data.value;
 
@@ -3118,7 +3324,7 @@ DOTCONF_CB(get_server_key)
 DOTCONF_CB(get_security_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
     config_s->security_timeout = cmd->data.value;
     return NULL;
 }
@@ -3126,7 +3332,7 @@ DOTCONF_CB(get_security_timeout)
 DOTCONF_CB(tree_width)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     config_s->tree_width = cmd->data.value;
 
@@ -3136,7 +3342,7 @@ DOTCONF_CB(tree_width)
 DOTCONF_CB(tree_threshold)
 {
     struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
+            (struct server_configuration_s *)cmd->context;
 
     config_s->tree_threshold = cmd->data.value;
 
@@ -3338,7 +3544,7 @@ static int is_valid_handle_range_description(char *h_range)
 }
 
 static int is_populated_filesystem_configuration(
-    struct filesystem_configuration_s *fs)
+        struct filesystem_configuration_s *fs)
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
              fs->meta_handle_ranges && fs->data_handle_ranges &&
@@ -3346,8 +3552,8 @@ static int is_populated_filesystem_configuration(
 }
     
 static int is_root_handle_in_a_meta_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config,
+        struct filesystem_configuration_s *fs)
 {
     int ret = 0;
     PINT_llist *cur = NULL;
@@ -3383,16 +3589,14 @@ static int is_root_handle_in_a_meta_range(
                 break;
             }
 
-            extent_list = PINT_create_extent_list(
-                cur_h_mapping->handle_range);
+            extent_list = PINT_create_extent_list(cur_h_mapping->handle_range);
             if (!extent_list)
             {
                 gossip_err("Failed to create extent list.\n");
                 break;
             }
 
-            ret = PINT_handle_in_extent_list(
-                extent_list,fs->root_handle);
+            ret = PINT_handle_in_extent_list(extent_list,fs->root_handle);
             PINT_release_extent_list(extent_list);
             if (ret == 1)
             {
@@ -3405,8 +3609,8 @@ static int is_root_handle_in_a_meta_range(
 }
 
 static int is_valid_filesystem_configuration(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config,
+        struct filesystem_configuration_s *fs)
 {
     int ret = is_root_handle_in_a_meta_range(config,fs);
     if (ret == 0)
@@ -3421,7 +3625,7 @@ static int is_valid_filesystem_configuration(
 static void free_host_handle_mapping(void *ptr)
 {
     struct host_handle_mapping_s *h_mapping =
-        (struct host_handle_mapping_s *)ptr;
+            (struct host_handle_mapping_s *)ptr;
     if (h_mapping)
     {
         /*
@@ -3462,7 +3666,7 @@ static void free_host_alias(void *ptr)
 static void free_filesystem(void *ptr)
 {
     struct filesystem_configuration_s *fs =
-        (struct filesystem_configuration_s *)ptr;
+            (struct filesystem_configuration_s *)ptr;
 
     if (fs)
     {
@@ -3532,9 +3736,8 @@ static void free_filesystem(void *ptr)
     }
 }
 
-static void copy_filesystem(
-    struct filesystem_configuration_s *dest_fs,
-    struct filesystem_configuration_s *src_fs)
+static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
+                            struct filesystem_configuration_s *src_fs)
 {
     PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
@@ -3574,22 +3777,20 @@ static void copy_filesystem(
             }
 
             new_h_mapping = (struct host_handle_mapping_s *)
-                malloc(sizeof(struct host_handle_mapping_s));
-            assert(new_h_mapping);
+                    malloc(sizeof(struct host_handle_mapping_s));
+            assert(new_h_mapping); /* TODO: replace with error handling */
 
             /* these are pointers into another struct with a different
              * lifetime, do not copy */
             new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
-            new_h_mapping->handle_range =
-                strdup(cur_h_mapping->handle_range);
-            assert(new_h_mapping->handle_range);
+            new_h_mapping->handle_range = strdup(cur_h_mapping->handle_range);
+            assert(new_h_mapping->handle_range); /* TODO: replace with error handling */
 
             build_extent_array(new_h_mapping->handle_range,
                                &new_h_mapping->handle_extent_array);
 
-            PINT_llist_add_to_tail(
-                dest_fs->meta_handle_ranges, new_h_mapping);
+            PINT_llist_add_to_tail(dest_fs->meta_handle_ranges, new_h_mapping);
 
             cur = PINT_llist_next(cur);
         }
@@ -3605,20 +3806,19 @@ static void copy_filesystem(
             }
 
             new_h_mapping = (struct host_handle_mapping_s *)
-                malloc(sizeof(struct host_handle_mapping_s));
-            assert(new_h_mapping);
+                    malloc(sizeof(struct host_handle_mapping_s));
+            assert(new_h_mapping); /* TODO: replace with error handling */
 
             new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
             new_h_mapping->handle_range =
-                strdup(cur_h_mapping->handle_range);
-            assert(new_h_mapping->handle_range);
+                    strdup(cur_h_mapping->handle_range);
+            assert(new_h_mapping->handle_range); /* TODO: replace with error handling */
 
             build_extent_array(new_h_mapping->handle_range,
                                &new_h_mapping->handle_extent_array);
 
-            PINT_llist_add_to_tail(
-                dest_fs->data_handle_ranges, new_h_mapping);
+            PINT_llist_add_to_tail(dest_fs->data_handle_ranges, new_h_mapping);
 
             cur = PINT_llist_next(cur);
         }
@@ -3626,16 +3826,15 @@ static void copy_filesystem(
         /* if the optional hints are used, copy them too */
         if (src_fs->attr_cache_keywords)
         {
-            dest_fs->attr_cache_keywords =
-                strdup(src_fs->attr_cache_keywords);
+            dest_fs->attr_cache_keywords = strdup(src_fs->attr_cache_keywords);
             assert(dest_fs->attr_cache_keywords);
         }
 
         dest_fs->handle_recycle_timeout_sec =
-            src_fs->handle_recycle_timeout_sec;
+                src_fs->handle_recycle_timeout_sec;
         dest_fs->attr_cache_size = src_fs->attr_cache_size;
         dest_fs->attr_cache_max_num_elems =
-            src_fs->attr_cache_max_num_elems;
+                src_fs->attr_cache_max_num_elems;
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
  
@@ -3648,7 +3847,7 @@ static void copy_filesystem(
         {
             int i;
             dest_fs->ro_hosts = (char **) calloc(src_fs->ro_count, sizeof(char *));
-            assert(dest_fs->ro_hosts);
+            assert(dest_fs->ro_hosts); /* TODO: replace with error handling */
             for (i = 0; i < src_fs->ro_count; i++)
             {
                 dest_fs->ro_hosts[i] = strdup(src_fs->ro_hosts[i]);
@@ -3658,42 +3857,54 @@ static void copy_filesystem(
         if (src_fs->ro_count > 0 && src_fs->ro_netmasks)
         {
             dest_fs->ro_netmasks = (int *) calloc(src_fs->ro_count, sizeof(int));
-            assert(dest_fs->ro_netmasks);
-            memcpy(dest_fs->ro_netmasks, src_fs->ro_netmasks, src_fs->ro_count * sizeof(int));
+            assert(dest_fs->ro_netmasks); /* TODO; replace with error handling */
+            memcpy(dest_fs->ro_netmasks,
+                   src_fs->ro_netmasks,
+                   src_fs->ro_count * sizeof(int));
         }
         if (src_fs->root_squash_count > 0 && src_fs->root_squash_hosts)
         {
             int i;
-            dest_fs->root_squash_hosts = (char **) calloc(src_fs->root_squash_count, sizeof(char *));
-            assert(dest_fs->root_squash_hosts);
+            dest_fs->root_squash_hosts =
+                    (char **) calloc(src_fs->root_squash_count, sizeof(char *));
+            assert(dest_fs->root_squash_hosts); /* TODO; replace with error handling */
             for (i = 0; i < src_fs->root_squash_count; i++)
             {
-                dest_fs->root_squash_hosts[i] = strdup(src_fs->root_squash_hosts[i]);
-                assert(dest_fs->root_squash_hosts[i]);
+                dest_fs->root_squash_hosts[i] =
+                        strdup(src_fs->root_squash_hosts[i]);
+                assert(dest_fs->root_squash_hosts[i]); /* TODO; replace with error handling */
             }
         }
         if (src_fs->root_squash_count > 0 && src_fs->root_squash_netmasks)
         {
-            dest_fs->root_squash_netmasks = (int *) calloc(src_fs->root_squash_count, sizeof(int));
-            assert(dest_fs->root_squash_netmasks);
-            memcpy(dest_fs->root_squash_netmasks, src_fs->root_squash_netmasks, src_fs->root_squash_count * sizeof(int));
+            dest_fs->root_squash_netmasks =
+                    (int *) calloc(src_fs->root_squash_count, sizeof(int));
+            assert(dest_fs->root_squash_netmasks); /* TODO; replace with error handling */
+            memcpy(dest_fs->root_squash_netmasks,
+                   src_fs->root_squash_netmasks,
+                   src_fs->root_squash_count * sizeof(int));
         }
         if (src_fs->all_squash_count > 0 && src_fs->all_squash_hosts)
         {
             int i;
-            dest_fs->all_squash_hosts = (char **) calloc(src_fs->all_squash_count, sizeof(char *));
-            assert(dest_fs->all_squash_hosts);
+            dest_fs->all_squash_hosts =
+                    (char **) calloc(src_fs->all_squash_count, sizeof(char *));
+            assert(dest_fs->all_squash_hosts); /* TODO; replace with error handling */
             for (i = 0; i < src_fs->all_squash_count; i++)
             {
-                dest_fs->all_squash_hosts[i] = strdup(src_fs->all_squash_hosts[i]);
-                assert(dest_fs->all_squash_hosts[i]);
+                dest_fs->all_squash_hosts[i] =
+                        strdup(src_fs->all_squash_hosts[i]);
+                assert(dest_fs->all_squash_hosts[i]); /* TODO; replace with error handling */
             }
         }
         if (src_fs->all_squash_count > 0 && src_fs->all_squash_netmasks)
         {
-            dest_fs->all_squash_netmasks = (int *) calloc(src_fs->all_squash_count, sizeof(int));
-            assert(dest_fs->all_squash_netmasks);
-            memcpy(dest_fs->all_squash_netmasks, src_fs->all_squash_netmasks, src_fs->all_squash_count * sizeof(int));
+            dest_fs->all_squash_netmasks =
+                    (int *) calloc(src_fs->all_squash_count, sizeof(int));
+            assert(dest_fs->all_squash_netmasks); /* TODO; replace with error handling */
+            memcpy(dest_fs->all_squash_netmasks,
+                   src_fs->all_squash_netmasks,
+                          src_fs->all_squash_count * sizeof(int));
         }
         dest_fs->exp_anon_uid = src_fs->exp_anon_uid;
         dest_fs->exp_anon_gid = src_fs->exp_anon_gid;
@@ -3705,9 +3916,9 @@ static void copy_filesystem(
 
 
 static host_alias_s *find_host_alias_ptr_by_alias(
-    struct server_configuration_s *config_s,
-    char *alias,
-    int *index)
+        struct server_configuration_s *config_s,
+        char *alias,
+        int *index)
 {
     PINT_llist *cur = NULL;
     struct host_alias_s *ret = NULL;
@@ -3792,7 +4003,7 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
     if (!ret)
     {
         ret = (host_handle_mapping_s *)
-            malloc(sizeof(struct host_handle_mapping_s));
+                malloc(sizeof(struct host_handle_mapping_s));
         if (ret)
         {
             memset(ret,0,sizeof(struct host_handle_mapping_s));
@@ -3802,8 +4013,8 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
 }
 
 static int build_extent_array(
-    char *handle_range_str,
-    PVFS_handle_extent_array *handle_extent_array)
+        char *handle_range_str,
+        PVFS_handle_extent_array *handle_extent_array)
 {
     int i = 0, status = 0, num_extents = 0;
     PVFS_handle_extent cur_extent;
@@ -3812,7 +4023,8 @@ static int build_extent_array(
     {
         /* first pass, find out how many extents there are total */
         while(PINT_parse_handle_ranges(handle_range_str,
-                                       &cur_extent, &status))
+                                       &cur_extent,
+                                       &status))
         {
             num_extents++;
         }
@@ -3821,7 +4033,7 @@ static int build_extent_array(
         {
             handle_extent_array->extent_count = num_extents;
             handle_extent_array->extent_array = (PVFS_handle_extent *)
-                malloc(num_extents * sizeof(PVFS_handle_extent));
+                    malloc(num_extents * sizeof(PVFS_handle_extent));
             if (!handle_extent_array->extent_array)
             {
                 gossip_err("Error: failed to alloc %d extents\n",
@@ -3836,7 +4048,8 @@ static int build_extent_array(
 
             /* second pass, fill in the extent array */
             while(PINT_parse_handle_ranges(handle_range_str,
-                                           &cur_extent, &status))
+                                           &cur_extent,
+                                           &status))
             {
                 handle_extent_array->extent_array[i] = cur_extent;
                 i++;
@@ -3859,10 +4072,9 @@ static int build_extent_array(
  *
  * Synopsis: Retrieve the list of allowed ports (i.e. range)
  */
-int PINT_config_get_allowed_ports(
-    struct server_configuration_s *config_s,
-    int *enabled,
-    unsigned long *allowed_ports)
+int PINT_config_get_allowed_ports(struct server_configuration_s *config_s,
+                                  int *enabled,
+                                  unsigned long *allowed_ports)
 {
     int ret = -1;
 
@@ -3895,11 +4107,11 @@ int PINT_config_get_allowed_ports(
  */
 
 int PINT_config_get_allowed_networks(
-    struct server_configuration_s *config_s,
-    int  *enabled,
-    int  *allowed_networks_count,
-    char ***allowed_networks,
-    int  **allowed_masks)
+        struct server_configuration_s *config_s,
+        int  *enabled,
+        int  *allowed_networks_count,
+        char ***allowed_networks,
+        int  **allowed_masks)
 {
     int ret = -1;
 
@@ -3930,9 +4142,8 @@ int PINT_config_get_allowed_networks(
  * Synopsis: retrieve the bmi_address matching the specified alias
  *           
  */
-char *PINT_config_get_host_addr_ptr(
-    struct server_configuration_s *config_s,
-    char *alias)
+char *PINT_config_get_host_addr_ptr(struct server_configuration_s *config_s,
+                                    char *alias)
 {
     char *ret = (char *)0;
     PINT_llist *cur = NULL;
@@ -3974,8 +4185,8 @@ char *PINT_config_get_host_addr_ptr(
  *           
  */
 char *PINT_config_get_host_alias_ptr(
-    struct server_configuration_s *config_s,
-    char *bmi_address)
+        struct server_configuration_s *config_s,
+        char *bmi_address)
 {
     char *ret = (char *)0;
     PINT_llist *cur = NULL;
@@ -4018,16 +4229,16 @@ char *PINT_config_get_host_alias_ptr(
  *           
  */
 char *PINT_config_get_meta_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config_s,
+        struct filesystem_configuration_s *fs)
 {
     return get_handle_range_str(config_s,fs,1);
 }
 
 int PINT_config_get_meta_handle_extent_array(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id,
-    PVFS_handle_extent_array *extent_array)
+        struct server_configuration_s *config_s,
+        PVFS_fs_id fs_id,
+        PVFS_handle_extent_array *extent_array)
 {
     int ret = -1;
     PINT_llist *cur = NULL;
@@ -4055,8 +4266,8 @@ int PINT_config_get_meta_handle_extent_array(
 
         if (cur_fs)
         {
-            my_alias = PINT_config_get_host_alias_ptr(
-                config_s, config_s->host_id);
+            my_alias = PINT_config_get_host_alias_ptr(config_s,
+                                                      config_s->host_id);
             if (my_alias)
             {
                 cur = cur_fs->meta_handle_ranges;
@@ -4079,8 +4290,8 @@ int PINT_config_get_meta_handle_extent_array(
                         extent_array->extent_count = 
                             cur_h_mapping->handle_extent_array.extent_count;
                         extent_array->extent_array = malloc(
-                            (extent_array->extent_count *
-                             sizeof(PVFS_handle_extent)));
+                                (extent_array->extent_count *
+                                sizeof(PVFS_handle_extent)));
                         assert(extent_array->extent_array);
                         memcpy(extent_array->extent_array,
                                cur_h_mapping->handle_extent_array.extent_array,
@@ -4112,8 +4323,8 @@ int PINT_config_get_meta_handle_extent_array(
  *           
  */
 char *PINT_config_get_data_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config_s,
+        struct filesystem_configuration_s *fs)
 {
     return get_handle_range_str(config_s,fs,0);
 }
@@ -4134,8 +4345,8 @@ char *PINT_config_get_data_handle_range_str(
  *           
  */
 char *PINT_config_get_merged_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config_s,
+        struct filesystem_configuration_s *fs)
 {
     char *merged_range = NULL;
     char *mrange = get_handle_range_str(config_s,fs,1);
@@ -4164,9 +4375,8 @@ char *PINT_config_get_merged_handle_range_str(
   even if this call fails half way into it, a PINT_config_release
   call should properly de-alloc all consumed memory.
 */
-static int cache_config_files(
-    struct server_configuration_s *config_s,
-    char *global_config_filename)
+static int cache_config_files(struct server_configuration_s *config_s,
+                              char *global_config_filename)
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
@@ -4272,7 +4482,8 @@ static int cache_config_files(
     }
 
     memset(config_s->fs_config_buf, 0, config_s->fs_config_buflen);
-    nread = read(fd, config_s->fs_config_buf,
+    nread = read(fd,
+                 config_s->fs_config_buf,
                  (config_s->fs_config_buflen - 1));
     if (nread != (config_s->fs_config_buflen - 1))
     {
@@ -4293,9 +4504,9 @@ static int cache_config_files(
 }
 
 static char *get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs,
-    int meta_handle_range)
+        struct server_configuration_s *config_s,
+        struct filesystem_configuration_s *fs,
+        int meta_handle_range)
 {
     char *ret = (char *)0;
     char *my_alias = (char *)0;
@@ -4304,12 +4515,11 @@ static char *get_handle_range_str(
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
+        my_alias = PINT_config_get_host_alias_ptr(config_s,config_s->host_id);
         if (my_alias)
         {
             cur = (meta_handle_range ? fs->meta_handle_ranges :
-                   fs->data_handle_ranges);
+                                       fs->data_handle_ranges);
             while(cur)
             {
                 cur_h_mapping = PINT_llist_head(cur);
@@ -4339,7 +4549,7 @@ static char *get_handle_range_str(
   (i.e. contains values that make sense); 0 otherwise
 */
 int PINT_config_is_valid_configuration(
-    struct server_configuration_s *config_s)
+        struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
     PINT_llist *cur = NULL;
@@ -4372,9 +4582,8 @@ int PINT_config_is_valid_configuration(
   returns 1 if the specified coll_id is valid based on
   the specified server_configuration struct; 0 otherwise
 */
-int PINT_config_is_valid_collection_id(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id)
+int PINT_config_is_valid_collection_id(struct server_configuration_s *config_s,
+                                       PVFS_fs_id fs_id)
 {
     int ret = 0;
     PINT_llist *cur = NULL;
@@ -4406,8 +4615,8 @@ int PINT_config_is_valid_collection_id(
   the specified filesystem; NULL otherwise
 */
 struct filesystem_configuration_s* PINT_config_find_fs_name(
-    struct server_configuration_s *config_s,
-    char *fs_name)
+        struct server_configuration_s *config_s,
+        char *fs_name)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -4441,8 +4650,8 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
  * returns pointer to file system config struct on success, NULL on failure
  */
 struct filesystem_configuration_s* PINT_config_find_fs_id(
-    struct server_configuration_s* config_s,
-    PVFS_fs_id fs_id)
+        struct server_configuration_s* config_s,
+        PVFS_fs_id fs_id)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -4468,12 +4677,12 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
 }
 
 PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
-    struct server_configuration_s *config_s,
-    char *fs_name)
+        struct server_configuration_s *config_s,
+        char *fs_name)
 {
     PVFS_fs_id fs_id = 0;
     struct filesystem_configuration_s *fs =
-        PINT_config_find_fs_name(config_s, fs_name);
+            PINT_config_find_fs_name(config_s, fs_name);
     if (fs)
     {
         fs_id = fs->coll_id;
@@ -4490,7 +4699,7 @@ PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
  * NULL on failure
  */
 PINT_llist *PINT_config_get_filesystems(
-    struct server_configuration_s *config_s)
+        struct server_configuration_s *config_s)
 {
     return (config_s ? config_s->file_systems : NULL);
 }
@@ -4500,8 +4709,8 @@ PINT_llist *PINT_config_get_filesystems(
   filesystems if the fs_id does not match that of the specifed fs_id
 */
 int PINT_config_trim_filesystems_except(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id)
+        struct server_configuration_s *config_s,
+        PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL, *new_fs_list = NULL;
@@ -4527,10 +4736,11 @@ int PINT_config_trim_filesystems_except(
             if (cur_fs->coll_id == fs_id)
             {
                 new_fs = (struct filesystem_configuration_s *)malloc(
-                    sizeof(struct filesystem_configuration_s));
+                        sizeof(struct filesystem_configuration_s));
                 assert(new_fs);
 
-                memset(new_fs, 0,
+                memset(new_fs,
+                       0,
                        sizeof(struct filesystem_configuration_s));
 
                 copy_filesystem(new_fs, cur_fs);
@@ -4551,11 +4761,10 @@ int PINT_config_trim_filesystems_except(
     return ret;
 }
 
-int PINT_config_get_fs_key(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id,
-    char ** key,
-    int * length)
+int PINT_config_get_fs_key(struct server_configuration_s *config,
+                           PVFS_fs_id fs_id,
+                           char ** key,
+                           int * length)
 {
 #ifndef HAVE_OPENSSL
     *key = NULL;
@@ -4608,7 +4817,7 @@ int PINT_config_get_fs_key(
     {
         BIO_free_all(bio);
         return -PVFS_ENOMEM;
-   }
+    }
     
     *length = BIO_read(bio, *key, len);
 
@@ -4621,8 +4830,8 @@ int PINT_config_get_fs_key(
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
+        struct server_configuration_s *config,
+        struct filesystem_configuration_s *fs)
 {
     int ret = 0;
     PINT_llist *cur = NULL;
@@ -4662,7 +4871,7 @@ static int is_root_handle_in_my_range(
             if (strcmp(config->host_id,cur_host_id) == 0)
             {
                 extent_list = PINT_create_extent_list(
-                    cur_h_mapping->handle_range);
+                        cur_h_mapping->handle_range);
                 if (!extent_list)
                 {
                     gossip_err("Failed to create extent list.\n");
@@ -4670,7 +4879,7 @@ static int is_root_handle_in_my_range(
                 }
 
                 ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
+                        extent_list,fs->root_handle);
                 PINT_release_extent_list(extent_list);
                 if (ret == 1)
                 {
@@ -4688,7 +4897,7 @@ static int is_root_handle_in_my_range(
   with the particular host settings local to the caller
 */
 int PINT_config_pvfs2_mkspace(
-    struct server_configuration_s *config)
+        struct server_configuration_s *config)
 {
     int ret = 1;
     PVFS_handle root_handle = PVFS_HANDLE_NULL;
@@ -4709,9 +4918,9 @@ int PINT_config_pvfs2_mkspace(
             }
 
             cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
-                config, cur_fs);
+                                            config, cur_fs);
             cur_data_handle_range = PINT_config_get_data_handle_range_str(
-                config, cur_fs);
+                                            config, cur_fs);
 
             /*
               make sure have either a meta or data handle range (or
@@ -4747,10 +4956,15 @@ int PINT_config_pvfs2_mkspace(
                 (create_collection_only ? "collection" :
                  "storage space"));
 
-            ret = pvfs2_mkspace(
-                config->data_path, config->meta_path, cur_fs->file_system_name,
-                cur_fs->coll_id, root_handle, cur_meta_handle_range,
-                cur_data_handle_range, create_collection_only, 1);
+            ret = pvfs2_mkspace(config->data_path,
+                                config->meta_path,
+                                cur_fs->file_system_name,
+                                cur_fs->coll_id,
+                                root_handle,
+                                cur_meta_handle_range,
+                                cur_data_handle_range,
+                                create_collection_only,
+                                1);
 
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
@@ -4776,7 +4990,7 @@ int PINT_config_pvfs2_mkspace(
   with the particular host settings local to the caller
 */
 int PINT_config_pvfs2_rmspace(
-    struct server_configuration_s *config)
+        struct server_configuration_s *config)
 {
     int ret = 1;
     int remove_collection_only = 0;
@@ -4821,8 +5035,8 @@ int PINT_config_pvfs2_rmspace(
   fs_id if valid; TROVE_SYNC otherwise
 */
 int PINT_config_get_trove_sync_meta(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id)
+        struct server_configuration_s *config,
+        PVFS_fs_id fs_id)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
@@ -4838,8 +5052,8 @@ int PINT_config_get_trove_sync_meta(
   fs_id if valid; TROVE_SYNC otherwise
 */
 int PINT_config_get_trove_sync_data(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id)
+        struct server_configuration_s *config,
+        PVFS_fs_id fs_id)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
