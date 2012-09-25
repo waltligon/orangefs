@@ -2,6 +2,9 @@
 #include <usrint.h>
 #include "ucached.h"
 
+/* prototypes */
+void check_rc(int rc);
+
 /* FIFO  */
 static int readfd = 0;  /* Command File Descriptor */
 static int writefd = 0; /* Response File Descriptor */

@@ -1436,15 +1436,15 @@ void calc_copy_ops(
         /* Record necessary info for the future memcpy operation */
         if(i == 0)
         {
-            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr +
+            ucop[i].cache_pos = (char *)ureq[ureq_ndx].ublk_ptr +
             (offset % CACHE_BLOCK_SIZE);
         }
         else
         {
-            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr +
+            ucop[i].cache_pos = (char *)ureq[ureq_ndx].ublk_ptr +
             (blk_tfer_size - blk_left);
         }
-        ucop[i].buff_pos = vector[vec_ndx].iov_base +
+        ucop[i].buff_pos = (char *)vector[vec_ndx].iov_base +
         (vector[vec_ndx].iov_len - vec_left);
         ucop[i].blk_index = ureq[ureq_ndx].ublk_index;
         
