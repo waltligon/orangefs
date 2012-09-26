@@ -115,6 +115,7 @@ public class PVFS2JNI {
     //public native long pvfsWritev(int fd, Iovec [] vector, int count);
     
     //fuctions using the structure stat
+    public native int isDir(int mode);
     public native PVFS2JNI.Stat pvfsStat(String path);/* 06/26/2012 (STRUCTURE TESTED) */
     public native int pvfsStatMask(long x, String path, long mask); /* 06/27/2012 (STRUCTURE TESTED) */
     public native int pvfsFstat(long x, int fd); /* 06/27/2012 (STRUCTURE TESTED) */
@@ -275,7 +276,8 @@ public class PVFS2JNI {
         long st_mtime;
         long st_ctime;
     }
-    
+
+/*    
     public class Dirent{
         long d_ino;
         long d_off;
@@ -293,7 +295,8 @@ public class PVFS2JNI {
         String d_name;
         
     }
-    
+*/
+  
     public class Statfs{
         long f_type;
         long f_bsize;

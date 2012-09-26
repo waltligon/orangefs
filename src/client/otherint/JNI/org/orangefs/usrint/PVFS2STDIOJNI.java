@@ -6,7 +6,12 @@
 
 package org.orangefs.usrint;
 
+import java.lang.reflect.Field;
+
 public class PVFS2STDIOJNI {
+    public native String [] getUsernameGroupname(int uid, int gid);
+    public native String [] getFilesInDir(String path);
+    public native int recursiveDelete(String path);
 
     public native long Malloc(long size);
     public native void Free(long ptr);
@@ -83,7 +88,7 @@ public class PVFS2STDIOJNI {
     public native String Mkdtemp(String tmplate);
     public native int Mkstemp(String tmplate);
     public native long Tmpfile();
-    public native long Opendir(String name);
+    public native PVFS2STDIOJNI.Dir Opendir(String name);
     public native int Dirfd(long dir);
     public native void Rewinddir(long dir);
     public native void Seekdir(long dir, long offset);
@@ -100,6 +105,78 @@ public class PVFS2STDIOJNI {
             System.err.println("Couldn't load libPVFS2STDIOJNI.so.");
             System.err.println("java.library.path = " + System.getProperty("java.library.path"));
             System.exit(-1);
+        }
+    }
+
+    public class Dir {
+        public long d_ino;
+        public long d_off;
+        public int d_reclen;
+        public String d_type;
+        public String d_name;
+
+        /* Constructor */
+        Dir(){}
+
+        public String toString() {
+            StringBuilder result = new StringBuilder();
+            String newLine = System.getProperty("line.separator");
+
+            result.append(this.getClass().getName());
+            result.append(" Object {");
+            result.append(newLine);
+
+            Field[] fields = this.getClass().getDeclaredFields();
+
+            for(Field field : fields ) {
+                result.append("  ");
+                try {
+                    result.append(field.getName());
+                    result.append(": ");
+                    result.append(field.get(this));
+                } catch(IllegalAccessException ex) {
+                    System.out.println(ex);
+                }
+                result.append(newLine);
+            }
+            result.append("}");
+            return result.toString();
+        }
+    }
+
+    public class Dir64 {
+        public long d_ino;
+        public long d_off;
+        public int d_reclen;
+        public String d_type;
+        public String d_name;
+
+        /* Constructor */
+        Dir64(){}
+        
+        public String toString() {
+            StringBuilder result = new StringBuilder();
+            String newLine = System.getProperty("line.separator");
+        
+            result.append(this.getClass().getName());
+            result.append(" Object {");
+            result.append(newLine);
+
+            Field[] fields = this.getClass().getDeclaredFields();
+
+            for(Field field : fields ) {
+                result.append("  ");
+                try {
+                    result.append(field.getName());
+                    result.append(": ");
+                    result.append(field.get(this));
+                } catch(IllegalAccessException ex) {
+                    System.out.println(ex);
+                }
+                result.append(newLine);
+            }
+            result.append("}");
+            return result.toString();
         }
     }
 }
