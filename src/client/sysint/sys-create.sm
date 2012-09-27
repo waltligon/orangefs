@@ -28,6 +28,8 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
 
+MY_ARRAY;
+
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -46,6 +48,14 @@ static int create_delete_handles_comp_fn(
 /* misc helper functions */
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 static int check_config_for_replication(replication_s *replication,PVFS_object_ref *parent);
+int copy_replication_info_from_config(uint32_t         replication_switch
+                                     ,PVFS_sys_layout *replication_layout
+                                     ,uint32_t         replication_number_of_copies
+                                     ,replication_s   *dst_p
+);
+int copy_replication_info(replication_s *src_p, replication_s *dst_p);
+void print_replication_structure(replication_s *replication_p);
+
 
 %%
 
@@ -870,7 +880,8 @@ static PINT_sm_action create_parent_getattr_inspect(
     /* Determine if replication is on:
      *  1. Did the user send in replication information on the PVFS_sys_create() call?
      *  2. Does the parent directory contain replication information?
-     *  3. What does the fs.conf say?
+     *  3. What does the fs.conf say?  NOTE: config file will have system defaults or
+     *     whatever the user has defined.
      */
 
     /* get replication info from PVFS_sys_create() call */
@@ -1055,14 +1066,16 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-static int check_config_for_replication(replication_s *replication, PVFS_object_ref *parent)
+/* This function pulls replication information from the config file and stores the data in the
+ * replication structure within the create structure (sm_p->u.create.replication).
+ */
+static int check_config_for_replication(replication_s *replication_p, PVFS_object_ref *parent)
 {
     struct server_configuration_s *server_config = PINT_get_server_config_struct(parent->fs_id);
     filesystem_configuration_s *fs               = PINT_config_find_fs_id(server_config,parent->fs_id);
-    PVFS_sys_layout *dest_layout 
-                   ,*src_layout;
-    struct PVFS_sys_server_list *dest_server_list
-                               ,*src_server_list;
+    int ret;
+
+    /* NOTE: config info cannot change until PINT_put_server_config_struct() is called. */
 
     if (!fs)
     {
@@ -1073,51 +1086,111 @@ static int check_config_for_replication(replication_s *replication, PVFS_object_
         return(-PVFS_EINVAL);
     }
 
-
-    replication->replication_switch = fs->replication_switch;
-    replication->replication_number_of_copies = fs->replication_number_of_copies;
-
-    dest_layout = &replication->replication_layout;
-    src_layout  = &fs->replication_layout;
-
-    dest_server_list = &dest_layout->server_list;
-    src_server_list  = &src_layout->server_list;
-
-    dest_layout->algorithm = src_layout->algorithm;
-    dest_server_list->count = src_server_list->count;
-
-    if (src_server_list-> count != 0)
+    ret = copy_replication_info_from_config(fs->replication_switch
+                                           ,&fs->replication_layout
+                                           ,fs->replication_number_of_copies
+                                           ,replication_p);
+    if (ret)
     {
-        dest_server_list->servers = 
-            calloc(src_server_list->count,sizeof(*src_server_list->servers));
-        if (!dest_server_list->servers)
-        {
-           return(-PVFS_ENOMEM);
-        }
-        memcpy(dest_server_list->servers,
-               src_server_list->servers,
-               src_server_list->count * sizeof(*src_server_list->servers));
+       gossip_err("%s:Error copying replication data from the config file.\n",__func__);
+       return(ret);
     }
-    gossip_debug(GOSSIP_CLIENT_DEBUG,"\nreplication switch : %d.\n"
-                                     "         algorithm : %u.\n"
-                                     "  number of copies : %d.\n",
-            replication->replication_switch,
-            replication->replication_layout.algorithm,
-            replication->replication_number_of_copies);
-    if (replication->replication_layout.server_list.count != 0)
+
+    //if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
-        int i;
-        for (i=0; i<replication->replication_layout.server_list.count; i++)
-            gossip_debug(GOSSIP_CLIENT_DEBUG,"replication server[%d] : %d\n"
-                      ,i
-                      ,(int)replication->replication_layout.server_list.servers[i]);
+       print_replication_structure(replication_p);
     }
 
     PINT_put_server_config_struct(server_config);
 
     return(0);
 }/*end check_config_for_replication*/
+
+/* wrapper function that copies individual variables to a replication structure */
+int copy_replication_info_from_config(uint32_t         replication_switch
+                                     ,PVFS_sys_layout *replication_layout
+                                     ,uint32_t         replication_number_of_copies
+                                     ,replication_s   *dst_p)
+{
+    replication_s src = {0};
+
+    src.replication_switch                     = replication_switch;
+    src.replication_number_of_copies           = replication_number_of_copies;
+    src.replication_layout                     = *replication_layout;
+ //   src.replication_layout.server_list.count   = replication_layout->server_list.count;
+ //   src.replication_layout.server_list.servers = replication_layout->server_list.servers;
+
+    return(copy_replication_info(&src,dst_p));
+
+}/*end copy_replication_info_from_config*/
+
+
+/* helper function to copy data from one replication structure to another */
+int copy_replication_info(replication_s *src_p, replication_s *dst_p)
+{
+    int32_t server_count = 0;
+
+    dst_p->replication_switch           = src_p->replication_switch;
+    dst_p->replication_number_of_copies = src_p->replication_number_of_copies;
+
+    dst_p->replication_layout.algorithm         = src_p->replication_layout.algorithm;
+    dst_p->replication_layout.server_list.count = server_count = src_p->replication_layout.server_list.count;
+
+    if (server_count <= 0)
+    {
+        return(0);
+    }
+
+    dst_p->replication_layout.server_list.servers = calloc(server_count,sizeof(*src_p->replication_layout.server_list.servers));
+    if (!dst_p->replication_layout.server_list.servers)
+    {
+       gossip_err("%s:Error allocating memory for dst->replication_layout.server_list.servers.\n",__func__);
+       return(-PVFS_ENOMEM);
+    }
+
+    memcpy(dst_p->replication_layout.server_list.servers,
+           src_p->replication_layout.server_list.servers,
+           server_count * sizeof(*src_p->replication_layout.server_list.servers));
+
+    return(0);
+
+}/*end copy_replication_info*/
+
+/* helper function to print the replication structure */
+void print_replication_structure(replication_s *replication_p)
+{
+   char *PINT_layout_str_mapping[] =        
+   {                                          
+      "IGNORE",                               
+      "PVFS_SYS_LAYOUT_NONE",                 
+      "PVFS_SYS_LAYOUT_ROUND_ROBIN",          
+      "PVFS_SYS_LAYOUT_RANDOM",               
+      "PVFS_SYS_LAYOUT_LIST"                  
+   }; 
+
+    //gossip_debug(GOSSIP_CLIENT_DEBUG,"\nreplication switch : %d.\n"
+    gossip_err("\nreplication switch : %d.\n",replication_p->replication_switch);
+    gossip_err("  number of copies : %d.\n",replication_p->replication_number_of_copies);
+
+    gossip_err("         algorithm : %s.\n",PINT_layout_str_mapping[replication_p->replication_layout.algorithm]);
+
+
+    if (replication_p->replication_layout.server_list.count != 0)
+    {
+        int i;
+        for (i=0; i<replication_p->replication_layout.server_list.count; i++)
+            //gossip_debug(GOSSIP_CLIENT_DEBUG,"replication server[%d] : %d\n"
+            gossip_err("replication server[%d] : %d\n"
+                      ,i
+                      ,(int)replication_p->replication_layout.server_list.servers[i]);
+    }
+
+    return;
+
+}/*end print_replication_structure*/
+
 /*
+ *
  * Local variables:
  *  mode: c
  *  c-indent-level: 4
