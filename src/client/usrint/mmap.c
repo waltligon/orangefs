@@ -93,7 +93,8 @@ int pvfs_munmap(void *start, size_t length)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if __SIZEOF_POINTER__ == __SIZEOF_LONG__
+#if (defined(__SIZEOF_POINTER__) && defined(__SIZEOF_LONG__)) && \
+    (__SIZEOF_POINTER__ == __SIZEOF_LONG__)
     if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
     if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)
@@ -137,7 +138,8 @@ int pvfs_msync(void *start, size_t length, int flags)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if __SIZEOF_POINTER__ == __SIZEOF_LONG__
+#if (defined(__SIZEOF_POINTER__) && defined(__SIZEOF_LONG__)) && \
+    (__SIZEOF_POINTER__ == __SIZEOF_LONG__)
     if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
     if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)

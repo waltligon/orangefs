@@ -2053,11 +2053,11 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
  *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-                         PVFS_object_ref *por,
-                         PVFS_size offset,
-                         void *buf,
-                         PVFS_Request mem_req,
-                         PVFS_Request file_req)
+                                 PVFS_object_ref *por,
+                                 PVFS_size offset,
+                                 void *buf,
+                                 PVFS_Request mem_req,
+                                 PVFS_Request file_req)
 {
     int rc = 0;
     int orig_errno = errno;
