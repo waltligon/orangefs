@@ -9,6 +9,17 @@ package org.orangefs.usrint;
 import java.lang.reflect.Field;
 
 public class PVFS2STDIOJNI {
+
+    /* from stdio.h: "The possibilities for the third argument to `setvbuf'." */
+    public int _IOFBF = 0; /* Fully buffered.  */
+    public int _IOLBF = 1; /* Line buffered.  */
+    public int _IONBF = 2; /* No buffering.  */
+
+    /* from stdio.h: "The possibilities for the third argument to `fseek'." */
+    public int SEEK_SET = 0; /* Seek from beginning of file.  */
+    public int SEEK_CUR = 1; /* Seek from current position.  */
+    public int SEEK_END = 2; /* Seek from end of file.  */
+
     public native String [] getUsernameGroupname(int uid, int gid);
     public native String [] getFilesInDir(String path);
     public native int recursiveDelete(String path);
@@ -25,26 +36,19 @@ public class PVFS2STDIOJNI {
     public native int Fseek(long stream, long offset, int whence);
     public native long Fread(byte [] ptr, long size, long nmemb, long stream);
     public native long Fwrite(byte [] ptr, long size, long nmemb, long stream);
-    
     public native long Fdopendir(int fd);
-    public native void InitStdio();
-    public native void LockInitStream(long stream);
-    public native void LockStream(long stream);
-    public native int TrylockStream(long stream);
-    public native void UnlockStream(long stream);
-    public native void LockFiniStream(long stream);
+
     public native void Flockfile(long stream);
     public native int Ftrylockfile(long stream);
     public native void Funlockfile(long stream);
-    public native int Mode2flags(String mode);
     
     public native long Fopen64(String path, String modes);
-    public native int InitStream(long stream, int flags, int bufsize);
     public native long Freopen(String path, String mode, long stream);
     public native long Freopen64(String path, String modes, long stream);
     public native long FwriteUnlocked(byte [] ptr, long size, long nmemb, long stream);
     public native long FreadUnlocked(byte [] ptr, long size, long nmemb, long stream);
     public native int Fcloseall();
+    public native long Ftell(long stream);
     public native int Fseeko(long stream, long offset, int whence);
     public native int Fseeko64(long stream, long offset, int whence);
     public native int Fseek64(long stream, long offset, int whence);

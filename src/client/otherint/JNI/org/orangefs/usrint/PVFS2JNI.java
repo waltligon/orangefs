@@ -117,12 +117,9 @@ public class PVFS2JNI {
     //fuctions using the structure stat
     public native int isDir(int mode);
     public native PVFS2JNI.Stat pvfsStat(String path);/* 06/26/2012 (STRUCTURE TESTED) */
-    public native int pvfsStatMask(long x, String path, long mask); /* 06/27/2012 (STRUCTURE TESTED) */
-    public native int pvfsFstat(long x, int fd); /* 06/27/2012 (STRUCTURE TESTED) */
-    public native int pvfsFstatMask(long x, int fd, long mask); /* 06/27/2012 (STRUCTURE TESTED) */
-    public native int pvfsFstatat(long x, int fd, String path, int flag); /* 06/27/2012 (STRUCTURE TESTED) */
-    public native int pvfsLstat(long x, String path); /* 06/27/2012 */
-    public native int pvfsLstatMask(long x, String path, long mask); /* 06/27/2012 */
+    public native PVFS2JNI.Stat pvfsFstat(int fd); /* 06/27/2012 (STRUCTURE TESTED) */
+    public native PVFS2JNI.Stat pvfsFstatat(int fd, String path, int flag); /* 06/27/2012 (STRUCTURE TESTED) */
+    public native PVFS2JNI.Stat pvfsLstat(String path); /* 06/27/2012 */
     
     //fuctions using the structure stat64
     public native int pvfsStat64(long x, String path); /* 06/28/2012  (STRUCTURE TESTED) */
@@ -130,8 +127,8 @@ public class PVFS2JNI {
     public native int pvfsLstat64(long x, String path);
     
     //fuctions using the structure statfs
-    public native int pvfsStatfs(long x, String path);
-    public native int pvfsFstatfs(long x, int fd);
+    public native PVFS2JNI.Statfs pvfsStatfs(String path);
+    public native PVFS2JNI.Statfs pvfsFstatfs(int fd);
     
     //fuctions using the structure statfs64
     public native int pvfsStatfs64(long x, String path);
@@ -141,8 +138,6 @@ public class PVFS2JNI {
     public native int pvfsStatvfs(long x, String path);
     public native int pvfsFstatvfs(long x, int fd);
     
-    
-    
     //fuctions using the structure dirent
     public native int pvfsReaddir(long x, int fd, int count);
     public native int pvfsGetdents (long x, int fd, int size);
@@ -151,13 +146,12 @@ public class PVFS2JNI {
     public native int pvfsGetdents64 (long x, int fd, int size);
     
     //fuctions using the structure timeval
-    public native int pvfsFutimesat (long x, long y, int dirfd, String path);
-    public native int pvfsUtimes (long x, long y,String path);
-    public native int pvfsFutimes (long x, long y, int fd);
+    public native PVFS2JNI.Timeval pvfsFutimesat (int dirfd, String path);
+    public native PVFS2JNI.Timeval pvfsUtimes (String path);
+    public native PVFS2JNI.Timeval pvfsFutimes (int fd);
     
     //fuctions using the structure utimbuf
-    public native int pvfsUtime(long x, String path);
-    
+    public native PVFS2JNI.Utimbuf pvfsUtime(String path);
     
     public native long pvfsListxattr(String path, String list, long size);
     public native long pvfsLlistxattr (String path, String list, long size);

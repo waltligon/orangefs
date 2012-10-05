@@ -41,7 +41,7 @@ int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
 #define JNI_DBG 1
 
 /* Macro that helps print function info */
-#define PFI if(JNI_DBG){jni_printf("function = {%s}\n", __func__);}
+#define PFI if(JNI_DBG){jni_printf("function={%s}\n", __func__);}
 
 /* Macro that flushes stderr. stdout if JNI_DBG is enabled */
 #define JNI_FLUSH if(JNI_DBG){jni_fflush(stdout);} jni_fflush(stderr);
@@ -276,7 +276,7 @@ int remove_files_in_dir(char *dir, DIR* dirp)
             memset((void *)abs_path, 0, abs_path_len);
             combine(dir, direntp->d_name, abs_path);
             errno = 0;
-            if(jni_remove(abs_path) == -1)
+            if(pvfs_unlink(abs_path) == -1)
             {
                 jni_perror("remove");
                 rc = -1;
@@ -332,7 +332,6 @@ int recursive_delete(char *dir)
     jni_rewinddir(dirp);
     do
     {
-        errno = 0;
         direntp = jni_readdir(dirp);
         if(direntp && (direntp->d_type == DT_DIR))
         {
@@ -349,7 +348,6 @@ int recursive_delete(char *dir)
     } while(direntp);
 
     /* Close current directory before we attempt removal */
-    errno = 0;
     if(jni_closedir(dirp) != 0)
     {
         jni_perror("closedir");
@@ -357,10 +355,9 @@ int recursive_delete(char *dir)
         goto err;
     }
 
-    errno = 0;
-    if(jni_remove(dir) != 0)
+    if(pvfs_rmdir(dir) != 0)
     {
-        jni_perror("remove");
+        perror("remove");
         rc = -1;
     }
     rc = 0;
@@ -541,11 +538,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_Remove(JNIEnv *env, jobject obj, jstring 
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    errno = 0;
     int val = jni_remove(cpath);
     if (val != 0)
     {
-        perror("remove failed!");
+        jni_perror("remove failed!");
     }
     return (jint) val;
 }
@@ -825,6 +821,20 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_Fcloseall(JNIEnv *env, jobject obj)
     return rc;
 }
 
+/* ftell */
+JNIEXPORT jlong JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_Ftell(JNIEnv *env, jobject obj, jlong stream)
+{
+    PFI
+    long rc = jni_ftell((FILE *) stream);
+    if(rc < 0)
+    {
+        jni_perror("Fseek failed!");
+    }
+    JNI_FLUSH
+    return (jlong) rc;
+}
+
 /* fseek */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_Fseek(JNIEnv *env, jobject obj, jlong stream, jlong offset, int whence)
@@ -877,6 +887,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_Setvbuf(JNIEnv *env, jobject obj, jlong s
     {
         jni_perror("setvbuf");
     }
+    JNI_FLUSH
     return (jint) rc;
 }
 
