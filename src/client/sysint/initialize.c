@@ -136,6 +136,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_DIST_INIT;
     
+    /* Initialize the security subsystem */
     ret = PINT_client_security_initialize();
     if (ret < 0)
     {
@@ -234,6 +235,9 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }        
     client_status_flag |= CLIENT_CONFIG_MGR_INIT;
 
+/* WBL V3 ADD SID INIT CALL */
+
+/* WBL V3 BEGIN REMOVE HANDLE MAPPING */
     /* initialize the handle mapping interface */
     ret = PINT_cached_config_initialize();
     if (ret < 0)
@@ -241,6 +245,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         gossip_lerr("Error initializing handle mapping interface\n");
         goto error_exit;
     }
+/* WBL V3 END REMOVE HANDLE MAPPING */
 
     /* start job timer */
     PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,

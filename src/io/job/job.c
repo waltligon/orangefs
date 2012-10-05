@@ -69,7 +69,8 @@ enum
 #define PRECREATE_POOL_MAX_KEYS 32
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-
+/* WBL V3 remove precreate pool */
+#if 0
 static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
 static QLIST_HEAD(precreate_pool_check_level_list);
 static QLIST_HEAD(precreate_pool_get_handles_list);
@@ -105,6 +106,7 @@ struct precreate_pool_get_trove
     struct PINT_thread_mgr_trove_callback trove_callback;
     struct precreate_pool* pool;
 };
+#endif
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
 /********************************************************
@@ -141,6 +143,8 @@ static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 #ifdef __PVFS2_TROVE_SUPPORT__
+/* WBL V3 remove precreate pool */
+#if 0
 static void precreate_pool_get_thread_mgr_callback(
     void* data, 
     PVFS_error error_code);
@@ -155,6 +159,7 @@ static void precreate_pool_iterate_callback(
     PVFS_error error_code);
 static void precreate_pool_get_handles_try_post(struct job_desc* jd);
 static struct fs_pool* find_fs(PVFS_fs_id fsid);
+#endif
 #endif
 
 /********************************************************
@@ -4488,6 +4493,8 @@ static void teardown_queues(void)
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 
+/* WBL V3 remove precreate pool */
+#if 0
 /* precreate_pool_get_thread_mgr_callback_unlocked()
  *
  * callback function executed by the thread manager for precreate pool get
@@ -4832,6 +4839,7 @@ static void precreate_pool_fill_thread_mgr_callback(
 
     return;
 }
+#endif
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
 
@@ -5095,10 +5103,13 @@ static void fill_status(struct job_desc *jd,
         status->error_code = jd->u.null_info.error_code;
         break;
     case JOB_PRECREATE_POOL:
+/* WBL V3 remove precreate pool */
+#if 0
         status->error_code = jd->u.precreate_pool.error_code;
         status->count = jd->u.precreate_pool.count;
         status->position = jd->u.precreate_pool.pool_index << 32;
         status->position |= jd->u.precreate_pool.position;
+#endif
         break;
     }
 
@@ -5409,7 +5420,8 @@ static void flow_callback(flow_descriptor* flow_d, int cancel_path)
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-
+/* WBL V3 removing precreate */
+#if 0
 /* job_precreate_pool_fill_signal_error()
  *
  * used for the entity responsible for filling the pool to indicate when
@@ -5789,18 +5801,18 @@ int job_precreate_pool_check_level(
  * returns 0 on success, 1 on immediate completion, and -PVFS_errno on failure
  */
 int job_precreate_pool_get_handles(
-    PVFS_fs_id fsid,
-    int count,
-    PVFS_ds_type type,
-    const char** servers,
-    PVFS_handle* handle_array,
-    PVFS_ds_flags flags,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id,
-    PVFS_hint hints)
+    PVFS_fs_id fsid, /* IN */
+    int count, /* IN */
+    PVFS_ds_type type, /* IN */
+    const char** servers, /* IN */
+    PVFS_handle* handle_array, /* OUT */
+    PVFS_ds_flags flags, /* IN */
+    void *user_ptr, /* IN */
+    job_aint status_user_tag, /* IN */
+    job_status_s * out_status_p, /* OUT */
+    job_id_t * id, /* OUT */
+    job_context_id context_id, /* IN */
+    PVFS_hint hints) /* IN */
 {
     struct job_desc *jd = NULL;
     struct fs_pool* fs;
@@ -6337,6 +6349,7 @@ static struct fs_pool* find_fs(PVFS_fs_id fsid)
     }
     return(NULL);
 }
+#endif
 
 
 #endif /* __PVFS2_TROVE_SUPPORT__ */

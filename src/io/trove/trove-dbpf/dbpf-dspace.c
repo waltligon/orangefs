@@ -133,18 +133,18 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op,
-        &q_op_p,
-        DSPACE_CREATE,
-        coll_p,
-        (handle_p ? *handle_p : TROVE_HANDLE_NULL),
-        dbpf_dspace_create_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_CREATE,
+                                           coll_p,
+                                           (handle_p ? *handle_p :
+                                                       TROVE_HANDLE_NULL),
+                                           dbpf_dspace_create_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -156,7 +156,10 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     }
 
     event_type = trove_dbpf_dspace_create_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -165,9 +168,9 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
      * in dbpf_queue_or_service in the case of immediate completion */
     op_p->u.d_create.extent_array.extent_count =
-        extent_array->extent_count;
+                    extent_array->extent_count;
     op_p->u.d_create.extent_array.extent_array =
-        malloc(extent_array->extent_count * sizeof(TROVE_extent));
+                    malloc(extent_array->extent_count * sizeof(TROVE_extent));
     op_p->hints = hints;
 
     if (op_p->u.d_create.extent_array.extent_array == NULL)
@@ -182,8 +185,10 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     op_p->u.d_create.out_handle_p = handle_p;
     op_p->u.d_create.type = type;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_ADD);
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
                                  event_type, event_id);
@@ -208,13 +213,12 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
         {
             /*
-              we should probably handle this error nicely;
-              right now, it will fail later (gracefully) if this
-              fails since the handle will already exist, but
-              since we know it here, handle it here ?
-            */
+             * currently the only way to check for an already
+             * used handle is to look into the DB - which we
+             * will do later, so we test for that error then
+             */
             new_handle = cur_extent.first;
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
 #endif
@@ -228,9 +232,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
               if we got TROVE_HANDLE_NULL, the caller doesn't care
               where the handle comes from
             */
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
             new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
+#else
+            PVFS_OID_gen(&new_handle);
 #endif
         }
     }
@@ -240,10 +246,12 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
           otherwise, we have to try to allocate a handle from
           the specified range that we're given
         */
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
         new_handle = trove_handle_alloc_from_range(
             op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
+#else
+        PVFS_OID_gen(&new_handle);
 #endif
     }
 
@@ -267,31 +275,35 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
                                           new_handle);
     if(ret < 0)
     {
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
         trove_handle_free(op_p->coll_p->coll_id, new_handle);
+#else
+        PVFS_OID_init(&new_handle); /* clear out the variable */
 #endif
         return(ret);
     }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
     return DBPF_OP_COMPLETE;
 }
 
 static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
-                              TROVE_handle_extent_array *extent_array,
-                              TROVE_handle *handle_array_p,
-                              int count,
-                              TROVE_ds_type type,
-                              TROVE_keyval_s *hint,
-                              TROVE_ds_flags flags,
-                              void *user_ptr,
-                              TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p,
-                              PVFS_hint hints)
+                                   TROVE_handle_extent_array *extent_array,
+                                   TROVE_handle *handle_array_p,
+                                   int count,
+                                   TROVE_ds_type type,
+                                   TROVE_keyval_s *hint,
+                                   TROVE_ds_flags flags,
+                                   void *user_ptr,
+                                   TROVE_context_id context_id,
+                                   TROVE_op_id *out_op_id_p,
+                                   PVFS_hint hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -310,7 +322,8 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     if (flags & TROVE_FORCE_REQUESTED_HANDLE ||
         !PVFS_OID_cmp(&extent_array->extent_array[0].first, &TROVE_HANDLE_NULL))
     {
-        gossip_err("Error: dbpf_dspace_create_list() does not support forced handles or empty extent specifier.\n");
+        gossip_err("Error: dbpf_dspace_create_list() does not "
+                   "support forced handles or empty extent specifier.\n");
         return(-TROVE_EINVAL);
     }
 
@@ -336,7 +349,10 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     }
 
     event_type = trove_dbpf_dspace_create_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -345,9 +361,9 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
      * in dbpf_queue_or_service in the case of immediate completion */
     op_p->u.d_create_list.extent_array.extent_count =
-        extent_array->extent_count;
+                    extent_array->extent_count;
     op_p->u.d_create_list.extent_array.extent_array =
-        malloc(extent_array->extent_count * sizeof(TROVE_extent));
+                    malloc(extent_array->extent_count * sizeof(TROVE_extent));
 
     if (op_p->u.d_create_list.extent_array.extent_array == NULL)
     {
@@ -368,8 +384,12 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
-                                 event_type, event_id);
+    return dbpf_queue_or_service(op_p,
+                                 q_op_p,
+                                 coll_p,
+                                 out_op_id_p,
+                                 event_type,
+                                 event_id);
 }
 
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
@@ -386,10 +406,13 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         /*
           try to allocate a handle from the specified range that we're given
         */
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
         new_handle = trove_handle_alloc_from_range(
             op_p->coll_p->coll_id, &op_p->u.d_create_list.extent_array);
+#else
+        PVFS_OID_gen(&new_handle);
+        
 #endif
 
         /*
@@ -408,7 +431,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         if(ret < 0)
         {
             /* release any handles we grabbed so far */
-            for(j=0; j<=i; j++)
+            for(j = 0; j <= i; j++)
             {
                 if(PVFS_OID_cmp(&op_p->u.d_create_list.out_handle_array_p[j],
                                 &TROVE_HANDLE_NULL))
@@ -417,12 +440,16 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
                     key.data = &op_p->u.d_create_list.out_handle_array_p[j];
                     key.size = key.ulen = sizeof(TROVE_handle);
                     op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, 
-                        NULL, &key, 0);
+                                             NULL,
+                                             &key,
+                                             0);
 
-/* NEXT */
+/* WBL V3 replace handle allocation */
 #if 0
                     trove_handle_free(op_p->coll_p->coll_id, 
                         op_p->u.d_create_list.out_handle_array_p[j]);
+#else
+                    PVFS_OID_init(&op_p->u.d_create_list.out_handle_array_p[j]);
 #endif
                 }
             }
@@ -432,8 +459,10 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         op_p->u.d_create_list.out_handle_array_p[i] = new_handle;
     }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-        1, PINT_PERF_SUB);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
 }
@@ -461,15 +490,14 @@ static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
         return -TROVE_ENOMEM;
     }
 
-    dbpf_queued_op_init(
-        q_op_p,
-        DSPACE_REMOVE_LIST,
-        TROVE_HANDLE_NULL,
-        coll_p,
-        dbpf_dspace_remove_list_op_svc,
-        user_ptr,
-        flags,
-        context_id);
+    dbpf_queued_op_init(q_op_p,
+                        DSPACE_REMOVE_LIST,
+                        TROVE_HANDLE_NULL,
+                        coll_p,
+                        dbpf_dspace_remove_list_op_svc,
+                        user_ptr,
+                        flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_remove_list.count = count;
@@ -501,32 +529,33 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_REMOVE,
-        coll_p,
-        handle,
-        dbpf_dspace_remove_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_REMOVE,
+                                           coll_p,
+                                           handle,
+                                           dbpf_dspace_remove_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
     }
     op_p->hints = hints;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_ADD);
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
-static int remove_one_handle(
-    TROVE_object_ref ref, 
-    struct dbpf_collection* coll_p)
+static int remove_one_handle(TROVE_object_ref ref, 
+                             struct dbpf_collection* coll_p)
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
@@ -575,24 +604,25 @@ static int remove_one_handle(
      * the trove keyval interfaces.  It does allow us to perform the cleanup
      * of a handle without having to post more operations though.
      */
-    ret = PINT_dbpf_keyval_iterate(
-        coll_p->keyval_db,
-        ref.handle,
-        coll_p->pcache,
-        NULL,
-        NULL,
-        &count,
-        TROVE_ITERATE_START,
-        PINT_dbpf_dspace_remove_keyval);
+    ret = PINT_dbpf_keyval_iterate(coll_p->keyval_db,
+                                   ref.handle,
+                                   coll_p->pcache,
+                                   NULL,
+                                   NULL,
+                                   &count,
+                                   TROVE_ITERATE_START,
+                                   PINT_dbpf_dspace_remove_keyval);
     if(ret != 0 && ret != -TROVE_ENOENT)
     {
         goto return_error;
     }
 
     /* return handle to free list */
-/* NEXT */
+/* WBL V3 replace handle alloc */
 #if 0
     trove_handle_free(coll_p->coll_id, ref.handle);
+#else
+    PVFS_OID_init(&ref.handle); /* clear out the variable */
 #endif
     return 0;
 
@@ -607,7 +637,7 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
     int i;
 
-    for(i=0; i<op_p->u.d_remove_list.count; i++)
+    for(i = 0; i < op_p->u.d_remove_list.count; i++)
     {
         ref.handle = op_p->u.d_remove_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
@@ -616,7 +646,7 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
         if(op_p->u.d_remove_list.error_p)
         {
             op_p->u.d_remove_list.error_p[i] = 
-                remove_one_handle(ref, op_p->coll_p);
+                           remove_one_handle(ref, op_p->coll_p);
         }
         else
         {
@@ -633,8 +663,10 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
 }
@@ -660,14 +692,18 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
 }
 
-int PINT_dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
+int PINT_dbpf_dspace_remove_keyval(void * args,
+                                   TROVE_handle handle,
+                                   TROVE_keyval_s *key,
+                                   TROVE_keyval_s *val)
 {
     int ret;
     DBC * dbc_p = (DBC *)args;
@@ -704,17 +740,17 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_ITERATE_HANDLES,
-        coll_p,
-        TROVE_HANDLE_NULL,
-        dbpf_dspace_iterate_handles_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_ITERATE_HANDLES,
+                                           coll_p,
+                                           TROVE_HANDLE_NULL,
+                                           dbpf_dspace_iterate_handles_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -778,8 +814,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * remainder in this or the above case.
          */
 
-        memcpy(&dummy_handle, op_p->u.d_iterate_handles.position_p,
-                sizeof(TROVE_ds_position));
+        memcpy(&dummy_handle,
+               op_p->u.d_iterate_handles.position_p,
+               sizeof(TROVE_ds_position));
 
         memset(&key, 0, sizeof(key));
         key.data = &dummy_handle;
@@ -921,7 +958,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             if(sizeof_handle != sizeof(TROVE_handle) ||
                sizeof_attr != sizeof(attr))
             {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: got invalid handle or "
+                           "key size in dbpf_dspace_iterate_handles().\n");
                 gossip_err("Warning: skipping entry.\n");
                 i--;
                 continue;
@@ -963,16 +1001,21 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                            "key size in dbpf_dspace_iterate_handles().\n");
                 gossip_err("Warning: skipping entry.\n");
             }
-            DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
-                                 tmp_handle, sizeof_handle,
-                                 tmp_attr, sizeof_attr);
+            DB_MULTIPLE_KEY_NEXT(tmp_ptr,
+                                 &data,
+                                 tmp_handle,
+                                 sizeof_handle,
+                                 tmp_attr,
+                                 sizeof_attr);
             if(!tmp_ptr)
             {
                 goto get_next;
             }
 
             memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
-            if(!PVFS_OID_cmp(&aligned_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]))
+            if(!PVFS_OID_cmp(&aligned_handle,
+                             &op_p->u.d_iterate_handles.handle_array[
+                                    *op_p->u.d_iterate_handles.count_p]))
             {
                 gossip_err("Warning: found duplicate handle: %s\n",
                             PVFS_OID_str(&aligned_handle));
@@ -981,7 +1024,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
         } while (sizeof_handle != sizeof(TROVE_handle) ||
                  sizeof_attr != sizeof(attr) ||
-                 !PVFS_OID_cmp(&aligned_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]));
+                 !PVFS_OID_cmp(&aligned_handle,
+                               &op_p->u.d_iterate_handles.handle_array[
+                                      *op_p->u.d_iterate_handles.count_p]));
 
         /* seek to aligned_handle and then get its recno */
         memset(&key, 0, sizeof(key));
@@ -1038,7 +1083,9 @@ get_next:
         ret = -dbpf_db_error_to_trove_error(ret);
     }
     if(*op_p->u.d_iterate_handles.count_p > 0 && 
-        !PVFS_OID_cmp(&dummy_handle, &op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]))
+        !PVFS_OID_cmp(&dummy_handle,
+                      &op_p->u.d_iterate_handles.handle_array[
+                             *op_p->u.d_iterate_handles.count_p]))
     {
         gossip_err("Warning: found duplicate handle: %s\n",
                    PVFS_OID_str(&dummy_handle));
@@ -1119,17 +1166,17 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_VERIFY,
-        coll_p,
-        handle,
-        dbpf_dspace_verify_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_VERIFY,
+                                           coll_p,
+                                           handle,
+                                           dbpf_dspace_verify_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -1251,24 +1298,27 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_GETATTR,
-        coll_p,
-        handle,
-        dbpf_dspace_getattr_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_GETATTR,
+                                           coll_p,
+                                           handle,
+                                           dbpf_dspace_getattr_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
     }
 
     event_type = trove_dbpf_dspace_getattr_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -1279,20 +1329,24 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     op_p->u.d_getattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
-                                 event_type, event_id);
+    return dbpf_queue_or_service(op_p,
+                                 q_op_p,
+                                 coll_p,
+                                 out_op_id_p,
+                                 event_type,
+                                 event_id);
 }
 
 static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
-                               int nhandles,
-                               TROVE_handle *handle_array,
-                               TROVE_ds_attributes_s *ds_attr_p,
-                               TROVE_ds_state *error_array,
-                               TROVE_ds_flags flags,
-                               void *user_ptr,
-                               TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p,
-                               PVFS_hint  hints)
+                                    int nhandles,
+                                    TROVE_handle *handle_array,
+                                    TROVE_ds_attributes_s *ds_attr_p,
+                                    TROVE_ds_state *error_array,
+                                    TROVE_ds_flags flags,
+                                    void *user_ptr,
+                                    TROVE_context_id context_id,
+                                    TROVE_op_id *out_op_id_p,
+                                    PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1423,24 +1477,27 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_SETATTR,
-        coll_p,
-        handle,
-        dbpf_dspace_setattr_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_SETATTR,
+                                           coll_p,
+                                           handle,
+                                           dbpf_dspace_setattr_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
     }
 
     event_type = trove_dbpf_dspace_setattr_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -1451,11 +1508,17 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     op_p->u.d_setattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
-                                 event_type, event_id);
+    return dbpf_queue_or_service(op_p,
+                                 q_op_p,
+                                 coll_p,
+                                 out_op_id_p,
+                                 event_type,
+                                 event_id);
 }
 
 int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
@@ -1473,12 +1536,10 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     data.data = attr;
     data.size = sizeof(*attr);
 
-    ret = coll_p->ds_db->put(
-        coll_p->ds_db, NULL, &key, &data, 0);
+    ret = coll_p->ds_db->put(coll_p->ds_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        coll_p->ds_db->err(
-            coll_p->ds_db, ret, "dspace_db->put setattr");
+        coll_p->ds_db->err(coll_p->ds_db, ret, "dspace_db->put setattr");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1501,8 +1562,10 @@ int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
+                    1,
+                    PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
 }
@@ -1605,7 +1668,9 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
         ref.fs_id = op_p->coll_p->coll_id;
 
         op_p->u.d_getattr_list.error_p[i] = dbpf_dspace_attr_get(
-           op_p->coll_p, ref, &op_p->u.d_getattr_list.attr_p[i]);
+                                            op_p->coll_p,
+                                            ref,
+                                            &op_p->u.d_getattr_list.attr_p[i]);
     }
 
     return 1;
@@ -1615,10 +1680,9 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
   FIXME: it's possible to have a non-threaded version of this, but
   it's not implemented right now
 */
-static int dbpf_dspace_cancel(
-    TROVE_coll_id coll_id,
-    TROVE_op_id id,
-    TROVE_context_id context_id)
+static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
+                              TROVE_op_id id,
+                              TROVE_context_id context_id)
 {
     int ret = -TROVE_ENOSYS;
 #ifdef __PVFS2_TROVE_THREADED__
@@ -1659,7 +1723,9 @@ static int dbpf_dspace_cancel(
         }
         else
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "Trove cancellation is not supported for this operation type; ignoring.\n");
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "Trove cancellation is not supported "
+                         "for this operation type; ignoring.\n");
             return(0);
 
         }
@@ -1688,22 +1754,19 @@ static int dbpf_dspace_cancel(
                 /* this is a macro defined in dbpf-thread.h */
                 dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                gossip_debug(GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
                 ret = 0;
             }
             break;
         case OP_IN_SERVICE:
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
-                "operation type %d\n", cur_op->op.type);
+            gossip_debug(GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
+                         "operation type %d\n", cur_op->op.type);
             ret = 0;
             break;
         case OP_COMPLETED:
         case OP_CANCELED:
             /* easy cancelation case; do nothing */
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
+            gossip_debug(GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
             ret = 0;
             break;
         default:
@@ -1728,15 +1791,14 @@ static int dbpf_dspace_cancel(
  *
  * Removes completed operations from the queue.
  */
-static int dbpf_dspace_test(
-    TROVE_coll_id coll_id,
-    TROVE_op_id id,
-    TROVE_context_id context_id,
-    int *out_count_p,
-    TROVE_vtag_s *vtag,
-    void **returned_user_ptr_p,
-    TROVE_ds_state *state_p,
-    int max_idle_time_ms)
+static int dbpf_dspace_test(TROVE_coll_id coll_id,
+                            TROVE_op_id id,
+                            TROVE_context_id context_id,
+                            int *out_count_p,
+                            TROVE_vtag_s *vtag,
+                            void **returned_user_ptr_p,
+                            TROVE_ds_state *state_p,
+                            int max_idle_time_ms)
 {
     int ret = -TROVE_EINVAL;
     dbpf_queued_op_t *cur_op = NULL;
@@ -1772,10 +1834,9 @@ static int dbpf_dspace_test(
 
         /* compute how long to wait */
         gettimeofday(&base, NULL);
-        wait_time.tv_sec = base.tv_sec +
-            (max_idle_time_ms / 1000);
+        wait_time.tv_sec = base.tv_sec + (max_idle_time_ms / 1000);
         wait_time.tv_nsec = base.tv_usec * 1000 + 
-            ((max_idle_time_ms % 1000) * 1000000);
+                        ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {
             wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
@@ -1783,7 +1844,8 @@ static int dbpf_dspace_test(
         }
 
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
-                                     context_mutex, &wait_time);
+                                     context_mutex,
+                                     &wait_time);
 
         if (ret == ETIMEDOUT)
         {
@@ -1805,7 +1867,7 @@ static int dbpf_dspace_test(
     }
     else
     {
-      op_completed:
+    op_completed:
         assert(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]));
 
         /* pull the op out of the context specific completion queue */
@@ -1825,7 +1887,7 @@ static int dbpf_dspace_test(
         return 1;
     }
 
-  op_not_completed:
+op_not_completed:
     gen_mutex_unlock(context_mutex);
     return 0;
 
@@ -1877,14 +1939,13 @@ static int dbpf_dspace_test(
 #endif
 }
 
-static int dbpf_dspace_testcontext(
-    TROVE_coll_id coll_id,
-    TROVE_op_id *ds_id_array,
-    int *inout_count_p,
-    TROVE_ds_state *state_array,
-    void** user_ptr_array,
-    int max_idle_time_ms,
-    TROVE_context_id context_id)
+static int dbpf_dspace_testcontext(TROVE_coll_id coll_id,
+                                   TROVE_op_id *ds_id_array,
+                                   int *inout_count_p,
+                                   TROVE_ds_state *state_array,
+                                   void** user_ptr_array,
+                                   int max_idle_time_ms,
+                                   TROVE_context_id context_id)
 {
     int ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
@@ -1916,10 +1977,9 @@ static int dbpf_dspace_testcontext(
 
         /* compute how long to wait */
         gettimeofday(&base, NULL);
-        wait_time.tv_sec = base.tv_sec +
-            (max_idle_time_ms / 1000);
+        wait_time.tv_sec = base.tv_sec + (max_idle_time_ms / 1000);
         wait_time.tv_nsec = base.tv_usec * 1000 + 
-            ((max_idle_time_ms % 1000) * 1000000);
+                        ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {
             wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
@@ -1927,7 +1987,8 @@ static int dbpf_dspace_testcontext(
         }
 
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
-                                     context_mutex, &wait_time);
+                                     context_mutex,
+                                     &wait_time);
 
         if (ret == ETIMEDOUT)
         {
@@ -1945,7 +2006,7 @@ static int dbpf_dspace_testcontext(
           (out_count < limit))
     {
         cur_op = dbpf_op_queue_shownext(
-            dbpf_completion_queue_array[context_id]);
+                        dbpf_completion_queue_array[context_id]);
         assert(cur_op);
 
         /* pull the op out of the context specific completion queue */
@@ -1988,9 +2049,14 @@ static int dbpf_dspace_testcontext(
 
     if (cur_op)
     {
-        ret = dbpf_dspace_test(
-            coll_id, cur_op->op.id, context_id, inout_count_p, NULL,
-            &(user_ptr_array[0]), &(state_array[0]), max_idle_time_ms);
+        ret = dbpf_dspace_test(coll_id,
+                               cur_op->op.id,
+                               context_id,
+                               inout_count_p,
+                               NULL,
+                               &(user_ptr_array[0]),
+                               &(state_array[0]),
+                               max_idle_time_ms);
         if (ret == 1)
         {
             ds_id_array[0] = cur_op->op.id;
@@ -2017,16 +2083,15 @@ static int dbpf_dspace_testcontext(
  * The error state of the completed operation is returned via the
  * state_p.
  */
-static int dbpf_dspace_testsome(
-    TROVE_coll_id coll_id,
-    TROVE_context_id context_id,
-    TROVE_op_id *ds_id_array,
-    int *inout_count_p,
-    int *out_index_array,
-    TROVE_vtag_s *vtag_array,
-    void **returned_user_ptr_array,
-    TROVE_ds_state *state_array,
-    int max_idle_time_ms)
+static int dbpf_dspace_testsome(TROVE_coll_id coll_id,
+                                TROVE_context_id context_id,
+                                TROVE_op_id *ds_id_array,
+                                int *inout_count_p,
+                                int *out_index_array,
+                                TROVE_vtag_s *vtag_array,
+                                void **returned_user_ptr_array,
+                                TROVE_ds_state *state_array,
+                                int max_idle_time_ms)
 {
     int i = 0, out_count = 0, ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
@@ -2083,16 +2148,15 @@ static int dbpf_dspace_testsome(
 #else
         int tmp_count = 0;
 
-        ret = dbpf_dspace_test(
-            coll_id,
-            ds_id_array[i],
-            context_id,
-            &tmp_count,
-            &vtag_array[i],
-            ((returned_user_ptr_array != NULL) ?
-             &returned_user_ptr_array[out_count] : NULL),
-            &state_array[out_count],
-            max_idle_time_ms);
+        ret = dbpf_dspace_test(coll_id,
+                               ds_id_array[i],
+                               context_id,
+                               &tmp_count,
+                               &vtag_array[i],
+                               ((returned_user_ptr_array != NULL) ?
+                                &returned_user_ptr_array[out_count] : NULL),
+                               &state_array[out_count],
+                               max_idle_time_ms);
 #endif
         if (ret != 0)
         {
@@ -2113,10 +2177,9 @@ static int dbpf_dspace_testsome(
 
         /* compute how long to wait */
         gettimeofday(&base, NULL);
-        wait_time.tv_sec = base.tv_sec +
-            (max_idle_time_ms / 1000);
+        wait_time.tv_sec = base.tv_sec + (max_idle_time_ms / 1000);
         wait_time.tv_nsec = base.tv_usec * 1000 + 
-            ((max_idle_time_ms % 1000) * 1000000);
+                        ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {
             wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
@@ -2124,7 +2187,8 @@ static int dbpf_dspace_testsome(
         }
 
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
-                                     context_mutex, &wait_time);
+                                     context_mutex,
+                                     &wait_time);
 
         if (ret != ETIMEDOUT)
         {
@@ -2147,8 +2211,9 @@ static int dbpf_dspace_testsome(
     return ((out_count > 0) ? 1 : 0);
 }
 
-int PINT_trove_dbpf_ds_attr_compare_reversed(
-    DB * dbp, const DBT * a, const DBT * b)
+int PINT_trove_dbpf_ds_attr_compare_reversed(DB * dbp,
+                                             const DBT * a,
+                                             const DBT * b)
 {
     int cmpval;
 
@@ -2166,8 +2231,7 @@ int PINT_trove_dbpf_ds_attr_compare_reversed(
     return (cmpval < 0) ? -1 : 1;
 }
 
-int PINT_trove_dbpf_ds_attr_compare(
-    DB * dbp, const DBT * a, const DBT * b)
+int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b)
 {
     int cmpval;
 
@@ -2191,10 +2255,9 @@ int PINT_trove_dbpf_ds_attr_compare(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle)
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle)
 {
     int ret = -TROVE_EINVAL;
     TROVE_ds_attributes attr;

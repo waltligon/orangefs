@@ -60,12 +60,15 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+/* WBL V3 Removing precreate */
+#if 0
 /* Specifies the number of handles to be preceated at a time from each
  * server using the batch create request.
  */
 #define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
 /* precreate pools will be topped off if they fall below this value */
 #define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
+#endif
 
 /* types of permission checking that a server may need to perform for
  * incoming requests
@@ -138,7 +141,8 @@ typedef enum
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
     SERVER_PRECREATE_INIT      = (1 << 18),
     SERVER_UID_MGMT_INIT       = (1 << 19), 
-    SERVER_SECURITY_INIT       = (1 << 20)
+    SERVER_SECURITY_INIT       = (1 << 20),
+    SERVER_SID_INIT            = (1 << 21)
 } PINT_server_status_flag;
 
 typedef enum
@@ -397,6 +401,8 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+/* WBL V# removing precreate */
+#if 0
 struct PINT_server_precreate_pool_refiller_op
 {
     PVFS_handle pool_handle;
@@ -408,6 +414,7 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_ds_type type;
     PVFS_capability capability;
 };
+#endif
 
 struct PINT_server_batch_create_op
 {
@@ -598,8 +605,11 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+    /* WBL V3 removing precreate */
+    #if 0
         struct PINT_server_precreate_pool_refiller_op
             precreate_pool_refiller;
+    #endif
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;

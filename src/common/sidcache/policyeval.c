@@ -16,9 +16,11 @@
 
 static int first_cursor_end = 0;
 
-DB *SID_attr_indices[SID_NUM_ATTR];
+/*
+DB *SID_attr_index[SID_NUM_ATTR];
 
 DBC *SID_attr_cursor[SID_NUM_ATTR];
+*/
 
 int SID_get_attr (DB *pri,
                   const DBT *pkey,

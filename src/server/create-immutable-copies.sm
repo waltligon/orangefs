@@ -162,12 +162,12 @@ nested machine pvfs2_create_immutable_copies_sm
    state store_mirror_info
     {
         run store_mirror_info;
-        /* default => replace_remote_datahandle_objects;
-         * If the write of the datahandle information fails, even though the
-         * the copies actually exist, the metadata for the logical file will
-         * NOT have knowledge of it. */
         default => check_store_job;
     }
+/* WBL V3 remove this comment too */
+/*
+        default => replace_remote_datahandle_objects;
+*/
 
    state check_store_job
     {
@@ -175,12 +175,15 @@ nested machine pvfs2_create_immutable_copies_sm
         default => cleanup;
     }
 
+/* WBL V3 remove precreate pool */
+/*
    state replace_remote_datahandle_objects
     {
         run replace_remote_datahandle_objects;
         REPLACE_DONE => remove_local_datahandle_objects;
         default      => replace_remote_datahandle_objects;
     }
+*/
 
    state remove_local_datahandle_objects
     {
@@ -904,7 +907,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     } 
-    for (i=0;i<data_handle_ext_array.extent_count;i++)
+    for (i = 0;i < data_handle_ext_array.extent_count; i++)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,
                      "Extent Range %d:\tfirst  %s"
@@ -945,13 +948,14 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
                  "Executing create_remote_datahandles...\n");
     struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-    int ret = 0,i;
-    job_id_t job_id;
+    int ret = 0, i;
 
     js_p->error_code = 0;
 
     if (imm_p->handle_array_copies_remote_count == 0)
+    {
         return SM_ACTION_COMPLETE;
+    }
 
     int rows = imm_p->copies;
     int cols = imm_p->handle_array_copies_remote_count;
@@ -968,8 +972,9 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
     /* setup my_remote_servers[copy,remote#] = remote server name.  This will
      * allow job_precreate_pool to return handle_array_copies_remote where   
      * [copy,remote#] = remote handle.  We end up with a list of remotes for 
-     * each copy in original distribution order. */  
-    for (i=0; i<(rows*cols); i++)
+     * each copy in original distribution order.
+     */  
+    for (i = 0; i < (rows * cols); i++)
     {
         imm_p->my_remote_servers[i] = imm_p->remote_io_servers[i%cols];
         gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\tremote_io_servers[%d]:%s "
@@ -980,8 +985,10 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
                                           imm_p->my_remote_servers[i]);
     }
 
+/* WBL V3 remote precreate pool */
+#if 0
     ret = job_precreate_pool_get_handles(imm_p->fs_id,
-                                         rows*cols,
+                                         rows * cols,
                                          PVFS_TYPE_DATAFILE,
                                          (const char **)
                                             imm_p->my_remote_servers,
@@ -993,6 +1000,13 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
                                          &job_id,
                                          server_job_context,
                                          NULL);
+#else
+    for (i = 0; i < (rows * cols); i++)
+    {
+        PVFS_OID_gen(&imm_p->handle_array_copies_remote[i]);
+    }
+    ret = 0;
+#endif
     return ret;
 } /* end action create_remote_datahandles */
 
@@ -1754,7 +1768,8 @@ static PINT_sm_action check_store_job (struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 } /* end state check_store_job */
 
-
+/* WBL V3 remove precreate pool */
+#if 0
 static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {   
@@ -1814,6 +1829,7 @@ static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb,
 
     return ret;
 } /* end action replace_remote_datahandle_objects */
+#endif
 
 
 static PINT_sm_action remove_local_datahandle_objects(struct PINT_smcb *smcb,

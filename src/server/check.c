@@ -529,7 +529,7 @@ static int permit_operation(PVFS_fs_id fsid,
     {
         return 0;  /* anything that doesn't modify state is okay */
     }
-    serv_config = PINT_get_server_config();
+    serv_config = get_server_config_struct();
     fsconfig = PINT_config_find_fs_id(serv_config, fsid);
 
     if (fsconfig == NULL)

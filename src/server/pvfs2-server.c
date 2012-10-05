@@ -33,6 +33,7 @@
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-server.h"
+#include "sid.h"
 #include "state-machine.h"
 #include "mkspace.h"
 #include "server-config.h"
@@ -158,19 +159,23 @@ static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int generate_shm_key_hint(int* server_index);
 
+/* WBL V3 BEGIN REMOVE PRECREATE CODE */
+#if 0
 static void precreate_pool_finalize(void);
 static int precreate_pool_initialize(int server_index);
-
 static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
     PVFS_fs_id fsid, PVFS_handle* pool_handle);
 static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type, 
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
 static int precreate_pool_count(
     PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
+#endif
+/* WBL V3 END REMOVE PRECREATE CODE */
+
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
-
+/* this appears to be deprecated and should probably be removed */
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
@@ -274,11 +279,11 @@ int main(int argc, char **argv)
     }
 
     server_job_id_array = (job_id_t *)
-        malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
+            malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
     server_completed_job_p_array = (void **)
-        malloc(PVFS_SERVER_TEST_COUNT * sizeof(void *));
+            malloc(PVFS_SERVER_TEST_COUNT * sizeof(void *));
     server_job_status_array = (job_status_s *)
-        malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_status_s));
+            malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_status_s));
 
     if (!server_job_id_array ||
         !server_completed_job_p_array ||
@@ -675,16 +680,25 @@ static int server_setup_process_environment(int background)
  *   - gets a context from Trove
  *   - tells Trove what handles are to be used
  *     for each file system (collection)
+ *   - migrates database if needed
  * - initializes the flow subsystem
  * - initializes the job subsystem
  *   - gets a job context
+ *   - initializes the job timer
  * - initialize the request scheduler
+ * - initialize performance counters
+ * - initialize uid tracker
+ * - initialize precreate pool
  */
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag)
 {
     int ret = -PVFS_EINVAL;
+/* WBL V3 BEGIN REMOVE HANDLE RANGES */
+#if 0
     char *cur_merged_handle_range = NULL;
+#endif
+/* WBL V3 END REMOVE HANDLE RANGES */
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
@@ -766,6 +780,7 @@ static int server_initialize_subsystems(
 #endif
     *server_status_flag |= SERVER_BMI_INIT;
 
+    /** BEGIN TROVE INIT **/
     ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
                                    &server_config.db_cache_size_bytes);
     /* this should never fail */
@@ -777,7 +792,9 @@ static int server_initialize_subsystems(
 
     /* help trove chose a differentiating shm key if needed for Berkeley DB */
     shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Server using shm key hint: %d\n",
+                 shm_key_hint);
     ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
     assert(ret == 0);
 
@@ -788,18 +805,20 @@ static int server_initialize_subsystems(
         init_flags |= TROVE_DB_CACHE_MMAP;
     }
 
+    /* TODO: Why is this here and not up with BMI init? */
     /* Set the buffer size according to configuration file */
     BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
                  (void *)&server_config.tcp_buffer_size_send);
     BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
                  (void *)&server_config.tcp_buffer_size_receive);
 
-    ret = trove_initialize(
-        server_config.trove_method, 
-        trove_coll_to_method_callback,
-        server_config.data_path,
-		server_config.meta_path,
-        init_flags);
+    /* Fire up TROVE */
+    ret = trove_initialize(server_config.trove_method, 
+                           trove_coll_to_method_callback,
+                           server_config.data_path,
+                           server_config.meta_path,
+                           init_flags);
+
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -819,6 +838,7 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_TROVE_INIT;
 
+    /* create the configuration cache */
     ret = PINT_cached_config_initialize();
     if(ret < 0)
     {
@@ -854,40 +874,45 @@ static int server_initialize_subsystems(
         }
 
         /*
-           set storage hints if any.  if any of these fail, we
-           can't error out since they're just hints.  thus, we
-           complain in logging and continue.
-           */
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_THREADS_NUM,
-            (void *)&cur_fs->directio_thread_num);
+         * set storage hints if any.  if any of these fail, we
+         * can't error out since they're just hints.  thus, we
+         * complain in logging and continue.
+         */
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_THREADS_NUM,
+                                       (void *)&cur_fs->directio_thread_num);
+
         if (ret < 0)
         {
             gossip_err("Error setting directio threads num\n");
         }
 
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_OPS_PER_QUEUE,
-            (void *)&cur_fs->directio_ops_per_queue);
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_OPS_PER_QUEUE,
+                                       (void *)&cur_fs->directio_ops_per_queue);
+
         if (ret < 0)
         {
             gossip_err("Error setting directio ops per queue\n");
         }
 
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_TIMEOUT,
-            (void *)&cur_fs->directio_timeout);
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_TIMEOUT,
+                                       (void *)&cur_fs->directio_timeout);
+
         if (ret < 0)
         {
             gossip_err("Error setting directio threads num\n");
         }
 
-        ret = trove_collection_lookup(
-            cur_fs->trove_method,
-            cur_fs->file_system_name, &(orig_fsid), NULL, NULL);
+        ret = trove_collection_lookup(cur_fs->trove_method,
+                                      cur_fs->file_system_name,
+                                      &(orig_fsid),
+                                      NULL,
+                                      NULL);
 
         if (ret < 0)
         {
@@ -907,6 +932,8 @@ static int server_initialize_subsystems(
             return(-PVFS_ENODEV);
         }
 
+/* WBL V3 BEGIN REMOVE HANDLE RANGES */
+#if 0
         /*
          * get a range string that combines all handles for both meta
          * and data ranges specified in the config file.
@@ -915,9 +942,9 @@ static int server_initialize_subsystems(
          * are meta and which are data at this level, so we lump them
          * all together and hand them to trove-handle-mgmt.
          */
-        cur_merged_handle_range =
-            PINT_config_get_merged_handle_range_str(
-                &server_config, cur_fs);
+        cur_merged_handle_range = PINT_config_get_merged_handle_range_str(
+                                         &server_config,
+                                         cur_fs);
 
         /*
          * error out if we're not configured to house either a meta or
@@ -928,161 +955,196 @@ static int server_initialize_subsystems(
             gossip_err("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
                         server_config.host_id,
-                        PINT_config_get_host_alias_ptr(
-                            &server_config, server_config.host_id),
+                        PINT_config_get_host_alias_ptr(&server_config,
+                                                       server_config.host_id),
                         cur_fs->file_system_name);
             return -1;
         }
-        else
+#endif
+/* WBL V3 END REMOVE HANDLE RANGES */
+
+        ret = trove_open_context(cur_fs->coll_id, &trove_context);
+        if (ret < 0)
         {
-            ret = trove_open_context(cur_fs->coll_id, &trove_context);
-            if (ret < 0)
-            {
-                gossip_err("Error initializing trove context\n");
-                return ret;
-            }
-
-            /*
-              set storage hints if any.  if any of these fail, we
-              can't error out since they're just hints.  thus, we
-              complain in logging and continue.
-            */
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_HANDLE_TIMEOUT,
-                (void *)&cur_fs->handle_recycle_timeout_sec);
-            if (ret < 0)
-            {
-                gossip_err("Error setting handle timeout\n");
-            }
-
-            if (cur_fs->attr_cache_keywords &&
-                cur_fs->attr_cache_size &&
-                cur_fs->attr_cache_max_num_elems)
-            {
-                ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
-                    (void *)cur_fs->attr_cache_keywords);
-                if (ret < 0)
-                {
-                    gossip_err("Error setting attr cache keywords\n");
-                }
-                ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_SIZE,
-                    (void *)&cur_fs->attr_cache_size);
-                if (ret < 0)
-                {
-                    gossip_err("Error setting attr cache size\n");
-                }
-                ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-                    (void *)&cur_fs->attr_cache_max_num_elems);
-                if (ret < 0)
-                {
-                    gossip_err("Error setting attr cache max num elems\n");
-                }
-                ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-                    (void *)0);
-                if (ret < 0)
-                {
-                    gossip_err("Error initializing the attr cache\n");
-                }
-            }
-
-            /*
-              add configured merged handle range for this host/fs.
-              NOTE: if the attr cache was properly configured above,
-              this next setinfo may have the opportunity to cache
-              a number of attributes on startup during an iterate.
-            */
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_HANDLE_RANGES,
-                (void *)cur_merged_handle_range);
-            if (ret < 0)
-            {
-                gossip_err("Error adding handle range %s to "
-                            "filesystem %s\n",
-                            cur_merged_handle_range,
-                            cur_fs->file_system_name);
-                return ret;
-            }
-
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
-                (void *)&cur_fs->coalescing_high_watermark);
-            if(ret < 0)
-            {
-                gossip_err("Error setting coalescing high watermark\n");
-                return ret;
-            }
-
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
-                (void *)&cur_fs->coalescing_low_watermark);
-            if(ret < 0)
-            {
-                gossip_err("Error setting coalescing low watermark\n");
-                return ret;
-            }
-            
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_META_SYNC_MODE,
-                (void *)&cur_fs->trove_sync_meta);
-            if(ret < 0)
-            {
-                gossip_err("Error setting coalescing low watermark\n");
-                return ret;
-            } 
-            
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_IMMEDIATE_COMPLETION,
-                (void *)&cur_fs->immediate_completion);
-            if(ret < 0)
-            {
-                gossip_err("Error setting trove immediate completion\n");
-                return ret;
-            } 
-
-            gossip_debug(GOSSIP_SERVER_DEBUG, "File system %s using "
-                         "handles:\n\t%s\n", cur_fs->file_system_name,
-                         cur_merged_handle_range);
-
-            gossip_debug(GOSSIP_SERVER_DEBUG, "Sync on metadata update "
-                         "for %s: %s\n", cur_fs->file_system_name,
-                         ((cur_fs->trove_sync_meta == TROVE_SYNC) ?
-                          "yes" : "no"));
-
-            gossip_debug(GOSSIP_SERVER_DEBUG, "Sync on I/O data update "
-                         "for %s: %s\n", cur_fs->file_system_name,
-                         ((cur_fs->trove_sync_data == TROVE_SYNC) ?
-                          "yes" : "no"));
-
-            gossip_debug(GOSSIP_SERVER_DEBUG, "Export options for "
-                         "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
-                         " AnonUID %u\n AnonGID %u\n", cur_fs->file_system_name,
-                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ? "yes" : "no",
-                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ? "yes" : "no",
-                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ? "yes" : "no",
-                         cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
-
-            /* format and pass sync mode to the flow implementation */
-            snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
-                     cur_fs->trove_sync_data);
-            PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
-
-            trove_close_context(cur_fs->coll_id, trove_context);
-            free(cur_merged_handle_range);
+            gossip_err("Error initializing trove context\n");
+            return ret;
         }
+
+        /*
+          set storage hints if any.  if any of these fail, we
+          can't error out since they're just hints.  thus, we
+          complain in logging and continue.
+        */
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context, 
+                             TROVE_COLLECTION_HANDLE_TIMEOUT,
+                             (void *)&cur_fs->handle_recycle_timeout_sec);
+        if (ret < 0)
+        {
+            gossip_err("Error setting handle timeout\n");
+        }
+
+        if (cur_fs->attr_cache_keywords &&
+            cur_fs->attr_cache_size &&
+            cur_fs->attr_cache_max_num_elems)
+        {
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context, 
+                                 TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
+                                 (void *)cur_fs->attr_cache_keywords);
+            if (ret < 0)
+            {
+                gossip_err("Error setting attr cache keywords\n");
+            }
+
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context, 
+                                 TROVE_COLLECTION_ATTR_CACHE_SIZE,
+                                 (void *)&cur_fs->attr_cache_size);
+            if (ret < 0)
+            {
+                gossip_err("Error setting attr cache size\n");
+            }
+
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context, 
+                                 TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
+                                 (void *)&cur_fs->attr_cache_max_num_elems);
+            if (ret < 0)
+            {
+                gossip_err("Error setting attr cache max num elems\n");
+            }
+/* WBL V3 - MOVED END OF IF HERE - REMOVE THIS COMMENT */
+        }
+
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context, 
+                             TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+                             (void *)0);
+        if (ret < 0)
+        {
+            gossip_err("Error initializing the attr cache\n");
+        }
+
+/* WBL V3 BEGIN REMOVE HANDLE RANGES */
+#if 0
+        /*
+          add configured merged handle range for this host/fs.
+          NOTE: if the attr cache was properly configured above,
+          this next setinfo may have the opportunity to cache
+          a number of attributes on startup during an iterate.
+        */
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context,
+                             TROVE_COLLECTION_HANDLE_RANGES,
+                             (void *)cur_merged_handle_range);
+        if (ret < 0)
+        {
+            gossip_err("Error adding handle range %s to "
+                        "filesystem %s\n",
+                        cur_merged_handle_range,
+                        cur_fs->file_system_name);
+            return ret;
+        }
+#endif 
+/* WBL V3 END REMOVE HANDLE RANGES */
+
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context,
+                             TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+                             (void *)&cur_fs->coalescing_high_watermark);
+        if(ret < 0)
+        {
+            gossip_err("Error setting coalescing high watermark\n");
+            return ret;
+        }
+
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context,
+                             TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+                             (void *)&cur_fs->coalescing_low_watermark);
+        if(ret < 0)
+        {
+            gossip_err("Error setting coalescing low watermark\n");
+            return ret;
+        }
+            
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context,
+                             TROVE_COLLECTION_META_SYNC_MODE,
+                             (void *)&cur_fs->trove_sync_meta);
+        if(ret < 0)
+        {
+            gossip_err("Error setting coalescing low watermark\n");
+            return ret;
+        } 
+            
+        ret = trove_collection_setinfo(
+                             cur_fs->coll_id,
+                             trove_context,
+                             TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                             (void *)&cur_fs->immediate_completion);
+        if(ret < 0)
+        {
+            gossip_err("Error setting trove immediate completion\n");
+            return ret;
+        } 
+
+/* WBL V3 BEGIN REMOVE HANDLE RANGES */
+#if 0
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "File system %s using handles:\n\t%s\n",
+                     cur_fs->file_system_name,
+                     cur_merged_handle_range);
+#endif
+/* WBL V3 END REMOVE HANDLE RANGES */
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Sync on metadata update for %s: %s\n",
+                     cur_fs->file_system_name,
+                     ((cur_fs->trove_sync_meta == TROVE_SYNC) ?
+                            "yes" : "no"));
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Sync on I/O data update for %s: %s\n",
+                     cur_fs->file_system_name,
+                     ((cur_fs->trove_sync_data == TROVE_SYNC) ?
+                            "yes" : "no"));
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Export options for "
+                     "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
+                     " AnonUID %u\n AnonGID %u\n",
+                     cur_fs->file_system_name,
+                     (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ?
+                             "yes" : "no",
+                     (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ?
+                            "yes" : "no",
+                     (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ?
+                            "yes" : "no",
+                     cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
+
+        /* format and pass sync mode to the flow implementation */
+        snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
+                 cur_fs->trove_sync_data);
+        PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+
+        trove_close_context(cur_fs->coll_id, trove_context);
+/* WBL V3 BEGIN REMOVE HANDLE RANGES */
+#if 0
+        free(cur_merged_handle_range);
+#endif
+/* WBL V3 END REMOVE HANDLE RANGES */
+/* WBL V3 IF USED TO END HERE, MOVED UP - REMOVE THIS COMMENT*/
 
         cur = PINT_llist_next(cur);
     }
@@ -1090,8 +1152,10 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
+                 "Storage Init Complete (%s)\n",
+                 SERVER_STORAGE_MODE);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
 
     /*
@@ -1105,7 +1169,20 @@ static int server_initialize_subsystems(
         gossip_err("trove_migrate failed: ret=%d\n", ret);
         return(ret);
     }
+    /** END OF TROVE INIT **/
 
+/* WBL V3 ADD */
+    /* Initialize SID cache */
+    ret = SID_initialize();
+    if(ret < 0)
+    {
+        PVFS_perror_gossip("Error: SID_initialize", ret);
+        return(ret);
+    }
+
+    *server_status_flag |= SERVER_SID_INIT;
+
+    /* Initialize Job Timer */
     ret = job_time_mgr_init();
     if(ret < 0)
     {
@@ -1134,6 +1211,7 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_JOB_CTX_INIT;
 
+    /* initialize Request Scheduler */
     ret = PINT_req_sched_initialize();
     if (ret < 0)
     {
@@ -1143,26 +1221,30 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-                            /* hist size should be in server config too */
+    /* Initialize performance counters */
+    /* hist size should be in server config too */
     PINT_server_pc = PINT_perf_initialize(server_keys);
     if(!PINT_server_pc)
     {
         gossip_err("Error initializing performance counters.\n");
         return(ret);
     }
-    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, 
-                                        server_config.perf_update_interval);
+
+    ret = PINT_perf_set_info(PINT_server_pc,
+                             PINT_PERF_UPDATE_INTERVAL, 
+                             server_config.perf_update_interval);
     if (ret < 0)
     {
         gossip_err("Error PINT_perf_set_info (update interval)\n");
         return(ret);
     }
+
     /* if history_size is greater than 1, start the rollover SM */
     if (PINT_server_pc->running)
     {
         struct PINT_smcb *tmp_op = NULL;
-        ret = server_state_machine_alloc_noreq(
-                PVFS_SERV_PERF_UPDATE, &(tmp_op));
+        ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                               &(tmp_op));
         if (ret == 0)
         {
             ret = server_state_machine_start_noreq(tmp_op);
@@ -1178,6 +1260,7 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 
+    /* Initialize uid tracker */
     ret = PINT_uid_mgmt_initialize();
     if (ret < 0)
     {
@@ -1187,6 +1270,13 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_UID_MGMT_INIT;
 
+/* WBL V3 BEGIN REMOVE PRECREATE CODE */
+#if 0
+    /* VERSION 3 gets rid of the precreate pool
+     * THis code should be removed in V3 it is only
+     * here for reference during development
+     */
+    /* Initialize precreate pool */
     ret = precreate_pool_initialize(server_index);
     if (ret < 0)
     {
@@ -1195,6 +1285,11 @@ static int server_initialize_subsystems(
     }
 
     *server_status_flag |= SERVER_PRECREATE_INIT;
+#endif
+/* WBL V3 END REMOVE PRECREATE CODE */
+
+/* WBL V3 ADD */
+    /* Perform Server Check-In */
 
     return ret;
 }
@@ -1274,8 +1369,8 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     if (sig == SIGSEGV)
     {
         gossip_err("PVFS2 server: signal %d, faulty address is %p, " 
-            "from %p\n", sig, info->si_addr, 
-            (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
+                "from %p\n", sig, info->si_addr, 
+                (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
     {
@@ -1289,7 +1384,9 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     messages = backtrace_symbols(trace, trace_size);
     /* skip first stack frame (points here) */
     for (i=1; i<trace_size; ++i)
+    {
         gossip_err("[bt] %s\n", messages[i]);
+    }
 
     signal_recvd_flag = sig;
     return;
@@ -1354,10 +1451,12 @@ static void reload_config(void)
         }
         
         /* Copy the new logging mask into the current server configuration */
-        orig_server_config->event_logging = strdup(sighup_server_config.event_logging);
+        orig_server_config->event_logging =
+                strdup(sighup_server_config.event_logging);
         
         /* Reset the debug mask */
-        gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
+        gossip_set_debug_mask(1,
+                PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
         orig_filesystems = server_config.file_systems;
         /* Loop and update all stored file systems */
@@ -1413,15 +1512,18 @@ static void reload_config(void)
             hup_fs->root_squash_netmasks = tmp_int_ptr;
 
             tmp_value = orig_fs->root_squash_exceptions_count;
-            orig_fs->root_squash_exceptions_count = hup_fs->root_squash_exceptions_count;
+            orig_fs->root_squash_exceptions_count =
+                            hup_fs->root_squash_exceptions_count;
             hup_fs->root_squash_exceptions_count = tmp_value;
 
             tmp_ptr = orig_fs->root_squash_exceptions_hosts;
-            orig_fs->root_squash_exceptions_hosts = hup_fs->root_squash_exceptions_hosts;
+            orig_fs->root_squash_exceptions_hosts =
+                            hup_fs->root_squash_exceptions_hosts;
             hup_fs->root_squash_exceptions_hosts = tmp_ptr;
 
             tmp_int_ptr = orig_fs->root_squash_exceptions_netmasks;
-            orig_fs->root_squash_exceptions_netmasks = hup_fs->root_squash_exceptions_netmasks;
+            orig_fs->root_squash_exceptions_netmasks =
+                            hup_fs->root_squash_exceptions_netmasks;
             hup_fs->root_squash_exceptions_netmasks = tmp_int_ptr;
 
             /* Update all squashing. Prelude is only place to accesses
@@ -1512,6 +1614,8 @@ static int server_shutdown(
 
     free(s_server_options.server_alias);
 
+/* WBL V3 BEGIN REMOVE PRECREATE CODE */
+#if 0
     if (status & SERVER_PRECREATE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting precreate pool "
@@ -1520,6 +1624,8 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         precreate pool "
                      "           [ stopped ]\n");
     }
+#endif
+/* WBL V3 END REMOVE PRECREATE CODE */
 
     if (status & SERVER_STATE_MACHINE_INIT)
     {
@@ -1587,6 +1693,15 @@ static int server_shutdown(
         PINT_flow_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         flow "
                      "interface            [ stopped ]\n");
+    }
+
+    if (status & SERVER_SID_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] closing SID "
+                     "cache                 [   ...   ]\n");
+        SID_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         SID "
+                     "cache                 [ closed  ]\n");
     }
 
     if (status & SERVER_BMI_INIT)
@@ -1972,17 +2087,19 @@ int server_post_unexpected_recv(void)
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "server_post_unexpected_recv\n");
 
-    ret = PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
-            sizeof(struct PINT_server_op),
-            server_op_state_get_machine,
-            server_state_machine_terminate,
-            server_job_context);
+    ret = PINT_smcb_alloc(&smcb,
+                          BMI_UNEXPECTED_OP,
+                          sizeof(struct PINT_server_op),
+                          server_op_state_get_machine,
+                          server_state_machine_terminate,
+                          server_job_context);
     if (ret < 0)
     {
         gossip_lerr("Error: failed to allocate SMCB "
                     "of op type %x\n", BMI_UNEXPECTED_OP);
         return ret;
     }
+
     s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     memset(s_op, 0, sizeof(PINT_server_op));
     s_op->op = BMI_UNEXPECTED_OP;
@@ -2080,8 +2197,13 @@ int server_state_machine_start(
          */
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
         s_op->op = s_op->req->op;
-        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_SERVER_ID_NAME, sizeof(uint32_t), &server_config.host_index);
-        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_OP_ID_NAME,     sizeof(uint32_t), &s_op->req->op);
+        PVFS_hint_add(&s_op->req->hints,
+                      PVFS_HINT_SERVER_ID_NAME,
+                      sizeof(uint32_t),
+                      &server_config.host_index);
+        PVFS_hint_add(&s_op->req->hints,
+                      PVFS_HINT_OP_ID_NAME,
+                      sizeof(uint32_t), &s_op->req->op);
     }
     else
     {
@@ -2147,17 +2269,19 @@ int server_state_machine_alloc_noreq(
     if (new_op)
     {
         PINT_server_op *tmp_op;
-        ret = PINT_smcb_alloc(new_op, op, 
-                sizeof(struct PINT_server_op),
-                server_op_state_get_machine,
-                server_state_machine_terminate,
-                server_job_context);
+        ret = PINT_smcb_alloc(new_op,
+                              op, 
+                              sizeof(struct PINT_server_op),
+                              server_op_state_get_machine,
+                              server_state_machine_terminate,
+                              server_job_context);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to allocate SMCB "
                         "of op type %x\n", op);
             return ret;
         }
+
         tmp_op = PINT_sm_frame(*new_op, PINT_FRAME_CURRENT);
         tmp_op->op = op;
         tmp_op->target_handle = PVFS_HANDLE_NULL;
@@ -2233,8 +2357,11 @@ int server_state_machine_complete(PINT_smcb *smcb)
 
     if(s_op->req)
     {
-        PINT_EVENT_END(PINT_sm_event_id, server_controlling_pid,
-                       NULL, s_op->event_id, 0);
+        PINT_EVENT_END(PINT_sm_event_id,
+                       server_controlling_pid,
+                       NULL,
+                       s_op->event_id,
+                       0);
     }
 
     /* release the decoding of the unexpected request */
@@ -2423,6 +2550,15 @@ static int generate_shm_key_hint(int* server_index)
     return(rand());
 }
 
+/* WBL V3 BEGIN REMOVE PRECREATE CODE */
+#if 0
+/**************
+ *
+ * The precreate pools are going away in V3 the functions below
+ * won't be needed any more
+ *
+ */
+
 /* precreate_pool_initialize()
  * 
  * starts the infrastructure for managing pools of precreated handles
@@ -2458,14 +2594,13 @@ static int precreate_pool_initialize(int server_index)
         fs_count++;
 
         /* am I a meta server in this file system? */
-        ret = PINT_cached_config_check_type(
-            cur_fs->coll_id,
-            server_config.host_id,
-            &server_type);
+        ret = PINT_cached_config_check_type(cur_fs->coll_id,
+                                            server_config.host_id,
+                                            &server_type);
         if(ret < 0)
         {
             gossip_err("Error: %s not found in configuration file.\n", 
-                server_config.host_id);
+                       server_config.host_id);
             gossip_err("Error: configuration file is inconsistent.\n");
             return(ret);
         }
@@ -2479,12 +2614,13 @@ static int precreate_pool_initialize(int server_index)
         }
 
         /* how many servers do we have? */
-        ret = PINT_cached_config_count_servers(
-            cur_fs->coll_id, PINT_SERVER_TYPE_ALL, &server_count);
+        ret = PINT_cached_config_count_servers(cur_fs->coll_id,
+                                               PINT_SERVER_TYPE_ALL,
+                                               &server_count);
         if(ret < 0)
         {
             gossip_err("Error: unable to count servers for fsid: %d\n", 
-                (int)cur_fs->coll_id);
+                       (int)cur_fs->coll_id);
             return(ret);
         }
         
@@ -2497,9 +2633,10 @@ static int precreate_pool_initialize(int server_index)
         }
 
         /* resolve addrs for each I/O server */
-        ret = PINT_cached_config_get_server_array(
-            cur_fs->coll_id, PINT_SERVER_TYPE_ALL,
-            addr_array, &server_count);
+        ret = PINT_cached_config_get_server_array(cur_fs->coll_id,
+                                                  PINT_SERVER_TYPE_ALL,
+                                                  addr_array,
+                                                  &server_count);
         if(ret < 0)
         {
             gossip_err("Error: unable retrieve servers for fsid: %d\n", 
@@ -2509,8 +2646,9 @@ static int precreate_pool_initialize(int server_index)
 
         for(i=0; i<server_count; i++)
         {
-            host = PINT_cached_config_map_addr(
-                cur_fs->coll_id, addr_array[i], &server_type);
+            host = PINT_cached_config_map_addr(cur_fs->coll_id,
+                                               addr_array[i],
+                                               &server_type);
             if(!strcmp(host, server_config.host_id) == 0)
             {
                 /* this is a peer server */
@@ -2554,8 +2692,11 @@ static int precreate_pool_initialize(int server_index)
                                  __func__, host, t, 
                                  (long long unsigned int)cur_fs->coll_id, 
                                  PVFS_OID_str(&pool_handle));
-                    ret = precreate_pool_setup_server(host, t, 
-                        cur_fs->coll_id, &pool_handle);
+
+                    ret = precreate_pool_setup_server(host,
+                                                      t, 
+                                                      cur_fs->coll_id,
+                                                      &pool_handle);
                     if(ret < 0)
                     {
                         gossip_err("Error: precreate_pool_initialize failed to "
@@ -2565,8 +2706,9 @@ static int precreate_pool_initialize(int server_index)
                     }
     
                     /* count current handles */
-                    ret = precreate_pool_count(cur_fs->coll_id, pool_handle, 
-                        &handle_count);
+                    ret = precreate_pool_count(cur_fs->coll_id,
+                                               pool_handle, 
+                                               &handle_count);
                     if(ret < 0)
                     {
                         gossip_err("Error: precreate_pool_initialize failed to "
@@ -2576,16 +2718,23 @@ static int precreate_pool_initialize(int server_index)
                     }
     
                     /* prepare the job interface to use this pool */
-                    ret = job_precreate_pool_register_server(host, t,
-                        cur_fs->coll_id, pool_handle, handle_count,
-                        user_opts->precreate_batch_size);
+                    ret = job_precreate_pool_register_server(
+                                             host,
+                                             t,
+                                             cur_fs->coll_id,
+                                             pool_handle,
+                                             handle_count,
+                                             user_opts->precreate_batch_size);
     
                     /* launch sm to take care of refilling */
                     /* the refiller will only actually launch if the batch count
                      * for the specified type, t, is greater than 0. Otherwise,
                      * there is no reason to have a refiller running. */
-                    ret = precreate_pool_launch_refiller(host, t, addr_array[i],
-                        cur_fs->coll_id, pool_handle);
+                    ret = precreate_pool_launch_refiller(host,
+                                                         t,
+                                                         addr_array[i],
+                                                         cur_fs->coll_id,
+                                                         pool_handle);
                     if(ret < 0)
                     {
                         gossip_err("Error: precreate_pool_initialize failed to "
@@ -2629,8 +2778,10 @@ static void precreate_pool_finalize(void)
  *  handle: out value of the handle of the pool
  *
  */
-static int precreate_pool_setup_server(const char* host, PVFS_ds_type type, 
-    PVFS_fs_id fsid, PVFS_handle* pool_handle)
+static int precreate_pool_setup_server(const char* host,
+                                       PVFS_ds_type type, 
+                                       PVFS_fs_id fsid,
+                                       PVFS_handle* pool_handle)
 {
     job_status_s js;
     job_id_t job_id;
@@ -2655,24 +2806,41 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
     key.buffer_sz = strlen(host) + strlen(type_string) + 
                     strlen("precreate-pool-") + 2;
     key.buffer = malloc(key.buffer_sz);
+
     if(!key.buffer)
     {
         return(-ENOMEM);
     }
-    snprintf((char*)key.buffer, key.buffer_sz, "precreate-pool-%s-%s", 
-             host, type_string);
+    snprintf((char*)key.buffer,
+             key.buffer_sz,
+             "precreate-pool-%s-%s", 
+             host,
+             type_string);
+
     key.read_sz = 0;
 
     val.buffer = pool_handle;
     val.buffer_sz = sizeof(*pool_handle);
     val.read_sz = 0;
 
-    ret = job_trove_fs_geteattr(fsid, &key, &val, 0, NULL, 0, &js, 
-        &job_id, server_job_context, NULL);
+    ret = job_trove_fs_geteattr(fsid,
+                                &key,
+                                &val,
+                                0,
+                                NULL,
+                                0,
+                                &js, 
+                                &job_id,
+                                server_job_context,
+                                NULL);
     while(ret == 0)
     {
-        ret = job_test(job_id, &outcount, NULL, &js, 
-            PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+        ret = job_test(job_id,
+                       &outcount,
+                       NULL,
+                       &js, 
+                       PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                       server_job_context);
     }
     if(ret < 0)
     {
@@ -2693,8 +2861,10 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
                      "for %s, type %s; creating now.\n", host, type_string);
 
         /* find extent array for ourselves */
-        ret = PINT_cached_config_get_server(
-            fsid, server_config.host_id, PINT_SERVER_TYPE_META, &ext_array);
+        ret = PINT_cached_config_get_server(fsid,
+                                            server_config.host_id,
+                                            PINT_SERVER_TYPE_META,
+                                            &ext_array);
         if(ret < 0)
         {
             gossip_err("Error: PINT_cached_config_get_meta() failure.\n");
@@ -2703,12 +2873,25 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
         }
 
         /* create a trove object for the pool */
-        ret = job_trove_dspace_create(fsid, &ext_array, PVFS_TYPE_INTERNAL,
-            NULL, TROVE_SYNC, NULL, 0, &js, &job_id, server_job_context, NULL);
+        ret = job_trove_dspace_create(fsid,
+                                      &ext_array,
+                                      PVFS_TYPE_INTERNAL,
+                                      NULL,
+                                      TROVE_SYNC,
+                                      NULL,
+                                      0,
+                                      &js,
+                                      &job_id,
+                                      server_job_context,
+                                      NULL);
         while(ret == 0)
         {
-            ret = job_test(job_id, &outcount, NULL, &js, 
-                PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+            ret = job_test(job_id,
+                           &outcount,
+                           NULL,
+                           &js, 
+                           PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                           server_job_context);
         }
         if(ret < 0 || js.error_code)
         {
@@ -2720,12 +2903,24 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
         *pool_handle = js.handle;
 
         /* store reference to pool handle as collection eattr */
-        ret = job_trove_fs_seteattr(fsid, &key, &val, TROVE_SYNC, NULL, 0, &js, 
-            &job_id, server_job_context, NULL);
+        ret = job_trove_fs_seteattr(fsid,
+                                    &key,
+                                    &val,
+                                    TROVE_SYNC,
+                                    NULL,
+                                    0,
+                                    &js, 
+                                    &job_id,
+                                    server_job_context,
+                                    NULL);
         while(ret == 0)
         {
-            ret = job_test(job_id, &outcount, NULL, &js, 
-                PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+            ret = job_test(job_id,
+                           &outcount,
+                           NULL,
+                           &js, 
+                           PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                           server_job_context);
         }
         if(ret < 0 || js.error_code)
         {
@@ -2754,8 +2949,9 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
  *
  * counts the number of handles stored in a persistent precreate pool
  */
-static int precreate_pool_count(
-    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count)
+static int precreate_pool_count(PVFS_fs_id fsid,
+                                PVFS_handle pool_handle,
+                                int* count)
 {
     int ret;
     job_status_s js;
@@ -2764,13 +2960,24 @@ static int precreate_pool_count(
     PVFS_ds_keyval_handle_info handle_info;
 
     /* try to get the current number of handles from the pool */
-    ret = job_trove_keyval_get_handle_info(
-        fsid, pool_handle, TROVE_KEYVAL_HANDLE_COUNT, &handle_info,
-        NULL, 0, &js, &job_id, server_job_context, NULL);
+    ret = job_trove_keyval_get_handle_info(fsid,
+                                           pool_handle,
+                                           TROVE_KEYVAL_HANDLE_COUNT,
+                                           &handle_info,
+                                           NULL,
+                                           0,
+                                           &js,
+                                           &job_id,
+                                           server_job_context,
+                                           NULL);
     while(ret == 0)
     {
-        ret = job_test(job_id, &outcount, NULL, &js, 
-            PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+        ret = job_test(job_id,
+                      &outcount,
+                      NULL,
+                      &js, 
+                      PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                      server_job_context);
     }
     if(ret < 0)
     {
@@ -2805,8 +3012,11 @@ static int precreate_pool_count(
  *    so a remote server that is I/O only will only get refillers for datafile
  *    handles.
  */
-static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
-    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
+static int precreate_pool_launch_refiller(const char* host,
+                                          PVFS_ds_type type,
+                                          PVFS_BMI_addr_t addr,
+                                          PVFS_fs_id fsid,
+                                          PVFS_handle pool_handle)
 {
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
@@ -2826,7 +3036,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
 
     /* allocate smcb */
     ret = server_state_machine_alloc_noreq(PVFS_SERV_PRECREATE_POOL_REFILLER,
-        &(tmp_smcb));
+                                           &(tmp_smcb));
     if (ret < 0)
     {
         return(ret);
@@ -2834,6 +3044,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
 
     s_op = PINT_sm_frame(tmp_smcb, PINT_FRAME_CURRENT);
     s_op->u.precreate_pool_refiller.host = strdup(host);
+
     if(!s_op->u.precreate_pool_refiller.host)
     {
         PINT_smcb_free(tmp_smcb);
@@ -2843,10 +3054,13 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     /* set this refillers handle range based on the type of handle it will 
      * hold. If it's a datafile get an IO server range, otherwise get a meta
      * range. */
-    ret = PINT_cached_config_get_server( fsid, host, 
-              ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
+    ret = PINT_cached_config_get_server(
+              fsid,
+              host, 
+              ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO :
                                               PINT_SERVER_TYPE_META),
               &s_op->u.precreate_pool_refiller.handle_extent_array);
+
     if(ret < 0)
     {
         free(s_op->u.precreate_pool_refiller.host);
@@ -2878,6 +3092,8 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
 
     return(0);
 }
+#endif
+/* WBL V3 END REMOVE PRECREATE CODE */
 
 /*
  * Local variables:

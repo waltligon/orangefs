@@ -99,7 +99,7 @@ int trove_initialize(TROVE_method_id method_id,
         return ret;
     }
 
-/* NEXT */
+/* WBL V3 replace handle alloc */
 #if  0
     ret = trove_handle_mgmt_initialize();
     if (ret == -1)
@@ -122,8 +122,9 @@ int trove_initialize(TROVE_method_id method_id,
       initialize can fail if storage name isn't valid, but we want
       those op pointers to be right either way.
     */
-    ret = mgmt_method_table[method_id]->initialize(
-        data_path, meta_path, flags);
+    ret = mgmt_method_table[method_id]->initialize(data_path,
+                                                   meta_path,
+                                                   flags);
     if (ret > -1)
     {
         ret = 1;
@@ -150,7 +151,7 @@ int trove_finalize(TROVE_method_id method_id)
 
     ret = mgmt_method_table[method_id]->finalize();
 
-/* NEXT */
+/* WBL V3 replace handle alloc */
 #if 0
     ret = trove_handle_mgmt_finalize();
 #endif
@@ -166,8 +167,10 @@ int trove_storage_create(TROVE_method_id method_id,
                          void *user_ptr,
                          TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->storage_create(
-	          data_path, meta_path, user_ptr, out_op_id_p);
+    int ret = mgmt_method_table[method_id]->storage_create(data_path,
+                                                           meta_path,
+                                                           user_ptr,
+                                                           out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }
@@ -175,12 +178,14 @@ int trove_storage_create(TROVE_method_id method_id,
 
 int trove_storage_remove(TROVE_method_id method_id,
                          char *data_path,
-			 			 char *meta_path,
+                         char *meta_path,
                          void *user_ptr,
                          TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->storage_remove(
-                  data_path, meta_path, user_ptr, out_op_id_p);
+    int ret = mgmt_method_table[method_id]->storage_remove(data_path,
+                                                           meta_path,
+                                                           user_ptr,
+                                                           out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }
@@ -200,8 +205,10 @@ int trove_collection_create(char *collname,
     }
 
     method_id = global_trove_method_callback(new_coll_id);
-    ret = mgmt_method_table[method_id]->collection_create(
-        collname, new_coll_id, user_ptr, out_op_id_p);
+    ret = mgmt_method_table[method_id]->collection_create(collname,
+                                                          new_coll_id,
+                                                          user_ptr,
+                                                          out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }
@@ -211,8 +218,9 @@ int trove_collection_remove(TROVE_method_id method_id,
                             void *user_ptr,
                             TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->collection_remove(
-        collname, user_ptr, out_op_id_p);
+    int ret = mgmt_method_table[method_id]->collection_remove(collname,
+                                                              user_ptr,
+                                                              out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }
@@ -223,8 +231,10 @@ int trove_collection_lookup(TROVE_method_id method_id,
                             void *user_ptr,
                             TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->collection_lookup(
-        collname, coll_id_p, user_ptr, out_op_id_p);
+    int ret = mgmt_method_table[method_id]->collection_lookup(collname,
+                                                              coll_id_p,
+                                                              user_ptr,
+                                                              out_op_id_p);
 
     return (ret < 0) ? ret : 1;
 }
@@ -239,16 +249,20 @@ int trove_collection_iterate(TROVE_method_id method_id,
                              void *user_ptr,
                              TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->collection_iterate(
-        inout_position_p, name_array, coll_id_array, inout_count_p,
-        flags, vtag, user_ptr, out_op_id_p);
+    int ret = mgmt_method_table[method_id]->collection_iterate(inout_position_p,
+                                                               name_array,
+                                                               coll_id_array,
+                                                               inout_count_p,
+                                                               flags,
+                                                               vtag,
+                                                               user_ptr,
+                                                               out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }
 
-int trove_open_context(
-    TROVE_coll_id coll_id,
-    TROVE_context_id *context_id)
+int trove_open_context(TROVE_coll_id coll_id,
+                       TROVE_context_id *context_id)
 {
     TROVE_method_id method_id;
     int ret = 0;
@@ -261,15 +275,14 @@ int trove_open_context(
 
     if (trove_init_status != 0)
     {
-        ret = context_method_table[method_id]->open_context(
-            coll_id, context_id);
+        ret = context_method_table[method_id]->open_context(coll_id,
+                                                            context_id);
     }
     return ret;
 }
 
-int trove_close_context(
-    TROVE_coll_id coll_id,
-    TROVE_context_id context_id)
+int trove_close_context(TROVE_coll_id coll_id,
+                        TROVE_context_id context_id)
 {
     TROVE_method_id method_id;
     int ret = 0;
@@ -282,15 +295,14 @@ int trove_close_context(
 
     if (trove_init_status != 0)
     {
-        ret = context_method_table[method_id]->close_context(
-            coll_id, context_id);
+        ret = context_method_table[method_id]->close_context(coll_id,
+                                                             context_id);
     }
     return ret;
 }
 
-int trove_collection_clear(
-    TROVE_method_id method_id,
-    TROVE_coll_id coll_id)
+int trove_collection_clear(TROVE_method_id method_id,
+                           TROVE_coll_id coll_id)
 {
     return mgmt_method_table[method_id]->collection_clear(coll_id);
 }

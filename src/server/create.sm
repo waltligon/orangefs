@@ -68,8 +68,12 @@ machine pvfs2_create_sm
     {
         run write_keyvals;
         success => setobj_attribs;
-        default => replace_remote_datafile_handles;
+        default => remove_local_datafile_handles;
     }
+/* WBL V3 removing precreate pool */
+/*
+        default => replace_remote_datafile_handles;
+*/
 
     state setobj_attribs
     {
@@ -90,12 +94,15 @@ machine pvfs2_create_sm
         default => remove_metafile_object;
     }
 
+/* WBL V3 removing precreate pool */
+/*
     state replace_remote_datafile_handles
     {
         run replace_remote_datafile_handles;
         REPLACE_DONE => remove_local_datafile_handles;
         default => replace_remote_datafile_handles;
     }
+*/
 
     state remove_metafile_object
     {
@@ -106,7 +113,7 @@ machine pvfs2_create_sm
     state remove_keyvals
     {
         run remove_keyvals;
-        success => replace_remote_datafile_handles;
+        success => remove_local_datafile_handles;
         default => setup_final_response;
     }
 
@@ -408,8 +415,7 @@ static PINT_sm_action request_datafiles(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t j_id;
+    int ret = -1, h = 0;
 
     if(s_op->u.create.handle_array_remote_count == 0)
     {
@@ -417,19 +423,21 @@ static PINT_sm_action request_datafiles(
         return(SM_ACTION_COMPLETE);
     }
 
-    ret = job_precreate_pool_get_handles(
-        s_op->req->u.create.fs_id,
-        s_op->u.create.handle_array_remote_count,
-        PVFS_TYPE_DATAFILE,
-        s_op->u.create.remote_io_servers,
-        s_op->u.create.handle_array_remote,
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    /* this expects a list of handles that are also tied to a server */
+    /* up to this point presumably the servers have been selected */
+    /* via the remote_io_servers array */
+    /* in V3 we need to generate handle_array_remote_count OIDs */
+    /* and then select SIDs to go with them - two distinct tasks */
+    /* but neither requires blocking so we can do it all in one */
+    /* state (in fact could have done in last state and skiped */
+    /* this one */
+
+    for (h = 0; h < s_op->u.create.handle_array_remote_count; h++)
+    {
+        PVFS_OID_gen(&s_op->u.create.handle_array_remote[h]);
+    }
+    ret = 0;
+    /* now need a SIDcache query to get SIDS */
     return ret;
 }
 
@@ -494,6 +502,8 @@ static PINT_sm_action remove_local_datafile_handles(
     return ret;
 }
 
+/* WBL V3 remove precreate pool */
+#if 0
 static PINT_sm_action replace_remote_datafile_handles(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -546,6 +556,7 @@ static PINT_sm_action replace_remote_datafile_handles(
         return(SM_ACTION_COMPLETE);
     }
 }
+#endif
 
 static PINT_sm_action remove_keyvals(
     struct PINT_smcb *smcb, job_status_s *js_p)

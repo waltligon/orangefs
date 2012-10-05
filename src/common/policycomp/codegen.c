@@ -50,7 +50,7 @@ void gen_attrib_table()
             fprintf(header, ",\n");
         }
         fprintf(code, "    SID_get_%s", attr->name);
-        fprintf(header, "    SID_%s = %d", attr->name, i++);
+        fprintf(header, "    SID_attr_%s = %d", attr->name, i++);
     }
     fprintf(code, "\n};\n\n");
     fprintf(header, "\n} SID_attr_t;\n\n");
@@ -94,7 +94,7 @@ void gen_policy_table()
         }
         else
         {
-            fprintf(code, "    .spread_attr = SID_%s,\n", policy->name);
+            fprintf(code, "    .spread_attr = SID_attr_%s,\n", policy->name);
         }
         fprintf(code, "    .rule_count = sizeof(SID_sc%d)"
                 "/sizeof(SID_set_criteria_t),\n", i);
@@ -115,7 +115,7 @@ void gen_save_attr_name(char *name)
     /* generate extractor function */
     fprintf(code, "int SID_get_%s (DB *pri, const DBT *pkey, "
             "const DBT *pdata, DBT *skey)\n{\n    "
-            "return SID_get_attr (pri, pkey, pdata, skey, SID_%s);\n}\n\n",
+            "return SID_get_attr (pri, pkey, pdata, skey, SID_attr_%s);\n}\n\n",
             name, name);
 }
 
@@ -137,12 +137,12 @@ void gen_int_decl(int low, int high)
 
 void gen_value(char *value)
 {
-    fprintf(header, "    SID_%s_%s\n", attr_name, value);
+    fprintf(header, "    SID_attr_%s_%s\n", attr_name, value);
 }
 
 void gen_value_comma(char *value)
 {
-    fprintf(header, "    SID_%s_%s,\n", attr_name, value);
+    fprintf(header, "    SID_attr_%s_%s,\n", attr_name, value);
 }
 
 void gen_init_join_criteria()
@@ -177,7 +177,7 @@ void gen_jc_separator()
 
 void gen_output_join_criteria(char *attr, char *value)
 {
-    fprintf(code, "    .attr = SID_%s,\n    .value = SID_%s_%s\n",
+    fprintf(code, "    .attr = SID_attr_%s,\n    .value = SID_attr_%s_%s\n",
             attr, attr, value);
 }
 
@@ -240,7 +240,7 @@ void gen_compare(char *attr, int cmpop, char *value)
 {
     long v;
     char *ep;
-    fprintf(code2, "\t\tSID_ATTR(SID_%s) ", attr);
+    fprintf(code2, "\t\tSID_ATTR(SID_attr_%s) ", attr);
     switch (cmpop)
     {
         case SID_EQ :
@@ -271,7 +271,7 @@ void gen_compare(char *attr, int cmpop, char *value)
     else
     {
         /* monething non integer was found */
-        fprintf(code2, " SID_%s_%s\n", attr, value);
+        fprintf(code2, " SID_attr_%s_%s\n", attr, value);
     }
 }
 

@@ -249,8 +249,6 @@ static PINT_sm_action inspect_keyvals(
 static PINT_sm_action get_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret;
-    job_id_t j_id;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     if(s_op->u.unstuff.layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
@@ -287,6 +285,12 @@ static PINT_sm_action get_handles(
         return SM_ACTION_COMPLETE;
     }
 
+/* again this allocates handles on a server BUT unstuff is going away 
+ * so there's no real point in  writing code to replace it, just comment 
+ * out to avoid temp compile issues
+ */
+/* WBL V3 remove precreate pool */
+#if 0
     /* NOTE: we are leaving the existing resp attr structure alone until we
      * get a successful answer from get_handles() and commit to disk
      */
@@ -304,6 +308,8 @@ static PINT_sm_action get_handles(
         server_job_context,
         s_op->req->hints);
     return ret;
+#endif
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action set_handles_on_object(

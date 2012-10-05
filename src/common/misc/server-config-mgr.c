@@ -161,8 +161,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
         {
             qhash_for_each(hash_link, &s_fsid_to_config_table->array[i])
             {
-                config = qlist_entry(
-                    hash_link, server_config_t, hash_link);
+                config = qlist_entry(hash_link, server_config_t, hash_link);
                 assert(config);
                 assert(config->server_config);
 
@@ -209,10 +208,9 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
     return ret;
 }
 
-int PINT_server_config_mgr_add_config(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id,
-    int* free_config_flag)
+int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
+                                      PVFS_fs_id fs_id,
+                                      int* free_config_flag)
 {
     int ret = -PVFS_EINVAL;
     server_config_t *config = NULL;
@@ -258,8 +256,7 @@ int PINT_server_config_mgr_add_config(
         config->fs_id = fs_id;
         config->ref_count = 1;
 
-        qhash_add(s_fsid_to_config_table, &fs_id,
-                  &config->hash_link);
+        qhash_add(s_fsid_to_config_table, &fs_id, &config->hash_link);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "\tmapped fs_id %d => "
                      "config %p\n", fs_id, config_s);
@@ -283,8 +280,7 @@ int PINT_server_config_mgr_add_config(
     return ret;
 }
 
-int PINT_server_config_mgr_remove_config(
-    PVFS_fs_id fs_id)
+int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
     server_config_t *config = NULL;
@@ -298,8 +294,7 @@ int PINT_server_config_mgr_remove_config(
         gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
-        hash_link = qhash_search(
-            s_fsid_to_config_table, &fs_id);
+        hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -341,7 +336,7 @@ int PINT_server_config_mgr_remove_config(
 }
 
 struct server_configuration_s *__PINT_server_config_mgr_get_config(
-    PVFS_fs_id fs_id)
+                PVFS_fs_id fs_id)
 {
     struct server_configuration_s *ret = NULL;
     server_config_t *config = NULL;
@@ -376,8 +371,7 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
     return ret;
 }
 
-void __PINT_server_config_mgr_put_config(
-    struct server_configuration_s *config_s)
+void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -394,8 +388,7 @@ void __PINT_server_config_mgr_put_config(
         cur_fs = PINT_llist_head(cur);
         assert(cur_fs);
 
-        hash_link = qhash_search(
-            s_fsid_to_config_table, &cur_fs->coll_id);
+        hash_link = qhash_search(s_fsid_to_config_table, &cur_fs->coll_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);

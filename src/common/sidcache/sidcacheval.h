@@ -7,6 +7,7 @@
 #ifndef SIDCACHEVAL_H
 #define SIDCACHEVAL_H 1
 
+#include "policy.h"
 
 typedef int BMI_addr;
 
@@ -18,11 +19,11 @@ typedef struct SID_cacheval_s
 } SID_cacheval_t;
 
 /* these are defined in policyeval.c */
-/* the depend on SID_NUM_ATTR and thus they are here */
+/* they depend on SID_NUM_ATTR and thus they are here */
 
-DB *SID_attr_indices[SID_NUM_ATTR];
+extern DB *SID_attr_index[SID_NUM_ATTR];
 
-DBC *SID_attr_cursor[SID_NUM_ATTR];
+extern DBC *SID_attr_cursor[SID_NUM_ATTR];
 
 #endif
 /*

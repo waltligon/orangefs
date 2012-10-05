@@ -10,9 +10,10 @@
 #include <db.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sidcacheval.h>
 #include <pvfs2-types.h>
 #include <pvfs3-handle.h>
+#include "sidcacheval.h"
+#include "sid.h"
 
 /* these are defines just to temporarily allow compile */
 //typedef int BMI_addr;
@@ -29,11 +30,13 @@ extern DB_ENV *SID_envp;
 /* main SID transaction */
 extern DB_TXN *SID_txn;
 
+#if 0
 /* attribute secondary DBs */
 extern DB     *SID_attr_index[SID_NUM_ATTR]; 
 
 /* cursor for each secondary DB */
 extern DBC    *SID_attr_cursor[SID_NUM_ATTR];
+#endif
 
 /* <===================== GLOBAL DATABASE DEFINES =====================> */
 /* Used to set the in cache memory size for DB environment*/
@@ -70,9 +73,18 @@ void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
  * Returns 0 on success, otherwise returns an error code
 */
 int SID_load_sid_cache_from_file(DB **dbp,
-                                 FILE *inpfile,
                                  const char *file_name, 
                                  int *db_records);
+
+/*
+ * This function dumps the contents of the sid cache in ASCII to the file
+ * specified through the outpfile parameter
+ *
+ * Returns 0 on success, otherwise returns an error code
+*/
+int SID_dump_sid_cache_to_file(DB **dbp,
+                               const char *file_name,
+                               int db_records);
 
 /*
  * This function stores the sid into the sid cache
@@ -190,17 +202,6 @@ int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t,
  * created SID_cacheval_t struct
 */
 void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t);
-
-/*
- * This function dumps the contents of the sid cache in ASCII to the file
- * specified through the outpfile parameter
- *
- * Returns 0 on success, otherwise returns an error code
-*/
-int SID_dump_sid_cache(DB **dbp,
-                       const char *file_name,
-                       FILE *outpfile,
-                       int db_records);
 
 /*
  * This function retrieves entries from a primary database and stores them into a

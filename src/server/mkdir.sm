@@ -195,7 +195,7 @@ static int mkdir_create_dirdata_dspace(
 
     /* find our meta handle range for this create */
     ret = PINT_config_get_meta_handle_extent_array(
-        user_opts, s_op->u.mkdir.fs_id, &extent_array);
+                    user_opts, s_op->u.mkdir.fs_id, &extent_array);
     assert(ret == 0);
     assert(extent_array.extent_count > 0);
 

@@ -642,6 +642,8 @@ int job_null(
     job_id_t * id,
     job_context_id context_id);
 
+/* WBL V3 remove precate */
+#if 0
 int job_precreate_pool_fill(
     PVFS_handle precreate_pool,
     PVFS_fs_id fsid,
@@ -718,6 +720,7 @@ int job_precreate_pool_lookup_server(
   
 void job_precreate_pool_set_index(
     int server_index);
+#endif
 
 /******************************************************************
  * job test/wait for completion functions

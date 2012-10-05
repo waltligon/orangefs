@@ -255,7 +255,7 @@ static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid,
     struct server_configuration_s *serv_config = NULL;
     struct filesystem_configuration_s * fsconfig = NULL;
 
-    serv_config = PINT_get_server_config();
+    serv_config = get_server_config_struct();
     fsconfig = PINT_config_find_fs_id(serv_config, fsid);
 
     if (fsconfig == NULL)
@@ -330,7 +330,7 @@ static int permit_operation(PVFS_fs_id fsid,
     {
         return 0;  /* anything that doesn't modify state is okay */
     }
-    serv_config = PINT_get_server_config();
+    serv_config = get_server_config_struct();
     fsconfig = PINT_config_find_fs_id(serv_config, fsid);
 
     if (fsconfig == NULL)

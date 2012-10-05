@@ -41,6 +41,8 @@ struct trove_desc
     int count;
 };
 
+/* WBL V3 remove precreate pools */
+#if 0
 /* describes precreate pool operations */
 struct precreate_pool_desc
 {
@@ -65,6 +67,7 @@ struct precreate_pool_desc
     
     PVFS_error error_code;
 };
+#endif
 
 /* describes unexpected BMI operations */
 struct bmi_unexp_desc
@@ -136,7 +139,10 @@ struct job_desc
 	struct req_sched_desc req_sched;
 	struct dev_unexp_desc dev_unexp;
 	struct null_info_desc null_info;
+    /* WBL V3 remove precreate pool */
+    #if 0
         struct precreate_pool_desc precreate_pool;
+    #endif 
     }
     u;
 

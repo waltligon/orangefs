@@ -4,11 +4,15 @@
  * See COPYING in top-level directory.
 */
 
-#include "pvfs3-handle.h"
-#include "policy.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <pvfs3-handle.h>
+#include <pvfs2-debug.h>
+#include <gossip.h>
+#include <server-config-mgr.h>
 #include "sidcache.h"
-#include "pvfs2-debug.h"
-#include "gossip.h"
 
 /* Length of string representation of PVFS_SID */
 /*#define SID_STR_LEN (37) in sidcache.h */
@@ -44,7 +48,7 @@ static int SID_parse_input_file_header(FILE *inpfile, int *records_in_file);
 /* <================================ INITIALIZATION FUNCTIONS ==================================> */
 
 /* 
- * This function initializes the incides of a secondary DB to all be equal
+ * This function initializes the indices of a secondary DB to all be equal
  * to NULL
  *
  * On success 0 is returned, otherwise the index that is not equal to NULL
@@ -240,12 +244,12 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
  * Returns 0 on success, otherwise returns an error code
 */
 int SID_load_sid_cache_from_file(DB **dbp,
-                                 FILE *inpfile,
                                  const char *file_name,
                                  int *db_records)
 {
     int ret = 0;                      /* Function return value */
     int i = 0, j = 0;                 /* Loop index variables */
+    FILE *inpfile = NULL;             /* file ptr for input file */
     int attr_pos_index = 0;           /* Index of the attribute from the */
                                       /* file in the SID_cacheval_t attrs */
     int records_in_file = 0;          /* Total number of sids in input file */
@@ -966,10 +970,11 @@ void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t)
  *
  * Returns 0 on success, otherwise returns error code
 */
-int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_records)
+int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
 {
     int ret = 0;                   /* Function return value */
     int i = 0;                     /* Loop index variable */
+    FILE *outpfile;                /* file ptr for output file */
     int attr_pos_index = 0;        /* Index of the attribute from the file in the SID_cacheval_t attrs */
     DBC *cursorp;                  /* Database cursor used to iterate over contents of the database */
     DBT key, data;          	   /* Database variables */
@@ -1423,10 +1428,10 @@ int SID_create_open_assoc_sec_dbs(
                         DB_ENV *envp,
                         DB *dbp,
                         DB *secondary_dbs[], 
-                        int (* secdbs_callback_funcs[])(DB *pri,
-                                                        const DBT *pkey,
-                                                        const DBT *pdata,
-                                                        DBT *skey))
+                        int (* key_extractor_func[])(DB *pri,
+                                                     const DBT *pkey,
+                                                     const DBT *pdata,
+                                                     DBT *skey))
 {
     int ret = 0;
     int i = 0;
@@ -1483,11 +1488,10 @@ int SID_create_open_assoc_sec_dbs(
 
         /* Associating the primary database to the secondary.
            Returns 0 on success */
-        ret = dbp->associate(dbp,                      /* Primary db pointer */
+        ret = dbp->associate(dbp,                      /* Primary db ptr */
                              NULL,                     /* TXN id */
-                             tmp_db,                   /* Secondary db pointer */
-                             secdbs_callback_funcs[i], /* Secondary db
-                                                          callback func */
+                             tmp_db,                   /* Secondary db ptr */
+                             key_extractor_func[i],    /* key extractor func */
                              0);                       /* Associate flags */
 
         if(ret)
@@ -1654,6 +1658,168 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
     }
 
     return(ret);
+}
+
+/* <======================== EXPORTED FUNCTIONS ==========================> */
+/* called from startup routines, this gets the SID cache up and running
+ * should work on server and client
+ */
+int SID_initialize(void)
+{
+    int ret = -1;
+    static int initialized = 0;
+
+    /* if already initialized bail out - we assume higher levels
+     * prevent multiple threads from initializing so we won't deal
+     * with that here.
+     */
+    if (initialized)
+    {
+        ret = 0;
+        goto errorout;
+    }
+
+    /* create DBD env */
+    ret = SID_create_open_environment(&SID_envp);
+    if (ret < 0)
+    {
+        goto errorout;
+    }
+
+    /* create main DB */
+    ret = SID_create_open_sid_cache(SID_envp, &SID_db);
+    if (ret < 0)
+    {
+        goto errorout;
+    }
+
+    /* create secondary (attribute index) DBs */
+    ret = SID_create_open_assoc_sec_dbs(SID_envp,
+                                        SID_db,
+                                        SID_attr_index,
+                                        SID_extract_key);
+    if (ret < 0)
+    {
+        goto errorout;
+    }
+
+    /* create cursors */
+    ret = SID_create_open_dbcs(SID_attr_index, SID_attr_cursor);
+    if (ret < 0)
+    {
+        SID_close_dbs_env(SID_envp, SID_db, SID_attr_index);
+        goto errorout;
+    }
+
+    /* load entries from the configuration */
+
+errorout:
+    return ret;
+}
+
+/* called to load the contents of the SID cache from a file
+ * so we do not have to discover everything
+ */
+int SID_load(void)
+{
+    int ret = -1;
+    int records_imported = 0;
+    char *filename = NULL;
+    struct server_configuration_s *srv_conf;
+    int fnlen;
+    struct stat sbuf;
+    PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
+
+    /* figure out the path to the cached data file */
+    srv_conf = PINT_server_config_mgr_get_config(fsid);
+    fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
+    filename = (char *)malloc(fnlen + 1);
+    strncpy(filename, srv_conf->meta_path, fnlen + 1);
+    strncat(filename, "/SIDcache", fnlen + 1);
+    PINT_server_config_mgr_put_config(srv_conf);
+
+    /* check if file exists */
+    ret = stat(filename, &sbuf);
+    if (ret < 0)
+    {
+        if (errno == EEXIST)
+        {
+            /* file doesn't exist - not an error, but bail out */
+            errno = 0;
+            ret = 0;
+        }
+        goto errorout;
+    }
+
+    /* load cache from file */
+    ret = SID_load_sid_cache_from_file(&SID_db,
+                                       filename,
+                                       &records_imported);
+    if (ret < 0)
+    {
+        /* something failed, close up the database */
+        SID_close_dbcs(SID_attr_cursor);
+        SID_close_dbs_env(SID_envp, SID_db, SID_attr_index);
+        goto errorout;
+    }
+
+errorout:
+    return ret;
+}
+
+/* called periodically to save the contents of the SID cache to a file
+ * so we can reload at some future startup and not have to discover
+ * everything
+ */
+int SID_save(void)
+{
+    int ret = -1;
+    int records_exported = 0;
+    char *filename = NULL;
+    struct server_configuration_s *srv_conf;
+    int fnlen;
+    PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
+
+    /* figure out the path to the cached data file */
+    srv_conf = PINT_server_config_mgr_get_config(fsid);
+    fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
+    filename = (char *)malloc(fnlen + 1);
+    strncpy(filename, srv_conf->meta_path, fnlen + 1);
+    strncat(filename, "/SIDcache", fnlen + 1);
+    PINT_server_config_mgr_put_config(srv_conf);
+
+    /* dump cache to the file */
+    ret = SID_dump_sid_cache_to_file(&SID_db, filename, records_exported);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    return ret;
+}
+
+/* called from shutdown routines, this closes up the BDB constructs
+ * and saves the contents to a file
+ */
+int SID_finalize(void)
+{
+    int ret = -1;
+
+    /* close cursors */
+    ret = SID_close_dbcs(SID_attr_cursor);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    /* close DBs and env */
+    ret = SID_close_dbs_env(SID_envp, SID_db, SID_attr_index);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    return ret;
 }
 
 /*
