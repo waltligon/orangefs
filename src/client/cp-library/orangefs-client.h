@@ -5,6 +5,13 @@
 #include <stdint.h>
 #include <time.h>
 
+#undef DLL_CODE
+#ifdef CREATING_DLL
+	#define DLL_CODE __declspec(dllexport)
+#else
+	#define DLL_CODE __declspec(dllimport)
+#endif
+
 
 typedef uint32_t OrangeFS_fsid;
 typedef uint32_t OrangeFS_uid;
@@ -209,30 +216,37 @@ typedef struct
     OrangeFS_size blksize;
 }OrangeFS_attr;
 
-int _declspec(dllexport) orangefs_init(const char *fs_uri, const char *mount_point, OrangeFS_fsid *fsid, char *error_msg, size_t error_msg_len, const char *tabfile);
-int _declspec(dllexport) orangefs_load_tabfile(const char *path, OrangeFS_mntent **mntents, char *error_msg, size_t error_msg_len);
-int _declspec(dllexport) orangefs_lookup(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, OrangeFS_handle *handle);
-int _declspec(dllexport) orangefs_lookup_follow_links(OrangeFS_fsid fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_sysresp_lookup *resp, OrangeFS_attr *attr);
-int _declspec(dllexport) orangefs_get_symlink_attr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, char *target, OrangeFS_object_ref *ref, OrangeFS_attr *attr);
-int _declspec(dllexport) orangefs_create(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, unsigned perms, OrangeFS_handle *handle);
-int _declspec(dllexport) orangefs_create_h(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_handle parent_handle, char *name, unsigned perms, OrangeFS_handle *handle);
-int _declspec(dllexport) orangefs_remove(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path);
-int _declspec(dllexport) orangefs_remove_h(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_handle handle, char *name);
-int _declspec(dllexport) orangefs_rename(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *old_path, char *new_path);
-int _declspec(dllexport) orangefs_getattr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, OrangeFS_attr *attr);
-int _declspec(dllexport) orangefs_setattr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_attr *attr);
-int _declspec(dllexport) orangefs_mkdir(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_handle *handle, unsigned perms);
-int _declspec(dllexport) orangefs_io(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, enum ORANGEFS_io_type io_type, char *fs_path, void *buffer, size_t buffer_len, uint64_t offset, OrangeFS_size *op_len);
-int _declspec(dllexport) orangefs_flush(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path);
-int _declspec(dllexport) orangefs_find_files(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_ds_position *token, int32_t incount, int32_t *outcount, char **filename_array, OrangeFS_attr *attr_array);
-int _declspec(dllexport) orangefs_get_diskfreespace(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_size *free_bytes, OrangeFS_size *total_bytes);
-int _declspec(dllexport) orangefs_finalize();
-int _declspec(dllexport) orangefs_credential_init(OrangeFS_credential *cred);
-int _declspec(dllexport) orangefs_credential_set_user(OrangeFS_credential *cred, OrangeFS_uid uid);
-void _declspec(dllexport) orangefs_credential_add_group(OrangeFS_credential *cred, OrangeFS_gid gid);
-void _declspec(dllexport) orangefs_cleanup_credentials(OrangeFS_credential *cred);
-int _declspec(dllexport) orangefs_credential_in_group(OrangeFS_credential *cred, OrangeFS_gid group);
-void _declspec(dllexport) orangefs_credential_set_timeout(OrangeFS_credential *cred, OrangeFS_time timeout);
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+int DLL_CODE orangefs_initialize(OrangeFS_fsid *fsid, OrangeFS_credential *cred, OrangeFS_mntent *mntent, char *error_msg, size_t error_msg_len, const char *tabfile);
+int DLL_CODE orangefs_load_tabfile(const char *path, OrangeFS_mntent **mntents, char *error_msg, size_t error_msg_len);
+int DLL_CODE orangefs_lookup(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, OrangeFS_handle *handle);
+int DLL_CODE orangefs_lookup_follow_links(OrangeFS_fsid fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_sysresp_lookup *resp, OrangeFS_attr *attr);
+int DLL_CODE orangefs_get_symlink_attr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, char *target, OrangeFS_object_ref *ref, OrangeFS_attr *attr);
+int DLL_CODE orangefs_create(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, unsigned perms, OrangeFS_handle *handle);
+int DLL_CODE orangefs_create_h(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_handle parent_handle, char *name, unsigned perms, OrangeFS_handle *handle);
+int DLL_CODE orangefs_remove(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path);
+int DLL_CODE orangefs_remove_h(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_handle handle, char *name);
+int DLL_CODE orangefs_rename(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *old_path, char *new_path);
+int DLL_CODE orangefs_getattr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, OrangeFS_attr *attr);
+int DLL_CODE orangefs_setattr(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_attr *attr);
+int DLL_CODE orangefs_mkdir(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_handle *handle, unsigned perms);
+int DLL_CODE orangefs_io(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, enum ORANGEFS_io_type io_type, char *fs_path, void *buffer, size_t buffer_len, uint64_t offset, OrangeFS_size *op_len);
+int DLL_CODE orangefs_flush(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path);
+int DLL_CODE orangefs_find_files(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_ds_position *token, int32_t incount, int32_t *outcount, char **filename_array, OrangeFS_attr *attr_array);
+int DLL_CODE orangefs_get_diskfreespace(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, OrangeFS_size *free_bytes, OrangeFS_size *total_bytes);
+int DLL_CODE orangefs_finalize();
+int DLL_CODE orangefs_credential_init(OrangeFS_credential *cred);
+int DLL_CODE orangefs_credential_set_user(OrangeFS_credential *cred, OrangeFS_uid uid);
+void DLL_CODE orangefs_credential_add_group(OrangeFS_credential *cred, OrangeFS_gid gid);
+void DLL_CODE orangefs_cleanup_credentials(OrangeFS_credential *cred);
+int DLL_CODE orangefs_credential_in_group(OrangeFS_credential *cred, OrangeFS_gid group);
+void DLL_CODE orangefs_credential_set_timeout(OrangeFS_credential *cred, OrangeFS_time timeout);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

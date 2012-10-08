@@ -6,6 +6,8 @@
 #include <Windows.h>
 #endif
 
+#define CREATING_DLL	/* will export the functions into the DLL to create */
+
 #include "orangefs-client.h" 
 #include "pint-util.h"
 #include "cred.h"
@@ -20,7 +22,10 @@ int num_mntents = 0;
 
 
 /* caller needs to allocate the space and zero out the **mntents parameter */
-int orangefs_load_tabfile(const char *path, OrangeFS_mntent **mntents, char *error_msg, size_t error_msg_len)
+int orangefs_load_tabfile(const char *path, 
+						  OrangeFS_mntent **mntents, 
+						  char *error_msg, 
+						  size_t error_msg_len)
 {
 	int i = 0;
 		
@@ -43,15 +48,19 @@ int orangefs_load_tabfile(const char *path, OrangeFS_mntent **mntents, char *err
 	return 0;
 }
 
-int orangefs_initialize(OrangeFS_mntent *mntent, OrangeFS_fsid *fsid, char *error_msg, size_t error_msg_len)
+int orangefs_initialize(OrangeFS_fsid *fsid,		/* not currently implemented */
+						OrangeFS_credential *cred,	/* not currently implemented */
+						OrangeFS_mntent *mntent, 
+						char *error_msg, 
+						size_t error_msg_len, 
+						const char *tabfile)
 {
-	int ret, found_one = 0;
-	char errbuf[256];
+	int ret = 0;
 
 	ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
 	if (ret < 0)
     {
-        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", errbuf);
+        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", error_msg);
         return ret;
     }
 
@@ -60,7 +69,7 @@ int orangefs_initialize(OrangeFS_mntent *mntent, OrangeFS_fsid *fsid, char *erro
         if (ret == 0)
 		{
 			_snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
-												"file systems from %s", tab->tabfile_name);
+												"file systems from %s", tabfile);
 			PVFS_sys_finalize();
 			return -1;
 		}
