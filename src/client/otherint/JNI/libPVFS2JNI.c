@@ -1458,85 +1458,198 @@ Java_org_orangefs_usrint_PVFS2JNI_pvfsLstat(JNIEnv *env, jobject obj, jstring pa
     return NULL_OBJ;
 }
 
-/* TODO */
-#if 0
+/* Convert allocated struct to an instance of our PVFS2JNI$Stat64 Class */
+int fill_stat64(JNIEnv *env, struct stat64 *ptr, jobject *inst)
+{
+    int num_fields = 13;
+    char *field_names[] = {
+        "st_dev", "st_ino", "st_mode",
+        "st_nlink", "st_uid", "st_gid",
+        "st_rdev", "st_size", "st_blksize",
+        "st_blocks", "st_atime", "st_mtime", "st_ctime"};
+    char *field_types[] = {
+        "J", "J", "I",
+        "I", "J", "J",
+        "J", "J", "I",
+        "J", "J", "J", "J"};
+    jfieldID fids[num_fields];
+    char *cls_name = "org/orangefs/usrint/PVFS2JNI$Stat64";
+    jclass cls = (*env)->FindClass(env, cls_name);
+    if(!cls)
+    {
+        fprintf(stderr, "invalid class: %s\n", cls_name);
+        fill_error((void *)ptr);
+        return -1;
+    }
+    int fid_index = 0;
+    for(; fid_index < num_fields; fid_index++)
+    {
+        fids[fid_index] = GET_FIELD_ID(env, cls,
+            field_names[fid_index], field_types[fid_index]);
+        if(!fids[fid_index])
+        {
+            fprintf(stderr, "invalid field requested: %s\n", field_names[fid_index]);
+            fill_error((void *) ptr);
+            return -1;
+        }
+    }
+    *inst = (*env)->AllocObject(env, cls);
+    /* Load object with data from structure using
+     * constructor or set methods.
+     */
+    SET_LONG_FIELD(env, *inst, fids[0],ptr->st_dev);
+    SET_LONG_FIELD(env, *inst, fids[1],ptr->st_ino);
+    SET_INT_FIELD(env, *inst, fids[2],ptr->st_mode);
+    SET_INT_FIELD(env, *inst, fids[3],ptr->st_nlink);
+    SET_LONG_FIELD(env, *inst, fids[4],ptr->st_uid);
+    SET_LONG_FIELD(env, *inst, fids[5],ptr->st_gid);
+    SET_LONG_FIELD(env, *inst, fids[6],ptr->st_rdev);
+    SET_LONG_FIELD(env, *inst, fids[7],ptr->st_size);
+    SET_INT_FIELD(env, *inst, fids[8],ptr->st_blksize);
+    SET_LONG_FIELD(env, *inst, fids[9],ptr->st_blocks);
+    SET_LONG_FIELD(env, *inst, fids[10],ptr->st_atime);
+    SET_LONG_FIELD(env, *inst, fids[11],ptr->st_mtime);
+    SET_LONG_FIELD(env, *inst, fids[12],ptr->st_ctime);
+    /* Free the space allocated for the stat struct and
+     * return an instance of PVFS2JNI$Stat64.
+     */
+    JNI_FLUSH
+    free(ptr);
+    return 0;
+}
+
 /* pvfs_stat64 */
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2JNI_pvfsStat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2JNI_pvfsStat64(JNIEnv *env, jobject obj, jstring path)
 {
     PFI
-    struct stat64 *arg;
-    arg = (struct stat64 *)jarg;
+    struct stat64 *ptr = 0;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    int rc = pvfs_stat64(cpath, arg);
+    ptr = (struct stat64 *) calloc(1, sizeof(struct stat64));
+    if(!ptr)
+    {
+        fprintf(stderr, "couldn't allocate memory for struct stat64!\n");
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+    int rc = pvfs_stat64(cpath, ptr);
     if(rc < 0)
     {
         perror("pvfs_stat64 error");
-        rc = -1;
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+
+    jobject stat64_obj;
+    if(fill_stat64(env, ptr, &stat64_obj) == 0)
+    {
+        JNI_FLUSH
+        return stat64_obj;
     }
     JNI_FLUSH
-    return rc;
+    return NULL_OBJ;
 }
 
 /* pvfs_Fstat64 */
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2JNI_pvfsFstat64  (JNIEnv *env, jobject obj, jlong jarg, int fd)
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2JNI_pvfsFstat64(JNIEnv *env, jobject obj, int fd)
 {
     PFI
-    struct stat64 *arg;
-    arg = (struct stat64 *)jarg;
-    int rc = pvfs_fstat64(fd, arg);
+    struct stat64 *ptr = 0;
+    ptr = (struct stat64 *) calloc(1, sizeof(struct stat64));
+    if(!ptr)
+    {
+        fprintf(stderr, "couldn't allocate memory for struct stat64!\n");
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+    int rc = pvfs_fstat64(fd, ptr);
     if(rc < 0)
     {
         perror("pvfs_fstat64 error");
-        rc = -1;
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+
+    jobject stat64_obj;
+    if(fill_stat64(env, ptr, &stat64_obj) == 0)
+    {
+        return stat64_obj;
     }
     JNI_FLUSH
-    return rc;
+    return NULL_OBJ;
 }
 
 /* pvfs_Fstatat64 */
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2JNI_pvfsFstatat64  (JNIEnv *env, jobject obj, jlong jarg, int fd, jstring path, int flag)
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2JNI_pvfsFstatat64(JNIEnv *env, jobject obj, int fd, jstring path, int flag)
 {
     PFI
-    struct stat64 *arg;
-    arg = (struct stat64 *)jarg;
+    struct stat64 *ptr = 0;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    int rc = pvfs_fstatat64(fd, cpath, arg, flag);
+    ptr = (struct stat64 *) calloc(1, sizeof(struct stat64));
+    if(!ptr)
+    {
+        fprintf(stderr, "couldn't allocate memory for struct stat64!\n");
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+    int rc = pvfs_fstatat64(fd, cpath, ptr, flag);
     if(rc < 0)
     {
         perror("pvfs_fstatat64 error");
-        rc = -1;
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+
+    jobject stat64_obj;
+    if(fill_stat64(env, ptr, &stat64_obj) == 0)
+    {
+        return stat64_obj;
     }
     JNI_FLUSH
-    return rc;
+    return NULL_OBJ;
 }
 
 /* pvfs_lstat64 */
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2JNI_pvfsLstat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2JNI_pvfsLstat64(JNIEnv *env, jobject obj, jstring path)
 {
     PFI
-    struct stat64 *arg;
-    arg = (struct stat64 *)jarg;
+    struct stat64 *ptr = 0;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    int rc = pvfs_lstat64(cpath, arg);
+    ptr = (struct stat64 *) calloc(1, sizeof(struct stat64));
+    if(!ptr)
+    {
+        fprintf(stderr, "couldn't allocate memory for struct stat64!\n");
+        fill_error((void *) ptr);
+        return NULL_OBJ;
+    }
+    int rc = pvfs_lstat64(cpath, ptr);
     if(rc < 0)
     {
         perror("pvfs_lstat64 error");
-        rc = -1;
+        fill_error((void *) ptr);
+        return NULL_OBJ;
     }
-    return rc;
+
+    jobject stat64_obj;
+    if(fill_stat64(env, ptr, &stat64_obj) == 0)
+    {
+        return stat64_obj;
+    }
+    JNI_FLUSH
+    return NULL_OBJ;
 }
 
-
+/* TODO */
+#if 0
 /* pvfs_readdir */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2JNI_pvfsReaddir  (JNIEnv *env, jobject obj, jlong jarg, int fd, int count)
