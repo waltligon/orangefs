@@ -28,7 +28,8 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
 
-MY_ARRAY;
+/* LAYOUT_MAPPING is defined in pvfs2-types.h */
+LAYOUT_MAPPING()
 
 extern job_context_id pint_client_sm_context;
 
@@ -1159,17 +1160,9 @@ int copy_replication_info(replication_s *src_p, replication_s *dst_p)
 /* helper function to print the replication structure */
 void print_replication_structure(replication_s *replication_p)
 {
-   char *PINT_layout_str_mapping[] =        
-   {                                          
-      "IGNORE",                               
-      "PVFS_SYS_LAYOUT_NONE",                 
-      "PVFS_SYS_LAYOUT_ROUND_ROBIN",          
-      "PVFS_SYS_LAYOUT_RANDOM",               
-      "PVFS_SYS_LAYOUT_LIST"                  
-   }; 
 
     //gossip_debug(GOSSIP_CLIENT_DEBUG,"\nreplication switch : %d.\n"
-    gossip_err("\nreplication switch : %d.\n",replication_p->replication_switch);
+    gossip_err("replication switch : %s.\n",replication_p->replication_switch?"ON":"OFF");
     gossip_err("  number of copies : %d.\n",replication_p->replication_number_of_copies);
 
     gossip_err("         algorithm : %s.\n",PINT_layout_str_mapping[replication_p->replication_layout.algorithm]);

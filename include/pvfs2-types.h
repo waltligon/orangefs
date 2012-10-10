@@ -222,6 +222,17 @@ enum PVFS_sys_layout_algorithm
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
+/* LAYOUT_MAPPING corresponds to PVFS_sys_layout_algorithm */
+#define LAYOUT_MAPPING() \
+const char *PINT_layout_str_mapping[] = {     \
+    "IGNORE", /* 0 */                         \
+    "PVFS_SYS_LAYOUT_NONE",        /* 1 */    \
+    "PVFS_SYS_LAYOUT_ROUND_ROBIN", /* 2 */    \
+    "PVFS_SYS_LAYOUT_RANDOM",      /* 3 */    \
+    "PVFS_SYS_LAYOUT_LIST",        /* 4 */    \
+};                                                    
+
+
 /* The list of datafile servers that can be passed into PVFS_sys_create
  * to specify the exact layout of a file.  The count parameter will override
  * the num_dfiles field in the attribute.
