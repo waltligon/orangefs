@@ -38,11 +38,13 @@
 /* internal attribute masks for metadata objects */
 #define PVFS_ATTR_META_DIST          (1 << 10)
 #define PVFS_ATTR_META_DFILES        (1 << 11)
+#define PVFS_ATTR_META_UNSTUFFED     (1 << 12)
 #define PVFS_ATTR_META_MIRROR_DFILES (1 << 13)
+#define PVFS_ATTR_META_REPLICATION   (1 << 14)
 #define PVFS_ATTR_META_ALL \
-(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | PVFS_ATTR_META_MIRROR_DFILES)
+(PVFS_ATTR_META_DIST          | PVFS_ATTR_META_DFILES | \
+ PVFS_ATTR_META_MIRROR_DFILES | PVFS_ATTR_META_REPLICATION)
 
-#define PVFS_ATTR_META_UNSTUFFED (1 << 12)
 
 
 /* internal attribute masks for datafile objects */

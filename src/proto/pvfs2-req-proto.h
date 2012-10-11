@@ -185,22 +185,29 @@ struct PVFS_servreq_create
     PVFS_object_attr attr;
 
     int32_t num_dfiles_req;
+
+    uint32_t replication_number_of_copies;
+
     /* NOTE: leave layout as final field so that we can deal with encoding
      * errors */
-    PVFS_sys_layout layout;
+    PVFS_sys_layout replication_layout; /*layout for replicated data*/
+    PVFS_sys_layout layout; /*layout for primary file*/
 };
-endecode_fields_6_struct(
+endecode_fields_8_struct(
     PVFS_servreq_create,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_credential, credential,
     PVFS_object_attr, attr,
     int32_t, num_dfiles_req,
+    uint32_t, replication_number_of_copies,
+    PVFS_sys_layout, replication_layout,
     PVFS_sys_layout, layout);
 
+/* added additional bytes for replication layout */
 #define extra_size_PVFS_servreq_create \
     (extra_size_PVFS_object_attr + extra_size_PVFS_sys_layout + \
-     extra_size_PVFS_credential)
+     extra_size_PVFS_credential + extra_size_PVFS_sys_layout)
 
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __cap,                                    \

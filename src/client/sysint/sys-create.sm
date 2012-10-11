@@ -29,6 +29,7 @@
 #include "pvfs2-dist-varstrip.h"
 
 /* LAYOUT_MAPPING is defined in pvfs2-types.h */
+/* defines a printable string for each type of layout algorithm */
 LAYOUT_MAPPING()
 
 extern job_context_id pint_client_sm_context;
@@ -48,13 +49,10 @@ static int create_delete_handles_comp_fn(
 
 /* misc helper functions */
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
-static int check_config_for_replication(replication_s *replication,PVFS_object_ref *parent);
-int copy_replication_info_from_config(uint32_t         replication_switch
-                                     ,PVFS_sys_layout *replication_layout
-                                     ,uint32_t         replication_number_of_copies
-                                     ,replication_s   *dst_p
-);
-int copy_replication_info(replication_s *src_p, replication_s *dst_p);
+static int get_replication_from_config(replication_s *replication,PVFS_object_ref *parent);
+int copy_replication_info_from_config(filesystem_configuration_s *fs
+                                     ,replication_s *dest_p);
+int copy_replication_info(replication_s *src_p, replication_s *dest_p);
 void print_replication_structure(replication_s *replication_p);
 
 
@@ -64,6 +62,7 @@ machine pvfs2_client_create_sm
 {
     state init
     {
+        /* when getting parent dir's attributes, also retrieve directory-related replication info. */
         run create_init;
         default => parent_getattr;
     }
@@ -879,23 +878,25 @@ static PINT_sm_action create_parent_getattr_inspect(
         sm_p->u.create.num_data_files, num_dfiles_requested);
 
     /* Determine if replication is on:
-     *  1. Did the user send in replication information on the PVFS_sys_create() call?
+     *  1. What does the fs.conf say?  NOTE: config file will have system defaults or
+     *     whatever the user put in there. 
      *  2. Does the parent directory contain replication information?
-     *  3. What does the fs.conf say?  NOTE: config file will have system defaults or
-     *     whatever the user has defined.
+     *  3. Did the user send in replication information on the PVFS_sys_create() call, just for
+     *     this file?
      */
 
-    /* get replication info from PVFS_sys_create() call */
-
-    /* get replication info from parent */
-
-    /* check config file for filesystem default */
-    ret = check_config_for_replication(&sm_p->u.create.replication,&sm_p->object_ref);
+    /* check config file for filesystem default, putting defaults into the frame structure */
+    ret = get_replication_from_config(&sm_p->u.create.replication,&sm_p->object_ref);
+    ret = get_replication_from_config(&sm_p->u.create.replication,&sm_p->object_ref);
     if (ret)
     {
        gossip_err("%s:Failure to get replication information from the filesystem config file.\n",__func__);
        return(ret);
     }
+
+    /* get replication info from parent */
+
+    /* get replication info from PVFS_sys_create() call */
 
     return SM_ACTION_COMPLETE;
 }
@@ -1070,7 +1071,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
 /* This function pulls replication information from the config file and stores the data in the
  * replication structure within the create structure (sm_p->u.create.replication).
  */
-static int check_config_for_replication(replication_s *replication_p, PVFS_object_ref *parent)
+static int get_replication_from_config(replication_s *replication_p, PVFS_object_ref *parent)
 {
     struct server_configuration_s *server_config = PINT_get_server_config_struct(parent->fs_id);
     filesystem_configuration_s *fs               = PINT_config_find_fs_id(server_config,parent->fs_id);
@@ -1087,10 +1088,7 @@ static int check_config_for_replication(replication_s *replication_p, PVFS_objec
         return(-PVFS_EINVAL);
     }
 
-    ret = copy_replication_info_from_config(fs->replication_switch
-                                           ,&fs->replication_layout
-                                           ,fs->replication_number_of_copies
-                                           ,replication_p);
+    ret = copy_replication_info_from_config(fs,replication_p);
     if (ret)
     {
        gossip_err("%s:Error copying replication data from the config file.\n",__func__);
@@ -1099,57 +1097,60 @@ static int check_config_for_replication(replication_s *replication_p, PVFS_objec
 
     //if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
+       gossip_err("Printing replication info from config file.\n");
        print_replication_structure(replication_p);
     }
 
     PINT_put_server_config_struct(server_config);
 
     return(0);
-}/*end check_config_for_replication*/
+}/*end get_replication_from_config*/
 
-/* wrapper function that copies individual variables to a replication structure */
-int copy_replication_info_from_config(uint32_t         replication_switch
-                                     ,PVFS_sys_layout *replication_layout
-                                     ,uint32_t         replication_number_of_copies
-                                     ,replication_s   *dst_p)
+
+
+
+/* wrapper function that copies variables from filesystem config to a replication structure */
+int copy_replication_info_from_config(filesystem_configuration_s *fs
+                                     ,replication_s *dest_p)
 {
     replication_s src = {0};
 
-    src.replication_switch                     = replication_switch;
-    src.replication_number_of_copies           = replication_number_of_copies;
-    src.replication_layout                     = *replication_layout;
- //   src.replication_layout.server_list.count   = replication_layout->server_list.count;
- //   src.replication_layout.server_list.servers = replication_layout->server_list.servers;
+    src.replication_switch                     =  fs->replication_switch;
+    src.replication_number_of_copies           =  fs->replication_number_of_copies;
+    src.replication_layout                     =  fs->replication_layout;
 
-    return(copy_replication_info(&src,dst_p));
+    return(copy_replication_info(&src,dest_p));
 
 }/*end copy_replication_info_from_config*/
 
 
+
+
+
 /* helper function to copy data from one replication structure to another */
-int copy_replication_info(replication_s *src_p, replication_s *dst_p)
+int copy_replication_info(replication_s *src_p, replication_s *dest_p)
 {
     int32_t server_count = 0;
 
-    dst_p->replication_switch           = src_p->replication_switch;
-    dst_p->replication_number_of_copies = src_p->replication_number_of_copies;
+    dest_p->replication_switch           = src_p->replication_switch;
+    dest_p->replication_number_of_copies = src_p->replication_number_of_copies;
 
-    dst_p->replication_layout.algorithm         = src_p->replication_layout.algorithm;
-    dst_p->replication_layout.server_list.count = server_count = src_p->replication_layout.server_list.count;
+    dest_p->replication_layout.algorithm         = src_p->replication_layout.algorithm;
+    dest_p->replication_layout.server_list.count = server_count = src_p->replication_layout.server_list.count;
 
     if (server_count <= 0)
     {
         return(0);
     }
 
-    dst_p->replication_layout.server_list.servers = calloc(server_count,sizeof(*src_p->replication_layout.server_list.servers));
-    if (!dst_p->replication_layout.server_list.servers)
+    dest_p->replication_layout.server_list.servers = calloc(server_count,sizeof(*src_p->replication_layout.server_list.servers));
+    if (!dest_p->replication_layout.server_list.servers)
     {
        gossip_err("%s:Error allocating memory for dst->replication_layout.server_list.servers.\n",__func__);
        return(-PVFS_ENOMEM);
     }
 
-    memcpy(dst_p->replication_layout.server_list.servers,
+    memcpy(dest_p->replication_layout.server_list.servers,
            src_p->replication_layout.server_list.servers,
            server_count * sizeof(*src_p->replication_layout.server_list.servers));
 
@@ -1157,15 +1158,18 @@ int copy_replication_info(replication_s *src_p, replication_s *dst_p)
 
 }/*end copy_replication_info*/
 
+
+
+
 /* helper function to print the replication structure */
 void print_replication_structure(replication_s *replication_p)
 {
 
     //gossip_debug(GOSSIP_CLIENT_DEBUG,"\nreplication switch : %d.\n"
-    gossip_err("replication switch : %s.\n",replication_p->replication_switch?"ON":"OFF");
-    gossip_err("  number of copies : %d.\n",replication_p->replication_number_of_copies);
-
-    gossip_err("         algorithm : %s.\n",PINT_layout_str_mapping[replication_p->replication_layout.algorithm]);
+    gossip_err("replication structure pointer : %p.\n",replication_p);
+    gossip_err("           replication switch : %s.\n",replication_p->replication_switch?"ON":"OFF");
+    gossip_err("             number of copies : %d.\n",replication_p->replication_number_of_copies);
+    gossip_err("                    algorithm : %s.\n",PINT_layout_str_mapping[replication_p->replication_layout.algorithm]);
 
 
     if (replication_p->replication_layout.server_list.count != 0)

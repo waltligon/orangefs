@@ -78,8 +78,8 @@ nested machine pvfs2_client_small_io_sm
  * message.  The sys-io state machine checks for possible 'small i/o' cases
  * and routes to the small i/o state actions in case.
  */
-static PINT_sm_action small_io_setup_msgpairs(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action small_io_setup_msgpairs(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
@@ -114,14 +114,14 @@ static PINT_sm_action small_io_setup_msgpairs(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(sm_p->u.io.small_io_ctx,0,sizeof(*sm_p->u.io.small_io_ctx) *
-                                     attr->u.meta.dfile_count);
-
+    memset(sm_p->u.io.small_io_ctx,
+           0,
+           sizeof(*sm_p->u.io.small_io_ctx) * attr->u.meta.dfile_count);
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         datafile_handle = attr->u.meta.dfile_array[
-            sm_p->u.io.datafile_index_array[i]];
+                          sm_p->u.io.datafile_index_array[i]];
 
         gossip_debug(GOSSIP_IO_DEBUG, "   small_io_setup_msgpairs: "
                      "handle: %llu\n", llu(datafile_handle));
@@ -159,11 +159,11 @@ static PINT_sm_action small_io_setup_msgpairs(
             result.size_array = msg_p->req.u.small_io.sizes;
             msg_p->req.u.small_io.buffer = sm_p->u.io.buffer;
 
-            ret = PINT_process_request(
-                file_req_state, mem_req_state,
-                &file_data,
-                &result,
-                PINT_CLIENT);
+            ret = PINT_process_request(file_req_state,
+                                       mem_req_state,
+                                       &file_data,
+                                       &result,
+                                       PINT_CLIENT);
             if(ret < 0)
             {
                 js_p->error_code = ret;
@@ -183,20 +183,19 @@ static PINT_sm_action small_io_setup_msgpairs(
          * reads don't require processing of the memory request until
          * the response.  
          */ 
-        PINT_SERVREQ_SMALL_IO_FILL(
-            msg_p->req,
-            attr->capability,
-            sm_p->object_ref.fs_id,
-            datafile_handle,
-            sm_p->u.io.io_type,
-            sm_p->u.io.datafile_index_array[i], 
-            attr->u.meta.dfile_count,
-            attr->u.meta.dist,
-            sm_p->u.io.file_req,
-            sm_p->u.io.file_req_offset,
-            regions,
-            PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-            sm_p->hints);
+        PINT_SERVREQ_SMALL_IO_FILL(msg_p->req,
+                                   attr->capability,
+                                   sm_p->object_ref.fs_id,
+                                   datafile_handle,
+                                   sm_p->u.io.io_type,
+                                   sm_p->u.io.datafile_index_array[i], 
+                                   attr->u.meta.dfile_count,
+                                   attr->u.meta.dist,
+                                   sm_p->u.io.file_req,
+                                   sm_p->u.io.file_req_offset,
+                                   regions,
+                                   PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+                                   sm_p->hints);
 
         msg_p->fs_id  = sm_p->object_ref.fs_id;
         msg_p->handle = datafile_handle;
@@ -216,9 +215,9 @@ static PINT_sm_action small_io_setup_msgpairs(
         }
         msg_p->comp_fn = small_io_completion_fn;
 
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, datafile_handle,
-            sm_p->object_ref.fs_id);
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               datafile_handle,
+                                               sm_p->object_ref.fs_id);
         if(ret < 0)
         {
             gossip_lerr("Failed to map data server address\n");
@@ -252,7 +251,7 @@ static int small_io_completion_fn(void * user_args,
     PINT_sm_msgarray_op   *mop   = &(sm_p->msgarray_op);
     PINT_sm_msgpair_state *msg_p = &(mop->msgarray[index]);
     PINT_client_small_io_ctx *ctx = 
-         &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
+            &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
     uint32_t server_nr = msg_p->req.u.small_io.server_nr;
 #ifdef WIN32
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
@@ -306,20 +305,19 @@ static int small_io_completion_fn(void * user_args,
             PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
                                           sm_p->u.io.file_req_offset);
             PINT_REQUEST_STATE_SET_FINAL(
-                file_req_state, sm_p->u.io.file_req_offset + 
-                PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+                    file_req_state, sm_p->u.io.file_req_offset + 
+                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
 
             do
             {
                 result.segs = 0;
                 result.bytes = 0;
 
-                ret = PINT_process_request(
-                    file_req_state,
-                    mem_req_state,
-                    &fdata,
-                    &result,
-                    PINT_CLIENT);
+                ret = PINT_process_request(file_req_state,
+                                           mem_req_state,
+                                           &fdata,
+                                           &result,
+                                           PINT_CLIENT);
                 if(ret < 0)
                 {
                     gossip_err("Failed processing request in small I/O read\n");
@@ -334,17 +332,17 @@ static int small_io_completion_fn(void * user_args,
 
                     dest_ptr = (char *)sm_p->u.io.buffer + offsets[i];
                     src_ptr = (char *)resp_p->u.small_io.buffer + 
-                        bytes_processed;
+                            bytes_processed;
 
                     if((bytes_processed + sizes[i]) <= 
-                       resp_p->u.small_io.result_size)
+                            resp_p->u.small_io.result_size)
                     {
                         tmp_size = sizes[i];
                     }
                     else
                     {
                         tmp_size = resp_p->u.small_io.result_size - 
-                            bytes_processed;
+                                bytes_processed;
                         done = 1;
                     }
 
@@ -452,7 +450,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         server_nr = msgarray[i].req.u.small_io.server_nr;
         ctx = &sm_p->u.io.small_io_ctx[server_nr];
         if (!ctx->msg_completed)
+        {
             retry_msg_count++;
+        }
     }
 
     /* no retries needed */
@@ -479,7 +479,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
      
         /* don't process completed messages */
         if (ctx->msg_completed)
+        {
            continue;
+        }
 
         /* for incomplete messages, cleanup memory, if necessary */
         enc_req_bytes = (char *)&(msg->encoded_req);
@@ -607,7 +609,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
      
         /* don't populate with completed messages */
         if (ctx->msg_completed)
+        {
            continue;
+        }
 
         new_msg = &new_mop.msgarray[j];
         j++;
@@ -637,8 +641,8 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
 
 
 
-static int small_io_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int small_io_cleanup(struct PINT_smcb *smcb,
+                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
