@@ -47,7 +47,7 @@ get_cvs() {
 	echo "Current directory is `pwd`"
 	svn export --force -q http://www.orangefs.org/svn/orangefs/branches/$1/
 	if [ $? -ne 0 ] ; then
-		echo "Pulling PVFS2 from $cvsroot failed."
+		echo "Pulling PVFS2 from http://www.orangefs.org/svn/orangefs/branches/$1/ failed."
 		exit 1
 	fi
 	#ls -l 
