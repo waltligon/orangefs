@@ -80,10 +80,13 @@ pull_and_build_mpich2 () {
 	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
-	rm -rf mpich2-latest.tar.gz
-	wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
+	rm -rf mpich2-*.tar.gz
+	wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+	#wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
-	tar xzf mpich2-latest.tar.gz
+	#tar xzf mpich2-latest.tar.gz
+	tar xzf mpich2-1.5.tar.gz
+	mv mpich2-1.5 mpich2-snap-1.5
 	cd mpich2-snap-*
 	mkdir build
 	cd build
