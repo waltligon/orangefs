@@ -49,8 +49,8 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="`hostname` server-276 server-274"
-
+#VFS_HOSTS="`hostname` server-276 server-274"
+VFS_HOSTS="badname"
 #
 # Detect basic heap corruption
 #
@@ -77,6 +77,7 @@ pull_and_build_pvfs2 () {
 
 pull_and_build_mpich2 () {
 	# just to make debugging less painful
+	return 0
 	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
