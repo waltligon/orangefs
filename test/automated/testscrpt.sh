@@ -94,7 +94,7 @@ pull_and_build_mpich2 () {
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
 		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
 		--enable-g=dbg --without-mpe \
-		--disable-f77 >mpich2config-${CVS_TAG}.log &&\
+		--disable-f77 --disable-fc >mpich2config-${CVS_TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
