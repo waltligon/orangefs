@@ -1,4 +1,4 @@
-#!/bin/sh  
+#/bin/sh  
 #
 # requires: 
 #  cvs (if pulling from CVS
@@ -43,12 +43,16 @@ get_dist() {
 # pulls from CVS the tag or branch specified by the first argument.  returns
 # nonzero on error.
 get_cvs() {
-	cvs -Q -d $cvsroot co -r $1 pvfs2 
+	#cvs -Q -d $cvsroot co -r $1 pvfs2 
+	echo "Current directory is `pwd`"
+	svn export --force -q http://www.orangefs.org/svn/orangefs/branches/$1/
 	if [ $? -ne 0 ] ; then
 		echo "Pulling PVFS2 from $cvsroot failed."
 		exit 1
 	fi
-	mv pvfs2 pvfs2-$1
+	#ls -l 
+	#mv pvfs2 pvfs2-$1
+	mv $1 pvfs2-$1
 }
 
 # end of user defines
@@ -115,7 +119,10 @@ get_cvs $cvs_tag || exit 1
 # create build and install directories, configure
 mkdir $builddir
 mkdir $installdir
+cd $srcdir
+$srcdir/prepare
 cd $builddir
+#ls $srcdir
 if [ $build_kernel = "true" ] ; then
 	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"

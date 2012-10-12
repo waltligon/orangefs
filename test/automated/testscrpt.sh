@@ -1,4 +1,4 @@
-#!/bin/sh
+#/bin/bash
 
 # i'm not married to bash. just wanted to get things prototyped
 
@@ -27,8 +27,10 @@ export CVS_TAG="${CVS_TAG:-HEAD}"
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=~+/sysint-tests.d
-VFS_SCRIPTS=~+/vfs-tests.d
+#SYSINT_SCRIPTS=~+/sysint-tests.d
+SYSINT_SCRIPTS=`pwd`/sysint-tests.d
+VFS_SCRIPTS=`pwd`/vfs-tests.d
+#VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
@@ -47,7 +49,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="devorange2 devorange35 andy jeffrey"
+VFS_HOSTS="`hostname` server-273 server-274"
 
 #
 # Detect basic heap corruption
