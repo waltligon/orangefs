@@ -1,0 +1,220 @@
+
+\section{State Machine Code}
+
+Both the PVFS client and server use a state machine model to control
+execution.  State machines are written in files with a .sm extention and
+are compiled into C data structures for further compilation and linking.
+
+A state machine consists of a set of states, with one state indicated as
+the first state.  Each state includes a state action followed by a set of
+the possible transitions to other states.  Each transtition includes the
+name of the next state and the return code that is used to select that
+transition.
+
+Alternatively a state can specify another "nested" state machine rather
+than a state action, in which case this new state machine is executed as
+a subroutine.  Upon return, the nested state machine returns to the
+calling state machine.  A state can also specify that multiple instances
+of a state machine will be executed concurrently.  When all of the
+concurrent state machines have returned the caller continues.
+
+Transitions can specify another state in the same machine, or to return
+from a nested state machine, or to terminate the current state machine.
+
+The following is a synopsis of the state machine language, showing the
+various options by way of example:
+
+\begin{verbatim}
+/* beginning of .sm file */
+
+/* code at the top of the file is plain C code. */
+/* state actions must be declared here before the state machine */
+
+static PINT_sm_action state_action_1 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+/* helper functions and other declarations go here too */
+
+#define RETVAL 1
+
+%%
+
+/* after the double percent goes the machine declaration */
+
+machine my_machine_sm (
+    state_1,
+	 state_2,
+	 state_3)
+{
+    state state_1
+	 {
+	     run state_action_1;
+		  success => state_2;  /* success is return value 0 */
+		  default => state_4;
+	 }
+
+	 state state_2
+	 {
+	     jump a_nested_state_machine_sm;
+		  RETVAL => state_3;
+	 }
+
+	 state state_3
+	 {
+	     pjmp state_action_3
+		  {
+		      /* values here are set up in state_action_3 */
+		      4 => parallel_state_machine_1;
+		      3 => parallel_state_machine_2;
+		      RETVAL => parallel_state_machine_3;
+		  }
+		  default => state_4;
+	 }
+
+	 state state_4
+	 {
+	     /* this state action cleans up after the pjmp */
+	     run state_action_4;
+		  default => terminate;
+	 }
+}
+
+%%
+
+/* after the second double percent all code is in plain C */
+/* here we implement all of the state actions */
+
+static PINT_sm_action state_action_1 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    retrn SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* This state action sets up a pjmp.  It needs to push one frame
+       onto the frame stack for each parallel task.  Each time is pushes a
+       frame it needs to specify a tag that matches one of the tags in the
+       state machine code above (4, 3, or RETVAL).
+     */
+    for (i = 0; i < sop->req.u.foo.num_servers; i++)
+    {
+        PINT_server_op *new = (PINT_server_op *)malloc(sizeof(PINT_server_op));
+        /* set up new for the new sm probably from the current frame */
+        new->req.u.foo.blah = sop->req.u.foo.blah;
+        /* determine which state machine to run */
+        if (i = 0)
+            tag = RETVAL; /* run parallel_state_machine_3 */
+        else
+            if (somevar > someval)
+                tag = 4; /* run parallel_state_machine_1 */
+            else
+                tag = 3; /* run parallel_state_machine_2 */
+        /* push frame */
+        PINT_push_frame(smcb,new,tag);
+    } 
+    return SM_ACTION_DEFERED;
+}
+
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* This state action cleans up after the parallel SMs have been run with
+       pjmp.  The frames pushed before the pjmp are still on the stack and must
+       be poped off.  Presumably there is return information in each one that
+       must be aggrigated.  In particular, error codes should be reviewed.
+     */
+    return SM_ACTION_COMPLETE;
+}
+
+\end{verbatim}
+
+\section{State Machine Stacks}
+
+A running state machine has two stacks.  One is used implicitly to control flow 
+in and out of nested state machines.  When a state machine performs a jump it
+automatically pushes information onto the state stack, and when a nested
+state machine returns it automatically pops that information and uses it to
+return to the calling state machine.  Since this is all done by the built in
+logic, we need not consider it further.
+
+The second stack used by a running state machine is the frame stack.  A frame
+is a collection of data used by the state actions to store local variables and
+is analogous to the frames created by compilers of high level languages for
+holding local variables and function parameters.  The first step of every
+state action function is to call PINT_sm_frame() which retrives a frame from the
+stack that will be used by the state action. Normally, this will be the 
+the "current" frame which is indexed by the macro PINT_FRAME_CURRENT or zero.
+When a state machine begins execution one frame is allocated to it and pushed
+on the stack, becomming the current frame.  If no additional frames are pushed
+this frame will be the current frame for all states and nested state machines.
+
+Additional frames can be pushed on the stack.  Pushing a frame on the stack
+does not change the current frame.  Frames pushed can be accessed by specifying
+a positive index to PINT_sm_frame() and are indexed in the order pushed.  Thus,
+if a state action pushes 4 frames, they can be retrieved  as index 1 (the first
+frame pushed), 2, 3, and 4 (the last frame pushed, or top of stack).  Of course
+frames can also be poped from the stack in the usual LIFO manner.
+
+When there are frames pushed on the frame stack and a state machine executes a
+jump to a nested state machine it is assumed that the top frame on the stack
+is intended as the new current frame.  Once the jump is exected, inside the
+nested state machine the top of stack becomes the current frame at index 0, and
+there will be no frames on top of it (unless and until it chooses to push some).
+When the nested state machine return, the frame stack is restored to its
+previous configuration.
+
+It is possible to access frames that were on the stack in the previous context
+while inside a nested state machine.  These frames are accessed using a negative
+index.  Thus the frame immediately below the current frame is -1, and the one
+below it is -2, and so on.  In general, all frames on the stack since the
+initiation of the state machine can be accessed.  The frame is organized as
+follows.  There is a linked list of frames accessible from the SMCB through the
+field "frames" which is a struct with two fields "next" and "prev".  The field
+smcb->frames->next points to the top of stack, and the field smcb->frames->prev
+points to the bottom of stack.  The list is doubly linked and implemented with
+the qlist facility in PVFS.  All frames should be access via the PINT_sm_frame()
+function which takes and SMCB and an integer index as arguments.
+
+The frames can be though of as numbered starting at zero from the bottom of the
+stack to N-1 at the top of the stack, where there are N frames in the stack. 
+The field smcb->frame_count is equal to N.  The index passed in through 
+PINT_sm_frame() is NOT this number.  Instead, there is a second field which
+records the number of the current frame smcb->base_frame.  The index passed to
+the function is added to the base_frame to arrive at the number of the desired
+frame, counting from the bottom of the stack.  For example:
+
+frame_count 6
+base_frame 2
+
+frame_number     0  1  2  3  4  5  <- top of stack
+index           -2 -1  0  1  2  3
+
+In general, the index of the top of stack can be computed as:
+
+(smcb->frame_count - 1) - smcb->base_frame
+
+This should be included in src/common/misc/state_machine.h as a macro:
+
+#define PINT_FRAME_TOP(smcb) (((smcb)->frame_count - 1) - (smcb)->base_frame)
+
+So call to retrieve the frame on top of the stack would be:
+
+top_frame = PINT_sm_frame(smcb,PINT_FRAME_TOP(smcb));
+
+The current frame can be retrieved with the following macro:
+
+current_frame = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+
+Offsets from the top or current frame can be made by either adding or subracting
+from one of these macros.  The bottom frame on the stack would be accessed as
+the negative of the base_frame, but this is rarely needed and there isn't a 
+macro for it at this time.

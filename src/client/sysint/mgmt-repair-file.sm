@@ -1,0 +1,307 @@
+/* 
+ * (C) 2007 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for repairing files.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-dist-simple-stripe.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "pint-distribution.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pint-dist-utils.h"
+#include "ncache.h"
+#include "pvfs2-internal.h"
+#include "sys-create.h"
+
+extern job_context_id pint_client_sm_context;
+
+%%
+
+machine pvfs2_client_mgmt_repair_file_sm
+{
+    state init
+    {
+        rung create_init;
+        default => parent_getattr;
+    }
+
+    state parent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => parent_getattr_inspect;
+        default => cleanup;
+    }
+
+    state parent_getattr_inspect
+    {
+        rung create_parent_getattr_inspect;
+        success => dspace_create_setup_msgpair;
+        default => cleanup;
+    }
+
+    state dspace_create_setup_msgpair
+    {
+        rung create_dspace_create_setup_msgpair;
+        success => dspace_create_xfer_msgpair;
+        default => dspace_create_failure;
+    }
+
+    state dspace_create_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => create_setattr_setup_msgpair;
+        default => dspace_create_failure;
+    }
+
+    state dspace_create_failure
+    {
+        run create_dspace_create_failure;
+        default => cleanup;
+    }
+
+    state create_setattr_setup_msgpair
+    {
+        rung create_setattr_setup_msgpair;
+        success => create_setattr_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state create_setattr_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => crdirent_setup_msgpair;
+        default => create_setattr_failure;
+    }
+
+    state create_setattr_failure
+    {
+        rung create_setattr_failure;
+        default => delete_handles_setup_msgpair_array;
+    }
+
+    state crdirent_setup_msgpair
+    {
+        rung create_crdirent_setup_msgpair;
+        success => crdirent_xfer_msgpair;
+        default => crdirent_failure;
+    }
+
+    state crdirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => cleanup;
+        default => crdirent_failure;
+    }
+
+    state crdirent_failure
+    {
+        rung create_crdirent_failure;
+        default => delete_handles_setup_msgpair_array;
+    }
+
+    state delete_handles_setup_msgpair_array
+    {
+        rung create_delete_handles_setup_msgpair_array;
+        success => delete_handles_xfer_msgpair_array;
+        default => cleanup;
+    }
+
+    state delete_handles_xfer_msgpair_array
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        rung create_cleanup;
+        CREATE_RETRY => init;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiate creation of a file with a specified distribution.
+ */
+PVFS_error PVFS_imgmt_repair_file(
+    char *object_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_handle handle,  /*Pull in handle of dfile to create*/
+    PVFS_sysresp_create *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
+{
+    int num_dfiles_req = 0;
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_imgmt_repair_file entered\n");
+
+    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (object_name == NULL) || (resp == NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
+        PVFS_ATTR_SYS_ALL_SETABLE)
+    {
+        gossip_lerr("PVFS_imgmt_repair_file() failure: invalid attributes "
+                    "specified\n");
+        return ret;
+    }
+
+    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
+        ((attr.dfile_count < 1) ||
+         (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
+    {
+	gossip_err("Error: invalid number of datafiles (%d) specified "
+                   "in PVFS_mgmt_repair_file().\n", (int)attr.dfile_count);
+	return ret;
+    }
+
+    if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
+    {
+        return -PVFS_ENAMETOOLONG;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_REPAIR_FILE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if(smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    sm_p->u.create.datafile_handles = (PVFS_handle *)malloc(
+        sizeof(PVFS_handle));
+    if (sm_p->u.create.datafile_handles == NULL)
+    {
+        gossip_err("create: Failed to allocate data handle array\n");
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p->u.create.datafile_handles, 0,sizeof(PVFS_handle));
+
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    sm_p->u.create.object_name = object_name;
+    sm_p->u.create.create_resp = resp;
+    sm_p->u.create.datafile_handles[0] = handle; /*Assign handle pulled in here*/
+    PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
+    sm_p->u.create.stored_error_code = 0;
+    sm_p->u.create.retry_count = 0;
+
+    sm_p->object_ref = parent_ref;
+
+    /* use the basic_dist distribution to keep all on one server */
+    sm_p->u.create.dist = PINT_dist_create("basic_dist");
+    if (!sm_p->u.create.dist)
+    {
+        free(sm_p);
+        return -PVFS_ENOMEM;
+    }
+
+    /*Set requested number of dfiles to 1*/
+    num_dfiles_req = 1;
+
+    /* Determine the number of dfiles, passing in desired value of 1 */
+    ret = PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
+                                            sm_p->u.create.dist,
+                                            num_dfiles_req,
+                                            &sm_p->u.create.num_data_files);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get number of data servers\n");
+        free(sm_p);
+        return ret;
+    }
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
+        object_name, llu(parent_ref.handle), parent_ref.fs_id);
+          
+    return PINT_client_state_machine_post(
+        smcb, op_id, user_ptr);
+}
+
+/** Create a file with a specified distribution.
+ */
+PVFS_error PVFS_mgmt_repair_file(
+    char *object_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_handle handle, 
+    PVFS_sysresp_create *resp)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_repair_file entered\n");
+
+    ret = PVFS_imgmt_repair_file(object_name, parent_ref, attr, credentials,
+                                 handle, resp, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_imgmt_repair_file call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "create", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+static PINT_sm_action create_dspace_create_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->u.create.stored_error_code = js_p->error_code;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: dspace_create_failure\n");
+    return 1;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

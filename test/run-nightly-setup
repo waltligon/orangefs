@@ -1,0 +1,33 @@
+#!/bin/sh
+
+if [ $# -lt 1 ]; then
+   echo "Usage: $0 <tagnames>"
+   echo "        e.g. $0 HEAD Orange-Branch"
+   exit 0
+fi
+CVSTAGS=$*
+
+export PATH_SUFFIX=$(cd `dirname $0`;pwd)
+
+echo "Running nightly tests for ${CVSTAGS}"
+
+cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs
+run_nightly_scripts="pvfs2/test/run-nightly pvfs2/maint/build pvfs2/test/automated"
+
+#remove existing files
+cd $PATH_SUFFIX
+sudo /bin/rm -rf ~+/pvfs2
+
+#checkout needed directories and files to run the nightly process
+cvs -Q -d $cvsroot co -rOrange-Branch $run_nightly_scripts
+if [ $? != 0 ]
+then
+   echo "Failed to retrieve scripts from CVS"
+   exit 1
+fi
+
+
+cd ~+/pvfs2/test
+./run-nightly $CVSTAGS
+
+exit 

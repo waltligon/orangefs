@@ -1,0 +1,59 @@
+#!/usr/bin/expect -f
+
+# expect script to login to a baytech management module and control power
+# to one of its outlets
+
+# gather command line arguments into variables
+set host [lrange $argv 0 0]   
+set user [lrange $argv 1 1] 
+set password [lrange $argv 2 2] 
+
+# complain if we don't get exactly 5 arguments
+if {$argc!=3} {
+	send_user "Usage: baytech.exp <host> <user> <password>\n"
+	exit 1
+}
+
+# use a 15 second timeout
+set timeout 15
+
+# this disables showing interaction on stdout.  It should be commented
+# if you are trying to debug this script and want to see what it is doing
+log_user 0
+
+# delete old log file and start a new one
+#system rm -f /tmp/expect.log
+#log_file -a /tmp/expect.log
+
+# open ssh connection.  Turn off strict host checking so ssh doesn't ask us 
+# if it is ok to connect to this hostname
+spawn ssh "-oStrictHostKeyChecking no" $user@$host 
+
+# Look for passwod prompt
+expect {
+	"*?assword:*" {}
+	default {
+		# password prompt never showed up
+		send_user "failed to ssh to host $host\n"
+		exit 1
+	}
+}
+
+# Send password aka $password 
+send -- "$password\r"
+# look for top level prompt
+expect {
+	"*Enter Request*" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: host $host failed to accept username and password\n"
+		exit 1
+	}
+}
+
+# send logout command
+send -- "T\r"
+
+close
+wait
+

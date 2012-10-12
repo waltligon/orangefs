@@ -1,0 +1,303 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pint-event.h"
+#include "pvfs2-internal.h"
+#include "gossip.h"
+#include "request-scheduler/request-scheduler.h"
+
+static int check_fs_id(PVFS_fs_id fs_id);
+static int drop_caches(void);
+
+%%
+
+machine pvfs2_setparam_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => work;
+        default => final_response;
+    }
+
+    state work
+    {
+        run setparam_work;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run setparam_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/* setparam_work()
+ *
+ * actually does the "work" involved in setting a runtime server parameter
+ */
+static PINT_sm_action setparam_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1, tmp_on = 0;
+    job_id_t tmp_id;
+    uint64_t tmp_mask = 0;
+    PVFS_handle tmp_handle = PVFS_HANDLE_NULL;
+    struct server_configuration_s *user_opts;
+    struct filesystem_configuration_s *fs_conf;
+    char buf[16] = {0};
+
+    switch(s_op->req->u.mgmt_setparam.param)
+    {
+        case PVFS_SERV_PARAM_GOSSIP_MASK:
+            gossip_get_debug_mask(&tmp_on, &tmp_mask);
+            gossip_set_debug_mask(
+                1, s_op->req->u.mgmt_setparam.value.u.value);
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_INVALID:
+            gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
+                (int)s_op->req->u.mgmt_setparam.param);
+            js_p->error_code = -PVFS_ENOSYS;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_FSID_CHECK:
+            js_p->error_code = check_fs_id(
+                (PVFS_fs_id)s_op->req->u.mgmt_setparam.value.u.value);
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_ROOT_CHECK:
+            tmp_handle = (PVFS_handle)s_op->req->u.mgmt_setparam.value.u.value;
+            gossip_debug(GOSSIP_SERVER_DEBUG, " - ROOT_CHECK looking for"
+                         " handle %llu, on fs_id %d\n", llu(tmp_handle),
+                         s_op->req->u.mgmt_setparam.fs_id);
+            ret = job_trove_dspace_verify(
+                s_op->req->u.mgmt_setparam.fs_id, tmp_handle,
+                0, 
+                smcb, 0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+            return(ret);
+        case PVFS_SERV_PARAM_EVENT_ENABLE:
+            ret = 0;
+            PINT_event_enable(s_op->req->u.mgmt_setparam.value.u.string_value);
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_EVENT_DISABLE:
+            PINT_event_disable(s_op->req->u.mgmt_setparam.value.u.string_value);
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_SYNC_META:
+            user_opts = get_server_config_struct();
+            fs_conf = PINT_config_find_fs_id(user_opts, 
+                s_op->req->u.mgmt_setparam.fs_id);
+            if(fs_conf)
+            {
+                if(s_op->req->u.mgmt_setparam.value.u.value)
+                    fs_conf->trove_sync_meta = TROVE_SYNC;
+                else
+                    fs_conf->trove_sync_meta = 0;
+            }
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_SYNC_DATA:
+            user_opts = get_server_config_struct();
+            fs_conf = PINT_config_find_fs_id(user_opts, 
+                s_op->req->u.mgmt_setparam.fs_id);
+            if(fs_conf)
+            {
+                if(s_op->req->u.mgmt_setparam.value.u.value)
+                {
+                    snprintf(buf, 16, "%d,%d", s_op->req->u.mgmt_setparam.fs_id,
+                             TROVE_SYNC);
+                    PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+                    fs_conf->trove_sync_data = TROVE_SYNC;
+                }
+                else
+                {
+                    snprintf(buf, 16, "%d,%d", s_op->req->u.mgmt_setparam.fs_id,
+                             0);
+                    PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+                    fs_conf->trove_sync_data = 0;
+                }
+            }
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_MODE:
+
+            ret = job_req_sched_change_mode(
+                s_op->req->u.mgmt_setparam.value.u.value,
+                NULL, 0, js_p, &s_op->scheduled_id,
+                server_job_context);
+
+            js_p->error_code = 0;
+            return ret;
+        case PVFS_SERV_PARAM_DROP_CACHES:
+            js_p->error_code = drop_caches();
+            return SM_ACTION_COMPLETE;
+    }
+
+    gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
+                (int)s_op->req->u.mgmt_setparam.param);
+
+    js_p->error_code = -PVFS_ENOSYS;
+    return SM_ACTION_COMPLETE;
+}
+
+/* setparam_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action setparam_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, " - setparam returning %d\n",
+                 js_p->error_code);
+    return(server_state_machine_complete(smcb));
+}
+
+/* check_fs_id()
+ *
+ * checks to see if a given fs id is valid
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int check_fs_id(PVFS_fs_id fs_id)
+{
+    int ret = -PVFS_ENOENT, count = 1;
+    TROVE_ds_position pos = TROVE_ITERATE_START;
+    TROVE_keyval_s name;
+    TROVE_coll_id tmp_coll;
+    TROVE_op_id tmp_id;
+    struct server_configuration_s * server_config;
+
+    name.buffer = malloc(PVFS_NAME_MAX);
+    if (!name.buffer)
+    {
+        ret = -PVFS_ENOMEM;
+        goto check_failed;
+    }
+    name.buffer_sz = PVFS_NAME_MAX;
+
+    server_config = get_server_config_struct();
+
+    while(count == 1)
+    {
+        ret = trove_collection_iterate(
+            server_config->trove_method,
+            &pos, &name, &tmp_coll, &count, 0, 0, NULL, &tmp_id);
+
+        if (ret == 0)
+        {
+            gossip_lerr("Error: unexpected trove behavior.\n");
+            ret = -PVFS_EINVAL;
+            goto free_name_buffer;
+        }
+        
+        if (ret < 0)
+        {
+            goto free_name_buffer;
+        }
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "looking for fs_id: %d, "
+                     "found %d.\n", (int)fs_id, (int)tmp_coll);
+
+        if ((count > 0) && (tmp_coll == fs_id))
+        {
+            /* we found a matching collection */
+            ret = 0;
+            break;
+        }
+    }
+
+free_name_buffer:
+    free(name.buffer);
+check_failed:
+
+    return ret;
+}
+
+static inline int PINT_get_object_ref_setparam(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.mgmt_setparam.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_setparam_params =
+{
+    .string_name = "mgmt_setparam",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .get_object_ref = PINT_get_object_ref_setparam,
+    .state_machine = &pvfs2_setparam_sm
+};
+
+/* drop_caches()
+ *
+ * Linux specific, but should fail cleanly on other platforms. 
+ *
+ * This function asks the operating system to sync and drop any in memory
+ * caches that it may have.  Applies globally to all file systems on the
+ * server, not just the PVFS storage space.
+ */
+static int drop_caches(void)
+{
+    int fd;
+    int ret;
+
+    /* try to commit buffer cache first */
+    sync();
+
+    /* open Linux specific control file if present */
+    fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
+    if(fd < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Warning: drop_caches not supported.\n");
+        return(-PVFS_EOPNOTSUPP);
+    }
+
+    /* free page cache, dentries, and inodes */
+    ret = write(fd, "3", 2);
+    if(ret < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Warning: found drop_caches file but failed to write to it.\n");
+        close(fd);
+        return(-PVFS_EOPNOTSUPP);
+    }
+   
+    close(fd);
+    return(0);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

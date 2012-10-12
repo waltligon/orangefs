@@ -1,0 +1,231 @@
+#!/bin/bash
+
+# (C) 2011 Clemson University
+#
+# See COPYING in top-level directory.
+
+echo
+
+#check for root permission
+if [ $(whoami) != 'root' ]
+then echo "Please run this script as root user..."
+    exit 1
+fi
+
+changes=0 #counting the number of selected changes
+
+echo "Memory Info:"
+echo ===========================================================================
+#total ram
+MemTotal=`cat /proc/meminfo | grep MemTotal: | awk '{ print $2 }'`
+MemTotalBytes=`echo "$MemTotal * 1024" | bc`
+MemTotalMB=`echo "scale=4; $MemTotal / 1024" | bc`
+echo "Total Memory = $MemTotalBytes (B) = $MemTotalMB (MB)" 
+#other info
+PageSize=`getconf PAGE_SIZE`
+MemTotalPages=`echo "$MemTotalBytes / $PageSize" | bc`
+echo -e "PAGE_SIZE = $PageSize (B)\n"
+
+#Read from config file using the source command
+source ucache.conf
+
+#UcacheSizeMB=256
+UcacheSizeKB=`echo "$UcacheSizeMB * 1024" | bc`
+UcacheSizeB=`echo "$UcacheSizeMB * (1024 * 1024)" | bc`
+
+#BlocksInCache=1024
+BlockSize=`echo "($UcacheSizeMB * (1024 * 1024))/$BlocksInCache" | bc`
+BlockSizeMB=`echo "scale=4; $BlockSize / (1024 * 1024)" | bc` 
+
+#LockSize=24    #sizeof(POSIX MUTEX)
+NumLocks=$[ $BlocksInCache + 1 ] #plus one for the global ucache lock
+LockMemoryRequirement=`echo "$NumLocks * $LockSize" | bc`
+
+#UCACHE_STATS_64=3
+#UCACHE_STATS_16=2
+UCACHE_AUX_SIZE=`echo "$LockMemoryRequirement + ($UCACHE_STATS_64 * 8) + ($UCACHE_STATS_16 * 2)" | bc`
+
+ShmemTotalB=`echo "$UcacheSizeB + $UCACHE_AUX_SIZE" | bc`
+ShmemTotalMB=`echo "scale=4; $ShmemTotalB / (1024 * 1024)" | bc`
+ShmemTotalPages=`echo "($ShmemTotalB / 4096)" | bc`
+
+
+echo "User Cache Considerations:"
+echo ===========================================================================
+echo "Values read from ucache.conf:"
+echo "-->ucache size = $UcacheSizeB (B) = $UcacheSizeMB (MB)" 
+echo "-->BlocksInCache = $BlocksInCache"
+echo "-->LockSize = $LockSize (B)"
+echo "-->UCACHE_STATS_64 = $UCACHE_STATS_64"
+echo -e "-->UCACHE_STATS_16 = $UCACHE_STATS_16\n"
+
+echo "Calculated Values Based on Input:"
+echo "BlockSize = $BlockSize (B) = $BlockSizeMB (MB)"
+echo "NumLocks = $NumLocks"
+echo "Shared memory required for ucache auxiliary structure (including locks and stats) = $UCACHE_AUX_SIZE (B)"
+echo "Shared memory required for all ucache blocks = $UcacheSizeB (B)"
+echo -e "Total shared memory requirement = $ShmemTotalB (B) = $ShmemTotalMB\
+ (MB) = $ShmemTotalPages (Pages)\n"
+
+
+echo Current SYS V IPC Limits:
+echo ===========================================================================
+echo "given by: 'ipcs -lm'"
+ipcs -lm
+
+echo "Current shmall and shmmax values:"
+echo ===========================================================================
+#shmall
+CurrentShmall=`cat /proc/sys/kernel/shmall`
+echo "shmall located at: /proc/sys/kernel/shmall = $CurrentShmall (Pages)" 
+#shmmax
+CurrentShmmax=`cat /proc/sys/kernel/shmmax`
+echo -e "shmmax located at: /proc/sys/kernel/shmmax = $CurrentShmmax (Bytes)\n"
+
+
+echo "/* For the ucache to work: shmall and shmmax both must be >= the memory
+ * required for the ucache, its locks, and any other applications using shared
+ * memory. Note that 'shmall' represents the overall #of memory pages that can  
+ * be used by SYSV shared memory. Also, 'shmmax' represents the maximum size
+ * (in bytes) of any single shared memory segment.
+ */"
+echo "Recommendations:"
+echo ===========================================================================
+
+#adjust shmem
+reqChanges=0
+
+ucacheSlice=`echo "scale=8; $ShmemTotalPages / $MemTotalPages" | bc`
+echo "Note: $ucacheSlice = Fraction of total memory required for ucache"
+compare_result1=`echo "$ucacheSlice >= 1" | bc`
+compare_result2=`echo "$ucacheSlice >= 0.4" | bc`
+
+if [ $compare_result1 == 1 ]
+    then
+        echo "*** Insufficient memory for current ucache configuration."
+        echo "--> Adjust ucache.config and/or total memory and try again."
+        exit 0
+elif [ $compare_result2 == 1 ]
+    then
+        echo "*** Enough memory can be allocated."
+        echo "--> You may still want to adjust the ucache.config though."
+        NewShmall=$MemTotalPages
+        NewShmmax=$MemTotalBytes
+else
+        echo "*** Enough memory can be allocated."
+        NewShmall=`echo "$MemTotalPages / 2" | bc` #half total memory should do
+        NewShmmax=`echo "$NewShmall * ($PageSize)" | bc`
+fi
+
+
+if [[ $CurrentShmall -lt $ShmemTotalPages ]]
+    then
+        reqChanges=$(($reqChanges+1))
+        echo "--> increase shmall for proper ucache functionality"
+fi
+
+if [[ $CurrentShmmax -lt $UcacheSizeB ]]
+    then
+        reqChanges=$(($reqChanges+1))
+        echo "--> increase shmmax for proper ucache functionality"
+fi
+
+echo
+
+if [[ $reqChanges == 0 ]]
+    then
+        echo "No changes were required for the ucache to function. Exiting..."  
+        exit 0
+fi
+
+function askYN {
+    echo -n "(Y/N)? "
+    read answer
+
+    while [[ $answer != "Y" && $answer != "y" \
+         && $answer != "n" && $answer != "N" ]]
+    do
+        echo "Error: you entered: '$answer'"
+        echo -n "Please enter Y or N: "
+        read answer
+    done
+
+    if [[ $answer != 'Y' && $answer != 'y' ]]
+        then
+            return 0
+        else
+            return 1
+    fi
+}
+
+if [[ $CurrentShmall -lt $ShmemTotalPages ]]
+    then
+        echo "Mark 'shmall' to be changed to $NewShmall?"
+        askYN
+        changeShmall=$?
+        echo
+fi
+
+if [[ $CurrentShmmax -lt $UcacheSizeB ]]
+    then
+        echo "Mark 'shmmax' to be changed to $NewShmmax?"
+        askYN
+        changeShmmax=$?
+        echo
+fi
+
+echo "You selected the following changes:"
+echo ===========================================================================
+if [[ $changeShmall == 1 ]]
+    then
+        changes=$(($changes+1))
+        echo "shmall = $NewShmall"
+fi
+
+if [[ $changeShmmax == 1 ]]
+    then
+        changes=$(($changes+1))
+        echo "smmax = $NewShmmax"
+fi
+echo
+
+if [[ $changes == 0 ]]
+    then 
+        echo "No changes to be made. Exiting..."
+        exit 0
+fi
+
+echo "Are you sure you want to perform these changes?"
+
+askYN
+performChanges=$?
+echo
+
+#Finally Perform Changes
+if [[ $performChanges == 1 ]]
+    then
+        echo -e "performing selected changes...\n"
+        if [[ $changeShmall == 1 ]]
+            then
+                SHMALL_CHANGE="sysctl -w kernel.shmall=$NewShmall"
+                echo "Running: $SHMALL_CHANGE"
+                $SHMALL_CHANGE
+        fi
+        if [[ $changeShmmax == 1 ]]
+            then
+                SHMMAX_CHANGE="sysctl -w kernel.shmmax=$NewShmmax"
+                echo "Running: $SHMMAX_CHANGE"
+                $SHMMAX_CHANGE
+        fi
+        echo 
+        echo -e "To make these changes persistent add (or adjust) the\nfollowing 2 lines in /etc/sysctl.conf:\n\n"
+        echo "kernel.shmall=$NewShmall"
+        echo "kernel.shmmax=$NewShmmax"
+        echo -e "\n\nThen run: sysctl -p\nAfter that, restart the system and the changes should persist.\n"
+    else
+        exit 0
+fi
+
+echo -e "\nDONE"
+exit 0
+

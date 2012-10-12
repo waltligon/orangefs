@@ -1,0 +1,102 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+#include "job-time-mgr.h"
+#include "server-config.h"
+
+%%
+
+machine pvfs2_job_timer_sm
+{
+	state do_work 
+	{
+		run job_timer_do_work;
+		success => do_work;
+		default => error;
+	}
+
+	state error 
+	{
+		run job_timer_error;
+		default => terminate;
+	}
+}
+
+%%
+
+/* job_timer_error()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action job_timer_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_err("Error: stopping server job timer.\n");
+
+    return(server_state_machine_complete(smcb));
+}
+
+/* job_timer_do_work()
+ *
+ * resets counters, updates metrices, etc- this is intended to be called
+ * repeatedly on a regular interval
+ */
+static PINT_sm_action job_timer_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret = -1;
+    job_id_t tmp_id;
+
+#if 0
+    PINT_STATE_DEBUG("do_work");
+#endif
+
+    /* look for expired jobs */
+    ret = job_time_mgr_expire();
+    if(ret < 0)
+    {
+	js_p->error_code = ret;
+	return SM_ACTION_COMPLETE;
+    }
+	
+    /* post another timer */
+    return(job_req_sched_post_timer(1000,
+	    smcb,
+	    0,
+	    js_p,
+	    &tmp_id,
+	    server_job_context));
+}
+
+struct PINT_server_req_params pvfs2_job_timer_params =
+{
+    .string_name = "job_timer",
+    .perm = PINT_SERVER_CHECK_INVALID,
+    .state_machine = &pvfs2_job_timer_sm
+};
+
+
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

@@ -1,0 +1,152 @@
+
+\documentclass[10pt]{article} % FORMAT CHANGE
+\usepackage[dvips]{graphicx}
+\usepackage{times}
+
+\graphicspath{{./}{figs/}} 
+
+\pagestyle{plain}
+
+\addtolength{\hoffset}{-2cm}
+\addtolength{\textwidth}{4cm}
+
+\addtolength{\voffset}{-1.5cm}
+\addtolength{\textheight}{3cm}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{11pt}
+
+\title{Trove DBPF Handle Allocator }
+\author{PVFS Development Team}
+
+\begin{document}
+\maketitle
+\begin{verbatim}$Id: handle-allocator.tex,v 1.1 2003-01-24 23:29:18 pcarns Exp $\end{verbatim}
+
+\section{Introduction}
+
+The Trove interface gives out handles -- unique identifiers to trove
+objects.  In addition to being unique, handles will not be reused within
+a configurable amount of time.  These two constraints make for a handle
+allocator that ends up being a bit more complicated than one might
+expect.  Add to that the fact that we want to serialize on disk all or
+part of the handle allocator's state, and here we are with a document to
+explain it all.
+
+\subsection{Data Structures}
+\subsubsection{Extents}
+We have a large handle space we need to represent efficiently.  This
+approach uses extents:
+\begin{verbatim}
+
+struct extent {
+	int64_t first;
+	int64_t last;
+};
+
+\end{verbatim}
+
+\subsubsection{Extent List}
+We keep the extents (not nescessarily sorted) in the \texttt{extents}
+array.  For faster searches, \texttt{index} keeps an index into
+\texttt{extents} in an AVL tree. 
+In addition
+to the extents themselves, some bookkeeping members are added.  The most
+important is the \texttt{timestamp} member, used to make sure no handle in
+its list gets reused before it should.  \texttt{\_\_size} is only used
+internally, keeping track of how big \texttt{extents} is.  
+
+\begin{verbatim}
+struct extentlist {
+	int64_t __size;
+	int64_t num_extents;
+	int64_t num_handles;
+	struct timeval timestamp;
+	struct extent * extents;
+};
+\end{verbatim}
+
+\subsubsection{Handle Ledger}
+We manage several lists.  The \texttt{free\_list} contains all the valid
+handles. The \texttt{recently\_freed\_list} contains handles which have been
+freed, but possibly before some expire time has passed.  The
+\texttt{overflow\_list} holds freed handles while items on the
+\texttt{recently\_freed\_list} wait for the expire time to pass.
+
+We save our state by writing out and reading from the three
+\texttt{TROVE\_handle} members, making use of the higher level trove
+interface. 
+\begin{verbatim}
+struct handle_ledger {
+        struct extentlist free_list;
+	struct extentlist recently_freed_list;
+	struct extentlist overflow_list;
+	FILE *backing_store;
+	TROVE_handle free_list_handle;
+	TROVE_handle recently_freed_list_handle;
+	TROVE_handle overflow_list_handle;
+}
+\end{verbatim}
+
+\section{Algorithm}
+\subsection {Assigning handles}
+Start off with a \texttt{free\_list} of one big extent encompassing the
+entire handle space.
+\begin{itemize}
+\item Get the last extent from the \texttt{free\_list} (We hope getting
+the last extent improves the effiency of the extent representation)
+\item Save \texttt{last} for later return to the caller
+\item Decrement \texttt{last}
+\item if $ first > last $, mark the extent as empty. 
+\end{itemize}
+
+\subsection{returning handles}
+\begin {itemize}
+\item when the first handle is returned, it gets added to the
+    \texttt{recently\_freed} list. Because this is the first item on that
+    list, we check the time. 
+\item  now we add more handles to the list.  we check the time after $N$            handles are returned and update the timestamp.
+\item  Once we have added $H$ handles, we decide the \texttt{recently\_freed}
+    list has enough handles.  We then start using the
+    \texttt{overflow\_list} to hold returned handles.
+\item  as with the \texttt{recently\_freed} list, we record the time that
+    this handle was added, updating the timestamp after every $N$
+    additions.  We also check how old the \texttt{recently\_freed} list is. 
+\item  at some point in time, the whole \texttt{recently\_freed} list is ready
+    to be returned to the \texttt{free\_list}.  The \texttt{recently\_freed}
+    list is merged into the \texttt{free\_list}, the \texttt{overflow\_list}
+    becomes the \texttt{recently\_freed} list and the  \texttt{overflow\_list}
+    is empty.
+\end{itemize}
+
+\subsection{I don't know what to call this section}
+
+Let $T_{r}$ be the minimum response time for an operation of any sort,
+$T_{f}$ be the time a handle must sit before being moved back to the free list, and $N_{tot}$ be the total number of handles available on a server.
+
+The pathological case would be one where a caller
+\begin{itemize}
+\item fills up the \texttt{recently\_freed} list
+\item immediately starts consuming handles as quickly as possible to make for
+ the largest possible \texttt{recently\_freed} list in the next pass
+\end{itemize}
+
+This results in the largest number of handles being unavailable due to sitting
+on the \texttt{overflow\_list}.  Call $N_{purg}$ the number of handles waiting
+in ``purgatory'' ( waiting for $T_{f}$ to pass) 
+\begin{equation}
+N_{purg} = T_{f} / T_{r}
+\end{equation}
+
+\begin{equation}
+F_{purg} = N_{purg} / N_{tot}
+\end{equation}
+\begin{equation}
+F_{purg} = T_{f} / (T_{r} * N_{tot})
+\end{equation}
+
+We should try to collect statistics and see what $T_{r}$ and $N_{purg}$ end up being for real and pathological workloads.
+
+
+\end{document}
+% vim: tw=72

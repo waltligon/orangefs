@@ -1,0 +1,36 @@
+
+Step in adding a syscall to the client:
+
+1) write a state machine
+		src/clent/sysint/...
+		state machines should include the PVFS syscall and
+		and internal PVFS isyscall
+		Most SMs will utilize a message pair - a request to the server
+			and a response from the server.  A reusable SM can process
+			multiple concurrent message pairs: pvfs2_msgpairarray_sm
+			thus mostly the SM must set up the message pairs and 
+			process the results.
+				There is both a msgpair and a msgarray field in the SM struct
+		State functions return 0 or 1 on error-free completion,
+		   0 indicates an asynchronous call has been made and must be waited for
+			1 indicates no async call was made and should proceed to next state
+		  <0 indicates an error - use PVFS_EXXX codes defined in
+		       include/pvfs2-types.h
+
+2) add items to
+		include/pvfs2-sysint.h
+		add function prototypes for syscall and isyscall
+		add definition of system response struct (if needed)
+
+3) add items to
+		src/client/sysint/client-state-machine.h
+		add struct for syscall specific fields
+		add entry to union near bottom of file : struct PINT_client_sm
+		add enumeration item near bottom of file
+		add declarate of state machine function at bottom of file
+
+4) add entries to identify the state machine
+		src/client/sysint/client-state-machine.c
+		PINT_client_state_machine_post()
+		PINT_client_get_name_str()
+		 

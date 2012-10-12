@@ -1,0 +1,47 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2-CP 1 "JUNE 2004"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-cp \- Copy files to and from PVFS2 volumes 
+.SH SYNOPSIS
+.B pvfs2-cp
+.I [-n nr_datafiles] [-b buffer_size ] [-t] <SOURCE> <DESTINATION>
+
+.SH DESCRIPTION
+.B pvfs2-cp
+copies files to and from a PVFS2 volume without going through the kernel (VFS)
+interface.  It reads a file 
+.I SOURCE
+and produces 
+.I DESTINATION.
+Both 
+.I SOURCE 
+and 
+.I DESTINATION
+can be either local or PVFS2 files.
+.SH OPTIONS
+.IP -b
+Use an intermediate buffer of
+.I buffer_size
+bytes when copying the file
+.IP -n
+The newly created PVFS2 file will have
+.I nr_datafiles
+datafiles
+.IP -t
+Report some timing information.
+
+.SH ENVIRONMENT
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.IR pvfs2tab
+file
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)

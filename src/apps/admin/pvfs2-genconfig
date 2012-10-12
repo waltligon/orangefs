@@ -1,0 +1,1685 @@
+#!/usr/bin/perl -w
+#
+#  (C) 2001 Clemson University and The University of Chicago
+#
+#  See COPYING in top-level directory.
+#
+# generate a global pvfs2 configuration file based on user input
+#
+use Term::ReadLine;
+use Getopt::Long;
+use Math::BigInt;
+
+# turn on strictness
+use strict 'vars';
+
+# ugly global variables for option parsing
+my $opt_protocol = '';
+my $opt_port = '';
+my $opt_board = '';
+my $opt_tcpport = '';
+my $opt_tcpbindspecific = '0';
+my $opt_gmport = '';
+my $opt_mxboard = '';
+my $opt_mxendpoint = '';
+my $opt_ibport = '';
+my $opt_portal = '';
+my $opt_ioservers = '';
+my $opt_metaservers = '';
+my $opt_logfile = '';
+my $opt_storage = '';
+my $opt_trovesync = '1';
+my $opt_trovemethod = '';
+my $opt_quiet = '';
+my $opt_logging = '';
+my $opt_tracing = '';
+my $opt_logstamp = '';
+my $opt_server_job_timeout = '';
+my $opt_client_job_timeout = '';
+my $opt_first_handle = '';
+my $opt_last_handle = '';
+my $opt_root_handle = '';
+my $opt_fsid = '';
+my $opt_fsname = '';
+my $opt_default_num_dfiles = '';
+my $opt_default_flow_buffer_size = '';
+my $opt_default_flow_buffer_count = '';
+
+my $opt_security = '0';
+my $opt_trusted_port = '';
+my $opt_trusted_network = '';
+my $opt_trusted_netmask = '';
+
+my $opt_iospec = undef;
+my $opt_metaspec = undef;
+
+my %all_endpoints = ();
+
+my $default_storage = undef;
+my $default_meta_storage = undef;
+my $default_logfile = undef;
+
+my $bmi_module = undef;
+
+my $opt_gen_key = 0;
+
+my $META_ENDPOINT = 0x1;
+my $IO_ENDPOINT   = 0x2;
+
+my $OUT = undef;
+my $term = undef;
+
+#$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
+my $num_unexp_reqs = 50;
+
+# sometimes people use ip addresses instead of hostnames.  perl's default sort
+# will sort the ip addresses lexically, not numerically, so we need a slightly
+# smarter sorter 
+
+sub get_user_input
+{
+    my($prompt,$res);
+       
+    print $OUT "\n";
+    $prompt = "* $_[0]";
+
+    my $line = $term->readline($prompt);
+    print $OUT "\n";
+    return $line;
+}
+
+sub valid_number
+{
+    my($num, $len, $i, $digit);
+
+    $num = $_[0];
+    $len = length($num);
+
+    for($i = 0; $i < $len; $i++)
+    {
+        $digit = substr($num,$i,1);
+        if (($digit < 0) || ($digit > 9))
+        {
+            return 0;
+        }
+    }
+    return (($len > 0) ? 1 : 0);
+}
+
+sub prompt_num
+{
+    my($prompt,$num,$default);
+    $prompt = $_[0];
+    $default = $_[1];
+    do
+    {
+        $num = get_user_input($prompt);
+        if (length($num) == 0)
+        {
+            return $default;
+        }
+    } while(!valid_number($num));
+    return $num;
+}
+
+sub prompt_word
+{
+    my($prompt,$default,$val);
+    $prompt = $_[0];
+    $default = $_[1];
+
+    $val = get_user_input($prompt);
+    if (length($val) == 0)
+    {
+        $val = $default;
+    }
+    return $val;
+}
+
+sub parse_hostlist
+{
+    my $inputline = shift;
+    my @components = ();
+    my @hosts = ();
+
+    # we want to split the string into components seperated by comma
+    # but we don't want split components that have curly brackets.  For example,
+    # we need to be sure that "hosta{1-4,8-12},hostb,hostc{1,2,3}" splits to
+    # hosta{1-4,8-12}
+    # hostb
+    # hostc{1,2,3}
+    #
+    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?[^,]*))/g;
+    foreach my $comp_ws (@components)
+    {
+        my $comp;
+
+        # Trim leading and trailing whitespace
+        $comp = $comp_ws;
+        $comp =~ s/^\s+//;
+        $comp =~ s/\s+$//;
+
+        # if we've got a component that has {..}, then expand.
+        # match the prefix (hostname) and curly brackets
+        if($comp =~ /([^{]+){([^}]+)}(.*)$/)
+        {
+            my $prefix = $1;
+            my $ranges = $2;
+            my $suffix = $3;
+
+            # split the ranges string on the commas
+            foreach my $r (split(/,/, $ranges))
+            {
+                if($r !~ /-/)
+                {
+                    # only one number, just push it on
+                }
+                else
+                {
+                    # min and max in this range.  Add each of the indexes
+                    my ($s, $f) = $r =~ /([0-9]+)-([0-9]+)/; 
+                    for(my $i = $s; $i <= $f; ++$i)
+                    {
+                        push @hosts, "$prefix$i$suffix";
+                    }
+                }
+            }
+        }
+        else {
+            push @hosts, $comp;
+        }
+    }
+    return @hosts;
+}
+
+sub emit_defaults
+{
+    my ($target, $num_unexp, $bmi_module, $logfile,
+        $logging, $tracing, $logstamp, $server_job_timeout, $client_job_timeout) = @_;
+
+    print $target "<Defaults>\n";
+    print $target "\tUnexpectedRequests $num_unexp\n";
+    print $target "\tEventLogging $logging\n";
+    print $target "\tEnableTracing $tracing\n";
+    print $target "\tLogStamp $logstamp\n";
+    print $target "\tBMIModules $bmi_module\n";
+    print $target "\tFlowModules flowproto_multiqueue\n";
+    print $target "\tPerfUpdateInterval 1000\n";
+    print $target "\tServerJobBMITimeoutSecs $server_job_timeout\n";
+    print $target "\tServerJobFlowTimeoutSecs $server_job_timeout\n";
+    print $target "\tClientJobBMITimeoutSecs $client_job_timeout\n";
+    print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
+    print $target "\tClientRetryLimit 5\n";
+    print $target "\tClientRetryDelayMilliSecs 2000\n";
+    print $target "\tPrecreateBatchSize 0,32,512,32,32,32,0\n";
+    print $target "\tPrecreateLowThreshold 0,16,256,16,16,16,0\n";
+
+    if(defined($default_storage))
+    {
+        print $target "\n\tDataStorageSpace " . $default_storage . "\n";
+    }
+
+    if(defined($default_meta_storage))
+    {
+        print $target "\tMetadataStorageSpace " . $default_meta_storage . "\n\n";
+    }
+
+    if(defined($default_logfile))
+    {
+        print $target "\tLogFile " . $default_logfile . "\n";
+    }
+
+    if($opt_tcpbindspecific)
+    {
+        print $target "\tTCPBindSpecific yes\n";
+    }
+
+    print $target "</Defaults>\n";
+}
+
+sub emit_security
+{
+    my ($target, $portlist, $network, $netmask) = @_;
+
+    print $target "<Security>\n";
+    print $target "\tTrustedPorts $portlist\n";
+    print $target "\tTrustedNetwork $network $netmask\n";
+    print $target "</Security>\n";
+}
+
+sub emit_aliases
+{
+    my $target = shift;
+
+    print $target "\n<Aliases>\n";
+    foreach my $alias (sort keys %all_endpoints)
+    {
+        print $target "\tAlias $alias " . 
+        get_bmi_endpoint($alias) . "\n";
+    }
+    print $target "</Aliases>\n";
+}
+
+sub emit_filesystem
+{
+    my ($target, $name, $fs_id, $root_handle, 
+        $last_handle, $first_handle, $count,
+        $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
+
+    # divide handle range space equally among servers ((2^63)-1 for now)
+    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
+    $num_ranges = $count;
+    $total_num_handles_available = $last_handle->copy();
+    $total_num_handles_available->bsub($first_handle);
+    $total_num_handles_available->binc();
+
+    # since meta and data handle ranges must be split, increment
+    # num nodes for calculation purposes below
+    $step = $total_num_handles_available->copy();
+    $step->bdiv($num_ranges);
+
+    print $target "\n<Filesystem>\n";
+    print $target "\tName $name\n";
+    print $target "\tID $fs_id\n";
+    print $target "\tRootHandle $root_handle\n";
+    if($default_num_dfiles > 0)
+    {
+        print $target "\tDefaultNumDFiles $default_num_dfiles\n";
+    }
+
+    # Rules for default stuffing setting: only enable it if every I/O server
+    # is also a metadata server, otherwise we would tend to unbalance by
+    # always stuffing on the subset that does metadata.  User can override
+    # if desired.
+    $stuffing = "yes";
+    foreach my $alias (keys %all_endpoints)
+    {
+        if($all_endpoints{$alias}->{TYPE} & $IO_ENDPOINT)
+        {
+            if(!($all_endpoints{$alias}->{TYPE} & $META_ENDPOINT))
+            {
+                $stuffing = "no";
+            }
+        }
+    }
+    print $target "\tFileStuffing $stuffing\n";
+
+    print $target "\t<MetaHandleRanges>\n";
+    $start = $end = $first_handle->copy();
+    $start->bdec();
+    $end->bdec();
+
+    my @meta_aliases = get_aliases($META_ENDPOINT);
+    @meta_aliases = sort @meta_aliases;
+    foreach my $ma (@meta_aliases)
+    {
+        $start = $end->copy();
+        $start->binc();
+        $end->badd($step);
+        print $target "\t\tRange $ma $start-$end\n";
+    }
+
+    print $target "\t</MetaHandleRanges>\n";
+    print $target "\t<DataHandleRanges>\n";
+
+    my @io_aliases = get_aliases($IO_ENDPOINT);
+    @io_aliases = sort @io_aliases;
+    foreach my $ia (@io_aliases)
+    {
+        $start = $end->copy();
+        $start->binc();
+        $end->badd($step);
+        print $target "\t\tRange $ia $start-$end\n";
+    }
+    print $target "\t</DataHandleRanges>\n";
+
+    print $target "\t<StorageHints>\n";
+
+    # only in special cases would someone want to sync data (failover comes to
+    # mind)  The default thus should be to sync metadata but not sync data.  
+    if ($opt_trovesync == 1) {
+        print $target "\t\tTroveSyncMeta yes\n";
+        print $target "\t\tTroveSyncData no\n";
+    } else {
+        print $target "\t\tTroveSyncMeta no\n";
+        print $target "\t\tTroveSyncData no\n";
+        print $target "\t\tCoalescingHighWatermark infinity\n";
+        print $target "\t\tCoalescingLowWatermark 1\n";
+    }
+
+    if($opt_trovemethod ne "")
+    {
+        print $target "\t\tTroveMethod $opt_trovemethod\n";
+    }
+    else
+    {
+        print $target "\t\tTroveMethod alt-aio\n";
+    }
+
+    print $target "\t</StorageHints>\n";
+
+    if($opt_gen_key ne "0")
+    {
+        emit_fs_key($target);
+    }
+
+    if($default_flow_buffer_size > 0)
+    {
+        print $target "\tFlowBufferSizeBytes $default_flow_buffer_size\n";
+    }
+ 
+    if($default_flow_buffer_count > 0)
+    {
+        print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
+    }
+
+    print $target "</Filesystem>\n";
+}
+
+sub emit_serveropts
+{
+    my $target = shift;
+
+    foreach my $alias (sort keys %all_endpoints)
+    {
+        my $endpoint = $all_endpoints{$alias};
+        print $target "\n<ServerOptions>\n";
+        print $target "\tServer $alias\n";
+        print $target "\tDataStorageSpace $endpoint->{STORAGE}\n";
+        print $target "\tMetadataStorageSpace $endpoint->{METASTORAGE}\n";
+        print $target "\tLogFile $endpoint->{LOGFILE}\n";
+        print $target "</ServerOptions>\n";
+    }
+}
+
+
+sub emit_server_conf
+{
+    my($target, $node, $storage, $metastorage, $logfile) = @_;
+
+    print $target "DataStorageSpace $storage\n";
+    print $target "MetadataStorageSpace $metastorage\n";
+    print $target "HostID \"" . get_bmi_endpoint($node) . "\"\n";
+    print $target "LogFile $logfile\n";
+}
+
+sub emit_fs_key
+{
+    my ($target, @path, $openssl_cmd, $b64_rand);
+
+    $target = $_[0];
+
+    $openssl_cmd = undef;
+
+    @path = split(/:/, $ENV{PATH});
+    for my $p (@path)
+    {
+        if( -x "$p/openssl" )
+        {
+            $openssl_cmd = "$p/openssl";
+        }
+    }
+
+    if(!defined($openssl_cmd))
+    {
+        print STDERR "\n\nFailed to find openssl executable in PATH\n\n";
+        exit 1;
+    }
+
+    $b64_rand = `$openssl_cmd rand -base64 20 2> /dev/null`;
+    chomp($b64_rand);
+    print $target "\tSecretKey $b64_rand\n";
+}
+
+sub confirm
+{
+    my($prompt, $char, $valid_char);
+    $prompt = shift;
+    $valid_char = 0;
+    do
+    {
+        $char = prompt_word($prompt,"-");
+        if (($char eq 'y') || ($char eq 'n'))
+        {
+            $valid_char = 1;
+        }
+    } while($valid_char == 0);
+
+    return (($char eq 'y') ? 1 : 0);
+}
+
+sub specusage
+{
+    print $OUT <<"THIS"                                
+               
+  The -iospec and -metaspec options allow a wide variaty of configurations
+  to be specified, including multiple endpoints on the same node (different
+  ports), different storage locations for endpoints on the same node, etc.
+
+  Both the -iospec and -metaspec options take strings as arguments.
+  The format of the strings are comma separated endpoints, where 
+  each endpoint is formatted as:
+                
+    [<proto>://]<host>:<port>[:<storage>][:<logfile>]
+
+  The protocol, storage, and logfile are all optional.
+  The port can be a range of the format {#-#,#,#-#,..}.
+  If the logfile is specified, the storage path must be as well.
+                
+  Examples:
+
+    myhosta:3334,myhostb:{3334-3338}
+    myhosta:{3334-3338}
+    ib://myhosta:3335:/psto,tcp://myhostb:3334:/psto
+
+  Multiple protocols for the same endpoint may also be specified.  The
+  format for this type of endpoint is:
+
+    [<proto1>://<host>:<port1>,<proto2>://<host>:<port2>,...]
+
+  In this case, the [] delineate the single endpoint (with multiple protocols)
+  from the rest of the spec.  While the protocols and ports are different, the
+  host for each uri must be the same.  For example:
+
+    --metaspec="[ib://myhosta:3335,gm://myhosta:6,mx://myhosta:0:3]:/psto,tcp://myhostb:3334"
+
+  This specifies that one endpoint is at myhosta with the infiniband and myrinet
+  protocols enabled, and the other endpoint is at myhostb with tcp enabled.
+
+  Note that the --iospec and --metaspec options cannot be used with enumerated
+  hosts.  Each endpoint must be a single host.  I.e. tcp://myhost{1-4}:3334
+  is not allowed.  This does not preclude multiple endpoints from being
+  on the same host, such as tcp://myhost1:{3334-3338}
+
+THIS
+    ;;
+}
+
+sub usage
+{
+
+# dump usage with a single HERE document rather than seperate print
+# statements
+    print $OUT <<"THIS";    
+Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
+
+  The pvfs2-genconfig utility creates configuration files for the
+  PVFS2 file system.  The <fs.conf> argument is
+  manditory and specify the name of the configuration file that will
+  be written.  This utility will create the fs.conf file.  
+
+  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf' will
+  generate a file called /tmp/fs.conf
+  NOTE: If pvfs2-genconfig is executed with a single argument of "-", 
+  then all output is directed to stdout and no files are written.
+
+  All other arguments are optional.  If run without any optional
+  arguments, then pvfs2-genconfig will prompt interactively for required
+  parameters.
+
+  pvfs2-genconfig can also be executed non-interactively with --quiet
+  and one of the two [] grouped options below:
+
+     [
+       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,portals)
+       --ioservers   <STRING>   hostnames of data servers.  Can be
+                                <prefix>{#-#,#,#-#,...}
+       --metaservers <STRING>   hostnames of meta servers.
+     ]
+  or
+     [
+       --iospec      <STRING>   endpoints of data servers. See --spec-usage
+       --metaspec    <STRING>   endpoints of meta servers. See --spec-usage
+     ]
+
+  The following arguments are entirely optional, whether your intention is
+  to run pvfs2-genconfig in interactive or non-interactive mode:
+
+     --tcpport     <NUM>               TCP port to use (default: 3334)
+     --tcpbindspecific                 Bind TCP only to specific interfaces
+     --gmport      <NUM>               GM port to use (default: 6)
+     --mxboard     <NUM>               MX board to use (default is 0)
+     --mxendpoint  <NUM>               MX endpoint to use (default is 3)
+     --ibport      <NUM>               IB port to use (default is 3335)
+     --portal      <NUM>               Portals index for
+                                       listening server (default is 5)
+     --logging     <STRING>            debugging mask for log messages
+     --tracing                         Enable event tracing in the server
+     --logstamp    <STRING>            timestamp type for log messages 
+                                       ('none','usec', or 'datetime' are valid)
+     --storage <STRING>                path to pvfs storage directory.
+     --logfile <STRING>                file to place server logging.
+     --notrovesync                     sync metadata only upon request
+     --server-job-timeout <NUM>        server job timeout value (seconds)
+     --client-job-timeout <NUM>        server job timeout value (seconds)
+     --trove-method <STRING>           specify a trove method
+     --first-handle <NUM>              first handle value to reserve
+     --last-handle  <NUM>              last handle value to reserve
+     --root-handle  <NUM>              handle value to reserve for root object
+     --fsid         <NUM>              fs identifier value
+     --fsname <STRING>                 fs name
+     --default-num-dfiles <NUM>        number of datafiles to use per file
+                                       (defaults to number of I/O servers)
+     --flow-buffer-size <NUM>          set flowbuffersize in bytes            
+     --flow-buffer-count <NUM>         set flow buffers per flow
+     --trusted      <0|1>              indicate whether trusted connection options need to be emitted
+     --genkey                          optionally generates a secret key for the 
+                                       filesystem(s).
+
+     --help                            This message
+     --spec-usage                      Show the usage info for --iospec 
+                                       and --metaspec options
+THIS
+
+}
+
+sub print_welcome
+{
+    if (!$opt_quiet) {
+        print $OUT <<"WELCOMEMSG"
+**********************************************************************
+    Welcome to the PVFS2 Configuration Generator:
+
+This interactive script will generate configuration files suitable
+for use with a new PVFS2 file system.  Please see the PVFS2 quickstart
+guide for details.
+
+**********************************************************************
+WELCOMEMSG
+        ;;
+    }
+}
+
+sub get_portlist
+{
+    my $type;
+
+    if (!$opt_quiet) {
+        print $OUT <<"PORTLIST"
+
+You must enter the trusted port ranges that your file system will accept
+This must be of the form <port1 - port2>
+PORTLIST
+        ;;
+        $type = prompt_word("Enter port list [Default is 0-65535]: ","0-65535");
+    }
+    return $type;
+}
+
+sub get_network
+{
+    my $type;
+
+    if (!$opt_quiet) {
+        print $OUT <<"NETWORK"
+You must enter the network address and network mask to identify list of trusted hosts
+This must be of the form <network>, <netmask>
+NETWORK
+        ;;
+    }
+    $type = prompt_word("Enter network address, network mask [Default is 0.0.0.0, 0.0.0.0]: ", "0.0.0.0, 0.0.0.0");
+    return $type;
+}
+
+sub get_protocol
+{
+    my $type;
+    my %port;
+
+    if ($opt_protocol) {
+        $type = $opt_protocol;
+    } else {
+        if (!$opt_quiet) {
+            # get network type
+            print $OUT <<"PROTOCOL"
+You must first select the network protocol that your file system will use.
+The only currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
+(For multi-homed configurations, use e.g. \"ib,tcp\".)
+PROTOCOL
+            ;;
+        }
+        $type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
+    }
+
+    foreach (split(',', $type)) {
+        if ($_ eq "tcp") {
+            $port{'tcp'} = tcp_get_port();
+            if ($opt_security == 1)
+            {
+                $opt_trusted_port = get_portlist();
+                my $str = get_network();
+                my $cnt = 0;
+                foreach (split(',', $str)) {
+                    $_ =~ s/\s/ /g; 
+                    $_ =~ s/ +/ /g;
+                    $_ =~ s/^ +//;
+                    $_ =~ s/ +$//;
+                    if ($cnt == 0)
+                    {
+                        $opt_trusted_network = "tcp://" . $_;
+                    }
+                    else 
+                    {
+                        $opt_trusted_netmask = "tcp://" . $_;
+                    }
+                    $cnt = $cnt + 1;
+                }
+            }
+        } elsif ($_ eq "gm") {
+            $port{'gm'} = gm_get_port();
+        } elsif ($_ eq "mx") {
+            $port{'mx'} = mx_get_endpoint();
+        } elsif ($_ eq "ib") {
+            $port{'ib'} = ib_get_port();
+        } elsif ($_ eq "portals") {
+            $port{'portals'} = portals_get_portal();
+        } else {
+            die "Sorry.  At this time, only the tcp, gm, mx, ib, and portals protocols are available\nfor use with this configuration utility.\n";
+        }
+    }
+
+    return \%port;
+}
+
+sub get_logging
+{
+    my $logging;
+    if ($opt_logging) {
+        $logging = $opt_logging;
+    } else {
+        $logging = "none";
+    }
+    return $logging;
+}
+
+sub get_tracing
+{
+    my $tracing;
+    if ($opt_tracing) {
+        $tracing = "yes";
+    } else {
+        $tracing = "no";
+    }
+    return $tracing;
+}
+
+sub get_logstamp
+{
+    my $logstamp;
+    if ($opt_logstamp) {
+        $logstamp = $opt_logstamp;
+    } else {
+        $logstamp = "datetime";
+    }
+    return $logstamp;
+}
+
+sub get_root_handle
+{
+    my $root_handle;
+    if ($opt_root_handle) {
+        $root_handle = $opt_root_handle;
+    } else {
+        $root_handle = 1048576;
+    }
+    return $root_handle;
+}
+
+sub get_fsid
+{
+    my $fsid;
+    if ($opt_fsid) {
+        $fsid = $opt_fsid;
+    } else {
+        # compute a psuedo-random 32 bit file system ID
+        $fsid = int((rand() * 2147483647));
+    }
+    return $fsid;
+}
+
+sub get_fsname
+{
+    my $fsname;
+    if ($opt_fsname) {
+        $fsname = $opt_fsname;
+    } else {
+        $fsname = "pvfs2-fs";
+    }
+    return $fsname;
+}
+
+sub get_last_handle
+{
+    my $last_handle;
+    if ($opt_last_handle) {
+        $last_handle = Math::BigInt->new($opt_last_handle);
+    } else {
+        $last_handle = Math::BigInt->new('0x7FFFFFFFFFFFFFFF');  # 2^63
+    }
+    return $last_handle;
+}
+
+sub get_default_num_dfiles
+{
+    my $default_num_dfiles;
+    if ($opt_default_num_dfiles) {
+        $default_num_dfiles = $opt_default_num_dfiles;
+    } else {
+        $default_num_dfiles = -1;
+    }
+    return $default_num_dfiles;
+}
+
+sub get_default_flow_buffer_size
+{
+    my $default_flow_buffer_size;
+    if($opt_default_flow_buffer_size ne '') {
+        $default_flow_buffer_size = $opt_default_flow_buffer_size;
+    } else {
+        $default_flow_buffer_size = -1;
+    }
+    return $default_flow_buffer_size;
+}
+
+sub get_default_flow_buffer_count
+{
+    my $default_flow_buffer_count;
+    if($opt_default_flow_buffer_count ne '') {
+        $default_flow_buffer_count = $opt_default_flow_buffer_count;
+    } else {
+        $default_flow_buffer_count = -1;
+    }
+    return $default_flow_buffer_count;
+}
+
+sub get_first_handle
+{
+    my $first_handle;
+    if ($opt_first_handle) {
+        $first_handle = Math::BigInt->new($opt_first_handle);
+    } else {
+        $first_handle = Math::BigInt->new(4);
+    }
+    return $first_handle;
+}
+
+sub get_server_job_timeout
+{
+    my $server_job_timeout;
+    if ($opt_server_job_timeout) {
+        $server_job_timeout = $opt_server_job_timeout;
+    } else {
+        $server_job_timeout = 30;
+    }
+    return $server_job_timeout;
+}
+
+sub get_client_job_timeout
+{
+    my $client_job_timeout;
+    if ($opt_client_job_timeout) {
+        $client_job_timeout = $opt_client_job_timeout;
+    } else {
+        $client_job_timeout = 300;
+    }
+    return $client_job_timeout;
+}
+
+sub get_logfile
+{
+    my $logfile = "/tmp/pvfs2-server.log";
+    if ($opt_logfile) {
+        $logfile = $opt_logfile;
+    } elsif (!$opt_quiet) {
+            print $OUT "Choose a file for each server to write log messages to.\n";
+            $logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
+    }
+    return $logfile;
+}
+
+sub get_storage
+{
+    my $storage = "/pvfs2-storage-space";
+    if ($opt_storage) {
+        $storage = $opt_storage;
+    } elsif (!$opt_quiet) {
+            print $OUT "Choose a directory for each server to store data in.\n";
+            $storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
+    }
+    return $storage;
+}
+
+sub get_meta_storage
+{
+    my $metastorage = "/pvfs2-storage-space";
+    if ($opt_storage) {
+        $metastorage = $opt_storage;
+    } elsif (!$opt_quiet) {
+            print $OUT "Choose a directory for each server to store metadata in.\n";
+            $metastorage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
+    }
+    return $metastorage;
+}
+
+# get host port
+sub tcp_get_port
+{
+    my $port = 3334;
+    if ($opt_tcpport) {
+        $port = $opt_tcpport;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
+            print $OUT "script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3334]: ","3334");
+        }
+    }
+    return  $port;
+}
+
+sub gm_get_port
+{
+    my $port = 6;
+    if ($opt_gmport) {
+        $port = $opt_gmport;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
+            print $OUT "This script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 6]: ","6");
+        }
+    }
+    # every myrinet card i've seen has 8 ports.  If myricom makes a card
+    # with more than that, we'll have to adapt
+    ($port < 8) or die "GM ports must be in the range 0 to 7";
+
+    return  $port;
+}
+
+sub mx_get_endpoint
+{
+    my $port = 3;
+    my $board = 0;
+
+    if ($opt_mxboard) {
+        $board = $opt_mxboard;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a MX board (in the range of 0 to 4) for the servers to listen on. \n";
+            print $OUT "This script assumes that all servers will use the same board number.\n";
+            $board = prompt_num("Enter board number [Default is 0]: ","0");
+        }
+    }
+    # The number of boards is only limited by the number of PCI-X or PCI-Express
+    # slots in the machine. This is reasonable maximum.
+    ($board < 8) or die "MX board must be in the range 0 to 7";
+
+    if ($opt_mxendpoint) {
+        $port = $opt_mxendpoint;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
+            print $OUT "This script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3]: ","3");
+        }
+    }
+    # The number of endpoints in MX is configurable. The default value is 4 
+    # but may be changing to 8. It can be higher, but this is reasonable.
+    ($port < 8) or die "MX endpoint must be in the range 0 to 7";
+
+    $port = $board . ":" . $port;
+    return  $port;
+}
+
+sub ib_get_port
+{
+    my $port = 3335;
+    if ($opt_ibport) {
+        $port = $opt_ibport;
+    } elsif(!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
+            print $OUT "script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3335]: ","3335");
+        }
+    }
+    return  $port;
+}
+
+sub portals_get_portal
+{
+    my $port = 5;
+    if ($opt_portal) {
+        $port = $opt_portal;
+    } elsif(!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a portal index for the servers to listen on for communications.  Note that this\n";
+            print $OUT "script assumes that all servers will use the same portal index.\n";
+            $port = prompt_num("Enter portal index [Default is 5]: ","5");
+        }
+    }
+    return $port;
+}
+
+sub get_ionames
+{
+    my $portmap = shift;
+    my $storage = shift;
+    my $metastorage = shift;
+    my $logfile = shift;
+    my $ioline = '';
+    if ($opt_ioservers) {
+        $ioline = $opt_ioservers;
+    } else {
+        print $OUT "Next you must list the hostnames of " .
+                   "the machines that will act as\n";
+        print $OUT "I/O servers.  Acceptable syntax is " .
+                   "\"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
+        $ioline = prompt_word(
+            "Enter hostnames [Default is localhost]: ",
+            "localhost");
+    }
+
+    my @io_hosts = parse_hostlist($ioline);
+    foreach my $io_host (@io_hosts)
+    {
+        if(exists $all_endpoints{$io_host})
+        {
+            $all_endpoints{$io_host}->{TYPE} |= $IO_ENDPOINT;
+        }
+        else
+        {
+
+            $all_endpoints{$io_host} = {
+                ALIAS => $io_host, 
+                TYPE => $IO_ENDPOINT,
+                HOSTNAME => $io_host, 
+                PORTMAP => $portmap, 
+                STORAGE => $storage,
+                METASTORAGE => $metastorage, 
+                LOGFILE => $logfile};
+        }
+    }
+}
+
+sub get_metanames
+{
+    my $portmap = shift;
+    my $storage = shift;
+    my $metastorage = shift;
+    my $logfile = shift;
+    my $metaline = '';
+    my @meta_hosts;
+    if ($opt_metaservers) {
+        $metaline = $opt_metaservers;
+        @meta_hosts = parse_hostlist($metaline);
+    } 
+    else 
+    {
+        print $OUT "Use same servers for metadata? (recommended)\n";
+        $metaline = prompt_word(
+            "Enter yes or no [Default is yes]: ",
+            "yes");
+        if($metaline =~ /^yes$/i)
+        {
+            foreach my $alias (keys %all_endpoints)
+            {
+                $all_endpoints{$alias}->{TYPE} |= $META_ENDPOINT;
+            }
+        }
+        else
+        {
+            print $OUT "Now list the hostnames of the machines that will act as " .
+                       "Metadata\nservers.  This list may or may not overlap " .
+                       "with the I/O server list.\n";
+            $metaline = prompt_word(
+                "Enter hostnames [Default is localhost]: ",
+                "localhost");
+            @meta_hosts = parse_hostlist($metaline);
+        }
+    }
+
+    foreach my $meta_host (@meta_hosts)
+    {
+        if(exists $all_endpoints{$meta_host})
+        {
+            $all_endpoints{$meta_host}->{TYPE} |= $META_ENDPOINT;
+        }
+        else
+        {
+            $all_endpoints{$meta_host} = {
+                ALIAS => $meta_host, 
+                TYPE => $META_ENDPOINT,
+                HOSTNAME => $meta_host, 
+                PORTMAP => $portmap, 
+                STORAGE => $storage,
+                METASTORAGE => $metastorage, 
+                LOGFILE => $logfile};
+        }
+    }
+}
+
+sub get_specs
+{
+    my $type = shift;
+    my $line = shift;
+
+    # we need to split the spec string into individual components that
+    # specify different endpoints.  The endpoints are separated by commas,
+    # but so are the protocols inside square brackets [] and the port ranges
+    # inside curly brackets {}, so its a bit tricky to get what we actually
+    # want.  Hence the long regex.  
+    #
+    # The (?: ...) groups a pattern without
+    # putting the matched text in the result variables ($1, $2, ..).  The
+    # regex tries to match everything that's not a comma, skipping over
+    # the [] and {} bits that may contain commas.  The global flag at the
+    # end allows it to keep matching until no more matches can be made.
+    #
+    my @endpoints =
+        $line =~ /(?:,?[ ]*((?:\[[^\]]+\])|[^\[{,]+(?:{[^}]+})?[^\[{,]*))/g;
+
+    foreach my $ep (@endpoints)
+    {
+        my $stor = undef;
+        my $mstor = undef;
+        my $logf = undef;
+        my $proto = undef;
+        my $hostname = undef;
+        my $portn = undef;
+        my $boardn = undef;
+        if($ep =~ /^\[/)
+        {
+            # the string must have multiple protocols specified for the same
+            # endpoint.  We want to match on [...]:storage:logfile
+            # and place the stuff between the [] in $1, and optionally
+            # place the matched storage path and meta path in $2 and $3,
+            # logfile is in $4
+            #
+            $ep =~ /\[([^\]]+)\](?::([^:]+))?(?::([^:]+))?/;
+
+            $stor = $2;
+            $mstor = $3;
+            $logf = $4;
+
+            if(!defined($1))
+            {
+                print STDERR "Invalid spec option format: Missing endpoints\n" .
+                             "between brackets.\n\n";
+                exit(1);
+            }
+
+            my @multiproto = split(/,/, $1);
+            my $alias_suffix = "";
+            my %port = ();
+            foreach my $prothost (@multiproto)
+            {
+                $prothost =~ /([a-z]+):\/\/([^:]+):([0-9]+)/;
+                $proto = $1;
+                my $hn = $2;
+
+                # special casing for mx
+                if($proto =~ /mx/)
+                {
+                    $boardn = $3;
+                    $portn = $4;
+                }
+                else
+                {
+                    $portn = $3;
+                }
+
+                if(!defined($hostname))
+                {
+                    $hostname = $hn;
+                }
+                elsif($hostname ne $hn)
+                {
+                    print STDERR "Invalid spec option format: multiple" .  
+                                 "protocols specified between [] must\n" .
+                                 "specify the same host ($hostname != $hn)\n\n";
+                    exit(1);
+                }
+
+                $port{$proto} = "$boardn:$portn";
+                $alias_suffix .= "_" . $proto . $boardn . "_" . $portn;
+            }
+
+            my $alias = $hostname . $alias_suffix;
+            $all_endpoints{$alias} = {
+                ALIAS => $alias, 
+                TYPE => $type,
+                HOSTNAME => $hostname, 
+                PORTMAP => \%port, 
+                STORAGE => $stor,
+                METASTORAGE => $mstor, 
+                LOGFILE => $logf};
+        }
+        else
+        {
+            # I'll probably forget what this does in a day or two, hence the
+            # comment.  The (?: ...) pattern allows for grouping without
+            # putting the matched string in the result variables ($1, $2, ..).
+            # The first (?: ...) pattern optionally looks for the protocol.
+            # There's a subgroup that matches the actual protocol name and puts
+            # it in $1 if it exists.
+            # The grouped pattern following that looks for the hostname, and
+            # the one after that looks for the port, putting the results
+            # in $2 and $3 respectively.  The next two (?: ...) optionally
+            # match the storage and logfile respectively, with subgroups that
+            # put the actual strings into $4 and $5.
+            # 
+            my $count = 
+                $ep =~ /(?:([a-z]+):\/\/)?([^:]+):([^:]+)(?::([^:]+))?(?::([^:]+))?(?::([^:]+))?/;
+            if(!defined($1))
+            {
+                # assume tcp for now
+                $proto = "tcp";
+            }
+            else
+            {
+                $proto = $1;
+            }
+
+            if(!defined($2))
+            {
+                print STDERR "Invalid spec option format: endpoint: $ep\n" .
+                "requires a port number\n";
+                exit(1);
+            }
+            $hostname = $2;
+
+            if(!defined($3))
+            {
+                print STDERR "Invalid spec option format: endpoint\n" .
+                "requires a port number\n";
+                exit(1);
+            }
+
+            my $branges = $3;
+            my $pranges = $4;
+            $stor = $5;
+            $mstor = $6;
+            $logf = $7;
+
+            if($proto !~ /mx/)
+            {
+                $logf = $stor;
+                $stor = $mstor;
+                $mstor = $pranges;
+                $pranges = $branges;
+                $branges = undef;
+            }
+
+            my ($s, $e);
+
+            foreach my $r (split(/,/, $pranges))
+            {
+                if($r !~ /-/)
+                {
+                    $s = $r;
+                    $e = $r;
+                }
+                else
+                {
+                    if($r =~ /([0-9]+)-([0-9]+)/)
+                    {
+                        $s = $1;
+                        $e = $2;
+                    }
+                }
+
+                for(my $i = $s; $i <= $e; ++$i)
+                {
+                    if($proto !~ /mx/)
+                    {
+                        my $portmap = {$proto => $i};
+                        my $alias = $hostname . "_" . $proto . $i;
+
+                        if(exists $all_endpoints{$alias})
+                        {
+                            $all_endpoints{$alias}->{TYPE} |= $type;
+                        }
+                        else
+                        {
+                            $all_endpoints{$alias} = {
+                                ALIAS => $alias, 
+                                TYPE => $type,
+                                HOSTNAME => $hostname,
+                                PORTMAP => $portmap, 
+                                STORAGE => $stor, 
+                                METASTORAGE => $mstor,
+                                LOGFILE => $logf};
+                        }
+                    }
+                    else
+                    {
+                        if(!defined($branges))
+                        {
+                            my $portmap = {$proto => "$branges:$i"};
+                            my $alias = $hostname . "_" . $proto . $branges . "_" . $i;
+                            if(exists $all_endpoints{$alias})
+                            {
+                                $all_endpoints{$alias}->{TYPE} |= $type;
+                            }
+                            else
+                            {
+                                $all_endpoints{$alias} = {
+                                    ALIAS => $alias,
+                                    TYPE => $type,
+                                    HOSTNAME => $hostname,
+                                    PORTMAP => $portmap,
+                                    STORAGE => $stor,
+                                    METASTORAGE => $mstor,
+                                    LOGFILE => $logf};
+                            }
+                        }
+
+                        my ($bs, $be);
+
+                        foreach my $br (split(/,/, $branges))
+                        {
+                            if($br !~ /-/)
+                            {
+                                $bs = $br;
+                                $be = $br;
+                            }
+                            else
+                            {
+                                if($br =~ /([0-9]+)-([0-9]+)/)
+                                {
+                                    $bs = $1;
+                                    $be = $2;
+                                }
+                            }
+
+                            for(my $bi = $bs; $bi <= $be; ++$bi)
+                            {
+                                my $portmap = {$proto => "$bi:$i"};
+                                my $alias = $hostname . "_" . $proto . $bi . "_" . $i;
+                                if(exists $all_endpoints{$alias})
+                                {
+                                    $all_endpoints{$alias}->{TYPE} |= $type;
+                                }
+                                else
+                                {
+                                    $all_endpoints{$alias} = {
+                                        ALIAS => $alias,
+                                        TYPE => $type,
+                                        HOSTNAME => $hostname,
+                                        PORTMAP => $portmap,
+                                        STORAGE => $stor,
+                                        METASTORAGE => $mstor,
+                                        LOGFILE => $logf};
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+sub get_aliases
+{
+    my $type = shift;
+    my @aliases = ();
+    foreach my $ep (values %all_endpoints)
+    {
+        if($ep->{TYPE} & $type)
+        {
+            push @aliases, $ep->{ALIAS};
+        }
+    }
+    return @aliases;
+}
+
+sub get_bmi_endpoint
+{
+    my $alias = shift;
+    my $endpoint = $all_endpoints{$alias};
+    my @bmi_list = ();
+
+    foreach my $proto (keys %{$endpoint->{PORTMAP}})
+    {
+        my $tmpstr = $proto . "://" . $endpoint->{HOSTNAME} . ":" . 
+        $endpoint->{PORTMAP}->{$proto};
+        push(@bmi_list, $tmpstr);
+    }
+    return join(",", @bmi_list);
+}
+
+sub get_all_protocols
+{
+    my %protos = ();
+    foreach my $ep (keys %all_endpoints)
+    {
+        my $portmap = $all_endpoints{$ep}->{PORTMAP};
+
+        foreach my $prot (keys %{$all_endpoints{$ep}->{PORTMAP}})
+        {
+            if(!exists $protos{$prot})
+            {
+                $protos{$prot} = 1;
+            }
+        }
+    }
+    return keys %protos;
+}
+
+sub needs_default_value
+{
+    my $paramname = shift;
+
+    foreach my $ep (keys %all_endpoints)
+    {
+        if(!defined($all_endpoints{$ep}->{$paramname}))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+sub set_default_value
+{
+    my $paramname = shift;
+    my $val = shift;
+
+    foreach my $ep (keys %all_endpoints)
+    {
+        if(!defined($all_endpoints{$ep}->{$paramname}))
+        {
+            $all_endpoints{$ep}->{$paramname} = $val . "-" . $ep;
+        }
+    }
+}
+
+# ---------------------
+# entry point of script
+# ---------------------
+
+my $using_stdout = 0;
+my $show_help = '';
+my $show_specusage = '';
+
+$opt_quiet = 0;
+GetOptions('protocol=s'    => \$opt_protocol,
+    'tcpport=i'     => \$opt_tcpport,
+    'tcpbindspecific'  => \$opt_tcpbindspecific,
+    'gmport=i'      => \$opt_gmport,
+    'mxboard=i'     => \$opt_mxboard,
+    'mxendpoint=i'  => \$opt_mxendpoint,
+    'ibport=i'      => \$opt_ibport,
+    'portal=i'      => \$opt_portal,
+    'ioservers=s'   => \$opt_ioservers,
+    'metaservers=s' => \$opt_metaservers,
+    'logfile=s'     => \$opt_logfile,
+    'logging=s'     => \$opt_logging,
+    'tracing'       => \$opt_tracing,
+    'logstamp=s'    => \$opt_logstamp,
+    'first-handle=i' => \$opt_first_handle,
+    'last-handle=i' => \$opt_last_handle,
+    'default-num-dfiles=i' => \$opt_default_num_dfiles,
+    'flow-buffer-size=i' => \$opt_default_flow_buffer_size,
+    'flow-buffer-count=i'=> \$opt_default_flow_buffer_count,
+    'root-handle=i' => \$opt_root_handle,
+    'fsid=i'        => \$opt_fsid,
+    'fsname=s'      => \$opt_fsname,
+    'trusted=i'        => \$opt_security,
+    'server-job-timeout=i' => \$opt_server_job_timeout,
+    'client-job-timeout=i' => \$opt_client_job_timeout,
+    'storage=s'     => \$opt_storage,
+    'help'          => \$show_help,
+    'quiet!'        => \$opt_quiet,
+    'trovesync!'    => \$opt_trovesync,
+    'trove-method=s' => \$opt_trovemethod,
+    'iospec=s'     => \$opt_iospec,
+    'metaspec=s'   => \$opt_metaspec, 
+    'spec-usage!'  => \$show_specusage,
+    'genkey!'       => \$opt_gen_key,
+    '-'           => \$using_stdout)
+    or die "Could not parse arguments.  See -h for help.\n";
+
+if($opt_quiet)
+{
+    if(
+        !($opt_protocol && $opt_ioservers && $opt_metaservers) 
+        &&
+        !($opt_iospec && $opt_metaspec)
+    )
+    {
+        # quiet requires full specification of server addresses somehow
+        die "Invalid arguments for --quiet usage.  See -h for help\n";
+    }
+}
+else
+{
+
+    $term = new Term::ReadLine 'pvfs2-genconfig';
+    if(!defined($term))
+    {
+        print STDERR "Failed to open ReadLine terminal\n";
+        exit(1);
+    }
+}
+
+if($term && $term->OUT)
+{
+    $OUT = $term->OUT;
+}
+else
+{
+    $OUT = \*STDOUT;
+}
+
+if($show_help) {
+    usage();
+    exit;
+}
+
+if($show_specusage) {
+    specusage();
+    exit;
+}
+
+my $output_target = undef;
+if ($using_stdout) {
+    $output_target = \*STDOUT;
+}
+elsif (@ARGV != 1)
+{
+    die "Bad arguments.  See -h for help.\n";
+}
+else
+{
+    unless (open(FILEOUT, ">", $ARGV[0]))
+    {
+        die "Can't open specified file $ARGV[0]: $!\n";
+    }
+    $output_target = \*FILEOUT;
+}
+
+die "-port not allowed with -iospec or -metaspec."
+if($opt_port ne '' && defined($opt_iospec) && defined($opt_metaspec));
+die "-iospec requires -metaspec." 
+if(defined($opt_iospec) && !defined($opt_metaspec));
+die "-metaspec requires -iospec." 
+if(defined($opt_metaspec) && !defined($opt_iospec));
+
+# only open the terminal for reading input if options specified
+# on the command line are not enough to gather necessary information
+
+print_welcome();
+
+if($opt_metaspec)
+{
+    get_specs($IO_ENDPOINT, $opt_iospec);
+    get_specs($META_ENDPOINT, $opt_metaspec);
+
+    $bmi_module = join(',', (map { "bmi_" . $_ } get_all_protocols()));
+}
+else
+{
+    my $portmap = get_protocol();
+    $bmi_module = join(',', map("bmi_" . $_, keys (%{$portmap})));
+
+    $default_storage = get_storage();
+    $default_meta_storage = get_meta_storage();
+    $default_logfile = get_logfile();
+
+    get_ionames($portmap, $default_storage, $default_logfile);
+    get_metanames($portmap, $default_meta_storage, $default_logfile);
+}
+
+# find out if any of the storage or logfile entries in the endpoints
+# are undefined, in which case we need to find the default
+
+if(needs_default_value(STORAGE))
+{
+    if(!defined($default_storage))
+    {
+        $default_storage = get_storage();
+    }
+    set_default_value(STORAGE, $default_storage);
+    set_default_value(STORAGE, $default_storage);
+}
+
+if(needs_default_value(METASTORAGE))
+{
+    if(!defined($default_meta_storage))
+    {
+        $default_meta_storage = get_meta_storage();
+    }
+    set_default_value(METASTORAGE, $default_meta_storage);
+    set_default_value(METASTORAGE, $default_meta_storage);
+}
+
+if(needs_default_value(LOGFILE))
+{
+    if(!defined($default_logfile))
+    {
+        $default_logfile = get_logfile();
+    }
+
+    set_default_value(LOGFILE, $default_logfile);
+    set_default_value(LOGFILE, $default_logfile);
+}
+
+my $count = scalar(keys %all_endpoints);
+my $io_count = scalar(get_aliases($IO_ENDPOINT));
+my $meta_count = scalar(get_aliases($META_ENDPOINT));
+
+if (!$opt_quiet) {
+    print $OUT <<"FINI"
+Configured a total of $count servers:
+$io_count of them are I/O servers.
+$meta_count of them are Metadata servers.
+FINI
+    ;;
+
+    if ($opt_security == 1)
+    {
+        print $OUT "Configured trusted connection settings\n";
+        print $OUT "Trusted port list : ", $opt_trusted_port, "\n";
+        print $OUT "Trusted network,netmask : ", 
+        $opt_trusted_network, ",", $opt_trusted_netmask, "\n";
+    }
+}
+
+if (!$opt_quiet) {
+
+    my $verify_svr_flag = prompt_word("Would you like to verify server list (y/n) [Default is n]? ","n");
+
+    if($verify_svr_flag eq "y" or $verify_svr_flag eq "yes")
+    {
+        print $OUT "****** I/O servers:\n";
+        foreach my $ios (get_aliases($IO_ENDPOINT))
+        {
+            print "$ios\n";
+        }
+        print $OUT "\n****** Metadata servers:\n";
+        foreach my $mos (get_aliases($META_ENDPOINT))
+        {
+            print $OUT "$mos\n";
+        }
+        my $ok_flag = prompt_word("Does this look ok (y/n) [Default is y]? ","y");
+        if(!($ok_flag eq "y" or $ok_flag eq "yes"))
+        {
+            die "Aborting...\n";
+        }
+    }
+}
+
+
+my $logging = get_logging();
+my $tracing = get_tracing();
+my $logstamp = get_logstamp();
+my $first_handle = get_first_handle();
+my $last_handle = get_last_handle();
+my $default_num_dfiles = get_default_num_dfiles();
+my $default_flow_buffer_size = get_default_flow_buffer_size();
+my $default_flow_buffer_count = get_default_flow_buffer_count();
+my $root_handle = get_root_handle();
+my $fsid = get_fsid();
+my $fsname = get_fsname();
+my $server_job_timeout = get_server_job_timeout();
+my $client_job_timeout = get_client_job_timeout();
+
+# ----------------------------------------------------------
+# now that we have all the info, emit the configuration data
+# ----------------------------------------------------------
+
+# NOTE: we assume that server_aliases and server_addrs
+# arrays are properly populated from above
+
+if (!$opt_quiet) {
+    print $OUT "Writing fs config file... ";
+}
+
+emit_defaults($output_target, $num_unexp_reqs,
+    $bmi_module, $default_logfile, $logging, $tracing,
+    $logstamp, $server_job_timeout, $client_job_timeout);
+if ($opt_security == 1) 
+{
+    emit_security($output_target, $opt_trusted_port, 
+        $opt_trusted_network, $opt_trusted_netmask);
+}
+emit_aliases($output_target);
+emit_filesystem($output_target, $fsname , $fsid, $root_handle, 
+    $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
+
+if ($opt_metaspec) {
+    emit_serveropts($output_target);
+}
+
+# close fs.conf
+if ($using_stdout == 0)
+{
+    close($output_target);
+
+    my $req_limit = 65536;
+
+    if(-s $ARGV[0] > $req_limit)
+    {
+        my $size = (-s $ARGV[0]);
+        print STDERR
+"Warning: Generated config file: " . $ARGV[0] . "\n" .
+"has size: $size, which is larger than the current PVFS request: $req_limit\n" .
+"Increase the value of PVFS_REQ_LIMIT_CONFIG_FILE_BYTES in src/proto/pvfs2-req-proto.h\n";
+    }
+}
+
+if (!$opt_quiet) {
+    print $OUT "done\n";
+}
+
+# Local variables:
+#  c-indent-level: 4
+#  c-basic-offset: 4
+# End:
+#  
+# vim: ts=8 sts=4 sw=4 expandtab
+
+

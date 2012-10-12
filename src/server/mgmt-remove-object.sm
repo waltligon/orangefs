@@ -1,0 +1,100 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-storage.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_mgmt_remove_object_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => remove_dspace;
+        default => final_response;
+    }
+
+    state remove_dspace
+    {
+        run mgmt_remove_dspace;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_remove_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action mgmt_remove_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "Trying to mgmt_remove object %llu,%d\n",
+        llu(s_op->req->u.mgmt_remove_object.handle),
+        s_op->req->u.mgmt_remove_object.fs_id);
+
+    ret = job_trove_dspace_remove(
+        s_op->req->u.mgmt_remove_object.fs_id,
+        s_op->req->u.mgmt_remove_object.handle,
+        TROVE_SYNC,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action mgmt_remove_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_object);
+
+struct PINT_server_req_params pvfs2_mgmt_remove_object_params =
+{
+    .string_name = "mgmt-remove-object",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_remove_object,
+    .state_machine = &pvfs2_mgmt_remove_object_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

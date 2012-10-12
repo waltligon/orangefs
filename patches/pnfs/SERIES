@@ -1,0 +1,33 @@
+pNFS patches for PVFS provided by Dean Hildebrand.
+
+* pvfs2 layout driver:
+
+p00001_pnfs_pvfs2layoutdriver.patch
+This patch was written against the pvfs2-1.5.1 release.  It creates a
+pluggable module that the pNFS client can use
+to perform I/O to pvfs2 I/O servers.
+
+* pvfs2 server side (these patches build on each other):
+
+p00001_pnfs_pvfs2layoutsupport.patch
+In order to use the above layout driver, the nfs exported pvfs2 client must
+be able to generate a data layout.  (via the pNFS LAYOUTGET rpc operation).
+This patch generates a pvfs2 layout (via the nfsd export operations)
+
+p00002_pnfs_nfslayoutsupport.patch
+Currently there are 4 layout types: file, object, block,pvfs2.  This patch
+provides support for the file-based layout.  Instead of
+creating a pvfs2 layout (in the above patch), this patch creates a
+file-based layout based on the existing set of I/O servers.
+This patch makes the assumption that you have an NFS server running on each
+pvfs2 I/O server.
+
+p00003_pnfs_nfsproclayoutsupport.patch
+This patch is a variant of the file-based layout patch above.  Instead of
+creating a file layout that includes the pvfs2 I/O servers,
+it uses a /proc variable to set the servers that should be used in the
+layout.  This allows any node that runs a nfs server and exports a pvfs2
+client to be included in the layout.  This is much more flexible than the
+above patch, but requires the user
+to manually set which servers the pNFS client will access for I/O.
+

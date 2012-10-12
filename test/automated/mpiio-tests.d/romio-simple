@@ -1,0 +1,58 @@
+#!/bin/sh 
+
+. functions
+
+##
+## entry point for script
+##
+
+# all the ROMIO tests have the same form: <testname> -fname <file>
+# only the name changes:
+
+TESTNAME=simple
+TEST_DEST=${CLUSTER_DIR}/$TESTNAME
+
+
+(cd ${PVFS2_DEST}/mpich2-snapshot/build/src/mpi/romio/test && \
+	make $TESTNAME && cp $TESTNAME $TEST_DEST)
+
+if [ $? -ne 0 ] ; then
+	exit 1
+fi
+
+
+# like the other mpiio tests we can only do multi processor tests if there's a
+# pav config file we can use
+# If we have to we can fall back to single processor, and still do something
+# reasonable. 
+
+if [ -f $PAV_CONFIG ] ; then 
+	# write out a pbs script
+	pbs_script=${CLUSTER_DIR}/${TESTNAME}.sh
+	make_pbs_script ${TEST_DEST} -fname pvfs2:\${MOUNTPOINT}/$TESTNAME \
+		> $pbs_script
+
+	# submit it
+	job_id=$(qsub -N $TESTNAME $pbs_script | cut -d . -f1)
+
+	if [ $? -ne 0 ] ; then
+		exit 1
+	fi	
+
+	if [ -z "$job_id" ] ; then
+		exit 1
+	fi	
+
+	# wait patently for it to complete
+	block_until_done $job_id
+
+	# need to get results into per-test log files
+	cat ${TESTNAME}.o$job_id
+
+	grep -q '^ No Errors$' ${TESTNAME}.o$job_id
+	if [ $? -ne 0 ] ; then 
+		exit 1
+	fi
+
+	exit 0
+fi

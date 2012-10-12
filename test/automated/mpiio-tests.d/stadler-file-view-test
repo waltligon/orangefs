@@ -1,0 +1,38 @@
+#!/bin/sh
+
+. functions
+
+##
+## entry point for script
+##
+
+FILE_VIEW_TEST=${CLUSTER_DIR}/file_view_test
+
+${CLUSTER_DIR}/mpich2/bin/mpicxx ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.cpp -o $FILE_VIEW_TEST
+
+if [ $? -eq 1 ] ; then
+	exit 1
+fi
+
+# like the other mpiio tests we can only do multi processor tests if there's a
+# pav config file we can use
+# If we have to we can fall back to single processor, and still do something
+# reasonable. 
+
+if [ -f $PAV_CONFIG ] ; then 
+	# write out a pbs script
+	pbs_script=${CLUSTER_DIR}/fileviewtest.sh
+	make_pbs_script ${FILE_VIEW_TEST} pvfs2:\${MOUNTPOINT}/fview-1 > $pbs_script
+
+	# submit it
+	job_id=$(qsub -N fileview $pbs_script | cut -d . -f1)
+
+	# wait patently for it to complete
+	block_until_done $job_id
+
+	# need to get results into per-test log files
+	cat fileview.o$job_id
+
+	# need to know if we failed or not
+	grep -q "`cat ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.std`" fileview.o$job_id 
+fi

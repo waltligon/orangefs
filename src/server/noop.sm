@@ -1,0 +1,68 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+
+%%
+
+machine pvfs2_noop_sm
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => final_response;
+	}
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run noop_cleanup;
+		default => terminate;
+	}
+}
+
+%%
+
+/* noop_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action noop_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+struct PINT_server_req_params pvfs2_noop_params =
+{
+    .string_name = "noop",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_readonly,
+    .state_machine = &pvfs2_noop_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

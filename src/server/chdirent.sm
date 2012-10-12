@@ -1,0 +1,343 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-util.h"
+#include "pvfs2-internal.h"
+#include "pint-util.h"
+
+enum
+{
+    UPDATE_DIR_ATTR_REQUIRED = 135
+};
+
+%%
+
+machine pvfs2_chdirent_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => verify_parent_metadata_and_read_directory_entry_handle;
+        default => final_response;
+    }
+
+    state verify_parent_metadata_and_read_directory_entry_handle
+    {
+        run chdirent_verify_parent_metadata_and_read_directory_entry_handle;
+        success => read_directory_entry;
+        default => setup_resp;
+    }
+
+    state read_directory_entry
+    {
+        run chdirent_read_directory_entry;
+        success => change_directory_entry;
+        default => read_directory_entry_failure;
+    }
+
+    state read_directory_entry_failure
+    {
+        run chdirent_read_directory_entry_failure;
+        default => setup_resp;
+    }
+
+    state change_directory_entry
+    {
+        run chdirent_change_directory_entry;
+        success => check_for_req_dir_update;
+        default => change_directory_entry_failure;
+    }
+
+    state change_directory_entry_failure
+    {
+        run chdirent_change_directory_entry_failure;
+        default => setup_resp;
+    }
+
+    state check_for_req_dir_update
+    {
+        run chdirent_check_for_req_dir_update;
+        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        default => setup_resp;
+    }
+
+    state update_directory_attr
+    {
+        run chdirent_update_directory_attr;
+        default => setup_resp;
+    }
+
+    state setup_resp
+    {
+        run chdirent_setup_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run chdirent_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action chdirent_verify_parent_metadata_and_read_directory_entry_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    s_op->val.buffer = &s_op->u.chdirent.dirdata_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  reading dirdata handle (coll_id = 0x%x, handle = %llu, "
+        "key = %s (%d), val_buf = %p (%d))\n",
+        s_op->req->u.chdirent.fs_id,
+        llu(s_op->req->u.chdirent.handle),
+        (char *) s_op->key.buffer,
+        s_op->key.buffer_sz,
+        s_op->val.buffer,
+        s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.chdirent.fs_id,
+        s_op->req->u.chdirent.handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action chdirent_read_directory_entry(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  reading from dirent handle = %llu, name = %s\n",
+		 llu(s_op->u.chdirent.dirdata_handle),
+		 s_op->req->u.chdirent.entry);
+
+    s_op->key.buffer = s_op->req->u.chdirent.entry;
+    s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
+    s_op->val.buffer = &s_op->u.chdirent.old_dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.chdirent.fs_id,
+        s_op->u.chdirent.dirdata_handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action chdirent_read_directory_entry_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    switch (js_p->error_code)
+    {
+	case -TROVE_ENOENT:
+	    js_p->error_code = -PVFS_ENOENT;
+	    break;
+	default:
+	    gossip_err("chdirent_read_directory_entry_failure: "
+                       "unexpected error %d\n", js_p->error_code);
+	    break;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action chdirent_change_directory_entry(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+
+    js_p->error_code = 0;
+
+    s_op->u.chdirent.new_dirent_handle =
+        s_op->req->u.chdirent.new_dirent_handle;
+
+    if (s_op->u.chdirent.old_dirent_handle ==
+        s_op->u.chdirent.new_dirent_handle)
+    {
+        /* FIXME: return an error since a dirent is
+           being changed to itself (?) */
+    }
+
+    s_op->key.buffer = s_op->req->u.chdirent.entry;
+    s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
+
+    s_op->val.buffer = &s_op->u.chdirent.new_dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  changing dir entry for %s from handle value "
+                 "%llu to %llu\n", s_op->req->u.chdirent.entry,
+                 llu(s_op->u.chdirent.old_dirent_handle),
+                 llu(s_op->u.chdirent.new_dirent_handle));
+
+    ret = job_trove_keyval_write(
+        s_op->req->u.chdirent.fs_id, s_op->u.chdirent.dirdata_handle,
+        &s_op->key, &s_op->val, 
+        TROVE_SYNC |
+        0,
+        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+
+    s_op->u.chdirent.dir_attr_update_required = 1;
+    return ret;
+}
+
+static PINT_sm_action chdirent_check_for_req_dir_update(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if ((js_p->error_code == 0) &&
+        (s_op->u.chdirent.dir_attr_update_required))
+    {
+        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action chdirent_update_directory_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
+    {
+        PVFS_perror_gossip("previous keyval write failed",
+                           js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
+
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    dspace_attr = &s_op->attr;
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
+
+    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+    ds_attr = &(s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
+        ds_attr, 
+        TROVE_SYNC |
+        0,
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action chdirent_change_directory_entry_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    assert(js_p->error_code != -TROVE_ENOENT);
+	    
+    switch (js_p->error_code)
+    {
+	case -TROVE_ENOENT:
+	    js_p->error_code = -PVFS_ENOENT;
+	    break;
+	default:
+	    break;
+    }
+    gossip_err("unexpected error %d\n", js_p->error_code);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action chdirent_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (js_p->error_code == 0)
+    {
+	/* return original dirent handle in the response */
+	s_op->resp.u.chdirent.old_dirent_handle =
+            s_op->u.chdirent.old_dirent_handle;
+
+	gossip_debug(GOSSIP_SERVER_DEBUG,
+		     "  succeeded; returning handle %llu in response\n",
+		     llu(s_op->resp.u.chdirent.old_dirent_handle));
+    }
+    else
+    {
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  sending error response\n");
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action chdirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return (server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(chdirent);
+
+struct PINT_server_req_params pvfs2_chdirent_params =
+{
+    .string_name = "chdirent",
+    .perm = PINT_SERVER_CHECK_WRITE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_chdirent,
+    .state_machine = &pvfs2_chdirent_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

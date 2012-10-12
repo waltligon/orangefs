@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd ${EXTRA_TESTS}/bonnie++-1.03a
+./configure -q && make 2>&1 && cd ${PVFS2_MOUNTPOINT} || exit 1
+cd ${PVFS2_MOUNTPOINT} && \
+	${EXTRA_TESTS}/bonnie++-1.03a/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1

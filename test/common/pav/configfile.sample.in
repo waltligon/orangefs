@@ -1,0 +1,105 @@
+#
+# BUGS
+#	. comments in this file are ignored only at the beginning of a line
+#	. trailing whitespace can confuse some parts of PAV
+# 
+
+# pav is in the test/ sub-project, but it uses a lot of stuff in the main pvfs2
+# tree.  ASSUMPTION: test/ is a subdir of pvfs2, not a standalone directory
+
+SRCDIR_TOP=@SRC_ABSOLUTE_TOP@/../
+BUILDDIR=@BUILD_ABSOLUTE_TOP@/../
+
+# primative bakctick expansion is allowed: 
+# NODEFILE=`sort $PBS_NODEFILE | uniq > machines ; echo machines`
+NODEFILE=machines.pav
+
+# this is the default number of IO servers, but it can be overridden with -n
+IONCOUNT=1
+
+METACOUNT=1
+UNIQUEMETA=0
+
+
+#
+# EVERYTHING SHOULD BE IN THIS DIRECTORY ON REMOTE NODES
+#
+WORKINGDIR="/tmp/pvfs-pav-working"
+
+#
+# SERVER CONFIGURATION
+#
+
+# be careful: the port has to be a port apropriate for the protocol
+PROTOCOL=tcp
+
+# hopefully random enough...
+PVFSTCPPORT=3349
+#  --  could be --
+# PROTOCOL=gm
+# PVFSGMPORT=6
+#  --  or even --
+# PROTOCOL=ib
+# PVFSIBPORT=12345
+#  --  or multiples --
+# PROTOCOL=ib,tcp
+# PVFSIBPORT=3334
+# PVFSTCPPORT=3335
+
+STORAGE=$WORKINGDIR/storage
+SERVERLOG=$WORKINGDIR/log
+
+MOUNTPOINT="/pvfs2-auto"
+
+BINDIR=$WORKINGDIR/bin
+
+RCMDPROG=ssh
+RCPPROG=scp
+
+#
+# LOCATION OF IMPORTANT BINARIES LOCALLY
+#
+PROGROOT=$SRCDIR_TOP/test/common/pav
+
+# pav understands simple shell-like variables
+#PVFS=/homes/robl/pvfs2
+#SERVER=$PVFS/sbin/pvfs2-server
+#PINGPROG=$PVFS/bin/pvfs2-ping
+#GENCONFIG=$PVFS/bin/pvfs2-genconfig
+
+SERVER=$BUILDDIR/src/server/pvfs2-server
+PINGPROG=$BUILDDIR/src/apps/admin/pvfs2-ping
+GENCONFIG=$SRCDIR_TOP/src/apps/admin/pvfs2-genconfig
+
+# set this to 1 if the machines used by pav need the important pvfs2
+# binaries copied out to them.  set it to 0 if using, for example, NFS
+COPYBINS=1
+
+#this value only has to be set in heterogenous environments 
+#ENCODING="{direct|le_bfield|xdr}" 
+
+# Set this to 0 to turn off trove metadata syncing.  This is EXPERIMENTAL and
+# could cause DATA LOSS, but will give improved performance.
+TROVESYNC=1
+
+# Set this to the desired Trove method (as you would set TroveMethod in
+# fs.conf).  Defaults to 'dbpf'.  'alt-aio' is another good one
+# TROVEMETHOD=dbpf
+
+# set MOUNT_FS if you want PAV to load the kernel module, start
+# pvfs2-client, and mount the file system.  If you set MOUNT_FS, you
+# will also need the path to the kernel module and kernel helper
+# utilities...
+MOUNT_FS=0
+KERNEL_KVER=2.6.20-15-generic
+PVFS_KMOD=/home/robl/soft/pvfs2/lib/modules/$KERNEL_KVER/kernel/fs/pvfs2/pvfs2.ko
+PVFS_CLIENT=$PVFS/sbin/pvfs2-client
+
+#    ... and you will need a way to get root (sudo, ssh with keys, etc):
+#    set this to the apropriate mechansim, e.g.
+# RCMDPROG_ROOT="ssh -l root"
+RCMDPROG_ROOT=$RCMDPROG
+
+# set this to 0 if you would rather have compute nodes come before server
+# nodes in the list of hosts pav uses
+COMPUTENODES_LAST=1

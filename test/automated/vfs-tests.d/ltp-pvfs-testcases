@@ -1,0 +1,323 @@
+# LTP test cases for PVFS
+# known to work with LTP version 20060717, not sure about later versions
+
+access03 access03
+asyncio02 asyncio02
+chdir02 chdir02
+chown01 chown01
+close08 close08
+creat09 creat09
+dup01 dup01
+dup02 dup02
+dup03 dup03
+dup04 dup04
+fchmod01 fchmod01
+fchown01 fchown01
+fcntl02 fcntl02
+fcntl03 fcntl03
+fcntl04 fcntl04
+fcntl07 fcntl07
+fcntl08 fcntl08
+fpathconf01 fpathconf01
+fstat01 fstat01
+fstatfs01 fstatfs01
+fsync01 fsync01
+lseek01 lseek01
+lseek02 lseek02
+lseek03 lseek03
+lseek05 lseek05
+lstat02 lstat02
+mkdir01 mkdir01
+mkdir08 mkdir08
+open03 open03
+pathconf01 pathconf01
+read01 read01
+readdir01 readdir01
+readlink02 readlink02
+rename02 rename02
+rmdir04 rmdir04
+rmdir05 rmdir05
+select01 select01
+select02 select02
+stat05 stat05
+stat06 stat06
+statfs01 statfs01
+sync01 sync01
+umask01 umask01
+unlink05 unlink05
+unlink07 unlink07
+unlink08 unlink08
+write01 write01
+symlink01 symlink01
+symlink02 symlink02
+readlink01 symlink01 -T readlink01
+lstat01 symlink01 -T lstat01
+mkdir05 symlink01 -T mkdir05
+rmdir03 symlink01 -T rmdir03
+chdir01 symlink01 -T chdir01
+unlink01 symlink01 -T unlink01
+chmod01 symlink01 -T chmod01
+utime01 symlink01 -T utime01
+rename01 symlink01 -T rename01
+open01 symlink01 -T open01
+abort01 ulimit -c 1024;abort01
+access02 access02
+access04 access04
+access05 access05
+chdir01 chdir01
+chdir01A symlink01 -T chdir01
+chdir03 chdir03
+chdir04 chdir04
+chmod01A symlink01 -T chmod01
+chown05 chown05
+chroot01 chroot01
+chroot02 chroot02
+chroot03 chroot03
+chroot04 chroot04
+close01 close01
+close02 close02
+creat01 creat01
+creat03 creat03
+creat04 creat04
+creat05 creat05
+creat06 creat06
+creat07 creat07 -F $LTPROOT/testcases/bin/test1
+creat08 creat08
+dup06 dup06
+dup07 dup07
+dup201 dup201
+dup202 dup202
+dup203 dup203
+dup204 dup204
+dup205 dup205
+fchdir01 fchdir01
+fchdir02 fchdir02
+fchdir03 fchdir03
+fchown04 export change_owner=$LTPROOT/testcases/bin/change_owner;fchown04
+fchown05 fchown05
+fcntl01 fcntl01
+fcntl06 fcntl06
+fcntl12 fcntl12
+fcntl13 fcntl13
+fcntl18 fcntl18
+fdatasync01 fdatasync01
+fdatasync02 fdatasync02
+fstat02 fstat02
+fstat03 fstat03
+fstat04 fstat04
+fstat05 fstat05
+fstatfs02 fstatfs02
+fsync03 fsync03
+ftruncate01 ftruncate01
+ftruncate02 ftruncate02
+ftruncate03 ftruncate03
+ftruncate04 ftruncate04
+getcwd01 getcwd01
+getcwd02 getcwd02
+getcwd03 getcwd03
+getdents01 getdents01
+getdents02 getdents02
+getdents03 getdents03
+getdents04 getdents04
+ioperm01 ioperm01
+iopl01 iopl01
+iopl02 iopl02
+lchown01 lchown01
+link06 link06
+link07 link07
+llseek01 llseek01
+llseek02 llseek02
+lseek06 lseek06
+lseek07 lseek07
+lseek08 lseek08
+lseek09 lseek09
+lstat01 lstat01
+lstat03 lstat03
+mallopt01 mallopt01
+mkdir02 mkdir02
+mkdir03 mkdir03
+mkdir04 mkdir04
+mkdir05 mkdir05
+mkdir05A symlink01 -T mkdir05
+mkdir09 mkdir09
+mmap06 mmap06
+mmap07 mmap07
+mmap08 mmap08
+modify_ldt01 modify_ldt01
+modify_ldt02 modify_ldt02
+mprotect01 mprotect01
+mremap02 mremap02
+mremap03 mremap03
+mremap04 mremap04
+msync03 msync03
+msync04 msync04
+msync05 msync05
+nftw01 nftw01
+nftw6401 nftw6401
+open01A symlink01 -T open01
+open02 open02
+open04 open04
+open05 open05
+open07 open07
+open08 open08
+open09 open09
+open10 open10
+pipe01 pipe01
+pipe02 pipe02
+pipe03 pipe03
+pipe04 pipe04
+pipe05 pipe05
+pipe06 pipe06
+pipe07 pipe07
+pipe08 pipe08
+pipe09 pipe09
+pipe10 pipe10
+pipe11 pipe11
+prctl01 prctl01
+prctl02 prctl02
+pread01 pread01
+pread02 pread02
+pread03 pread03
+profil01 profil01
+ptrace01 ptrace01
+ptrace02 ptrace02
+ptrace03 ptrace03
+pwrite01 pwrite01
+pwrite02 pwrite02
+pwrite03 pwrite03
+pwrite04 pwrite04
+read02 read02
+read04 read04
+readdir02 readdir02
+readlink01A symlink01 -T readlink01
+readlink01 readlink01
+readlink03 readlink03
+readlink04 cp -f $LTPROOT/testcases/bin/creat_slink $TMP; readlink04
+readv01 readv01
+readv02 readv02
+readv03 readv03
+rename01 rename01
+rename01A symlink01 -T rename01
+rename03 rename03
+rename04 rename04
+rename05 rename05
+rename06 rename06
+rename07 rename07
+rename08 rename08
+rename09 rename09
+rename10 rename10
+rename14 rename14
+rmdir01 rmdir01
+rmdir02 rmdir02
+rmdir03A symlink01 -T rmdir03
+stat01 stat01
+stat02 stat02
+stat03 stat03
+statfs02 statfs02
+statfs03 statfs03
+symlink03 symlink03
+symlink04 symlink04
+symlink05 symlink05
+sync02 sync02
+syscall01 syscall01
+sysconf01 sysconf01
+sysfs02 sysfs02
+sysfs03 sysfs03
+sysfs04 sysfs04
+sysfs05 sysfs05
+sysfs06 sysfs06
+sysinfo01 sysinfo01
+sysinfo02 sysinfo02
+truncate01 truncate01
+truncate02 truncate02
+truncate03 truncate03
+truncate04 truncate04
+umask02 umask02
+umask03 umask03
+uname01 uname01
+uname02 uname02
+uname03 uname03
+ustat01 ustat01
+ustat02 ustat02
+utime01 utime01
+utime01A symlink01 -T utime01
+utime02 utime02
+utime03 utime03
+utime04 utime04
+utime05 utime05
+utime06 utime06
+write02 write02
+write03 write03
+write05 write05
+writev02 writev02
+writev05 writev05
+pipeio_3 pipeio -T pipeio_3 -c 5 -s 4090 -i 100 -u -b -f x80
+pipeio_4 pipeio -T pipeio_4 -c 5 -s 4090 -i 100 -u -f x80
+pipeio_6 pipeio -T pipeio_6 -c 5 -s 5000 -i 10 -b -u -f x80
+pipeio_8 pipeio -T pipeio_8 -c 5 -s 5000 -i 10 -u -f x80
+openfile01 openfile -f10 -t10
+statvfs01 statvfs01
+stat04 symlink01 -T stat04
+lstat01A symlink01 -T lstat01
+
+
+# TESTS THAT ARE KNOWN TO FAIL 
+###############################################
+
+# this is a known issue, not likely to be fixed.  The posix semantics are not
+# well defined for writev in some cases and pvfs2 differs in its
+# interpretation from ext3
+# http://www.beowulf-underground.org/pipermail/pvfs2-developers/2005-August/001449.html
+
+# writev01 writev01
+# writev03 writev03
+# writev04 writev04
+
+# PVFS does not support mkfifo, needed by a few pipeio,lseek,unlink tests
+
+# These tests use tests/pipeio to put pipes (named or unnamed) through a workout
+#
+# pipeio_1 pipeio -T pipeio_1 -c 5 -s 4090 -i 100 -b -f x80
+
+# spawns 5 children to write 100 chunks of 4090 bytes to an unnamed pipe 
+# using non-blocking I/O
+# pipeio_5 pipeio -T pipeio_5 -c 5 -s 5000 -i 10 -b -f x80
+# unlink06 unlink06
+
+# PVFS does not support mknod, needed by this lseek,open,read test
+# lseek10 lseek10
+# open06 open06
+# read03 read03
+# write04 write04
+
+# PVFS does not support the S_ISVTX (sticky) permission bit
+# rename12 rename12
+# rmdir03 rmdir03
+
+# PVFS does not support hard links
+# rename13 rename13
+
+# PVFS does not support close-on-exec (see F_SETFD in fcntl man page)
+# open01      1  FAIL  :  Save test bit cleared, but should not have been
+# open01 open01
+
+# PVFS does not support suid?
+# chown04 cp -p $LTPROOT/testcases/bin/change_owner $TMP;chown04
+# fchmod06 cp -p $LTPROOT/testcases/bin/change_owner $TMP;fchmod06
+# lchown02 cp -p $LTPROOT/testcases/bin/create_link $TMP; lchown02
+
+# PVFS does not support flocks
+# fcntl05 fcntl05
+# fcntl22 fcntl22
+# fcntl09 fcntl09
+# fcntl10 fcntl10
+# fcntl11 fcntl11
+# fcntl14 fcntl14
+# fcntl15 fcntl15
+# fcntl17 fcntl17
+# fcntl19 fcntl19
+# fcntl20 fcntl20
+# fcntl21 fcntl21
+
+# this test is specific to ext2
+# sysfs01 sysfs01

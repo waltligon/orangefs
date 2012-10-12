@@ -1,0 +1,107 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+require HTTP::Request;
+require LWP::UserAgent;
+
+use Getopt::Std;
+
+my $descfile = undef;
+my $operation = undef;
+my $metaservers = undef;
+my $ioservers = undef;
+my $cvstag = undef;
+my $cvsdate = undef;
+
+my %opts = ();
+getopts('o:m:i:t:d:f:h', \%opts);
+
+sub usage()
+{
+	print "\nusage: perfbase-web-input [options]\n";
+	print "\nREQUIRED ARGS:\n\n";
+	print "   -o <operation>	- the file system operation\n";
+	print "   -m <meta servers>     - the number of meta servers used\n";
+	print "   -i <io servers>       - the number of io servers used\n";
+	print "   -f <input desc>       - the input descriptor file\n";
+	print "\n\nOPTIONAL ARGS:\n\n";
+	print "   -t <cvs tag>          - cvs tag or branch used\n";
+	print "   -d <cvs date>         - cvs date tag\n";
+	print "   -h                    - help\n\n"; 
+        exit 1;
+}
+
+my %option_vars = ('o' => \$operation,
+		   'm' => \$metaservers,
+		   'i' => \$ioservers,
+		   't' => \$cvstag,
+		   'd' => \$cvsdate,
+		   'f' => \$descfile);
+
+for (keys %opts)
+{
+	if(exists $option_vars{$_})
+	{
+		my $varref = $option_vars{$_};
+		$$varref = $opts{$_};
+	}
+	else 
+	{ 
+		usage;
+	}
+}
+
+if(!defined($operation) || !defined($metaservers) || !defined($ioservers) || 
+   !defined($descfile))
+{
+	usage;
+}
+
+if(!defined($cvstag))
+{
+	$cvstag = "HEAD";
+}
+
+if(!defined($cvsdate))
+{
+	$cvsdate = `date --iso-8601=date`;
+}
+
+my $line;
+my $msg = "";
+
+my $input_desc = `cat $descfile`;
+
+$msg = << "INPUTDESC"
+INPUT DESCRIPTION BEGIN
+$input_desc
+INPUT DESCRIPTION END
+INPUTDESC
+;;
+
+my $hostn=`hostname`;
+$msg .= "cvsstamp=$cvstag-$cvsdate\nhost=$hostn\n";
+$msg .= "op=$operation\nmeta=$metaservers\nio=$ioservers\n";
+
+while (defined($line = <STDIN>))
+{
+    $msg .= $line;
+}
+
+my $req = HTTP::Request->new(
+    "POST" => "http://lain.mcs.anl.gov/bin/perfbase-input.cgi" );
+$req->content( $msg );
+
+my $ua = LWP::UserAgent->new;
+
+my $resp = $ua->request( $req );
+if( $resp->is_success )
+{
+	print $resp->content;
+}
+else
+{
+	die $resp->status_line;
+}
+

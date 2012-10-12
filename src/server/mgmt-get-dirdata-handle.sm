@@ -1,0 +1,139 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-storage.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_mgmt_get_dirdata_handle_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => get_dirdata_handle_from_parent;
+        default => final_response;
+    }
+
+    state get_dirdata_handle_from_parent
+    {
+        run mgmt_get_dirdata_handle_from_parent;
+        success => get_dirdata_handle_setup_resp;
+        default => final_response;
+    }
+
+    state get_dirdata_handle_setup_resp
+    {
+        run mgmt_get_dirdata_handle_setup_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_get_dirdata_handle_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int mgmt_get_dirdata_handle_from_parent(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    s_op->val.buffer = &s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  reading dirdata handle (coll_id = %d, handle = %llu\n\t"
+        "key = %s (%d), val_buf = %p (%d))\n",
+        s_op->req->u.mgmt_get_dirdata_handle.fs_id,
+        llu(s_op->req->u.mgmt_get_dirdata_handle.handle),
+        (char *)s_op->key.buffer, s_op->key.buffer_sz,
+        s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.mgmt_get_dirdata_handle.fs_id,
+        s_op->req->u.mgmt_get_dirdata_handle.handle,
+        &s_op->key, &s_op->val, 
+        0, 
+        NULL, smcb, 0, js_p, &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (js_p->error_code == 0)
+    {
+        s_op->resp.u.mgmt_get_dirdata_handle.handle =
+            s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
+
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  Found dirdata handle %llu of parent "
+            "%llu\n", llu(s_op->u.mgmt_get_dirdata_handle.dirdata_handle),
+            llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
+    }
+    else
+    {
+        s_op->resp.u.mgmt_get_dirdata_handle.handle = PVFS_HANDLE_NULL;
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to retrieve dirdata "
+                     "handle from parent %llu\n",
+                     llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
+
+struct PINT_server_req_params pvfs2_mgmt_get_dirdata_handle_params =
+{
+    .string_name = "mgmt-get-dirdata-handle",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_get_dirdata_handle,
+    .state_machine = &pvfs2_mgmt_get_dirdata_handle_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

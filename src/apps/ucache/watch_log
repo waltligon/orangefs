@@ -1,0 +1,1 @@
+watch --interval=1 'cat /tmp/ucached.log | cat -n | sort -r -g'

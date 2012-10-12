@@ -1,0 +1,212 @@
+*************************************************************************
+*                                                                       *
+*   BMI over Myrinet Express (bmi_mx) documentation                     *
+*                                                                       *
+*   Copyright (C) 2007 Myricom, Inc.                                    *
+*   Author: Myricom, Inc. <help at myri.com>                            *
+*                                                                       *
+*************************************************************************
+
+README of bmi_mx
+
+Bmi_mx provides support for Myricom's Myrinet Express (MX) communication
+layer in PVFS2.
+
+Bmi_mx may be used with either MX-10G or MX-2G. See MX's README for
+supported NICs.
+
+Table of Contents:
+    I. Installation
+       1. Configuring and compiling
+       2. Compile-time tunables
+       3. Runtime tunables
+   II. bmi_mx Performance
+  III. Caveats
+       1. Multi-homing
+       2. MX endpoint collision
+   IV. License
+    V. Support
+
+===============
+I. Installation
+===============
+
+Bmi_mx is supported on Linux 2.6. It may be possible to run it on 2.4,
+but it has not been tested. Bmi_mx requires Myricom's MX version 1.2.1
+or higher. See MX's README for the supported list of platforms.
+
+1. Configuring and compiling
+
+Bmi_mx should be already integrated into the PVFS2 build process. To 
+build bmi_mx, you will need to set the path to your MX installation
+in PVFS2's ./configure:
+
+    --with-mx=/opt/mx
+
+replacing /opt with the actual path. Configure will check to ensure that
+the MX version has the required functions. If not, it will fail to build.
+To check if bmi_mx built, look for:
+
+    checking myriexpress.h usability... yes
+    checking myriexpress.h presence... yes
+
+in configure's output or the presence of:
+
+    $PVFS2/src/io/bmi/bmi_mx/module.mk
+
+2. Compile-time tunables
+
+Bmi_mx supports a number of compile-time tunables in mx.h.
+
+The options are:
+
+    BMX_PEER_RX_NUM             Number of rxs allocated per peer
+    BMX_UNEXPECTED_SIZE         Max size of unexpected messages
+    BMX_MEM_TWEAK               Let bmi_mx manage memory
+    BMX_BUFF_SIZE               Maximum buffer size for managed memory
+    BMX_BUFF_NUM                Number of managed buffers
+    BMX_DEBUG                   Turn on gossip messages
+    BMX_MEM_ACCT                Track memory usage
+    BMX_SERVER_RXS              Additional rxs for servers
+    BMX_TIMEOUT                 Timeout for all MX messages
+    BMX_DB_MASK                 Determine which debug messages to print
+
+You may want to vary these options to obtain the optimal performance for your
+platform. Each is described in more detail:
+
+BMX_PEER_RX_NUM
+When creating a new peer, pre-allocate some rxs. Ideally, this would equal the
+maximum number of messages in flight from a single peer.
+
+BMX_UNEXPECTED_SIZE
+This determines how much data PVFS2 can send in a single, unexpected message.
+This impacts the amount of memory used on the server (the client never receives
+unexpected messages). On the server, every RX structure will have a buffer of
+this size. This value times BMX_PEER_RX_NUM will be allocated for each peer.
+Also, it does not make sense to set this any larger than
+mx_medium_message_threshold (see MX's README).
+
+BMX_MEM_TWEAK
+This allows bmi_mx to pre-allocate some buffers for larger messages and manage
+them directly using its own active and free lists rather than using malloc().
+It can dramatically improve performance and is recommended. This will increase
+the amount of memory used by bmi_mx by BMX_BUFF_SIZE times BMX_BUFF_NUM.
+
+BMX_BUFF_SIZE
+When using BMX_MEM_TWEAK, allocate buffers of this size (in bytes). Expected
+messages up to this size will try to use these buffers. If they are not
+available or the buffer is larger than this size, bmi_mx will fallback to using
+malloc(). For MX-2G systems, 1 MB are large enough. For MX-10G, you may want to
+increase it to 4 MB. Also, set FlowBufferSizeBytes to this value in fs.conf.
+
+BMX_BUFF_NUM
+When using BMX_MEM_TWEAK, allocate this many buffers. Increasing this number
+will improve performance at the cost of more memory used.
+
+BMX_DEBUG
+This will turn on debug output via gossip. The level of verbosity is controlled
+by BMX_DB_MASK.
+
+BMX_MEM_ACCT
+This will track memory allocated by bmi_mx to aid in tracking memory leaks
+within bmi_mx. It does not track buffers allocated in BMI_mx_memalloc() because
+we do not know how much to decrease when free() is called (although it does
+track the pre-allocated buffers managed by bmi_mx). It also does not track
+memory allcoated before bmi_mx is started such as during
+BMI_mx_method_addr_lookup().
+
+BMX_SERVER_RXS
+The server will receive messages from unknown peers. This value determines how
+many additional RXs to allocate to handle these messages. The upper-bound
+should be the number of clients in the cluster.
+
+BMX_TIMEOUT
+The time (in milliseconds) that all MX requests should complete within. If they
+are not complete, they will return with a timeout.
+
+BMX_DB_MASK
+If BMX_DEBUG is enabled, then this will determine which types of messages are
+generated. There are several types of messages, all start with BMX_DB_ (see
+mx.h). Set the mask by OR'ing together the types of messages that you want
+bmi_mx to display.  At a minimum, always use BMX_DB_ERR and BMX_DB_WARN.
+
+3. Runtime tunables
+
+MX uses an internal registration cache when MX_RCACHE=1 is set in the
+environment when the application starts. Using MX_RCACHE improves performance
+slightly for the metadata and IO servers as well as when using MPI-IO and
+PVFS2.
+
+4. Valid bmi_mx storage paths
+
+Valid bmi_mx storage paths include the MX hostname and the endpoint ID. MX
+hostnames include the UTS hostname and optionally a board index if the machine
+has multiple Myricom NICs. Thus, valid bmi_mx storage paths are either:
+
+mx://hostname:board:ep_id
+
+or
+
+mx://hostname:ep_id
+
+Use the first option if mx_info lists hostname:board and use the second option
+if mx_info simply shows a hostname.
+
+======================
+II. bmi_mx Performance
+======================
+
+On MX-2G systems, bmi_mx should easily saturate the link and use minimal CPU.
+On MX-10G systems, bmi_mx can saturate the link and use moderate CPU resources
+(20-30% for IO operations).  MX-10G relies on PCI-Express which is relatively
+new and performance varies considerably by processor, motherboard and PCI-E
+chipset. Refer to Myricom's website for the latest DMA read/write performance
+results by motherboard. The DMA results will place an upper-bound on bmi_mx
+performance.
+
+============
+III. Caveats
+============
+
+1. Multi-homing
+
+At this time, PVFS2 does not support multi-homing of non-TCP interconnects.
+Thus, a single client cannot mount two MX-10G, two MX-2G, or both MX-10G and
+MX-2G fabrics.
+
+2. MX endpoint collision
+
+Each process that uses MX is required to have at least one MX endpoint to
+access the MX library and NIC. Other processes may need to use MX and no two
+processes can use the same endpoint ID.  MPICH-MX dynamically chooses one at
+MPI startup and should not interfere with bmi_mx. Sockets-MX, on the other hand,
+is hard coded to use 0 for its ID. If it is possible that anyone will want to
+run Sockets-MX on this system, use a non-0 value for bmi_mx's endpoint ID.
+
+===========
+IV. License
+===========
+
+bmi_mx is copyright (C) 2007 of Myricom, Inc. 
+
+bmi_mx is free software; you can redistribute it and/or modify it under the
+terms of version 2.1 of the GNU Lesser General Public License as published by the
+Free Software Foundation.
+
+bmi_mx is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with PVFS2; if not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+Cambridge, MA 02139, USA.
+
+==========
+V. Support
+==========
+
+If you have questions about bmi_mx, please contact help@myri.com.
+
+/* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
+ *  vim:expandtab:shiftwidth=8:tabstop=8:
+ */
