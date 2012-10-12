@@ -77,7 +77,6 @@ pull_and_build_pvfs2 () {
 
 pull_and_build_mpich2 () {
 	# just to make debugging less painful
-	return 0
 	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
