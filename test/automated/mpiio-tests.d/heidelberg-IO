@@ -1,5 +1,6 @@
 #!/bin/sh
 
+echo "Looking for functions at `pwd`"
 . functions
 
 ##
