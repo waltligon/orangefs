@@ -86,8 +86,8 @@ pull_and_build_mpich2 () {
 	rm -rf mpich2-snap-*
 	#tar xzf mpich2-latest.tar.gz
 	tar xzf mpich2-1.5.tar.gz
-	mv mpich2-1.5 mpich2-snap-1.5
-	cd mpich2-snap-*
+	mv mpich2-1.5 mpich2-snapshot
+	cd mpich2-snapshot
 	mkdir build
 	cd build
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
