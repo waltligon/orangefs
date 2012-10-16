@@ -480,7 +480,8 @@ static PINT_sm_action create_create_setup_msgpair(
         sm_p->u.create.attr,
         sm_p->u.create.num_data_files,
         sm_p->u.create.layout,
-        sm_p->hints);
+        sm_p->hints,
+        sm_p->u.create.replication);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
@@ -886,7 +887,6 @@ static PINT_sm_action create_parent_getattr_inspect(
      */
 
     /* check config file for filesystem default, putting defaults into the frame structure */
-    ret = get_replication_from_config(&sm_p->u.create.replication,&sm_p->object_ref);
     ret = get_replication_from_config(&sm_p->u.create.replication,&sm_p->object_ref);
     if (ret)
     {

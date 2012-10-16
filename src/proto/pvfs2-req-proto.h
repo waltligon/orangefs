@@ -209,30 +209,37 @@ endecode_fields_8_struct(
     (extra_size_PVFS_object_attr + extra_size_PVFS_sys_layout + \
      extra_size_PVFS_credential + extra_size_PVFS_sys_layout)
 
-#define PINT_SERVREQ_CREATE_FILL(__req,                                    \
-                                 __cap,                                    \
-                                 __cred,                                   \
-                                 __fsid,                                   \
-                                 __attr,                                   \
-                                 __num_dfiles_req,                         \
-                                 __layout,                                 \
-                                 __hints)                                  \
-do {                                                                       \
-    int mask;                                                              \
-    memset(&(__req), 0, sizeof(__req));                                    \
-    (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).capability = (__cap);                                          \
-    (__req).hints = (__hints);                                             \
-    (__req).u.create.fs_id = (__fsid);                                     \
-    (__req).u.create.credential = (__cred);                                \
-    (__req).u.create.num_dfiles_req = (__num_dfiles_req);                  \
-    (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
-    mask = (__attr).mask;                                                  \
-    (__attr).mask = PVFS_ATTR_COMMON_ALL;                                  \
-    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                   \
-    PINT_copy_object_attr(&(__req).u.create.attr, &(__attr));              \
-    (__req).u.create.attr.mask |= mask;                                    \
-    (__req).u.create.layout = __layout;                                    \
+#define PINT_SERVREQ_CREATE_FILL(__req,                                                           \
+                                 __cap,                                                           \
+                                 __cred,                                                          \
+                                 __fsid,                                                          \
+                                 __attr,                                                          \
+                                 __num_dfiles_req,                                                \
+                                 __layout,                                                        \
+                                 __hints,                                                         \
+                                 __replication)                                                   \
+do {                                                                                              \
+    int mask;                                                                                     \
+    memset(&(__req), 0, sizeof(__req));                                                           \
+    (__req).op = PVFS_SERV_CREATE;                                                                \
+    (__req).capability = (__cap);                                                                 \
+    (__req).hints = (__hints);                                                                    \
+    (__req).u.create.fs_id = (__fsid);                                                            \
+    (__req).u.create.credential = (__cred);                                                       \
+    (__req).u.create.num_dfiles_req = (__num_dfiles_req);                                         \
+    (__attr).objtype = PVFS_TYPE_METAFILE;                                                        \
+    mask = (__attr).mask;                                                                         \
+    (__attr).mask = PVFS_ATTR_COMMON_ALL;                                                         \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                                          \
+    PINT_copy_object_attr(&(__req).u.create.attr, &(__attr));                                     \
+    (__req).u.create.attr.mask |= mask;                                                           \
+    (__req).u.create.layout = __layout;                                                           \
+    (__req).u.create.replication_number_of_copies = (__replication).replication_number_of_copies; \
+    (__req).u.create.replication_layout = (__replication).replication_layout;                     \
+    if ( (__replication).replication_switch == 1 )                                                \
+    {                                                                                             \
+       (__req).u.create.attr.mask |= PVFS_ATTR_META_REPLICATION;                                  \
+    }                                                                                             \
 } while (0)
 
 struct PVFS_servresp_create
