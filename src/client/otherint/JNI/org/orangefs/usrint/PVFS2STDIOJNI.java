@@ -10,94 +10,84 @@ import java.lang.reflect.Field;
 
 public class PVFS2STDIOJNI {
 
-    /* from stdio.h: "The possibilities for the third argument to `setvbuf'." */
-    public int _IOFBF = 0; /* Fully buffered.  */
-    public int _IOLBF = 1; /* Line buffered.  */
-    public int _IONBF = 2; /* No buffering.  */
-
-    /* from stdio.h: "The possibilities for the third argument to `fseek'." */
-    public int SEEK_SET = 0; /* Seek from beginning of file.  */
-    public int SEEK_CUR = 1; /* Seek from current position.  */
-    public int SEEK_END = 2; /* Seek from end of file.  */
-
     public native String [] getUsernameGroupname(int uid, int gid);
     public native String [] getFilesInDir(String path);
     public native int recursiveDelete(String path);
 
-    public native long Malloc(long size);
-    public native void Free(long ptr);
+    public native long malloc(long size);
+    public native void free(long ptr);
 
-    public native long Fopen(String path, String mode);
-    public native int Fclose(long stream);
-    public native int Setvbuf(long stream, long buf, int mode, long size);
-    public native long Fdopen(int fd, String mode);
-    public native int Fileno(long stream);
-    public native int Remove(String path); 
-    public native int Fseek(long stream, long offset, int whence);
-    public native long Fread(byte [] ptr, long size, long nmemb, long stream);
-    public native long Fwrite(byte [] ptr, long size, long nmemb, long stream);
-    public native long Fdopendir(int fd);
+    public native long fopen(String path, String mode);
+    public native int fclose(long stream);
+    public native int setvbuf(long stream, long buf, String mode, long size);
+    public native long fdopen(int fd, String mode);
+    public native int fileno(long stream);
+    public native int remove(String path); 
+    public native int fseek(long stream, long offset, String whence);
+    public native long fread(byte [] ptr, long size, long nmemb, long stream);
+    public native long fwrite(byte [] ptr, long size, long nmemb, long stream);
+    public native long fdopendir(int fd);
 
-    public native void Flockfile(long stream);
-    public native int Ftrylockfile(long stream);
-    public native void Funlockfile(long stream);
+    public native void flockfile(long stream);
+    public native int ftrylockfile(long stream);
+    public native void funlockfile(long stream);
     
-    public native long Fopen64(String path, String modes);
-    public native long Freopen(String path, String mode, long stream);
-    public native long Freopen64(String path, String modes, long stream);
-    public native long FwriteUnlocked(byte [] ptr, long size, long nmemb, long stream);
-    public native long FreadUnlocked(byte [] ptr, long size, long nmemb, long stream);
-    public native int Fcloseall();
-    public native long Ftell(long stream);
-    public native int Fseeko(long stream, long offset, int whence);
-    public native int Fseeko64(long stream, long offset, int whence);
-    public native int Fseek64(long stream, long offset, int whence);
+    public native long fopen64(String path, String modes);
+    public native long freopen(String path, String mode, long stream);
+    public native long freopen64(String path, String modes, long stream);
+    public native long fwriteUnlocked(byte [] ptr, long size, long nmemb, long stream);
+    public native long freadUnlocked(byte [] ptr, long size, long nmemb, long stream);
+    public native int fcloseall();
+    public native long ftell(long stream);
+    public native int fseeko(long stream, long offset, String whence);
+    public native int fseeko64(long stream, long offset, String whence); /* TODO C Function */
+    public native int fseek64(long stream, long offset, String whence);
 
-    public native int Fflush(long stream);
-    public native int FflushUnlocked(long stream);
-    public native int Fputc(int c, long stream);
-    public native int FputcUnlocked(int c, long stream);
-    public native int Fputs(String s, long stream);
-    public native int FputsUnlocked(String s, long stream);
-    public native int Putc(int c, long stream);
-    public native int PutcUnlocked(int c, long stream);
-    public native int Putchar(int c);
-    public native int PutcharUnlocked(int c);
-    public native int Puts(String s);
-    public native int Putw(int wd, long stream);
-    public native String Fgets(String s, int size, long stream);
-    public native String FgetsUnlocked(String s, int size, long stream);
-    public native int Fgetc(long stream);
-    public native int FgetcUnlocked(long stream);
+    public native int fflush(long stream);
+    public native int fflushUnlocked(long stream);
+    public native int fputc(int c, long stream);
+    public native int fputcUnlocked(int c, long stream);
+    public native int fputs(String s, long stream);
+    public native int fputsUnlocked(String s, long stream);
+    public native int putc(int c, long stream);
+    public native int putcUnlocked(int c, long stream);
+    public native int putchar(int c);
+    public native int putcharUnlocked(int c);
+    public native int puts(String s);
+    public native int putw(int wd, long stream);
+    public native String fgets(String s, int size, long stream);
+    public native String fgetsUnlocked(String s, int size, long stream);
+    public native int fgetc(long stream);
+    public native int fgetcUnlocked(long stream);
  
-    public native int Getc(long stream);
-    public native int GetcUnlocked(long stream);
-    public native int Getchar();
-    public native int GetcharUnlocked();
-    public native int Getw(long stream);
-    public native String Gets(String s);
+    public native int getc(long stream);
+    public native int getcUnlocked(long stream);
+    public native int getchar();
+    public native int getcharUnlocked();
+    public native int getw(long stream);
+    public native String gets(String s);
     
-    public native int Ungetc(int c, long stream);
-    public native void Perror(String s);
-    public native void Clearerr(long stream);
-    public native void ClearerrUnlocked(long stream);
-    public native int Feof(long stream);
-    public native int FeofUnlocked(long stream);
-    public native int Ferror(long stream);
-    public native int FerrorUnlocked(long stream);
-    public native int FilenoUnlocked(long stream);
-    public native void Setbuf(long stream, String buf);
-    public native void Setbuffer(long stream, String buf, long size);
-    public native void Setlinebuf(long stream);
-    public native String Mkdtemp(String tmplate);
-    public native int Mkstemp(String tmplate);
-    public native long Tmpfile();
-    public native PVFS2STDIOJNI.Dir Opendir(String name);
-    public native int Dirfd(long dir);
-    public native void Rewinddir(long dir);
-    public native void Seekdir(long dir, long offset);
-    public native long Telldir(long dir);
-    public native int Closedir(long dir);
+    public native int ungetc(int c, long stream);
+    public native void perror(String s);
+    public native void clearerr(long stream);
+    public native void clearerrUnlocked(long stream);
+    public native int feof(long stream);
+    public native int feofUnlocked(long stream);
+    public native int ferror(long stream);
+    public native int ferrorUnlocked(long stream);
+    public native int filenoUnlocked(long stream);
+    public native void setbuf(long stream, String buf);
+    public native void setbuffer(long stream, String buf, long size);
+    public native void setlinebuf(long stream);
+    public native String mkdtemp(String tmplate);
+    public native int mkstemp(String tmplate);
+    public native long tmpfile();
+    public native PVFS2STDIOJNI.Dir opendir(String name);
+    public native int dirfd(long dir);
+    public native void rewinddir(long dir);
+    public native void seekdir(long dir, long offset);
+    public native long telldir(long dir);
+    public native int closedir(long dir);
 
     public PVFS2STDIOJNI() {}   
 
