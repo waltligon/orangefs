@@ -12,7 +12,7 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma"
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma --with-db=/opt/db4"
 
 
 #
@@ -124,10 +124,10 @@ $srcdir/prepare
 cd $builddir
 #ls $srcdir
 if [ $build_kernel = "true" ] ; then
-	$srcdir/configure $configureopts --with-db=/opt/db4 --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --with-db=/opt/db4 --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all"
 fi
 
