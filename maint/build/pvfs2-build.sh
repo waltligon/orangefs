@@ -124,10 +124,10 @@ $srcdir/prepare
 cd $builddir
 #ls $srcdir
 if [ $build_kernel = "true" ] ; then
-	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts --with-db=/opt/db4 --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts --with-db=/opt/db4 --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all"
 fi
 
