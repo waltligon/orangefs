@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
 echo "Looking for functions at `pwd`"
-. functions
+source ./functions
 
 ##
 ## entry point for script
