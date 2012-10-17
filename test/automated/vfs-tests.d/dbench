@@ -4,7 +4,7 @@
 if [ ! $BENCHMARKS ]
 then
    #this is the existing name of the tar file
-   BENCHMARKS=benchmarks-20060512.tar.gz
+   BENCHMARKS=benchmarks-20121017.tar.gz
 fi
 
 #make directory, if it doesn't exist

@@ -13,7 +13,7 @@ export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
 #export EXTRA_TESTS=/tmp/src/benchmarks
 export URL=http://devorange.clemson.edu/pvfs
-export BENCHMARKS=benchmarks-20060512.tar.gz
+export BENCHMARKS=benchmarks-20121017.tar.gz
 
 # look for a 'nightly-test.cfg' in the same directory as this script
 if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
@@ -34,7 +34,7 @@ VFS_SCRIPTS=`pwd`/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
-BENCHMARKS=benchmarks-20060512.tar.gz
+BENCHMARKS=benchmarks-20121017.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
