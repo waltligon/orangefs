@@ -6,9 +6,9 @@ then
   URL=http://devorange.clemson.edu/pvfs
 fi
 
-LTPVER="20081130"
+LTPVER="20120903"
 THISDATE=`date +%F-%R`
-LTP_ARCHIVE=ltp-full-${LTPVER}.tgz
+LTP_ARCHIVE=ltp-full-${LTPVER}.bz2
 DOWNLOAD=${URL}/${LTP_ARCHIVE}
 
 cd ${EXTRA_TESTS}
@@ -16,6 +16,7 @@ cd ${EXTRA_TESTS}
 # get rid of any old copies
 sudo rm -rf ltp-full-${LTPVER}
 sudo rm -f ltp-full-${LTPVER}.tgz  
+sudo rm -f ltp-full-${LTPVER}.bz2
 
 # download
 echo Downloading LTP...
@@ -26,7 +27,7 @@ then
     exit 1;
 fi
 
-tar -xvzf ${LTP_ARCHIVE} > /dev/null
+tar -xvjf ${LTP_ARCHIVE} > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to untar ${DOWNLOAD}."
@@ -35,18 +36,18 @@ fi
 
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
-for patch in \
-	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
-        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
-	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
-        ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
-		patch -p1 < $patch
-done
-if [ "${?}" != 0 ]
-then
-    echo "Error: failed to apply patches to LTP."
-    exit 1;
-fi
+#for patch in \
+#	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
+#        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
+#	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
+#        ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
+#		patch -p1 < $patch
+#done
+#if [ "${?}" != 0 ]
+#then
+#    echo "Error: failed to apply patches to LTP."
+#    exit 1;
+#fi
 
 echo Compiling LTP...
 export CFLAGS="-g"
