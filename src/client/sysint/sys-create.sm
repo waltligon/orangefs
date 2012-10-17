@@ -493,6 +493,8 @@ static PINT_sm_action create_create_setup_msgpair(
     msg_p->req.u.create.attr.u.meta.dist_size =
         PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
+    gossip_lerr("msg_p->req.u.create.attr.mask : 0x%08x.\n",msg_p->req.u.create.attr.mask);
+
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }

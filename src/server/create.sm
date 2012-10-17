@@ -18,6 +18,13 @@
 
 #define REPLACE_DONE 100
 
+enum
+{
+    LOCAL_OPERATION  = 2,
+    REMOTE_OPERATION = 3,
+    LOCAL_XATTR      = 4
+};
+
 %%
 
 machine pvfs2_create_sm
@@ -74,6 +81,13 @@ machine pvfs2_create_sm
     state setobj_attribs
     {
         run setattr_setobj_attribs;
+        success => write_replication_xattrs_if_needed;
+        default => remove_keyvals;
+    }
+
+    state write_replication_xattrs_if_needed
+    {
+        run write_replication_xattrs_if_needed;
         success => setup_resp;
         default => remove_keyvals;
     }
@@ -203,6 +217,7 @@ static int check_stuffed(
     int i;
 
     s_op->resp.u.create.metafile_handle = js_p->handle;
+    gossip_lerr("s_op->resp.u.create.metafile_handle:%llu\n",llu(s_op->resp.u.create.metafile_handle));
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
         llu(js_p->handle));
@@ -773,6 +788,227 @@ static PINT_sm_action setattr_setobj_attribs(
 
      return ret;
 }
+
+
+
+
+static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb, 
+                                               job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PVFS_server_req *req = s_op->req;
+   uint32_t req_attr_mask = req->u.create.attr.mask;
+
+   struct PINT_server_op *xattr_s_op = NULL;
+   struct PVFS_server_req *xattr_req = NULL;
+
+   int key_count;
+   PVFS_sys_layout *xattr_layout = NULL;
+
+   /* Do we need to set the replication extended attributes? */
+   gossip_lerr("request attribute mask: 0x%08x.\n",req_attr_mask);
+   if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
+   {
+      gossip_lerr("replication is OFF.\n");
+      js_p->error_code = 0;
+      return SM_ACTION_COMPLETE;
+   }
+
+   gossip_lerr("replication is ON.\n");
+
+   
+   /* Create and prepare a new server frame in order to call set-eattr.sm */
+   js_p->error_code = LOCAL_OPERATION;
+   PINT_CREATE_SUBORDINATE_SERVER_FRAME( smcb
+                                        ,xattr_s_op
+                                        ,s_op->resp.u.create.metafile_handle
+                                        ,s_op->req->u.create.fs_id
+                                        ,js_p->error_code
+                                        ,xattr_req
+                                        ,LOCAL_XATTR
+                                       );
+
+   /* Allocate and populate the key/val pairs */
+   xattr_req->u.seteattr.nkey = 5;
+   key_count = 0;
+
+   xattr_req->u.seteattr.key = calloc( xattr_req->u.seteattr.nkey, sizeof(*xattr_req->u.seteattr.key) );
+   xattr_req->u.seteattr.val = calloc( xattr_req->u.seteattr.nkey, sizeof(*xattr_req->u.seteattr.val) );
+   if ( !xattr_req->u.seteattr.key || !xattr_req->u.seteattr.val )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+
+   /* setup user.pvfs2.mirror.handles.  these are the replicated handles. */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_HANDLES);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_HANDLES) + 1;
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+       gossip_lerr("Unable to allocate memory.\n");
+       goto err_out;
+   }
+   memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
+          1 * sizeof(s_op->resp.u.create.metafile_handle));
+  
+   gossip_lerr("metafile_handle:%llu\n",llu(s_op->resp.u.create.metafile_handle)); 
+   gossip_lerr("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                               ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+   gossip_lerr("val[%d].val:%llu. \tsize:%d\n",key_count
+                                              ,llu(*(uint64_t *)xattr_req->u.seteattr.val[key_count].buffer)
+                                              ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
+   key_count++;
+   assert(key_count < xattr_req->u.seteattr.nkey);
+
+
+
+   /* setup user.pvfs2.mirror.copies - the number of replicas to make. */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_COPIES);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_COPIES) + 1;
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(req->u.create.replication_number_of_copies));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(req->u.create.replication_number_of_copies);
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+   memcpy(xattr_req->u.seteattr.val[key_count].buffer, &req->u.create.replication_number_of_copies,
+          sizeof(req->u.create.replication_number_of_copies));
+
+   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count
+                                       ,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count
+                                       ,*(int *)xattr_req->u.seteattr.val[key_count].buffer
+                                       ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
+   key_count++;
+   assert(key_count < xattr_req->u.seteattr.nkey);
+
+
+   /* setup user.pvfs2.mirror.status - the status of each handle in the replication. */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_STATUS);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_STATUS) + 1;
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+   memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
+          1 * sizeof(s_op->resp.u.create.metafile_handle));
+
+   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+   gossip_lerr("val[%d]:%llu \tsize:%d\n",key_count,llu(*(uint64_t *)xattr_req->u.seteattr.val[key_count].buffer)
+                                         ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
+   key_count++;
+   assert(key_count < xattr_req->u.seteattr.nkey);
+
+
+   /* setup user.pvfs2.mirror.mode - set mode to MIRROR_ON_WRITE */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_MODE);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_MODE) + 1;
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(MIRROR_ON_WRITE));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(MIRROR_ON_WRITE);
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+   *(MIRROR_MODE *)xattr_req->u.seteattr.val[key_count].buffer = MIRROR_ON_WRITE;
+
+   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count,*(int *)xattr_req->u.seteattr.val[key_count].buffer
+                                       ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
+   key_count++;
+   assert( key_count < xattr_req->u.seteattr.nkey);
+
+
+   /* setup user.pvfs2.mirror.layout - this contains the layout algorithm and possibly server order. */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_LAYOUT) + 1;
+
+   /* calculate bytes of replication_layout.server_list */ 
+   if ( req->u.create.replication_layout.algorithm == PVFS_SYS_LAYOUT_LIST )
+   {
+      /* account for server_list structure when populated*/
+      xattr_req->u.seteattr.val[key_count].buffer_sz = 
+            req->u.create.replication_layout.server_list.count *
+            sizeof(*req->u.create.replication_layout.server_list.servers) +
+            sizeof(req->u.create.replication_layout.server_list.count);
+   }
+   else
+   {
+      /* account for server_list structure when NOT populated */
+      xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(req->u.create.replication_layout.server_list);
+   }
+   
+   /* now add in the algorithm member */
+   xattr_req->u.seteattr.val[key_count].buffer_sz += sizeof(req->u.create.replication_layout.algorithm);
+
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,xattr_req->u.seteattr.val[key_count].buffer_sz);
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+
+   xattr_layout = (PVFS_sys_layout *)xattr_req->u.seteattr.val[key_count].buffer;
+   xattr_layout->algorithm         = req->u.create.replication_layout.algorithm;
+   xattr_layout->server_list.count = req->u.create.replication_layout.server_list.count;
+   if ( req->u.create.replication_layout.algorithm == PVFS_SYS_LAYOUT_LIST )
+   {
+      memcpy (  xattr_layout->server_list.servers,
+                req->u.create.replication_layout.server_list.servers,
+                req->u.create.replication_layout.server_list.count * 
+                sizeof(*req->u.create.replication_layout.server_list.servers)
+             );
+   }
+   else
+   {
+      xattr_layout->server_list.servers = NULL;
+   }
+
+   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count,xattr_layout->algorithm
+                                       ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
+
+
+   key_count++;
+
+
+   /* Fill in set-eattr request. */
+   PINT_SERVREQ_SETEATTR_FILL( *xattr_req
+                              ,s_op->req->capability /* will not be checked */
+                              ,xattr_req->u.create.fs_id
+                              ,s_op->resp.u.create.metafile_handle
+                              ,xattr_req->u.seteattr.flags
+                              ,xattr_req->u.seteattr.nkey
+                              ,xattr_req->u.seteattr.key
+                              ,xattr_req->u.seteattr.val
+                              ,s_op->req->hints /* will not be checked */ 
+                             );
+
+
+   return SM_ACTION_COMPLETE;
+
+err_out:
+   return SM_ACTION_COMPLETE;
+}/*end write_replication_xattrs_if_needed*/
+
+
+
+
 
 static int setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
