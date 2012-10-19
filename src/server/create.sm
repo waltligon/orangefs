@@ -18,6 +18,10 @@
 
 #define REPLACE_DONE 100
 
+int replication_calculate_layout_size( int32_t *layout_size
+                                      ,PVFS_sys_layout *replication_layout) ;
+int replication_copy_layout( PVFS_sys_layout *src
+                            ,void *dest );
 enum
 {
     LOCAL_OPERATION  = 2,
@@ -809,7 +813,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    struct PINT_server_op *xattr_s_op = NULL;
    struct PVFS_server_req *xattr_req = NULL;
 
-   int key_count;
+   int key_count, rc, i;
    PVFS_sys_layout *xattr_layout = NULL;
 
    /* Do we need to set the replication extended attributes? */
@@ -836,7 +840,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
                                        );
 
    /* Allocate and populate the key/val pairs */
-   xattr_req->u.seteattr.nkey = 5;
+   xattr_req->u.seteattr.nkey = 6;
    key_count = 0;
 
    xattr_req->u.seteattr.key = calloc( xattr_req->u.seteattr.nkey, sizeof(*xattr_req->u.seteattr.key) );
@@ -849,7 +853,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    /* setup user.pvfs2.mirror.handles.  these are the replicated handles. */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_HANDLES);
-   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_HANDLES) + 1;
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_HANDLES);
    xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
    xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
@@ -874,7 +878,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    /* setup user.pvfs2.mirror.copies - the number of replicas to make. */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_COPIES);
-   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_COPIES) + 1;
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_COPIES);
    xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(req->u.create.replication_number_of_copies));
    xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(req->u.create.replication_number_of_copies);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
@@ -898,7 +902,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    /* setup user.pvfs2.mirror.status - the status of each handle in the replication. */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_STATUS);
-   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_STATUS) + 1;
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_STATUS);
    xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
    xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
@@ -920,7 +924,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    /* setup user.pvfs2.mirror.mode - set mode to MIRROR_ON_WRITE */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_MODE);
-   xattr_req->u.seteattr.key[key_count].buffer_sz = strlen(USER_PVFS2_MIRROR_MODE) + 1;
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_MODE);
    xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(MIRROR_ON_WRITE));
    xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(MIRROR_ON_WRITE);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
@@ -939,57 +943,37 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    assert( key_count < xattr_req->u.seteattr.nkey);
 
 
-   /* setup user.pvfs2.mirror.layout - this contains the layout algorithm and possibly server order. */
-   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT);
-   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_LAYOUT) + 1;
+   /* setup user.pvfs2.mirror.layout_size - this contains the total size of the layout stored in the
+    * in user.pvfs2.mirror.layout.  This size is needed to retrieve the layout.
+    */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT_SIZE);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_LAYOUT_SIZE); 
 
-   /* calculate bytes of replication_layout.server_list */ 
-   if ( req->u.create.replication_layout.algorithm == PVFS_SYS_LAYOUT_LIST )
+   /* calculate the size of the replication layout */
+   rc = replication_calculate_layout_size( &(xattr_req->u.seteattr.val[key_count].buffer_sz)
+                                          ,&(req->u.create.replication_layout)
+                                         );
+   if (!rc)
    {
-      /* account for server_list structure when populated*/
-      xattr_req->u.seteattr.val[key_count].buffer_sz = 
-            req->u.create.replication_layout.server_list.count *
-            sizeof(*req->u.create.replication_layout.server_list.servers) +
-            sizeof(req->u.create.replication_layout.server_list.count);
-   }
-   else
-   {
-      /* account for server_list structure when NOT populated */
-      xattr_req->u.seteattr.val[key_count].buffer_sz = sizeof(req->u.create.replication_layout.server_list);
+      gossip_lerr("Error calculating layout size for replication.\n");
+      goto err_out;
    }
    
-   /* now add in the algorithm member */
-   xattr_req->u.seteattr.val[key_count].buffer_sz += sizeof(req->u.create.replication_layout.algorithm);
-
    xattr_req->u.seteattr.val[key_count].buffer = calloc(1,xattr_req->u.seteattr.val[key_count].buffer_sz);
-   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer)
    {
       gossip_lerr("Unable to allocate memory.\n");
       goto err_out;
    }
 
-   xattr_layout = (PVFS_sys_layout *)xattr_req->u.seteattr.val[key_count].buffer;
-   xattr_layout->algorithm         = req->u.create.replication_layout.algorithm;
-   xattr_layout->server_list.count = req->u.create.replication_layout.server_list.count;
-   if ( req->u.create.replication_layout.algorithm == PVFS_SYS_LAYOUT_LIST )
-   {
-      memcpy (  xattr_layout->server_list.servers,
-                req->u.create.replication_layout.server_list.servers,
-                req->u.create.replication_layout.server_list.count * 
-                sizeof(*req->u.create.replication_layout.server_list.servers)
-             );
-   }
-   else
-   {
-      xattr_layout->server_list.servers = NULL;
-   }
+   rc = replication_copy_layout( &(req->u.create.replication_layout)
+                                ,xattr_req->u.seteattr.val[key_count].buffer
+                               );
 
    gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
    gossip_lerr("val[%d]:%d \tsize:%d\n",key_count,xattr_layout->algorithm
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
-
-
 
    key_count++;
 
@@ -1010,6 +994,18 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    return SM_ACTION_COMPLETE;
 
 err_out:
+   for (i=0; i<xattr_req->u.seteattr.nkey; i++)
+   {
+      if (xattr_req->u.seteattr.key[i].buffer)
+         free(xattr_req->u.seteattr.key[i].buffer);
+      if (xattr_req->u.seteattr.val[i].buffer)
+         free(xattr_req->u.seteattr.val[i].buffer);
+   }   
+   if (xattr_req->u.seteattr.key)
+      free(xattr_req->u.seteattr.key);
+   if (xattr_req->u.seteattr.val)
+      free(xattr_req->u.seteattr.val);
+
    return SM_ACTION_COMPLETE;
 }/*end write_replication_xattrs_if_needed*/
 
@@ -1097,6 +1093,53 @@ static int cleanup(
 
     return(server_state_machine_complete(smcb));
 }
+
+
+int replication_calculate_layout_size( int32_t *layout_size
+                                      ,PVFS_sys_layout *replication_layout )
+{
+   /* size of replication_layout structure */
+   *layout_size = sizeof(PVFS_sys_layout);
+    
+   /* add in size of the server list, if it is present. */ 
+   if ( replication_layout->algorithm == PVFS_SYS_LAYOUT_LIST )
+   {
+      *layout_size += replication_layout->server_list.count *
+                      sizeof(*replication_layout->server_list.servers);
+   }
+
+   gossip_lerr("layout size is %d\n",*(int *)layout_size);
+
+   return(0);   
+}/*end replication_calculate_layout_size*/
+
+
+int replication_copy_layout( PVFS_sys_layout *src
+                            ,void *dest )
+{
+   PVFS_sys_layout *dest_layout = (PVFS_sys_layout *)dest;
+
+   dest_layout->algorithm         = src->algorithm;
+   dest_layout->server_list.count = src->server_list.count;
+
+   if ( src->algorithm == PVFS_SYS_LAYOUT_LIST )
+   {
+      memcpy (  dest_layout->server_list.servers,
+                src->server_list.servers,
+                src->server_list.count * 
+                sizeof(*src->server_list.servers)
+             );
+   }
+   else
+   {
+      dest_layout->server_list.servers = NULL;
+   }
+
+   return(0);
+}/*end replication_copy_layout*/
+
+
+
 
 static inline int PINT_get_object_ref_create(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)

@@ -16,10 +16,11 @@ enum MIRROR_MODE_t {
 
 typedef enum MIRROR_MODE_t MIRROR_MODE;
 
-#define USER_PVFS2_MIRROR_HANDLES "user.pvfs2.mirror.handles"
-#define USER_PVFS2_MIRROR_COPIES  "user.pvfs2.mirror.copies"
-#define USER_PVFS2_MIRROR_STATUS  "user.pvfs2.mirror.status"
-#define USER_PVFS2_MIRROR_MODE    "user.pvfs2.mirror.mode"
-#define USER_PVFS2_MIRROR_LAYOUT  "user.pvfs2.mirror.layout"
+#define USER_PVFS2_MIRROR_HANDLES     "user.pvfs2.mirror.handles"
+#define USER_PVFS2_MIRROR_COPIES      "user.pvfs2.mirror.copies"
+#define USER_PVFS2_MIRROR_STATUS      "user.pvfs2.mirror.status"
+#define USER_PVFS2_MIRROR_MODE        "user.pvfs2.mirror.mode"
+#define USER_PVFS2_MIRROR_LAYOUT      "user.pvfs2.mirror.layout"
+#define USER_PVFS2_MIRROR_LAYOUT_SIZE "user.pvfs2.mirror.layout_size"
 
 #endif /* __MIRROR_H */
