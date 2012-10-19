@@ -165,14 +165,13 @@ machine pvfs2_client_sysint_getattr_sm
 
 /** Initiate retrieval of object attributes.
  */
-PVFS_error PVFS_isys_getattr(
-    PVFS_object_ref ref,
-    uint32_t attrmask, 
-    const PVFS_credential *credential,
-    PVFS_sysresp_getattr *resp_p,
-    PVFS_sys_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
+                             uint32_t attrmask, 
+                             const PVFS_credential *credential,
+                             PVFS_sysresp_getattr *resp_p,
+                             PVFS_sys_op_id *op_id,
+                             PVFS_hint hints,
+                             void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -213,34 +212,37 @@ PVFS_error PVFS_isys_getattr(
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle)
                  ,&ref.handle);
     
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        ref,
-        PVFS_util_sys_to_object_attr_mask(
-            attrmask),
-        PVFS_TYPE_NONE,
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               ref,
+                               PVFS_util_sys_to_object_attr_mask(attrmask),
+                               PVFS_TYPE_NONE,
+                               0);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,
+                                          op_id,
+                                          user_ptr);
 }
 
 /** Retrieve object attributes.
  */
-PVFS_error PVFS_sys_getattr(
-    PVFS_object_ref ref,
-    uint32_t attrmask, 
-    const PVFS_credential *credential,
-    PVFS_sysresp_getattr *resp_p,
-    PVFS_hint hints)
+PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
+                            uint32_t attrmask, 
+                            const PVFS_credential *credential,
+                            PVFS_sysresp_getattr *resp_p,
+                            PVFS_hint hints)
 {
     PVFS_error ret, error;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
-    ret = PVFS_isys_getattr(ref, attrmask, credential,
-                            resp_p, &op_id, hints, NULL);
+    ret = PVFS_isys_getattr(ref,
+                            attrmask,
+                            credential,
+                            resp_p,
+                            &op_id,
+                            hints,
+                            NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_getattr call", ret);
@@ -301,8 +303,8 @@ PVFS_error PVFS_sys_getattr(
  * @return This function should always return 1 unless an error occurred
  * within the internals of the state machine.
  */
-static PINT_sm_action getattr_acache_lookup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     uint32_t trimmed_mask = 0;
@@ -341,10 +343,10 @@ static PINT_sm_action getattr_acache_lookup(
     }
 
     ret = PINT_acache_get_cached_entry(object_ref,
-        &sm_p->getattr.attr,
-        &attr_status,
-        &sm_p->getattr.size,
-        &size_status);
+                                       &sm_p->getattr.attr,
+                                       &attr_status,
+                                       &sm_p->getattr.size,
+                                       &size_status);
     if(ret < 0 || attr_status < 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
@@ -442,7 +444,7 @@ static PINT_sm_action getattr_acache_lookup(
 
     if ( missing_attrs & PVFS_ATTR_META_MIRROR_DFILES )
     {
-       /*Mirroring is optional, so remove mirror-dfiles*/
+         /* Mirroring is optional, so remove mirror-dfiles */
          missing_attrs &= ~PVFS_ATTR_META_MIRROR_DFILES;   
     }
          
@@ -505,7 +507,8 @@ static PINT_sm_action getattr_acache_lookup(
 
 
 static PINT_sm_action getattr_object_getattr_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                             struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -528,23 +531,22 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     assert(object_ref.handle != PVFS_HANDLE_NULL);
 
     /* setup the msgpair to do a getattr operation */
-    PINT_SERVREQ_GETATTR_FILL(
-        msg_p->req,
-        capability,
-        *sm_p->cred_p,
-        object_ref.fs_id,
-        object_ref.handle,
-        sm_p->getattr.req_attrmask,
-        sm_p->hints);
+    PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+                              capability,
+                              *sm_p->cred_p,
+                              object_ref.fs_id,
+                              object_ref.handle,
+                              sm_p->getattr.req_attrmask,
+                              sm_p->hints);
     
     msg_p->fs_id = object_ref.fs_id;
     msg_p->handle = object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle,
-        msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                           msg_p->handle,
+                                           msg_p->fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -560,10 +562,9 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
   structure.  returns 0 for directories and symlinks, and
   GETATTR_NEED_DATAFILE_SIZES for a metafile (when appropriate)
 */
-static int getattr_object_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
+static int getattr_object_getattr_comp_fn(void *v_p,
+                                          struct PVFS_server_resp *resp_p,
+                                          int index)
 {
     PVFS_object_attr *attr = NULL;
     PINT_smcb *smcb = v_p;
@@ -748,7 +749,8 @@ static PINT_sm_action getattr_object_getattr_failure(
  * nasty memory leak.
 */
 static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+        struct PINT_smcb *smcb,
+        job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
@@ -756,14 +758,18 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     int i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    uint64_t mirror_retry = (sm_p->getattr.attr.mask & PVFS_ATTR_META_MIRROR_DFILES);
+    uint64_t mirror_retry =
+                    (sm_p->getattr.attr.mask & PVFS_ATTR_META_MIRROR_DFILES);
     PVFS_handle *handles;
     PVFS_capability capability;
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing getattr_datafile_getattr_setup_msgpairarray...\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"%s: Are we mirroring? %s\n",__func__
-                                    ,(mirror_retry ? "YES" : "NO")); 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"%s: attr.mask:0x%08x \tmirror_retry:0x%08x\n"
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing getattr_datafile_getattr_setup_msgpairarray...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "%s: Are we mirroring? %s\n",__func__
+                ,(mirror_retry ? "YES" : "NO")); 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "%s: attr.mask:0x%08x \tmirror_retry:0x%08x\n"
                 ,__func__
                 ,sm_p->getattr.attr.mask
                 ,(unsigned int)mirror_retry);
@@ -780,25 +786,29 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     msg_p = &sm_p->msgarray_op.msgpair;
 
     /*initialize the size_array, which will hold the size of each datahandle*/
-    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,attr->u.meta.dfile_count);
+    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,
+                                     attr->u.meta.dfile_count);
 
     /* initialize mir_ctx_array: one context for each handle in the file */
     getattr->mir_ctx_array = malloc(attr->u.meta.dfile_count *
-                                    sizeof(*getattr->mir_ctx_array));
+                                     sizeof(*getattr->mir_ctx_array));
     if (!getattr->mir_ctx_array)
     {
         gossip_lerr("Unable to allocate mirror context array.\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(getattr->mir_ctx_array,0,attr->u.meta.dfile_count * 
-                                   sizeof(*getattr->mir_ctx_array));
+    memset(getattr->mir_ctx_array,
+           0,
+           attr->u.meta.dfile_count * sizeof(*getattr->mir_ctx_array));
+
     getattr->mir_ctx_count = attr->u.meta.dfile_count;
 
-    for (i=0; i<getattr->mir_ctx_count; i++)
+    for (i = 0; i < getattr->mir_ctx_count; i++)
     {
-       getattr->mir_ctx_array[i].original_datahandle = attr->u.meta.dfile_array[i];
-       getattr->mir_ctx_array[i].original_server_nr = i;
+        getattr->mir_ctx_array[i].original_datahandle =
+                                     attr->u.meta.dfile_array[i];
+        getattr->mir_ctx_array[i].original_server_nr = i;
     }
 
     /* allocate handle array and populate */
@@ -809,42 +819,52 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(handles,0,sizeof(PVFS_handle) * attr->u.meta.dfile_count);
-    memcpy(handles,attr->u.meta.dfile_array,attr->u.meta.dfile_count *
-                                            sizeof(PVFS_handle));
+    memset(handles,
+           0,
+           sizeof(PVFS_handle) * attr->u.meta.dfile_count);
+
+    memcpy(handles,
+           attr->u.meta.dfile_array,
+           attr->u.meta.dfile_count * sizeof(PVFS_handle));
 
     /*allocate index-to-server array and populate*/
-    getattr->index_to_server = malloc(sizeof(uint32_t)*attr->u.meta.dfile_count);
+    getattr->index_to_server =
+                  malloc(sizeof(uint32_t)*attr->u.meta.dfile_count);
+
     if (!getattr->index_to_server)
     {
         gossip_lerr("Unable to allocate index-to-server array.\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(getattr->index_to_server,0,sizeof(uint32_t)*attr->u.meta.dfile_count);
-    for (i=0; i<attr->u.meta.dfile_count; i++)
+
+    memset(getattr->index_to_server,
+           0,
+           sizeof(uint32_t)*attr->u.meta.dfile_count);
+
+    for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
         getattr->index_to_server[i] = (uint32_t)i;
     }
 
 //START_PROFILER(getattr_prof);
-    PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
-            msg_p->req,
-            capability,
-            *sm_p->cred_p,
-            sm_p->getattr.object_ref.fs_id,
-            0,
-            attr->u.meta.dfile_count,
-            handles,
-            (mirror_retry ? 1 : 0),
-            sm_p->hints);
+    PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(msg_p->req,
+                                         capability,
+                                         *sm_p->cred_p,
+                                         sm_p->getattr.object_ref.fs_id,
+                                         0,
+                                         attr->u.meta.dfile_count,
+                                         handles,
+                                         (mirror_retry ? 1 : 0),
+                                         sm_p->hints);
 
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
     msg_p->handle = handles[0];
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                           msg_p->handle,
+                                           msg_p->fs_id);
     if (ret)
     {
         gossip_lerr("Unable to map server address for this handle(%llu) and "
@@ -866,7 +886,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     {
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     }
-
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -956,8 +975,8 @@ static int getattr_datafile_getattr_comp_fn(
     return(0);
 }/*end getattr_datafile_getattr_comp_fn*/
 
-static PINT_sm_action getattr_datafile_getattr_retry(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_client_sm   *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_object_attr *attr = &(sm_p->getattr.attr);
@@ -984,9 +1003,9 @@ static PINT_sm_action getattr_datafile_getattr_retry(
                  "(%p) getattr state: "
                  "getattr_datafile_getattr_retry\n", sm_p);
 
-    /*We only need to retry if we have mirrors; otherwise, msgpairarray 
-     *has already handled the retries.
-    */
+    /* We only need to retry if we have mirrors; otherwise, msgpairarray 
+     * has already handled the retries.
+     */
     if (!(attr->mask & PVFS_ATTR_META_MIRROR_DFILES))  
     {  
        /*we are NOT mirroring.*/
@@ -994,12 +1013,14 @@ static PINT_sm_action getattr_datafile_getattr_retry(
     }
     
     /* How many handles need to be retried? */
-    for (i=0; i<tree->num_data_files; i++)
+    for (i = 0; i < tree->num_data_files; i++)
     {
         server_nr = getattr->index_to_server[i];
         ctx = &(getattr->mir_ctx_array[server_nr]);
         if (ctx->msg_completed == 0)
+        {
             retry_msg_count++;
+        }
     }
 
     /* no retries needed */

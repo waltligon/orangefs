@@ -29,6 +29,16 @@ typedef unsigned char *OrangeFS_signature;
 #define ORANGEFS_PATH_MAX 4096
 #define MAX_LINKS 256
 
+/* gossip debugging-type masks */
+#define OrangeFS_DEBUG_SYSLOG (1 << 0)
+#define OrangeFS_DEBUG_STDERR (1 << 1)
+#define OrangeFS_DEBUG_FILE	  (1 << 2)
+#define OrangeFS_DEBUG_MVS    (1 << 3)	/* microsoft visual studio debugging output window */
+#define OrangeFS_DEBUG_ALL	 (OrangeFS_DEBUG_SYSLOG | \
+							  OrangeFS_DEBUG_STDERR | \
+							  OrangeFS_DEBUG_FILE   | \
+							  OrangeFS_DEBUG_MVS)
+
 /* permission bits */
 #define OrangeFS_O_EXECUTE (1 << 0)
 #define OrangeFS_O_WRITE   (1 << 1)
@@ -220,7 +230,7 @@ typedef struct
 extern "C"
 {
 #endif
-int DLL_CODE orangefs_initialize(OrangeFS_fsid *fsid, OrangeFS_credential *cred, OrangeFS_mntent *mntent, char *error_msg, size_t error_msg_len, const char *tabfile);
+int DLL_CODE orangefs_initialize(OrangeFS_fsid *fsid, OrangeFS_credential *cred, OrangeFS_mntent *mntent, char *error_msg, size_t error_msg_len, const char *tabfile, int debugType, const char *debugFile);
 int DLL_CODE orangefs_load_tabfile(const char *path, OrangeFS_mntent **mntents, char *error_msg, size_t error_msg_len);
 int DLL_CODE orangefs_lookup(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *path, OrangeFS_handle *handle);
 int DLL_CODE orangefs_lookup_follow_links(OrangeFS_fsid fs_id, OrangeFS_credential *cred, char *fs_path, OrangeFS_sysresp_lookup *resp, OrangeFS_attr *attr);
@@ -244,6 +254,8 @@ void DLL_CODE orangefs_credential_add_group(OrangeFS_credential *cred, OrangeFS_
 void DLL_CODE orangefs_cleanup_credentials(OrangeFS_credential *cred);
 int DLL_CODE orangefs_credential_in_group(OrangeFS_credential *cred, OrangeFS_gid group);
 void DLL_CODE orangefs_credential_set_timeout(OrangeFS_credential *cred, OrangeFS_time timeout);
+void DLL_CODE orangefs_enable_debug(int debugType, const char *filePath);
+void DLL_CODE orangefs_debug_print(const char *format, ...);
 #ifdef __cplusplus
 }
 #endif

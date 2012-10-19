@@ -199,7 +199,7 @@ extern int pvfs_linkat (int olddirfd, const char *oldpath,
 /* this reads exactly one dirent, count is ignored */
 extern int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
 
-/* this reads multiple dirents, up to count */
+/* this reads multiple dirents, count is number of bytes in buffer */
 extern int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count);
 
 extern int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count);

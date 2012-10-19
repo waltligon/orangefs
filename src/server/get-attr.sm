@@ -35,6 +35,12 @@
 
 static uint64_t UINT64_HIGH = 0xffffffffffffffffULL;
 
+/* These are defined in src/common/misc/pvfs2-internal.h
+ * This table SHOULD be defined using macros not the strings
+ * See Trove_Common_Keys in src/server/pvfs2-server.c
+ * This should be fixed as soon as possible
+ */
+
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
     {"user.pvfs2.dist_name"    , SPECIAL_DIST_NAME_KEYLEN},

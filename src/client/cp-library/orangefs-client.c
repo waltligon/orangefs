@@ -13,13 +13,110 @@
 #include "cred.h"
 #include "str-utils.h"
 #include "pvfs2.h"
+#include "gossip.h"
 
 
 /* GLOBALS */
 OrangeFS_mntent **mntents = { 0 };
 const PVFS_util_tab *tab;
-int num_mntents = 0;
+BOOL MVS_DEBUGGING = FALSE;	/* will be set to true in orangefs_enable_debug */
 
+
+void orangefs_enable_debug(int debugType, const char *filePath)
+{
+	switch (debugType)
+	{
+	case OrangeFS_DEBUG_SYSLOG :
+		gossip_enable_syslog(0);	/* current un-implemented on windows */
+		break;
+	case OrangeFS_DEBUG_STDERR :
+		gossip_enable_stderr();
+		break;
+	case OrangeFS_DEBUG_FILE:
+		gossip_enable_file(filePath, "w+");
+		break;
+	case OrangeFS_DEBUG_MVS:
+		MVS_DEBUGGING = TRUE;
+		/* dont need to enable anything to do this */
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR:
+		gossip_enable_syslog(0);
+		gossip_enable_stderr();
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_FILE:
+		gossip_enable_syslog(0);
+		gossip_enable_file(filePath, "w+");
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_MVS:
+		gossip_enable_syslog(0);
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE:
+		gossip_enable_stderr();
+		gossip_enable_file(filePath, "w+");
+		break;
+	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_MVS:
+		gossip_enable_stderr();
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS:
+		gossip_enable_file(filePath, "w+");
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE :
+		gossip_enable_syslog(0);
+		gossip_enable_stderr();
+		gossip_enable_file(filePath, "w+");
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_MVS :
+		gossip_enable_syslog(0);
+		gossip_enable_stderr();
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS :
+		gossip_enable_syslog(0);
+		gossip_enable_file(filePath, "w+");
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS :
+		gossip_enable_stderr();
+		gossip_enable_file(filePath, "w+");
+		MVS_DEBUGGING = TRUE;
+		break;
+	case OrangeFS_DEBUG_ALL:
+		gossip_enable_syslog(0);
+		gossip_enable_stderr();
+		gossip_enable_file(filePath, "w+");
+		MVS_DEBUGGING = TRUE;
+		break;
+	default :
+		break;
+	}
+}
+
+void orangefs_debug_print(const char *format, ...)
+{
+#ifdef ORANGEFS_DEBUG
+	char buff[GOSSIP_BUF_SIZE];
+	va_list argp;
+
+#ifdef WIN32
+	if (MVS_DEBUGGING)
+		OutputDebugString("---- DEBUG ----\n");
+#endif
+	
+	va_start(argp, format);
+	vsprintf(buff, format, argp);
+	va_end(argp);
+
+	gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, buff, argp);	/* can you pass a va_list as a variable argument parameter? */
+
+#ifdef WIN32
+	if (MVS_DEBUGGING)
+		OutputDebugString(buff);
+#endif
+#endif
+}
 
 /* caller needs to allocate the space and zero out the **mntents parameter */
 int orangefs_load_tabfile(const char *path, 
@@ -27,25 +124,7 @@ int orangefs_load_tabfile(const char *path,
 						  char *error_msg, 
 						  size_t error_msg_len)
 {
-	int i = 0;
-		
-		/* read tab file */
-		tab = PVFS_util_parse_pvfstab(path);
-		if (!tab)
-		{
-			_snprintf(error_msg, error_msg_len, "fs_initialize: failed to parse %s", path);
-			return -1;
-		}
-
-		/* keep global copy of the number of mntents */
-		num_mntents = tab->mntent_count;
-
-		for (i=0; i < tab->mntent_count; i++)
-		{
-			memcpy(mntents[i], &tab->mntent_array[i], 1);
-		}
-
-	return 0;
+	/* currently unimplemented */
 }
 
 int orangefs_initialize(OrangeFS_fsid *fsid,		/* not currently implemented */
@@ -53,26 +132,82 @@ int orangefs_initialize(OrangeFS_fsid *fsid,		/* not currently implemented */
 						OrangeFS_mntent *mntent, 
 						char *error_msg, 
 						size_t error_msg_len, 
-						const char *tabfile)
+						const char *tabF,
+						int debugType,
+						const char *debugFile)
 {
-	int ret = 0;
+	char exe_path[MAX_PATH];
+	char *tabfile, *p;
+	int ret, malloc_flag, i, found_one = 0;
 
-	ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-	if (ret < 0)
-    {
-        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", error_msg);
-        return ret;
-    }
+#ifdef ORANGEFS_DEBUG
+	orangefs_enable_debug(debugType, debugFile);
+#endif
 
-	/* initialize file system */
-        ret = PVFS_sys_fs_add((struct PVFS_sys_mntent *) mntent);
-        if (ret == 0)
-		{
-			_snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
-												"file systems from %s", tabfile);
-			PVFS_sys_finalize();
-			return -1;
-		}
+	ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
+	if (ret)
+	{
+		tabfile = (char *)malloc(MAX_PATH);
+		malloc_flag = TRUE;
+
+		/* cut off the exe file, just get up to last directory */
+		p = strrchr(exe_path, '\\');
+		if (p)
+			*p = '\0';
+
+		strcpy(tabfile, exe_path);
+		strcat(tabfile, tabF);	/* now we have absolute path to orangefstab file */
+	}
+
+	if (tabfile)
+	{
+		orangefs_debug_print("Using tabfile: %s\n", tabfile);
+		do {
+			ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+			if (ret != 0)
+			{
+				orangefs_debug_print("Failed to initialize the file system with call to: PVFS_sys_initialize()\n");
+				free(tabfile);
+				return -1;
+			}
+
+			/* read tab file */
+			tab = PVFS_util_parse_pvfstab(tabfile);
+			if (!tab)
+			{
+				orangefs_debug_print("Failed to parse tabfile: %s", tabfile);
+				free(tabfile);
+				return -1;
+			}
+
+			/* initialize file system */
+			ret = PVFS_sys_fs_add(&tab->mntent_array[0]);	/* currently only supports adding 1 mount entry at a time with a call to orangefs_initialize() */
+			if (ret == 0)
+				found_one = 1;
+			
+			/* now copy the mntent data into the mntnet passed in */
+			memcpy(mntent, &tab->mntent_array[0], sizeof(OrangeFS_mntent));
+
+			if (!found_one)
+			{
+				orangefs_debug_print("orangefs_initialize: could not initialize any file systems from %s\n", tab->tabfile_name);
+				PINT_release_pvfstab();
+				PVFS_sys_finalize();
+				ret = -1;
+			}
+
+			if (ret < 0)
+			{
+				orangefs_debug_print("ERROR initializing OrangeFS file system...\nTrying again in 30 seconds...\n");
+				Sleep(30000); /* 30 seconds */
+			}
+		}while (ret < 0);
+	}
+
+	if (malloc_flag)
+		free(tabfile);
+
+	/* is there a gossip cleanup or turn off function? */
 
     return 0;
 }
@@ -695,8 +830,7 @@ int orangefs_find_files(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *f
                 /* TODO: DEBUG */
                 if (resp_readdirplus.attr_array[i].link_target)
                 {
-					/* MAKE DBGPRINT() FUNCTION */
-                    // DbgPrint("    %s link: %s\n", filename_array[i], resp_readdirplus.attr_array[i].link_target);                    
+                    // orangefs_debug_print("    %s link: %s\n", filename_array[i], resp_readdirplus.attr_array[i].link_target);                    
                 }
             }
             else

@@ -89,6 +89,9 @@ typedef struct PINT_server_trove_keys
     int size;
 } PINT_server_trove_keys_s;
 
+/* This is defined in src/server/pvfs2-server.c
+ * These values index this table
+ */
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
@@ -102,6 +105,14 @@ enum
     NUM_DFILES_REQ_KEY   = 6
 };
 
+/* This is defined in src/server/get-attr.sm
+ * These values index this table
+ * The first NUM_SPECIAL_KEYS of these are automatically
+ * Read when getting metadata
+ *
+ * WBL V3 Uncomment this declaration if it doesn't cause problems
+ */
+/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
 /* optional; user-settable keys */
 enum 
 {
@@ -599,7 +610,7 @@ typedef struct PINT_server_op
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
         struct PINT_server_precreate_pool_refiller_op
-            precreate_pool_refiller;
+                                               precreate_pool_refiller;
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;

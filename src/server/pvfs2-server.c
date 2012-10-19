@@ -115,6 +115,8 @@ static char startup_cwd[PATH_MAX+1];
  * we're able to use sizeof here because sizeof an inlined string ("") gives
  * the length of the string with the null terminator
  */
+/* These are defined in src/common/pvfs2-internal.h
+ */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
     {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
