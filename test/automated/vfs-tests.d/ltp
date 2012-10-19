@@ -49,7 +49,12 @@ cd ltp-full-${LTPVER}
 #    exit 1;
 #fi
 echo Configuring LTP...
-./configure
+./configure >& /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to configure LTP."
+    exit 1;
+fi
 echo Compiling LTP...
 export CFLAGS="-g"
 make all>& /dev/null 
