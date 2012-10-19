@@ -21,7 +21,7 @@ sudo /bin/rm -rf dbench-3.03
 cd ..
 
 #untar the dbench directory
-tar -xzf ${BENCHMARKS} benchmarks/dbench-3.03/*
+tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
 
 #goto the dbench directory
 cd benchmarks/dbench-3.03
