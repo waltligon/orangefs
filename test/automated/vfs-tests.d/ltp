@@ -49,10 +49,10 @@ cd ltp-full-${LTPVER}
 #    exit 1;
 #fi
 echo Configuring LTP...
-./configure --prefix=`pwd`
+./configure
 echo Compiling LTP...
 export CFLAGS="-g"
-make >& /dev/null 
+make all>& /dev/null 
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to build LTP."
@@ -63,14 +63,14 @@ fi
 # just configures the test programs so that they can be executed.  We
 # deliberately avoid running make install at the top level because that
 # _would_ install files in /opt/ltp unecessarily.
-cd testcases
-make install > /dev/null
+#cd testcases
+sudo make install > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to make install LTP testcases."
     exit 1;
 fi
-cd ../
+#cd ../
 
 # copy pvfs friendly test cases; we should pass all of these
 cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
