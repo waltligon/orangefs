@@ -14,17 +14,18 @@ mkdir -p ${EXTRA_TESTS}/dbench-3.03
 cwd=`pwd`
 
 #goto benchmark directory and cleanup
-cd ${EXTRA_TESTS}
-sudo /bin/rm -rf dbench-3.03
+cd ${EXTRA_TESTS}/dbench-3.03
+make clean
+#sudo /bin/rm -rf dbench-3.03
 
 #go back
-cd ..
+#cd ..
 
 #untar the dbench directory
-tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
+#tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
 
 #goto the dbench directory
-cd benchmarks/dbench-3.03
+#cd benchmarks/dbench-3.03
 
 #configure the dbench software
 ./configure -q
