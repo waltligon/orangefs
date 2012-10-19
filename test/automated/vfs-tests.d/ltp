@@ -6,9 +6,9 @@ then
   URL=http://devorange.clemson.edu/pvfs
 fi
 
-LTPVER="20120903"
+LTPVER="20081130"
 THISDATE=`date +%F-%R`
-LTP_ARCHIVE=ltp-full-${LTPVER}.bz2
+LTP_ARCHIVE=ltp-full-${LTPVER}.tgz
 DOWNLOAD=${URL}/${LTP_ARCHIVE}
 
 cd ${EXTRA_TESTS}
@@ -27,7 +27,7 @@ then
     exit 1;
 fi
 
-tar -xvjf ${LTP_ARCHIVE} > /dev/null
+tar -xvzf ${LTP_ARCHIVE} > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to untar ${DOWNLOAD}."
