@@ -49,7 +49,7 @@ cd ltp-full-${LTPVER}
 #    exit 1;
 #fi
 echo Configuring LTP...
-./configure
+./configure --prefix=`pwd`
 echo Compiling LTP...
 export CFLAGS="-g"
 make >& /dev/null 
@@ -64,7 +64,7 @@ fi
 # deliberately avoid running make install at the top level because that
 # _would_ install files in /opt/ltp unecessarily.
 cd testcases
-sudo make install > /dev/null
+make install > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to make install LTP testcases."
