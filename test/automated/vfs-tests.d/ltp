@@ -85,13 +85,15 @@ umask 0
 
 # run ltp
 echo Running LTP...
-sudo ./runltp -p -l `pwd`/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& `pwd`/../ltp-pvfs-testcases-$THISDATE.output
+CURRENTDIR=`pwd`
+cd /opt/ltp
+sudo ./runltp -p -l ${CURRENTDIR}/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& ${CURRENTDIR}/../ltp-pvfs-testcases-$THISDATE.output
 LTPRET=${?}
 if [ "${LTPRET}" != 0 ]
 then
     echo "Error: either failed to invoke LTP, or at least one test failed"
 fi
-
+cd -
 cd ..
 
 FAILCOUNT=`grep FAIL ltp-pvfs-testcases-$THISDATE.log | wc -l`
