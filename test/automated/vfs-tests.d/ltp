@@ -49,7 +49,7 @@ cd ltp-full-${LTPVER}
 #    exit 1;
 #fi
 echo Configuring LTP...
-./configure >& /dev/null
+./configure --prefix=/opt/ltp ADD_CFLAGS="-D_GNU_SOURCE" >& /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to configure LTP."
