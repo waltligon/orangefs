@@ -359,7 +359,7 @@ int recursive_delete(char *dir)
 
     if(pvfs_rmdir(dir) != 0)
     {
-        perror("remove");
+        jni_perror("remove");
         rc = -1;
     }
     rc = 0;
@@ -462,7 +462,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_malloc(JNIEnv *env, jobject obj, jlong si
     void *ptr = malloc((size_t) size);
     if(!ptr)
     {
-        perror("malloc failed");
+        jni_perror("malloc failed");
     }
     return (long unsigned int) ptr;
 }
@@ -492,7 +492,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fopen(JNIEnv *env, jobject obj, jstring p
     if(JNI_DBG) jni_printf("FILE *fp = %llu\n", (long long unsigned int) fp);
     if(fp == 0)
     {
-        perror("fopen failed");
+        jni_perror("fopen failed");
     }
 err:
     JNI_FLUSH
@@ -511,7 +511,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopen(JNIEnv *env, jobject obj, int fd, 
     fptr = jni_fdopen(fd, cmode);
     if(fptr == NULL)
     {
-        perror("fdopen failed!");
+        jni_perror("fdopen failed!");
     }
     return (jlong) fptr;
 }
@@ -558,7 +558,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fread(JNIEnv *env, jobject obj, jbyteArra
     jbyte * cptr = (*env)->GetByteArrayElements(env, ptr, &is_copy);
     if(!ptr)
     {
-        perror("GetByteArrayElements");
+        jni_perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto err;
@@ -566,11 +566,11 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fread(JNIEnv *env, jobject obj, jbyteArra
     rc = jni_fread((void *) cptr, (size_t) size, (size_t) nmemb, (FILE *) stream);
     if(rc < 0)
     {
-        perror("jni fread");
+        jni_perror("jni fread");
     }
     else
     {
-        if(JNI_DBG) printf("\tread %llu \n", ((long long unsigned int) rc * (long long unsigned int) size));
+        if(JNI_DBG) jni_printf("\tread %llu \n", ((long long unsigned int) rc * (long long unsigned int) size));
     }
 err:
     /* copy back and free the ptr using 0 */
@@ -588,7 +588,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fwrite(JNIEnv *env,
     jlong stream
 )   
 {
-    PFI
+    //PFI
     ssize_t rc = 0;
     jboolean is_copy;
     jbyte * cptr = (*env)->GetByteArrayElements(env, ptr, &is_copy);
@@ -606,8 +606,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fwrite(JNIEnv *env,
     }
     else
     {
+        /*
         if(JNI_DBG) jni_printf("\twrote %llu bytes\n", 
             ((long long unsigned int) rc * (long long unsigned int) size));
+        */
     }
 err:
     /* copy back and free the ptr using 0 */
@@ -627,6 +629,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopendir(JNIEnv *env, jobject obj, int f
     {
         jni_perror("jni fdopendir");
     }
+    JNI_FLUSH
     return (jlong) dstr;
 }
 
@@ -647,8 +650,9 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_ftrylockfile(JNIEnv *env, jobject obj, jl
     int rc = jni_ftrylockfile((FILE *) stream);
     if(rc == 0)
     {
-        perror("jni ftrylockfile");
+        jni_perror("jni ftrylockfile");
     }
+    JNI_FLUSH
     return (jint) rc;
 }
 
@@ -681,6 +685,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fopen64(JNIEnv *env, jobject obj, jstring
     {
         if(JNI_DBG) jni_printf("Fptr = %llu \n",(long long unsigned int) fptr);
     }
+    JNI_FLUSH
     return (jlong) fptr;
 }
 
@@ -698,12 +703,13 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freopen(JNIEnv *env, jobject obj, jstring
     FILE * fptr = jni_freopen(cpath, cmodes, (FILE *) stream);
     if (fptr == NULL)
     {
-        perror("freopen failed");
+        jni_perror("freopen failed");
     }
     else
     {
-        if(JNI_DBG) printf("fptr = %llu \n", (long long unsigned int) fptr);
+        if(JNI_DBG) jni_printf("fptr = %llu \n", (long long unsigned int) fptr);
     }
+    JNI_FLUSH
     return (jlong) fptr;
 }
 
@@ -727,6 +733,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freopen64(JNIEnv *env, jobject obj, jstri
     {
         if(JNI_DBG) jni_printf("fptr = %llu \n", (long long unsigned int) fptr);
     }
+    JNI_FLUSH
     return (jlong) fptr;
 }   
 
@@ -758,6 +765,7 @@ ssize_t rc = 0;
 err:
     /* copy back and free the ptr using 0 */
     (*env)->ReleaseByteArrayElements(env, ptr, cptr, 0);
+    JNI_FLUSH
     return (jlong) rc;
 }
 
@@ -771,7 +779,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freadUnlocked(JNIEnv *env, jobject obj, j
     jbyte * cptr = (*env)->GetByteArrayElements(env, ptr, &is_copy);
     if(!ptr)
     {
-        perror("GetByteArrayElements");
+        jni_perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto err;
@@ -783,11 +791,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freadUnlocked(JNIEnv *env, jobject obj, j
     }
     else
     {
-        if(JNI_DBG) printf("\tread %llu bytes\n", (long long unsigned int) rc);
+        if(JNI_DBG) jni_printf("\tread %llu bytes\n", (long long unsigned int) rc);
     }
 err:
     /* copy back and free the ptr using 0 */
     (*env)->ReleaseByteArrayElements(env, ptr, cptr, 0);
+    JNI_FLUSH
     return (jlong) rc;
 }
 
@@ -847,7 +856,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj, jlong str
     char cwhence[cwhence_len + 1];
     (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
     /* Finally Convert to int representation */
-    int int_whence = (int) posix_fsti(cwhence);
+    int int_whence = (int) stdio_fsti(cwhence);
 
     int rc = jni_fseek((FILE *) stream, (long) offset, int_whence);
     if(rc != 0)
@@ -868,7 +877,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseeko(JNIEnv *env, jobject obj, jlong st
     char cwhence[cwhence_len + 1];
     (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
     /* Finally Convert to int representation */
-    int int_whence = (int) posix_fsti(cwhence);
+    int int_whence = (int) stdio_fsti(cwhence);
 
     int rc = jni_fseeko((FILE *) stream, (off_t) offset, int_whence);
     if(rc != 0)
@@ -889,7 +898,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek64(JNIEnv *env, jobject obj, jlong s
     char cwhence[cwhence_len + 1];
     (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
     /* Finally Convert to mode_t representation */
-    int int_whence = (int) posix_fsti(cwhence);
+    int int_whence = (int) stdio_fsti(cwhence);
 
     int rc = jni_fseek64((FILE *) stream, (off64_t) offset, int_whence);
     if(rc != 0)
@@ -910,7 +919,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong s
     char cmode[cmode_len + 1];
     (*env)->GetStringUTFRegion(env, mode, 0, cmode_len, cmode);
     /* Finally Convert to mode_t representation */
-    int int_mode = (int) posix_fsti(cmode);
+    int int_mode = (int) stdio_fsti(cmode);
 
     int rc = jni_setvbuf((FILE *) stream, (char *) buf, int_mode, (size_t) size);
     if(rc != 0)
@@ -926,7 +935,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong s
 JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_FillFpost(JNIEnv *env, jobject obj, jobject x)
 {
-    printf("FillStatvfs\n");
+    jni_printf("FillStatvfs\n");
     
     jfieldID fid1;
     jfieldID fid2;
@@ -965,9 +974,9 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_FillFpost(JNIEnv *env, jobject obj, jobje
 
 void dispfpost(fpos_t *abc)
 {
-    printf("=======DISPLAY========\n");
-    printf("The pos is: %lu\n", abc->__pos);
-    printf("The state is: %lu\n", abc->__state);
+    jni_printf("=======DISPLAY========\n");
+    jni_printf("The pos is: %lu\n", abc->__pos);
+    jni_printf("The state is: %lu\n", abc->__state);
     free(abc);
 }
 
@@ -978,61 +987,53 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_useFpost(JNIEnv *env, jobject obj, jlong 
     arg = (fpos_t *)jarg;
     dispfpost(arg);
 }*/
+#endif
 
 /* fflush */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fflush(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Fflush\n");
-    int rc = 0;
-    rc = fflush((FILE *) stream);
-    if(rc == -1)
+    PFI
+    int rc = jni_fflush((FILE *) stream);
+    if(rc < 0)
     {
-        perror("Fflush failed!");
-        
+        jni_perror("fflush failed");
     }
-    else
-    {
-        printf("Fflush successful.\n");
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
 /*fflush_unlocked*/
 
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_fflushUnlocked(JNIEnv *env, jobject obj, jlong stream)
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fflush_unlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("FflushUnlocked\n");
-    int rc = 0;
-    rc = fflush_unlocked((FILE *) stream);
+    PFI
+    int rc = jni_fflush_unlocked((FILE *) stream);
     if(rc < 0)
     {
-        perror("FflushUnlocked failed!");
-        
+        jni_perror("fflush_unlocked failed");
     }
-    else
-    {
-        printf("FflushUnlocked successful.\n");
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
+#if 0
 /*fputc*/
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fputc(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    if(JNI_DBG) printf("Fputc\n");
+    if(JNI_DBG) jni_printf("Fputc\n");
     int rc = 0;
     rc = fputc(c, (FILE *) stream);
     if(rc == -1)
     {
-        perror("Fputc failed!");
+        jni_perror("Fputc failed!");
         
     }
     else
     {
-        printf("Fputc successful.\n");
+        jni_printf("Fputc successful.\n");
     }
     return (jint) rc;
 }
@@ -1041,16 +1042,16 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputc(JNIEnv *env, jobject obj, int c, jl
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fputcUnlocked(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    printf("FputcUnlocked\n");
+    jni_printf("FputcUnlocked\n");
     int rc;
     rc = fputc_unlocked(c, (FILE *) stream);
     if(rc == -1)
     {
-        perror("FputcUnlocked failed!");
+        jni_perror("FputcUnlocked failed!");
     }
     else
     {
-        printf("FputcUnlocked successful.\n");
+        jni_printf("FputcUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1059,7 +1060,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputcUnlocked(JNIEnv *env, jobject obj, i
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fputs(JNIEnv *env, jobject obj, jstring s, jlong stream)
 {
-    printf("Fputs\n");
+    jni_printf("Fputs\n");
     int rc = 0;
     char cs[1024];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1067,12 +1068,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputs(JNIEnv *env, jobject obj, jstring s
     rc = fputs(cs, (FILE *) stream);
     if(rc == -1)
     {
-        perror("Fputs failed!");
+        jni_perror("Fputs failed!");
         
     }
     else
     {
-        printf("Fputs successful.\n");
+        jni_printf("Fputs successful.\n");
     }
     return (jint) rc;
 }
@@ -1081,7 +1082,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputs(JNIEnv *env, jobject obj, jstring s
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fputsUnlocked(JNIEnv *env, jobject obj, jstring s, jlong stream)
 {
-    printf("FputsUnlocked\n");
+    jni_printf("FputsUnlocked\n");
     int rc ;
     char cs[1024];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1089,12 +1090,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputsUnlocked(JNIEnv *env, jobject obj, j
     rc = fputs_unlocked(cs, (FILE *) stream);
     if(rc == -1)
     {
-        perror("FputsUnlocked failed!");
+        jni_perror("FputsUnlocked failed!");
         
     }
     else
     {
-        printf("FputsUnlocked successful.\n");
+        jni_printf("FputsUnlocked successful.\n");
     }
     return (jint) rc;
 } 
@@ -1103,17 +1104,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputsUnlocked(JNIEnv *env, jobject obj, j
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_putc(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    printf("Putc\n");
+    jni_printf("Putc\n");
     int rc = 0;
     rc = putc(c, (FILE *) stream);
     if(rc == -1)
     {
-        perror("Putc failed!");
+        jni_perror("Putc failed!");
         
     }
     else
     {
-        printf("Putc successful.\n");
+        jni_printf("Putc successful.\n");
     }
     return (jint) rc;
 }
@@ -1122,17 +1123,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_putc(JNIEnv *env, jobject obj, int c, jlo
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_putcUnlocked(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    printf("PutcUnlocked\n");
+    jni_printf("PutcUnlocked\n");
     int rc;
     rc = putc_unlocked(c, (FILE *) stream);
     if(rc == -1)
     {
-        perror("PutcUnlocked failed!");
+        jni_perror("PutcUnlocked failed!");
         
     }
     else
     {
-        printf("PutcUnlocked successful.\n");
+        jni_printf("PutcUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1142,17 +1143,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_putcUnlocked(JNIEnv *env, jobject obj, in
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_putchar(JNIEnv *env, jobject obj, int c)
 {
-    printf("Putchar\n");
+    jni_printf("Putchar\n");
     int rc = 0;
     rc = putchar(c);
     if(rc == -1)
     {
-        perror("Putchar failed!");
+        jni_perror("Putchar failed!");
         
     }
     else
     {
-        printf("Putchar successful.\n");
+        jni_printf("Putchar successful.\n");
     }
     return (jint) rc;
 }
@@ -1161,17 +1162,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_putchar(JNIEnv *env, jobject obj, int c)
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_putcharUnlocked(JNIEnv *env, jobject obj, int c)
 {
-    printf("PutcharUnlocked\n");
+    jni_printf("PutcharUnlocked\n");
     int rc;
     rc = putchar_unlocked(c);
     if(rc == -1)
     {
-        perror("PutcharUnlocked failed!");
+        jni_perror("PutcharUnlocked failed!");
         
     }
     else
     {
-        printf("PutcharUnlocked successful.\n");
+        jni_printf("PutcharUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1180,7 +1181,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_putcharUnlocked(JNIEnv *env, jobject obj,
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_puts(JNIEnv *env, jobject obj, jstring s)
 {
-    printf("Puts\n");
+    jni_printf("Puts\n");
     int rc = 0;
     char cs[1024];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1188,29 +1189,29 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_puts(JNIEnv *env, jobject obj, jstring s)
     rc = puts(cs);
     if(rc == -1)
     {
-        perror("Puts failed!");
+        jni_perror("Puts failed!");
         
     }
     else
     {
-        printf("Puts successful.\n");
+        jni_printf("Puts successful.\n");
     }
 
 /*fputc*/
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fputc(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    printf("Fputc\n");
+    jni_printf("Fputc\n");
     int rc = 0;
     rc = fputc(c, (FILE *) stream);
     if(rc == -1)
     {
-        perror("Fputc failed!");
+        jni_perror("Fputc failed!");
         
     }
     else
     {
-        printf("Fputc successful.\n");
+        jni_printf("Fputc successful.\n");
     }
     return (jint) rc;
 }
@@ -1219,18 +1220,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fputc(JNIEnv *env, jobject obj, int c, jl
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_putw(JNIEnv *env, jobject obj, int wd, jlong stream)
 {
-    printf("Putw\n");
+    jni_printf("Putw\n");
     int rc;
     char cs[1024];
     rc = putw(wd, (FILE *) stream);
     if(rc <= 0)
     {
-        perror("Putw failed!");
+        jni_perror("Putw failed!");
         
     }
     else
     {
-        printf("Putw successful.\n");
+        jni_printf("Putw successful.\n");
     }
     return (jint) rc;
 }
@@ -1239,7 +1240,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_putw(JNIEnv *env, jobject obj, int wd, jl
 JNIEXPORT jstring JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fgets(JNIEnv *env, jobject obj, jstring s, int size, jlong stream)
 {
-    printf("Fgets\n");
+    jni_printf("Fgets\n");
     char *rc = NULL;
     char cs[size];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1247,12 +1248,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgets(JNIEnv *env, jobject obj, jstring s
     rc = fgets(cs, size, (FILE *) stream);
     if(rc == NULL)
     {
-        perror("Fgets failed!");
+        jni_perror("Fgets failed!");
         
     }
     else
     {
-        printf("Fgets successful.\n");
+        jni_printf("Fgets successful.\n");
     }
     return (*env)->NewStringUTF(env, rc);
 }
@@ -1261,7 +1262,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgets(JNIEnv *env, jobject obj, jstring s
 JNIEXPORT jstring JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetsUnlocked(JNIEnv *env, jobject obj, jstring s, int size, jlong stream)
 {
-    printf("FgetsUnlocked\n");
+    jni_printf("FgetsUnlocked\n");
     char *rc = NULL;
     char cs[size];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1269,11 +1270,11 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetsUnlocked(JNIEnv *env, jobject obj, j
     rc = fgets_unlocked(cs, size, (FILE *) stream);
     if(rc == NULL)
     {
-        perror("FgetsUnlocked failed!");
+        jni_perror("FgetsUnlocked failed!");
     }
     else
     {
-        printf("FgetsUnlocked successful.\n");
+        jni_printf("FgetsUnlocked successful.\n");
     }
     return (*env)->NewStringUTF(env, rc);
     
@@ -1283,17 +1284,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetsUnlocked(JNIEnv *env, jobject obj, j
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetc(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Fgetc\n");
+    jni_printf("Fgetc\n");
     int rc;
     rc = fgetc((FILE *) stream);
     if(rc == -1)
     {
-        perror("Fgetc failed!");
+        jni_perror("Fgetc failed!");
         
     }
     else
     {
-        printf("Fgetc successful.\n");
+        jni_printf("Fgetc successful.\n");
     }
     return (jint) rc;
 }
@@ -1302,17 +1303,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetc(JNIEnv *env, jobject obj, jlong str
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetcUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("FgetcUnlocked\n");
+    jni_printf("FgetcUnlocked\n");
     int rc;
     rc = fgetc_unlocked((FILE *) stream);
     if(rc == -1)
     {
-        perror("FgetcUnlocked failed!");
+        jni_perror("FgetcUnlocked failed!");
         
     }
     else
     {
-        printf("FgetcUnlocked successful.\n");
+        jni_printf("FgetcUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1322,17 +1323,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fgetcUnlocked(JNIEnv *env, jobject obj, j
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_getc(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Getc\n");
+    jni_printf("Getc\n");
     int rc;
     rc = getc((FILE *) stream);
     if(rc == -1)
     {
-        perror("Getc failed!");
+        jni_perror("Getc failed!");
         
     }
     else
     {
-        printf("Getc successful.\n");
+        jni_printf("Getc successful.\n");
     }
     return (jint) rc;
 }
@@ -1341,17 +1342,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getc(JNIEnv *env, jobject obj, jlong stre
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_getcUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("GetcUnlocked\n");
+    jni_printf("GetcUnlocked\n");
     int rc;
     rc = getc_unlocked((FILE *) stream);
     if(rc == -1)
     {
-        perror("GetcUnlocked failed!");
+        jni_perror("GetcUnlocked failed!");
         
     }
     else
     {
-        printf("GetcUnlocked successful.\n");
+        jni_printf("GetcUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1360,17 +1361,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getcUnlocked(JNIEnv *env, jobject obj, jl
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_getchar(JNIEnv *env, jobject obj)
 {
-    printf("Getchar\n");
+    jni_printf("Getchar\n");
     int rc;
     rc = jni_getchar();
     if(rc == -1)
     {
-        perror("Getchar failed!");
+        jni_perror("Getchar failed!");
         
     }
     else
     {
-        printf("Getchar successful.\n");
+        jni_printf("Getchar successful.\n");
     }
     return (jint) rc;
 }
@@ -1379,17 +1380,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getchar(JNIEnv *env, jobject obj)
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_getcharUnlocked(JNIEnv *env, jobject obj)
 {
-    printf("GetcharUnlocked\n");
+    jni_printf("GetcharUnlocked\n");
     int rc;
     rc = jni_getchar_unlocked();
     if(rc == -1)
     {
-        perror("GetcharUnlocked failed!");
+        jni_perror("GetcharUnlocked failed!");
         
     }
     else
     {
-        printf("GetcharUnlocked successful.\n");
+        jni_printf("GetcharUnlocked successful.\n");
     }
     return (jint) rc;
 }
@@ -1398,17 +1399,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getcharUnlocked(JNIEnv *env, jobject obj)
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_getw(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Getw\n");
+    jni_printf("Getw\n");
     int rc;
     rc = getw((FILE *) stream);
     if(rc == -1)
     {
-        perror("Getw failed!");
+        jni_perror("Getw failed!");
         
     }
     else
     {
-        printf("Getw successful.\n");
+        jni_printf("Getw successful.\n");
     }
     return (jint) rc;
 }
@@ -1417,7 +1418,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getw(JNIEnv *env, jobject obj, jlong stre
 JNIEXPORT jstring JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_gets(JNIEnv *env, jobject obj, jstring s)
 {
-    printf("Gets\n");
+    jni_printf("Gets\n");
     char *rc = NULL;
     char cs[1024];
     int cs_len = (*env)->GetStringLength(env, s);
@@ -1425,12 +1426,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_gets(JNIEnv *env, jobject obj, jstring s)
     rc = gets(cs);
     if(rc == NULL)
     {
-        perror("Gets failed!");
+        jni_perror("Gets failed!");
         
     }
     else
     {
-        printf("Gets successful.\n");
+        jni_printf("Gets successful.\n");
     }
     return (*env)->NewStringUTF(env, rc);
     
@@ -1440,41 +1441,43 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_gets(JNIEnv *env, jobject obj, jstring s)
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_ungetc(JNIEnv *env, jobject obj, int c, jlong stream)
 {
-    printf("Ungetc\n");
+    jni_printf("Ungetc\n");
     int rc;
     rc = ungetc(c, (FILE *) stream);
     if(rc < 0)
     {
-        perror("Ungetc failed!");
+        jni_perror("Ungetc failed!");
         
     }
     else
     {
-        printf("Ungetc successful.\n");
+        jni_printf("Ungetc successful.\n");
     }
     return (jint) rc;
 }
 
-/* perror */
+/* jni_perror */
 
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_perror(JNIEnv *env, jobject obj, jstring s)
 {
-    printf("Perror\n");
+    jni_printf("Perror\n");
     
     char cs[1024];
     int cs_len = (*env)->GetStringLength(env, s);
     (*env)->GetStringUTFRegion(env, s, 0, cs_len, cs);
-    perror(cs);
+    jni_perror(cs);
 }
+#endif
 
 /* clearerr */
 
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_clearerr(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Clearerr\n");
+    PFI
     clearerr((FILE *) stream);
+    JNI_FLUSH
 }
 
 /* clearerr_unlocked */
@@ -1482,27 +1485,22 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_clearerr(JNIEnv *env, jobject obj, jlong 
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_clearerrUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("ClearerrUnlocked\n");
+    PFI
     clearerr_unlocked((FILE *) stream);
+    JNI_FLUSH
 }
 
 /* feof */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_feof(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Feof\n");
-    int rc = 0;
-    rc = feof((FILE *) stream);
-    if(rc == -1)
+    PFI
+    int rc = feof((FILE *) stream);
+    if(rc != 0)
     {
-        perror("Feof failed!");
-        
+       if(JNI_DBG) jni_printf("EOF reached!\n");
     }
-    else
-    {
-        printf("Feof successful.\n");
-        
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
@@ -1510,19 +1508,13 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_feof(JNIEnv *env, jobject obj, jlong stre
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_feofUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("FeofUnlocked\n");
-    int rc = 0;
-    rc = feof_unlocked((FILE *) stream);
-    if(rc == -1)
+    PFI
+    int rc = feof_unlocked((FILE *) stream);
+    if(rc != 0)
     {
-        perror("FeofUnlocked failed!");
-        
+        if(JNI_DBG) jni_printf("EOF reached!\n");
     }
-    else
-    {
-        printf("FeofUnlocked successful.\n");
-        
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
@@ -1530,19 +1522,13 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_feofUnlocked(JNIEnv *env, jobject obj, jl
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_ferror(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("Ferror\n");
-    int rc = 0;
-    rc = ferror((FILE *) stream);
-    if(rc == -1)
+    PFI
+    int rc = ferror((FILE *) stream);
+    if(rc != 0)
     {
-        perror("Ferror failed!");
-        
+        if(JNI_DBG) jni_perror("ferror detected error");        
     }
-    else
-    {
-        printf("Ferror successful.\n");
-        
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
@@ -1550,37 +1536,32 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_ferror(JNIEnv *env, jobject obj, jlong st
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_ferrorUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("FerrorUnlocked\n");
-    int rc = 0;
-    rc = ferror_unlocked((FILE *) stream);
-    if(rc == -1)
+    PFI
+    int rc = ferror_unlocked((FILE *) stream);
+    if(rc != 0)
     {
-        perror("FerrorUnlocked failed!");
-        
+        if(JNI_DBG) jni_perror("ferror detected error");        
     }
-    else
-    {
-        printf("FerrorUnlocked successful.\n");
-        
-    }
+    JNI_FLUSH
     return (jint) rc;
 }
 
+#if 0
 /* fileno_unlocked */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_filenoUnlocked(JNIEnv *env, jobject obj, jlong stream)
 {
-    printf("FilenoUnlocked\n");
+    jni_printf("FilenoUnlocked\n");
     int rc = 0;
     rc = fileno_unlocked((FILE *) stream);
     if(rc == -1)
     {
-        perror("FilenoUnlocked failed!");
+        jni_perror("FilenoUnlocked failed!");
         
     }
     else
     {
-        printf("FilenoUnlocked successful.\n");
+        jni_printf("FilenoUnlocked successful.\n");
         
     }
     return (jint) rc;
@@ -1590,7 +1571,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_filenoUnlocked(JNIEnv *env, jobject obj, 
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_setbuf(JNIEnv *env, jobject obj, jlong stream, jstring buf)
 {    
-    printf("Setbuf\n");
+    jni_printf("Setbuf\n");
     
     char cbuf[1024];
     int cbuf_len = (*env)->GetStringLength(env, buf);
@@ -1603,7 +1584,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setbuf(JNIEnv *env, jobject obj, jlong st
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_setbuffer(JNIEnv *env, jobject obj, jlong stream, jstring buf, jlong size)
 {    
-    printf("Setbuffer\n");
+    jni_printf("Setbuffer\n");
     
     char cbuf[size];
     int cbuf_len = (*env)->GetStringLength(env, buf);
@@ -1616,7 +1597,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setbuffer(JNIEnv *env, jobject obj, jlong
 JNIEXPORT void JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_setlinebuf(JNIEnv *env, jobject obj, jlong stream)
 {    
-    printf("Setlinebuf\n");
+    jni_printf("Setlinebuf\n");
     setlinebuf((FILE *) stream);
 }
 
@@ -1628,11 +1609,11 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong s
 */
 {
     /*
-    if(JNI_DBG) printf("setvbuf\n");
+    if(JNI_DBG) jni_printf("setvbuf\n");
     int rc = jni_setvbuf((FILE *) stream, (char *) buf, (int) mode, (size_t) size);
     if(rc != 0)
     {
-        perror("setvbuf failed!");
+        jni_perror("setvbuf failed!");
     }
     return (jint) rc;
     */
@@ -1643,7 +1624,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong s
 JNIEXPORT jstring JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_mkdtemp(JNIEnv *env, jobject obj, jstring tmplate)
 {    
-    printf("Mkdtemp\n");
+    jni_printf("Mkdtemp\n");
     char * rc;
     char ctmplate[1024];
     int ctmplate_len = (*env)->GetStringLength(env, tmplate);
@@ -1651,12 +1632,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkdtemp(JNIEnv *env, jobject obj, jstring
     rc = mkdtemp(ctmplate);
     if(rc == NULL)
     {
-        perror("Mkdtemp failed!");
+        jni_perror("Mkdtemp failed!");
         
     }
     else
     {
-        printf("Mkdtemp successful.\n");
+        jni_printf("Mkdtemp successful.\n");
     }
     return (*env)->NewStringUTF(env, rc);
 }
@@ -1665,7 +1646,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkdtemp(JNIEnv *env, jobject obj, jstring
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj, jstring tmplate)
 {    
-    printf("Mkstemp\n");
+    jni_printf("Mkstemp\n");
     int rc;
     char ctmplate[1024];
     int ctmplate_len = (*env)->GetStringLength(env, tmplate);
@@ -1673,12 +1654,12 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj, jstring
     rc = mkstemp(ctmplate);
     if(rc == -1)
     {
-        perror("Mkstemp failed!");
+        jni_perror("Mkstemp failed!");
         
     }
     else
     {
-        printf("Mkstemp successful.\n");
+        jni_printf("Mkstemp successful.\n");
         
     }
     return (jint) rc;
@@ -1688,18 +1669,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj, jstring
 JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_tmpfile(JNIEnv *env, jobject obj)
 {    
-    printf("Tmpfile\n");
+    jni_printf("Tmpfile\n");
     FILE * fd;
     
     fd = tmpfile();
     if(fd == NULL)
     {
-        perror("Tmpfile failed!");
+        jni_perror("Tmpfile failed!");
         
     }
     else
     {
-        printf("Tmpfile successful.\n");
+        jni_printf("Tmpfile successful.\n");
         
     }
     return (jlong) fd;
