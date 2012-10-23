@@ -36,18 +36,18 @@ fi
 
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
-#for patch in \
-#	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
-#        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
-#	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
-#        ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
-#		patch -p1 < $patch
-#done
-#if [ "${?}" != 0 ]
-#then
-#    echo "Error: failed to apply patches to LTP."
-#    exit 1;
-#fi
+for patch in \
+	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
+        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
+	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
+        ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
+		patch -p1 < $patch
+done
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to apply patches to LTP."
+    exit 1;
+fi
 echo Configuring LTP...
 ./configure --prefix=/opt/ltp ADD_CFLAGS="-D_GNU_SOURCE" >& /dev/null
 if [ "${?}" != 0 ]
