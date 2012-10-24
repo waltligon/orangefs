@@ -81,7 +81,9 @@ creat03 creat03
 creat04 creat04
 creat05 creat05
 creat06 creat06
-creat07 creat07 -F $LTPROOT/testcases/bin/test1
+# creat07 has changed in ltp 20120906. No longer recognizes -F option
+#creat07 creat07 -F $LTPROOT/testcases/bin/test1
+creat07 creat07
 creat08 creat08
 dup06 dup06
 dup07 dup07
