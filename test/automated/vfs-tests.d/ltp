@@ -79,6 +79,7 @@ fi
 
 # copy pvfs friendly test cases; we should pass all of these
 cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
+sudo cp ${VFS_SCRIPTS}/ltp-pvfs-testcases /opt/ltp/runtest/
 mkdir -p ${PVFS2_MOUNTPOINT}/ltp-tmp 
 chmod 777 ${PVFS2_MOUNTPOINT}/ltp-tmp
 umask 0
