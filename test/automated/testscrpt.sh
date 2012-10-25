@@ -257,6 +257,11 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
+if [ $SKIP_VFS_TESTS != "" ]
+then
+	do_vfs = 0;
+fi
+
 # "install" benchmark software, if EXTRA_TESTS is not null
 if [ $EXTRA_TESTS ] 
 then
@@ -343,12 +348,18 @@ fi
 
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
-which qsub >/dev/null 2>&1
-if [ $? -eq 0 ] ; then 
-	# go through the hassle of downloading/building mpich2 only if we are
-	# actually going to use it
-	pull_and_build_mpich2 || buildfail
-	. $MPIIO_DRIVER
+
+
+if [ $SKIP_MPI_TESTS != "" ]
+then
+	
+	which qsub >/dev/null 2>&1
+	if [ $? -eq 0 ] ; then 
+		# go through the hassle of downloading/building mpich2 only if we are
+		# actually going to use it
+		pull_and_build_mpich2 || buildfail
+		source $MPIIO_DRIVER
+	fi
 fi
 
 # restore file descriptors and close temporary fds
