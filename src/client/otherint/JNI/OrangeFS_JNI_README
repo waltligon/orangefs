@@ -1,8 +1,9 @@
 
 ===============================================================================
-Documentation - PVFS2JNI
+Documentation - OrangeFS JNI
 
-  Exposing OrangeFS Direct Client User Interface Calls to Java Developers through JNI.
+  Exposing OrangeFS Direct Client User Interface Calls to Java Developers 
+  through JNI.
 
 ===============================================================================
 Step 1:
@@ -27,11 +28,11 @@ Step 2:
 ===============================================================================
 Step 3:
 
-  Change directory to src/client/otherint/JNI. To generate the JNI library, 
-  modify the Makefile to reflect the correct PVFS2_TOP_PREFIX 
-  (the folder where OrangeFS was installed). You will also have to set 
-  USRINT_DIR and JAVA_HOME (see 'Makefile' in src/client/otherint/JNI for more 
-  info). 
+  Change directory to src/client/otherint/JNI. To generate libPVFS2POSIXJNI.so 
+  and libPVFS2STDIOJNI.so, modify the Makefile to reflect the correct 
+  PVFS2_TOP_PREFIX (the folder where OrangeFS was installed). You will also 
+  have to set USRINT_DIR and JAVA_HOME (see 'Makefile' in 
+  src/client/otherint/JNI for more info). 
 
   ex:
     #Path to our PVFS prefix
@@ -46,8 +47,8 @@ Step 3:
     Then run make:
     make
 
-  This should generate many '.class' and '.h' files, and our shared
-  JNI libries in the current directory.
+  This should generate many '.class' files, '.h' files, and our JNI shared 
+  libraries in the current directory.
 
 ===============================================================================
 Step 4:
