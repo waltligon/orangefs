@@ -104,7 +104,7 @@ libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGDIR)/PVFS2STDIOJNI.java $(ORGUNDER)
 	  flags/stdio_flag_conv.c 
 #==============================================================================
 clean :
-	rm -f *.o *.so *.h *.jar org/orangefs/usrint/*.class \
+	rm -f *.o org_*.h *.so *.jar org/orangefs/usrint/*.class \
 		$(PVFS2_TOP_PREFIX)/lib/libPVFS2POSIXJNI.so \
 		$(PVFS2_TOP_PREFIX)/lib/libPVFS2STDIOJNI.so 
 
