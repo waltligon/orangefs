@@ -1,7 +1,8 @@
+
 ===============================================================================
 Documentation - PVFS2JNI
 
-  Exposing PVFS2 User Interface Calls to Java Developers through JNI
+  Exposing OrangeFS Direct Client User Interface Calls to Java Developers through JNI.
 
 ===============================================================================
 Step 1:
@@ -27,24 +28,33 @@ Step 2:
 Step 3:
 
   Change directory to src/client/otherint/JNI. To generate the JNI library, 
-  modify the 'createLib' script to reflect the correct PVFS2_TOP_PREFIX 
-  (the folder where PVFS was installed).
+  modify the Makefile to reflect the correct PVFS2_TOP_PREFIX 
+  (the folder where OrangeFS was installed). You will also have to set 
+  USRINT_DIR and JAVA_HOME (see 'Makefile' in src/client/otherint/JNI for more 
+  info). 
 
   ex:
     #Path to our PVFS prefix
     PVFS2_TOP_PREFIX=~/trunk
 
-    #Execute the createLib script:
-    ./createLib
+    USRINT_DIR=~/trunk/ofs/src/client/usrint
 
-  This should generate many '.class' and '.h' files, and our single shared 
-  JNI library in the current directory.
+    #Found JAVA_HOME by running: 
+    #   readlink -f /usr/bin/javac | sed "s:bin/javac::"
+    JAVA_HOME=/usr/lib/jvn/java-7-openjdk-amd64
+
+    Then run make:
+    make
+
+  This should generate many '.class' and '.h' files, and our shared
+  JNI libries in the current directory.
 
 ===============================================================================
 Step 4:
 
-  Compile your Java code that depends upon the JNI layer. 
-  Note: The class path of the JNI code must be specified.
+  Compile your Java code that depends upon one or both JNI layers. 
+  Note: The class path of the JNI .class files (generated during make) must be 
+    specified.
 
   ex: 
     javac Main.java -cp ~/trunk/ofs/src/client/otherint/JNI/
@@ -54,7 +64,7 @@ Step 5:
 
   Note: 
      The environment variable LD_LIBRARY_PATH must contain the 
-     path of your JNI library. 
+     path of your JNI libraries. 
 
      Alternatively, the appropriate command line option can be provided when 
      running 'java' to indicate where the JNI library is.
@@ -65,19 +75,12 @@ Step 5:
 
   ex. using command line option:
     java -cp ~/trunk/ofs/src/client/otherint/JNI/:. \
-    -Djava.library.path=/home/denton/trunk/ofs/src/client/otherint/JNI \
+    -Djava.library.path=~/trunk/ofs/src/client/otherint/JNI \
     -ea Main
 
 ===============================================================================
 Note:
 
-  Please review the file 'PVFS2JNI.java'. The Java developer will instantiate
-  a PVFS2JNI object. The developer can then utilize the native methods through 
-  this object. Also, constants required by certain functions and defined in C 
-  header files have been naively replicated in the JNI layer and are members of
-  the PVFS2JNI class for convenient use. However, the original constants, 
-  along with C structures also defined at the Java level, likely vary between 
-  distros. This means there will need to be some cross-distro research into 
-  their differences. Also, TBD what configure steps will be necessary to 
-  overcome the errors that will likely occur when building the JNI library 
-  since the JNI layer was developed on a single distro. (Ubuntu 12.04)
+  Please review the files 'PVFS2POSIXJNI.java' and 'PVFS2STDIOJNI.java'. The 
+  Java developer will instantiate, PVFS2STDIOJNI and/or PVFS2POSIXJNI to obtain
+  access to functions available in the OrangeFS Direct Client Interface.
