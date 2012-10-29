@@ -19,6 +19,17 @@ do
 	case $arguments in
 	h)
 		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo ""
+		echo "Examples: "
+		echo ""
+		echo "runalltests -vmd -s branches/stable -i cloud-ubuntu-12.04 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo ""
+		echo "This runs all tests against branches/stable, including vfs and mpi, on an new instance of Ubuntu 12.04LTS and deletes the instance upon completion."
+		echo ""
+		echo "runalltests -vmd -s trunk -i cloud-rhel6 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo ""
+		echo "This runs just the sysint and build tests against trunk on a running Redhat Enterprise Linux 6 instance at 10.20.102.30"
+		echo ""
 		;;
 	s)	
 		SVNBRANCH=$OPTARG
@@ -174,7 +185,7 @@ then
 #	if [ ${VMINSTANCEID} != "" ]
 #	then
 		echo "Deleting instance $VMINSTANCEID at $VMIPADDR."
-		euca-terminate-instance --config=$EC2CONFFILE $VMINSTANCEID
+		euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
 
 #	else
 		#echo "This script cannot delete existing instances."
