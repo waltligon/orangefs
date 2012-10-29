@@ -19,6 +19,7 @@
 #include "dist-dir-utils.h"
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
+#include "security-util.h"
 
 enum
 {
@@ -265,6 +266,7 @@ static PINT_sm_action crdirent_setup_op(
     s_op->u.crdirent.dir_attr_update_required = 0;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
+    memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for dirdata handle %llu\n", llu(s_op->req->u.crdirent.dirent_handle));
@@ -530,20 +532,6 @@ static PINT_sm_action crdirent_validate(
           * scheduled before we checked the filename */
         return SM_ACTION_COMPLETE;
     }
-
-    /* make sure we're dealing with a dirdata object */
-#if 0
-    if (!(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE) ||
-        !(s_op->attr.objtype == PVFS_TYPE_DIRECTORY))
-    {   
-        gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: error: Cannot read dirent on "
-                     "a non-directory object!  handle = %llu, objtype = %d. Returning error.\n",
-                     llu(s_op->u.crdirent.parent_handle), s_op->attr.objtype);
-
-        js_p->error_code = INVALID_OBJECT;
-        return SM_ACTION_COMPLETE;
-    }
-#endif
 
     /* make sure the entry belongs to the dirdata handle*/
     PVFS_dist_dir_hash_type dirdata_hash;
@@ -1556,6 +1544,12 @@ static PINT_sm_action crdirent_cleanup(
     {
         PINT_dist_free(s_op->u.crdirent.dist);
     }
+
+    /* Don't want PINT_cleanup_capability to free memory
+       pointed to by handle_array because this was just
+       a pointer to memory that is freed elsewhere.      */
+    s_op->u.crdirent.capability.handle_array = NULL;
+    PINT_cleanup_capability(&s_op->u.crdirent.capability);
 
     return(server_state_machine_complete(smcb));
 }

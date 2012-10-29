@@ -132,8 +132,8 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     state_name = PINT_state_machine_current_state_name(smcb);
     machine_name = PINT_state_machine_current_machine_name(smcb);
 
-if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpected_sm") != 0)
-{
+//if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpected_sm") != 0)
+//{
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
                  "[SM Entering]: (%p) %s:%s (status: %d)\n",
                  smcb,
@@ -141,7 +141,7 @@ if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpecte
                  machine_name,
                  state_name,
                  (int32_t)r->status_user_tag);
-}
+//}
      
     /* call state action function */
     retval = (smcb->current_state->action.func)(smcb,r);
@@ -162,8 +162,8 @@ if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpecte
     }
 
     /* print post-call debugging info */
-if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpected_sm") != 0)
-{
+//if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpected_sm") != 0)
+//{
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
                  "[SM Exiting]: (%p) %s:%s (error code: %d), (action: %s)\n",
                  smcb,
@@ -172,7 +172,7 @@ if (strcmp(machine_name, "job_timer_sm") != 0 && strcmp(machine_name, "unexpecte
                  state_name,
                  r->error_code,
                  SM_ACTION_STRING(retval));
-}
+//}
 
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {

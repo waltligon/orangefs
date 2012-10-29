@@ -621,16 +621,6 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = PINT_server_to_server_capability(&s_op->u.remove.capability,
-            s_op->req->u.remove.fs_id,
-            attr_p->u.dir.dist_dir_attr.num_servers,
-            attr_p->u.dir.dirdata_handles);
-    if (ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
     /* prepare to post the getattr send/recv pairs for all dirdata*/
     foreach_msgpair(&s_op->msgarray_op, msg_p, i)
     {

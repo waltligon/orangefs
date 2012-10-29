@@ -879,11 +879,6 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
 
-    PINT_server_to_server_capability(&s_op->u.setattr.capability,
-        s_op->req->u.setattr.fs_id,
-        s_op->attr.u.dir.dist_dir_attr.num_servers,
-        s_op->attr.u.dir.dirdata_handles);
-
     PINT_SERVREQ_TREE_SETATTR_FILL(
         msg_p->req,
         s_op->req->capability,

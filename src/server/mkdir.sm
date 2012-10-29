@@ -470,15 +470,6 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct 
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->u.mkdir.fs_id);
 
-    ret = PINT_server_to_server_capability(&s_op->u.mkdir.capability,
-               s_op->u.mkdir.fs_id,
-               s_op->attr.u.dir.dist_dir_attr.num_servers,
-               s_op->attr.u.dir.dirdata_handles);
-    if (ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
 
     PINT_SERVREQ_TREE_SETATTR_FILL(
         msg_p->req,

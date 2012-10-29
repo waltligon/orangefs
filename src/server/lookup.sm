@@ -847,6 +847,7 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret;
+    PVFS_capability null_cap;
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup state: read_directory_entry_remote\n");
 
@@ -860,19 +861,11 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.lookup_path.fs_id);
 
-    ret = PINT_server_to_server_capability(&s_op->u.lookup.capability, 
-              s_op->req->u.lookup_path.fs_id,
-              1,
-              &s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index]);
-    if (ret != 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
+    PINT_null_capability(&null_cap);
 
     PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
         msg_p->req,
-        s_op->u.lookup.capability,
+        null_cap,
         s_op->req->u.lookup_path.fs_id,
         s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index],
         s_op->u.lookup.segp,
@@ -1009,6 +1002,7 @@ static PINT_sm_action lookup_cleanup(
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
+
     return(server_state_machine_complete(smcb));
 }
 

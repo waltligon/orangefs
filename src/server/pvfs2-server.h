@@ -354,12 +354,6 @@ struct PINT_server_lookup_op
     PVFS_object_attr attr;
 
     int dirdata_server_index;
-    PVFS_capability capability;
-};
-
-struct PINT_server_setattr_op
-{
-    PVFS_capability capability;
 };
 
 struct PINT_server_readdir_op
@@ -455,7 +449,6 @@ struct PINT_server_remove_op
     int *rebuild_dirdata_index_array_remote;
     PVFS_handle handle_local;
     PVFS_handle* handle_array_remote;
-    PVFS_capability capability;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -544,7 +537,6 @@ struct PINT_server_mkdir_op
     int handle_array_remote_count;
     PVFS_error saved_error_code;
     int handle_index;
-    PVFS_capability capability;
 };
 
 struct PINT_server_getattr_op
@@ -560,7 +552,6 @@ struct PINT_server_getattr_op
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
     PVFS_credential credential;
-    PVFS_capability capability;
 };
 
 struct PINT_server_listattr_op
@@ -595,7 +586,6 @@ struct PINT_server_tree_communicate_op
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
-    PVFS_capability capability;
 };
 
 struct PINT_server_mgmt_get_dirent_op
@@ -694,7 +684,7 @@ typedef struct PINT_server_op
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
-	struct PINT_server_setattr_op setattr;
+//	struct PINT_server_setattr_op setattr;
 	struct PINT_server_readdir_op readdir;
 	struct PINT_server_remove_op remove;
 	struct PINT_server_chdirent_op chdirent;

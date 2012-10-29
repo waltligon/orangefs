@@ -205,17 +205,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         return SM_ACTION_COMPLETE;
     }
 
-    /* Initialize capability that can be used for any of the supported operations. */
-    ret = PINT_server_to_server_capability(&s_op->u.tree_communicate.capability,
-            fs_id,
-            num_data_files,
-            handle_array);
-    if (ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
     {
