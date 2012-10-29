@@ -1,7 +1,7 @@
 #!/bin/sh
 
-bonnie_tarballname=bonnie++-1.03a.tgz
-bonnie_url=http://www.parl.clemson.edu/~tluck/$bonnie_tarballname
+bonnie_tarballname=bonnie++-1.03e.tgz
+bonnie_url=http://www.coker.com.au/bonnie++/$bonnie_tarballname
 
 bonnie_srcdir=/tmp/bonnie++.${USER}
 bonnie_tarball=$bonnie_srcdir/$bonnie_tarballname
@@ -31,8 +31,8 @@ if [ $bonnie_scratchdir = "fake" ] ; then
 fi
 
 bonnie_configureopts="--prefix=$bonnie_installdir"
-bonnie_csv=/tmp/bonnie++-1.03a.csv.$USER
-bonnie_log=/tmp/bonnie++-1.03a.log.$USER
+bonnie_csv=/tmp/bonnie++-1.03e.csv.$USER
+bonnie_log=/tmp/bonnie++-1.03e.log.$USER
 
 scratch_size=20
 ram_size=10
