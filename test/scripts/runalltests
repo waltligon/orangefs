@@ -14,7 +14,7 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvmc:k:f: arguments
+while getopts s:i:a:dvhmc:k:f: arguments
 do
 	case $arguments in
 	h)
