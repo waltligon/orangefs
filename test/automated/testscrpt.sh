@@ -1,4 +1,4 @@
-#!/bin/sh
+#/bin/bash
 
 # i'm not married to bash. just wanted to get things prototyped
 
@@ -13,7 +13,7 @@ export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
 #export EXTRA_TESTS=/tmp/src/benchmarks
 export URL=http://devorange.clemson.edu/pvfs
-export BENCHMARKS=benchmarks-20060512.tar.gz
+export BENCHMARKS=benchmarks-20121017.tar.gz
 
 # look for a 'nightly-test.cfg' in the same directory as this script
 if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
@@ -27,12 +27,14 @@ export CVS_TAG="${CVS_TAG:-HEAD}"
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=~+/sysint-tests.d
-VFS_SCRIPTS=~+/vfs-tests.d
+#SYSINT_SCRIPTS=~+/sysint-tests.d
+SYSINT_SCRIPTS=`pwd`/sysint-tests.d
+VFS_SCRIPTS=`pwd`/vfs-tests.d
+#VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
-BENCHMARKS=benchmarks-20060512.tar.gz
+BENCHMARKS=benchmarks-20121017.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -47,8 +49,8 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="devorange2 devorange35 andy jeffrey"
-
+VFS_HOSTS="`hostname` server-276 server-274"
+#VFS_HOSTS="badname"
 #
 # Detect basic heap corruption
 #
@@ -78,18 +80,21 @@ pull_and_build_mpich2 () {
 	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
-	rm -rf mpich2-latest.tar.gz
-	wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
+	rm -rf mpich2-*.tar.gz
+	wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+	#wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
-	tar xzf mpich2-latest.tar.gz
-	cd mpich2-snap-*
+	#tar xzf mpich2-latest.tar.gz
+	tar xzf mpich2-1.5.tar.gz
+	mv mpich2-1.5 mpich2-snapshot
+	cd mpich2-snapshot
 	mkdir build
 	cd build
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
 		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
 		--enable-g=dbg --without-mpe \
-		--disable-f77 >mpich2config-${CVS_TAG}.log &&\
+		--disable-f77 --disable-fc >mpich2config-${CVS_TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
@@ -252,6 +257,11 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
+if [ $RUN_VFS_TESTS ]
+then
+	do_vfs = 0;
+fi
+
 # "install" benchmark software, if EXTRA_TESTS is not null
 if [ $EXTRA_TESTS ] 
 then
@@ -338,12 +348,18 @@ fi
 
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
-which qsub >/dev/null 2>&1
-if [ $? -eq 0 ] ; then 
-	# go through the hassle of downloading/building mpich2 only if we are
-	# actually going to use it
-	pull_and_build_mpich2 || buildfail
-	. $MPIIO_DRIVER
+
+
+if [ $RUN_MPI_TESTS ]
+then
+	
+	which qsub >/dev/null 2>&1
+	if [ $? -eq 0 ] ; then 
+		# go through the hassle of downloading/building mpich2 only if we are
+		# actually going to use it
+		pull_and_build_mpich2 || buildfail
+		source $MPIIO_DRIVER
+	fi
 fi
 
 # restore file descriptors and close temporary fds
