@@ -177,7 +177,7 @@ then
 		euca-terminate-instance --config=$EC2CONFFILE $VMINSTANCEID
 
 #	else
-		echo "This script cannot delete existing instances."
+		#echo "This script cannot delete existing instances."
 #e	fi
 	
 fi
