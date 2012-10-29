@@ -1,4 +1,4 @@
-#!/bin/sh  
+#/bin/sh  
 #
 # requires: 
 #  cvs (if pulling from CVS
@@ -12,7 +12,7 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma"
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma --with-db=/opt/db4"
 
 
 #
@@ -43,12 +43,16 @@ get_dist() {
 # pulls from CVS the tag or branch specified by the first argument.  returns
 # nonzero on error.
 get_cvs() {
-	cvs -Q -d $cvsroot co -r $1 pvfs2 
+	#cvs -Q -d $cvsroot co -r $1 pvfs2 
+	echo "Current directory is `pwd`"
+	svn export --force -q http://www.orangefs.org/svn/orangefs/$1/
 	if [ $? -ne 0 ] ; then
-		echo "Pulling PVFS2 from $cvsroot failed."
+		echo "Pulling PVFS2 from http://www.orangefs.org/svn/orangefs/$1/ failed."
 		exit 1
 	fi
-	mv pvfs2 pvfs2-$1
+	#ls -l 
+	#mv pvfs2 pvfs2-$1
+	mv $1 pvfs2-$1
 }
 
 # end of user defines
@@ -67,7 +71,6 @@ usage()
     echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
-    echo "  -s: enable security"
     echo "  -t: build test programs"
     echo "  -v: name of tag or branch in CVS"
     echo ""
@@ -76,12 +79,11 @@ usage()
 }
 
 # get command line arguments
-while getopts k:r:stv: opt
+while getopts k:r:tv: opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
-        s) enablesecurity="true";;
 	t) build_tests="true";;
 	v) cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
@@ -92,11 +94,6 @@ echo "PVFS2 will be built in ${rootdir}."
 
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
-fi
-
-if [ "$enablesecurity" = "true" ]
-then
-    configureopts="${configureopts} --enable-security"
 fi
 
 date=`date "+%Y-%m-%d-%H-%M"`
@@ -122,12 +119,15 @@ get_cvs $cvs_tag || exit 1
 # create build and install directories, configure
 mkdir $builddir
 mkdir $installdir
+cd $srcdir
+$srcdir/prepare
 cd $builddir
+#ls $srcdir
 if [ $build_kernel = "true" ] ; then
-	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all"
 fi
 
