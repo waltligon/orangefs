@@ -257,7 +257,7 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
-if [ $SKIP_VFS_TESTS != "" ]
+if [ $RUN_VFS_TESTS ]
 then
 	do_vfs = 0;
 fi
@@ -350,7 +350,7 @@ fi
 # generic way of submitting jobs. for now assume all the world has pbs
 
 
-if [ $SKIP_MPI_TESTS != "" ]
+if [ $RUN_MPI_TESTS ]
 then
 	
 	which qsub >/dev/null 2>&1
