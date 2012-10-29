@@ -1,4 +1,4 @@
-a#!/bin/bash
+#!/bin/bash
 
 #arguments will come from calling program
 #runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]
@@ -149,7 +149,7 @@ echo "VM IP ADDRESS is ${VMIPADDR}"
 
 #need to make sure key can import itself automatically
 
-ssh-keygen -f "/home/jburton/.ssh/known_hosts" -R ${VMIPADDR}
+ssh-keygen -f "~/.ssh/known_hosts" -R ${VMIPADDR}
 
 #upload rpms to the server
 rsync -a -e "ssh -i $KEYFILE -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" rpm ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/

@@ -8,8 +8,14 @@ script prepare.txt
 sudo yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` perl make
 sudo yum -y install subversion automake autoconf
 
-sudo rpm -i ~/rpm/RPMS/x86_64/db4*.rpm
+#install db4
+cd ~
+wget http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
+tar zxf db-4.8.30.tar.gz
+cd db-4.8.30/build_unix
+../dist/configure --prefix=/opt/db4
+make 
+sudo make install
 
-rpm -q db4-local
 
 exit
