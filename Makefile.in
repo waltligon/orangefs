@@ -198,7 +198,7 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 @LIBS@ 
+LIBS += -lpvfs2 -lm @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
@@ -343,7 +343,7 @@ SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 # OpenSSL support
 SERVERCFLAGS += @OPENSSL_CPPFLAGS@
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt

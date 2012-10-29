@@ -631,6 +631,7 @@ int PVFS_util_copy_sys_attr(
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
+        dest_attr->dirdata_count = src_attr->dirdata_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -2158,6 +2159,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
+    {
+        attrmask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -2235,7 +2241,7 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     }
     if (obj_mask & PVFS_ATTR_DATA_SIZE)
     {
-        sys_mask |= PVFS_ATTR_DATA_SIZE;
+        sys_mask |= PVFS_ATTR_SYS_SIZE;
     }
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -2264,6 +2270,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_CAPABILITY)
     {
         sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
+    }
+    if (obj_mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed

@@ -22,7 +22,9 @@ LIBSRC += $(DIR)/server-config.c \
           $(DIR)/pint-eattr.c \
           $(DIR)/pint-hint.c \
           $(DIR)/pint-mem.c \
-          $(DIR)/pint-uid-mgmt.c
+          $(DIR)/pint-uid-mgmt.c \
+          $(DIR)/dist-dir-utils.c \
+          $(DIR)/md5.c
 
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
@@ -43,7 +45,9 @@ SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/pint-eattr.c \
              $(DIR)/pint-mem.c \
              $(DIR)/pint-hint.c \
-             $(DIR)/pint-uid-mgmt.c
+             $(DIR)/pint-uid-mgmt.c \
+             $(DIR)/dist-dir-utils.c \
+             $(DIR)/md5.c
 
 LIBBMISRC += $(DIR)/str-utils.c \
              $(DIR)/pint-event.c \

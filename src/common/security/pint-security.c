@@ -353,6 +353,38 @@ int PINT_sign_capability(PVFS_capability *cap)
     return 0;
 }
 
+int PINT_server_to_server_capability(PVFS_capability *capability,
+                                     PVFS_fs_id fs_id,
+                                     int num_handles,
+                                     PVFS_handle *handle_array)
+{
+    int ret = -PVFS_EINVAL;
+    server_configuration_s *user_opts = get_server_config_struct();
+
+    ret = PINT_init_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_ENOMEM;
+    }
+    capability->issuer =
+        malloc(strlen(user_opts->server_alias) + 3);
+    capability->issuer[0] = 'S';
+    capability->issuer[1] = ':';
+    strcpy(capability->issuer+2, user_opts->server_alias);
+    capability->fsid = fs_id;
+    capability->timeout =
+        PINT_util_get_current_time() + user_opts->security_timeout;
+    capability->op_mask = ~((uint32_t)0);
+    capability->num_handles = num_handles;
+    capability->handle_array = handle_array;
+    ret = PINT_sign_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_EINVAL;
+    }
+    return 0;
+}
+
 /*  PINT_verify_capability
  *
  *  Takes in a PVFS_capability structure and checks to see if the
@@ -652,6 +684,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     if (!cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Null credential\n");
+gossip_err("1P\n");
         return 0;
     }
 
@@ -663,6 +696,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
                      "(timeout %llu)\n", 
                      PINT_util_bytes2str(cred->signature, sigbuf, 4),
                      llu(cred->timeout));
+gossip_err("2P\n");
         return 0;
     }
 
@@ -677,6 +711,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
         gossip_debug(GOSSIP_SECURITY_DEBUG,
                      "Public key not found for issuer: %s\n", 
                      cred->issuer);
+gossip_err("3P\n");
         return 0;
     }
 
@@ -692,6 +727,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
                      pubkey->type);
+gossip_err("4P\n");
         return 0;
     }
 
@@ -701,6 +737,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
+gossip_err("5P\n");
         return 0;
     }
 
@@ -721,6 +758,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
+gossip_err("6P\n");
         return 0;
     }
 
@@ -734,6 +772,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     EVP_MD_CTX_cleanup(&mdctx);
 
+gossip_err("7P\n");
     return (ret == 1);
 }
 

@@ -61,7 +61,8 @@ enum
     TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
     TROVE_BINARY_KEY             = 1 << 8, /* tell trove this is a binary key */
-    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9  /* tell trove to delete keyvals as it iterates */
+    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9, /* tell trove to delete keyvals as it iterates */
+    TROVE_KEYVAL_DIRECTORY_ENTRY = 1 << 10 /* tell trove to store this as a directory entry */
 };
 
 enum

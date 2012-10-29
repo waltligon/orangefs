@@ -16,6 +16,7 @@
 #include "gossip.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "server-config.h"
 
 /* PINT_print_op_mask
  *

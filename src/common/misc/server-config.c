@@ -128,6 +128,8 @@ static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(get_init_num_dirdata_handles);
+static DOTCONF_CB(split_mem_limit);
 static DOTCONF_CB(tree_width);
 static DOTCONF_CB(tree_threshold);
 
@@ -1031,6 +1033,18 @@ static const configoption_t options[] =
 
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS, "3600"},
+
+     /* Initial number of dirdata handles when creating a new directory.
+      * TODO: determine the default value, use 2 as a start
+      */
+     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2"},
+
+    /* Specifies the maximum size of data transmitted with a
+     *   directory split operation.
+     */
+    {"SplitMemLimit", ARG_INT, split_mem_limit, NULL,
+        CTX_FILESYSTEM, "0"},
 
     /* Specifies the number of partitions to use for tree communication. */
     {"TreeWidth", ARG_INT, tree_width, NULL,
@@ -3119,6 +3133,37 @@ DOTCONF_CB(get_security_timeout)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_init_num_dirdata_handles)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if(cmd->data.value <= 0)
+    {
+        return "InitNumDirdataHandles has to be a positive integer!\n";
+    }
+    config_s->init_num_dirdata_handles = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(split_mem_limit)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->split_mem_limit = cmd->data.value;
+
     return NULL;
 }
 

@@ -5,6 +5,7 @@ CSRC := \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
+	$(DIR)/rcache.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
@@ -50,7 +51,8 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-remove-dirent.c \
 	$(DIR)/mgmt-create-dirent.c \
 	$(DIR)/mgmt-get-dirdata-handle.c \
-    $(DIR)/mgmt-get-uid-list.c
+        $(DIR)/mgmt-get-uid-list.c \
+	$(DIR)/mgmt-get-dirdata-array.c
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

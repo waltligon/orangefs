@@ -410,6 +410,7 @@ typedef struct
 
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
+#define PVFS_ATTR_SYS_DISTDIR_ATTR          (1 << 21)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
@@ -436,16 +437,19 @@ typedef struct
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
@@ -539,6 +543,38 @@ endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
     PVFS_handle, handle);
+
+/* Distributed directory attributes struct
+ * will be stored in keyval space under DIST_DIR_ATTR
+ */
+typedef struct {
+        /* global info */
+        int32_t tree_height; /* ceil(log2(num_servers)) */
+        int32_t num_servers; /* total number of servers */
+        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype stored under the key DIST_DIR_BITMAP */
+        int32_t split_size; /* maximum number of entries before a split */
+
+        /* local info */
+        int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
+        int32_t branch_level; /* level of branching on this server */
+} PVFS_dist_dir_attr;
+endecode_fields_6(
+    PVFS_dist_dir_attr,
+    int32_t, tree_height,
+    int32_t, num_servers,
+    int32_t, bitmap_size,
+    int32_t, split_size,
+    int32_t, server_no,
+    int32_t, branch_level);
+
+typedef uint32_t PVFS_dist_dir_bitmap_basetype;
+typedef uint32_t *PVFS_dist_dir_bitmap;
+typedef uint64_t PVFS_dist_dir_hash_type;
+
+#define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
+#define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
+#define encode_PVFS_dist_dir_hash_type encode_uint64_t
+#define decode_PVFS_dist_dir_hash_type decode_uint64_t
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.

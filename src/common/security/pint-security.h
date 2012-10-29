@@ -37,6 +37,11 @@ int PINT_security_finalize(void);
 int PINT_init_capability(PVFS_capability *cap);
 int PINT_sign_capability(PVFS_capability *cap);
 int PINT_verify_capability(const PVFS_capability *cap);
+int PINT_server_to_server_capability(PVFS_capability *capability,
+                                     PVFS_fs_id fs_id,
+                                     int num_handles,
+                                     PVFS_handle *handle_array);
+
 
 int PINT_init_credential(PVFS_credential *cred);
 int PINT_sign_credential(PVFS_credential *cred);

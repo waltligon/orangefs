@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -15,11 +16,20 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-security.h"
+#include "dist-dir-utils.h"
+#include "pint-cached-config.h"
+#include "pvfs2-dist-basic.h"
 
 enum
 {
     INVALID_OBJECT = 131,
-    UPDATE_DIR_ATTR_REQUIRED
+    INVALID_DIRDATA,
+    UPDATE_DIR_ATTR_REQUIRED,
+    SPLIT_REQUIRED,
+    NO_SPLIT_REQUIRED,
+    SPLIT_FATAL_ERROR,
+    LOCAL_METAHANDLE,
+    REMOTE_METAHANDLE
 };
 
 %%
@@ -36,14 +46,29 @@ machine pvfs2_crdirent_sm
     state setup_op
     {
         run crdirent_setup_op;
-        default => validate;
+        default => get_dist_dir_attr;
+    }
+
+    state get_dist_dir_attr
+    {
+        run crdirent_get_dist_dir_attr;
+        success => get_bitmap_and_dirdata_handles;
+        default => final_response;
+    }
+
+    state get_bitmap_and_dirdata_handles
+    {
+        run crdirent_get_bitmap_and_dirdata_handles;
+        success => validate;
+        default => final_response;
     }
 
     state validate
     {
         run crdirent_validate;
-        success => read_directory_entry_handle;
+        success => write_directory_entry;
         INVALID_OBJECT => validation_object_type_failure;
+        INVALID_DIRDATA => validation_dirdata_mismatch;
         default => final_response;
     }
 
@@ -53,10 +78,9 @@ machine pvfs2_crdirent_sm
         default => final_response;
     }
 
-    state read_directory_entry_handle
+    state validation_dirdata_mismatch
     {
-        run crdirent_read_directory_entry_handle;
-        success => write_directory_entry;
+        run validation_dirdata_mismatch;
         default => final_response;
     }
 
@@ -77,6 +101,126 @@ machine pvfs2_crdirent_sm
     state update_directory_attr
     {
         run crdirent_update_directory_attr;
+        success => get_dirent_count;
+        default => final_response;
+    }
+
+    state get_dirent_count
+    {
+        run crdirent_get_dirent_count;
+        success => check_for_split;
+        default => final_response;
+    }
+
+    state check_for_split
+    {
+        run crdirent_check_for_split;
+/*        SPLIT_REQUIRED => activate_server_setup; */
+        SPLIT_REQUIRED => retrieve_dir_entries;
+        default => final_response;
+    }
+
+    state retrieve_dir_entries
+    {
+        run crdirent_retrieve_dir_entries;
+        success => find_split_entries;
+        default => final_response;
+    }
+
+    state find_split_entries
+    {
+        run crdirent_find_split_entries;
+        SPLIT_REQUIRED => split_xfer_msgpair;
+        default => final_response;
+    }
+
+    state split_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+/*        success => remove_local_copies; */
+        success => activate_server_setup;
+        default => split_cleanup_msgpairarray;
+    }
+
+    state activate_server_setup
+    {
+        run crdirent_activate_server_setup;
+        success => activate_server;
+        default => split_remove_entries;
+    }
+
+    state activate_server
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => update_dirdata_attrs;
+        default => split_remove_entries;
+    }
+
+    state deactivate_server_setup
+    {
+        run crdirent_deactivate_server_setup;
+        success => deactivate_server;
+        default => final_response;
+    }
+
+    state deactivate_server
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => split_remove_entries;
+    }
+
+    state update_dirdata_attrs
+    {
+        run crdirent_update_dirdata_attrs;
+        success => update_metahandle_attrs;
+        default => deactivate_server_setup;
+    }
+
+    state update_metahandle_attrs
+    {
+        run crdirent_update_metahandle_attrs;
+        REMOTE_METAHANDLE => update_metahandle_xfer_msgpair;
+        success => remove_local_copies;
+        default => backout_dirdata_attrs;
+    }
+
+    state update_metahandle_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => remove_local_copies;
+        default => backout_dirdata_attrs;
+    }
+
+    state backout_dirdata_attrs
+    {
+        run crdirent_backout_dirdata_attrs;
+        default => deactivate_server;
+    }
+
+    state remove_local_copies
+    {
+        run crdirent_remove_local_copies;
+        default => final_response;
+    }
+
+    state split_cleanup_msgpairarray
+    {
+        run crdirent_split_cleanup_msgpairarray;
+        success => final_response;
+        default => split_remove_entries;
+    }
+
+    state split_remove_entries
+    {
+        run crdirent_split_remove_entries;
+        success => split_remove_entries_xfer_msgpair;
+        default => final_response;
+    }
+
+    state split_remove_entries_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => deactivate_server_setup;
         default => final_response;
     }
 
@@ -95,17 +239,265 @@ machine pvfs2_crdirent_sm
 
 %%
 
+/* crdirent_setup_op()
+ * 
+ * prepare some state machine fields for later processing; mainly just
+ * storing request structure fields in state machine so that nested
+ * machines are not dependent on request type
+ */
+static PINT_sm_action crdirent_setup_op(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t tmp_id;
+
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG, "crdirent entry: %s points to %llu\n", 
+        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
+    
+    js_p->error_code = 0;
+    s_op->u.crdirent.credential = s_op->req->u.crdirent.credential;
+    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
+    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
+    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
+    s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
+    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
+    s_op->u.crdirent.dir_attr_update_required = 0;
+
+    memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
+                 "for dirdata handle %llu\n", llu(s_op->req->u.crdirent.dirent_handle));
+
+    ret = job_trove_dspace_getattr(
+        s_op->target_fs_id, s_op->req->u.crdirent.dirent_handle, smcb,
+        &(s_op->u.crdirent.dirdata_ds_attr),
+        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+    
+    return ret;
+}
+
+
+/* crdirent_get_dist_dir_attr()
+ * 
+ * Retrieve basic distributed directory attributes for this dirent handle
+ */
+static PINT_sm_action crdirent_get_dist_dir_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{   
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    
+    /*
+      first we translate the dirdata dspace attributes into a more convenient
+      server use-able format.  i.e. a PVFS_object_attr
+    */
+    PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.dirdata_ds_attr,
+                                &s_op->u.crdirent.dirdata_attr);
+    s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+
+    /* set up key and value structures for reading the dist_dir_attr */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    if(s_op->free_val)
+    {   
+        free(s_op->val.buffer);
+    }
+    
+    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+    s_op->free_val = 0;
+    
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  trying to read dist_dir_attr (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 s_op->u.crdirent.fs_id, llu(s_op->u.crdirent.dirent_handle),
+                 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+                 s_op->val.buffer, s_op->val.buffer_sz);
+    
+    ret = job_trove_keyval_read(
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+    
+    return ret;
+}
+
+/* crdirent_get_bitmap_and_dirdata_handles()
+ *  * Retrieve the rest of the distributed directory attributes for this dirent han
+dle.
+ * The size of the bitmap and the handles array was not known until the basic
+ * distributed directory attributes had been retrieved.
+ */
+static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{   
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL, i = 0;
+    PVFS_object_attr *attr_p = NULL;
+    job_id_t j_id;
+
+    attr_p = &s_op->attr;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
+        attr_p->u.dir.dist_dir_bitmap = NULL;
+        attr_p->u.dir.dirdata_handles = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0 &&
+        attr_p->u.dir.dist_dir_attr.bitmap_size > 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "crdirent: get dist-dir-attr for dirdata handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(s_op->u.crdirent.dirent_handle),
+            attr_p->u.dir.dist_dir_attr.tree_height,
+            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.bitmap_size,
+            attr_p->u.dir.dist_dir_attr.split_size,
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for bitmap and dirdata handles */
+    attr_p->u.dir.dist_dir_bitmap =
+        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
+                sizeof(PVFS_dist_dir_bitmap_basetype));
+    attr_p->u.dir.dirdata_handles =
+        malloc(attr_p->u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle));
+    if(!attr_p->u.dir.dist_dir_bitmap ||
+            !attr_p->u.dir.dirdata_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up attr->mask */
+    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+    /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
+
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
+
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+       free(s_op->error_a);
+       s_op->error_a = NULL;
+    }
+    s_op->free_val = 0;
+
+   /* allocate space for keys and values */
+   s_op->keyval_count = 2;
+   s_op->key_a = s_op->val_a = NULL;
+   s_op->error_a = NULL;
+
+    s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->error_a = calloc(s_op->keyval_count, sizeof(PVFS_error));
+    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
+    {
+        gossip_lerr("Cannot allocate memory for key/val/error.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+
+    s_op->val_a[0].buffer_sz =
+        attr_p->u.dir.dist_dir_attr.bitmap_size *
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[0].buffer = attr_p->u.dir.dist_dir_bitmap;
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+
+    s_op->val_a[1].buffer = attr_p->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
+        sizeof(PVFS_handle);
+
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read_list(
+        s_op->u.crdirent.fs_id,
+        s_op->u.crdirent.dirent_handle,
+        s_op->key_a, s_op->val_a,
+        s_op->error_a,
+        s_op->keyval_count,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
 /*
  * Function: crdirent_validate
  *
- * Synopsis: verifies that entry name and object type is valid
+ * Synopsis: verifies that entry name and object type is valid,
+ *           entry name belongs to the right dirdata object.
  */
 static PINT_sm_action crdirent_validate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
-
+    int i = 0;
+    unsigned char *c = NULL;
+    PVFS_object_attr *attr_p = NULL;
+    
+    attr_p = &s_op->attr;
+    
+    /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "crdirent: dist_dir_bitmap as:\n");
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {       
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
+    }           
+    gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "\t getattr: dirdata handles\n");
+            
+    for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "\t\tdirdata server %d: %llu.\n",
+                i, llu(attr_p->u.dir.dirdata_handles[i]));
+    }           
+ 
     if ((s_op->u.crdirent.name == NULL) ||
         (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
     {
@@ -139,74 +531,54 @@ static PINT_sm_action crdirent_validate(
         return SM_ACTION_COMPLETE;
     }
 
-    /* make sure we're dealing with a directory */
+    /* make sure we're dealing with a dirdata object */
+#if 0
     if (!(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE) ||
         !(s_op->attr.objtype == PVFS_TYPE_DIRECTORY))
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, " Cannot read dirent on "
-                     "a non-directory!  Returning error.\n");
+    {   
+        gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: error: Cannot read dirent on "
+                     "a non-directory object!  handle = %llu, objtype = %d. Returning error.\n",
+                     llu(s_op->u.crdirent.parent_handle), s_op->attr.objtype);
 
         js_p->error_code = INVALID_OBJECT;
         return SM_ACTION_COMPLETE;
     }
+#endif
+
+    /* make sure the entry belongs to the dirdata handle*/
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(s_op->u.crdirent.name);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: encrypt dirent %s into hash value %llu.\n",
+            s_op->u.crdirent.name,
+            llu(dirdata_hash));
+
+    dirdata_server_index =
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &attr_p->u.dir.dist_dir_attr,
+            attr_p->u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    if(dirdata_server_index !=
+            attr_p->u.dir.dist_dir_attr.server_no)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
+
+        js_p->error_code = INVALID_DIRDATA;
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "crdirent: Correct dirdata object!\n");
+    }
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
-}
-
-/*
- * Function: crdirent_read_directory_entry_handle
- *
- * Params:   server_op *s_op, 
- *           job_status_s *js_p
- *
- * Pre:      s_op->u.crdirent.parent_handle is handle of directory
- *
- * Post:     s_op->val.buffer is the directory entry k/v space OR NULL
- *           if first entry
- *
- * Returns:  int
- *
- * Synopsis: Given a directory handle, look up the handle used to store
- * directory entries for this directory.
- *
- * Get the directory entry handle for the directory entry k/v space.
- * Recall that directories have two key-val spaces, one of which is
- * synonymous with files where the metadata is stored.  The other
- * space holds the filenames and their handles.  In this function, we
- * attempt to retrieve the handle for the filename/handle key/val
- * space and if it does not exist, we need to create it.
- *
- */
-static PINT_sm_action crdirent_read_directory_entry_handle(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    job_id_t i;
-
-    /* get the key and key size out of our list of common keys */
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-
-    /* store the handle in the crdirent-specific space in s_op */
-    s_op->val.buffer = &s_op->u.crdirent.dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
-
-    ret = job_trove_keyval_read(
-        s_op->u.crdirent.fs_id,
-        s_op->u.crdirent.parent_handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &i,
-        server_job_context, s_op->req->hints);
-
-    return ret;
 }
 
 static PINT_sm_action validation_object_type_failure(
@@ -216,6 +588,17 @@ static PINT_sm_action validation_object_type_failure(
                  "type_failure called\n");
 
     js_p->error_code = -PVFS_ENOTDIR;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action validation_dirdata_mismatch(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_dirdata_"
+                 "mismatch called, let client try again!!\n");
+
+    /* using a new error code?? use the try again error code*/
+    js_p->error_code = -PVFS_EAGAIN;
     return SM_ACTION_COMPLETE;
 }
 
@@ -241,7 +624,7 @@ static PINT_sm_action crdirent_write_directory_entry(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    job_id_t i;
+    job_id_t j_id;
     TROVE_ds_flags keyval_flags;
 
     assert(s_op->u.crdirent.dirent_handle);
@@ -275,13 +658,13 @@ static PINT_sm_action crdirent_write_directory_entry(
     /* We also want to keep track of the keyval entries added on this
      * handle, which allows us to get the size of the directory later
      */
-    keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+    keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
 
     ret = job_trove_keyval_write(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
         &s_op->key, &s_op->val, 
         keyval_flags,
-        NULL, smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
+        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     /*
      * creating an entry will cause directory times to be updated.
@@ -319,50 +702,862 @@ static PINT_sm_action crdirent_update_directory_attr(
         return SM_ACTION_COMPLETE;
     }
 
+    js_p->error_code = 0;
+
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    dspace_attr = &s_op->attr;
+    dspace_attr = &s_op->u.crdirent.dirdata_attr;
     dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
-    ds_attr = &(s_op->ds_attr);
+    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
+    /* update timestamps for the dirdata handle. */
     ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
-        ds_attr, 
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.dirent_handle,
+        ds_attr,
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
+                     ds_attr->type);
     return ret;
+}
+
+static PINT_sm_action crdirent_get_dirent_count(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t tmp_id;
+
+    ret = job_trove_keyval_get_handle_info(
+        s_op->req->u.crdirent.fs_id,
+        s_op->req->u.crdirent.dirent_handle,
+        TROVE_KEYVAL_HANDLE_COUNT |
+        0,
+        &s_op->u.crdirent.keyval_handle_info,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action crdirent_check_for_split(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PVFS_object_attr *attr_p = NULL;
+    unsigned char *c = NULL;
+
+    if (js_p->error_code != 0)
+    {
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "retrieval of dirent count failed.\n");
+        PVFS_perror_gossip("retrieval of dirent count failed",
+                           js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, " dirent count = %d "
+        "split_size =%d, branch_level = %d\n",
+        s_op->u.crdirent.keyval_handle_info.count,
+        s_op->attr.u.dir.dist_dir_attr.split_size,
+        s_op->attr.u.dir.dist_dir_attr.branch_level);
+
+    /* Save the current attrs in case we have to back out due to an error. */
+    PINT_copy_object_attr(&s_op->u.crdirent.saved_attr, &s_op->attr);
+
+    if (s_op->u.crdirent.keyval_handle_info.count >=
+         s_op->attr.u.dir.dist_dir_attr.split_size)
+    {
+        /* Determine which node will get split entries. */
+        s_op->u.crdirent.split_node = PINT_find_dist_dir_split_node(
+               &s_op->attr.u.dir.dist_dir_attr, s_op->attr.u.dir.dist_dir_bitmap);
+        if (s_op->u.crdirent.split_node < 0)
+        {
+            /* No new node can be found. No need to split. */
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG, " No new node found for split.\n");
+            return SM_ACTION_COMPLETE;
+        }
+
+        js_p->error_code = SPLIT_REQUIRED;
+
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, " split to node %d, new branch_level = %d\n",
+            s_op->u.crdirent.split_node, s_op->attr.u.dir.dist_dir_attr.branch_level);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "crdirent: new dist_dir_bitmap as:\n");
+        attr_p = &s_op->attr;
+        for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+                i >= 0 ; i--)
+        {
+            c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                    " i=%d : %02x %02x %02x %02x\n",
+                    i, c[3], c[2], c[1], c[0]);
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action crdirent_save_dirdata_attrs(
+        struct PINT_smcb *smcb, job_status_s *js_p,
+        PVFS_handle handle, PVFS_object_attr *attr_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    int i = 0;
+
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
+
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+       free(s_op->error_a);
+       s_op->error_a = NULL;
+    }
+    s_op->free_val = 0;
+
+    /* total 2 keyvals, PVFS_DIST_DIR_ATTR and PVFS_DIRDATA_BITMAP
+           (PVFS_DIRDATA_HANDLES does not change) */
+    int keyval_count = 2;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+
+    s_op->val_a[0].buffer = &attr_p->u.dir.dist_dir_attr;
+    s_op->val_a[0].buffer_sz =
+         sizeof(attr_p->u.dir.dist_dir_attr);
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+
+    s_op->val_a[1].buffer_sz =
+        attr_p->u.dir.dist_dir_attr.bitmap_size *
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[1].buffer = attr_p->u.dir.dist_dir_bitmap;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "  updating dist-dir-struct keyvals for handle: %llu "
+            "\t with server_no=%d and branch_level=%d \n",
+            llu(handle),
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
+
+
+    ret = job_trove_keyval_write_list(
+            s_op->req->u.crdirent.fs_id,
+            handle,
+            s_op->key_a, s_op->val_a,
+            keyval_count, TROVE_SYNC, NULL, smcb,
+            0, js_p, &j_id, server_job_context,
+            s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action crdirent_update_dirdata_attrs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    js_p->error_code = 0;
+    attr_p = &s_op->attr;
+    ret = crdirent_save_dirdata_attrs(smcb, js_p,
+        s_op->req->u.crdirent.dirent_handle, attr_p);
+    return(ret);
+}
+ 
+static PINT_sm_action crdirent_backout_dirdata_attrs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    js_p->error_code = 0;
+    attr_p = &s_op->u.crdirent.saved_attr;
+    ret = crdirent_save_dirdata_attrs(smcb, js_p,
+        s_op->req->u.crdirent.dirent_handle, attr_p);
+    return(ret);
+}
+
+static PINT_sm_action crdirent_send_server_attrs(
+        struct PINT_smcb *smcb, job_status_s *js_p,
+        PVFS_handle handle, PVFS_ds_type type, PVFS_object_attr *attr_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
+
+    /* Capability was initialized earlier. */
+    PINT_SERVREQ_SETATTR_FILL(
+        msg_p->req,
+        s_op->u.crdirent.capability,
+        s_op->req->u.crdirent.credential,
+        s_op->req->u.crdirent.fs_id,
+        handle,
+        type,
+        *attr_p,
+        0,
+        s_op->req->hints);
+
+    PINT_dist_dir_attr_copyto(msg_p->req.u.setattr.attr.u.dir.dist_dir_attr,
+                              attr_p->u.dir.dist_dir_attr);
+    msg_p->req.u.setattr.attr.u.dir.dirdata_handles = attr_p->u.dir.dirdata_handles;
+    msg_p->req.u.setattr.attr.u.dir.dist_dir_bitmap = attr_p->u.dir.dist_dir_bitmap;
+    msg_p->req.u.setattr.attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+    msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+    msg_p->handle = handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "setting dist_dir_attrs for handle %llu\n",
+        llu(msg_p->handle));
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+
+}
+
+/* Tell the other server he is now active. */
+static PINT_sm_action crdirent_activate_server_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    attr_p = &s_op->attr;
+    ret = crdirent_send_server_attrs(smcb, js_p,
+        attr_p->u.dir.dirdata_handles[s_op->u.crdirent.split_node], PVFS_TYPE_DIRDATA, attr_p);
+    return(ret);
+}
+
+
+/* Tell the other server he is no longer active. This is necessary
+   when an error occurs while sending directory entries. */
+static PINT_sm_action crdirent_deactivate_server_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    attr_p = &s_op->u.crdirent.saved_attr;
+    ret = crdirent_send_server_attrs(smcb, js_p,
+        attr_p->u.dir.dirdata_handles[s_op->u.crdirent.split_node], PVFS_TYPE_DIRDATA, attr_p);
+    return(ret);
+}
+
+static PINT_sm_action crdirent_update_metahandle_attrs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char server_name[1024];
+    struct server_configuration_s *server_config = get_server_config_struct();
+    PVFS_object_attr *attr_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    /* Determine whether the metadata handle is on the local server. */
+    PINT_cached_config_get_server_name(server_name, 1024,
+        s_op->u.crdirent.parent_handle, s_op->u.crdirent.fs_id);
+    if (! strcmp(server_config->host_id, server_name))
+    {
+        /* local */
+        attr_p = &s_op->attr;
+        ret = crdirent_save_dirdata_attrs(smcb, js_p,
+            s_op->u.crdirent.parent_handle, attr_p);
+        return(ret);
+    }
+    else
+    {
+        /* remote */
+        attr_p = &s_op->attr;
+        ret = crdirent_send_server_attrs(smcb, js_p,
+            s_op->u.crdirent.parent_handle, PVFS_TYPE_DIRECTORY, attr_p);
+        js_p->error_code = REMOTE_METAHANDLE;
+        return(ret);
+    }
+}
+
+static PINT_sm_action crdirent_retrieve_dir_entries(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_dirent *dirent_array = NULL;
+    int kv_array_size = 0;
+    int memory_size = 0;
+    char *memory_buffer = NULL;
+    int j = 0;
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+
+    js_p->error_code = 0;
+
+    /* Allocate memory to retrieve all the directory entries.
+       - 2 * dirent_count keyval structures to pass to iterate function
+       - dirent_count dirent structures to hold the results
+    */
+    kv_array_size = (s_op->u.crdirent.keyval_handle_info.count *
+                     sizeof(PVFS_ds_keyval));
+
+    memory_size = (2 * kv_array_size +
+                   s_op->u.crdirent.keyval_handle_info.count *
+                   sizeof(PVFS_dirent));
+
+    memory_buffer = malloc(memory_size);
+    if (!memory_buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->u.crdirent.read_all_directory_entries = 1;
+
+    /* set up all the pointers into the one big buffer */
+    s_op->u.crdirent.entries_key_a = (PVFS_ds_keyval *)memory_buffer;
+    memory_buffer += kv_array_size;
+
+    s_op->u.crdirent.entries_val_a = (PVFS_ds_keyval *)memory_buffer;
+    memory_buffer += kv_array_size;
+
+    dirent_array = (PVFS_dirent *)memory_buffer;
+
+    for (j = 0; j < s_op->u.crdirent.keyval_handle_info.count; j++)
+    {
+        s_op->u.crdirent.entries_key_a[j].buffer =
+            dirent_array[j].d_name;
+        s_op->u.crdirent.entries_key_a[j].buffer_sz = PVFS_NAME_MAX;
+        s_op->u.crdirent.entries_val_a[j].buffer =
+            &(dirent_array[j].handle);
+        s_op->u.crdirent.entries_val_a[j].buffer_sz = sizeof(PVFS_handle);
+    }
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, " - iterating keyvals: [%llu,%d], "
+        "\n\ttoken=%llu, count=%d\n",
+        llu(s_op->u.crdirent.dirent_handle), s_op->u.crdirent.fs_id,
+        llu(PVFS_ITERATE_START),
+        s_op->u.crdirent.keyval_handle_info.count);
+
+    ret = job_trove_keyval_iterate(
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        PVFS_ITERATE_START, s_op->u.crdirent.entries_key_a, s_op->u.crdirent.entries_val_a,
+        s_op->u.crdirent.keyval_handle_info.count,
+        TROVE_KEYVAL_DIRECTORY_ENTRY,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+{
+    /* This function executes AFTER each msgpair has completed and is under the
+    * control of msgpairarray.sm.  Here, we will capture the response from the
+    * PVFS_SERV_SPLIT_DIRENT request. We will retain the status
+    * from each response and then check it when we return from the jump to
+    * msgpairarray.  We will always return a zero from this function, even if
+    * the request failed, so we can check it later. */
+
+    PINT_smcb *smcb = v_p;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    s_op->u.crdirent.split_status[i] = resp_p->status;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "\tsplit_comp_fn: status=%d\n",
+        (int)resp_p->status);
+    return(0);
+}
+
+static PINT_sm_action crdirent_find_split_entries(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0, j = 0;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index = 0;
+    int ret = -PVFS_EINVAL;
+    int cur_bytes = 0;
+    int num_entries_needed = 0;
+
+    js_p->error_code = 0;
+    /* Allocate memory to store entries that need to be sent.
+       Allocating the current number of directory entries will
+       be overkill, but guaranteed to be big enough. */
+    s_op->u.crdirent.nentries = 0;
+    s_op->u.crdirent.entry_handles = (PVFS_handle *) malloc(
+        s_op->u.crdirent.keyval_handle_info.count * sizeof(PVFS_handle));
+    if (!s_op->u.crdirent.entry_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->u.crdirent.entry_names = (char **) malloc(
+        s_op->u.crdirent.keyval_handle_info.count * sizeof(char *));
+    if (!s_op->u.crdirent.entry_names)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* Sending entries will require multiple messages if they don't all fit.
+       Calculate the worst case scenario, if all entries must be sent and
+       all their names are the max length.                                  */
+    s_op->u.crdirent.num_msgs_required = 1;
+    num_entries_needed = s_op->u.crdirent.keyval_handle_info.count /
+                         PVFS_REQ_LIMIT_NENTRIES_MAX + 1;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "entry count = %d\n",
+        s_op->u.crdirent.keyval_handle_info.count);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS_REQ_LIMIT_NENTRIES_MAX = %d\n",
+        PVFS_REQ_LIMIT_NENTRIES_MAX);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "# array entries needed = %d\n",
+        num_entries_needed);
+
+    s_op->u.crdirent.msg_boundaries = (split_msg_boundary *) malloc(
+        num_entries_needed * sizeof(split_msg_boundary));
+    s_op->u.crdirent.split_status = (PVFS_error *) malloc(
+        num_entries_needed * sizeof(PVFS_error));
+    if (!s_op->u.crdirent.msg_boundaries || !s_op->u.crdirent.split_status)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->u.crdirent.msg_boundaries[0].start_entry = 0;
+    s_op->u.crdirent.msg_boundaries[0].nentries = 0;
+    for (j = 0; j < s_op->u.crdirent.keyval_handle_info.count; j++)
+    {
+        /* find the hash value and the dist dir bucket */
+        dirdata_hash = PINT_encrypt_dirdata(s_op->u.crdirent.entries_key_a[j].buffer);
+        dirdata_server_index = 
+            PINT_find_dist_dir_bucket(dirdata_hash,
+                &s_op->attr.u.dir.dist_dir_attr,
+                s_op->attr.u.dir.dist_dir_bitmap);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "crdirent: dirent %s target bucket No.%d.\n",
+            (char *) s_op->u.crdirent.entries_key_a[j].buffer, dirdata_server_index);
+
+        if(dirdata_server_index == s_op->u.crdirent.split_node)
+        {
+            /* This one needs to go to the newly-participating node. */
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                "Putting %s into entry_names[%d]\n",
+                (char *) s_op->u.crdirent.entries_key_a[j].buffer, s_op->u.crdirent.nentries);
+
+            s_op->u.crdirent.entry_names[s_op->u.crdirent.nentries] =
+                s_op->u.crdirent.entries_key_a[j].buffer;
+            s_op->u.crdirent.entry_handles[s_op->u.crdirent.nentries] =
+                (PVFS_handle) (*(PVFS_handle *) s_op->u.crdirent.entries_val_a[j].buffer);
+            cur_bytes += strlen(s_op->u.crdirent.entries_key_a[j].buffer) + 1 + sizeof(PVFS_handle);
+            if (cur_bytes >= PVFS_REQ_LIMIT_SPLIT_SIZE_MAX)
+            {
+                s_op->u.crdirent.num_msgs_required++;
+                s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].start_entry = s_op->u.crdirent.nentries;
+                s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].nentries = 1;
+                cur_bytes = strlen(s_op->u.crdirent.entries_key_a[j].buffer) + 1 + sizeof(PVFS_handle);
+            }
+            else
+            {
+                s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].nentries++;
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                    "number of entries in message #%i = %d\n",
+                    s_op->u.crdirent.num_msgs_required, 
+                    s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].nentries);
+            }
+            s_op->u.crdirent.nentries++;
+        }
+    }
+
+    if (s_op->u.crdirent.nentries > 0) {
+        js_p->error_code = SPLIT_REQUIRED;
+
+        /* initialize msgarray_op structure */
+        PINT_sm_msgarray_op *msgarray_op = &(s_op->msgarray_op);
+        memset(msgarray_op, 0, sizeof(PINT_sm_msgarray_op));
+
+        /*parameters are setup like a client except for job_context*/
+        PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
+
+        /*allocate a mspair_state structure for each destination handle.*/
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "allocating space for %d msgpairs\n", s_op->u.crdirent.num_msgs_required);
+        ret=PINT_msgpairarray_init(msgarray_op,s_op->u.crdirent.num_msgs_required);
+        if (ret)
+        {
+            gossip_lerr("Failed to allocate msgarray.\n");
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
+                 s_op->req->u.crdirent.fs_id,
+                 s_op->attr.u.dir.dist_dir_attr.num_servers,
+                 s_op->attr.u.dir.dirdata_handles);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+
+        s_op->u.crdirent.dist = PINT_dist_create(PVFS_DIST_BASIC_NAME);
+        for (i = 0; i < s_op->u.crdirent.num_msgs_required; i++)
+        {
+            PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
+
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+                     s_op->req->u.crdirent.fs_id,
+                     s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node],
+                     s_op->u.crdirent.dist,
+                     0,     /* Not an "undo" message. */
+                     s_op->u.crdirent.msg_boundaries[i].nentries,
+                     &s_op->u.crdirent.entry_handles[s_op->u.crdirent.msg_boundaries[i].start_entry],
+                     &s_op->u.crdirent.entry_names[s_op->u.crdirent.msg_boundaries[i].start_entry],
+                     s_op->req->hints);
+
+            msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+            msg_p->handle = s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node];
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = split_comp_fn;
+
+            /* Determine the BMI svr address for the destination handle */
+            ret = PINT_cached_config_map_to_server(
+                &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+            if (ret)
+            {
+                gossip_err("Failed to map dirdata server address\n");
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+
+        }
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action crdirent_remove_local_copies(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    TROVE_ds_flags keyval_flags;
+    int i;
+
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
+
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+       free(s_op->error_a);
+       s_op->error_a = NULL;
+    }
+    s_op->free_val = 0;
+
+    s_op->key_a = calloc(s_op->u.crdirent.nentries, sizeof(PVFS_ds_keyval));
+    s_op->val_a = calloc(s_op->u.crdirent.nentries, sizeof(PVFS_ds_keyval));
+    s_op->error_a = calloc(s_op->u.crdirent.nentries, sizeof(PVFS_error));
+    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
+    {
+        gossip_lerr("Cannot allocate memory for key/val/error.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    for (i = 0; i < s_op->u.crdirent.nentries; i++)
+    {
+        s_op->key_a[i].buffer = s_op->u.crdirent.entry_names[i];
+        s_op->key_a[i].buffer_sz = strlen(s_op->u.crdirent.entry_names[i]) + 1;
+        s_op->val_a[i].buffer = &s_op->u.crdirent.entry_handles[i];
+        s_op->val_a[i].buffer_sz = sizeof(PVFS_handle);
+    }
+
+    /* We want to keep track of the keyval entries added or removed on
+     * this handle, which allows us to get the size of the directory later
+     */
+    keyval_flags = TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT |
+                   TROVE_KEYVAL_DIRECTORY_ENTRY;
+
+    ret = job_trove_keyval_remove_list(
+        s_op->req->u.crdirent.fs_id,
+        s_op->u.crdirent.dirent_handle,
+        s_op->key_a,
+        s_op->val_a,
+        s_op->error_a,
+        s_op->u.crdirent.nentries,
+        keyval_flags,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
+}
+
+static PINT_sm_action crdirent_split_remove_entries(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    int ret = -PVFS_EINVAL;
+    int cur_bytes = 0;
+    int num_undo_entries = 0;
+
+    js_p->error_code = 0;
+    /* Reuse the arrays for sending entries. We are guaranteed
+       to send no more than the original number of split entries. */
+
+    s_op->u.crdirent.num_msgs_required = 0;
+    for (i = 0; i < s_op->u.crdirent.nentries; i++)
+    {
+        if (s_op->u.crdirent.split_status[i] == 0)
+        {
+            /* This one needs to be undone. */
+            if (i > num_undo_entries)
+            {
+                s_op->u.crdirent.entry_handles[num_undo_entries] =
+                    s_op->u.crdirent.entry_handles[i];
+/*                (PVFS_handle) *(PVFS_handle *) s_op->u.crdirent.entry_handles[i];
+*/
+                s_op->u.crdirent.entry_names[num_undo_entries] =
+                    s_op->u.crdirent.entry_names[i];;
+            }
+            cur_bytes += sizeof(PVFS_handle);
+            if (cur_bytes >= PVFS_REQ_LIMIT_SPLIT_SIZE_MAX)
+            {
+                s_op->u.crdirent.num_msgs_required++;
+                s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].start_entry = num_undo_entries;
+                s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].nentries = 1;
+                cur_bytes = sizeof(PVFS_handle);
+            }
+            else
+            {
+                 s_op->u.crdirent.msg_boundaries[s_op->u.crdirent.num_msgs_required - 1].nentries++;
+            }
+            num_undo_entries++;
+        }
+    }
+
+    if (num_undo_entries > 0) {
+        /* initialize msgarray_op structure */
+        PINT_sm_msgarray_op *msgarray_op = &(s_op->msgarray_op);
+        memset(msgarray_op, 0, sizeof(PINT_sm_msgarray_op));
+
+        /*parameters are setup like a client except for job_context*/
+        PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
+
+        /* mspair_state structures have already been allocated. */
+
+        for (i = 0; i < s_op->u.crdirent.num_msgs_required; i++)
+        {
+            PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
+
+            msg_p = &s_op->msgarray_op.msgpair;
+            PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
+
+            /* Capability was initialized earlier. */
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+                     s_op->req->u.crdirent.fs_id,
+                     s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node],
+                     NULL,
+                     1,     /* This is an "undo" message. */
+                     num_undo_entries,
+                     &s_op->u.crdirent.entry_handles[s_op->u.crdirent.msg_boundaries[i].start_entry],
+                     &s_op->u.crdirent.entry_names[s_op->u.crdirent.msg_boundaries[i].start_entry],
+                     s_op->req->hints);
+
+            msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+            msg_p->handle = s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node];
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = split_comp_fn;
+
+            /* Determine the BMI svr address for the destination handle */
+            ret = PINT_cached_config_map_to_server(
+                &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+            if (ret)
+            {
+                gossip_err("Failed to map dirdata server address for undoing split\n");
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+
+        }
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action crdirent_split_cleanup_msgpairarray( struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_sm_msgarray_op *msgarray_op = &(s_op->msgarray_op);
+    int i;
+
+    js_p->error_code = 0;
+
+    /*if ALL msgpairs have errors, then set an error code and skip the rest */
+    /*of this request.                                                      */
+    for (i = 0; i < s_op->u.crdirent.num_msgs_required; i++)
+    {
+        if (s_op->u.crdirent.split_status != 0)
+        {
+           js_p->error_code = SPLIT_FATAL_ERROR;
+           break;
+        }
+    }
+
+    /*will free msgarray if necessary*/
+    PINT_msgpairarray_destroy(msgarray_op);
+
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action crdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(smcb));
-}
-
-/* crdirent_setup_op()
- *
- * prepare some state machine fields for later processing; mainly just
- * storing request structure fields in state machine so that nested
- * machines are not dependent on request type
- */
-static PINT_sm_action crdirent_setup_op(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
-        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
+    int i = 0;
 
-    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
-    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
-    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
-    s_op->u.crdirent.dir_attr_update_required = 0;
+    if (s_op->u.crdirent.read_all_directory_entries)
+    {
+        if (s_op->u.crdirent.entries_key_a)
+        {
+            free(s_op->u.crdirent.entries_key_a);
+            s_op->u.crdirent.entries_key_a = NULL;
+            s_op->u.crdirent.entries_val_a = NULL;
+            s_op->u.crdirent.read_all_directory_entries = 0;
+        }
+    }
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
 
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+       free(s_op->error_a);
+       s_op->error_a = NULL;
+    }
+    s_op->free_val = 0;
+
+    PINT_free_object_attr(&s_op->attr);
+    PINT_free_object_attr(&s_op->u.crdirent.saved_attr);
+
+    if (s_op->u.crdirent.entry_handles)
+    {
+        free(s_op->u.crdirent.entry_handles);
+    }
+    if (s_op->u.crdirent.entry_names)
+    {
+        free(s_op->u.crdirent.entry_names);
+    }
+    if (s_op->u.crdirent.msg_boundaries)
+    {
+        free(s_op->u.crdirent.msg_boundaries);
+    }
+    if (s_op->u.crdirent.split_status)
+    {
+        free(s_op->u.crdirent.split_status);
+    }
+    if (s_op->u.crdirent.dist)
+    {
+        PINT_dist_free(s_op->u.crdirent.dist);
+    }
+
+    return(server_state_machine_complete(smcb));
 }
 
 static int perm_crdirent(PINT_server_op *s_op)
