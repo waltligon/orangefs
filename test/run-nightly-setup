@@ -21,7 +21,7 @@ mkdir -p pvfs2/maint/build
 
 #checkout needed directories and files to run the nightly process
 cd ${PATH_SUFFIX}/pvfs2/maint
-svn export --force -q http://www.orangefs.org/svn/orangefs/branches/${SVNTAGS}/maint/build
+svn export --force -q http://www.orangefs.org/svn/orangefs/${SVNTAGS}/maint/build
 if [ $? != 0 ]
 then
    echo "Failed to export maint/build directory from SVN"
@@ -29,14 +29,14 @@ then
 fi
 
 cd ${PATH_SUFFIX}/pvfs2/test
-svn export --force -q http://www.orangefs.org/svn/orangefs/branches/${SVNTAGS}/test/run-nightly
+svn export --force -q http://www.orangefs.org/svn/orangefs/${SVNTAGS}/test/run-nightly
 if [ $? != 0 ]
 then
    echo "Failed to export the run-nightly file from SVN"
    exit 1
 fi
 
-svn export --force -q http://www.orangefs.org/svn/orangefs/branches/${SVNTAGS}/test/automated
+svn export --force -q http://www.orangefs.org/svn/orangefs/${SVNTAGS}/test/automated
 if [ $? != 0 ]
 then
    echo "Failed to export test/automated directory from SVN"
