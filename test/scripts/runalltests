@@ -151,10 +151,6 @@ echo "VM IP ADDRESS is ${VMIPADDR}"
 
 ssh-keygen -f "~/.ssh/known_hosts" -R ${VMIPADDR}
 
-#upload rpms to the server
-rsync -a -e "ssh -i $KEYFILE -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" rpm ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/
-
-rsync -a -e "ssh -i $KEYFILE -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" atrpms.repo  ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/
 
 #prepare the image for testing
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh
