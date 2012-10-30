@@ -20,8 +20,9 @@ JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
 ORGDIR = org/orangefs/usrint
 ORGDOT = org.orangefs.usrint
 ORGUNDER = org_orangefs_usrint
+#JNI Directory
+JNIDIR=/home/denton/trunk/ofs/src/client/otherint/JNI
 #------------------------------------------------------------------------------
-
 ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so 
 	jar cf ofs_jni.jar \
 	  $(ORGDIR)/*.class
@@ -37,8 +38,6 @@ libPVFS2POSIXJNI.so : PVFS2POSIXJNI.class $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2PO
 	gcc -shared -g \
       -o $@ \
       libPVFS2POSIXJNI.o \
-      flag_conv_common.o \
-      posix_flag_conv.o \
       -L$(PVFS2_TOP_PREFIX)/lib \
       -lofs \
       -lpvfs2 \
@@ -47,24 +46,24 @@ libPVFS2POSIXJNI.so : PVFS2POSIXJNI.class $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2PO
       -lcrypto
 
 #Generate Java classes
-PVFS2POSIXJNI.class : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c
-	javac $<
+PVFS2POSIXJNI.class : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c \
+$(ORGDIR)/PVFS2POSIXJNIFlags.java $(ORGDIR)/Orange.java
+	javac $< $(ORGDIR)/PVFS2POSIXJNIFlags.java $(ORGDIR)/Orange.java
 
 #Generate JNI Compatible C Header for JNI Shim
 $(ORGUNDER)_PVFS2POSIXJNI.h : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c
 	javah $(ORGDOT).PVFS2POSIXJNI
 
 #Preprocess, Compile, and Assemble in one step
-libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGDIR)/PVFS2POSIXJNI.java $(ORGUNDER)_PVFS2POSIXJNI.h \
-                     PVFS2POSIXJNI.class flags/flag_conv_common.c flags/posix_flag_conv.c
+libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGDIR)/PVFS2POSIXJNI.java \
+$(ORGUNDER)_PVFS2POSIXJNI.h PVFS2POSIXJNI.class $(ORGDIR)/PVFS2POSIXJNIFlags.java
 	cc -fPIC -c \
       -I$(PVFS2_TOP_PREFIX)/include \
       -I$(USRINT_DIR) \
       -I$(JAVA_HOME)include \
       -I$(JAVA_HOME)include/linux \
-      libPVFS2POSIXJNI.c \
-      flags/flag_conv_common.c \
-      flags/posix_flag_conv.c 
+	  -I$(JNIDIR) \
+      libPVFS2POSIXJNI.c
 
 #PVFS2STDIOJNI
 #==============================================================================
