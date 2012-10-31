@@ -89,7 +89,8 @@ run_pvfs_tests () {
   cd $auto_dir
   # generate the test config file 
   cat > /tmp/$USER/nightly-tests.cfg << EOF
-export CVS_TAG="$tag"
+export CVS_TAG_FULL="$tag"
+export CVS_TAG=`echo $CVS_TAG_FULL | awk -F"/" '{print $NF}'`
 export PVFS2_DEST=$base_dir/$tag
 #export PVFS2_MOUNTPOINT=/scratch/pvfs2-nightly
 export PVFS2_MOUNTPOINT=$base_dir/$tag/mount
