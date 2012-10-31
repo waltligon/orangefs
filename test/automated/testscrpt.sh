@@ -301,7 +301,7 @@ then
 fi
 
 echo "pull_and_build_pvfs2"
-pull_and_build_pvfs2  $CVS_TAG || buildfail
+pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
 echo "setup_pvfs2"
 teardown_pvfs2 && setup_pvfs2 

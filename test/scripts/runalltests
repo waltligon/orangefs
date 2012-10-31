@@ -71,7 +71,7 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
-echo "VMUSER is $VMUSER"
+
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
 echo "VMIPADDR is $VMIPADDR"
@@ -81,7 +81,7 @@ echo "DELETE_INSTANCE is $DELETE_INSTANCE"
 export SVNBRANCH
 export NEWINSTANCE
 export VMSYSTEM
-export VMUSER
+
 export RUN_VFS_TEST
 export RUN_MPI_TEST
 export KEYFILE
@@ -105,6 +105,9 @@ case $VMSYSTEM in
 		echo "System $VMSYSTEM not supported."
 		exit 1
 esac
+
+echo "VMUSER is $VMUSER"
+export VMUSER
 
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
