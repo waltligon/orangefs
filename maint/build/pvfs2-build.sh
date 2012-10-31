@@ -57,6 +57,8 @@ get_cvs() {
 	#split off last element in path
 	BRANCH=echo $1 | awk -F"/" '{print $NF}'
 	
+	echo "Branch is ${BRANCH}"
+	
 	mv $BRANCH pvfs2-$BRANCH
 }
 
