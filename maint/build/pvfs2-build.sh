@@ -55,7 +55,7 @@ get_cvs() {
 	
 	#mv pvfs2 pvfs2-$1
 	#split off last element in path
-	BRANCH=echo $1 | awk -F"/" '{print $NF}'
+	BRANCH=`echo $1 | awk -F"/" '{print $NF}'`
 	
 	echo "Branch is ${BRANCH}"
 	
@@ -100,7 +100,7 @@ done
 echo "PVFS2 will be built in ${rootdir}."
 
 #cvs tag is final element of full cvs tag
-cvs_tag=echo $full_cvs_tag | awk -F"/" '{print $NF}'
+cvs_tag=`echo $full_cvs_tag | awk -F"/" '{print $NF}'`
 
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
