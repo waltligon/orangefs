@@ -22,8 +22,8 @@ fi
 
 
 # need to make this a command line arugment:
-export CVS_TAG="${CVS_TAG:-HEAD}"
-
+export CVS_TAG_FULL="${CVS_TAG:-HEAD}"
+export CVS_TAG=`echo $CVS_TAG_FULL | awk -F"/" '{print $NF}'`
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
