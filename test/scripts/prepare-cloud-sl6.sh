@@ -12,8 +12,8 @@ wget -q http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
 tar zxf db-4.8.30.tar.gz &> /dev/null
 cd db-4.8.30/build_unix
 ../dist/configure --prefix=/opt/db4 &> db4conf.out
-make 1&2> db4make.out
-sudo make install 1&2> db4install.out
+make &> db4make.out
+sudo make install &> db4install.out
 
 echo '[atrpms]
 name=Fedora Core $releasever - $basearch - ATrpms
