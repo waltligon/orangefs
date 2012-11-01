@@ -836,8 +836,8 @@ $(ADMINTOOLS_SERVER): %: %.o
 
 # special rules for devel tool objects which also require db components
 $(DEVELOBJS): %.o: %.c
-        $(Q) "  CC              $@"
-        $(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(Q) "  CC              $@"
+	$(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 ifdef BUILD_BMI_ONLY
 # rule for building the bmi library
