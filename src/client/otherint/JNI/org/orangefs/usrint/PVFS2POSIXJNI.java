@@ -1,3 +1,9 @@
+/* 
+ * (C) 2011 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+ 
 package org.orangefs.usrint;
 
 import org.orangefs.usrint.*;
@@ -101,7 +107,7 @@ public class PVFS2POSIXJNI {
      */
     //fuctions using the structure statfs
     public native Statfs statfs(String path);
-    public native Fstatfs fstatfs(int fd);
+    public native Statfs fstatfs(int fd);
     
     //fuctions using the structure statfs64
     //public native Statfs64 statfs64(long x, String path);

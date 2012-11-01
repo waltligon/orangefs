@@ -16,9 +16,9 @@ public class PVFS2STDIOJNIFlags {
     /* Fields set by JNI function fill_PVFS2STDIOJNIFlags.
     * See libPVFS2STDIOJNI.c 
     */
-    long SEEK_SET;
-    long SEEK_CUR;
-    long SEEK_END;
+    public long SEEK_SET;
+    public long SEEK_CUR;
+    public long SEEK_END;
 
     public String toString() {
         StringBuilder result = new StringBuilder();
