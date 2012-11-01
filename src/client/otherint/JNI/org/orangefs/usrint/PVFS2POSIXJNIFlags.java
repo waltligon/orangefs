@@ -1,8 +1,18 @@
+/* 
+ * (C) 2011 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
 package org.orangefs.usrint;
 
 import java.lang.reflect.Field;
 
 public class PVFS2POSIXJNIFlags {
+
+    /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
+    public PVFS2POSIXJNIFlags() {}
+
     /* Fields set by JNI function fill_PVFS2POSIXJNIFlags.
     * See posix_flags.c 
     */
@@ -46,15 +56,6 @@ public class PVFS2POSIXJNIFlags {
     public long S_IROTH;
     public long S_IWOTH;
     public long S_IXOTH;
-/*
-    public long S_ISREG;
-    public long S_ISDIR;
-    public long S_ISCHR;
-    public long S_ISBLK;
-    public long S_ISFIFO;
-    public long S_ISLINK;
-    public long S_ISSOCK;
-*/
     public long S_IFMT;
     public long S_IFSOCK;
     public long S_IFLNK;   
@@ -67,9 +68,6 @@ public class PVFS2POSIXJNIFlags {
     public long S_ISGID;    
     public long S_ISVTX;
     public long S_IRWXU;
-
-    /* Constructor won't matter since we're calling JNI allocObject */
-    PVFS2POSIXJNIFlags(){}
 
     public String toString() {
         StringBuilder result = new StringBuilder();

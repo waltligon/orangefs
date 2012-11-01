@@ -10,6 +10,15 @@ import java.lang.reflect.Field;
 
 public class PVFS2STDIOJNI {
 
+    public PVFS2STDIOJNIFlags f;
+
+    public PVFS2STDIOJNIFlags getF() {
+        return f;
+    }
+
+    /* ========== PVFS2STDIOJNI Native Methods START ========== */
+    public native PVFS2STDIOJNIFlags fillPVFS2STDIOJNIFlags();
+    
     public native String [] getUsernameGroupname(int uid, int gid);
     public native String [] getFilesInDir(String path);
     public native int recursiveDelete(String path);
@@ -19,11 +28,10 @@ public class PVFS2STDIOJNI {
 
     public native long fopen(String path, String mode);
     public native int fclose(long stream);
-    public native int setvbuf(long stream, long buf, String mode, long size);
+    public native int setvbuf(long stream, long buf, long mode, long size);
     public native long fdopen(int fd, String mode);
     public native int fileno(long stream);
     public native int remove(String path); 
-    public native int fseek(long stream, long offset, String whence);
     public native long fread(byte [] ptr, long size, long nmemb, long stream);
     public native long fwrite(byte [] ptr, long size, long nmemb, long stream);
     public native long fdopendir(int fd);
@@ -32,16 +40,17 @@ public class PVFS2STDIOJNI {
     public native int ftrylockfile(long stream);
     public native void funlockfile(long stream);
     
-    public native long fopen64(String path, String modes);
+    public native long fopen64(String path, String mode);
     public native long freopen(String path, String mode, long stream);
-    public native long freopen64(String path, String modes, long stream);
+    public native long freopen64(String path, String mode, long stream);
     public native long fwriteUnlocked(byte [] ptr, long size, long nmemb, long stream);
     public native long freadUnlocked(byte [] ptr, long size, long nmemb, long stream);
     public native int fcloseall();
     public native long ftell(long stream);
-    public native int fseeko(long stream, long offset, String whence);
-    public native int fseeko64(long stream, long offset, String whence); /* TODO C Function */
-    public native int fseek64(long stream, long offset, String whence);
+    public native int fseek(long stream, long offset, long whence);
+    public native int fseek64(long stream, long offset, long whence);
+    public native long fseeko(long stream, long offset, long whence);
+    public native long fseeko64(long stream, long offset, long whence);
 
     public native int fflush(long stream);
     public native int fflushUnlocked(long stream);
@@ -82,15 +91,43 @@ public class PVFS2STDIOJNI {
     public native String mkdtemp(String tmplate);
     public native int mkstemp(String tmplate);
     public native long tmpfile();
-    public native PVFS2STDIOJNI.Dir opendir(String name);
+    public native Dirent opendir(String name);
     public native int dirfd(long dir);
     public native void rewinddir(long dir);
     public native void seekdir(long dir, long offset);
     public native long telldir(long dir);
     public native int closedir(long dir);
 
-    public PVFS2STDIOJNI() {}   
+    public PVFS2STDIOJNI() {
+        this.f = this.fillPVFS2STDIOJNIFlags();
+    }
 
+    /* Generic Object Dump to String */
+    public String toString() {
+        StringBuilder result = new StringBuilder();
+        String newLine = System.getProperty("line.separator");
+
+        result.append(this.getClass().getName());
+        result.append(" Object {");
+        result.append(newLine);
+
+        Field[] fields = this.getClass().getDeclaredFields();
+
+        for(Field field : fields ) {
+            result.append("  ");
+            try {
+                result.append(field.getName());
+                result.append(": ");
+                result.append(field.get(this));
+            } catch(IllegalAccessException ex) {
+                System.out.println(ex);
+            }
+            result.append(newLine);
+        }
+        result.append("}");
+        return result.toString();
+    }
+    
     static {
         try {
             System.loadLibrary("PVFS2STDIOJNI");
@@ -99,78 +136,6 @@ public class PVFS2STDIOJNI {
             System.err.println("Couldn't load libPVFS2STDIOJNI.so.");
             System.err.println("java.library.path = " + System.getProperty("java.library.path"));
             System.exit(-1);
-        }
-    }
-
-    public class Dir {
-        public long d_ino;
-        public long d_off;
-        public int d_reclen;
-        public String d_type;
-        public String d_name;
-
-        /* Constructor */
-        Dir(){}
-
-        public String toString() {
-            StringBuilder result = new StringBuilder();
-            String newLine = System.getProperty("line.separator");
-
-            result.append(this.getClass().getName());
-            result.append(" Object {");
-            result.append(newLine);
-
-            Field[] fields = this.getClass().getDeclaredFields();
-
-            for(Field field : fields ) {
-                result.append("  ");
-                try {
-                    result.append(field.getName());
-                    result.append(": ");
-                    result.append(field.get(this));
-                } catch(IllegalAccessException ex) {
-                    System.out.println(ex);
-                }
-                result.append(newLine);
-            }
-            result.append("}");
-            return result.toString();
-        }
-    }
-
-    public class Dir64 {
-        public long d_ino;
-        public long d_off;
-        public int d_reclen;
-        public String d_type;
-        public String d_name;
-
-        /* Constructor */
-        Dir64(){}
-        
-        public String toString() {
-            StringBuilder result = new StringBuilder();
-            String newLine = System.getProperty("line.separator");
-        
-            result.append(this.getClass().getName());
-            result.append(" Object {");
-            result.append(newLine);
-
-            Field[] fields = this.getClass().getDeclaredFields();
-
-            for(Field field : fields ) {
-                result.append("  ");
-                try {
-                    result.append(field.getName());
-                    result.append(": ");
-                    result.append(field.get(this));
-                } catch(IllegalAccessException ex) {
-                    System.out.println(ex);
-                }
-                result.append(newLine);
-            }
-            result.append("}");
-            return result.toString();
         }
     }
 }

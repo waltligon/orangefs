@@ -1,3 +1,4 @@
+
 /* 
  * (C) 2011 Clemson University
  *
@@ -6,14 +7,11 @@
 
 #define _GNU_SOURCE
 
-/* Include flag helper */
-#include "flags/stdio_flag_conv.h"
-
 /* Include our headers that wrap calls present in stdio.c */
 #include <jni_stdio.h>
 
 /* Header for JNI */
-#include "jni.h"
+//#include "jni.h"
 
 /* Include other headers */
 #include <stdlib.h>
@@ -42,6 +40,61 @@ int remove_files_in_dir(char *dir, DIR* dirp);
 int recursive_delete(char *dir);
 void fill_error(void *ptr);
 int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
+
+/********** BEGIN code related to filling PVFS2STDIOJNIFlags class */
+/* Fill PVFS2STDIOJNIFlags object */
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
+    JNIEnv *env, 
+    jobject obj
+)
+{
+    int num_fields = 3;
+    jfieldID fids[num_fields];
+    char *field_names[] = 
+    {
+        "SEEK_SET", "SEEK_CUR", "SEEK_END"
+    };
+    char *field_types[] = 
+    {
+        "J", "J", "J"
+    };
+
+    char *cls_name = "org/orangefs/usrint/PVFS2STDIOJNIFlags";
+    jclass cls = (*env)->FindClass(env, cls_name);
+    if(!cls)
+    {
+        fprintf(stderr, "invalid class: %s\n", cls_name);
+        return;
+    }
+    /* Allocates Memory for the Object specified by cls w/o calling its 
+     * constructor. 
+     */
+    jobject inst = (*env)->AllocObject(env, cls);
+    /* Get the field ids */
+    int fid_index = 0;
+    for(; fid_index < num_fields; fid_index++)
+    {
+        fids[fid_index] = GET_FIELD_ID(env, cls, 
+            field_names[fid_index], field_types[fid_index]);
+        if(!fids[fid_index])
+        {
+            fprintf(stderr, "invalid field requested: %s\n", field_names[fid_index]);
+            return;
+        }
+        
+    }
+
+    /* Load PVFS2STDIOJNIFlags object with data replaced by C-Preprocessor 
+     * using set methods.
+     */
+    SET_LONG_FIELD(env, inst, fids[0], SEEK_SET);
+    SET_LONG_FIELD(env, inst, fids[1], SEEK_CUR);
+    SET_LONG_FIELD(env, inst, fids[2], SEEK_END);
+    JNI_FLUSH
+    return inst;
+}
+/********** END code related to filling PVFS2STDIOJNIFlags class */
 
 /********** BEGIN code related to getFileStatus **********/
 
@@ -376,7 +429,7 @@ void fill_error(void *ptr)
     JNI_FLUSH;
 }
 
-/* Convert allocated struct DIR to an instance of our PVFS2JNI$Dir Class */
+/* Convert allocated struct DIR to an instance of our Dirent Class */
 int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
 {
     int rc = 0;
@@ -386,7 +439,7 @@ int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
     char *field_types[] = {
         "J", "J", "I", "Ljava/lang/String;", "Ljava/lang/String;"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2STDIOJNI$Dir";
+    char *cls_name = "org/orangefs/usrint/Dirent";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -813,7 +866,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_ftell(JNIEnv *env, jobject obj, jlong str
     long rc = jni_ftell((FILE *) stream);
     if(rc < 0)
     {
-        jni_perror("Fseek failed!");
+        jni_perror("ftell failed!");
     }
     JNI_FLUSH
     return (jlong) rc;
@@ -821,59 +874,41 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_ftell(JNIEnv *env, jobject obj, jlong str
 
 /* fseek */
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj, jlong stream, jlong offset, jstring whence)
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj, jlong stream, jlong offset, jlong whence)
 {
     PFI
 
-    int cwhence_len = (*env)->GetStringLength(env, whence);
-    char cwhence[cwhence_len + 1];
-    (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
-    /* Finally Convert to int representation */
-    int int_whence = (int) stdio_fsti(cwhence);
-
-    int rc = jni_fseek((FILE *) stream, (long) offset, int_whence);
+    int rc = jni_fseek((FILE *) stream, (long) offset, (int) whence);
     if(rc != 0)
     {
-        jni_perror("Fseek failed!");
+        jni_perror("fseek failed!");
     }
     JNI_FLUSH
     return (jint) rc;
 }
 
 /* fseeko */
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_fseeko(JNIEnv *env, jobject obj, jlong stream, jlong offset, jstring whence)
+JNIEXPORT jlong JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fseeko(JNIEnv *env, jobject obj, jlong stream, jlong offset, jlong whence)
 {
     PFI
 
-    int cwhence_len = (*env)->GetStringLength(env, whence);
-    char cwhence[cwhence_len + 1];
-    (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
-    /* Finally Convert to int representation */
-    int int_whence = (int) stdio_fsti(cwhence);
-
-    int rc = jni_fseeko((FILE *) stream, (off_t) offset, int_whence);
+    off_t rc = jni_fseeko((FILE *) stream, (off_t) offset, (int) whence);
     if(rc != 0)
     {
-        jni_perror("Fseeko failed!");
+        jni_perror("fseeko failed!");
     }
     JNI_FLUSH
-    return (jint) rc;
+    return (jlong) rc;
 }
 
 /* fseek64 */
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek64(JNIEnv *env, jobject obj, jlong stream, jlong offset, jstring whence)
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek64(JNIEnv *env, jobject obj, jlong stream, jlong offset, jlong whence)
 {
     PFI
 
-    int cwhence_len = (*env)->GetStringLength(env, whence);
-    char cwhence[cwhence_len + 1];
-    (*env)->GetStringUTFRegion(env, whence, 0, cwhence_len, cwhence);
-    /* Finally Convert to mode_t representation */
-    int int_whence = (int) stdio_fsti(cwhence);
-
-    int rc = jni_fseek64((FILE *) stream, (off64_t) offset, int_whence);
+    int rc = jni_fseek64((FILE *) stream, (off64_t) offset, (int) whence);
     if(rc != 0)
     {
         jni_perror("Fseek64 failed!");
@@ -882,19 +917,28 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek64(JNIEnv *env, jobject obj, jlong s
     return (jint) rc;
 }
 
-/* setvbuf*/
-JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong stream, jlong buf, jstring mode, jlong size)
+/* fseeko64 */
+JNIEXPORT jlong JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fseeko64(JNIEnv *env, jobject obj, jlong stream, jlong offset, jlong whence)
 {
     PFI
 
-    int cmode_len = (*env)->GetStringLength(env, mode);
-    char cmode[cmode_len + 1];
-    (*env)->GetStringUTFRegion(env, mode, 0, cmode_len, cmode);
-    /* Finally Convert to mode_t representation */
-    int int_mode = (int) stdio_fsti(cmode);
+    off_t rc = jni_fseeko64((FILE *) stream, (off_t) offset, (int) whence);
+    if(rc != 0)
+    {
+        jni_perror("fseeko failed!");
+    }
+    JNI_FLUSH
+    return (jlong) rc;
+}
 
-    int rc = jni_setvbuf((FILE *) stream, (char *) buf, int_mode, (size_t) size);
+/* setvbuf*/
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong stream, jlong buf, jlong mode, jlong size)
+{
+    PFI
+
+    int rc = jni_setvbuf((FILE *) stream, (char *) buf, (int) mode, (size_t) size);
     if(rc != 0)
     {
         jni_perror("setvbuf");

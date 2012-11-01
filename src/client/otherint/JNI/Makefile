@@ -46,17 +46,23 @@ libPVFS2POSIXJNI.so : PVFS2POSIXJNI.class $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2PO
       -lcrypto
 
 #Generate Java classes
-PVFS2POSIXJNI.class : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c \
-$(ORGDIR)/PVFS2POSIXJNIFlags.java $(ORGDIR)/Orange.java
-	javac $< $(ORGDIR)/PVFS2POSIXJNIFlags.java $(ORGDIR)/Orange.java
+POSIX_JAVA= $(ORGDIR)/PVFS2POSIXJNI.java \
+	$(ORGDIR)/PVFS2POSIXJNIFlags.java $(ORGDIR)/Orange.java \
+	$(ORGDIR)/Fsid.java $(ORGDIR)/Stat.java $(ORGDIR)/Stat64.java \
+	$(ORGDIR)/Statfs.java $(ORGDIR)/Statfs64.java $(ORGDIR)/Statvfs.java \
+	$(ORGDIR)/Timeval.java $(ORGDIR)/Utimbuf.java
+PVFS2POSIXJNI.class : $(POSIX_JAVA) libPVFS2POSIXJNI.c
+	javac $< $(POSIX_JAVA)
 
 #Generate JNI Compatible C Header for JNI Shim
 $(ORGUNDER)_PVFS2POSIXJNI.h : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c
 	javah $(ORGDOT).PVFS2POSIXJNI
 
+#$(ORGDIR)/PVFS2POSIXJNI.java \
+PVFS2POSIXJNI.class \
+#$(ORGDIR)/PVFS2POSIXJNIFlags.java
 #Preprocess, Compile, and Assemble in one step
-libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGDIR)/PVFS2POSIXJNI.java \
-$(ORGUNDER)_PVFS2POSIXJNI.h PVFS2POSIXJNI.class $(ORGDIR)/PVFS2POSIXJNIFlags.java
+libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGUNDER)_PVFS2POSIXJNI.h
 	cc -fPIC -c \
       -I$(PVFS2_TOP_PREFIX)/include \
       -I$(USRINT_DIR) \
@@ -83,7 +89,9 @@ libPVFS2STDIOJNI.so : PVFS2STDIOJNI.class $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2ST
 	  -lcrypto
 
 #Generate Java classes
-PVFS2STDIOJNI.class : $(ORGDIR)/PVFS2STDIOJNI.java libPVFS2STDIOJNI.c
+STDIO_JAVA=$(ORGDIR)/PVFS2STDIOJNI.java $(ORGDIR)/PVFS2STDIOJNIFlags.java \
+	$(ORGDIR)/Dirent.java $(ORGDIR)/Dirent64.java
+PVFS2STDIOJNI.class : $(STDIO_JAVA) libPVFS2STDIOJNI.c
 	javac $<
 
 #Generate JNI Compatible C Header for JNI Shim
@@ -91,8 +99,7 @@ $(ORGUNDER)_PVFS2STDIOJNI.h : $(ORGDIR)/PVFS2STDIOJNI.java libPVFS2STDIOJNI.c
 	javah $(ORGDOT).PVFS2STDIOJNI
 
 #Preprocess, Compile, and Assemble in one step
-libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGDIR)/PVFS2STDIOJNI.java $(ORGUNDER)_PVFS2STDIOJNI.h \
-                     PVFS2STDIOJNI.class flags/flag_conv_common.c flags/stdio_flag_conv.c 
+libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 	cc -fPIC -c \
 	  -I$(PVFS2_TOP_PREFIX)/include \
 	  -I$(USRINT_DIR) \

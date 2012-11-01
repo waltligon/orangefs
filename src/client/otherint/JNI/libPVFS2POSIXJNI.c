@@ -1468,7 +1468,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_isDir(JNIEnv *env, jobject obj, int mode)
     return S_ISDIR(mode);
 }
 
-/* Convert allocated struct to an instance of our PVFS2POSIXJNI$Stat Class */
+/* Convert allocated struct to an instance of our Stat Class */
 int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
 {
     int num_fields = 13;
@@ -1483,7 +1483,7 @@ int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
         "J", "J", "I",
         "J", "J", "J", "J"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNI$Stat";
+    char *cls_name = "org/orangefs/usrint/Stat";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -1521,7 +1521,7 @@ int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
     SET_LONG_FIELD(env, *inst, fids[11],ptr->st_mtime);
     SET_LONG_FIELD(env, *inst, fids[12],ptr->st_ctime);
     /* Free the space allocated for the stat struct and
-     * return an instance of PVFS2POSIXJNI$Stat.
+     * return an instance of Stat.
      */
     JNI_FLUSH
     free(ptr);
@@ -1666,7 +1666,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lstat(JNIEnv *env, jobject obj, jstring p
     return NULL_OBJ;
 }
 
-/* Convert allocated struct to an instance of our PVFS2POSIXJNI$Stat64 Class */
+/* Convert allocated struct to an instance of our Stat64 Class */
 int fill_stat64(JNIEnv *env, struct stat64 *ptr, jobject *inst)
 {
     int num_fields = 13;
@@ -1681,7 +1681,7 @@ int fill_stat64(JNIEnv *env, struct stat64 *ptr, jobject *inst)
         "J", "J", "I",
         "J", "J", "J", "J"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNI$Stat64";
+    char *cls_name = "org/orangefs/usrint/Stat64";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -1719,7 +1719,7 @@ int fill_stat64(JNIEnv *env, struct stat64 *ptr, jobject *inst)
     SET_LONG_FIELD(env, *inst, fids[11],ptr->st_mtime);
     SET_LONG_FIELD(env, *inst, fids[12],ptr->st_ctime);
     /* Free the space allocated for the stat struct and
-     * return an instance of PVFS2POSIXJNI$Stat64.
+     * return an instance of Stat64.
      */
     JNI_FLUSH
     free(ptr);
@@ -1932,7 +1932,7 @@ int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
     char *field_types[] = {
         "[J","[J"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNI$Timeval";
+    char *cls_name = "org/orangefs/usrint/Timeval";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -1974,7 +1974,7 @@ int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
     ar1 = (*env)->GetObjectField(env, *inst , fids[1]);
     (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
     /* Free the space allocated for the stat struct and
-     return an instance of PVFS2POSIXJNI$Timeval. */
+     return an instance of Timeval. */
     JNI_FLUSH
     free(ptr);
     return 0;
@@ -2085,7 +2085,7 @@ int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
     char *field_types[] = {
         "J", "J"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNI$Utimbuf";
+    char *cls_name = "org/orangefs/usrint/Utimbuf";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -2112,7 +2112,7 @@ int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
     SET_LONG_FIELD(env, *inst, fids[0],ptr->actime);
     SET_LONG_FIELD(env, *inst, fids[1],ptr->modtime);
     /* Free the space allocated for the stat struct and
-     * return an instance of PVFS2POSIXJNI$Stat.
+     * return an instance of Stat.
      */
     JNI_FLUSH
     free(ptr);
@@ -2312,7 +2312,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_sync(JNIEnv *env, jobject obj)
     return;
 }
 
-/* Convert allocated struct to an instance of our PVFS2POSIXJNI$Statfs Class */
+/* Convert allocated struct to an instance of our Statfs Class */
 int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
 {
     int num_fields = 12;
@@ -2327,7 +2327,7 @@ int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
         "J", "J", "J",
         "J","[J","[I"};
     jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNI$Statfs";
+    char *cls_name = "org/orangefs/usrint/Statfs";
     jclass cls = (*env)->FindClass(env, cls_name);
     if(!cls)
     {
@@ -2386,7 +2386,7 @@ int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
     (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
 
     /* Free the space allocated for the stat struct and
-     return an instance of PVFS2POSIXJNI$Statfs. */
+     return an instance of Statfs. */
     JNI_FLUSH
     free(ptr);
     return 0;
@@ -2497,9 +2497,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs64(JNIEnv *env, jobject obj, jlong
     JNI_FLUSH
     return rc;
 }
-#endif
 
-/* TODO */
 /* jni_statvfs */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_statvfs  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
@@ -2538,4 +2536,4 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatvfs(JNIEnv *env, jobject obj, jlong 
     JNI_FLUSH
     return rc;
 }
-
+#endif
