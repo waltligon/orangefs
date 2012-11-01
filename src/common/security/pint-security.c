@@ -684,7 +684,6 @@ int PINT_verify_credential(const PVFS_credential *cred)
     if (!cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Null credential\n");
-gossip_err("1P\n");
         return 0;
     }
 
@@ -696,7 +695,6 @@ gossip_err("1P\n");
                      "(timeout %llu)\n", 
                      PINT_util_bytes2str(cred->signature, sigbuf, 4),
                      llu(cred->timeout));
-gossip_err("2P\n");
         return 0;
     }
 
@@ -711,7 +709,6 @@ gossip_err("2P\n");
         gossip_debug(GOSSIP_SECURITY_DEBUG,
                      "Public key not found for issuer: %s\n", 
                      cred->issuer);
-gossip_err("3P\n");
         return 0;
     }
 
@@ -727,7 +724,6 @@ gossip_err("3P\n");
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
                      pubkey->type);
-gossip_err("4P\n");
         return 0;
     }
 
@@ -737,7 +733,6 @@ gossip_err("4P\n");
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
-gossip_err("5P\n");
         return 0;
     }
 
@@ -758,7 +753,6 @@ gossip_err("5P\n");
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
-gossip_err("6P\n");
         return 0;
     }
 
@@ -772,7 +766,6 @@ gossip_err("6P\n");
 
     EVP_MD_CTX_cleanup(&mdctx);
 
-gossip_err("7P\n");
     return (ret == 1);
 }
 
