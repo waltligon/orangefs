@@ -350,13 +350,16 @@ fi
 # generic way of submitting jobs. for now assume all the world has pbs
 
 
-if [ $RUN_MPI_TESTS ]
+if [ $RUN_MPI_TEST ]
 then
-	
 	which qsub >/dev/null 2>&1
-	if [ $? -eq 0 ] ; then 
+	if [ $? -eq 0 ] ; then
+		echo ""
+		echo "Found qsub at `which qsub`"
+		echo "Running MPI scripts..."
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
+		
 		pull_and_build_mpich2 || buildfail
 		source $MPIIO_DRIVER
 	fi
