@@ -34,6 +34,7 @@ VFS_SCRIPTS=`pwd`/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+REPORT_ERR=${PVFS2_DEST}/alltests-${CVS_TAG}.err
 BENCHMARKS=benchmarks-20121017.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
@@ -341,7 +342,7 @@ exec 6<&1
 exec 7<&2
 
 exec 1> ${REPORT_LOG}
-exec 2>&1
+exec 2> ${REPORT_ERR}
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
