@@ -260,7 +260,7 @@ done
 echo "Run MPI test is $RUN_MPI_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
 
-if [ ! $RUN_VFS_TEST ]
+if [ ! $RUN_VFS_TEST ] 
 then
 	do_vfs = 0;
 fi
@@ -352,7 +352,7 @@ fi
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
 
-if [ ! $RUN_MPI_TEST ]
+if [ $RUN_MPI_TEST -eq 1]
 then
 	which qsub >/dev/null 2>&1
 	if [ $? -eq 0 ] ; then
