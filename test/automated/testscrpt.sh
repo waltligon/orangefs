@@ -256,7 +256,7 @@ for s in $(echo $VFS_HOSTS); do
 		break
 	fi
 done
-
+do_vfs=0
 
 
 if [ ! $RUN_VFS_TEST ] 
