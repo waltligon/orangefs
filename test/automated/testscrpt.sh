@@ -261,7 +261,7 @@ done
 
 if [ ! $RUN_VFS_TEST ] 
 then
-	do_vfs = 0;
+	do_vfs=0;
 fi
 
 # "install" benchmark software, if EXTRA_TESTS is not null
