@@ -183,7 +183,7 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 #process the logs
 
 #if successful, delete the VM
-if [ ${DELETE_INSTANCE} != 0 ]
+if [ ${DELETE_INSTANCE} ]
 then
 #	if [ ${VMINSTANCEID} != "" ]
 #	then

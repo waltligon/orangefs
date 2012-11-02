@@ -257,8 +257,7 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
-echo "Run MPI test is $RUN_MPI_TEST"
-echo "Run VFS test is $RUN_VFS_TEST"
+
 
 if [ ! $RUN_VFS_TEST ] 
 then
@@ -314,6 +313,10 @@ if [ $? != 0 ] ; then
         setupfail
 fi
 
+echo "Run MPI test is $RUN_MPI_TEST"
+echo "Run VFS test is $RUN_VFS_TEST"
+echo "do_vfs is $do_vfs"
+
 if [ $do_vfs -eq 1 ] ; then 
 	echo "setup_vfs"
 	teardown_vfs && setup_vfs
@@ -352,7 +355,7 @@ fi
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
 
-if [ $RUN_MPI_TEST -eq 1 ]
+if [ $RUN_MPI_TEST ]
 then
 	which qsub >/dev/null 2>&1
 	if [ $? -eq 0 ] ; then
