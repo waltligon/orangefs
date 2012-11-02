@@ -257,7 +257,7 @@ for s in $(echo $VFS_HOSTS); do
 		break
 	fi
 done
-do_vfs=0
+#do_vfs=0
 
 
 if [ ! $RUN_VFS_TEST ] 
@@ -347,6 +347,7 @@ echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
@@ -361,7 +362,7 @@ fi
 	which qsub >/dev/null 2>&1
 	if [ $? -eq 0 ] ; then
 		echo ""
-		echo "Found qsub at `which qsub`"
+		#echo "Found qsub at `which qsub`"
 		echo "Running MPI scripts..."
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
