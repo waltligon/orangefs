@@ -363,7 +363,7 @@ then
 		# actually going to use it
 		
 		pull_and_build_mpich2 || buildfail
-		source $MPIIO_DRIVER
+		. $MPIIO_DRIVER
 	fi
 fi
 
