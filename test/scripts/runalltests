@@ -195,14 +195,8 @@ fi
 #if successful, delete the VM
 if [ ${DELETE_INSTANCE} ]
 then
-#	if [ ${VMINSTANCEID} != "" ]
-#	then
 		echo "Deleting instance $VMINSTANCEID at $VMIPADDR."
 		euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
 
-#	else
-		#echo "This script cannot delete existing instances."
-#e	fi
-	
 fi
 
