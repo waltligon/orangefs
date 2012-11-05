@@ -52,7 +52,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
 )
 {
 //    int num_fields = 59;
-    int num_fields = 48;
+    int num_fields = 76;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
@@ -73,7 +73,16 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "S_IFLNK", "S_IFREG", "S_IFBLK", 
         "S_IFDIR", "S_IFCHR", "S_IFIFO", 
         "S_ISUID", "S_ISGID", "S_ISVTX",
-        "S_IRWXU"
+        "S_IRWXU", "SEEK_SET", "SEEK_CUR", 
+        "SEEK_END", "SEEK_DATA", "SEEK_HOLE", 
+        "POSIX_FADV_NORMAL","POSIX_FADV_RANDOM","POSIX_FADV_SEQUENTIAL", 
+        "POSIX_FADV_WILLNEED", "POSIX_FADV_DONTNEED", "POSIX_FADV_NOREUSE", 
+        "O_RDWR", "O_TRUNC", "F_RDLCK",
+        "F_WRLCK", "F_UNLCK", "SIGIO", 
+        "SIGURG", "F_OWNER_TID", "F_OWNER_PID",
+        "F_OWNER_PGRP", "DN_ACCESS", "DN_MODIFY", 
+        "DN_CREATE", "DN_DELETE", "DN_RENAME", 
+        "DN_ATTRIB", "DN_MULTISHOT"
     };
     char *field_types[] = 
     {
@@ -94,7 +103,16 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
-        "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J"
     };
 
     char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNIFlags";
@@ -179,6 +197,34 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     SET_LONG_FIELD(env, inst, fids[45],S_ISGID);
     SET_LONG_FIELD(env, inst, fids[46],S_ISVTX);
     SET_LONG_FIELD(env, inst, fids[47],S_IRWXU);
+    SET_LONG_FIELD(env, inst, fids[48],SEEK_SET);
+    SET_LONG_FIELD(env, inst, fids[49],SEEK_CUR);
+    SET_LONG_FIELD(env, inst, fids[50],SEEK_END);
+    SET_LONG_FIELD(env, inst, fids[51],SEEK_DATA);
+    SET_LONG_FIELD(env, inst, fids[52],SEEK_HOLE);
+    SET_LONG_FIELD(env, inst, fids[53],POSIX_FADV_NORMAL);
+    SET_LONG_FIELD(env, inst, fids[54],POSIX_FADV_RANDOM);
+    SET_LONG_FIELD(env, inst, fids[55],POSIX_FADV_SEQUENTIAL);
+    SET_LONG_FIELD(env, inst, fids[56],POSIX_FADV_WILLNEED);
+    SET_LONG_FIELD(env, inst, fids[57],POSIX_FADV_DONTNEED);
+    SET_LONG_FIELD(env, inst, fids[58],POSIX_FADV_NOREUSE);
+    SET_LONG_FIELD(env, inst, fids[59],O_RDWR);
+    SET_LONG_FIELD(env, inst, fids[60],O_TRUNC);
+    SET_LONG_FIELD(env, inst, fids[61],F_RDLCK);
+    SET_LONG_FIELD(env, inst, fids[62],F_UNLCK);
+    SET_LONG_FIELD(env, inst, fids[63],SIGIO);
+    SET_LONG_FIELD(env, inst, fids[64],SIGURG);
+    SET_LONG_FIELD(env, inst, fids[65],F_OWNER_TID);
+    SET_LONG_FIELD(env, inst, fids[66],F_OWNER_PID);
+    SET_LONG_FIELD(env, inst, fids[67],F_OWNER_PGRP);
+    SET_LONG_FIELD(env, inst, fids[68],DN_ACCESS);
+    SET_LONG_FIELD(env, inst, fids[69],DN_MODIFY);
+    SET_LONG_FIELD(env, inst, fids[70],DN_CREATE);
+    SET_LONG_FIELD(env, inst, fids[71],DN_DELETE);
+    SET_LONG_FIELD(env, inst, fids[72],DN_RENAME );
+    SET_LONG_FIELD(env, inst, fids[73],DN_ATTRIB);
+    SET_LONG_FIELD(env, inst, fids[74],DN_MULTISHOT);
+        
     JNI_FLUSH
     return inst;
 }

@@ -14,7 +14,7 @@ PVFS2_TOP_PREFIX=$(HOME)/trunk
 USRINT_DIR=$(PVFS2_TOP_PREFIX)/ofs/src/client/usrint
 # JAVA: Found by running: 
 #    readlink -f /usr/bin/javac | sed "s:bin/javac::"
-JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
+JAVA_HOME=/usr/lib/jvm/java-6-openjdk-amd64/
 
 #For use with package
 ORGDIR = org/orangefs/usrint
@@ -86,7 +86,7 @@ libPVFS2STDIOJNI.so : PVFS2STDIOJNI.class $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2ST
 	  -lpvfs2 \
 	  -lpthread \
 	  -ldl \
-	  -lcrypto
+	  -lcrypto 
 
 #Generate Java classes
 STDIO_JAVA=$(ORGDIR)/PVFS2STDIOJNI.java $(ORGDIR)/PVFS2STDIOJNIFlags.java \
@@ -94,9 +94,11 @@ STDIO_JAVA=$(ORGDIR)/PVFS2STDIOJNI.java $(ORGDIR)/PVFS2STDIOJNIFlags.java \
 PVFS2STDIOJNI.class : $(STDIO_JAVA) libPVFS2STDIOJNI.c
 	javac $<
 
+
 #Generate JNI Compatible C Header for JNI Shim
 $(ORGUNDER)_PVFS2STDIOJNI.h : $(ORGDIR)/PVFS2STDIOJNI.java libPVFS2STDIOJNI.c
 	javah $(ORGDOT).PVFS2STDIOJNI
+
 
 #Preprocess, Compile, and Assemble in one step
 libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h

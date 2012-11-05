@@ -68,6 +68,34 @@ public class PVFS2POSIXJNIFlags {
     public long S_ISGID;    
     public long S_ISVTX;
     public long S_IRWXU;
+    public long SEEK_SET;
+	public long SEEK_CUR;
+	public long SEEK_END;
+	public long SEEK_DATA;
+	public long SEEK_HOLE;
+	public long POSIX_FADV_NORMAL;
+    public long POSIX_FADV_RANDOM;
+	public long POSIX_FADV_SEQUENTIAL;
+	public long POSIX_FADV_WILLNEED;
+	public long POSIX_FADV_DONTNEED;
+	public long POSIX_FADV_NOREUSE;
+	public long O_RDWR;
+	public long O_TRUNC;
+	public long F_RDLCK;
+	public long F_WRLCK;
+	public long F_UNLCK;
+	public long SIGIO;
+	public long SIGURG;
+	public long F_OWNER_TID;
+	public long F_OWNER_PID;
+	public long F_OWNER_PGRP;
+	public long DN_ACCESS;   
+	public long DN_MODIFY;   
+	public long DN_CREATE;  
+	public long DN_DELETE;   
+	public long DN_RENAME;   
+	public long DN_ATTRIB;
+	public long DN_MULTISHOT;
 
     public String toString() {
         StringBuilder result = new StringBuilder();
