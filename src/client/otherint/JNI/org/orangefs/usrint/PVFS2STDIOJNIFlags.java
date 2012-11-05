@@ -19,6 +19,17 @@ public class PVFS2STDIOJNIFlags {
     public long SEEK_SET;
     public long SEEK_CUR;
     public long SEEK_END;
+    public long O_EXCL;
+    public long O_APPEND;
+	public long O_SYNC;
+	public long DT_BLK;   
+	public long DT_CHR; 
+	public long DT_DIR;      
+	public long DT_FIFO;     
+	public long DT_LNK;      
+	public long DT_REG;      
+	public long DT_SOCK;    
+	public long DT_UNKNOWN;
 
     public String toString() {
         StringBuilder result = new StringBuilder();

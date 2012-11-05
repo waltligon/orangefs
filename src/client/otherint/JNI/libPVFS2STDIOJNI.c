@@ -49,15 +49,24 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
     jobject obj
 )
 {
-    int num_fields = 3;
+    int num_fields = 14;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
-        "SEEK_SET", "SEEK_CUR", "SEEK_END"
+        "SEEK_SET", "SEEK_CUR", "SEEK_END", 
+        "O_EXCL", "O_APPEND", "O_SYNC", 
+        "DT_BLK", "DT_CHR", "DT_DIR", 
+        "DT_FIFO", "DT_LNK", "DT_REG", 
+        "DT_SOCK", "DT_UNKNOWN"
     };
     char *field_types[] = 
     {
-        "J", "J", "J"
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J", "J",
+        "J", "J"
+        
     };
 
     char *cls_name = "org/orangefs/usrint/PVFS2STDIOJNIFlags";
@@ -91,6 +100,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
     SET_LONG_FIELD(env, inst, fids[0], SEEK_SET);
     SET_LONG_FIELD(env, inst, fids[1], SEEK_CUR);
     SET_LONG_FIELD(env, inst, fids[2], SEEK_END);
+    SET_LONG_FIELD(env, inst, fids[3], O_EXCL);
+    SET_LONG_FIELD(env, inst, fids[4], O_APPEND);
+    SET_LONG_FIELD(env, inst, fids[5], O_SYNC);
+    SET_LONG_FIELD(env, inst, fids[6], DT_BLK );
+    SET_LONG_FIELD(env, inst, fids[7], DT_CHR);
+    SET_LONG_FIELD(env, inst, fids[8], DT_DIR);
+    SET_LONG_FIELD(env, inst, fids[9], DT_FIFO);
+    SET_LONG_FIELD(env, inst, fids[10], DT_LNK);
+    SET_LONG_FIELD(env, inst, fids[11], DT_REG);
+    SET_LONG_FIELD(env, inst, fids[12], DT_SOCK);
+    SET_LONG_FIELD(env, inst, fids[13], DT_UNKNOWN);
+    
     JNI_FLUSH
     return inst;
 }
