@@ -180,7 +180,7 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt scripts || exit 1
 
 
-#process the logs
+#process the logs 
 
 #if successful, delete the VM
 if [ ${DELETE_INSTANCE} ]
