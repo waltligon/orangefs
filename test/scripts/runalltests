@@ -181,6 +181,16 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 
 
 #process the logs 
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
+./checklogs.pl logs/alltests-$SVNBRANCH_SHORT
+
+if [ $? -ne 0 ]
+then
+	#if the log check failed, bailout before deleteing instance
+	echo "Some tests failed. Please check `pwd`/logs/alltests-$SVNBRANCH_SHORT for more details."
+	echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
+	exit 1
+fi
 
 #if successful, delete the VM
 if [ ${DELETE_INSTANCE} ]

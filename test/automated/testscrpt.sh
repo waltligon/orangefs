@@ -363,7 +363,7 @@ fi
 	if [ $? -eq 0 ] ; then
 		echo ""
 		#echo "Found qsub at `which qsub`"
-		echo "Running MPI scripts..."
+		echo "running mpi scripts"
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
 		
