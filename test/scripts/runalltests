@@ -179,7 +179,7 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 #grab the scripts
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt scripts || exit 1
 
-
+ 
 #process the logs 
 SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 ./checklogs.pl logs/alltests-$SVNBRANCH_SHORT.log
