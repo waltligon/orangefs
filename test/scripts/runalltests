@@ -182,7 +182,7 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 
 #process the logs 
 SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
-./checklogs.pl logs/alltests-$SVNBRANCH_SHORT
+./checklogs.pl logs/alltests-$SVNBRANCH_SHORT.log
 
 if [ $? -ne 0 ]
 then
