@@ -44,6 +44,7 @@ get_dist() {
 # nonzero on error.
 get_cvs() {
 	#cvs -Q -d $cvsroot co -r $1 pvfs2 
+	
 	echo "Current directory is `pwd`"
 	svn export --force -q http://www.orangefs.org/svn/orangefs/$1/
 	if [ $? -ne 0 ] ; then
@@ -51,8 +52,14 @@ get_cvs() {
 		exit 1
 	fi
 	#ls -l 
+	
 	#mv pvfs2 pvfs2-$1
-	mv $1 pvfs2-$1
+	#split off last element in path
+	BRANCH=`echo $1 | awk -F"/" '{print $NF}'`
+	
+	echo "Branch is ${BRANCH}"
+	
+	mv $BRANCH pvfs2-$BRANCH
 }
 
 # end of user defines
@@ -85,12 +92,15 @@ do
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
 	t) build_tests="true";;
-	v) cvs_tag="$OPTARG";;
+	v) full_cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
     esac
 done   
 
 echo "PVFS2 will be built in ${rootdir}."
+
+#cvs tag is final element of full cvs tag
+cvs_tag=`echo $full_cvs_tag | awk -F"/" '{print $NF}'`
 
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
@@ -113,7 +123,7 @@ rm -rf $rootdir/pvfs2
 cd $rootdir
 
 # could make this some sort of command line option... 
-get_cvs $cvs_tag || exit 1
+get_cvs $full_cvs_tag || exit 1
 
 
 # create build and install directories, configure
