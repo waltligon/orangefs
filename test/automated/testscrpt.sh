@@ -22,8 +22,8 @@ fi
 
 
 # need to make this a command line arugment:
-export CVS_TAG="${CVS_TAG:-HEAD}"
-
+export CVS_TAG_FULL="${CVS_TAG:-HEAD}"
+export CVS_TAG=`echo $CVS_TAG_FULL | awk -F"/" '{print $NF}'`
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
@@ -34,6 +34,7 @@ VFS_SCRIPTS=`pwd`/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+REPORT_ERR=${PVFS2_DEST}/alltests-${CVS_TAG}.err
 BENCHMARKS=benchmarks-20121017.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
@@ -256,10 +257,12 @@ for s in $(echo $VFS_HOSTS); do
 		break
 	fi
 done
+#do_vfs=0
 
-if [ $RUN_VFS_TESTS ]
+
+if [ ! $RUN_VFS_TEST ] 
 then
-	do_vfs = 0;
+	do_vfs=0;
 fi
 
 # "install" benchmark software, if EXTRA_TESTS is not null
@@ -301,7 +304,7 @@ then
 fi
 
 echo "pull_and_build_pvfs2"
-pull_and_build_pvfs2  $CVS_TAG || buildfail
+pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
 echo "setup_pvfs2"
 teardown_pvfs2 && setup_pvfs2 
@@ -310,6 +313,10 @@ if [ $? != 0 ] ; then
 	echo "setup failed"
         setupfail
 fi
+
+echo "Run MPI test is $RUN_MPI_TEST"
+echo "Run VFS test is $RUN_VFS_TEST"
+echo "do_vfs is $do_vfs"
 
 if [ $do_vfs -eq 1 ] ; then 
 	echo "setup_vfs"
@@ -335,11 +342,12 @@ exec 6<&1
 exec 7<&2
 
 exec 1> ${REPORT_LOG}
-exec 2>&1
+exec 2> ${REPORT_ERR}
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
@@ -349,18 +357,20 @@ fi
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
 
-
-if [ $RUN_MPI_TESTS ]
-then
-	
+#if [ $RUN_MPI_TEST ]
+#then
 	which qsub >/dev/null 2>&1
-	if [ $? -eq 0 ] ; then 
+	if [ $? -eq 0 ] ; then
+		echo ""
+		#echo "Found qsub at `which qsub`"
+		echo "running mpi scripts"
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
+		
 		pull_and_build_mpich2 || buildfail
-		source $MPIIO_DRIVER
+		. $MPIIO_DRIVER
 	fi
-fi
+#fi
 
 # restore file descriptors and close temporary fds
 exec 1<&6 6<&-
