@@ -71,7 +71,7 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
-echo "VMUSER is $VMUSER"
+
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
 echo "VMIPADDR is $VMIPADDR"
@@ -81,7 +81,7 @@ echo "DELETE_INSTANCE is $DELETE_INSTANCE"
 export SVNBRANCH
 export NEWINSTANCE
 export VMSYSTEM
-export VMUSER
+
 export RUN_VFS_TEST
 export RUN_MPI_TEST
 export KEYFILE
@@ -105,6 +105,9 @@ case $VMSYSTEM in
 		echo "System $VMSYSTEM not supported."
 		exit 1
 esac
+
+echo "VMUSER is $VMUSER"
+export VMUSER
 
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
@@ -140,7 +143,7 @@ then
 	echo "Generating new instance of $VMSYSTEM"
 	echo "euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err"
 
-	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err
+	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err || exit 1
 
 	VMINSTANCEID=`cat newinstance.out | grep INSTANCE | awk '{print $2}'`
 
@@ -164,32 +167,36 @@ ssh-keygen -f "~/.ssh/known_hosts" -R ${VMIPADDR}
 
 
 #prepare the image for testing
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh || exit 1
 
 #run the test
 #echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < ./run-test.sh ${SVNBRANCH}
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'cat | bash /dev/stdin' "${SVNBRANCH}" < ./run-test.sh
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'cat | bash /dev/stdin' "${SVNBRANCH}" < ./run-test.sh || exit 1
 
 #grab the logs
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs || exit 1
 
 #grab the scripts
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt scripts
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt scripts || exit 1
 
+ 
+#process the logs 
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
+./checklogs.pl "`pwd`/logs/alltests-${SVNBRANCH_SHORT}.log"
 
-#process the logs
+if [ $? -ne 0 ]
+then
+	#if the log check failed, bailout before deleteing instance
+	echo "Some tests failed. Please check `pwd`/logs/alltests-$SVNBRANCH_SHORT for more details."
+	echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
+	exit 1
+fi
 
 #if successful, delete the VM
-if [ ${DELETE_INSTANCE} != 0 ]
+if [ ${DELETE_INSTANCE} ]
 then
-#	if [ ${VMINSTANCEID} != "" ]
-#	then
 		echo "Deleting instance $VMINSTANCEID at $VMIPADDR."
 		euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
 
-#	else
-		#echo "This script cannot delete existing instances."
-#e	fi
-	
 fi
 
