@@ -14,17 +14,17 @@ public class Orange {
     
     public PVFS2POSIXJNI posix;
     public PVFS2STDIOJNI stdio;
-    
-    protected Orange() {
-        System.out.println("hello from Orange constructor.");
+   
+    private static class OrangeHolder {
+        public static final Orange INSTANCE = new Orange();
+    }
+ 
+    private Orange() {
         posix = new PVFS2POSIXJNI();
         stdio = new PVFS2STDIOJNI();
     }
     
     public static Orange getInstance() {
-        if(orange == null)
-            return (orange = new Orange());
-        
-        return orange;
+        return OrangeHolder.INSTANCE;
     }
 }

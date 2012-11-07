@@ -23,13 +23,20 @@ ORGUNDER = org_orangefs_usrint
 #JNI Directory
 JNIDIR=/home/denton/trunk/ofs/src/client/otherint/JNI
 #------------------------------------------------------------------------------
-ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so 
+ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so \
+		$(ORGDIR)/OrangeFileSystemInputStream.class
 	jar cf ofs_jni.jar \
 	  $(ORGDIR)/*.class
 
 install : ofs_jni.jar
 	cp *.so $(PVFS2_TOP_PREFIX)/lib
 	cp ofs_jni.jar $(PVFS2_TOP_PREFIX)/lib
+
+#Other Java Classes
+IOSTREAMS = $(ORGDIR)/OrangeFileSystemInputStream.java \
+	$(ORGDIR)/OrangeFileSystemOutputStream.java
+$(ORGDIR)/OrangeFileSystemInputStream.class : $(IOSTREAMS)
+	javac $(IOSTREAMS)
 
 #PVFS2POSIXJNI
 #==============================================================================
@@ -51,16 +58,14 @@ POSIX_JAVA= $(ORGDIR)/PVFS2POSIXJNI.java \
 	$(ORGDIR)/Fsid.java $(ORGDIR)/Stat.java $(ORGDIR)/Stat64.java \
 	$(ORGDIR)/Statfs.java $(ORGDIR)/Statfs64.java $(ORGDIR)/Statvfs.java \
 	$(ORGDIR)/Timeval.java $(ORGDIR)/Utimbuf.java
+
 PVFS2POSIXJNI.class : $(POSIX_JAVA) libPVFS2POSIXJNI.c
-	javac $< $(POSIX_JAVA)
+	javac $<
 
 #Generate JNI Compatible C Header for JNI Shim
 $(ORGUNDER)_PVFS2POSIXJNI.h : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c
 	javah $(ORGDOT).PVFS2POSIXJNI
 
-#$(ORGDIR)/PVFS2POSIXJNI.java \
-PVFS2POSIXJNI.class \
-#$(ORGDIR)/PVFS2POSIXJNIFlags.java
 #Preprocess, Compile, and Assemble in one step
 libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGUNDER)_PVFS2POSIXJNI.h
 	cc -fPIC -c \
@@ -79,14 +84,12 @@ libPVFS2STDIOJNI.so : PVFS2STDIOJNI.class $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2ST
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2STDIOJNI.o \
-	  flag_conv_common.o \
-	  stdio_flag_conv.o \
 	  -L$(PVFS2_TOP_PREFIX)/lib \
 	  -lofs \
 	  -lpvfs2 \
 	  -lpthread \
 	  -ldl \
-	  -lcrypto 
+	  -lcrypto
 
 #Generate Java classes
 STDIO_JAVA=$(ORGDIR)/PVFS2STDIOJNI.java $(ORGDIR)/PVFS2STDIOJNIFlags.java \
@@ -107,9 +110,7 @@ libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 	  -I$(USRINT_DIR) \
 	  -I$(JAVA_HOME)include \
 	  -I$(JAVA_HOME)include/linux \
-	  libPVFS2STDIOJNI.c \
-	  flags/flag_conv_common.c \
-	  flags/stdio_flag_conv.c 
+	  libPVFS2STDIOJNI.c
 #==============================================================================
 clean :
 	rm -f *.o org_*.h *.so *.jar org/orangefs/usrint/*.class \

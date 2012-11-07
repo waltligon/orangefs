@@ -11,11 +11,7 @@ import java.lang.reflect.Field;
 
 public class PVFS2POSIXJNI {
 
-    private PVFS2POSIXJNIFlags f;
-    
-    public PVFS2POSIXJNIFlags getF() {
-        return f;
-    };
+    public PVFS2POSIXJNIFlags f;
 
     /* ========== PVFS2POSIXJNI Native Methods START ========== */
     public native PVFS2POSIXJNIFlags fillPVFS2POSIXJNIFlags();

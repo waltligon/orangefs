@@ -1,4 +1,3 @@
-
 /* 
  * (C) 2011 Clemson University
  *
@@ -51,39 +50,69 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     jobject obj
 )
 {
-//    int num_fields = 59;
-    int num_fields = 76;
+    int num_fields = 52;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
-        "O_WRONLY", "O_RDONLY", "PVFS_IO_READ", 
-        "PVFS_IO_WRITE", "O_ACCMODE", "O_HINTS", 
-        "PVFS_HINT_NULL", "O_LARGEFILE", "AT_FDCWD",
-        "O_EXCL","AT_REMOVEDIR","O_APPEND",
-        "PVFS_FD_FAILURE","PVFS_ATTR_DEFAULT_MASK", "AT_SYMLINK_NOFOLLOW",
-        "O_NOFOLLOW","PVFS_ATTR_SYS_ATIME", "PVFS_ATTR_SYS_MTIME",
-        "O_CLOEXEC", "O_ASYNC", "O_CREAT", 
-        "O_DIRECT", "O_DIRECTORY", "O_NOATIME", 
-        "O_NOCTTY", "O_NONBLOCK", "FD_CLOEXEC", 
-        "ST_RDONLY", "ST_NOSUID", "S_IRUSR", 
-        "S_IWUSR", "S_IXUSR", "S_IRWXG", 
-        "S_IRGRP", "S_IWGRP", "S_IXGRP", 
-        "S_IRWXO", "S_IROTH", "S_IWOTH", 
-        "S_IXOTH", "S_IFMT", "S_IFSOCK", 
-        "S_IFLNK", "S_IFREG", "S_IFBLK", 
-        "S_IFDIR", "S_IFCHR", "S_IFIFO", 
-        "S_ISUID", "S_ISGID", "S_ISVTX",
-        "S_IRWXU", "SEEK_SET", "SEEK_CUR", 
-        "SEEK_END", "SEEK_DATA", "SEEK_HOLE", 
-        "POSIX_FADV_NORMAL","POSIX_FADV_RANDOM","POSIX_FADV_SEQUENTIAL", 
-        "POSIX_FADV_WILLNEED", "POSIX_FADV_DONTNEED", "POSIX_FADV_NOREUSE", 
-        "O_RDWR", "O_TRUNC", "F_RDLCK",
-        "F_WRLCK", "F_UNLCK", "SIGIO", 
-        "SIGURG", "F_OWNER_TID", "F_OWNER_PID",
-        "F_OWNER_PGRP", "DN_ACCESS", "DN_MODIFY", 
-        "DN_CREATE", "DN_DELETE", "DN_RENAME", 
-        "DN_ATTRIB", "DN_MULTISHOT"
+        "O_WRONLY", //0 
+        "O_RDONLY", 
+        "PVFS_IO_READ", 
+        "PVFS_IO_WRITE", 
+        "O_ACCMODE", 
+        "O_HINTS", 
+        "PVFS_HINT_NULL", 
+        "O_LARGEFILE", 
+        "AT_FDCWD",
+        "O_EXCL",
+        
+        "AT_REMOVEDIR", //10
+        "O_APPEND",
+        "PVFS_FD_FAILURE", 
+        "PVFS_ATTR_DEFAULT_MASK", 
+        "AT_SYMLINK_NOFOLLOW",
+        "O_NOFOLLOW", 
+        "PVFS_ATTR_SYS_ATIME", 
+        "PVFS_ATTR_SYS_MTIME",
+        "O_CLOEXEC", 
+        "O_ASYNC",
+        
+        "O_CREAT", //20
+        "O_DIRECT", 
+        "O_DIRECTORY", 
+        "O_NOATIME", 
+        "O_NOCTTY", 
+        "O_NONBLOCK", 
+        "FD_CLOEXEC", 
+        "ST_RDONLY", 
+        "ST_NOSUID", 
+        "S_IRWXU",
+        
+        "S_IRUSR", //30
+        "S_IWUSR", 
+        "S_IXUSR", 
+        "S_IRWXG", 
+        "S_IRGRP", 
+        "S_IWGRP", 
+        "S_IXGRP", 
+        "S_IRWXO", 
+        "S_IROTH", 
+        "S_IWOTH",
+        
+        "S_IXOTH", //40
+        "S_IFMT", 
+        "S_IFSOCK", 
+        "S_IFLNK", 
+        "S_IFREG", 
+        "S_IFBLK", 
+        "S_IFDIR", 
+        "S_IFCHR", 
+        "S_IFIFO", 
+        "S_ISUID",
+        
+        "S_ISGID", //50
+        "S_ISVTX"
     };
+
     char *field_types[] = 
     {
         "J", "J", "J",
@@ -103,16 +132,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J",
-        "J", "J", "J"
+        "J"
     };
 
     char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNIFlags";
@@ -154,76 +174,56 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     SET_LONG_FIELD(env, inst, fids[2], PVFS_IO_READ);
     SET_LONG_FIELD(env, inst, fids[3], PVFS_IO_WRITE);
     SET_LONG_FIELD(env, inst, fids[4], O_ACCMODE);
-    SET_LONG_FIELD(env, inst, fids[5], O_LARGEFILE);
-    SET_LONG_FIELD(env, inst, fids[6], AT_FDCWD);
-    SET_LONG_FIELD(env, inst, fids[7], O_EXCL);
-    SET_LONG_FIELD(env, inst, fids[8], AT_REMOVEDIR);
-    SET_LONG_FIELD(env, inst, fids[9], O_APPEND);
-    SET_LONG_FIELD(env, inst, fids[10], AT_SYMLINK_NOFOLLOW);
-    SET_LONG_FIELD(env, inst, fids[11], O_NOFOLLOW);
-    SET_LONG_FIELD(env, inst, fids[12], PVFS_ATTR_SYS_ATIME);
-    SET_LONG_FIELD(env, inst, fids[13], PVFS_ATTR_SYS_MTIME);
-    SET_LONG_FIELD(env, inst, fids[14], O_CLOEXEC);
-    SET_LONG_FIELD(env, inst, fids[15], O_ASYNC);
-    SET_LONG_FIELD(env, inst, fids[16], O_CREAT);
-    SET_LONG_FIELD(env, inst, fids[17], O_DIRECT);
-    SET_LONG_FIELD(env, inst, fids[18], O_DIRECTORY);
-    SET_LONG_FIELD(env, inst, fids[19], O_NOATIME);
-    SET_LONG_FIELD(env, inst, fids[20], O_NOCTTY);
-    SET_LONG_FIELD(env, inst, fids[21], O_NONBLOCK);
-    SET_LONG_FIELD(env, inst, fids[22], FD_CLOEXEC);
-    SET_LONG_FIELD(env, inst, fids[23], ST_RDONLY);
-    SET_LONG_FIELD(env, inst, fids[24], ST_NOSUID);
-    SET_LONG_FIELD(env, inst, fids[25], S_IRUSR);
-    SET_LONG_FIELD(env, inst, fids[26], S_IWUSR);
-    SET_LONG_FIELD(env, inst, fids[27], S_IXUSR);
-    SET_LONG_FIELD(env, inst, fids[28], S_IRWXG);
-    SET_LONG_FIELD(env, inst, fids[29], S_IRGRP);
-    SET_LONG_FIELD(env, inst, fids[30], S_IWGRP);
-    SET_LONG_FIELD(env, inst, fids[31], S_IXGRP);
-    SET_LONG_FIELD(env, inst, fids[32], S_IRWXO);
-    SET_LONG_FIELD(env, inst, fids[33], S_IROTH);
-    SET_LONG_FIELD(env, inst, fids[34], S_IWOTH);
-    SET_LONG_FIELD(env, inst, fids[35], S_IXOTH);
-    SET_LONG_FIELD(env, inst, fids[36],S_IFMT);
-    SET_LONG_FIELD(env, inst, fids[37],S_IFSOCK);
-    SET_LONG_FIELD(env, inst, fids[38],S_IFLNK);
-    SET_LONG_FIELD(env, inst, fids[39],S_IFREG);
-    SET_LONG_FIELD(env, inst, fids[40],S_IFBLK);
-    SET_LONG_FIELD(env, inst, fids[41],S_IFDIR);
-    SET_LONG_FIELD(env, inst, fids[42],S_IFCHR);
-    SET_LONG_FIELD(env, inst, fids[43],S_IFIFO);
-    SET_LONG_FIELD(env, inst, fids[44],S_ISUID);
-    SET_LONG_FIELD(env, inst, fids[45],S_ISGID);
-    SET_LONG_FIELD(env, inst, fids[46],S_ISVTX);
-    SET_LONG_FIELD(env, inst, fids[47],S_IRWXU);
-    SET_LONG_FIELD(env, inst, fids[48],SEEK_SET);
-    SET_LONG_FIELD(env, inst, fids[49],SEEK_CUR);
-    SET_LONG_FIELD(env, inst, fids[50],SEEK_END);
-    SET_LONG_FIELD(env, inst, fids[51],SEEK_DATA);
-    SET_LONG_FIELD(env, inst, fids[52],SEEK_HOLE);
-    SET_LONG_FIELD(env, inst, fids[53],POSIX_FADV_NORMAL);
-    SET_LONG_FIELD(env, inst, fids[54],POSIX_FADV_RANDOM);
-    SET_LONG_FIELD(env, inst, fids[55],POSIX_FADV_SEQUENTIAL);
-    SET_LONG_FIELD(env, inst, fids[56],POSIX_FADV_WILLNEED);
-    SET_LONG_FIELD(env, inst, fids[57],POSIX_FADV_DONTNEED);
-    SET_LONG_FIELD(env, inst, fids[58],POSIX_FADV_NOREUSE);
-    SET_LONG_FIELD(env, inst, fids[59],O_RDWR);
-    SET_LONG_FIELD(env, inst, fids[60],O_TRUNC);
-    SET_LONG_FIELD(env, inst, fids[61],F_RDLCK);
-    SET_LONG_FIELD(env, inst, fids[62],F_UNLCK);
-    SET_LONG_FIELD(env, inst, fids[63],SIGIO);
-    SET_LONG_FIELD(env, inst, fids[64],SIGURG);
-    SET_LONG_FIELD(env, inst, fids[65],F_OWNER_TID);
-    SET_LONG_FIELD(env, inst, fids[66],F_OWNER_PID);
-    SET_LONG_FIELD(env, inst, fids[67],F_OWNER_PGRP);
-    SET_LONG_FIELD(env, inst, fids[68],DN_ACCESS);
-    SET_LONG_FIELD(env, inst, fids[69],DN_MODIFY);
-    SET_LONG_FIELD(env, inst, fids[70],DN_CREATE);
-    SET_LONG_FIELD(env, inst, fids[71],DN_DELETE);
-    SET_LONG_FIELD(env, inst, fids[72],DN_RENAME );
-    SET_LONG_FIELD(env, inst, fids[73],DN_ATTRIB);
-    SET_LONG_FIELD(env, inst, fids[74],DN_MULTISHOT);
+    SET_LONG_FIELD(env, inst, fids[7], O_LARGEFILE);
+    SET_LONG_FIELD(env, inst, fids[8], AT_FDCWD);
+    SET_LONG_FIELD(env, inst, fids[9], O_EXCL);
+    
+    SET_LONG_FIELD(env, inst, fids[10], AT_REMOVEDIR);
+    SET_LONG_FIELD(env, inst, fids[11], O_APPEND);
+    //SET_LONG_FIELD(env, inst, fids[12], PVFS_FD_FAILURE);
+    //SET_LONG_FIELD(env, inst, fids[13], PVFS_ATTR_DEFAULT_MASK);
+    SET_LONG_FIELD(env, inst, fids[14], AT_SYMLINK_NOFOLLOW);
+    SET_LONG_FIELD(env, inst, fids[15], O_NOFOLLOW);
+    SET_LONG_FIELD(env, inst, fids[16], PVFS_ATTR_SYS_ATIME);
+    SET_LONG_FIELD(env, inst, fids[17], PVFS_ATTR_SYS_MTIME);
+    SET_LONG_FIELD(env, inst, fids[18], O_CLOEXEC);
+    SET_LONG_FIELD(env, inst, fids[19], O_ASYNC);
+        
+    SET_LONG_FIELD(env, inst, fids[20], O_CREAT);
+    SET_LONG_FIELD(env, inst, fids[21], O_DIRECT);
+    SET_LONG_FIELD(env, inst, fids[22], O_DIRECTORY);
+    SET_LONG_FIELD(env, inst, fids[23], O_NOATIME);
+    SET_LONG_FIELD(env, inst, fids[24], O_NOCTTY);
+    SET_LONG_FIELD(env, inst, fids[25], O_NONBLOCK);
+    SET_LONG_FIELD(env, inst, fids[26], FD_CLOEXEC);
+    SET_LONG_FIELD(env, inst, fids[27], ST_RDONLY);
+    SET_LONG_FIELD(env, inst, fids[28], ST_NOSUID);
+    SET_LONG_FIELD(env, inst, fids[29], S_IRWXU);
+        
+    SET_LONG_FIELD(env, inst, fids[30], S_IRUSR);
+    SET_LONG_FIELD(env, inst, fids[31], S_IWUSR);
+    SET_LONG_FIELD(env, inst, fids[32], S_IXUSR);
+    SET_LONG_FIELD(env, inst, fids[33], S_IRWXG);
+    SET_LONG_FIELD(env, inst, fids[34], S_IRGRP);
+    SET_LONG_FIELD(env, inst, fids[35], S_IWGRP);
+    SET_LONG_FIELD(env, inst, fids[36], S_IXGRP);
+    SET_LONG_FIELD(env, inst, fids[37], S_IRWXO);
+    SET_LONG_FIELD(env, inst, fids[38], S_IROTH);
+    SET_LONG_FIELD(env, inst, fids[39], S_IWOTH);
+        
+    SET_LONG_FIELD(env, inst, fids[40], S_IXOTH);
+    SET_LONG_FIELD(env, inst, fids[41],S_IFMT);
+    SET_LONG_FIELD(env, inst, fids[42],S_IFSOCK);
+    SET_LONG_FIELD(env, inst, fids[43],S_IFLNK);
+    SET_LONG_FIELD(env, inst, fids[44],S_IFREG);
+    SET_LONG_FIELD(env, inst, fids[45],S_IFBLK);
+    SET_LONG_FIELD(env, inst, fids[46],S_IFDIR);
+    SET_LONG_FIELD(env, inst, fids[47],S_IFCHR);
+    SET_LONG_FIELD(env, inst, fids[48],S_IFIFO);
+    SET_LONG_FIELD(env, inst, fids[49],S_ISUID);
+    
+    SET_LONG_FIELD(env, inst, fids[50],S_ISGID);
+    SET_LONG_FIELD(env, inst, fids[51],S_ISVTX);
         
     JNI_FLUSH
     return inst;

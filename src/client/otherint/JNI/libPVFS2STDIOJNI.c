@@ -1,4 +1,3 @@
-
 /* 
  * (C) 2011 Clemson University
  *
@@ -9,9 +8,6 @@
 
 /* Include our headers that wrap calls present in stdio.c */
 #include <jni_stdio.h>
-
-/* Header for JNI */
-//#include "jni.h"
 
 /* Include other headers */
 #include <stdlib.h>
@@ -100,13 +96,14 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
     SET_LONG_FIELD(env, inst, fids[0], SEEK_SET);
     SET_LONG_FIELD(env, inst, fids[1], SEEK_CUR);
     SET_LONG_FIELD(env, inst, fids[2], SEEK_END);
-    SET_LONG_FIELD(env, inst, fids[3], O_EXCL);
-    SET_LONG_FIELD(env, inst, fids[4], O_APPEND);
-    SET_LONG_FIELD(env, inst, fids[5], O_SYNC);
+    //SET_LONG_FIELD(env, inst, fids[3], O_EXCL);
+    //SET_LONG_FIELD(env, inst, fids[4], O_APPEND);
+    //SET_LONG_FIELD(env, inst, fids[5], O_SYNC);
     SET_LONG_FIELD(env, inst, fids[6], DT_BLK );
     SET_LONG_FIELD(env, inst, fids[7], DT_CHR);
     SET_LONG_FIELD(env, inst, fids[8], DT_DIR);
     SET_LONG_FIELD(env, inst, fids[9], DT_FIFO);
+
     SET_LONG_FIELD(env, inst, fids[10], DT_LNK);
     SET_LONG_FIELD(env, inst, fids[11], DT_REG);
     SET_LONG_FIELD(env, inst, fids[12], DT_SOCK);

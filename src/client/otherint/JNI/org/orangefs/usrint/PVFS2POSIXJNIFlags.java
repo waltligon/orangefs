@@ -11,7 +11,7 @@ import java.lang.reflect.Field;
 public class PVFS2POSIXJNIFlags {
 
     /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
-    public PVFS2POSIXJNIFlags() {}
+    private PVFS2POSIXJNIFlags() {}
 
     /* Fields set by JNI function fill_PVFS2POSIXJNIFlags.
     * See posix_flags.c 
@@ -45,6 +45,7 @@ public class PVFS2POSIXJNIFlags {
     public long FD_CLOEXEC;
     public long ST_RDONLY;
     public long ST_NOSUID;
+    public long S_IRWXU;
     public long S_IRUSR;
     public long S_IWUSR;
     public long S_IXUSR;
@@ -67,35 +68,34 @@ public class PVFS2POSIXJNIFlags {
     public long S_ISUID;    
     public long S_ISGID;    
     public long S_ISVTX;
-    public long S_IRWXU;
     public long SEEK_SET;
-	public long SEEK_CUR;
-	public long SEEK_END;
-	public long SEEK_DATA;
-	public long SEEK_HOLE;
-	public long POSIX_FADV_NORMAL;
+    public long SEEK_CUR;
+    public long SEEK_END;
+    public long SEEK_DATA;
+    public long SEEK_HOLE;
+    public long POSIX_FADV_NORMAL;
     public long POSIX_FADV_RANDOM;
-	public long POSIX_FADV_SEQUENTIAL;
-	public long POSIX_FADV_WILLNEED;
-	public long POSIX_FADV_DONTNEED;
-	public long POSIX_FADV_NOREUSE;
-	public long O_RDWR;
-	public long O_TRUNC;
-	public long F_RDLCK;
-	public long F_WRLCK;
-	public long F_UNLCK;
-	public long SIGIO;
-	public long SIGURG;
-	public long F_OWNER_TID;
-	public long F_OWNER_PID;
-	public long F_OWNER_PGRP;
-	public long DN_ACCESS;   
-	public long DN_MODIFY;   
-	public long DN_CREATE;  
-	public long DN_DELETE;   
-	public long DN_RENAME;   
-	public long DN_ATTRIB;
-	public long DN_MULTISHOT;
+    public long POSIX_FADV_SEQUENTIAL;
+    public long POSIX_FADV_WILLNEED;
+    public long POSIX_FADV_DONTNEED;
+    public long POSIX_FADV_NOREUSE;
+    public long O_RDWR;
+    public long O_TRUNC;
+    public long F_RDLCK;
+    public long F_WRLCK;
+    public long F_UNLCK;
+    public long SIGIO;
+    public long SIGURG;
+    public long F_OWNER_TID;
+    public long F_OWNER_PID;
+    public long F_OWNER_PGRP;
+    public long DN_ACCESS;   
+    public long DN_MODIFY;   
+    public long DN_CREATE;  
+    public long DN_DELETE;   
+    public long DN_RENAME;   
+    public long DN_ATTRIB;
+    public long DN_MULTISHOT;
 
     public String toString() {
         StringBuilder result = new StringBuilder();

@@ -12,10 +12,6 @@ public class PVFS2STDIOJNI {
 
     public PVFS2STDIOJNIFlags f;
 
-    public PVFS2STDIOJNIFlags getF() {
-        return f;
-    }
-
     /* ========== PVFS2STDIOJNI Native Methods START ========== */
     public native PVFS2STDIOJNIFlags fillPVFS2STDIOJNIFlags();
     
