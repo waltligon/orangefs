@@ -14,7 +14,7 @@ PVFS2_TOP_PREFIX=$(HOME)/trunk
 USRINT_DIR=$(PVFS2_TOP_PREFIX)/ofs/src/client/usrint
 # JAVA: Found by running: 
 #    readlink -f /usr/bin/javac | sed "s:bin/javac::"
-JAVA_HOME=/usr/lib/jvm/java-6-openjdk-amd64/
+JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
 
 #For use with package
 ORGDIR = org/orangefs/usrint

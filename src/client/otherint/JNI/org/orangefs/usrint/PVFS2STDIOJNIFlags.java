@@ -30,6 +30,9 @@ public class PVFS2STDIOJNIFlags {
     public long DT_REG;      
     public long DT_SOCK;    
     public long DT_UNKNOWN;
+    public long _IONBF;
+    public long _IOLBF;
+    public long _IOFBF;
 
     public String toString() {
         StringBuilder result = new StringBuilder();

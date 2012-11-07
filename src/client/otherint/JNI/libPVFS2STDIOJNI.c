@@ -45,24 +45,37 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
     jobject obj
 )
 {
-    int num_fields = 14;
+    int num_fields = 17;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
-        "SEEK_SET", "SEEK_CUR", "SEEK_END", 
-        "O_EXCL", "O_APPEND", "O_SYNC", 
-        "DT_BLK", "DT_CHR", "DT_DIR", 
-        "DT_FIFO", "DT_LNK", "DT_REG", 
-        "DT_SOCK", "DT_UNKNOWN"
+        "SEEK_SET", 
+        "SEEK_CUR", 
+        "SEEK_END", 
+        "O_EXCL", 
+        "O_APPEND", 
+        "O_SYNC", 
+        "DT_BLK", 
+        "DT_CHR", 
+        "DT_DIR", 
+        "DT_FIFO", 
+        "DT_LNK", 
+        "DT_REG", 
+        "DT_SOCK", 
+        "DT_UNKNOWN", 
+        "_IONBF",
+        "_IOLBF",
+        "_IOFBF"
     };
+
     char *field_types[] = 
     {
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
+        "J", "J", "J",
         "J", "J"
-        
     };
 
     char *cls_name = "org/orangefs/usrint/PVFS2STDIOJNIFlags";
@@ -108,6 +121,9 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fillPVFS2STDIOJNIFlags(
     SET_LONG_FIELD(env, inst, fids[11], DT_REG);
     SET_LONG_FIELD(env, inst, fids[12], DT_SOCK);
     SET_LONG_FIELD(env, inst, fids[13], DT_UNKNOWN);
+    SET_LONG_FIELD(env, inst, fids[14], _IONBF);
+    SET_LONG_FIELD(env, inst, fids[15], _IOLBF);
+    SET_LONG_FIELD(env, inst, fids[16], _IOFBF);
     
     JNI_FLUSH
     return inst;
@@ -499,16 +515,35 @@ err:
 }
 
 /* malloc */
-JNIEXPORT long JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_malloc(JNIEnv *env, jobject obj, jlong size)
 {
     PFI
     void *ptr = malloc((size_t) size);
-    if(!ptr)
+    if(!ptr && (size != 0))
     {
         jni_perror("malloc failed");
     }
-    return (long unsigned int) ptr;
+    JNI_FLUSH
+    return (jlong) ptr;
+}
+
+/* calloc */
+JNIEXPORT jlong JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_calloc(JNIEnv *env, jobject obj, jlong nmemb, jlong size)
+{
+    PFI
+    void *ptr = calloc((size_t) nmemb, (size_t) size);
+    if(!ptr)
+    {
+        /* Not an error if either are zero */
+        if(nmemb != 0 || size != 0) 
+        {
+            jni_perror("calloc failed");
+        }
+    }
+    JNI_FLUSH
+    return (jlong) ptr;
 }
 
 /* free */
@@ -895,7 +930,6 @@ JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj, jlong stream, jlong offset, jlong whence)
 {
     PFI
-
     int rc = jni_fseek((FILE *) stream, (long) offset, (int) whence);
     if(rc != 0)
     {
@@ -955,7 +989,6 @@ JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_setvbuf(JNIEnv *env, jobject obj, jlong stream, jlong buf, jlong mode, jlong size)
 {
     PFI
-
     int rc = jni_setvbuf((FILE *) stream, (char *) buf, (int) mode, (size_t) size);
     if(rc != 0)
     {
@@ -1030,7 +1063,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fflush(JNIEnv *env, jobject obj, jlong st
 {
     PFI
     int rc = jni_fflush((FILE *) stream);
-    if(rc < 0)
+    if(rc != 0)
     {
         jni_perror("fflush failed");
     }

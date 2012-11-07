@@ -8,7 +8,6 @@ package org.orangefs.usrint;
 
 import java.io.InputStream;
 import java.io.IOException;
-import org.orangefs.usrint.*;
 
 public class OrangeFileSystemInputStream extends InputStream {
 
@@ -19,38 +18,75 @@ public class OrangeFileSystemInputStream extends InputStream {
 
     /* File Related Fields*/
     public String path;
+    public int bufferSize;
     public long filePtr;
     public long bufferPtr;
-    public int bufferSize;
+    public long fileSize;
+
+    /* FileSystem Statistics */
+    //public FileSystem.Statistics statistics;
 
     public OrangeFileSystemInputStream(
             String path,
-            int bufferSize) throws IOException {
+            int bufferSize//,
+            //FileSystem.Statistics statistics
+                ) throws IOException {
 
         displayMethodInfo(true, false);
         
+        int rc = 0;        
+
         this.orange = Orange.getInstance();
         pf = orange.posix.f;
         sf = orange.stdio.f;
 
+        //this.statistics = statistics;
+
         this.path = path;
+        this.filePtr = 0;
+        this.bufferPtr = 0;
         this.bufferSize = bufferSize;
-        int rc = 0;
         String fopenMode = "r";
 
-        filePtr = orange.stdio.fopen(this.path, fopenMode);
+        /* Get current file size by calling stat */
+        Stat fileStat = orange.posix.stat(this.path);
+        if(fileStat == null) {
+            fileSize = 0;
+        }
+        else {
+            fileSize = fileStat.st_size;
+        }
+
+        /* Perform fopen */
+        filePtr = orange.stdio.fopen(path, fopenMode);
         if(filePtr == 0) {
-            throw new IOException(this.path +
+            throw new IOException(path +
                 " couldn't be opened. (fopen)");
+        }
+
+        /* Allocate Space for Buffer based on bufferSize */
+        bufferPtr = orange.stdio.calloc(1, bufferSize);
+        if(bufferPtr == 0) {
+            throw new IOException(path + 
+                "couldn't be opened. (calloc for setvbuf)");
+        }
+
+        /* Set buffering as desired */
+        if(orange.stdio.setvbuf(filePtr, 
+            bufferPtr, sf._IOFBF, bufferSize) != 0)
+        {
+            throw new IOException(path + "couldn't be opened. (setvbuf)");
         }
     }
 
     /* This method has an implementation in abstract class InputStream */
-    public int available() throws IOException {
+    /* */
+    public synchronized int available() throws IOException {
         displayMethodInfo(true, false);
-        if(filePtr == 0)
+        if(filePtr == 0) {
             throw new IOException("Invalid filePtr");
-        return 0;
+        }
+        return (int) (fileSize - orange.stdio.ftell(filePtr));
     }
 
     /* This method has an implementation in abstract class InputStream */
@@ -59,13 +95,15 @@ public class OrangeFileSystemInputStream extends InputStream {
         if(filePtr == 0) {
             return;
         }
-
-        int ret = orange.stdio.fclose(filePtr);
-        if(ret != 0) {
+        if(orange.stdio.fclose(filePtr) != 0) {
             throw new IOException("Couldn't close stream: " + path);
         }
-
         filePtr = 0;
+        /* Free buffer */        
+        if(bufferPtr != 0) {
+            orange.stdio.free(bufferPtr);
+        }
+        bufferPtr = 0;
     }
 
     /* This method has an implementation in abstract class InputStream */
@@ -83,30 +121,18 @@ public class OrangeFileSystemInputStream extends InputStream {
     public synchronized int read() throws IOException {
         displayMethodInfo(true, false);
         byte [] b = new byte[1];
-        long ret = orange.stdio.fread(b, (long) 1, 1, filePtr);
-
-        if(ret != (long) 1) {
-            if(orange.stdio.feof(filePtr) != 0) {
-                System.out.println("read reached EOF on path: " + path);
-
-                orange.stdio.clearerr(filePtr);
-                return -1;
-            }
-
-            if(orange.stdio.ferror(filePtr) != 0) {
-                orange.stdio.clearerr(filePtr);
-                throw new IOException("Error: Byte not written to stream: "
-                   + path);
-            }
+        int rc = read(b, 0, 1);
+        if(rc == 1) {
+            int retVal = (int) (0xff & b[0]);
+            return retVal;
         }
-        return (int) b[0];
+        return -1;
     }
 
+    /* This method has an implementation in abstract class InputStream */
     public synchronized int read(byte[] b) throws IOException {
         displayMethodInfo(true, false);
-        //fill the byte and should return 1 or -1
-        //b = orange.posix.fread.(this.ptr);
-        return 0;
+        return read(b, 0, b.length);
     }
 
     /* This method has an implementation in abstract class InputStream */
@@ -114,38 +140,56 @@ public class OrangeFileSystemInputStream extends InputStream {
         displayMethodInfo(true, false);
         int ret = 0;
 
+        if(filePtr == 0) {
+            throw new IOException("Couldn't read, invalid filePtr.");
+        }
+
         if(len == 0) {
             return 0;
         }
 
         byte c[] = new byte[len];
-        ret = (int)orange.stdio.fread(c, (long) len, 1, filePtr);
-        if(ret != 1) {
+        ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
+        if(ret < len) {
+            /* Check for EOF */
             if(orange.stdio.feof(filePtr) != 0) {
                 orange.stdio.clearerr(filePtr);
                 return -1;
             }
+            /* Check for stream error indicator */
             if(orange.stdio.ferror(filePtr) != 0) {
                 orange.stdio.clearerr(filePtr);
                 throw new IOException("Error: Bytes not read from file ( " +
                     ret + " of " + len + "): " + path);
             }
         }
-        System.arraycopy(c, 0, b, off, len);
-        return ret * len;
+
+        /*
+        if(statistics != null) {
+            statistics.incrementBytesRead(ret);
+        }
+        */
+
+        System.arraycopy(c, 0, b, off, ret);
+        return ret;
     }
 
     /* This method has an implementation in abstract class InputStream */
     public void reset() throws IOException {
         displayMethodInfo(true, false);
-        throw new IOException("No marking support");
+        throw new IOException("No support for marking.");
     }
 
     /* This method has an implementation in abstract class InputStream */
     public long skip(long n) throws IOException {
         displayMethodInfo(true, false);
-        return 0;
+        int rc = orange.stdio.fseek(filePtr, n, sf.SEEK_CUR);
+        if(rc != 0) {
+            throw new IOException("Fseek failed.");
+        }
+        return n;
     }
+
     public void displayMethodInfo(boolean showName, boolean showStack) {
         if(showName || showStack) {
             String methodName =

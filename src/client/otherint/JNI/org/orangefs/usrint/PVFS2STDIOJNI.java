@@ -20,6 +20,7 @@ public class PVFS2STDIOJNI {
     public native int recursiveDelete(String path);
 
     public native long malloc(long size);
+    public native long calloc(long nmemb, long size);
     public native void free(long ptr);
 
     public native long fopen(String path, String mode);

@@ -9,9 +9,6 @@ package org.orangefs.usrint;
 import java.io.OutputStream;
 import java.io.IOException;
 
-//import java.nio.ByteBuffer;
-//import java.io.FileNotFoundException;
-
 /* An OFS compatible File Output Stream */
 public class OrangeFileSystemOutputStream extends OutputStream {
 
@@ -22,88 +19,94 @@ public class OrangeFileSystemOutputStream extends OutputStream {
 
     /* File Related Fields */
     public String path;
-    public long filePtr;
-    public int fd;
     public short replication;
+    public long bufferSize;
+    public long filePtr;
+    public long bufferPtr;
     public boolean append;
 
-    public long bufferPtr;
-    public long bufferSize;
-
     public OrangeFileSystemOutputStream (
-        String path, 
+        String path,
+        int bufferSize,
         short replication, 
         boolean append) throws IOException 
     {
         displayMethodInfo(true, false);
 
+        /* Initialize Interface and Flags */
         this.orange = Orange.getInstance();
         pf = orange.posix.f;
         sf = orange.stdio.f;
 
         this.path = path;
-        this.replication = replication;
+        this.filePtr = 0;
+        this.bufferPtr = 0;
+        this.bufferSize = bufferSize;
+        /* TODO: replication, also think about appends rep. */
+        this.replication = (short) 0; //replication;
         this.append = append;
-
-        /* TODO: replication */
-
         String fopenMode = append ? "a" : "w";
 
-        /* Open */
-        filePtr = orange.stdio.fopen(this.path, fopenMode);
+        /* Perform fopen */
+        filePtr = orange.stdio.fopen(path, fopenMode);
         if(filePtr == 0) {
-            throw new IOException(this.path + 
+            throw new IOException(path + 
                 " couldn't be opened. (fopen)");
         }
-        
-        fd = orange.stdio.fileno(filePtr);
-        System.out.println("fileno fd = " + fd);
-        if(fd == -1) {
-            //throw new FileNotFoundException(this.path + " couldn't be opened. (Fileno)");
-            throw new IOException(this.path + 
-                " couldn't be opened. (fileno)");
+        /* Allocate Space for Buffer based on bufferSize */
+        bufferPtr = orange.stdio.calloc(1, bufferSize);
+        if(bufferPtr == 0) {
+            throw new IOException(path +
+                "couldn't be opened. (calloc for setvbuf)");
         }
-
-        /* TODO: Buffering? */
-        //setvbuf
+        /* Set buffering as desired */
+        if(orange.stdio.setvbuf(filePtr,
+            bufferPtr, sf._IOFBF, bufferSize) != 0)
+        {
+            throw new IOException(path + "couldn't be opened. (setvbuf)");
+        }
     }
 
     public synchronized void close() throws IOException {
         displayMethodInfo(true, false);
 
-        if((filePtr == 0) && (fd == -1)) {
+        if(filePtr == 0 ) {
             return; 
         }
 
-        /*TODO: check if this flush is redundant */
-        //flush();
+        //TODO: Determine if flush should be called here
 
-        int ret = orange.stdio.fclose(filePtr);
-        if(ret != 0) {
+        if(orange.stdio.fclose(filePtr) != 0) {
             throw new IOException("Couldn't close stream: " + path);
         }
         filePtr = 0;
-        fd = -1;
+        /* Free buffer */
+        if(bufferPtr != 0) {
+            orange.stdio.free(bufferPtr);
+        }
+        bufferPtr = 0;
     }
 
     public void flush() throws IOException {
         displayMethodInfo(true, false);
 
         int ret = orange.stdio.fflush(filePtr);
-        if(ret < 0) {
+        if(ret != 0) {
             throw new IOException("Couldn't flush stream: " + path);
         }
     }
 
-    public void write(int v) throws IOException {
+    public void write(int b) throws IOException {
         displayMethodInfo(true, false);
 
-        byte [] b = { (byte) v };
-        long ret = orange.stdio.fwrite(b, (long) 1, 1, filePtr);
-        if(ret != (long) 1) {
-            throw new IOException("Bytes not fully written to stream: "
-                + path);
-        }
+        byte [] bytes = { (byte) b };
+        write(bytes, 0, 1);
+    }
+
+    public void write(byte[] b) throws IOException {
+        displayMethodInfo(true, false);
+
+        write(b, 0, b.length);
     }
 
     public void write(byte b[], int off, int len) throws IOException {
@@ -114,11 +117,14 @@ public class OrangeFileSystemOutputStream extends OutputStream {
 
         byte c[] = new byte[len];
         System.arraycopy(b, off, c, 0, len);
-        long ret = orange.stdio.fwrite(c, (long) len, 1, filePtr);
-        if(ret != (long) 1) {
-            throw new IOException("Bytes not fully written to stream: " 
-                + path + ". Requested write: " + len + ". Wrote: " 
-                + (ret * len) + ".");
+        long ret = orange.stdio.fwrite(c, 1, (long) len, filePtr);
+        if(ret < (long) len) {
+            /* Check for stream error indicator */
+            if(orange.stdio.ferror(filePtr) != 0) {
+                orange.stdio.clearerr(filePtr);
+                throw new IOException("Error: Bytes not written to file ( " +
+                    ret + " of " + len + "): " + path);
+            }        
         }
     }
 
