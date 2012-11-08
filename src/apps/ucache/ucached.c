@@ -37,12 +37,7 @@ static int create_ucache_shmem(void);
 static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
 static void clean_up(void);
 static int ucached_lockchk(void);
-
-/* Prototypes */
-
 void check_rc(int rc);
-
-
 
 void check_rc(int rc)
 {
@@ -60,6 +55,7 @@ void check_rc(int rc)
 /** Function to be run upon successful termination from an exit call */
 static void clean_up(void)
 {
+    int rc = 0;
     /* Only the parent process should execute these lines.
      * Must check the pid since the atexit function registered 
      * clean_up. This registration is passed on to any child
@@ -70,12 +66,21 @@ static void clean_up(void)
     {
         if(DEST_AT_EXIT)
         {
-            destroy_ucache_shmem(1, 1);
+            rc = destroy_ucache_shmem(1, 1);
         }
         gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: ucached exiting...PID=%d\n", pid);
-        unlink(FIFO1);
-        unlink(FIFO2);
+        errno = 0;
+        rc = unlink(FIFO1);
+        if(rc < 0)
+        {
+            perror("unklink of FIFO1 ucached failed");
+        }
+        rc = unlink(FIFO2);
+        if(rc < 0)
+        {
+            perror("unklink of FIFO2 ucached failed");
+        }
     }
 }
 
@@ -209,14 +214,8 @@ static int execute_cmd(char cmd)
             break;
         }
         /* Close Daemon */
-        case 'x': 
+        case 'x':
             writefd = open(FIFO2, O_WRONLY);
-            /*
-            if(writefd)
-            {
-                rc = write(writefd, "", BUFF_SIZE);
-            }
-            */
             close(writefd);
             close(readfd);
             remove(UCACHED_STARTED);
