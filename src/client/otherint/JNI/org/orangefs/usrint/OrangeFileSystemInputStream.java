@@ -8,8 +8,11 @@ package org.orangefs.usrint;
 
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.Closeable;
 
-public class OrangeFileSystemInputStream extends InputStream {
+public class OrangeFileSystemInputStream 
+        extends InputStream 
+        implements Closeable {
 
     /* Interface Related Fields*/
     public Orange orange;
@@ -28,9 +31,7 @@ public class OrangeFileSystemInputStream extends InputStream {
 
     public OrangeFileSystemInputStream(
             String path,
-            int bufferSize//,
-            //FileSystem.Statistics statistics
-                ) throws IOException {
+            int bufferSize) throws IOException {
 
         displayMethodInfo(true, false);
         
@@ -40,7 +41,6 @@ public class OrangeFileSystemInputStream extends InputStream {
         pf = orange.posix.f;
         sf = orange.stdio.f;
 
-        //this.statistics = statistics;
 
         this.path = path;
         this.filePtr = 0;
@@ -56,21 +56,18 @@ public class OrangeFileSystemInputStream extends InputStream {
         else {
             fileSize = fileStat.st_size;
         }
-
         /* Perform fopen */
         filePtr = orange.stdio.fopen(path, fopenMode);
         if(filePtr == 0) {
             throw new IOException(path +
                 " couldn't be opened. (fopen)");
         }
-
         /* Allocate Space for Buffer based on bufferSize */
         bufferPtr = orange.stdio.calloc(1, bufferSize);
         if(bufferPtr == 0) {
             throw new IOException(path + 
                 "couldn't be opened. (calloc for setvbuf)");
         }
-
         /* Set buffering as desired */
         if(orange.stdio.setvbuf(filePtr, 
             bufferPtr, sf._IOFBF, bufferSize) != 0)
@@ -120,36 +117,40 @@ public class OrangeFileSystemInputStream extends InputStream {
     /* *** This method declared abstract in InputStream *** */
     public synchronized int read() throws IOException {
         displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
+        }
         byte [] b = new byte[1];
         int rc = read(b, 0, 1);
         if(rc == 1) {
             int retVal = (int) (0xff & b[0]);
+            /* Return byte as int */
             return retVal;
         }
+        /* Return EOF */
         return -1;
     }
 
     /* This method has an implementation in abstract class InputStream */
     public synchronized int read(byte[] b) throws IOException {
         displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
+        }
         return read(b, 0, b.length);
     }
 
     /* This method has an implementation in abstract class InputStream */
     public synchronized int read(byte[] b, int off, int len) throws IOException {
         displayMethodInfo(true, false);
-        int ret = 0;
-
         if(filePtr == 0) {
             throw new IOException("Couldn't read, invalid filePtr.");
         }
-
         if(len == 0) {
             return 0;
         }
-
         byte c[] = new byte[len];
-        ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
+        int ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
         if(ret < len) {
             /* Check for EOF */
             if(orange.stdio.feof(filePtr) != 0) {
@@ -163,13 +164,11 @@ public class OrangeFileSystemInputStream extends InputStream {
                     ret + " of " + len + "): " + path);
             }
         }
-
         /*
         if(statistics != null) {
             statistics.incrementBytesRead(ret);
         }
         */
-
         System.arraycopy(c, 0, b, off, ret);
         return ret;
     }
@@ -183,6 +182,9 @@ public class OrangeFileSystemInputStream extends InputStream {
     /* This method has an implementation in abstract class InputStream */
     public long skip(long n) throws IOException {
         displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
+        }
         int rc = orange.stdio.fseek(filePtr, n, sf.SEEK_CUR);
         if(rc != 0) {
             throw new IOException("Fseek failed.");

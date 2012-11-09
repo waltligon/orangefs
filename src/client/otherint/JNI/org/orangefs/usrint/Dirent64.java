@@ -20,12 +20,12 @@ public class Dirent64 {
     /* This probably won't get called much since we're depending upon a 
      * native method to initialize this object.
      */
-    Dirent64() {
+    private Dirent64() {
 
     }
 
     /* Generic Object Dump to String */
-    String toString() {
+    public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
 
