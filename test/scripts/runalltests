@@ -167,6 +167,7 @@ ssh-keygen -f "~/.ssh/known_hosts" -R ${VMIPADDR}
 
 
 #prepare the image for testing
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh 
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh 
 
 #run the test
