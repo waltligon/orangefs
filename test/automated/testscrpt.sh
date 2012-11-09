@@ -152,7 +152,7 @@ setup_pvfs2() {
 	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi
-	#turn on degging on each server
+	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
         echo "....setting server-side debug mask"
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
@@ -257,7 +257,6 @@ for s in $(echo $VFS_HOSTS); do
 		break
 	fi
 done
-#do_vfs=0
 
 
 if [ ! $RUN_VFS_TEST ] 
@@ -311,7 +310,7 @@ teardown_pvfs2 && setup_pvfs2
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
-        setupfail
+	setupfail
 fi
 
 echo "Run MPI test is $RUN_MPI_TEST"
@@ -357,8 +356,8 @@ fi
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
 
-#if [ $RUN_MPI_TEST ]
-#then
+if [ $RUN_MPI_TEST ]
+then
 	which qsub >/dev/null 2>&1
 	if [ $? -eq 0 ] ; then
 		echo ""
@@ -370,7 +369,7 @@ fi
 		pull_and_build_mpich2 || buildfail
 		. $MPIIO_DRIVER
 	fi
-#fi
+fi
 
 # restore file descriptors and close temporary fds
 exec 1<&6 6<&-
