@@ -117,7 +117,7 @@ while (<LOGFILE>)
 	# test all the vfs scripts in the table
 	if ( $vfs_idx >= 0 && $vfs_idx < @vfs_tests)
 		{
-		print "checking sysint test number $vfs_idx $vfs_tests[$vfs_idx]\n";
+		#print "checking vfs test number $vfs_idx $vfs_tests[$vfs_idx]\n";
 		if ($line =~ /${vfs_tests[$vfs_idx]}(.*)FAILED/)
 			{
 			print "Test ${vfs_tests[$vfs_idx]} FAILED!\n";

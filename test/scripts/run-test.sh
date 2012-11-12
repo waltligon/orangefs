@@ -1,6 +1,8 @@
 #!/bin/bash
-export SVNBRANCH=$1
 script runtest.txt
+export RUN_MPI_TEST
+export RUN_VFS_TEST
+export SVNBRANCH
 export LD_LIBRARY_PATH=/opt/db4/lib
 mkdir ~/test2
 cd ~/test2
