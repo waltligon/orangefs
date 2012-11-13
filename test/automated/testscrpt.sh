@@ -1,4 +1,4 @@
-#/bin/bash -v
+#/bin/bash 
 
 # i'm not married to bash. just wanted to get things prototyped
 
@@ -110,7 +110,7 @@ pull_and_build_mpich2 () {
 		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
 		--enable-g=dbg --without-mpe \
 		--disable-f77 --disable-fc >mpich2config-${CVS_TAG}.log &&\
-	make && make install  
+	make > mpich2make-$CVSTAG.log 1&2> && make install > mpich2install-${CVSTAG} 1&2>
 }
 
 
