@@ -110,6 +110,9 @@ esac
 echo "VMUSER is $VMUSER"
 export VMUSER
 
+
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
+
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
 	echo "EC2 Configuration file $EC2CONFFILE not found."
@@ -218,7 +221,6 @@ rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyC
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
  
 echo "Processing the logs" 
-SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 ./checklogs.pl "`pwd`/logs-$DATETIME/alltests-${SVNBRANCH_SHORT}.log"
 
 if [ $? -ne 0 ]
