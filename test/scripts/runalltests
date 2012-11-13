@@ -187,7 +187,7 @@ do
 done
 
 # install all system updates and reboot
-ssh -i ${KEYFILE} -t ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < update-${VMSYSTEM}.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < update-${VMSYSTEM}.sh 
 
 echo "Waiting for image to reboot..."
 sleep 20
