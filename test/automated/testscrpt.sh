@@ -1,4 +1,4 @@
-#/bin/bash
+#/bin/bash 
 
 # i'm not married to bash. just wanted to get things prototyped
 
@@ -95,7 +95,8 @@ pull_and_build_mpich2 () {
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	rm -rf mpich2-*.tar.gz
-	wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+	#wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+	wget --quiet http://devorange.clemson.edu/pvfs/mpich2-1.5.tar.gz
 	#wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
 	#tar xzf mpich2-latest.tar.gz
@@ -109,7 +110,7 @@ pull_and_build_mpich2 () {
 		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
 		--enable-g=dbg --without-mpe \
 		--disable-f77 --disable-fc >mpich2config-${CVS_TAG}.log &&\
-	make >/dev/null && make install >/dev/null 
+	make > mpich2make-$CVSTAG.log 1&2> && make install > mpich2install-${CVSTAG} 1&2>
 }
 
 
@@ -448,6 +449,7 @@ then
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
 		pull_and_build_mpich2 || buildfail
+		source $MPIIO_DRIVER
 		. $MPIIO_DRIVER
 	fi
 fi
