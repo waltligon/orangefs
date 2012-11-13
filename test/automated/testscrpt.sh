@@ -1,4 +1,4 @@
-#/bin/bash
+#/bin/bash -v
 
 # i'm not married to bash. just wanted to get things prototyped
 
@@ -109,7 +109,7 @@ pull_and_build_mpich2 () {
 		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
 		--enable-g=dbg --without-mpe \
 		--disable-f77 --disable-fc >mpich2config-${CVS_TAG}.log &&\
-	make >/dev/null && make install >/dev/null 
+	make && make install  
 }
 
 
@@ -448,6 +448,7 @@ then
 		# go through the hassle of downloading/building mpich2 only if we are
 		# actually going to use it
 		pull_and_build_mpich2 || buildfail
+		source $MPIIO_DRIVER
 		. $MPIIO_DRIVER
 	fi
 fi
