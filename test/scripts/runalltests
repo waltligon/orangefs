@@ -5,8 +5,8 @@
 
 
 
-DATE=`date +'%Y%m%d'`
-DATETIME=`date +'%Y%m%d-%H.%M.%S'`
+DATE=`date -u +'%Y%m%d'`
+DATETIME=`date -u +'%Y%m%d-%H.%M.%S'`
 #export VMUSER=ec2-user
 VMUSER=ubuntu
 #export VMSYSTEM=sl6-mpi
