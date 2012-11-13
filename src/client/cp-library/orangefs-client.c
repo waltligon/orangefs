@@ -22,71 +22,86 @@ const PVFS_util_tab *tab;
 BOOL MVS_DEBUGGING = FALSE;	/* will be set to true in orangefs_enable_debug */
 
 
-void orangefs_enable_debug(int debugType, const char *filePath)
+void orangefs_enable_debug(int debugType, const char *filePath, int64_t gossip_mask)
 {
 	switch (debugType)
 	{
 	case OrangeFS_DEBUG_SYSLOG :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);	/* current un-implemented on windows */
 		break;
 	case OrangeFS_DEBUG_STDERR :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_stderr();
 		break;
 	case OrangeFS_DEBUG_FILE:
-		gossip_enable_file(filePath, "w+");
+		gossip_set_debug_mask(1, gossip_mask);
+		gossip_enable_file(filePath, "a");
 		break;
 	case OrangeFS_DEBUG_MVS:
+		gossip_set_debug_mask(1, gossip_mask);
 		MVS_DEBUGGING = TRUE;
 		/* dont need to enable anything to do this */
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
 		gossip_enable_stderr();
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_FILE:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_MVS:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_stderr();
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		break;
 	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_MVS:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_stderr();
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS:
-		gossip_enable_file(filePath, "w+");
+		gossip_set_debug_mask(1, gossip_mask);
+		gossip_enable_file(filePath, "a");
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
 		gossip_enable_stderr();
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_MVS :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
 		gossip_enable_stderr();
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_SYSLOG | OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_STDERR | OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS :
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_stderr();
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		MVS_DEBUGGING = TRUE;
 		break;
 	case OrangeFS_DEBUG_ALL:
+		gossip_set_debug_mask(1, gossip_mask);
 		gossip_enable_syslog(0);
 		gossip_enable_stderr();
-		gossip_enable_file(filePath, "w+");
+		gossip_enable_file(filePath, "a");
 		MVS_DEBUGGING = TRUE;
 		break;
 	default :
@@ -109,7 +124,7 @@ void orangefs_debug_print(const char *format, ...)
 	vsprintf(buff, format, argp);
 	va_end(argp);
 
-	gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, buff, argp);	/* can you pass a va_list as a variable argument parameter? */
+	gossip_debug(OrangeFS_WIN_CLIENT_DEBUG, buff, argp);	
 
 #ifdef WIN32
 	if (MVS_DEBUGGING)
@@ -139,10 +154,6 @@ int orangefs_initialize(OrangeFS_fsid *fsid,		/* not currently implemented */
 	char exe_path[MAX_PATH];
 	char *tabfile, *p;
 	int ret, malloc_flag, i, found_one = 0;
-
-#ifdef ORANGEFS_DEBUG
-	orangefs_enable_debug(debugType, debugFile);
-#endif
 
 	ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
 	if (ret)
@@ -843,7 +854,7 @@ int orangefs_find_files(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *f
                     &resp_getattr, NULL);
                 if (ret == 0)
                 {
-                    memcpy(&attr_array[i], &resp_getattr.attr, sizeof(OrangeFS_attr));                    
+                    memcpy(&attr_array[i], &resp_getattr.attr, sizeof(OrangeFS_attr));  
                 }
                 else {
                     break;
@@ -857,6 +868,7 @@ int orangefs_find_files(OrangeFS_fsid *fs_id, OrangeFS_credential *cred, char *f
                 /* note: ignore return code... just use attrs of the symlink */
                 orangefs_get_symlink_attr(fs_id, cred, fs_path, attr_array[i].link_target, (OrangeFS_object_ref *) &ref, &attr_array[i]);
             }
+
             /* clear allocated fields */
             PVFS_util_release_sys_attr((PVFS_sys_attr *) &attr_array[i]);
         }

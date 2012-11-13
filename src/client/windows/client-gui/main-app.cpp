@@ -1,24 +1,50 @@
+
 #include "main-app.h"
+
+#include <vld.h>
 
 #ifndef WIN32
 	#define __declspec(x)	/* to null out the DLL export compiler operatives on non-windows machines */
 #endif
 
 #ifdef ORANGEFS_DEBUG
-	const char *debugLogFilename = "C:\\Users\\Trent\\My\ Documents\\Visual\ Studio\ 2010\\Projects\\test-orangefs-app\\debug\\debugLog.txt";
+	const char *debugLogFilename = "C:\\Users\\Trent\\My Documents\\Visual Studio 2012\\Projects\\test-orangefs-app\\debug\\debugLog.txt";
 #endif
 
+const int MAX_FILES		= 256;
+const int MAX_MNTENTS	= 256;
+const int DEFAULT_WIN_WIDTH = 1024;
+const int DEFAULT_WIN_HEIGHT = 800;
+const OrangeFS_ds_position ORANGEFS_READDIR_START = INT32_MAX - 1;
+const char *TABFILE = "\\orangefstab";
+const wxString APP_LOGO_NAME = "OrangeFS_LOGO.png";
 
 /* global handle to the main app */
-static MainApp *MAIN_APP;
+MainApp *MAIN_APP;
 
+/* global handle to the window so FileListHandler can use it externally */
+MainFrame *MAIN_FRAME;
 
+/* give life to the singleton FileListHandler object */
+FileListHandler *FileListHandler::instance = NULL;
+
+BEGIN_EVENT_TABLE(MainFrame, wxFrame)
+	EVT_MENU(ID_FILE_QUIT, MainFrame::onQuit)
+	EVT_MENU(ID_FILE_ABOUT, MainFrame::onAbout)
+	EVT_MENU(ID_VIEW_PERMISSIONS, MainFrame::showPermissions)
+	EVT_MENU(ID_VIEW_SIZE, MainFrame::showFileSize)
+	EVT_MENU(ID_VIEW_MODIFIED, MainFrame::showLastModified)
+	EVT_MENU(ID_SETTINGS_CONFIG, MainFrame::showConfigDialog)
+	EVT_LIST_ITEM_SELECTED(LIST_CTRL_REMOTE, MainFrame::onRemoteFileSelected)
+END_EVENT_TABLE()
+
+/* sets up the required "main" */
 IMPLEMENT_APP(MainApp)
 
 void MainApp::cleanupApp()
 {
 	orangefs_cleanup_credentials(this->rootCred);
-	free(rootCred);
+	free(this->rootCred);
 
 	for (int i=0; i < MAX_MNTENTS; i++)
 	{
@@ -27,7 +53,6 @@ void MainApp::cleanupApp()
 	free(this->mntents);
 
 	free(this->rootSysAttr);
-	free(this->fileSize);
 }
 
 void MainApp::initFileSystem()
@@ -35,20 +60,17 @@ void MainApp::initFileSystem()
 	char error_msg[MAX_PATH];
 	int ret = -1;
 
-	if ((ret = orangefs_initialize(0, rootCred, mntents[0], error_msg, MAX_PATH, TABFILE, OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS, debugLogFilename)) == -1)		
+	if ((ret = orangefs_initialize(0, this->rootCred, this->mntents[0], error_msg, MAX_PATH, TABFILE, OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS, debugLogFilename)) == -1)
 	{																												
 		orangefs_debug_print("Failed to initialize file system\nMake sure the orangefs tabfile is in the proper directory");
 	}
 
-	orangefs_load_tabfile(TABFILE, mntents, error_msg, MAX_PATH);	/* currently unimplemented */
-
-/*	orangefs_debug_print("First config server: %s\nMount dir: %s\nFile System name: %s\nNumber of config servers: %d\n", mntents[0]->first_orangefs_config_server, 
-																														 mntents[0]->mnt_dir, 
-																														 mntents[0]->orangefs_fs_name, 
-																														 mntents[0]->num_orangefs_config_servers);
-*/
+	orangefs_load_tabfile(TABFILE, this->mntents, error_msg, MAX_PATH);	/* currently unimplemented */
 }
 
+/* maybe instead of allocating main memory for large numbers of files ,
+ * allocate memory, set the variables, save the values to a local database,
+ * then free the memory, rinse-repeat */
 void MainApp::allocateMembers()
 {
 	/* need to allocate the credential before calling credential functions */
@@ -60,11 +82,10 @@ void MainApp::allocateMembers()
 	orangefs_credential_add_group(this->rootCred, 0);	/* add root user to root group */
 	orangefs_credential_set_timeout(this->rootCred, ORANGEFS_DEFAULT_CREDENTIAL_TIMEOUT);	/* 1 hour */
 
+	/* this method of allocation might have to be changed with large numbers of files 
+	 * considering we can't put all this in memory at once on all systems */
 	this->rootSysAttr = (OrangeFS_attr *)malloc(MAX_FILES * sizeof(OrangeFS_attr));
 	memset(this->rootSysAttr, 0, MAX_FILES * sizeof(OrangeFS_attr));
-
-	this->fileSize = (OrangeFS_size *)malloc(MAX_FILES * sizeof(OrangeFS_size));
-	memset(this->fileSize, 0, MAX_FILES * sizeof(OrangeFS_size));
 
 	this->mntents = (OrangeFS_mntent **)malloc(MAX_MNTENTS * sizeof(OrangeFS_mntent *));
 	for (int i=0; i < MAX_MNTENTS; i++)
@@ -83,11 +104,11 @@ bool MainApp::OnInit()
 	char **tempFileListing;
 
 	this->num_files = 0;
+	this->screen_height = wxGetDisplaySize().GetHeight();
+	this->screen_width = wxGetDisplaySize().GetWidth();
 
 	/* give global main app handle a pointer to the app */
 	MAIN_APP = this;
-
-	orangefs_enable_debug( OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS, debugLogFilename);
 
 	/* initialize and allocate class entities */
 	tempFileListing = (char **)malloc(MAX_FILES * sizeof(char *));
@@ -101,10 +122,12 @@ bool MainApp::OnInit()
 
 	initFileSystem();
 
+	orangefs_enable_debug( OrangeFS_DEBUG_FILE | OrangeFS_DEBUG_MVS, debugLogFilename, OrangeFS_CLIENT_DEBUG | OrangeFS_GETATTR_DEBUG | OrangeFS_SETATTR_DEBUG);
+
 	ds_token = ORANGEFS_READDIR_START;
 
 	/* get a listing of all the files currently on the orangefs server */
-	orangefs_find_files(&mntents[0]->fs_id, this->rootCred, "/", &ds_token, MAX_FILES, &numRetrieved, tempFileListing, this->rootSysAttr); 
+	orangefs_find_files(&this->mntents[0]->fs_id, this->rootCred, "/", &ds_token, MAX_FILES, &numRetrieved, tempFileListing, this->rootSysAttr); 
 
 	this->num_files = numRetrieved;
 
@@ -121,9 +144,9 @@ bool MainApp::OnInit()
 				this->fileListing.Add(temp);
 				continue;
 			}
-			this->fileListing.Add(tempFileListing[i]);
 
-			this->fileSize[i] = rootSysAttr[i].size;
+			/* add the file name string to the array of strings that will populate the list control */
+			this->fileListing.Add(tempFileListing[i], 1);
 		}
 	}
 	else
@@ -131,7 +154,10 @@ bool MainApp::OnInit()
 		orangefs_debug_print("Failed to retrieve a file listing from the orangefs server.\nCheck orangefstab file and ensure settings are correct.\n");
 	}
 
-	MainFrame *frame = new MainFrame("OrangeFS File Browser", wxPoint(300, 200), wxSize(600, 480));
+	MainFrame *frame = new MainFrame("OrangeFS File Browser", 
+									 wxPoint((this->screen_width/2) - (DEFAULT_WIN_WIDTH/2), /* middle of screen */
+									 (this->screen_height/2) - (DEFAULT_WIN_HEIGHT/2)), 
+									 wxSize(DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT));
 
 	frame->Show(true);
 	SetTopWindow(frame);
@@ -145,13 +171,60 @@ bool MainApp::OnInit()
 	return true;
 }
 
+wxString getLogoPath(const wxString &logoName)	/* local util to get absolute path to logo png file */
+{
+	wxString retString;
+
+/* TODO 
+ * add the same funtionality for linux based machines */
+
+#ifdef WIN32
+	char exe_path[MAX_PATH];
+	char *logoFile, *ptr;
+	int ret, malloc_flag;
+	
+	ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
+	if (ret)
+	{
+		logoFile = (char *) malloc(MAX_PATH);
+		malloc_flag = TRUE;
+
+		/* cut off the exe file name, just get up to last directory */
+		ptr = strrchr(exe_path, '\\');
+		if (ptr)
+			*ptr = '\0';
+
+		strcpy(logoFile, exe_path);
+		strcat(logoFile, "\\");
+		strcat(logoFile, logoName.c_str());
+		retString = logoFile;
+	}
+
+	if (malloc_flag)
+		free(logoFile);
+#endif
+
+	return retString;
+}
+
 MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &size)
 	: wxFrame( NULL, -1, title, pos, size )
 {
-	wxValidator validator;
+	/* set the global window handle */
+	MAIN_FRAME = this;
 
-	this->mainPane = new wxPanel(this);
-	this->mainPane->SetSize(size);
+	this->windowSize = size;
+
+	/* set up the singleton object */
+	this->fileHandler = FileListHandler::getInstance();
+
+	wxImage::AddHandler( new wxPNGHandler );
+
+	wxString logoPath = getLogoPath(APP_LOGO_NAME);
+
+	wxIcon mainIcon(logoPath, wxBITMAP_TYPE_PNG, 32, 32);
+
+	this->SetIcon(mainIcon);
 
 	this->mainMenuBar = new wxMenuBar();	/* create the main menu bar */
 
@@ -167,142 +240,63 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 	this->view->AppendSeparator();
 	this->view->AppendCheckItem( ID_VIEW_MODIFIED, "Last Modified" );
 
+	this->settings = new wxMenu;
+	this->settings->Append( ID_SETTINGS_CONFIG, "Configuration" );
 	
 	this->mainMenuBar->Append( this->file, "&File");	/* add the "File" dropdown tab to the main menu bar */
 	this->mainMenuBar->Append( this->view, "&View");	
+	this->mainMenuBar->Append( this->settings, "&Settings");
 
 	SetMenuBar( this->mainMenuBar );	/* set the main manu bar as the visible menu bar */
 
-	CreateStatusBar();
-	SetStatusText("Loading files...");
+	this->CreateStatusBar();
+	this->SetStatusText("Select a file...");
 
-	/* create a list box and populate it with the retrieved file listing */
-	this->fileListCtrl = new wxListCtrl(this->mainPane,			/* window parent */
-									    LIST_CTRL,					/* window id */
-										wxDefaultPosition,			/* position */
-										wxDefaultSize,				/* size */
-										wxLC_REPORT | wxLC_VRULES,	/* window style */
-										validator,					/* window validator */
-										"");						/* list control name */
-	this->fileListCtrl->SetSize(size);
-	this->addColumn("File Name");
+	this->fileHandler->addColumn("File Name");
+}
+
+MainFrame::~MainFrame()
+{
+	MAIN_APP->cleanupApp();
+	delete fileHandler;
 }
 
 void MainFrame::onQuit(wxCommandEvent &WXUNUSED(event))
 {
-	MAIN_APP->cleanupApp();
-	Close(TRUE);
+	Close(true);
 }
 
 void MainFrame::onAbout(wxCommandEvent & WXUNUSED(event))
 {
-	wxMessageBox( _("This is a wxWidgets Testing sample"),
-				  _("About This Application"),
+	wxMessageBox( "Developed by: Trent Vigar\nClemson University and Omnibond LLC",
+				  "About This Application",
 				  wxOK | wxICON_INFORMATION, this);
 }
 
-/* function to take the file size in bytes and do 2 things :
- *		1) bit shift the file size down to a size < 1024
- *		2) return the proper byte prefix string			*/
-wxString MainFrame::getPrefixString(OrangeFS_size &size)
+void MainFrame::showConfigDialog(wxCommandEvent & WXUNUSED(event))
 {
-	const wxString prefixes[4] = { " KB" , " MB", " GB" , " TB" };
-	wxString size_string = " bytes";
-	short int count = 0;
+	/* creates a directory dialog browser with an "Add new folder" button */
+	wxDirDialog fileBrowser(this, "Choose a location", "/", wxDD_NEW_DIR_BUTTON);
+	int ret = -1;
 
-	while (1)
+	/* show the dialog */
+	ret = fileBrowser.ShowModal();
+
+	if (ret == wxID_OK)
 	{
-		if ((size >> 10) > 0)
-		{
-			size_string = prefixes[count];
-			count++;
-			size >>= 10;
-		}
-		else
-		{
-			break;
-		}
-	}
+		this->localSyncPath = fileBrowser.GetPath();
 
-	return size_string;
-}
+		orangefs_debug_print("Local file path selected : %s\n", this->localSyncPath);
 
-void MainFrame::addColumn(const wxString &name)
-{
-	/* create the column to appear */
-	wxListItem size;
-	size.SetId(0);
-	size.SetText(name);
-	size.SetWidth(this->mainPane->GetSize().x / (this->fileListCtrl->GetColumnCount()+1));
-	this->fileListCtrl->InsertColumn(this->fileListCtrl->GetColumnCount(), size);	/* add it to the end of the current columns, then increment the number of columns */
-
-	/* now add the column name and associated column ID to the map */
-	this->columnIDs[name] = this->fileListCtrl->GetColumnCount()-1;
-
-	/* fill the columns with the appropriate data */
-	if (!name.compare("File Name"))
-	{
-		/* populate the file name column */
-		for (int i = MAIN_APP->getNumFiles()-1; i>=0; i--)	
-		{
-			this->fileListCtrl->InsertItem( 0, MAIN_APP->getFileName(i) );
-		}
-	}
-	else if (!name.compare("File Size"))
-	{
-		/* populate the file size column with the "size" file attributes */
-		for (int i=0; i < MAIN_APP->getNumFiles(); i++)	
-		{
-			stringstream size;
-			wxString setString;
-			OrangeFS_size tempSize = MAIN_APP->getFileSize(i);	/* get size of file in bytes */
-
-			/* orangefs_debug_print("Old File size: %ld\n", tempSize); */
-
-			wxString prefixString = this->getPrefixString( tempSize );	/* get the prefix size (i.e. KB, MB, GB, etc.), and set tempSize to value less then 1000 */
-
-			/* orangefs_debug_print("New File size: %ld\nFile Size Prefix: %s\n", tempSize, prefixString); */
-
-			size << tempSize;
-			setString = size.str();
-			setString += prefixString;	/* should be <fileSize> <prefixString> now */
-
-			this->fileListCtrl->SetItem( i, this->columnIDs["File Size"], setString );
-		}
-	}
-	else if (!name.compare("Permissions"))
-	{
-		/* TODO */
-	}
-	else if (!name.compare("Last Modified"))
-	{
-		/* TODO */
-	}
-
-	/* new go through the other existing column(s) and resize accordingly */
-	for (int i=0; i < this->fileListCtrl->GetColumnCount(); i++)
-	{
-		this->fileListCtrl->SetColumnWidth(i, this->mainPane->GetSize().x / this->fileListCtrl->GetColumnCount());	/* set to panel size / number of columns */
-	}
-
-	/* orangefs_debug_print("ADDED COLUMN: %s\nCOLUMN ID: %d\nMAP SIZE: %d\n", name, this->columnIDs[name], this->columnIDs.size()); */
-}
-
-void MainFrame::removeColumn(const wxString &name)
-{
-	if (this->columnIDs.find(name) == this->columnIDs.end())	/* wasn't found in the map (sanity checking here) */
-	{
-		orangefs_debug_print("ERROR: unable to remove column: %s\n", name);
+		fileBrowser.Close(true);
+		fileBrowser.Destroy();
 		return;
 	}
-
-	this->fileListCtrl->DeleteColumn( this->columnIDs[name] );	/* columnIDs[name] will be the column identifier */
-	this->columnIDs.erase(name);	/* also remove the column name and ID from the map */
-
-	/* new go through the other existing column(s) and resize accordingly */
-	for (int i=0; i < this->fileListCtrl->GetColumnCount(); i++)
+	if (ret == wxID_CANCEL)
 	{
-		this->fileListCtrl->SetColumnWidth(i, this->mainPane->GetSize().x / this->fileListCtrl->GetColumnCount());	/* set to panel size / number of columns */
+		fileBrowser.Close(true);
+		fileBrowser.Destroy();
+		return;
 	}
 }
 
@@ -310,11 +304,11 @@ void MainFrame::showPermissions(wxCommandEvent & WXUNUSED(event))
 {
 	if ( this->view->IsChecked( ID_VIEW_PERMISSIONS ) )	/* if the "Permissions" view is now checked, add the column */ 
 	{
-		this->addColumn("Permissions");
+		this->fileHandler->addColumn("Permissions");	/* currently just adds to both, later add submenu inside the "View" menu to choose to check columns for each list */
 	}
 	else	/* otherwise, remove the column and resize the other column(s) */
 	{
-		this->removeColumn("Permissions");
+		this->fileHandler->removeColumn("Permissions");
 	}
 }
 
@@ -322,11 +316,11 @@ void MainFrame::showFileSize(wxCommandEvent & WXUNUSED(event))
 {
 	if ( this->view->IsChecked( ID_VIEW_SIZE ) )	/* if the "File Size" view is now checked, add the column */ 
 	{
-		this->addColumn("File Size");
+		this->fileHandler->addColumn("File Size");
 	}
 	else	/* otherwise, remove the column and resize the other column(s) */
 	{
-		this->removeColumn("File Size");
+		this->fileHandler->removeColumn("File Size");
 	}
 }
 
@@ -334,18 +328,19 @@ void MainFrame::showLastModified(wxCommandEvent & WXUNUSED(event))
 {
 	if ( this->view->IsChecked( ID_VIEW_MODIFIED ) )	/* if the "Last Modified" view is now checked, add the column */ 
 	{
-		this->addColumn("Last Modified");
+		this->fileHandler->addColumn("Last Modified");
 	}
 	else	/* otherwise, remove the column and resize the other column(s) */
 	{
-		this->removeColumn("Last Modified");
+		this->fileHandler->removeColumn("Last Modified");
 	}
 }
 
-void MainFrame::processListCtrlDoubleClick(wxCommandEvent & WXUNUSED(event))	/* user double clicked an entry in the file listing */
+void MainFrame::onRemoteFileSelected(wxListEvent &event)
 {
-	/* TODO */
+	/* determine whether the file selected is synced based on the index in the list control */
+	bool synced = this->fileHandler->getSyncStatus(event.GetIndex());
+
+	/* update status bar to say whether the file is synced or not */
+	(synced) ? this->SetStatusText("File is Synced") : this->SetStatusText("File is NOT Synced");
 }
-
-
-
