@@ -216,7 +216,7 @@ echo "Running tests..."
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
 echo "Grabbing logs and scripts from server"
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH_SHORT}/*.log logs-$DATETIME/
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
  
