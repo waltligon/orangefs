@@ -147,6 +147,7 @@ setup_vfs() {
 	then
 		echo "Something has gone wrong. Mount failed."
 	fi
+	mount > allmount.log
 }
 
 check_openssl() {
