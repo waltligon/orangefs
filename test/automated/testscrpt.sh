@@ -244,6 +244,7 @@ setup_pvfs2() {
 	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	echo "....setting server-side debug mask"
+	echo "INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} \"all\""	
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
@@ -421,6 +422,13 @@ fi
 # on hosts in our whitelist
 # - an entry in /etc/fstab (that was a prerequisite for this script after all)
 # - the VFS mounted at $PVFS2_MOUNTPOINT
+
+echo "Checking if pvfs is running"
+
+ps aux | grep pvfs
+
+echo "Checking mount"
+mount 
 
 nr_passed=0
 nr_failed=0
