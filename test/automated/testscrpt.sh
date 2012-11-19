@@ -125,8 +125,8 @@ teardown_vfs() {
 }
 
 setup_vfs() {
-	sudo dmesg -c >/dev/null
-	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
+	#sudo dmesg -c >/dev/null
+	sudo /sbin/insmod -s -v ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log
 #	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 #		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 #		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
