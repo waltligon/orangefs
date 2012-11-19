@@ -126,7 +126,8 @@ teardown_vfs() {
 
 setup_vfs() {
 	#sudo dmesg -c >/dev/null
-	sudo /sbin/insmod -s -v ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log
+	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log
+	sudo /sbin/lsmod >> pvfs2-kernel-module.log
 #	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 #		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 #		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
@@ -142,7 +143,7 @@ setup_vfs() {
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	echo "Mounting pvfs2 service at tcp://`hostname -s`:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
-	sudo mount -v -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} &> pvfs2mount.log
+	sudo mount -v -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} &> pvfs2-mount.log
 	if [ $? -ne 0 ]
 	then
 		echo "Something has gone wrong. Mount failed."
