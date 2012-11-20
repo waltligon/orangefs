@@ -201,6 +201,7 @@ setup_security() {
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
+	mkdir mount
 	rm -f fs.conf 
 	sec_args=""
 	if [ $ENABLE_SECURITY ] ; then
