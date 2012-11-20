@@ -41,19 +41,19 @@ typedef struct phys_server_desc
 
 typedef struct host_alias_s
 {
-    char *host_alias;
+    char *host_alias;  /* this is a traditional host name */
     char *bmi_address;
 } host_alias_s;
 
 typedef struct prime_server_s
 {
-    char *host_alias;
+    char *host_sid_text;  /* this is a SID in text format */
     char *bmi_address;
 } prime_server_s;
 
 typedef struct root_server_s
 {
-    char *host_alias;
+    char *host_sid_text;  /* this is a SID in text format */
 } root_server_s;
 
 typedef struct host_handle_mapping_s
@@ -62,20 +62,28 @@ typedef struct host_handle_mapping_s
     char *handle_range;
 
     /*
-      the handle_range above, represented as a
-      PVFS_handle_extent_array type.  This is a
-      convenient type for sending/receiving over
-      the wire on create/mkdir requests.
-    */
+     * the handle_range above, represented as a
+     * PVFS_handle_extent_array type.  This is a
+     * convenient type for sending/receiving over
+     * the wire on create/mkdir requests.
+     */
     PVFS_handle_extent_array handle_extent_array;
 } host_handle_mapping_s;
 
+/* NOTE NOTE NOTE
+ * Any changes made here should also be made to the function
+ * copy_filesystem and free_filesystem in server-config.c
+ */
 typedef struct filesystem_configuration_s
 {
+    /* FS identity fields */
     char *file_system_name;
     PVFS_fs_id coll_id;
+
+    /* root object and servers for this FS */
     PVFS_handle  root_handle;
-    int default_num_dfiles;
+    int root_sid_count;
+    PVFS_SID *root_sid_array;
 
     /* ptrs are type host_handle_mapping_s */
     PINT_llist *meta_handle_ranges;
@@ -86,13 +94,16 @@ typedef struct filesystem_configuration_s
     /* ptrs are type root_server_s */
     PINT_llist *root_servers;
 
+    /* FS level defaults - some can be overridden */
+    int default_num_dfiles;             /* num defiles for each file */
+    int metadata_replication_factor;    /* num sids for each meta object */
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
 
     /*
-      misc storage hints.  may need to be a union later depending on
-      which trove storage backends are available
-    */
+     * misc storage hints.  may need to be a union later depending on
+     * which trove storage backends are available
+     */
     struct timeval handle_recycle_timeout_sec;
     char *attr_cache_keywords;
     int attr_cache_size;

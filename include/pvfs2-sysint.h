@@ -161,6 +161,8 @@ struct PVFS_sysresp_readdir_s
     PVFS_ds_position token;
     PVFS_dirent *dirent_array;
     uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    PVFS_SID *sid_array;
+    uint32_t sid_count;
     uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;

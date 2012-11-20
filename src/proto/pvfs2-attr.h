@@ -29,18 +29,19 @@
 #define PVFS_ATTR_COMMON_TYPE  (1 << 6)
 #define PVFS_ATTR_COMMON_ATIME_SET (1 << 7)
 #define PVFS_ATTR_COMMON_MTIME_SET (1 << 8)
-#define PVFS_ATTR_COMMON_ALL                       \
-(PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
- PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
- PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
- PVFS_ATTR_COMMON_TYPE)
+#define PVFS_ATTR_COMMON_ALL                              \
+        (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
+        PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
+        PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
+        PVFS_ATTR_COMMON_TYPE)
 
 /* internal attribute masks for metadata objects */
 #define PVFS_ATTR_META_DIST          (1 << 10)
 #define PVFS_ATTR_META_DFILES        (1 << 11)
 #define PVFS_ATTR_META_MIRROR_DFILES (1 << 13)
-#define PVFS_ATTR_META_ALL \
-(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | PVFS_ATTR_META_MIRROR_DFILES)
+#define PVFS_ATTR_META_ALL                             \
+        (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
+        PVFS_ATTR_META_MIRROR_DFILES)
 
 #define PVFS_ATTR_META_UNSTUFFED (1 << 12)
 
@@ -63,8 +64,10 @@
 #define PVFS_ATTR_CAPABILITY               (1 << 21)
 
 /* attributes that do not change once set */
-#define PVFS_STATIC_ATTR_MASK \
-(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES|PVFS_ATTR_META_MIRROR_DFILES|PVFS_ATTR_META_UNSTUFFED)
+#define PVFS_STATIC_ATTR_MASK                                   \
+        (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_DIST |          \
+        PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
+        PVFS_ATTR_META_UNSTUFFED)
 
 /* extended hint attributes for a metafile object */
 struct PVFS_metafile_hint_s
@@ -73,7 +76,8 @@ struct PVFS_metafile_hint_s
 };
 typedef struct PVFS_metafile_hint_s PVFS_metafile_hint;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_1(PVFS_metafile_hint,
+endecode_fields_1(
+        PVFS_metafile_hint,
         PVFS_flags, flags);
 #endif
 
@@ -88,23 +92,36 @@ struct PVFS_metafile_attr_s
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
 
+    /* list of sids */
+    /* V3 there are dfile_count * (mirror_copies_count + 1) sids */
+    PVFS_SID *sid_array;
+    uint32_t sid_count;
+
     /* list of mirrored datafiles */
-    PVFS_handle *mirror_dfile_array;
+    /* V3 eventually these should go away */
+    PVFS_mirror_mode mirror_mode;
+    PVFS_handle *mirror_dfile_array; /* V3 remove this replaced by sids */
     uint32_t mirror_copies_count;
 
     int32_t stuffed_size;
 
     PVFS_metafile_hint hint;
 };
+
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
+
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_metafile_attr_dist(pptr,x) do { \
     encode_PINT_dist(pptr, &(x)->dist); \
 } while (0)
+
 #define decode_PVFS_metafile_attr_dist(pptr,x) do { \
     decode_PINT_dist(pptr, &(x)->dist); \
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); \
 } while (0)
+
+/* WBL V3 we now move the SIDs whenever we move the OIDs */
+#if 0
 #define encode_PVFS_metafile_attr_mirror_dfiles(pptr,x) do {            \
   int dfiles_i, copy_i, handle_i;                                       \
   encode_uint32_t(pptr, &(x)->mirror_copies_count);                     \
@@ -116,6 +133,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
        encode_PVFS_handle(pptr, &(x)->mirror_dfile_array[handle_i]);    \
     }                                                                   \
 } while (0)
+
 #define decode_PVFS_metafile_attr_mirror_dfiles(pptr,x) do {            \
   int dfiles_i, copy_i, handle_i;                                       \
   decode_uint32_t(pptr, &(x)->mirror_copies_count);                     \
@@ -130,29 +148,44 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
        decode_PVFS_handle(pptr, &(x)->mirror_dfile_array[handle_i]);    \
     }                                                                   \
 } while (0)
+#endif
+
 #define encode_PVFS_metafile_attr_dfiles(pptr,x) do {                   \
     int dfiles_i;                                                       \
+    encode_uint32_t(pptr, &(x)->mirror_mode);                           \
     encode_uint32_t(pptr, &(x)->dfile_count);                           \
-    encode_skip4(pptr,);                                                \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)             \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
+    encode_uint32_t(pptr, &(x)->sid_count);                             \
+    encode_skip4(pptr,);                                                \
+    for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)               \
+	encode_PVFS_SID(pptr, &(x)->sid_array[dfiles_i]);               \
     encode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
 } while (0)
+
 #define decode_PVFS_metafile_attr_dfiles(pptr,x) do {                     \
     int dfiles_i;                                                         \
+    decode_uint32_t(pptr, &(x)->mirror_mode);                             \
     decode_uint32_t(pptr, &(x)->dfile_count);                             \
-    decode_skip4(pptr,);                                                  \
     (x)->dfile_array = decode_malloc((x)->dfile_count                     \
-      * sizeof(*(x)->dfile_array));                                       \
+                       * sizeof(*(x)->dfile_array));                      \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)               \
 	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);            \
+    decode_uint32_t(pptr, &(x)->sid_count);                               \
+    decode_skip4(pptr,);                                                  \
+    (x)->sid_array = decode_malloc((x)->sid_count                         \
+                     * sizeof(*(x)->dfile_array));                        \
+    for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)                 \
+	decode_PVFS_handle(pptr, &(x)->sid_array[dfiles_i]);              \
     decode_PVFS_metafile_hint(pptr, &(x)->hint);                          \
 } while (0)
+
 #endif
 
 /* attributes specific to datafile objects */
 struct PVFS_datafile_attr_s
 {
+    /* V3 maybe we should put sequence number info here? */
     PVFS_size size;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
@@ -173,7 +206,8 @@ struct PVFS_directory_hint_s
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_7(PVFS_directory_hint,
+endecode_fields_7(
+        PVFS_directory_hint,
         uint32_t, dist_name_len,
         skip4,,
         string, dist_name,
@@ -186,20 +220,24 @@ endecode_fields_7(PVFS_directory_hint,
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
+    /* V3 when we get dist dir we will need sids, mirroring, etc. here */
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #define encode_PVFS_directory_attr(pptr, x) do { \
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
+
 #define decode_PVFS_directory_attr(pptr, x) do { \
     decode_PVFS_size(pptr, &(x)->dirent_count);\
     decode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
+
 #endif
 
 /* attributes specific to symlinks */
@@ -210,10 +248,10 @@ struct PVFS_symlink_attr_s
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
 endecode_fields_3(
-  PVFS_symlink_attr,
-  uint32_t, target_path_len,
-  skip4,,
-  string, target_path);
+        PVFS_symlink_attr,
+        uint32_t, target_path_len,
+        skip4,,
+        string, target_path);
 
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr
@@ -237,7 +275,9 @@ struct PVFS_object_attr
     u;
 };
 typedef struct PVFS_object_attr PVFS_object_attr;
+
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #define encode_PVFS_object_attr(pptr,x) do { \
     encode_PVFS_uid(pptr, &(x)->owner); \
     encode_PVFS_gid(pptr, &(x)->group); \
@@ -260,8 +300,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
 	encode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
-    if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES) \
-        encode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta); \
+/* V3 remove this */ \
+/*    if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES)*/ \
+/*        encode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta);*/ \
     if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
@@ -270,6 +311,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
+
 #define decode_PVFS_object_attr(pptr,x) do { \
     decode_PVFS_uid(pptr, &(x)->owner); \
     decode_PVFS_gid(pptr, &(x)->group); \
@@ -292,8 +334,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
 	decode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
-    if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES) \
-        decode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta); \
+/* V3 remove this */ \
+/*    if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES)*/ \
+/*        decode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta);*/ \
     if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
@@ -302,7 +345,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
+
 #endif
+
 /* attr buffer needs room for larger of symlink path, meta fields or 
  * dir hints: an attrib structure can never hold information for not more 
  * than a symlink or a metafile or a dir object 
@@ -322,7 +367,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr \
         (extra_size_PVFS_object_attr_capability + \
-        max(max(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink), extra_size_PVFS_object_attr_dir))
+        max(max(extra_size_PVFS_object_attr_meta, \
+        extra_size_PVFS_object_attr_symlink), \
+        extra_size_PVFS_object_attr_dir))
 
 #endif /* __PVFS2_ATTR_H */
 

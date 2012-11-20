@@ -46,12 +46,19 @@ typedef struct PINT_sm_msgpair_state_s
 
     int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
-    /* server address */
+    /* server address - corresponds to sid_array[sid_index] */
+    /* initialize to address of sid_array[0] */
     PVFS_BMI_addr_t svr_addr;
+    /* number of sids in the array */
+    int sid_count;
+    /* which SID we are using - always initialize to 0 */
+    int sid_index;
+    /* pointer to alternate sids for the target object */
+    PVFS_SID *sid_array;
 
-    /*session identifier between send and rcvs*/
-    /*note:  server-side i/o machine uses the session_tag as the flow */
-    /*descriptor tag.                                                 */
+    /* session identifier between send and rcvs*/
+    /* note:  server-side i/o machine uses the session_tag as the flow */
+    /* descriptor tag.                                                 */
     bmi_msg_tag_t session_tag;
 
     /* req and encoded_req are used to send a request */
@@ -132,20 +139,18 @@ void PINT_msgpairarray_destroy(PINT_sm_msgarray_op *op);
 
 int PINT_msgarray_status(PINT_sm_msgarray_op *op);
 
-int PINT_serv_decode_resp(
-    PVFS_fs_id fs_id,
-    void *encoded_resp_p,
-    struct PINT_decoded_msg *decoded_resp_p,
-    PVFS_BMI_addr_t *svr_addr_p,
-    int actual_resp_sz,
-    struct PVFS_server_resp **resp_out_pp);
+int PINT_serv_decode_resp(PVFS_fs_id fs_id,
+                          void *encoded_resp_p,
+                          struct PINT_decoded_msg *decoded_resp_p,
+                          PVFS_BMI_addr_t *svr_addr_p,
+                          int actual_resp_sz,
+                          struct PVFS_server_resp **resp_out_pp);
 
-int PINT_serv_free_msgpair_resources(
-    struct PINT_encoded_msg *encoded_req_p,
-    void *encoded_resp_p,
-    struct PINT_decoded_msg *decoded_resp_p,
-    PVFS_BMI_addr_t *svr_addr_p,
-    int max_resp_sz);
+int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
+                                     void *encoded_resp_p,
+                                     struct PINT_decoded_msg *decoded_resp_p,
+                                     PVFS_BMI_addr_t *svr_addr_p,
+                                     int max_resp_sz);
 
 int PINT_serv_msgpairarray_resolve_addrs(PINT_sm_msgarray_op *op);
 

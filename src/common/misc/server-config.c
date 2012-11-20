@@ -81,6 +81,7 @@ static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_event_tracing);
+static DOTCONF_CB(get_filesystem_replicate);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(check_this_server);
@@ -152,9 +153,12 @@ static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename);
 static int is_populated_filesystem_configuration(
                     struct filesystem_configuration_s *fs);
+/* V3 obsolete */
+#if 0
 static int is_root_handle_in_a_meta_range(
                     struct server_configuration_s *config_s,
                     struct filesystem_configuration_s *fs);
+#endif
 static int is_valid_filesystem_configuration(
                     struct server_configuration_s *config_s,
                     struct filesystem_configuration_s *fs);
@@ -431,13 +435,13 @@ static const configoption_t options[] =
      * The MetaHandleRanges context is required to be present in a
      * Filesystem context.
      */
-    {"<MetaHandleRanges>",ARG_NONE, enter_mhranges_context,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"<MetaHandleRanges>", ARG_NONE, enter_mhranges_context, NULL,
+        CTX_FILESYSTEM, NULL},
 
     /* Specifies the end-tag for the MetaHandleRanges context.
      */
-    {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,
-        CTX_METAHANDLERANGES,NULL},
+    {"</MetaHandleRanges>", ARG_NONE, exit_mhranges_context, NULL,
+        CTX_METAHANDLERANGES, NULL},
 
     /* This context groups together the Range options that define valid values
      * for the data handles on a per-host basis for this filesystem.
@@ -445,13 +449,13 @@ static const configoption_t options[] =
      * A DataHandleRanges context is required to be present in a
      * Filesystem context.
      */
-    {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"<DataHandleRanges>", ARG_NONE, enter_dhranges_context, NULL,
+        CTX_FILESYSTEM, NULL},
 
     /* Specifies the end-tag for the DataHandleRanges context.
      */
-    {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,
-        CTX_DATAHANDLERANGES,NULL},
+    {"</DataHandleRanges>", ARG_NONE, exit_dhranges_context, NULL,
+        CTX_DATAHANDLERANGES, NULL},
 
     /* Provides a context for defining the filesystem's default
      * distribution to use and the parameters to be set for that distribution.
@@ -461,13 +465,13 @@ static const configoption_t options[] =
      * This context is an optional context within the Filesystem context.  If
      * not specified, the filesystem defaults to the simple-stripe distribution.
      */
-    {"<Distribution>",ARG_NONE, enter_distribution_context,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"<Distribution>",ARG_NONE, enter_distribution_context, NULL,
+        CTX_FILESYSTEM, NULL},
 
     /* Specifies the end-tag for the Distribution context.
      */
-    {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,
-        CTX_DISTRIBUTION,NULL},
+    {"</Distribution>", ARG_NONE, exit_distribution_context, NULL,
+        CTX_DISTRIBUTION, NULL},
 
     /* As logical files are created in pvfs, the data files and meta files
      * that represent them are given filesystem unique handle values.  The
@@ -543,8 +547,8 @@ static const configoption_t options[] =
      * distribution that its defined in.  It is a required option in
      * Filesystem and Distribution contexts.
      */
-    {"Name",ARG_STR, get_name,NULL,
-        CTX_FILESYSTEM|CTX_DISTRIBUTION,NULL},
+    {"Name", ARG_STR, get_name, NULL,
+        CTX_FILESYSTEM | CTX_DISTRIBUTION, NULL},
 
     /* A pvfs server may manage more than one filesystem, and so a
      * unique identifier is used to represent each one.  
@@ -555,14 +559,22 @@ static const configoption_t options[] =
      * 2147483647 (INT32_MAX).  It is a required option in the Filesystem
      * context.
      */
-    {"ID",ARG_INT, get_filesystem_collid,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"ID", ARG_INT, get_filesystem_collid, NULL,
+        CTX_FILESYSTEM, NULL},
+
+    /* All metadata in a file system is replicated to the same degree.
+     * This defines the number of copies of each metadata object in the
+     * file system.  This is optional, and defauts to 1 (no
+     * replication).
+     */
+    {"MetaReplicationFactor", ARG_INT, get_filesystem_replication, NULL,
+        CTX_FILESYSTEM, "1"},
 
     /* maximum number of AIO operations that Trove will allow to run
      * concurrently 
      */
     {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"16"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, "16"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
@@ -572,8 +584,8 @@ static const configoption_t options[] =
      * specified for all the pvfs servers in the Defaults context or for
      * a particular server in the Global context.
      */
-    {"LogFile",ARG_STR, get_logfile,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"/tmp/pvfs2-server.log"},
+    {"LogFile", ARG_STR, get_logfile, NULL,
+        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs2-server.log"},
 
     /* The LogType option can be used to control the destination of log 
      * messages from PVFS2 server.  The default value is "file", which causes
@@ -581,8 +593,8 @@ static const configoption_t options[] =
      * parameter.  Another option is "syslog", which causes all log messages
      * to be written to syslog.
      */
-    {"LogType",ARG_STR, get_logtype,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"file"},
+    {"LogType", ARG_STR, get_logtype, NULL,
+        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "file"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  This option sets that level for
@@ -999,20 +1011,20 @@ static const configoption_t options[] =
      * followed by a Value option.
      */
     {"Param", ARG_STR, get_param, NULL, 
-        CTX_DISTRIBUTION,NULL},
+        CTX_DISTRIBUTION, NULL},
     
     /* This option specifies the value of the parameter who's name
      * was specified in the previous option.
      */
     {"Value", ARG_INT, get_value, NULL, 
-        CTX_DISTRIBUTION,NULL},
+        CTX_DISTRIBUTION, NULL},
     
     /* This option specifies the default number of datafiles to use
      * when a new file is created.  The value is passed to the distribution
      * and it determines whether to use that value or not.
      */
     {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
-        CTX_FILESYSTEM,"0"},
+        CTX_FILESYSTEM, "0"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
         CTX_STORAGEHINTS, "no"},
@@ -1512,6 +1524,16 @@ DOTCONF_CB(enter_rootsrvs_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+    static first_time = 1;
+    if (!first_time)
+    {
+        /* can only specify root servers once, this is an error */
+        gossip_err("Error, invalid filesystem configuration, only one "
+                   "RootServers section can be specified");
+        return("Config file format error - only one RootServers context "
+               "can be specified\n");
+    }
+    first_time = 0;
     config_s->configuration_context = CTX_ROOTSERVERS;
     return NULL;
 }
@@ -1520,6 +1542,44 @@ DOTCONF_CB(exit_rootsrvs_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf =
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+    struct root_server_s *cur_root_server;
+    PINT_llist *cur = NULL;
+    int i;
+
+    fs_conf->root_sid_array = (PVFS_SID *)malloc(fs_conf->root_sid_count *
+                                                       sizeof(PVFS_SID));
+    if(!fs_conf->root_sid_array)
+    {
+        gossip_err("Unable to malloc memory for root_sid_array\n");
+        return("Error, ran out of memory for root_sid_array\n");
+    }
+
+    /* run through the root_servers list, look up address in the
+     * SIDcache and build the root_sid_array
+     */
+    cur = fs_conf->root_servers;
+    for(i = 0; i < fs_conf->root_sid_count; i++)
+    {
+        if(!cur)
+        {
+            gossip_err("Error, ran out of root servers too soon\n");
+            return("Error, ran out of root servers too soon\n");
+        }
+        cur_root_server = PINT_llist_head(cur);
+        if (!cur_root_server)
+        {
+            break;
+        }
+        /* convert SID into array */
+        PVFS_SID_str2bin(&fs_conf->root_sid_array[i],
+                         cur_root_server->host_sid_text);
+        
+        cur = PINT_llist_next(cur);
+    }
+
     config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
@@ -2777,7 +2837,7 @@ DOTCONF_CB(get_rootsrv)
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    struct root_server_s *cur_server = NULL;
+    struct root_server_s *root_server = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
             PINT_llist_head(config_s->file_systems);
@@ -2785,14 +2845,15 @@ DOTCONF_CB(get_rootsrv)
 
     if (cmd->arg_count != 1)
     {
-        return "Error: root server must include at one alias";
+        return "Error: root server statement must include one alias";
     }
 
     /* malloc new server */
-    cur_server = (root_server_s *)malloc(sizeof(root_server_s));
+    root_server = (root_server_s *)malloc(sizeof(root_server_s));
 
     /* fill in new server */
-    cur_server->host_alias = strdup(cmd->data.list[0]);
+    /* just leaving the SID in text for now */
+    root_server->host_sid_text = strdup(cmd->data.list[0]);
 
     /* should we look up alias to verify? */
     /* could also check for dups */
@@ -2803,7 +2864,10 @@ DOTCONF_CB(get_rootsrv)
         fs_conf->root_servers = PINT_llist_new();
     }
     
-    PINT_llist_add_to_tail(fs_conf->root_servers, (void *)cur_server);
+    PINT_llist_add_to_tail(fs_conf->root_servers, (void *)root_server);
+
+    /* increment the root_sid_count so we know how many there are */
+    fs_conf->root_sid_count++;
     return NULL;
 }
 
@@ -2819,11 +2883,10 @@ DOTCONF_CB(get_root_handle)
             PINT_llist_head(config_s->file_systems);
     assert(fs_conf); /* TODO: replace with error handling */
 
-    /* ret = sscanf(cmd->data.str, "%llu", &tmp_var); */
     ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
     if(ret != 1)
     {
-        return("RootHandle does not have a long long unsigned value.\n");
+        return("RootHandle required argument is not a uuid value.\n");
     }
     fs_conf->root_handle = (PVFS_handle)tmp_var;
     return NULL;
@@ -2863,6 +2926,30 @@ DOTCONF_CB(get_name)
     return NULL;
 }
 
+DOTCONF_CB(get_filesystem_replication)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+
+    if (cmd->data.value < 1)
+    {
+        gossip_err("Metadata Replication Factor must be > 0");
+        return NULL;
+    }
+    if (fs_conf->metadata_replication_factor)
+    {
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   (int)fs_conf->metadata_replication_factor,
+                   (int)cmd->data.value);
+    }
+    fs_conf->metadata_replication_factor = (int)cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_filesystem_collid)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -2874,7 +2961,7 @@ DOTCONF_CB(get_filesystem_collid)
     if (fs_conf->coll_id)
     {
         gossip_err("WARNING: Overwriting %d with %d\n",
-                   (int)fs_conf->coll_id,(int)cmd->data.value);
+                   (int)fs_conf->coll_id, (int)cmd->data.value);
     }
     fs_conf->coll_id = (PVFS_fs_id)cmd->data.value;
     return NULL;
@@ -2941,7 +3028,7 @@ DOTCONF_CB(get_primesrv)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    struct prime_server_s *cur_server = NULL;
+    struct prime_server_s *prime_server = NULL;
     int i = 0;
     int len = 0;
     char *ptr;
@@ -2953,17 +3040,17 @@ DOTCONF_CB(get_primesrv)
     }
 
     /* malloc new server */
-    cur_server = (prime_server_s *)malloc(sizeof(prime_server_s));
+    prime_server = (prime_server_s *)malloc(sizeof(prime_server_s));
 
     /* fill in new server */
-    cur_server->host_alias = strdup(cmd->data.list[0]);
+    prime_server->host_sid_text = strdup(cmd->data.list[0]);
 
     /* should we look up alias to verify? */
     /* could also check for dups */
     /* could allow a direct SID instead of alias */
 
-    cur_server->bmi_address = (char *)calloc(1, 2048);
-    ptr = cur_server->bmi_address;
+    prime_server->bmi_address = (char *)calloc(1, 2048);
+    ptr = prime_server->bmi_address;
     for (i = 1; i < cmd->arg_count; i++)
     {
 	strncat(ptr, cmd->data.list[i], 2048 - len);
@@ -2981,7 +3068,7 @@ DOTCONF_CB(get_primesrv)
         config_s->prime_servers = PINT_llist_new();
     }
     
-    PINT_llist_add_to_tail(config_s->prime_servers, (void *)cur_server);
+    PINT_llist_add_to_tail(config_s->prime_servers, (void *)prime_server);
     return NULL;
 }
 
@@ -3515,6 +3602,7 @@ static int is_valid_alias(PINT_llist * host_aliases, char *str)
     return ret;
 }
 
+/* obsolete code remove */
 static int is_valid_handle_range_description(char *h_range)
 {
     int ret = 0;
@@ -3550,7 +3638,8 @@ static int is_populated_filesystem_configuration(
              fs->meta_handle_ranges && fs->data_handle_ranges &&
              PVFS_OID_cmp(&fs->root_handle, &PVFS_HANDLE_NULL)) ? 1 : 0);
 }
-    
+ 
+/* V3 this function is obsolete - remove it */
 static int is_root_handle_in_a_meta_range(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
@@ -3612,7 +3701,9 @@ static int is_valid_filesystem_configuration(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
 {
-    int ret = is_root_handle_in_a_meta_range(config,fs);
+    /* V3 no longer meta handle ranges or any handle ranges */
+    /* int ret = is_root_handle_in_a_meta_range(config,fs); */
+    int ret = 1;
     if (ret == 0)
     {
         gossip_err("RootHandle (%s) is NOT within the meta handle "
@@ -3663,6 +3754,19 @@ static void free_host_alias(void *ptr)
     }
 }
 
+static void free_root_server(void *ptr)
+{
+    struct root_server_s *root_sersver = (struct root_server_s *)ptr;
+    if (root_server)
+    {
+        free(root_server->host_sid_text);
+        root_server->host_sid_text = NULL;
+
+        free(root_server);
+        root_server = NULL;
+    }
+}
+
 static void free_filesystem(void *ptr)
 {
     struct filesystem_configuration_s *fs =
@@ -3673,9 +3777,16 @@ static void free_filesystem(void *ptr)
         free(fs->file_system_name);
         fs->file_system_name = NULL;
 
+        if(fs->root_sid_array)
+        {
+            free(fs->root_sid_array);
+            fs->root_sid_array = NULL;
+        }
+
         /* free all handle ranges */
-        PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
-        PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+        PINT_llist_free(fs->meta_handle_ranges, free_host_handle_mapping);
+        PINT_llist_free(fs->data_handle_ranges, free_host_handle_mapping);
+        PINT_llist_free(fs->root_servers, free_root_server);
 
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
@@ -3742,6 +3853,8 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
     PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
     struct host_handle_mapping_s *new_h_mapping = NULL;
+    struct root_server_s *cur_root_server = NULL;
+    struct root_server_s *new_root_server = NULL;
 
     if (dest_fs && src_fs)
     {
@@ -3750,22 +3863,51 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
 
         dest_fs->coll_id = src_fs->coll_id;
         dest_fs->root_handle = src_fs->root_handle;
-        dest_fs->default_num_dfiles = src_fs->default_num_dfiles;
+        dest_fs->root_sid_count = src_fs->root_sid_count;
+        if (dest_fs->root_sid_array)
+        {
+            dest_fs->root_sid_array = (PVFS_SID *)malloc(
+                                   dest_fs->root_sid_count * sizeof(PVFS_SID));
+            if (!dest_fs->root_sid_array)
+            {
+                gossip_err("Failed to allocate memory for root_sid_array\n");
+                return -1;
+            }
+            memcpy(dest_fs->root_sid_array,
+                   src_fs->root_sid_array,
+                   dest_fs->root_sid_count * sizeof(PVFS_SID));
+        }
+        else
+        {
+            /* this should neve happen, but until the list of root
+             * servers is converted into SIDS it is possible this is the
+             * state of the source.
+             */
+            dest_fs->root_sid_array = NULL;
+        }
 
+        dest_fs->default_num_dfiles = src_fs->default_num_dfiles;
+        dest_fs->metadata_repliation_factor = 
+                                   src_fs->metadata_replication_factor;
         dest_fs->flowproto = src_fs->flowproto;
         dest_fs->encoding = src_fs->encoding;
 
         dest_fs->meta_handle_ranges = PINT_llist_new();
         dest_fs->data_handle_ranges = PINT_llist_new();
+        dest_fs->root_servers = PINT_llist_new();
+
+        /* V3 these almost certainly should not be asserts */
+        /* TODO: replace with error handling */
+        assert(dest_fs->meta_handle_ranges);
+        assert(dest_fs->data_handle_ranges);
+        assert(dest_fs->root_servers);
 
         if(src_fs->secret_key)
         {
             dest_fs->secret_key = strdup(src_fs->secret_key);
         }
 
-        assert(dest_fs->meta_handle_ranges);
-        assert(dest_fs->data_handle_ranges);
-
+        /* V3 This loop goes away with hand ranges */
         /* copy all meta handle ranges */
         cur = src_fs->meta_handle_ranges;
         while(cur)
@@ -3795,6 +3937,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
             cur = PINT_llist_next(cur);
         }
 
+        /* V3 This loop goes away with hand ranges */
         /* copy all data handle ranges */
         cur = src_fs->data_handle_ranges;
         while(cur)
@@ -3820,6 +3963,31 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
 
             PINT_llist_add_to_tail(dest_fs->data_handle_ranges, new_h_mapping);
 
+            cur = PINT_llist_next(cur);
+        }
+
+        /* copy all root servers */
+        cur = src_fs->root_servers;
+        while(cur)
+        {
+            cur_root_server = PINT_llist_head(cur);
+            if (!cur_root_server)
+            {
+                /* end of list */
+                break;
+            }
+            new_root_server = (struct root_server_s *)malloc(
+                                            sizeof(struct root_server_s));
+            if (!new_root_server)
+            {
+                gossip_err("failed to alloacte memory for a root server\n");
+                return -1;
+            }
+
+            new_root_server->host_sid_text =
+                            strdup(cur_roor_server->host_sid_text);
+
+            PINT_llist_add_to_tail(dest_fs->root_servers, new_root_server);
             cur = PINT_llist_next(cur);
         }
 
@@ -4829,6 +4997,7 @@ int PINT_config_get_fs_key(struct server_configuration_s *config,
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+/* V3 this function is obsolete and needs to go away */
 static int is_root_handle_in_my_range(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
@@ -4937,6 +5106,10 @@ int PINT_config_pvfs2_mkspace(
                 break;
             }
 
+            /* V3 this needs to be replaced with a check if the current
+             * server is listed in the root_servers list or
+             * root_sid_array
+             */
             /*
               check if root handle is in our handle range for this fs.
               if it is, we're responsible for creating it on disk when

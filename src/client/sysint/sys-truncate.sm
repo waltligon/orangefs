@@ -29,15 +29,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int unstuff_needed(
-    PVFS_size size,
-    PINT_dist *dist_p,
-    uint32_t mask);
+static int unstuff_needed(PVFS_size size, PINT_dist *dist_p, uint32_t mask);
 
-static int unstuff_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %% 
 
@@ -103,13 +97,12 @@ machine pvfs2_client_truncate_sm
 
 /** Initiate resizing of a file.
  */
-PVFS_error PVFS_isys_truncate(
-    PVFS_object_ref ref,
-    PVFS_size size,
-    const PVFS_credential *credential,
-    PVFS_sys_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_isys_truncate(PVFS_object_ref ref,
+                              PVFS_size size,
+                              const PVFS_credential *credential,
+                              PVFS_sys_op_id *op_id,
+                              PVFS_hint hints,
+                              void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -131,11 +124,12 @@ PVFS_error PVFS_isys_truncate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_isys_truncate entered with %lld\n", lld(size));
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_TRUNCATE,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_TRUNCATE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -148,22 +142,20 @@ PVFS_error PVFS_isys_truncate(
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
-        PVFS_TYPE_METAFILE,
-        PINT_SM_GETATTR_BYPASS_CACHE);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_META_ALL | PVFS_ATTR_COMMON_TYPE |
+                                                    PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_METAFILE,
+                               PINT_SM_GETATTR_BYPASS_CACHE);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
-PVFS_error PVFS_sys_truncate(
-    PVFS_object_ref ref,
-    PVFS_size size,
-    const PVFS_credential *credential,
-    PVFS_hint hints)
+PVFS_error PVFS_sys_truncate(PVFS_object_ref ref,
+                             PVFS_size size,
+                             const PVFS_credential *credential,
+                             PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -191,10 +183,48 @@ PVFS_error PVFS_sys_truncate(
     return error;
 }
 
+/* <====================== COMPLETION FUNCTIONS ==================== */
+
+/* unstuff_comp_fn()
+ *
+ * completion function for unstuff msgpair array
+ */
+static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"unstuff completion fn: unstuff_comp_fn\n");
+
+    /* only posted one msgpair */
+    assert(i==0);
+
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "unstuff negative response with error code: %d\n", 
+            resp_p->status);
+        return resp_p->status;
+    }
+
+    assert(resp_p->op == PVFS_SERV_UNSTUFF);
+    
+    PINT_acache_update(sm_p->object_ref, &resp_p->u.unstuff.attr, NULL);
+
+    /* replace attrs found by getattr */
+    /* PINT_copy_object_attr() takes care of releasing old memory */
+    PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+    return(0);
+}
+
+/* <===================== STATE ACTION FUNCTIONS =================== */
 /** Resize a file.
  */
 static PINT_sm_action truncate_datafile_setup_msgpairarray(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+                                                     struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
@@ -208,11 +238,15 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
+    /* why all of these asserts? shouldn't this be checked above
+     * and error codes returned if bad?
+     */
     assert(attr->mask & PVFS_ATTR_CAPABILITY);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
     assert(attr->u.meta.dist_size > 0);
+
     /* cannot truncate an append-only or immutable file */
     if ((attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL)
         || (attr->u.meta.hint.flags & PVFS_APPEND_FL))
@@ -224,7 +258,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, attr->u.meta.dfile_count);
     if(ret != 0)
     {
-        gossip_err("Failed to initialize %d msgpairs\n", attr->u.meta.dfile_count);
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   attr->u.meta.dfile_count);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -240,31 +275,38 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     {
         file_data.server_nr = i;
         new_dfile_size = 
-            attr->u.meta.dist->methods->logical_to_physical_offset(
-                attr->u.meta.dist->params,
-                &file_data,
-                sm_p->u.truncate.size);
+                attr->u.meta.dist->methods->logical_to_physical_offset(
+                        attr->u.meta.dist->params,
+                        &file_data,
+                        sm_p->u.truncate.size);
        
         gossip_debug(GOSSIP_CLIENT_DEBUG,
             "  %s: client requests %lld: resizing %s to %lld bytes\n",
             __func__, lld(sm_p->u.truncate.size),
             PVFS_OID_str(&attr->u.meta.dfile_array[i]), lld(new_dfile_size));
 
-        PINT_SERVREQ_TRUNCATE_FILL(
-            msg_p->req,
-            attr->capability,
-            sm_p->object_ref.fs_id,
-            new_dfile_size,
-            attr->u.meta.dfile_array[i],
-            sm_p->hints);
+        PINT_SERVREQ_TRUNCATE_FILL(msg_p->req,
+                                   attr->capability,
+                                   sm_p->object_ref.fs_id,
+                                   new_dfile_size,
+                                   attr->u.meta.dfile_array[i],
+                                   attr->u.meta.sid_count,
+                                   attr->u.meta.sid_array,
+                                   sm_p->hints);
         /*
           no callback. the status will be in the generic response
           structure
         */
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = attr->u.meta.dfile_array[i];
+        msg_p->sid_count = attr->u.meta.sid_count / attr->u.meta.dfile_count;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = &attr->u.meta.sid_array[i * 
+                         (attr->u.meta.sid_count / attr->u.meta.dfile_count)];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
+
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);
     }
 
     sm_p->getattr.size = sm_p->u.truncate.size;
@@ -280,14 +322,14 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action truncate_datafile_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action truncate_datafile_failure(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action truncate_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action truncate_cleanup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code = js_p->error_code;
@@ -309,24 +351,67 @@ static PINT_sm_action truncate_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
-static PINT_sm_action truncate_inspect_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action truncate_inspect_attr(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* TODO: orange-security: check write access? */
 
     /* determine if we need to unstuff or not to service this request */
-    if(unstuff_needed(
-        sm_p->u.truncate.size,
-        sm_p->getattr.attr.u.meta.dist,
-        sm_p->getattr.attr.mask))
+    if(unstuff_needed(sm_p->u.truncate.size,
+                      sm_p->getattr.attr.u.meta.dist,
+                      sm_p->getattr.attr.mask))
     {
         js_p->error_code = TRUNCATE_UNSTUFF;
         return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action truncate_unstuff_setup_msgpair(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    js_p->error_code = 0;
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    /* note that unstuff must request the same attr mask that we requested
+     * earlier.  If the file has already been unstuffed then we need an 
+     * updated authoritative copy of all of the attrs relevant to I/O.
+     */
+    PINT_SERVREQ_UNSTUFF_FILL(msg_p->req,
+                              sm_p->getattr.attr.capability,
+                              *sm_p->cred_p,
+                              sm_p->object_ref.fs_id,
+                              sm_p->object_ref.handle,
+                              sm_p->object_ref.sid_count,
+                              sm_p->object_ref.sid_array,
+                              PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->sid_count = sm_p->object_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->object_ref.sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = unstuff_comp_fn;
+
+    ret = PINT_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);
+    if (ret)
+    {
+        gossip_err("Failed to get server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -338,22 +423,23 @@ static PINT_sm_action truncate_inspect_attr(
  *
  * returns 1 if unstuff is needed, 0 otherwise.
  */
-static int unstuff_needed(
-    PVFS_size size,
-    PINT_dist *dist_p,
-    uint32_t mask)
+static int unstuff_needed(PVFS_size size,
+                          PINT_dist *dist_p,
+                          uint32_t mask)
 {
     PVFS_offset first_unstuffed_offset = 0;
     PINT_request_file_data fake_file_data;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate checking to see if file should be unstuffed.\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "sys-truncate checking to see if file should be unstuffed.\n");
 
     /* check the flag first to see if file is already explicitly marked as
      * unstuffed
      */
     if(mask & PVFS_ATTR_META_UNSTUFFED)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate detected file is already unstuffed.\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "sys-truncate detected file is already unstuffed.\n");
         return(0);
     }
 
@@ -371,102 +457,24 @@ static int unstuff_needed(
      * on the 2nd server 
      */
     first_unstuffed_offset = dist_p->methods->next_mapped_offset(
-        dist_p->params,
-        &fake_file_data,
-        0);
+                                            dist_p->params,
+                                            &fake_file_data,
+                                            0);
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate calculated first unstuffed offset as %lld.\n", lld(first_unstuffed_offset));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "sys-truncate calculated first unstuffed offset as %lld.\n",
+                 lld(first_unstuffed_offset));
 
     /* compare to see if the file needs to be unstuffed yet */
     if(size > first_unstuffed_offset)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will unstuff the file.\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "sys-truncate will unstuff the file.\n");
         return(1);
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will not unstuff the file.\n");
-    return(0);
-}
-
-static PINT_sm_action truncate_unstuff_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    js_p->error_code = 0;
-
-    PINT_msgpair_init(&sm_p->msgarray_op);
-    msg_p = &sm_p->msgarray_op.msgpair;
-
-    /* note that unstuff must request the same attr mask that we requested
-     * earlier.  If the file has already been unstuffed then we need an 
-     * updated authoritative copy of all of the attrs relevant to I/O.
-     */
-    PINT_SERVREQ_UNSTUFF_FILL(
-            msg_p->req,
-            sm_p->getattr.attr.capability,
-            *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = unstuff_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr,
-            msg_p->handle,
-            msg_p->fs_id);
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
-
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
-}
-
-/* unstuff_comp_fn()
- *
- * completion function for unstuff msgpair array
- */
-static int unstuff_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"unstuff completion fn: unstuff_comp_fn\n");
-
-    /* only posted one msgpair */
-    assert(i==0);
-
-    if (resp_p->status != 0)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "unstuff negative response with error code: %d\n", 
-            resp_p->status);
-        return resp_p->status;
-    }
-
-    assert(resp_p->op == PVFS_SERV_UNSTUFF);
-    
-    PINT_acache_update(sm_p->object_ref,
-        &resp_p->u.unstuff.attr,
-        NULL);
-
-    /* replace attrs found by getattr */
-    /* PINT_copy_object_attr() takes care of releasing old memory */
-    PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
-
+                 "sys-truncate will not unstuff the file.\n");
     return(0);
 }
 

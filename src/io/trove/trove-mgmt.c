@@ -10,7 +10,6 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "gen-locks.h"
-#include "trove-handle-mgmt/trove-handle-mgmt.h"
 
 TROVE_method_callback global_trove_method_callback;
 
@@ -99,15 +98,6 @@ int trove_initialize(TROVE_method_id method_id,
         return ret;
     }
 
-/* WBL V3 replace handle alloc */
-#if  0
-    ret = trove_handle_mgmt_initialize();
-    if (ret == -1)
-    {
-        return ret;
-    }
-#endif
-
     if(!method_callback)
     {
         global_trove_method_callback = TROVE_default_method;
@@ -150,11 +140,6 @@ int trove_finalize(TROVE_method_id method_id)
     }
 
     ret = mgmt_method_table[method_id]->finalize();
-
-/* WBL V3 replace handle alloc */
-#if 0
-    ret = trove_handle_mgmt_finalize();
-#endif
 
     gen_mutex_unlock(&trove_init_mutex);
 

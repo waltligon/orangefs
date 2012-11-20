@@ -27,6 +27,7 @@
 #include <errno.h>
 #endif
 #include <pvfs3-handle.h>
+#include <pvfs2-mirror.h>
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
@@ -326,7 +327,6 @@ typedef enum
 #define encode_PVFS_ds_type encode_enum
 #define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
                                         * the PVFS_ds_type enum */
-                                            
 
 /* helper to translate bit-shifted enum types to array index number in the 
  * range (0-(PVFS_DS_TYPE_COUNT-1)) */
@@ -499,8 +499,9 @@ endecode_fields_12(
 typedef struct
 {
     PVFS_handle handle;
-    PVFS_fs_id fs_id;
-    int32_t    __pad1;
+    PVFS_fs_id  fs_id;
+    int32_t     sid_count;
+    PVFS_SID    *sid_array;
 } PVFS_object_ref;
 
 /* max length of BMI style URI's for identifying servers */

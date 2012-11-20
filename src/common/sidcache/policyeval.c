@@ -246,7 +246,7 @@ int SID_cmp(SID_cmpop_t cmpop, int v1, int v2)
     }
 }
 
-int SID_add_query_list(SID_server_list_t *sid_list,
+int SID_add_query_list(qlist_head *sid_list, /* SID_server_list_t */
                        DBT *key,
                        DBT *value)
 {
@@ -259,8 +259,9 @@ int SID_add_query_list(SID_server_list_t *sid_list,
         return -1; /* ENOMEM should be set */
     }
     INIT_QLIST_HEAD(&new->link);
-    qlist_add_tail(&new->link, &sid_list->link);
+    qlist_add_tail(&new->link, sid_list);
     memcpy(&new->server_sid, key->data, sizeof(PVFS_SID));
+    /* do we need this? we have nowhere to put it at the moment */
     new->server_addr = ((SID_cacheval_t *)value->data)->bmi_addr;
     url_len = strlen(((SID_cacheval_t *)value->data)->url) + 1;
     new->server_url = (char *)malloc(url_len);
@@ -271,13 +272,14 @@ int SID_add_query_list(SID_server_list_t *sid_list,
         return -1; /* ENOMEM should be set */
     }
     memcpy(new->server_url, ((SID_cacheval_t *)value->data)->url, url_len);
+    /* end of do we need this? */
     return 0;
 }
 
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
                        int copies,
-                       SID_server_list_t *sid_list)
+                       qlist_head *sid_list) /* SID_server_list_t */
 {
     int i;
     int set;

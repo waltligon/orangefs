@@ -116,9 +116,9 @@ int PINT_cached_config_check_type(
     const char *server_addr_str,
     int* server_type);
 
-int PINT_cached_config_get_root_handle(
+int PINT_cached_config_get_root_ref(
     PVFS_fs_id fsid,
-    PVFS_handle *fh_root);
+    PVFS_object_ref *fh_root);
 
 int PINT_cached_config_get_handle_timeout(
     PVFS_fs_id fsid,

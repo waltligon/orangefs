@@ -56,7 +56,8 @@ int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
 
-/* this structure is used to handle mirrored retries in the small-io case*/
+/* V3 I think all of this is subsumed into the MPA struct and is not needed */
+/* This structure is used to handle mirrored retries in the small-io case*/
 typedef struct PINT_client_mirror_ctx
 {
   /*which copy of the mirrored handle are we using?*/
@@ -78,7 +79,7 @@ typedef struct PINT_client_mirror_ctx
 
 /* this structure is used to handle mirrored retries when 
  * pvfs2_client_datafile_getattr_sizes_sm is called.
-*/
+ */
 typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
 
 /* flag to disable cached lookup during getattr nested sm */
@@ -94,9 +95,9 @@ typedef struct PINT_sm_getattr_state
     uint32_t req_attrmask;
     
     /*
-      Either from the acache or full getattr op, this is the resuling
-      attribute that can be used by calling state machines
-    */
+     * Either from the acache or full getattr op, this is the resulting
+     * attribute that can be used by calling state machines
+     */
     PVFS_object_attr attr;
 
 
@@ -108,7 +109,7 @@ typedef struct PINT_sm_getattr_state
 
     PVFS_ds_type ref_type;
 
-    PVFS_size * size_array;
+    PVFS_size *size_array;
     PVFS_size size;
 
     int flags;
@@ -179,9 +180,11 @@ struct PINT_client_create_sm
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    PVFS_handle metafile_handle;
-    int datafile_count;
+    int datafile_count;        /* metaobject stored in sm_p->object_ref */
     PVFS_handle *datafile_handles;
+    int sid_count;
+    PVFS_handle *sid_array;
+
     int stuffed;
     PVFS_object_attr store_attr;
 
@@ -198,7 +201,7 @@ struct PINT_client_mkdir_sm
 
     int retry_count;
     int stored_error_code;
-    PVFS_handle metafile_handle;
+    PVFS_handle metafile_handle; /* V3 remove this field */
     PINT_sm_getattr_state metafile_getattr;
 };
 
@@ -211,7 +214,10 @@ struct PINT_client_symlink_sm
 
     int retry_count;
     int stored_error_code;
+    /* V3 removed now that OID is send not received */
+#if 0
     PVFS_handle symlink_handle;
+#endif
 };
 
 struct PINT_client_getattr_sm
@@ -323,7 +329,7 @@ struct PINT_client_io_sm
 
     PVFS_size total_size;
 
-    PVFS_size * dfile_size_array;
+    PVFS_size *dfile_size_array;
     int small_io;
 };
 
@@ -338,6 +344,7 @@ struct PINT_client_readdir_sm
 {
     PVFS_ds_position pos_token;         /* input parameter */
     int dirent_limit;                   /* input parameter */
+    int meta_sid_count;                 /* input parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
 };
 
@@ -570,12 +577,14 @@ struct PINT_client_mgmt_get_uid_list_sm
 
 typedef struct 
 {
-    PVFS_dirent **dirent_array;
-    uint32_t      *dirent_outcount;
+    PVFS_dirent      **dirent_array;
+    uint32_t         *dirent_outcount;
+    PVFS_SID         **sid_array;
+    uint32_t         *sid_count;
     PVFS_ds_position *token;
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input parameter */
-    int32_t      dirent_limit;      /* input parameter */
+    int32_t          dirent_limit;  /* input parameter */
 } PINT_sm_readdir_state;
 
 typedef struct PINT_client_sm
@@ -596,16 +605,19 @@ typedef struct PINT_client_sm
                   * jobs for some states; typically set and
                   * then decremented to zero as jobs complete */
 
-    /* generic getattr used with getattr sub state machines */
+    /* generic getattr used with getattr sub SMs */
     PINT_sm_getattr_state getattr;
-    /* generic dirent array used by both readdir and readdirplus state machines */
+    /* generic dirent array used by both readdir and readdirplus SMs */
     PINT_sm_readdir_state readdir;
 
-    /* fetch_config state used by the nested fetch config state machines */
+    /* fetch_config state used by the nested fetch config SMs */
     struct PINT_server_fetch_config_sm_state fetch_config;
 
     PVFS_hint hints;
 
+    /* this is a frame for the msgpairarray SM there are helper
+     * functions to initialize this before you build the message
+     */
     PINT_sm_msgarray_op msgarray_op;
 
     PVFS_object_ref object_ref;

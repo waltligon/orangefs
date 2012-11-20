@@ -187,17 +187,18 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     if (cache_elem && (!(flags & TROVE_BINARY_KEY)))
     {
         dbpf_keyval_pair_cache_elem_t *keyval_pair =
-            dbpf_attr_cache_elem_get_data_based_on_key(
-                cache_elem, key_p->buffer);
+            dbpf_attr_cache_elem_get_data_based_on_key(cache_elem,
+                                                       key_p->buffer);
         if (keyval_pair)
         {
             val_p->read_sz = val_p->buffer_sz;
             /* note: dbpf_attr_cache_keyval_pair_fetch_cached_data() will
              * update read_sz appropriately
              */
-            ret = dbpf_attr_cache_keyval_pair_fetch_cached_data(
-                cache_elem, keyval_pair, val_p->buffer,
-                &val_p->read_sz);
+            ret = dbpf_attr_cache_keyval_pair_fetch_cached_data(cache_elem,
+                                                               keyval_pair,
+                                                               val_p->buffer,
+                                                               &val_p->read_sz);
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             if(ret < 0)
             {
@@ -214,24 +215,27 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        KEYVAL_READ,
-        coll_p,
-        handle,
-        dbpf_keyval_read_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           KEYVAL_READ,
+                                           coll_p,
+                                           handle,
+                                           dbpf_keyval_read_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
     }
 
     event_type = trove_dbpf_keyval_read_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -243,8 +247,12 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     op_p->u.k_read.val = val_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
-                                 event_type, event_id);
+    return dbpf_queue_or_service(op_p,
+                                 q_op_p,
+                                 coll_p,
+                                 out_op_id_p,
+                                 event_type,
+                                 event_id);
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -262,7 +270,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
            op_p->u.k_read.key->buffer_sz);
     key.data = &key_entry;
     key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
-        op_p->u.k_read.key->buffer_sz);
+                                              op_p->u.k_read.key->buffer_sz);
     key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
@@ -270,8 +278,11 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     data.ulen = op_p->u.k_read.val->buffer_sz;
     data.flags = DB_DBT_USERMEM;
 
-    ret = op_p->coll_p->keyval_db->get(
-        op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+    ret = op_p->coll_p->keyval_db->get(op_p->coll_p->keyval_db,
+                                       NULL,
+                                       &key,
+                                       &data,
+                                       0);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
@@ -301,8 +312,10 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     {
         gen_mutex_lock(&dbpf_attr_cache_mutex);
         if (dbpf_attr_cache_elem_set_data_based_on_key(
-                ref, key_entry.key,
-                op_p->u.k_read.val->buffer, data.size))
+                                            ref,
+                                            key_entry.key,
+                                            op_p->u.k_read.val->buffer,
+                                            data.size))
         {
             /*
              * NOTE: this can happen if the keyword isn't registered, or if
@@ -353,24 +366,27 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        KEYVAL_WRITE,
-        coll_p,
-        handle,
-        dbpf_keyval_write_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           KEYVAL_WRITE,
+                                           coll_p,
+                                           handle,
+                                           dbpf_keyval_write_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
     }
 
     event_type = trove_dbpf_keyval_write_event_id;
-    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+    DBPF_EVENT_START(coll_p,
+                     q_op_p,
+                     event_type,
+                     &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -382,11 +398,17 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     op_p->u.k_write.val = *val_p;
     op_p->hints = hints;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
-                    1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_KEYVAL_OPS,
+                    1,
+                    PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
-                                 event_type, event_id);
+    return dbpf_queue_or_service(op_p,
+                                 q_op_p,
+                                 coll_p,
+                                 out_op_id_p,
+                                 event_type,
+                                 event_id);
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -418,7 +440,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     memset(&data, 0, sizeof(data));
     key.data = &key_entry;
     key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
-        op_p->u.k_write.key.buffer_sz);
+                                         op_p->u.k_write.key.buffer_sz);
     key.flags = DB_DBT_USERMEM;
     data.data = op_p->u.k_write.val.buffer;
     data.size = op_p->u.k_write.val.buffer_sz;
@@ -439,8 +461,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         tmpdata.ulen = op_p->u.k_write.val.buffer_sz;
         tmpdata.data = (void *) malloc(tmpdata.ulen);
         tmpdata.flags = DB_DBT_USERMEM;
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &tmpdata, 0);
+        ret = op_p->coll_p->keyval_db->get(op_p->coll_p->keyval_db,
+                                           NULL,
+                                           &key,
+                                           &tmpdata,
+                                           0);
         /* A failed get implies that keys possibly did not exist */
         if (ret != 0)
         {
@@ -454,8 +479,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             {
                 if(ret != DB_NOTFOUND)
                 {
-                    op_p->coll_p->keyval_db->err(
-                        op_p->coll_p->keyval_db, ret, "keyval_db->get");
+                    op_p->coll_p->keyval_db->err(op_p->coll_p->keyval_db,
+                                                 ret,
+                                                 "keyval_db->get");
                 }
                 ret = -dbpf_db_error_to_trove_error(ret);
             }
@@ -479,8 +505,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                      key.size);
     }
 
-    ret = op_p->coll_p->keyval_db->put(
-        op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
+    ret = op_p->coll_p->keyval_db->put(op_p->coll_p->keyval_db,
+                                       NULL,
+                                       &key,
+                                       &data,
+                                       dbflags);
     /* Either a put error or key already exists */
     if (ret != 0 )
     {

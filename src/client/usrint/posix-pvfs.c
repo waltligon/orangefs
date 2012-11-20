@@ -1586,7 +1586,7 @@ int pvfs_linkat(int olddirfd, const char *oldpath,
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    return pvfs_getdents(fd, dirp, 1);
+    return pvfs_getdents(fd, dirp, sizeof(struct dirent));
 }
 
 /**

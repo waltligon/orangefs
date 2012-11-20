@@ -19,8 +19,8 @@
  *
  * The ncache implements a simple client side cache for PVFS2 files.
  * A timeout is associated with each entry to dictate when it will expire. 
- * The ncache is built on top of the generic tcache caching component. The NCACHE
- * component will cache the following:
+ * The ncache is built on top of the generic tcache caching component.
+ * The NCACHE component will cache the following:
  * - parent handle
  * - entry for a specific file OR directory within the parent directory
  * - entry handle
@@ -65,13 +65,14 @@
 
 /** @see PINT_tcache_options */
 #define PINT_ncache_options PINT_tcache_options
-enum {
-NCACHE_TIMEOUT_MSECS = TCACHE_TIMEOUT_MSECS,
-NCACHE_NUM_ENTRIES = TCACHE_NUM_ENTRIES,
-NCACHE_HARD_LIMIT = TCACHE_HARD_LIMIT,
-NCACHE_SOFT_LIMIT = TCACHE_SOFT_LIMIT,
-NCACHE_ENABLE = TCACHE_ENABLE,
-NCACHE_RECLAIM_PERCENTAGE = TCACHE_RECLAIM_PERCENTAGE,
+enum
+{
+    NCACHE_TIMEOUT_MSECS = TCACHE_TIMEOUT_MSECS,
+    NCACHE_NUM_ENTRIES = TCACHE_NUM_ENTRIES,
+    NCACHE_HARD_LIMIT = TCACHE_HARD_LIMIT,
+    NCACHE_SOFT_LIMIT = TCACHE_SOFT_LIMIT,
+    NCACHE_ENABLE = TCACHE_ENABLE,
+    NCACHE_RECLAIM_PERCENTAGE = TCACHE_RECLAIM_PERCENTAGE,
 };
 
 enum 

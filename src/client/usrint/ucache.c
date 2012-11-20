@@ -454,11 +454,13 @@ int ucache_flush_file(struct file_ent_s *fent)
 int flush_file(struct file_ent_s *fent)
 {
     int rc = 0;
-
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
-
+    PVFS_object_ref ref;
     uint16_t i;
     uint16_t temp_next = NIL16;
+    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+
+    memset(&ref, 0, sizeof(ref));
+
     for(i = mtbl->dirty_list; !dirty_done(i); i = temp_next)
     {
         struct mem_ent_s *ment = &(mtbl->mem[i]);
@@ -467,14 +469,19 @@ int flush_file(struct file_ent_s *fent)
             break;
         }
 
-        /* Aquire block lock - TODO:check if this is redundant due to global lock */
+        /* Aquire block lock - 
+         * TODO:check if this is redundant due to global lock
+         */
         ucache_lock_t *blk_lock = get_lock(ment->item);
         lock_lock(blk_lock);
 
         temp_next = mtbl->mem[i].dirty_next;
         mtbl->mem[i].dirty_next = NIL16; 
 
-        PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
+        ref.handle = fent->tag_handle;
+        ref.fs_id = fent->tag_id;
+        ref.sid_count = 0;
+        ref.sid_sid_array = NULL;
         
         /** If this is the last block needing flushing, then check the file,
          * size, so that we know how much of the last block to write to disk.
@@ -516,8 +523,14 @@ done:
 int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment)
 {
     int rc = 0;
-    PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
-    struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
+    PVFS_object_ref ref;
+    struct iovec vector = {&(ucache->b[ment->item].mblk[0]),
+                            CACHE_BLOCK_SIZE_K * 1024};
+    memset(&ref, 0, sizeof(ref));
+    ref.handle = fent->tag_handle;
+    ref.fs_id = fent->tag_id;
+    ref.sid_count = 0;
+    ref.sid_sid_array = NULL;
     rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector);
     return rc;
 }

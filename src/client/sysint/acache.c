@@ -66,6 +66,9 @@ struct acache_payload
     uint32_t dist_size;
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
+    PVFS_handle *sid_array;
+    uint32_t sid_count;
+    /* V3 eventually these should go away */
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
 
@@ -185,8 +188,8 @@ void PINT_acache_finalize(void)
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_acache_get_info(
-    enum PINT_acache_options option, /**< option to read */
-    unsigned int* arg)                   /**< output value */
+                     enum PINT_acache_options option, /**< option to read */
+                     unsigned int* arg)               /**< output value */
 {
     int ret = -1;
     
@@ -288,7 +291,7 @@ int PINT_acache_get_cached_entry(
     PVFS_object_ref refn,  /**< PVFS2 object to look up */
     PVFS_object_attr *attr,/**< attributes of the object */
     int *attr_status,  /**< indicates if the attributes are expired or not */
-    PVFS_size *size,   /**< logical size of the object (only valid for files) */
+    PVFS_size *size,   /**< logical size of the object - only valid for files */
     int *size_status)  /**< indicates if the size has expired or not */
 {
     int ret = -1;
@@ -298,7 +301,7 @@ int PINT_acache_get_cached_entry(
     /* Storage of current time */
     struct timeval current_time = { 0, 0};
     uint64_t current_time_msecs = 0;
-    /* Flags indicating whether dynamic attrs or capabilities attr have expired. */
+    /* Flags indicating if dynamic attrs or capabilities attr have expired. */
     /* unsigned char capabilities_expired = 0; */
     unsigned char dynamic_attrs_expired = 0;
   
@@ -341,6 +344,7 @@ int PINT_acache_get_cached_entry(
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
 
+/* V3 should this be removed? */
     #if 0
     if((current_time_msecs - tmp_payload->msecs_capabilities) >
         CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS)
@@ -412,6 +416,7 @@ int PINT_acache_get_cached_entry(
         
         if(tmp_payload->mask & PVFS_ATTR_META_DFILES)
         {
+            /* first get handles */
             if(attr->u.meta.dfile_array)
             {
                 free(attr->u.meta.dfile_array);
@@ -427,8 +432,25 @@ int PINT_acache_get_cached_entry(
                    tmp_payload->dfile_array,
                    tmp_payload->dfile_count * sizeof(PVFS_handle));
             attr->u.meta.dfile_count = tmp_payload->dfile_count;
+            /* now get SIDs which are needed with handles */
+            if(attr->u.meta.sid_array)
+            {
+                free(attr->u.meta.sid_array);
+            }
+            attr->u.meta.sid_array = 
+                    malloc(tmp_payload->sid_count * sizeof(PVFS_SID));
+            if(!attr->u.meta.sid_array)
+            {
+                gen_mutex_unlock(&acache_mutex);
+                return(-PVFS_ENOMEM);
+            }
+            memcpy(attr->u.meta.sid_array,
+                   tmp_payload->sid_array,
+                   tmp_payload->sid_count * sizeof(PVFS_SID));
+            attr->u.meta.sid_count = tmp_payload->sid_count;
         }
         
+        /* V3 this should go away eventually */
         if(tmp_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             if(attr->u.meta.mirror_dfile_array)
@@ -463,6 +485,10 @@ int PINT_acache_get_cached_entry(
                 if(attr->u.meta.dfile_array)
                 {
                     free(attr->u.meta.dfile_array);
+                }
+                if(attr->u.meta.sid_array)
+                {
+                    free(attr->u.meta.sid_array);
                 }
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
@@ -614,6 +640,7 @@ int PINT_acache_update(
         }
         if(attr->mask & PVFS_ATTR_META_DFILES)
         {
+            /* first do handles */
             tmp_payload->dfile_array = 
                     malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle));
             if(!tmp_payload->dfile_array)
@@ -623,9 +650,22 @@ int PINT_acache_update(
             }
             memcpy(tmp_payload->dfile_array,
                    attr->u.meta.dfile_array,
-                   attr->u.meta.dfile_count * sizeof(PVFS_handle));
+                   attr->u.meta.dfile_count * sizeof(PVFS_SID));
             tmp_payload->dfile_count = attr->u.meta.dfile_count;
+            /* now do SIDs which must accompany handles */
+            tmp_payload->sid_array = 
+                    malloc(attr->u.meta.sid_count * sizeof(PVFS_handle));
+            if(!tmp_payload->sid_array)
+            {
+                ret = -PVFS_ENOMEM;
+                goto err;
+            }
+            memcpy(tmp_payload->sid_array,
+                   attr->u.meta.sid_array,
+                   attr->u.meta.sid_count * sizeof(PVFS_SID));
+            tmp_payload->sid_count = attr->u.meta.sid_count;
         }
+        /* V3 eventually this should go away */
         if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
            tmp_payload->mirror_dfile_array =
@@ -717,10 +757,15 @@ int PINT_acache_update(
 err:
     if(tmp_payload)
     {
-	    if(tmp_payload->dfile_array)
+        if(tmp_payload->dfile_array)
         {
             free(tmp_payload->dfile_array);
         }
+        if(tmp_payload->sid_array)
+        {
+            free(tmp_payload->sid_array);
+        }
+        /* V3 eventually this goes away */
         if(tmp_payload->mirror_dfile_array)
         {
             free(tmp_payload->mirror_dfile_array);
@@ -791,11 +836,15 @@ static int acache_free_payload(void *payload)
     {
         PINT_free_object_attr(&tmp_payload->attr);
     }
-    
     if(tmp_payload->dfile_array)
     {
         free(tmp_payload->dfile_array);
     }
+    if(tmp_payload->sid_array)
+    {
+        free(tmp_payload->sid_array);
+    }
+    /* V3 eventually this goes away */
     if(tmp_payload->mirror_dfile_array)
     {
         free(tmp_payload->mirror_dfile_array);

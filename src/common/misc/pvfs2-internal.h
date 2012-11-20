@@ -62,6 +62,8 @@
 
 /* key string definition macros.  These are used by the server and
  * by the client (in the case of xattrs with viewdist, etc).
+ * These are used to define the table Trove_Common_Keys in
+ * the file src/server/pvfs2-server.c
  */
 #define ROOT_HANDLE_KEYSTR      "rh\0"
 #define ROOT_HANDLE_KEYLEN      3
@@ -84,7 +86,10 @@
 #define NUM_DFILES_REQ_KEYSTR   "nd\0"
 #define NUM_DFILES_REQ_KEYLEN   3
 
-/* Optional xattrs have "user.pvfs2." as a prefix */
+/* Optional xattrs have "user.pvfs2." as a prefix 
+ * These are used to define the table Trove_Special_keys in
+ * the file src/server/get-attr.sm
+ */
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
 #define SPECIAL_DIST_NAME_KEYLEN         21
 #define SPECIAL_DIST_PARAMS_KEYSTR      "dist_params\0"

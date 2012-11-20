@@ -154,7 +154,7 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
-    /* point the sm dirent array and outcount to the readdirplus response field */
+    /* point sm dirent array and outcount to the readdirplus response field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
     sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
     sm_p->readdir.token = &resp->token;
@@ -177,8 +177,7 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdirplus on handle "
                  "%s on fs %d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
 
-    return PINT_client_state_machine_post(
-        smcb, op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Read entries from a directory and their associated attributes
@@ -202,8 +201,15 @@ PVFS_error PVFS_sys_readdirplus(PVFS_object_ref ref,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdirplus entered\n");
 
-    ret = PVFS_isys_readdirplus(ref, token, pvfs_dirent_incount,
-                            credential, attrmask, resp, &op_id, NULL, hints);
+    ret = PVFS_isys_readdirplus(ref,
+                                token,
+                                pvfs_dirent_incount,
+                                credential,
+                                attrmask,
+                                resp,
+                                &op_id,
+                                NULL,
+                                hints);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_readdirplus call", ret);
@@ -223,7 +229,7 @@ PVFS_error PVFS_sys_readdirplus(PVFS_object_ref ref,
     return error;
 }
 
-/****************************************************************/
+/* <==================== HELPER FUNCTIONS =====================> */
 
 static int get_handle_index(struct handle_to_index *input_handle_array,
                             int nhandles,
@@ -331,13 +337,24 @@ static int destroy_partition_handles(int *svr_count,
     return 0;
 }
 
+/* V3 This function will need to re-written to deal with SIDs
+ * currently is runs through a list of handles to see which servers
+ * are involved and creates server specific handle lists as well as
+ * a list of all server addresses involved.  The handles are read with
+ * a regular readdir.  In V3 each handle will have a list orf SIDs so it
+ * would be easy enough to take each SID, bit it is unclear how failover
+ * will work given that handles exist on multiple SIDs and if one SID
+ * fails we can'be be sure the list of objects it had are on another
+ * given SID.
+ */
+
 static int create_partition_handles(PVFS_fs_id fsid,
                                     int input_handle_count, 
                                     struct handle_to_index *input_handle_array,
-                                     int *svr_count,
-                                     PVFS_BMI_addr_t **svr_addr_array,
-                                     int **per_server_handle_count,
-                                     PVFS_handle ***per_server_handles)
+                                    int *svr_count,
+                                    PVFS_BMI_addr_t **svr_addr_array,
+                                    int **per_server_handle_count,
+                                    PVFS_handle ***per_server_handles)
 {
     int i, err = 0;
     PVFS_BMI_addr_t tmp_svr_addr;
@@ -363,7 +380,8 @@ static int create_partition_handles(PVFS_fs_id fsid,
             /* unique server address */
             if (is_unique_server(tmp_svr_addr,
                                  *svr_count,
-                                 *svr_addr_array, NULL) == 1) 
+                                 *svr_addr_array,
+                                 NULL) == 1) 
             {
                 (*svr_count)++;
                 *svr_addr_array = (PVFS_BMI_addr_t *) 
@@ -388,8 +406,8 @@ static int create_partition_handles(PVFS_fs_id fsid,
             err = -PVFS_ENOMEM;
             break;
         }
-        *per_server_handles = (PVFS_handle **) 
-                               calloc(*svr_count, sizeof(PVFS_handle *));
+        *per_server_handles = (PVFS_handle **)calloc(*svr_count,
+                                                     sizeof(PVFS_handle *));
         if (*per_server_handles == NULL)
         {
             err = -PVFS_ENOMEM;
@@ -418,8 +436,9 @@ static int create_partition_handles(PVFS_fs_id fsid,
                              &svr_index); 
             (*per_server_handle_count)[svr_index]++;
             (*per_server_handles)[svr_index] = (PVFS_handle *) 
-                    realloc((*per_server_handles)[svr_index], 
-                    (*per_server_handle_count)[svr_index] * sizeof(PVFS_handle));
+                               realloc((*per_server_handles)[svr_index], 
+                                       (*per_server_handle_count)[svr_index] *
+                                        sizeof(PVFS_handle));
             if ((*per_server_handles)[svr_index] == NULL)
             {
                 err = -PVFS_ENOMEM;
@@ -440,7 +459,8 @@ static int create_partition_handles(PVFS_fs_id fsid,
 /* figure out which meta servers need to be contacted */
 static int list_of_meta_servers(PINT_client_sm *sm_p)
 {
-    PVFS_sysresp_readdirplus *readdirplus_resp = sm_p->u.readdirplus.readdirplus_resp;
+    PVFS_sysresp_readdirplus *readdirplus_resp =
+                                    sm_p->u.readdirplus.readdirplus_resp;
     int i, ret, err_array_len, attr_array_len;
 
     assert(readdirplus_resp);
@@ -471,7 +491,7 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
 
     sm_p->u.readdirplus.input_handle_array = (struct handle_to_index *) 
                              calloc(sm_p->u.readdirplus.nhandles,
-                             sizeof(struct handle_to_index));
+                                    sizeof(struct handle_to_index));
 
     if (sm_p->u.readdirplus.input_handle_array == NULL) 
     {
@@ -484,7 +504,7 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
 
     sm_p->u.readdirplus.obj_attr_array = (PVFS_object_attr *)
                          calloc(sm_p->u.readdirplus.nhandles,
-                         sizeof(PVFS_object_attr));
+                                sizeof(PVFS_object_attr));
 
     if (sm_p->u.readdirplus.obj_attr_array == NULL) 
     {
@@ -497,7 +517,7 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
 
     sm_p->u.readdirplus.size_array = (PVFS_size **)
                         calloc(sm_p->u.readdirplus.nhandles,
-                        sizeof(PVFS_size *));
+                               sizeof(PVFS_size *));
 
     if (sm_p->u.readdirplus.size_array == NULL)
     {
@@ -520,174 +540,16 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
     ret = create_partition_handles(sm_p->object_ref.fs_id,
                             sm_p->u.readdirplus.nhandles,
                             sm_p->u.readdirplus.input_handle_array,
-                            &sm_p->u.readdirplus.svr_count, /* number of servers */
-                            &sm_p->u.readdirplus.server_addresses, /* array of server addresses */
-                            &sm_p->u.readdirplus.handle_count, /* array of counts of handles to each server */
-                            &sm_p->u.readdirplus.handles); /* actual per-server handle array */
+                            /* number of servers */
+                            &sm_p->u.readdirplus.svr_count,
+                            /* array of server addresses */
+                            &sm_p->u.readdirplus.server_addresses,
+                            /* array of counts of handles to each server */
+                            &sm_p->u.readdirplus.handle_count,
+                            /* actual per-server handle array */
+                            &sm_p->u.readdirplus.handles);
 
     return ret;
-}
-
-/* Setup phase 1 stuff */
-static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *smcb,
-                               job_status_s *js_p)
-{
-    int i, ret;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability capability;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "readdirplus state: fetch_attrs_setup\n");
-
-    /* if there are no dirents then return NO_WORK */
-    if (sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount == 0)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "readdirplus: no dirent to read; return\n");
-        js_p->error_code = NO_WORK;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* From the readdirplus structure figure out which meta servers
-     * we need to speak to to get the attribute information
-     */
-     if ((ret = list_of_meta_servers(sm_p)) < 0) 
-     {
-         gossip_err("Could not locate list of attribute servers %d\n", ret);
-         js_p->error_code = ret;
-         return SM_ACTION_COMPLETE;
-     }
-     if (sm_p->u.readdirplus.svr_count == 0)
-     {
-         gossip_err("Number of meta servers to contact cannot be 0 %d\n",
-                    -PVFS_EINVAL);
-         js_p->error_code = -PVFS_EINVAL;
-         return SM_ACTION_COMPLETE;
-     }
-     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
-                                  sm_p->u.readdirplus.svr_count);
-     if(ret != 0)
-     {
-         gossip_err("Failed to initialize %d msgpairs\n",
-                    sm_p->u.readdirplus.svr_count);
-         js_p->error_code = ret;
-         return SM_ACTION_COMPLETE;
-     }
-
-     PINT_null_capability(&capability);
-
-     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-     {
-        PINT_SERVREQ_LISTATTR_FILL(msg_p->req,
-                                   capability,
-                                   sm_p->object_ref.fs_id,
-                                   sm_p->u.readdirplus.attrmask,
-                                   sm_p->u.readdirplus.handle_count[i],
-                                   sm_p->u.readdirplus.handles[i],
-                                   sm_p->hints);
-
-        msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = readdirplus_fetch_attrs_comp_fn;
-        msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
-     }
-     /* immediate return. next state jumps to msgpairarray machine */
-     js_p->error_code = 0;
-     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-     return SM_ACTION_COMPLETE;
-}
-
-/* Phase 1 completion callback */
-static int readdirplus_fetch_attrs_comp_fn(void *v_p,
-                                           struct PVFS_server_resp *resp_p,
-                                           int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-    gossip_debug(GOSSIP_LISTATTR_DEBUG,
-                 "readdirplus_fetch_attrs_comp_fn called\n");
-    assert(resp_p->op == PVFS_SERV_LISTATTR);
-
-    /* Mark all handles in this server range as having failed a stat */
-    if (sm_p->msgarray_op.msgarray[index].op_status != 0)
-    {
-        int i, handle_index;
-        for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++)
-        {
-            get_handle_index(sm_p->u.readdirplus.input_handle_array,
-                             sm_p->u.readdirplus.nhandles,
-                             sm_p->u.readdirplus.handles[index][i],
-                             &handle_index,
-                             NULL);
-
-            assert(handle_index >= 0);
-            sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] =
-                            sm_p->msgarray_op.msgarray[index].op_status;
-        }
-    }
-    else if (sm_p->msgarray_op.msgarray[index].op_status == 0)
-    {
-        /* fetch all errors from the servresp structure
-         * and copy the object attributes
-         */
-        int i, handle_index;
-
-        /* make sure that we get back responses for
-         * all handles that we sent out
-         */
-        assert(resp_p->u.listattr.nhandles ==
-               sm_p->u.readdirplus.handle_count[index]);
-
-        for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) 
-        {
-            get_handle_index(sm_p->u.readdirplus.input_handle_array,
-                             sm_p->u.readdirplus.nhandles,
-                             sm_p->u.readdirplus.handles[index][i],
-                             &handle_index,
-                             NULL);
-
-            assert(handle_index >= 0);
-            /* Copy any errors */
-            sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] =
-                            resp_p->u.listattr.error[i];
-
-            if (resp_p->u.listattr.error[i] == 0)
-            {
-                /* if no errors, stash the object attributes */
-                PINT_copy_object_attr(
-                           &sm_p->u.readdirplus.obj_attr_array[handle_index], 
-                           &resp_p->u.listattr.attr[i]);
-            }
-        }
-    }
-
-    /* if this is the last response, check all the status values
-       and return error codes if any requests failed
-     */
-    if (index == (sm_p->msgarray_op.count - 1))
-    {
-        int i;
-        for (i = 0; i < sm_p->msgarray_op.count; i++) 
-        {
-            if (sm_p->msgarray_op.msgarray[i].op_status != 0)
-            {
-                return sm_p->msgarray_op.msgarray[i].op_status;
-            }
-        }
-        /* destroy scratch space.. we need to reuse them in phase 2 */
-        destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 
-                                  &sm_p->u.readdirplus.server_addresses,
-                                  &sm_p->u.readdirplus.handle_count,
-                                  &sm_p->u.readdirplus.handles);
-
-        free(sm_p->u.readdirplus.input_handle_array);
-        sm_p->u.readdirplus.input_handle_array = NULL;
-        sm_p->u.readdirplus.nhandles = 0;
-    }
-    return 0;
 }
 
 /* figure out which data servers need to be contacted */
@@ -789,84 +651,109 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
      ret = create_partition_handles(sm_p->object_ref.fs_id,
                             sm_p->u.readdirplus.nhandles,
                             sm_p->u.readdirplus.input_handle_array,
-                            &sm_p->u.readdirplus.svr_count, /* number of servers */
-                            &sm_p->u.readdirplus.server_addresses, /* array of server addresses */
-                            &sm_p->u.readdirplus.handle_count, /* array of counts of handles to each server */
-                            &sm_p->u.readdirplus.handles); /* actual per-server handle array */
+                            /* number of servers */
+                            &sm_p->u.readdirplus.svr_count,
+                            /* array of server addresses */
+                            &sm_p->u.readdirplus.server_addresses,
+                            /* array of counts of handles to each server */
+                            &sm_p->u.readdirplus.handle_count,
+                            /* actual per-server handle array */
+                            &sm_p->u.readdirplus.handles);
 
     return ret;
 }
 
-/* Setup phase 2 stuff */
-static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
-                                                  struct PINT_smcb *smcb,
-                                                  job_status_s *js_p)
+/* <=================== COMPLETION FUNCTIONS ====================> */
+
+/* Phase 1 completion callback */
+static int readdirplus_fetch_attrs_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int index)
 {
-    int i, ret;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p;
-    PVFS_capability capability;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
-    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    gossip_debug(GOSSIP_LISTATTR_DEBUG,
+                 "readdirplus_fetch_attrs_comp_fn called\n");
+    assert(resp_p->op == PVFS_SERV_LISTATTR);
 
-    /* don't need sizes */
-    if (!(sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
-        && !(sm_p->u.readdirplus.attrmask & PVFS_ATTR_DATA_SIZE))
+    /* Mark all handles in this server range as having failed a stat */
+    if (sm_p->msgarray_op.msgarray[index].op_status != 0)
     {
-        js_p->error_code = NO_WORK;
-        return SM_ACTION_COMPLETE;
+        int i, handle_index;
+        for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++)
+        {
+            get_handle_index(sm_p->u.readdirplus.input_handle_array,
+                             sm_p->u.readdirplus.nhandles,
+                             sm_p->u.readdirplus.handles[index][i],
+                             &handle_index,
+                             NULL);
+
+            assert(handle_index >= 0);
+            sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] =
+                            sm_p->msgarray_op.msgarray[index].op_status;
+        }
     }
-   
-     /* ok, now we have all the data files. split it on a per-server basis */
-     if ((ret = list_of_data_servers(sm_p)) < 0) 
-     {
-         js_p->error_code = ret;
-         return SM_ACTION_COMPLETE;
-     }
-     if (sm_p->u.readdirplus.svr_count == 0)
-     {
-         /* no need to contact any server since 
-          * there are no regular meta files
-          */
-         js_p->error_code = NO_WORK;
-         return SM_ACTION_COMPLETE;
-     }
+    else if (sm_p->msgarray_op.msgarray[index].op_status == 0)
+    {
+        /* fetch all errors from the servresp structure
+         * and copy the object attributes
+         */
+        int i, handle_index;
 
-     ret = PINT_msgpairarray_init(
-                       &sm_p->msgarray_op, sm_p->u.readdirplus.svr_count);
+        /* make sure that we get back responses for
+         * all handles that we sent out
+         */
+        assert(resp_p->u.listattr.nhandles ==
+               sm_p->u.readdirplus.handle_count[index]);
 
-     if(ret != 0)
-     {
-         gossip_err("Failed to initialize %d msgpairs\n",
-                    sm_p->u.readdirplus.svr_count);
-         js_p->error_code = ret;
-         return SM_ACTION_COMPLETE;
-     }
+        for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) 
+        {
+            get_handle_index(sm_p->u.readdirplus.input_handle_array,
+                             sm_p->u.readdirplus.nhandles,
+                             sm_p->u.readdirplus.handles[index][i],
+                             &handle_index,
+                             NULL);
 
-     PINT_null_capability(&capability);
+            assert(handle_index >= 0);
+            /* Copy any errors */
+            sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] =
+                            resp_p->u.listattr.error[i];
 
-     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-     {
-         PINT_SERVREQ_LISTATTR_FILL(msg_p->req,
-                                    capability,
-                                    sm_p->object_ref.fs_id,
-                                    PVFS_ATTR_DATA_SIZE,
-                                    sm_p->u.readdirplus.handle_count[i],
-                                    sm_p->u.readdirplus.handles[i],
-                                    sm_p->hints);
+            if (resp_p->u.listattr.error[i] == 0)
+            {
+                /* if no errors, stash the object attributes */
+                PINT_copy_object_attr(
+                           &sm_p->u.readdirplus.obj_attr_array[handle_index], 
+                           &resp_p->u.listattr.attr[i]);
+            }
+        }
+    }
 
-         msg_p->fs_id = sm_p->object_ref.fs_id;
-         msg_p->handle = PVFS_HANDLE_NULL;
-         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-         msg_p->comp_fn = readdirplus_fetch_sizes_comp_fn;
-         msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
+    /* if this is the last response, check all the status values
+       and return error codes if any requests failed
+     */
+    if (index == (sm_p->msgarray_op.count - 1))
+    {
+        int i;
+        for (i = 0; i < sm_p->msgarray_op.count; i++) 
+        {
+            if (sm_p->msgarray_op.msgarray[i].op_status != 0)
+            {
+                return sm_p->msgarray_op.msgarray[i].op_status;
+            }
+        }
+        /* destroy scratch space.. we need to reuse them in phase 2 */
+        destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 
+                                  &sm_p->u.readdirplus.server_addresses,
+                                  &sm_p->u.readdirplus.handle_count,
+                                  &sm_p->u.readdirplus.handles);
 
-     }
-     /* immediate return. next state jumps to msgpairarray machine */
-     js_p->error_code = 0;
-
-     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-     return SM_ACTION_COMPLETE;
+        free(sm_p->u.readdirplus.input_handle_array);
+        sm_p->u.readdirplus.input_handle_array = NULL;
+        sm_p->u.readdirplus.nhandles = 0;
+    }
+    return 0;
 }
 
 /* Phase 2 completion callback */
@@ -940,6 +827,158 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
     return 0;
 }
 
+/* <================== STATE ACTION FUNCTIONS ===================> */
+
+/* Setup phase 1 stuff */
+static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
+{
+    int i, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "readdirplus state: fetch_attrs_setup\n");
+
+    /* if there are no dirents then return NO_WORK */
+    if (sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount == 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "readdirplus: no dirent to read; return\n");
+        js_p->error_code = NO_WORK;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* From the readdirplus structure figure out which meta servers
+     * we need to speak to to get the attribute information
+     */
+    if ((ret = list_of_meta_servers(sm_p)) < 0) 
+    {
+        gossip_err("Could not locate list of attribute servers %d\n", ret);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    if (sm_p->u.readdirplus.svr_count == 0)
+    {
+        gossip_err("Number of meta servers to contact cannot be 0 %d\n",
+                   -PVFS_EINVAL);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
+                                 sm_p->u.readdirplus.svr_count);
+    if(ret != 0)
+    {
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   sm_p->u.readdirplus.svr_count);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_null_capability(&capability);
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_LISTATTR_FILL(msg_p->req,
+                                   capability,
+                                   sm_p->object_ref.fs_id,
+                                   sm_p->u.readdirplus.attrmask,
+                                   sm_p->u.readdirplus.handle_count[i],
+                                   sm_p->u.readdirplus.handles[i],
+                                   sm_p->hints);
+
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->sid_count = 0;
+        msg_p->sid_index = 1;
+        msg_p->sid_array = NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = readdirplus_fetch_attrs_comp_fn;
+        msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
+    }
+    /* immediate return. next state jumps to msgpairarray machine */
+    js_p->error_code = 0;
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+/* Setup phase 2 stuff */
+static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
+                                                  struct PINT_smcb *smcb,
+                                                  job_status_s *js_p)
+{
+    int i, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    /* don't need sizes */
+    if (!(sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL) &&
+        !(sm_p->u.readdirplus.attrmask & PVFS_ATTR_DATA_SIZE))
+    {
+        js_p->error_code = NO_WORK;
+        return SM_ACTION_COMPLETE;
+    }
+   
+    /* ok, now we have all the data files. split it on a per-server basis */
+    if ((ret = list_of_data_servers(sm_p)) < 0) 
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    if (sm_p->u.readdirplus.svr_count == 0)
+    {
+         /* no need to contact any server since 
+          * there are no regular meta files
+          */
+        js_p->error_code = NO_WORK;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
+                                 sm_p->u.readdirplus.svr_count);
+
+    if(ret != 0)
+    {
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   sm_p->u.readdirplus.svr_count);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_null_capability(&capability);
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_LISTATTR_FILL(msg_p->req,
+                                   capability,
+                                   sm_p->object_ref.fs_id,
+                                   PVFS_ATTR_DATA_SIZE,
+                                   sm_p->u.readdirplus.handle_count[i],
+                                   sm_p->u.readdirplus.handles[i],
+                                   sm_p->hints);
+
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->sid_count = 0;
+        msg_p->sid_index = 1;
+        msg_p->sid_array = NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = readdirplus_fetch_sizes_comp_fn;
+        msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
+
+    }
+    /* immediate return. next state jumps to msgpairarray machine */
+    js_p->error_code = 0;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action readdirplus_msg_failure(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
@@ -974,92 +1013,86 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
      */
     for (i = 0; i < readdirplus_resp->pvfs_dirent_outcount; i++) 
     {
-        if (readdirplus_resp->stat_err_array[i] == 0)
+        PVFS_object_attr *obj_attr_i;
+        PVFS_sys_attr *resp_attr_i;
+
+        if (readdirplus_resp->stat_err_array[i] != 0)
         {
-            /* convert into sys attributes */
-            readdirplus_resp->attr_array[i].owner 
-                    = sm_p->u.readdirplus.obj_attr_array[i].owner;
-            readdirplus_resp->attr_array[i].group 
-                    = sm_p->u.readdirplus.obj_attr_array[i].group;
-            readdirplus_resp->attr_array[i].perms 
-                    = sm_p->u.readdirplus.obj_attr_array[i].perms;
-            readdirplus_resp->attr_array[i].atime 
-                    = sm_p->u.readdirplus.obj_attr_array[i].atime;
-            readdirplus_resp->attr_array[i].mtime 
-                    = sm_p->u.readdirplus.obj_attr_array[i].mtime;
-            readdirplus_resp->attr_array[i].ctime 
-                    = sm_p->u.readdirplus.obj_attr_array[i].ctime;
-            readdirplus_resp->attr_array[i].objtype 
-                    = sm_p->u.readdirplus.obj_attr_array[i].objtype;
-            readdirplus_resp->attr_array[i].mask
-                    = PVFS_util_object_to_sys_attr_mask
-                      (sm_p->u.readdirplus.obj_attr_array[i].mask);
-            if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_METAFILE)
-            {
-              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST )
-              {
-                  if(sm_p->u.readdirplus.obj_attr_array[i].mask 
-                      & PVFS_ATTR_META_UNSTUFFED)
-                  {
-                      PVFS_size (*logical_file_size)(void* params,
-                                                     uint32_t num_handles,
-                                                     PVFS_size *psizes) = NULL;
-                      /* compute the file size */
-                      assert(sm_p->u.readdirplus.size_array[i]);
-                      logical_file_size = 
-                        sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->methods->logical_file_size;
-                      assert(logical_file_size);
-                      assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params);
+            continue;
+        }
+        /* these are just convenience pointers for this loop */
+        obj_attr_i = &sm_p->u.readdurplus.obj_attr_array[i];
+        resp_attr_i = &readdirplus_resp->attr_array[i];
 
-                      readdirplus_resp->attr_array[i].size = logical_file_size(
-                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params,
-                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count,
-                      sm_p->u.readdirplus.size_array[i]);
+        /* convert into sys attributes */
+        resp_attr_i->owner = obj_attr_i->owner;
+        resp_attr_i->group = obj_attr_i->group;
+        resp_attr_i->perms = obj_attr_i->perms;
+        resp_attr_i->atime = obj_attr_i->atime;
+        resp_attr_i->mtime = obj_attr_i->mtime;
+        resp_attr_i->ctime = obj_attr_i->ctime;
+        resp_attr_i->objtype = obj_attr_i->objtype;
+        resp_attr_i->mask = PVFS_util_object_to_sys_attr_mask(obj_attr_i->mask);
 
-                  }
-                  else
-                  {
-                     /* size for stuffed case */
-                     readdirplus_resp->attr_array[i].size = 
-                     sm_p->u.readdirplus.obj_attr_array[i].u.meta.stuffed_size;
-                  }
-                    readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_SIZE;
-              }
-              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 
-              {
-                  readdirplus_resp->attr_array[i].dfile_count = 
-                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
-                  readdirplus_resp->attr_array[i].mask 
-                                               |= PVFS_ATTR_SYS_DFILE_COUNT;
-              }
-              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
-              {
-               readdirplus_resp->attr_array[i].mirror_copies_count =
-               sm_p->u.readdirplus.obj_attr_array[i].u.meta.mirror_copies_count;
-               readdirplus_resp->attr_array[i].mask 
-                           |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
-              }
-            }
-            else if (readdirplus_resp->attr_array[i].objtype ==
-                     PVFS_TYPE_DIRECTORY)
+        if (resp_attr_i->objtype == PVFS_TYPE_METAFILE)
+        {
+            if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST )
             {
-                readdirplus_resp->attr_array[i].dirent_count = 
-                    sm_p->u.readdirplus.obj_attr_array[i].u.dir.dirent_count;
-                readdirplus_resp->attr_array[i].mask 
-                      |= PVFS_ATTR_SYS_DIRENT_COUNT;
+                if(obj_attr_i->mask & PVFS_ATTR_META_UNSTUFFED)
+                {
+                    PVFS_size (*logical_file_size)(void* params,
+                                                   uint32_t num_handles,
+                                                   PVFS_size *psizes) = NULL;
+                    /* compute the file size */
+                    assert(sm_p->u.readdirplus.size_array[i]);
+                    logical_file_size = 
+                            obj_attr_i->u.meta.dist->methods->logical_file_size;
+                    assert(logical_file_size);
+                    assert(obj_attr_i->u.meta.dist->params);
+
+                    resp_attr_i->size = logical_file_size(
+                                          obj_attr_i->u.meta.dist->params,
+                                          obj_attr_i->u.meta.dfile_count,
+                                          sm_p->u.readdirplus.size_array[i]);
+
+                }
+                else
+                {
+                    /* size for stuffed case */
+                    resp_attr_i->size = obj_attr_i->u.meta.stuffed_size;
+                }
+                resp_attr_i->mask |= PVFS_ATTR_SYS_SIZE;
             }
-            else if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_SYMLINK
-                    && sm_p->u.readdirplus.attrmask & PVFS_ATTR_SYMLNK_TARGET) 
+            if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 
             {
-                readdirplus_resp->attr_array[i].link_target =
-                    strdup(sm_p->u.readdirplus.obj_attr_array[i].u.sym.target_path);
-                readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_LNK_TARGET;
+                resp_attr_i->dfile_count = obj_attr_i->u.meta.dfile_count;
+                resp_attr_i->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
             }
-            else 
+            if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
             {
-                gossip_err("Invalid type %d in readdirplus\n", 
-                    readdirplus_resp->attr_array[i].objtype);
+                resp_attr_i->mirror_copies_count =
+                                    obj_attr_i->u.meta.mirror_copies_count;
+                resp_attr_i->mask |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
             }
+        }
+        else if (resp_attr_i->objtype == PVFS_TYPE_DIRECTORY)
+        {
+            resp_attr_i->dirent_count = 
+                                obj_attr_i->u.dir.dirent_count;
+            resp_attr_i->mask 
+                                |= PVFS_ATTR_SYS_DIRENT_COUNT;
+        }
+        else if (resp_attr_i->objtype == PVFS_TYPE_SYMLINK
+                  && sm_p->u.readdirplus.attrmask & PVFS_ATTR_SYMLNK_TARGET) 
+        {
+            resp_attr_i->link_target =
+                                strdup(obj_attr_i->u.sym.target_path);
+            resp_attr_i->mask |= PVFS_ATTR_SYS_LNK_TARGET;
+        }
+        else 
+        {
+            gossip_err("Invalid type %d in readdirplus\n", 
+                       readdirplus_resp->attr_array[i].objtype);
         }
     }
 

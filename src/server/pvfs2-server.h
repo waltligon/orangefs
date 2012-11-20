@@ -60,16 +60,6 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
-/* WBL V3 Removing precreate */
-#if 0
-/* Specifies the number of handles to be preceated at a time from each
- * server using the batch create request.
- */
-#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
-/* precreate pools will be topped off if they fall below this value */
-#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
-#endif
-
 /* types of permission checking that a server may need to perform for
  * incoming requests
  */
@@ -605,11 +595,6 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
-    /* WBL V3 removing precreate */
-    #if 0
-        struct PINT_server_precreate_pool_refiller_op
-            precreate_pool_refiller;
-    #endif
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;

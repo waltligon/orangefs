@@ -35,8 +35,7 @@ typedef struct
 
 static struct qhash_table *s_id_gen_safe_table = NULL;
 
-#define ID_GEN_SAFE_INITIALIZED() \
-(s_id_gen_safe_table)
+#define ID_GEN_SAFE_INITIALIZED() (s_id_gen_safe_table)
 
 int id_gen_safe_initialize()
 {
@@ -59,16 +58,17 @@ int id_gen_safe_finalize()
     if(s_id_gen_safe_init_count == 0 && ID_GEN_SAFE_INITIALIZED())
     {
         gen_mutex_lock(&s_id_gen_safe_mutex);
-        qhash_destroy_and_finalize(s_id_gen_safe_table, id_gen_safe_t, hash_link, free);
+        qhash_destroy_and_finalize(s_id_gen_safe_table,
+                                   id_gen_safe_t,
+                                   hash_link,
+                                   free);
         s_id_gen_safe_table = NULL;
         gen_mutex_unlock(&s_id_gen_safe_mutex);
     }
     return 0;
 }
 
-int id_gen_safe_register(
-    BMI_id_gen_t *new_id,
-    void *item)
+int id_gen_safe_register(BMI_id_gen_t *new_id, void *item)
 {
     id_gen_safe_t *id_elem = NULL;
 

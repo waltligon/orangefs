@@ -11,8 +11,6 @@
 #include "gossip.h"
 #include "trove.h"
 #include "trove-internal.h"
-#include "trove-ledger.h"
-#include "trove-handle-mgmt.h"
 #include "dbpf.h"
 #include "dbpf-thread.h"
 #include "dbpf-bstream.h"

@@ -6,12 +6,12 @@
 #ifndef __MIRROR_H
 #define __MIRROR_H
 
-enum MIRROR_MODE_t { 
+typedef enum MIRROR_MODE_t { 
    BEGIN_MIRROR_MODE   = 100,
    NO_MIRRORING        = 100,
    MIRROR_ON_IMMUTABLE = 200,
    END_MIRROR_MODE     = 200
-};
+} PVFS_mirror_mode;
 
 typedef enum MIRROR_MODE_t MIRROR_MODE;
 

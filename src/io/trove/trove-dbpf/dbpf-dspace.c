@@ -21,8 +21,6 @@
 #include "pint-event.h"
 #include "pint-mem.h"
 #include "trove-internal.h"
-#include "trove-ledger.h"
-#include "trove-handle-mgmt.h"
 #include "dbpf.h"
 #include "dbpf-op.h"
 #include "dbpf-thread.h"
@@ -218,10 +216,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
              * will do later, so we test for that error then
              */
             new_handle = cur_extent.first;
-/* WBL V3 replace handle allocation */
-#if 0
-            trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-#endif
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "new_handle was FORCED to be %s\n",
                          PVFS_OID_str(&new_handle));
@@ -232,12 +226,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
               if we got TROVE_HANDLE_NULL, the caller doesn't care
               where the handle comes from
             */
-/* WBL V3 replace handle allocation */
-#if 0
-            new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
-#else
             PVFS_OID_gen(&new_handle);
-#endif
         }
     }
     else
@@ -246,13 +235,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
           otherwise, we have to try to allocate a handle from
           the specified range that we're given
         */
-/* WBL V3 replace handle allocation */
-#if 0
-        new_handle = trove_handle_alloc_from_range(
-            op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
-#else
         PVFS_OID_gen(&new_handle);
-#endif
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %s "
@@ -275,12 +258,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
                                           new_handle);
     if(ret < 0)
     {
-/* WBL V3 replace handle allocation */
-#if 0
-        trove_handle_free(op_p->coll_p->coll_id, new_handle);
-#else
         PVFS_OID_init(&new_handle); /* clear out the variable */
-#endif
         return(ret);
     }
 
@@ -406,14 +384,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         /*
           try to allocate a handle from the specified range that we're given
         */
-/* WBL V3 replace handle allocation */
-#if 0
-        new_handle = trove_handle_alloc_from_range(
-            op_p->coll_p->coll_id, &op_p->u.d_create_list.extent_array);
-#else
         PVFS_OID_gen(&new_handle);
-        
-#endif
 
         /*
           if we got a zero handle, we're either completely out of handles
@@ -444,13 +415,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
                                              &key,
                                              0);
 
-/* WBL V3 replace handle allocation */
-#if 0
-                    trove_handle_free(op_p->coll_p->coll_id, 
-                        op_p->u.d_create_list.out_handle_array_p[j]);
-#else
                     PVFS_OID_init(&op_p->u.d_create_list.out_handle_array_p[j]);
-#endif
                 }
             }
             return(ret);
@@ -618,12 +583,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     }
 
     /* return handle to free list */
-/* WBL V3 replace handle alloc */
-#if 0
-    trove_handle_free(coll_p->coll_id, ref.handle);
-#else
     PVFS_OID_init(&ref.handle); /* clear out the variable */
-#endif
     return 0;
 
 return_error:

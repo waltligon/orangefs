@@ -127,7 +127,7 @@ static __inline__ int qlist_empty(struct qlist_head *head)
  * qlist_pop - pop the first item off the list and return it
  * @head: qlist to modify
  */
-static __inline__ struct qlist_head* qlist_pop(struct qlist_head *head)
+static __inline__ struct qlist_head *qlist_pop(struct qlist_head *head)
 {
     struct qlist_head *item = NULL;
 
@@ -258,7 +258,7 @@ static inline int qlist_count(struct qlist_head *list)
     return count;
 }
 
-static inline struct qlist_head * qlist_find(
+static inline struct qlist_head *qlist_find(
     struct qlist_head *list,
     int (*compare)(struct qlist_head *, void *),
     void *ptr)

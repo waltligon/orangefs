@@ -36,8 +36,6 @@
 #include "dbpf-bstream.h"
 #include "dbpf-thread.h"
 #include "dbpf-attr-cache.h"
-#include "trove-ledger.h"
-#include "trove-handle-mgmt.h"
 #include "gossip.h"
 #include "dbpf-open-cache.h"
 #include "pint-util.h"

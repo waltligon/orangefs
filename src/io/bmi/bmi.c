@@ -1631,7 +1631,7 @@ int BMI_query_addr_range (BMI_addr_t addr, const char *id_string, int netmask)
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_addr_lookup(BMI_addr_t * new_addr,
+int BMI_addr_lookup(BMI_addr_t *new_addr,
                     const char *id_string)
 {
 

@@ -54,6 +54,8 @@ pvfs_descriptor_status pvfs_stdin_status =
     .fsops = &glibc_ops,
     .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
     .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
+    .pvfs_ref.sid_count = 0;
+    .pvfs_ref.sid_array = NULL;,
     .flags = O_RDONLY,
     .mode = 0,
     .file_pointer = 0,
@@ -77,6 +79,8 @@ pvfs_descriptor_status pvfs_stdout_status =
     .fsops = &glibc_ops,
     .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
     .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
+    .pvfs_ref.sid_count = 0;
+    .pvfs_ref.sid_array = NULL;,
     .flags = O_WRONLY | O_APPEND,
     .mode = 0,
     .file_pointer = 0,
@@ -100,6 +104,8 @@ pvfs_descriptor_status pvfs_stderr_status =
     .fsops = &glibc_ops,
     .pvfs_ref.fs_id = PVFS_FS_ID_NULL,
     .pvfs_ref.handle = PVFS_HANDLE_NULL_INIT,
+    .pvfs_ref.sid_count = 0;
+    .pvfs_ref.sid_array = NULL;,
     .flags = O_WRONLY | O_APPEND,
     .mode = 0,
     .file_pointer = 0,
@@ -642,12 +648,20 @@ int pvfs_descriptor_table_size(void)
     {
 	    pd->s->pvfs_ref.fs_id = file_ref->fs_id;
 	    pd->s->pvfs_ref.handle = file_ref->handle;
+	    pd->s->pvfs_ref.sid_count = file_ref->sid_count;
+        pd->s->pvfs_ref.sid_array = (PVFS_SID *)malloc(
+                        file_ref->sid_count * sizeof(PVFS_SID));
+	    memcpy(pd->s->pvfs_ref.sid_array,
+               file_ref->sid_array,
+               file_ref->sid_count * sizeof(PVFS_SID));
     }
     else
     {
         /* if this is not a PVFS file then the file_ref will be NULL */
 	    pd->s->pvfs_ref.fs_id = PVFS_FS_ID_NULL;
 	    pd->s->pvfs_ref.handle = PVFS_HANDLE_NULL;
+	    pd->s->pvfs_ref.sid_count = 0;
+	    pd->s->pvfs_ref.sid_arraay = NULL;
     }
 
     pd->s->flags = flags;
@@ -740,7 +754,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
 	pd->fd = newfd;
 	pd->true_fd = newfd;
 	pd->fdflags = 0;
-    /* share the pvfs_desdriptor_status info */
+    /* share the pvfs_descriptor_status info */
     pd->s = descriptor_table[oldfd]->s;
     gen_mutex_lock(&pd->s->lock);
     pd->s->dup_cnt++;
@@ -806,6 +820,8 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->fsops = &glibc_ops;
 	    pd->s->pvfs_ref.fs_id = PVFS_FS_ID_NULL;
 	    pd->s->pvfs_ref.handle = PVFS_HANDLE_NULL;
+	    pd->s->pvfs_ref.sid_count = 0;
+	    pd->s->pvfs_ref.sid_array = NULL;
 	    pd->s->flags = flags;
 	    pd->s->mode = 0;
 	    pd->s->file_pointer = 0;
@@ -871,8 +887,16 @@ int pvfs_free_descriptor(int fd)
         }
 #endif /* PVFS_UCACHE_ENABLE */
 
-	/* free descriptor status - wipe memory first */
-	memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+	    /* free descriptor status - wipe memory first */
+        if(pd->s->pvfs_ref.sid_array)
+        {
+	        memset(pd->s->pvfs_ref.sid_array,
+                   0,
+                   pd->s->pvfs_ref.sid_count * sizeof(PVFS_SID));
+            free(pd->s->pvfs_ref.sid_array);
+        }
+
+	    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
 
         /* first 3 descriptors not malloc'd */
         if (fd > 2)

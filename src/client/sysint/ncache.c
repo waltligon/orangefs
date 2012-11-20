@@ -21,12 +21,13 @@
  */
   
 /* compile time defaults */
-enum {
-NCACHE_DEFAULT_TIMEOUT_MSECS  =  3000,
-NCACHE_DEFAULT_SOFT_LIMIT     =  5120,
-NCACHE_DEFAULT_HARD_LIMIT     = 10240,
-NCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
-NCACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
+enum
+{
+    NCACHE_DEFAULT_TIMEOUT_MSECS  =  3000,
+    NCACHE_DEFAULT_SOFT_LIMIT     =  5120,
+    NCACHE_DEFAULT_HARD_LIMIT     = 10240,
+    NCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
+    NCACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
 };
 
 struct PINT_perf_key ncache_keys[] = 
@@ -50,28 +51,28 @@ struct ncache_payload
     PVFS_object_ref entry_ref;      /* PVFS2 object reference to entry */
     PVFS_object_ref parent_ref;     /* PVFS2 object reference to parent */
     int entry_status;               /* is the entry valid? */
-    char* entry_name;
+    char *entry_name;
 };
 
 struct ncache_key
 {
     PVFS_object_ref parent_ref;
-    const char* entry_name;
+    const char *entry_name;
 };
   
-static struct PINT_tcache* ncache = NULL;
+static struct PINT_tcache *ncache = NULL;
 static gen_mutex_t ncache_mutex = GEN_MUTEX_INITIALIZER;
   
-static int ncache_compare_key_entry(void* key, struct qhash_head* link);
-static int ncache_hash_key(void* key, int table_size);
-static int ncache_free_payload(void* payload);
-static struct PINT_perf_counter* ncache_pc = NULL;
+static int ncache_compare_key_entry(void *key, struct qhash_head *link);
+static int ncache_hash_key(void *key, int table_size);
+static int ncache_free_payload(void *payload);
+static struct PINT_perf_counter *ncache_pc = NULL;
 
 /**
  * Enables perf counter instrumentation of the ncache
  */
 void PINT_ncache_enable_perf_counter(
-    struct PINT_perf_counter* pc)     /**< perf counter instance to use */
+            struct PINT_perf_counter *pc) /**< perf counter instance to use */
 {
     gen_mutex_lock(&ncache_mutex);
 
@@ -79,12 +80,18 @@ void PINT_ncache_enable_perf_counter(
     assert(ncache_pc);
 
     /* set initial values */
-    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
-        ncache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
-        ncache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
-        ncache->enable, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_SOFT_LIMIT,
+                    ncache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_HARD_LIMIT,
+                    ncache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_ENABLED,
+                    ncache->enable,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
 
@@ -99,7 +106,7 @@ int PINT_ncache_initialize(void)
 {
     int ret = -1;
     unsigned int ncache_timeout_msecs;
-    char * ncache_timeout_str = NULL;
+    char *ncache_timeout_str = NULL;
   
     gen_mutex_lock(&ncache_mutex);
   
@@ -117,9 +124,13 @@ int PINT_ncache_initialize(void)
     /* fill in defaults that are specific to ncache */
     ncache_timeout_str = getenv("PVFS2_NCACHE_TIMEOUT");
     if (ncache_timeout_str != NULL) 
+    {
         ncache_timeout_msecs = (unsigned int)strtoul(ncache_timeout_str,NULL,0);
+    }
     else
+    {
         ncache_timeout_msecs = NCACHE_DEFAULT_TIMEOUT_MSECS;
+    }
 
     ret = PINT_tcache_set_info(ncache, TCACHE_TIMEOUT_MSECS,
                                ncache_timeout_msecs);
@@ -160,6 +171,7 @@ int PINT_ncache_initialize(void)
 }
   
 /** Finalizes and destroys the ncache, frees all cached entries */
+/* V3 will need to free sid arrays */
 void PINT_ncache_finalize(void)
 {
     gen_mutex_lock(&ncache_mutex);
@@ -178,8 +190,8 @@ void PINT_ncache_finalize(void)
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_ncache_get_info(
-    enum PINT_ncache_options option, /**< option to read */
-    unsigned int* arg)               /**< output value */
+                    enum PINT_ncache_options option, /**< option to read */
+                    unsigned int *arg)               /**< output value */
 {
     int ret = -1;
   
@@ -196,8 +208,8 @@ int PINT_ncache_get_info(
  * @return 0 on success, -PVFS_error on failure
  */
 int PINT_ncache_set_info(
-    enum PINT_ncache_options option, /**< option to modify */
-    unsigned int arg)                /**< input value */
+                    enum PINT_ncache_options option, /**< option to modify */
+                    unsigned int arg)                /**< input value */
 {
     int ret = -1;
   
@@ -205,14 +217,22 @@ int PINT_ncache_set_info(
     ret = PINT_tcache_set_info(ncache, option, arg);
 
     /* record any resulting parameter changes */
-    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
-        ncache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
-        ncache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
-        ncache->enable, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-        ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_SOFT_LIMIT,
+                    ncache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_HARD_LIMIT,
+                    ncache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_ENABLED,
+                    ncache->enable,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
 
@@ -225,9 +245,9 @@ int PINT_ncache_set_info(
  * @return 0 on success, -PVFS_error on failure
  */
 int PINT_ncache_get_cached_entry(
-    const char* entry,                 /**< path of obect to look up*/
-    PVFS_object_ref* entry_ref,        /**< PVFS2 object looked up */
-    const PVFS_object_ref* parent_ref) /**< Parent of PVFS2 object */
+            const char *entry,                 /**< path of obect to look up*/
+            PVFS_object_ref *entry_ref,        /**< PVFS2 object looked up */
+            const PVFS_object_ref *parent_ref) /**< Parent of PVFS2 object */
 {
     int ret = -1;
     struct PINT_tcache_entry* tmp_entry;
@@ -249,7 +269,8 @@ int PINT_ncache_get_cached_entry(
     if(ret < 0 || status != 0)
     {
         gossip_debug(GOSSIP_NCACHE_DEBUG, 
-            "ncache: miss: name=[%s]\n", entry_key.entry_name);
+                     "ncache: miss: name=[%s]\n",
+                     entry_key.entry_name);
         PINT_perf_count(ncache_pc, PERF_NCACHE_MISSES, 1, PINT_PERF_ADD);
         gen_mutex_unlock(&ncache_mutex);
         /* Return -PVFS_ENOENT if the entry has expired */
@@ -269,6 +290,7 @@ int PINT_ncache_get_cached_entry(
        !PVFS_OID_cmp(&tmp_payload->parent_ref.handle, &parent_ref->handle))
     {
         gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: copying out ref.\n");
+        /* V3 should we copy out sid_array */
         *entry_ref = tmp_payload->entry_ref;
     }
   
@@ -290,11 +312,11 @@ int PINT_ncache_get_cached_entry(
  * Invalidates a cache entry (if present)
  */
 void PINT_ncache_invalidate(
-    const char* entry,                  /**< path of obect */
-    const PVFS_object_ref* parent_ref)  /**< Parent of PVFS2 object */
+            const char *entry,                  /**< path of obect */
+            const PVFS_object_ref *parent_ref)  /**< Parent of PVFS2 object */
 {
     int ret = -1;
-    struct PINT_tcache_entry* tmp_entry;
+    struct PINT_tcache_entry *tmp_entry;
     struct ncache_key entry_key;
     int tmp_status;
   
@@ -315,12 +337,16 @@ void PINT_ncache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(ncache, tmp_entry);
-        PINT_perf_count(ncache_pc, PERF_NCACHE_DELETIONS, 1,
+        PINT_perf_count(ncache_pc,
+                        PERF_NCACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
     }
 
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-                    ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
     return;
@@ -336,9 +362,9 @@ void PINT_ncache_invalidate(
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_ncache_update(
-    const char* entry,                     /**< entry to update */
-    const PVFS_object_ref* entry_ref,      /**< entry ref to update */
-    const PVFS_object_ref* parent_ref)     /**< parent ref to update */
+                const char *entry,                 /**< entry to update */
+                const PVFS_object_ref *entry_ref,  /**< entry ref to update */
+                const PVFS_object_ref *parent_ref) /**< parent ref to update */
 {
     int ret = -1;
     struct PINT_tcache_entry* tmp_entry;
@@ -363,23 +389,46 @@ int PINT_ncache_update(
     }
   
     /* create new payload with updated information */
-    tmp_payload = (struct ncache_payload*) 
-                        calloc(1,sizeof(struct ncache_payload));
+    tmp_payload = (struct ncache_payload *) 
+                        calloc(1, sizeof(struct ncache_payload));
     if(tmp_payload == NULL)
     {
         return(-PVFS_ENOMEM);
     }
 
-    tmp_payload->parent_ref.handle = parent_ref->handle;
     tmp_payload->parent_ref.fs_id = parent_ref->fs_id;
-    tmp_payload->entry_ref.handle = entry_ref->handle;
+    tmp_payload->parent_ref.handle = parent_ref->handle;
+    tmp_payload->parent_ref.sid_count = parent_ref->sid_count;
+    tmp_payload->parent_ref.sid_array = (PVFS_SID *)malloc(
+                                   parent_ref->sid_count * sizeof(PVFS_SID));
+    if(!tmp_payload->parent_ref.sid_array)
+    {
+        ncache_free_payload(tmp_payload);
+        return(-PVFS_ENOMEM);
+    }
+    memcpy(tmp_payload->parent_ref.sid_array,
+           parent_ref.sid_array,
+           parent_ref->sid_count * sizeof(PVFS_SID));
+
     tmp_payload->entry_ref.fs_id = entry_ref->fs_id;
+    tmp_payload->entry_ref.handle = entry_ref->handle;
+    tmp_payload->entry_ref.sid_count = entry_ref->sid_count;
+    tmp_payload->entry_ref.sid_array = (PVFS_SID *)malloc(
+                                   entry_ref->sid_count * sizeof(PVFS_SID));
+    if(!tmp_payload->entry_ref.sid_array)
+    {
+        ncache_free_payload(tmp_payload);
+        return(-PVFS_ENOMEM);
+    }
+    memcpy(tmp_payload->entry_ref.sid_array,
+           entry_ref.sid_array,
+           entry_ref->sid_count * sizeof(PVFS_SID));
 
     tmp_payload->entry_status = 0;
-    tmp_payload->entry_name = (char*) calloc(1, strlen(entry) + 1);
+    tmp_payload->entry_name = (char *) calloc(1, strlen(entry) + 1);
     if(tmp_payload->entry_name == NULL)
     {
-        free(tmp_payload);
+        ncache_free_payload(tmp_payload);
         return(-PVFS_ENOMEM);
     }
     memcpy(tmp_payload->entry_name, entry, strlen(entry) + 1);
@@ -420,8 +469,10 @@ int PINT_ncache_update(
             /* since only one item was purged, we count this as one item being
              * replaced rather than as a purge and an insert
              */
-            PINT_perf_count(ncache_pc, PERF_NCACHE_REPLACEMENTS,purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(ncache_pc,
+                            PERF_NCACHE_REPLACEMENTS,
+                            purged,
+                            PINT_PERF_ADD);
         }
         else
         {
@@ -429,13 +480,17 @@ int PINT_ncache_update(
             /* if we didn't purge anything, then the "purged" variable will
              * be zero and this counter call won't do anything.
              */
-            PINT_perf_count(ncache_pc, PERF_NCACHE_PURGES, purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(ncache_pc,
+                            PERF_NCACHE_PURGES,
+                            purged,
+                            PINT_PERF_ADD);
         }
     }
     
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-        ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
   
@@ -456,7 +511,7 @@ int PINT_ncache_update(
  *
  * returns 1 on match, 0 otherwise
  */
-static int ncache_compare_key_entry(void* key, struct qhash_head* link)
+static int ncache_compare_key_entry(void *key, struct qhash_head *link)
 {
     struct ncache_key* real_key = (struct ncache_key*)key;
     struct ncache_payload* tmp_payload = NULL;
@@ -465,7 +520,7 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
     tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
     assert(tmp_entry);
 
-    tmp_payload = (struct ncache_payload*)tmp_entry->payload;
+    tmp_payload = (struct ncache_payload *)tmp_entry->payload;
      /* If the following aren't equal, we know we don't have a match... Maybe
      * these integer comparisons will be quicker than a strcmp each time?
      *   - parent_ref.handle 
@@ -496,9 +551,9 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
  *
  * returns hash index 
  */
-static int ncache_hash_key(void* key, int table_size)
+static int ncache_hash_key(void *key, int table_size)
 {
-    struct ncache_key* real_key = (struct ncache_key*) key;
+    struct ncache_key *real_key = (struct ncache_key *) key;
     int tmp_ret = 0;
     unsigned int sum = 0, i = 0;
 
@@ -508,7 +563,7 @@ static int ncache_hash_key(void* key, int table_size)
         i++;
     }
     sum += PVFS_OID_hash64(&real_key->parent_ref.handle) +
-            real_key->parent_ref.fs_id;
+                            real_key->parent_ref.fs_id;
     tmp_ret =  sum % table_size;
     return(tmp_ret);
 }
@@ -519,11 +574,26 @@ static int ncache_hash_key(void* key, int table_size)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int ncache_free_payload(void* payload)
+static int ncache_free_payload(void *payload)
 {
-    struct ncache_payload* tmp_payload = (struct ncache_payload*)payload;
+    struct ncache_payload* tmp_payload = (struct ncache_payload *)payload;
   
-    free(tmp_payload->entry_name);
+    if(tmp_payload == NULL)
+    {
+        return(-PVFS_EINVAL);
+    }
+    if(tmp_payload->entry_ref.sid_array)
+    {
+        free(tmp_payload->entry_ref.sid_array);
+    }
+    if(tmp_payload->parent_ref.sid_array)
+    {
+        free(tmp_payload->parent_ref.sid_array);
+    }
+    if(tmp_payload->entry_name)
+    {
+        free(tmp_payload->entry_name);
+    }
     free(tmp_payload);
     return(0);
 }

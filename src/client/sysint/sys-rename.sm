@@ -39,14 +39,18 @@ enum
     RENAME_SKIP_DEST_CAP
 };
 
-static int rename_lookups_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int rename_crdirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int rename_rmdirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int rename_chdirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int rename_lookups_comp_fn(void *v_p,
+                                  struct PVFS_server_resp *resp_p,
+                                  int index);
+static int rename_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index);
+static int rename_rmdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index);
+static int rename_chdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index);
 
 %%
 
@@ -254,15 +258,14 @@ machine pvfs2_client_rename_sm
  *
  *  \return 0 on success, -errno on failure.
  */
-PVFS_error PVFS_isys_rename(
-    char *old_entry,
-    PVFS_object_ref old_parent_ref,
-    char *new_entry,
-    PVFS_object_ref new_parent_ref,
-    const PVFS_credential *credential,
-    PVFS_sys_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_isys_rename(char *old_entry,
+                            PVFS_object_ref old_parent_ref,
+                            char *new_entry,
+                            PVFS_object_ref new_parent_ref,
+                            const PVFS_credential *credential,
+                            PVFS_sys_op_id *op_id,
+                            PVFS_hint hints,
+                            void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -299,11 +302,12 @@ PVFS_error PVFS_isys_rename(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_RENAME,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_RENAME,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -331,8 +335,12 @@ PVFS_error PVFS_isys_rename(
     sm_p->u.rename.rmdirent_index = 0;
     sm_p->u.rename.target_dirent_exists = 0;
     sm_p->u.rename.stored_error_code = 0;
+
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &old_parent_ref.handle);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &old_parent_ref.handle);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%s,%d]\n\t"
@@ -340,8 +348,9 @@ PVFS_error PVFS_isys_rename(
         PVFS_OID_str(&old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
         PVFS_OID_str(&new_parent_ref.handle), new_parent_ref.fs_id);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,
+                                          op_id,
+                                          user_ptr);
 }
 
 /** Rename an object.
@@ -353,21 +362,26 @@ PVFS_error PVFS_isys_rename(
  *
  *  \return 0 on success, -errno on failure.
  */
-PVFS_error PVFS_sys_rename(
-    char *old_entry,
-    PVFS_object_ref old_parent_ref,
-    char *new_entry,
-    PVFS_object_ref new_parent_ref,
-    const PVFS_credential *credential,
-    PVFS_hint hints)
+PVFS_error PVFS_sys_rename(char *old_entry,
+                           PVFS_object_ref old_parent_ref,
+                           char *new_entry,
+                           PVFS_object_ref new_parent_ref,
+                           const PVFS_credential *credential,
+                           PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");
 
-    ret = PVFS_isys_rename(old_entry, old_parent_ref, new_entry,
-                           new_parent_ref, credential, &op_id, hints, NULL);
+    ret = PVFS_isys_rename(old_entry,
+                           old_parent_ref,
+                           new_entry,
+                           new_parent_ref,
+                           credential,
+                           &op_id,
+                           hints,
+                           NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_rename call", ret);
@@ -387,30 +401,11 @@ PVFS_error PVFS_sys_rename(
     return error;
 }
 
-/****************************************************************/
+/* <==================== COMPLETION FUNCTIONS ==================== */
 
-static PINT_sm_action rename_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    assert(js_p->error_code == 0);
-
-    /* Invalidate the old entry in ncache */
-    PINT_ncache_invalidate(
-            (const char*) sm_p->u.rename.entries[0],
-            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
-    /* Invalidate the new entry in ncache in case it already exists */
-    PINT_ncache_invalidate(
-            (const char*) sm_p->u.rename.entries[1],
-            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
-
-    return SM_ACTION_COMPLETE;
-}
-
-static int rename_lookups_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
+static int rename_lookups_comp_fn(void *v_p,
+                                  struct PVFS_server_resp *resp_p,
+                                  int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
@@ -448,11 +443,20 @@ static int rename_lookups_comp_fn(
       generally we won't be here on index == 1, since 'new'
       may not exist
     */
+    /* We expect a simple path for the rename and thus
+     * we only deal with a single returned handle from the lookup
+     * prior lookups can be used in the user interface to guarantee
+     * this.
+     */
     assert(resp_p->u.lookup_path.handle_count == 1);
     sm_p->u.rename.refns[index].handle =
             resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
             sm_p->u.rename.parent_refns[index].fs_id;
+    sm_p->u.rename.refns[index].sid_count =
+            resp_p->u.lookup_path.sid_count[0];
+    sm_p->u.rename.refns[index].sid_array = (PVFS_SID *)malloc(
+                    resp_p->u.lookup_path.sid_count[0] * sizeof(PVFS_SID));
 
     if (index == 0)
     {
@@ -478,12 +482,12 @@ static int rename_lookups_comp_fn(
 
         if(sm_p->msgarray_op.msgarray[0].op_status == 0)
         {
-            PINT_SM_GETATTR_STATE_FILL(
-                sm_p->getattr,
-                sm_p->object_ref,
-                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_CAPABILITY,
-                PVFS_TYPE_NONE,
-                0);
+            PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                                       sm_p->object_ref,
+                                       PVFS_ATTR_COMMON_ALL | 
+                                                PVFS_ATTR_CAPABILITY,
+                                       PVFS_TYPE_NONE,
+                                       0);
 
             /* if both lookups succeeded, then we need chdirent */
             return RENAME_CHDIRENT;
@@ -538,8 +542,9 @@ static int rename_rmdirent_comp_fn(void *v_p,
     return 0;
 }
 
-static int rename_chdirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
+static int rename_chdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
@@ -558,7 +563,8 @@ static int rename_chdirent_comp_fn(
       with the target name; store it for later removal
     */
     sm_p->u.rename.old_dirent_handle =
-        resp_p->u.chdirent.old_dirent_handle;
+                 resp_p->u.chdirent.old_dirent_handle;
+    /* V3 NEED TO CATCH THE SIDs HERE TOO!!! */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %s\n",
                  PVFS_OID_str(&sm_p->u.rename.old_dirent_handle));
@@ -566,8 +572,28 @@ static int rename_chdirent_comp_fn(
     return 0;
 }
 
-static PINT_sm_action rename_getattr_src_parent_setup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+/* <=================== STATE ACTION FUNCTIONS =================== */
+
+static PINT_sm_action rename_init(struct PINT_smcb *smcb,
+                                  job_status_s *js_p)
+{
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(js_p->error_code == 0);
+
+    /* Invalidate the old entry in ncache */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[0],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    /* Invalidate the new entry in ncache in case it already exists */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_getattr_src_parent_setup(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -579,23 +605,24 @@ static PINT_sm_action rename_getattr_src_parent_setup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->u.rename.parent_refns[0],
-        PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->u.rename.parent_refns[0],
+                               PVFS_ATTR_CAPABILITY, 
+                               PVFS_TYPE_DIRECTORY,
+                               0);
 
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rename_getattr_src_parent_interpret(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                             struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* Copy capability */
-    PINT_copy_capability(&sm_p->getattr.attr.capability, &sm_p->u.rename.caps[0]);
+    PINT_copy_capability(&sm_p->getattr.attr.capability,
+                         &sm_p->u.rename.caps[0]);
 
     /* Now request capability for destination's parent */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: requesting capability for %s\n",
@@ -618,32 +645,34 @@ static PINT_sm_action rename_getattr_src_parent_interpret(
     {
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-        PINT_SM_GETATTR_STATE_FILL(
-            sm_p->getattr,
-            sm_p->u.rename.parent_refns[1],
-            PVFS_ATTR_CAPABILITY, 
-            PVFS_TYPE_DIRECTORY,
-            0);
+        PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                                   sm_p->u.rename.parent_refns[1],
+                                   PVFS_ATTR_CAPABILITY, 
+                                   PVFS_TYPE_DIRECTORY,
+                                   0);
     }
 
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rename_getattr_dest_parent_interpret(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                             struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: parent capabilities received\n");
 
     /* Copy destination parent capability */
-    PINT_copy_capability(&sm_p->getattr.attr.capability, &sm_p->u.rename.caps[1]);
+    PINT_copy_capability(&sm_p->getattr.attr.capability,
+                         &sm_p->u.rename.caps[1]);
 
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rename_lookups_setup_msgpair_array(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                            struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
@@ -661,31 +690,31 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     /* prepare to post the lookup send/recv pairs */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "rename: posting lookup[%d] (%s,%d)\n",
                      i, PVFS_OID_str(&sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
-        PINT_SERVREQ_LOOKUP_PATH_FILL(
-            msg_p->req,
-            sm_p->u.rename.caps[i],
-            *sm_p->cred_p,
-            sm_p->u.rename.entries[i],
-            sm_p->u.rename.parent_refns[i].fs_id,
-            sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL,
-            sm_p->hints);
+        PINT_SERVREQ_LOOKUP_PATH_FILL(msg_p->req,
+                                      sm_p->u.rename.caps[i],
+                                      *sm_p->cred_p,
+                                      sm_p->u.rename.entries[i],
+                                      sm_p->u.rename.parent_refns[i].fs_id,
+                                      sm_p->u.rename.parent_refns[i].handle,
+                                      PVFS_ATTR_COMMON_ALL,
+                                      sm_p->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
         msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
+        msg_p->sid_count = sm_p->u.rename.parent_refns[i].sid_count;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = sm_p->u.rename.parent_refns[i].sid_array;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = rename_lookups_comp_fn;
 
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+        ret = PVFS_SID_get_addr(&msg_p->scr_addr,
+                                &sm_p->u.rename.parent_refns[i].sid_array[0]);
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -698,16 +727,16 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_lookups_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_lookups_failure(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_crdirent_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -726,23 +755,27 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
       name -- on success we will have 2 dirents pointing to the same
       metafile; only update the mtime and ctime, leaving atime as 0
     */
-    PINT_SERVREQ_CRDIRENT_FILL(
-        msg_p->req,
-        sm_p->u.rename.caps[1],
-        sm_p->u.rename.entries[1],
-        sm_p->u.rename.refns[0].handle,
-        sm_p->u.rename.parent_refns[1].handle,
-        sm_p->u.rename.parent_refns[1].fs_id,
-        sm_p->hints);
+    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
+                               sm_p->u.rename.caps[1],
+                               sm_p->u.rename.entries[1],
+                               sm_p->u.rename.parent_refns[1].fs_id,
+                               sm_p->u.rename.parent_refns[1].handle,
+                               sm_p->u.rename.parent_refns[1].sid_count,
+                               sm_p->u.rename.parent_refns[1].sid_array,
+                               sm_p->u.rename.refns[0].handle,
+                               sm_p->u.rename.refns[0].sid_array,
+                               sm_p->hints);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->u.rename.parent_refns[1].sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+    ret = PVFS_SID_get_addr(&msg_p->scr_addr,
+                            &sm_p->u.rename.parent_refns[1].sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -753,8 +786,8 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_rmdirent_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -780,23 +813,30 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
       that case we need to rmdirent the 'new' parent as cleanup.
     */
     PINT_SERVREQ_RMDIRENT_FILL(
-        msg_p->req,
-        sm_p->u.rename.caps[sm_p->u.rename.rmdirent_index],
-        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
-        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
-        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
-        sm_p->hints);
+          msg_p->req,
+          sm_p->u.rename.caps[sm_p->u.rename.rmdirent_index],
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,
+          sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
+          sm_p->hints);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[
-        sm_p->u.rename.rmdirent_index].fs_id;
+                            sm_p->u.rename.rmdirent_index].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[
-        sm_p->u.rename.rmdirent_index].handle;
+                            sm_p->u.rename.rmdirent_index].handle;
+    msg_p->sid_count = sm_p->u.rename.parent_refns[
+                            sm_p->u.rename.rmdirent_index].sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->u.rename.parent_refns[
+                            sm_p->u.rename.rmdirent_index].array;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+ 
+    ret = PVFS_SID_get_addr(&msg_p->scr_addr,
+                            &sm_p->u.rename.parent_refns[
+                                  sm_p->u.renamed.rmdirent_index].sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -807,8 +847,8 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_rmdirent_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_rmdirent_failure(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
@@ -836,8 +876,8 @@ static PINT_sm_action rename_rmdirent_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_chdirent_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -911,23 +951,28 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
       refn that matches the 'new entry' with the 'old' -- on success
       we will have 2 dirents pointing to the same metafile
     */
-    PINT_SERVREQ_CHDIRENT_FILL(
-        msg_p->req,
-        sm_p->u.rename.caps[1],
-        sm_p->u.rename.parent_refns[1].fs_id,
-        sm_p->u.rename.parent_refns[1].handle,
-        sm_p->u.rename.refns[0].handle,
-        sm_p->u.rename.entries[1],
-        sm_p->hints);
+    PINT_SERVREQ_CHDIRENT_FILL(msg_p->req,
+                               sm_p->u.rename.caps[1],
+                               sm_p->u.rename.parent_refns[1].fs_id,
+                               sm_p->u.rename.parent_refns[1].handle,
+                               sm_p->u.rename.parent_refns[1].sid_count,
+                               sm_p->u.rename.parent_refns[1].sid_array,
+                               sm_p->u.rename.refns[0].handle,
+                               sm_p->u.rename.refns[0].sid_count,
+                               sm_p->u.rename.refns[0].sid_array,
+                               sm_p->u.rename.entries[1],
+                               sm_p->hints);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->u.rename.parent_refns[1].sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = rename_chdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                            sm_p->u.rename.parent_refns[1].sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -938,14 +983,14 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_chdirent_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_chdirent_failure(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_check_for_remove(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_check_for_remove(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -967,8 +1012,8 @@ static PINT_sm_action rename_check_for_remove(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_warn_user_to_run_fsck(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_warn_user_to_run_fsck(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
                "may lead to inconsistent state.\n");
@@ -977,8 +1022,8 @@ static PINT_sm_action rename_warn_user_to_run_fsck(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_cleanup(struct PINT_smcb *smcb,
+                                     job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code = (sm_p->u.rename.stored_error_code ?
@@ -998,9 +1043,10 @@ static PINT_sm_action rename_cleanup(
                      PVFS_OID_str(&sm_p->u.rename.refns[0].handle),
                      sm_p->u.rename.parent_refns[1].fs_id);
 
-        PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
-            (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
-            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
+        PINT_ncache_update(
+                (const char*) sm_p->u.rename.entries[1],
+                (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
+                (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -1010,22 +1056,25 @@ static PINT_sm_action rename_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
-static PINT_sm_action rename_generic_timer(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_generic_timer(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
-    ret = job_req_sched_post_timer(
-        sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
-        pint_client_sm_context);
+    ret = job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &tmp_id,
+                                   pint_client_sm_context);
 
     return ret;
 }
 
-static PINT_sm_action rename_crdirent_retry_or_fail(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_crdirent_retry_or_fail(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1053,8 +1102,8 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_rmdirent_retry_or_fail(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1084,8 +1133,8 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_getattr_src_interpret(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rename_getattr_src_interpret(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
@@ -1104,10 +1153,11 @@ static PINT_sm_action rename_getattr_src_interpret(
      * happens to be a directory rather than a file.
      */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
-         sm_p->object_ref,
-         (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT),
-         PVFS_TYPE_NONE,
-         PINT_SM_GETATTR_BYPASS_CACHE);
+                               sm_p->object_ref,
+                               (PVFS_ATTR_COMMON_ALL |
+                                        PVFS_ATTR_DIR_DIRENT_COUNT),
+                               PVFS_TYPE_NONE,
+                               PINT_SM_GETATTR_BYPASS_CACHE);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

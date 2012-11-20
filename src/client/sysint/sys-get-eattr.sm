@@ -27,10 +27,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int get_eattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+static int get_eattr_comp_fn(void *v_p,
+                             struct PVFS_server_resp *resp_p,
+                             int i);
 
 %%
 
@@ -58,15 +57,14 @@ machine pvfs2_client_get_eattr_sm
 
 %%
 
-PVFS_error PVFS_isys_geteattr_list(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        int32_t nkey,
-        PVFS_ds_keyval *key_array,
-        PVFS_sysresp_geteattr *resp_p,
-        PVFS_sys_op_id *op_id,
-        PVFS_hint hints,
-        void *user_ptr)
+PVFS_error PVFS_isys_geteattr_list(PVFS_object_ref ref,
+                                   const PVFS_credential *credential,
+                                   int32_t nkey,
+                                   PVFS_ds_keyval *key_array,
+                                   PVFS_sysresp_geteattr *resp_p,
+                                   PVFS_sys_op_id *op_id,
+                                   PVFS_hint hints,
+                                   void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -82,11 +80,12 @@ PVFS_error PVFS_isys_geteattr_list(
 	return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_GETEATTR,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_GETEATTR,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -95,32 +94,38 @@ PVFS_error PVFS_isys_geteattr_list(
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
     sm_p->u.geteattr.nkey = nkey;
     sm_p->u.geteattr.key_array = key_array;
     sm_p->u.geteattr.resp_p = resp_p;
+
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    return PINT_client_state_machine_post(
-            smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
-PVFS_error PVFS_sys_geteattr_list(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        int32_t nkey,
-        PVFS_ds_keyval *key_array,
-        PVFS_sysresp_geteattr *resp_p,
-        PVFS_hint hints)
+PVFS_error PVFS_sys_geteattr_list(PVFS_object_ref ref,
+                                  const PVFS_credential *credential,
+                                  int32_t nkey,
+                                  PVFS_ds_keyval *key_array,
+                                  PVFS_sysresp_geteattr *resp_p,
+                                  PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_geteattr entered\n");
 
-    ret = PVFS_isys_geteattr_list(ref, credential,
-            nkey, key_array, resp_p, &op_id, hints, NULL);
+    ret = PVFS_isys_geteattr_list(ref,
+                                  credential,
+                                  nkey,
+                                  key_array,
+                                  resp_p,
+                                  &op_id,
+                                  hints,
+                                  NULL);
 
     if (ret)
     {
@@ -141,12 +146,11 @@ PVFS_error PVFS_sys_geteattr_list(
     return error;
 }
 
-PVFS_error PVFS_sys_geteattr(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p,
-        PVFS_hint hints)
+PVFS_error PVFS_sys_geteattr(PVFS_object_ref ref,
+                             const PVFS_credential *credential,
+                             PVFS_ds_keyval *key_p,
+                             PVFS_ds_keyval *val_p,
+                             PVFS_hint hints)
 {
     PVFS_sysresp_geteattr resp_p;
     PVFS_error tmp_err;
@@ -155,86 +159,11 @@ PVFS_error PVFS_sys_geteattr(
     return PVFS_sys_geteattr_list(ref, credential, 1, key_p, &resp_p, hints);
 }
 
-static PINT_sm_action get_eattr_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    int i;
-    PINT_sm_msgpair_state *msg_p;
-    PVFS_capability capability;
+/* <==================== COMPLETION FUNCTIONS ====================> */
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_eattr state: get_eattr_setup_msgpair\n");
-
-    PINT_null_capability(&capability);
-
-    /* this will be the array of value buffer sizes */
-    sm_p->u.geteattr.size_array =
-             (PVFS_size *)malloc(sm_p->u.geteattr.nkey *
-                                 sizeof (PVFS_size));
-
-    /* fill the array pulling out of the value array */
-    /* we don't want to send the unused fields in this array */
-    for (i = 0; i < sm_p->u.geteattr.nkey; i++)
-        sm_p->u.geteattr.size_array[i] =
-            sm_p->u.geteattr.resp_p->val_array[i].buffer_sz;
-
-    PINT_msgpair_init(&sm_p->msgarray_op);
-    msg_p = &sm_p->msgarray_op.msgpair;
-
-    PINT_SERVREQ_GETEATTR_FILL(
-        msg_p->req,
-        capability,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        sm_p->u.geteattr.nkey,
-        sm_p->u.geteattr.key_array,
-        sm_p->u.geteattr.size_array,
-        sm_p->hints);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = get_eattr_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr,
-            msg_p->handle,
-            msg_p->fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = 0;
-    }
-
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action get_eattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_eattr state: get_eattr_cleanup\n");
-    /* free the array malloc'd above */
-    free(sm_p->u.geteattr.size_array);
-    sm_p->error_code  = js_p->error_code;
-    if(sm_p->error_code != 0)
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
-    }
-
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
-}
-
-static int get_eattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
+static int get_eattr_comp_fn(void *v_p,
+                             struct PVFS_server_resp *resp_p,
+                             int i)
 {
     int j = 0;
     int ret = 0;
@@ -311,8 +240,8 @@ static int get_eattr_comp_fn(
 
                 /* seems ok - decode the eattrs we know about */
                 decode_ret = PINT_eattr_decode(
-                    &sm_p->u.geteattr.key_array[k],
-                    &sm_p->u.geteattr.resp_p->val_array[k]);
+                                        &sm_p->u.geteattr.key_array[k],
+                                        &sm_p->u.geteattr.resp_p->val_array[k]);
                 if(decode_ret != 0)
                 {
                     gossip_debug(GOSSIP_GETATTR_DEBUG, 
@@ -342,6 +271,84 @@ static int get_eattr_comp_fn(
 	}
     }
     return ret;
+}
+
+/* <=================== STATE ACTION FUNCTIONS ===================> */
+
+static PINT_sm_action get_eattr_setup_msgpair(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    int i;
+    PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"get_eattr state: get_eattr_setup_msgpair\n");
+
+    PINT_null_capability(&capability);
+
+    /* this will be the array of value buffer sizes */
+    sm_p->u.geteattr.size_array =
+             (PVFS_size *)malloc(sm_p->u.geteattr.nkey * sizeof (PVFS_size));
+
+    /* fill the array pulling out of the value array */
+    /* we don't want to send the unused fields in this array */
+    for (i = 0; i < sm_p->u.geteattr.nkey; i++)
+    {
+        sm_p->u.geteattr.size_array[i] =
+                sm_p->u.geteattr.resp_p->val_array[i].buffer_sz;
+    }
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_GETEATTR_FILL(msg_p->req,
+                               capability,
+                               sm_p->object_ref.fs_id,
+                               sm_p->object_ref.handle,
+                               sm_p->u.geteattr.nkey,
+                               sm_p->u.geteattr.key_array,
+                               sm_p->u.geteattr.size_array,
+                               sm_p->hints);
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->sid_count = sm_p->object_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->object_ref.sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = get_eattr_comp_fn;
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, sm_p->object_ref.sid_array[0]);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = 0;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_eattr_cleanup(struct PINT_smcb *smcb,
+                                        job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"get_eattr state: get_eattr_cleanup\n");
+    /* free the array malloc'd above */
+    free(sm_p->u.geteattr.size_array);
+    sm_p->error_code  = js_p->error_code;
+    if(sm_p->error_code != 0)
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

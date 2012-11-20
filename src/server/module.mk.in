@@ -63,10 +63,6 @@ ifdef BUILD_SERVER
 	SERVERBINSRC += \
 		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c
 
-	# to stat the fs, need to know about handle statistics
-	MODCFLAGS_$(DIR)/statfs.c = \
-		-I$(srcdir)/src/io/trove/trove-handle-mgmt
-
 ifdef PVFS2_SEGV_BACKTRACE
 	MODCFLAGS_$(DIR)/pvfs2-server.c := -D__PVFS2_SEGV_BACKTRACE__
 endif

@@ -489,6 +489,7 @@ int PVFS_fsck_validate_dfile(
     PVFS_sysresp_getattr dfile_attributes;
     int err = 0;
     
+    memset(&obj_ref, 0, sizeof(obj_ref));
     memset(&dfile_attributes, 0, sizeof(dfile_attributes));
 
     if (fsck_options->check_stranded_objects)
@@ -576,7 +577,7 @@ int PVFS_fsck_validate_metafile(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const PVFS_object_ref * obj_ref,              /**< PVFS_Object reference */
     const PVFS_sysresp_getattr * attributes,      /**< METAFILE attributes */
-    const PVFS_credential * cred)               /**< Populated creditials structure */
+    const PVFS_credential * cred)         /**< Populated creditials structure */
 {
     int ret = 0;
     int i = 0;
@@ -817,6 +818,7 @@ int PVFS_fsck_validate_dirdata(
     PVFS_sysresp_getattr dirdata_attributes;
     PVFS_object_ref obj_ref;
 
+    memset(&obj_ref, 0, sizeof(obj_ref));
     memset(&dirdata_attributes, 0, sizeof(dirdata_attributes));
 
     obj_ref.handle = *handle;
@@ -1679,12 +1681,14 @@ static int PINT_handle_wrangler_display_stranded_handles(
     int header = 0;
     char buf[128] = {0};
 
+    memset(&pref, 0, sizeof(pref));
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
         /* get the pretty server name */
-        server_name = PINT_cached_config_map_addr(
-            *cur_fs, PINT_handle_wrangler_handlelist.
-            addr_array[i], &server_type);
+        server_name = PINT_cached_config_map_addr(*cur_fs,
+                                             PINT_handle_wrangler_handlelist.
+                                             addr_array[i],
+                                             &server_type);
 
         for (j = 0; j < PINT_handle_wrangler_handlelist.size_array[i]; j++)
         {
@@ -1703,8 +1707,10 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 }
 
                 /* get this objects attributes */
-                ret = PVFS_fsck_get_attributes(fsck_options, &pref, cred,
-                                         &attributes);
+                ret = PVFS_fsck_get_attributes(fsck_options,
+                                               &pref,
+                                               cred,
+                                               &attributes);
                 
                 printf(" %s   %d  ",
                        PVFS_OID_str(&PINT_handle_wrangler_handlelist.list_array[i][j]),

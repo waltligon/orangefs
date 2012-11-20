@@ -164,26 +164,12 @@ nested machine pvfs2_create_immutable_copies_sm
         run store_mirror_info;
         default => check_store_job;
     }
-/* WBL V3 remove this comment too */
-/*
-        default => replace_remote_datahandle_objects;
-*/
 
    state check_store_job
     {
         run check_store_job;
         default => cleanup;
     }
-
-/* WBL V3 remove precreate pool */
-/*
-   state replace_remote_datahandle_objects
-    {
-        run replace_remote_datahandle_objects;
-        REPLACE_DONE => remove_local_datahandle_objects;
-        default      => replace_remote_datahandle_objects;
-    }
-*/
 
    state remove_local_datahandle_objects
     {
@@ -985,28 +971,11 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
                                           imm_p->my_remote_servers[i]);
     }
 
-/* WBL V3 remote precreate pool */
-#if 0
-    ret = job_precreate_pool_get_handles(imm_p->fs_id,
-                                         rows * cols,
-                                         PVFS_TYPE_DATAFILE,
-                                         (const char **)
-                                            imm_p->my_remote_servers,
-                                         imm_p->handle_array_copies_remote,
-                                         0,
-                                         smcb,
-                                         0,
-                                         js_p,
-                                         &job_id,
-                                         server_job_context,
-                                         NULL);
-#else
     for (i = 0; i < (rows * cols); i++)
     {
         PVFS_OID_gen(&imm_p->handle_array_copies_remote[i]);
     }
     ret = 0;
-#endif
     return ret;
 } /* end action create_remote_datahandles */
 
@@ -1767,70 +1736,6 @@ static PINT_sm_action check_store_job (struct PINT_smcb *smcb,
 
     return SM_ACTION_COMPLETE;
 } /* end state check_store_job */
-
-/* WBL V3 remove precreate pool */
-#if 0
-static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
-{   
-    gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing replace_remote_datahandle_"
-                 "objects....\n");
-
-    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-    job_id_t job_id;
-    int ret;  
-    int tmpindex;
-    PVFS_handle pool_handle;
-
-    js_p->error_code = 0;
-
-    if (!imm_p->handle_array_copies_remote)
-    {
-        gossip_debug(GOSSIP_MIRROR_DEBUG, "handle_array_copies_remote is "
-                                          "null: %p\n",
-                                          imm_p->handle_array_copies_remote);
-        js_p->error_code = REPLACE_DONE;
-        return SM_ACTION_COMPLETE;
-    }
-
-    imm_p->handle_array_copies_remote_count--;
-    if (imm_p->handle_array_copies_remote_count < 0)
-    {
-        js_p->error_code = REPLACE_DONE;
-        return SM_ACTION_COMPLETE;
-    }
-
-    tmpindex = imm_p->handle_array_copies_remote_count;
-
-    /* find the pool that this handle belongs to */
-    ret = job_precreate_pool_lookup_server( imm_p->remote_io_servers[tmpindex],
-                                            PVFS_TYPE_DATAFILE, 
-                                            imm_p->fs_id,
-                                            &pool_handle );
-    if (ret < 0)
-    {
-        imm_p->handle_array_copies_remote_count++;
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
-    ret = job_precreate_pool_fill( pool_handle,
-                                   imm_p->fs_id,
-                                   &(imm_p->handle_array_copies_remote
-                                    [tmpindex]),
-                                   1,
-                                   smcb,
-                                   0,
-                                   js_p,
-                                   &job_id,
-                                   server_job_context,
-                                   NULL );
-
-    return ret;
-} /* end action replace_remote_datahandle_objects */
-#endif
-
 
 static PINT_sm_action remove_local_datahandle_objects(struct PINT_smcb *smcb,
                                                       job_status_s *js_p)

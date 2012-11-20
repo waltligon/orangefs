@@ -145,29 +145,23 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             dest->objtype = src->objtype;
         }
-
         if (src->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
-            dest->u.dir.dirent_count = 
-                src->u.dir.dirent_count;
+            dest->u.dir.dirent_count = src->u.dir.dirent_count;
         }
-
         if((src->objtype == PVFS_TYPE_METAFILE) &&
             (!(src->mask & PVFS_ATTR_META_UNSTUFFED)))
         {
             /* if this is a metafile, and does _not_ appear to be stuffed,
              * then we should propigate the stuffed_size
              */
-            dest->u.meta.stuffed_size = 
-                src->u.meta.stuffed_size;
+            dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
         }
 
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
-            dest->u.dir.hint.dfile_count = 
-                src->u.dir.hint.dfile_count;
-            dest->u.dir.hint.dist_name_len =
-                src->u.dir.hint.dist_name_len;
+            dest->u.dir.hint.dfile_count = src->u.dir.hint.dfile_count;
+            dest->u.dir.hint.dist_name_len = src->u.dir.hint.dist_name_len;
             if (dest->u.dir.hint.dist_name_len > 0)
             {
                 dest->u.dir.hint.dist_name = strdup(src->u.dir.hint.dist_name);
@@ -176,8 +170,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                     return ret;
                 }
             }
-            dest->u.dir.hint.dist_params_len =
-                src->u.dir.hint.dist_params_len;
+            dest->u.dir.hint.dist_params_len = src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
                 dest->u.dir.hint.dist_params 
@@ -218,8 +211,10 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             if(src->mask & PVFS_ATTR_META_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count *
-                    sizeof(PVFS_handle);
-
+                              sizeof(PVFS_handle);
+                PVFS_size sd_array_size = src->u.meta.sid_count *
+                              sizeof(PVFS_SID);
+                /* first copy handles */
                 if (df_array_size)
                 {
                     if ((dest->mask & PVFS_ATTR_META_DFILES) &&
@@ -237,7 +232,34 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                         return ret;
                     }
                     memcpy(dest->u.meta.dfile_array,
-                           src->u.meta.dfile_array, df_array_size);
+                           src->u.meta.dfile_array,
+                           df_array_size);
+                }
+                else
+                {
+                    dest->u.meta.dfile_array = NULL;
+                }
+                dest->u.meta.dfile_count = src->u.meta.dfile_count;
+                /* now copy sids */
+                if (sd_array_size)
+                {
+                    if ((dest->mask & PVFS_ATTR_META_DFILES) &&
+                        dest->u.meta.sid_count > 0)
+                    {
+                        if (dest->u.meta.sid_array)
+                        {
+                            free(dest->u.meta.sid_array);
+                            dest->u.meta.sid_array = NULL;
+                        }
+                    }
+                    dest->u.meta.sid_array = malloc(sd_array_size);
+                    if (!dest->u.meta.sid_array)
+                    {
+                        return ret;
+                    }
+                    memcpy(dest->u.meta.sid_array,
+                           src->u.meta.sid_array,
+                           sd_array_size);
                 }
                 else
                 {
@@ -245,7 +267,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
-
+          /* V3 this should go away eventually */
           if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count         *
@@ -280,7 +302,6 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                    = src->u.meta.mirror_copies_count;
             }
 
-
             if(src->mask & PVFS_ATTR_META_DIST)
             {
                 assert(src->u.meta.dist_size > 0);
@@ -296,7 +317,9 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
                 dest->u.meta.dist_size = src->u.meta.dist_size;
             }
-            memcpy(&dest->u.meta.hint, &src->u.meta.hint, sizeof(dest->u.meta.hint));
+            memcpy(&dest->u.meta.hint,
+                   &src->u.meta.hint,
+                   sizeof(dest->u.meta.hint));
         }
 
         if (src->mask & PVFS_ATTR_SYMLNK_TARGET)
@@ -356,7 +379,13 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     free(attr->u.meta.dfile_array);
                     attr->u.meta.dfile_array = NULL;
                 }
+                if (attr->u.meta.sid_array)
+                {
+                    free(attr->u.meta.sid_array);
+                    attr->u.meta.sid_array = NULL;
+                }
             }
+            /* V3 this should go away eventually */
             if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 if (attr->u.meta.mirror_dfile_array)
@@ -442,7 +471,7 @@ void PINT_util_get_current_timeval(struct timeval *tv)
 int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
 {
     return (tv_end->tv_sec * 1e6 + tv_end->tv_usec) -
-        (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
+           (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
 }
 
 /*
@@ -609,7 +638,8 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     for(i=0 ; i<x->server_list.count; i++)
     {
         /* room for each server encoding */
-        tmp_size += encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
+        tmp_size +=
+               encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
     }
 
     if(tmp_size > PVFS_REQ_LIMIT_LAYOUT)
@@ -646,7 +676,8 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     decode_skip4(pptr, NULL);
     if(x->server_list.count)
     {
-        x->server_list.servers = malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        x->server_list.servers =
+                 malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
         assert(x->server_list.servers);
     }
     for(i=0 ; i<x->server_list.count; i++)

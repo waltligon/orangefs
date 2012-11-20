@@ -114,14 +114,12 @@ int PVFS_util_resolve_absolute(
     char* out_fs_path,
     int out_fs_path_max);
 
-struct PVFS_sys_mntent* PVFS_util_gen_mntent(
-    char* config_server,
-    char* fs_name)
+struct PVFS_sys_mntent* PVFS_util_gen_mntent(char* config_server,
+                                             char* fs_name)
 {
     struct PVFS_sys_mntent* tmp_ent = NULL;
 
-    tmp_ent = (struct PVFS_sys_mntent*)malloc(sizeof(struct
-        PVFS_sys_mntent));
+    tmp_ent = (struct PVFS_sys_mntent*)malloc(sizeof(struct PVFS_sys_mntent));
     if(!tmp_ent)
     {
         return(NULL);
@@ -192,8 +190,11 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
  * keypath - path to client private key file
  * cred - the credential object
  */
-int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+int PVFS_util_gen_credential(const char *user,
+                             const char *group,
+                             unsigned int timeout,
+                             const char *keypath,
+                             PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
@@ -251,9 +252,9 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         if (timeout != 0 && 
             timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
         {
-           snprintf(timearg, sizeof(timearg), "%u", timeout);
-           *ptr++ = "-t";
-           *ptr++ = timearg;
+            snprintf(timearg, sizeof(timearg), "%u", timeout);
+            *ptr++ = "-t";
+            *ptr++ = timearg;
         }
         if (keypath)
         {
@@ -273,8 +274,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     }
     else
     {
-        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential],
-             ebuf[512];
+        char buf[sizeof(PVFS_credential) +
+                           extra_size_PVFS_credential], ebuf[512];
         ssize_t total = 0, etotal = 0;
         ssize_t cnt, ecnt;
 
@@ -355,8 +356,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
  * For use when robust security is disabled.
  */
-int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                 unsigned int timeout, PVFS_credential *cred)
+int PINT_gen_unsigned_credential(const char *user,
+                                 const char *group,
+                                 unsigned int timeout,
+                                 PVFS_credential *cred)
 {
     unsigned long uid, gid, bufsize;
     char *endptr;
@@ -374,7 +377,9 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
     bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
 #endif
     if (bufsize == -1)
+    {
         bufsize = 16384;  /* adequate amount */
+    }
     
     pwdbuf = (char *) malloc(bufsize);
     if (pwdbuf == NULL)
@@ -616,8 +621,8 @@ int PVFS_util_get_umask(void)
     return mask;
 }
 
-int PVFS_util_copy_sys_attr(
-    PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
+int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr,
+                            PVFS_sys_attr *src_attr)
 {
     int ret = -PVFS_EINVAL;
 
@@ -630,6 +635,7 @@ int PVFS_util_copy_sys_attr(
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
+        dest_attr->sid_count = src_attr->sid_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -690,9 +696,13 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
             (attr->objtype == PVFS_TYPE_DIRECTORY))
         {
             if (attr->dist_name)
+            {
                 free(attr->dist_name);
+            }
             if (attr->dist_params)
+            {
                 free(attr->dist_params);
+            }
             attr->dist_name = NULL;
             attr->dist_params = NULL;
         }
@@ -715,8 +725,7 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
  * returns const pointer to internal tab structure on success, NULL on
  * failure
  */
-const PVFS_util_tab *PVFS_util_parse_pvfstab(
-    const char *tabfile)
+const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
 {
     PINT_fstab_t *mnt_fp = NULL;
     int file_count = 5;
@@ -743,7 +752,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         mntent->pvfs_config_servers[0] = strdup(index(epenv, '=') + 1);
         mntent->num_pvfs_config_servers = 1;
         mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
-        mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server, '/'));
+        mntent->pvfs_fs_name =
+                    strdup(rindex(mntent->the_pvfs_config_server, '/'));
         mntent->pvfs_fs_name++;
         mntent->flowproto = FLOWPROTO_DEFAULT;
         mntent->encoding = PVFS2_ENCODING_DEFAULT;
@@ -758,18 +768,18 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     if (tabfile != NULL)
     {
         /*
-          caller wants us to look in a specific location for the
-          tabfile
-        */
+         * caller wants us to look in a specific location for the
+         * tabfile
+         */
         file_list[0] = tabfile;
         file_count = 1;
     }
     else
     {
         /*
-          search the system and env vars for tab files;
-          first check for environment variable override
-        */
+         * search the system and env vars for tab files;
+         * first check for environment variable override
+         */
         file_list[0] = getenv("PVFS2TAB_FILE");
     }
 
@@ -842,14 +852,15 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     current_tab = &s_stat_tab_array[s_stat_tab_count];
 
     current_tab->mntent_array = (struct PVFS_sys_mntent *)malloc(
-        (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+                    (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
 
     if (!current_tab->mntent_array)
     {
         gen_mutex_unlock(&s_stat_tab_mutex);
         return (NULL);
     }
-    memset(current_tab->mntent_array, 0,
+    memset(current_tab->mntent_array,
+           0,
            (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
     for (i = 0; i < tmp_mntent_count; i++)
     {
@@ -1296,8 +1307,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_util_remove_internal_mntent(
-    struct PVFS_sys_mntent *mntent)
+int PVFS_util_remove_internal_mntent(struct PVFS_sys_mntent *mntent)
 {
     int i = 0, j = 0, new_count = 0, found = 0, found_index = 0;
     int ret = -PVFS_EINVAL;
@@ -1475,11 +1485,10 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
  *
  * returns 0 on succees, -PVFS_error on failure
  */
-int PVFS_util_resolve(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max)
+int PVFS_util_resolve(const char* local_path,
+                      PVFS_fs_id* out_fs_id,
+                      char* out_fs_path,
+                      int out_fs_path_max)
 {
     int ret = -1;
     char* tmp_path = NULL;
@@ -1715,11 +1724,10 @@ static const char *PINT_s_str_size_table[NUM_SIZES] =
  * max_out_len  - maximum lenght of out_str
  * use_si_units - use units of 1000, not 1024
  */
-void PVFS_util_make_size_human_readable(
-    PVFS_size size,
-    char *out_str,
-    int max_out_len,
-    int use_si_units)
+void PVFS_util_make_size_human_readable(PVFS_size size,
+                                        char *out_str,
+                                        int max_out_len,
+                                        int use_si_units)
 {
     int i = 0;
     double tmp = 0.0f;
@@ -1756,9 +1764,8 @@ void PVFS_util_make_size_human_readable(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int parse_flowproto_string(
-    const char *input,
-    enum PVFS_flowproto_type *flowproto)
+static int parse_flowproto_string(const char *input,
+                                  enum PVFS_flowproto_type *flowproto)
 {
     int ret = 0;
     char *start = NULL;
@@ -1804,8 +1811,7 @@ static int parse_flowproto_string(
     return 0;
 }
 
-void PVFS_util_free_mntent(
-    struct PVFS_sys_mntent *mntent)
+void PVFS_util_free_mntent(struct PVFS_sys_mntent *mntent)
 {
     if (mntent)
     {
@@ -1856,9 +1862,8 @@ void PVFS_util_free_mntent(
     }    
 }
 
-int PVFS_util_copy_mntent(
-    struct PVFS_sys_mntent *dest_mntent,
-    struct PVFS_sys_mntent *src_mntent)
+int PVFS_util_copy_mntent(struct PVFS_sys_mntent *dest_mntent,
+                          struct PVFS_sys_mntent *src_mntent)
 {
     int ret = -PVFS_EINVAL, i = 0;
 
@@ -1979,9 +1984,8 @@ int PVFS_util_copy_mntent(
  *
  * Returns 0 if all okay.
  */
-static int parse_encoding_string(
-    const char *cp,
-    enum PVFS_encoding_type *et)
+static int parse_encoding_string(const char *cp,
+                                 enum PVFS_encoding_type *et)
 {
     int i = 0;
     const char *cq = NULL;
@@ -2057,8 +2061,9 @@ void PINT_release_pvfstab(void)
     }
     s_stat_tab_count = 0;
 
-    for (j = 0; j < s_stat_tab_array[
-             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    for (j = 0;
+         j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count;
+         j++)
     {
         if (s_stat_tab_array[
                 PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id !=
@@ -2077,15 +2082,13 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
-uint32_t PVFS_util_sys_to_object_attr_mask(
-    uint32_t sys_attrmask)
+uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
 {
-
     /*
-      adjust parameters as necessary; what's happening here
-      is that we're converting sys_attr masks to obj_attr masks
-      before passing the getattr request to the server.
-    */
+     * adjust parameters as necessary; what's happening here
+     * is that we're converting sys_attr masks to obj_attr masks
+     * before passing the getattr request to the server.
+     */
     uint32_t attrmask = 0;
     if (sys_attrmask & PVFS_ATTR_SYS_SIZE)
     {
@@ -2095,60 +2098,71 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
          */
         attrmask |= (PVFS_ATTR_META_ALL | PVFS_ATTR_DATA_SIZE);
     }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+    if(sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_MIRROR_DFILES);
     }
-    if (sys_attrmask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT)
+    if(sys_attrmask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT)
     {
         attrmask |= PVFS_ATTR_META_MIRROR_DFILES;
     }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
+    if(sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
     {
         attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
     }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_DIR_HINT)
+    if(sys_attrmask & PVFS_ATTR_SYS_DIR_HINT)
     {
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+    if(sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
-
     /* we need the distribution in order to calculate block size */
-    if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
+    if(sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
     {
         attrmask |= PVFS_ATTR_META_DIST;
     }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
+    if(sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
     {
         attrmask |= PVFS_ATTR_CAPABILITY;
     }
-
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
+    {
         attrmask |= PVFS_ATTR_COMMON_UID;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_GID)
+    {
         attrmask |= PVFS_ATTR_COMMON_GID;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_PERM)
+    {
         attrmask |= PVFS_ATTR_COMMON_PERM;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_ATIME)
+    {
         attrmask |= PVFS_ATTR_COMMON_ATIME;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_CTIME)
+    {
         attrmask |= PVFS_ATTR_COMMON_CTIME;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_MTIME)
+    {
         attrmask |= PVFS_ATTR_COMMON_MTIME;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
+    {
         attrmask |= PVFS_ATTR_COMMON_TYPE;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_ATIME_SET)
+    {
         attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
+    {
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+    }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: ");
@@ -2157,8 +2171,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
     return attrmask;
 }
 
-uint32_t PVFS_util_object_to_sys_attr_mask( 
-    uint32_t obj_mask)
+uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
 {
     int sys_mask = 0;
 
@@ -2387,7 +2400,6 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     }
     fsentry->fs_spec = strdup(nexttok);
 
-    
     /* get the mount point */
 
     nexttok = strtok_r(NULL, " \t", &strtok_ctx);
@@ -2425,27 +2437,22 @@ static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)
         {
             free(entry->fs_spec);
         }
-
         if(entry->fs_file)
         {
             free(entry->fs_file);
         }
-        
         if(entry->fs_vfstype)
         {
             free(entry->fs_vfstype);
         }
-
         if(entry->fs_mntops)
         {
             free(entry->fs_mntops);
         }
-
         if(entry->fs_type)
         {
             free(entry->fs_type);
         }
-    
         free(entry);
     }
 }

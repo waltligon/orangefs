@@ -47,7 +47,7 @@
  * - create
  * - remove
  * - mgmt-get-dfile-array
- * - setattrib
+ * - setattr
  * .
  *
  * Operations that may insert items into the cache:

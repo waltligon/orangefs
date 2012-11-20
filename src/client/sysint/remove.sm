@@ -110,21 +110,20 @@ nested machine pvfs2_client_remove_helper_sm
 
 %%
 
-static PINT_sm_action remove_getattr_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_getattr_init(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
-        PVFS_TYPE_NONE,
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+                               PVFS_TYPE_NONE,
+                               0);
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_getattr_analyze_results(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_getattr_analyze_results(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
@@ -167,7 +166,8 @@ static PINT_sm_action remove_getattr_analyze_results(
 }
 
 static PINT_sm_action remove_datafile_remove_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                             struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
@@ -191,34 +191,33 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_TREE_REMOVE_FILL(
-        msg_p->req,
-        sm_p->u.remove.parent_capability,
-        sm_p->object_ref.fs_id,
-        attr->u.meta.dfile_count,
-        attr->u.meta.dfile_array,
-        sm_p->hints);
+    PINT_SERVREQ_TREE_REMOVE_FILL(msg_p->req,
+                                  sm_p->u.remove.parent_capability,
+                                  sm_p->object_ref.fs_id,
+                                  attr->u.meta.dfile_count,
+                                  attr->u.meta.dfile_array,
+                                  attr->u.meta.sid_count,
+                                  attr->u.meta.sid_array,
+                                  sm_p->hints);
     
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = attr->u.meta.dfile_array[0];
+    msg_p->sid_count = attr->u.meta.sid_count / attr->u.meta.dfile_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = attr->u.meta.array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;     /* TODO: Do we want retry? */
     msg_p->comp_fn = NULL;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
+    /* the first SID of the first object is the target */
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, attr->u.meta.sid_array[0]);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action remove_object_remove_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                              struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -232,21 +231,23 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_REMOVE_FILL(
-        msg_p->req,
-        sm_p->u.remove.parent_capability,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        sm_p->hints);
+    PINT_SERVREQ_REMOVE_FILL(msg_p->req,
+                             sm_p->u.remove.parent_capability,
+                             sm_p->object_ref.fs_id,
+                             sm_p->object_ref.handle,
+                             sm_p->object_ref.sid_count,
+                             sm_p->object_ref.sid_count,
+                             sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
+    msg_p->sid_count = sm_p->object_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->object_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -257,8 +258,8 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_datafile_remove_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_datafile_remove_failure(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: failed removing one or more datafiles "
@@ -268,8 +269,8 @@ static PINT_sm_action remove_datafile_remove_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_object_remove_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_object_remove_failure(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
@@ -292,8 +293,8 @@ static PINT_sm_action remove_object_remove_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_helper_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_helper_cleanup(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");

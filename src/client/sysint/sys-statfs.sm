@@ -48,13 +48,12 @@ machine pvfs2_client_statfs_sm
 
 /** Initiate retrieval of file system statistics.
  */
-PVFS_error PVFS_isys_statfs(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    PVFS_sysresp_statfs *resp,
-    PVFS_sys_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_isys_statfs(PVFS_fs_id fs_id,
+                            const PVFS_credential *credential,
+                            PVFS_sysresp_statfs *resp,
+                            PVFS_sys_op_id *op_id,
+                            PVFS_hint hints,
+                            void *user_ptr)
 {
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
@@ -63,11 +62,12 @@ PVFS_error PVFS_isys_statfs(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_isys_statfs entered\n");
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_STATFS,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_STATFS,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -75,18 +75,20 @@ PVFS_error PVFS_isys_statfs(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* count the number of servers */
-    ret = PINT_cached_config_count_servers(
-        fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        &sm_p->u.statfs_list.count);
+    ret = PINT_cached_config_count_servers(fs_id,
+                                           PVFS_MGMT_IO_SERVER |
+                                                      PVFS_MGMT_META_SERVER,
+                                           &sm_p->u.statfs_list.count);
     if (ret < 0)
     {
         PINT_smcb_free(smcb);
-	return ret;
+        return ret;
     }
 
     /* allocate storage for addresses and statfs buffers */
     sm_p->u.statfs_list.addr_array = (PVFS_BMI_addr_t *)malloc(
-        sm_p->u.statfs_list.count*sizeof(PVFS_BMI_addr_t));
+                                               sm_p->u.statfs_list.count *
+                                               sizeof(PVFS_BMI_addr_t));
     if (sm_p->u.statfs_list.addr_array == NULL)
     {
         PINT_smcb_free(smcb);
@@ -94,24 +96,27 @@ PVFS_error PVFS_isys_statfs(
     }
 
     sm_p->u.statfs_list.stat_array = (struct PVFS_mgmt_server_stat*)malloc(
-        sm_p->u.statfs_list.count*sizeof(struct PVFS_mgmt_server_stat));
+                                          sm_p->u.statfs_list.count *
+                                          sizeof(struct PVFS_mgmt_server_stat));
     if (!sm_p->u.statfs_list.stat_array)
     {
         free(sm_p->u.statfs_list.addr_array);
         PINT_smcb_free(smcb);
-	return(-PVFS_ENOMEM);
+        return(-PVFS_ENOMEM);
     }
 
     /* generate default list of servers */
     ret = PINT_cached_config_get_server_array(
-        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        sm_p->u.statfs_list.addr_array, &sm_p->u.statfs_list.count);
+                                fs_id,
+                                PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
+                                sm_p->u.statfs_list.addr_array,
+                                &sm_p->u.statfs_list.count);
     if (ret < 0)
     {
         free(sm_p->u.statfs_list.addr_array);
         free(sm_p->u.statfs_list.stat_array);
         PINT_smcb_free(smcb);
-	return ret;
+        return ret;
     }
 
     PINT_init_msgarray_params(sm_p, fs_id);
@@ -120,37 +125,36 @@ PVFS_error PVFS_isys_statfs(
     sm_p->u.statfs_list.details = NULL;
     sm_p->u.statfs_list.resp = resp;
 
-    memset(sm_p->u.statfs_list.stat_array, 0,
+    memset(sm_p->u.statfs_list.stat_array,
+           0,
            (sm_p->u.statfs_list.count * sizeof(struct PVFS_mgmt_server_stat)));
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.statfs_list.count);
     if(ret != 0)
     {
-        gossip_err("Failed to initialize %d msgpairs\n", sm_p->u.statfs_list.count);
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   sm_p->u.statfs_list.count);
         return ret;
     }
     
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    return PINT_client_state_machine_post(
-        smcb, op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Obtain file system statistics.
  */
-PVFS_error PVFS_sys_statfs(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    PVFS_sysresp_statfs* resp,
-    PVFS_hint hints)
+PVFS_error PVFS_sys_statfs(PVFS_fs_id fs_id,
+                           const PVFS_credential *credential,
+                           PVFS_sysresp_statfs* resp,
+                           PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_statfs entered\n");
 
-    ret = PVFS_isys_statfs(
-        fs_id, credential, resp, &op_id, hints, NULL);
+    ret = PVFS_isys_statfs(fs_id, credential, resp, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -174,8 +178,10 @@ PVFS_error PVFS_sys_statfs(
     return error;
 }
 
-static PINT_sm_action sys_statfs_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+/* <=================== STATE ACTION FUNCTIONS ===================> */
+
+static PINT_sm_action sys_statfs_cleanup(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
@@ -197,25 +203,27 @@ static PINT_sm_action sys_statfs_cleanup(
 	{
 	    num_io_servers++;
 	    if(min_bytes_available == 0 || 
-		min_bytes_available > sm_p->u.statfs_list.stat_array[i].bytes_available)
-	    {
-		min_bytes_available = sm_p->u.statfs_list.stat_array[i].bytes_available;
-	    }
+               min_bytes_available >
+                        sm_p->u.statfs_list.stat_array[i].bytes_available)
+            {
+                min_bytes_available =
+                        sm_p->u.statfs_list.stat_array[i].bytes_available;
+            }
 	    if(min_bytes_total == 0 || 
-		min_bytes_total > sm_p->u.statfs_list.stat_array[i].bytes_total)
-	    {
-		min_bytes_total = sm_p->u.statfs_list.stat_array[i].bytes_total;
-	    }
+               min_bytes_total > sm_p->u.statfs_list.stat_array[i].bytes_total)
+            {
+                min_bytes_total = sm_p->u.statfs_list.stat_array[i].bytes_total;
+            }
 	}
-	sm_p->u.statfs_list.resp->statfs_buf.handles_available_count 
-	    += sm_p->u.statfs_list.stat_array[i].handles_available_count;
-	sm_p->u.statfs_list.resp->statfs_buf.handles_total_count 
-	    += sm_p->u.statfs_list.stat_array[i].handles_total_count;
+        sm_p->u.statfs_list.resp->statfs_buf.handles_available_count 
+                += sm_p->u.statfs_list.stat_array[i].handles_available_count;
+        sm_p->u.statfs_list.resp->statfs_buf.handles_total_count 
+                += sm_p->u.statfs_list.stat_array[i].handles_total_count;
     }
     sm_p->u.statfs_list.resp->statfs_buf.bytes_available = 
-        min_bytes_available*num_io_servers;
+            min_bytes_available*num_io_servers;
     sm_p->u.statfs_list.resp->statfs_buf.bytes_total = 
-        min_bytes_total*num_io_servers;
+            min_bytes_total*num_io_servers;
     sm_p->u.statfs_list.resp->server_count = sm_p->u.statfs_list.count;
 
     if(sm_p->u.statfs_list.stat_array)

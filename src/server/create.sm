@@ -70,10 +70,6 @@ machine pvfs2_create_sm
         success => setobj_attribs;
         default => remove_local_datafile_handles;
     }
-/* WBL V3 removing precreate pool */
-/*
-        default => replace_remote_datafile_handles;
-*/
 
     state setobj_attribs
     {
@@ -93,16 +89,6 @@ machine pvfs2_create_sm
         run remove_local_datafile_handles;
         default => remove_metafile_object;
     }
-
-/* WBL V3 removing precreate pool */
-/*
-    state replace_remote_datafile_handles
-    {
-        run replace_remote_datafile_handles;
-        REPLACE_DONE => remove_local_datafile_handles;
-        default => replace_remote_datafile_handles;
-    }
-*/
 
     state remove_metafile_object
     {
@@ -138,8 +124,7 @@ machine pvfs2_create_sm
 
 %%
 
-static int setup_final_response(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -153,8 +138,7 @@ static int setup_final_response(
     return(SM_ACTION_COMPLETE);
 }
 
-static int create_metafile(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
 {
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -175,29 +159,30 @@ static int create_metafile(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = PINT_cached_config_get_server(
-        s_op->req->u.create.fs_id,
-        config->host_id,
-        PINT_SERVER_TYPE_META,
-        &meta_handle_ext_array);
+    /* WBL V3 don't need to pass an extent array any more
+     * lose this
+     */
+    ret = PINT_cached_config_get_server(s_op->req->u.create.fs_id,
+                                        config->host_id,
+                                        PINT_SERVER_TYPE_META,
+                                        &meta_handle_ext_array);
 
-    ret = job_trove_dspace_create(
-        s_op->req->u.create.fs_id,
-        &meta_handle_ext_array,
-        PVFS_TYPE_METAFILE,
-        NULL,
-        0,
-        smcb,
-        0,
-        js_p,
-        &i,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
+                                  &meta_handle_ext_array,
+                                  PVFS_TYPE_METAFILE,
+                                  NULL,
+                                  0,
+                                  smcb,
+                                  0,
+                                  js_p,
+                                  &i,
+                                  server_job_context,
+                                  s_op->req->hints);
 
     return(ret);
 }
 
-static int check_stuffed(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int server_type;
@@ -223,12 +208,11 @@ static int check_stuffed(
         for(i=0; i<layout->server_list.count; i++)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
-                i, lld(layout->server_list.servers[i])); 
+                         i, lld(layout->server_list.servers[i])); 
         }
     }
 
-    fs_conf = PINT_config_find_fs_id(config, 
-        s_op->req->u.create.fs_id);
+    fs_conf = PINT_config_find_fs_id(config, s_op->req->u.create.fs_id);
     if(!fs_conf)
     {
         js_p->error_code = -PVFS_EINVAL;
@@ -243,28 +227,41 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
+    /* WBL V3 this must be replaced with a SID query 
+     * to get the server type
+     */
     /* is this metadata server also IO? */
     svr_name = PINT_cached_config_map_addr(s_op->req->u.create.fs_id,
-                                myaddr, &server_type);
+                                           myaddr,
+                                           &server_type);
     if(!svr_name)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
+    /* WBL V3 - file stuffing doesn't make sense any more
+     * Actually all files can be "stuffed" if the meta server
+     * is a data server - but we always allocated all handles
+     * and SIDs
+     */
     /* For now only support stuffing of ROUND_ROBIN layouts.
-     * As a performance enhancement, don't create a stuffed file when the current environment only has one server.
+     * As a performance enhancement, don't create a stuffed 
+     * file when the current environment only has one server.
      * This prevents unstuffing from being called by the client sys-io machine.
-    */
-    if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing && layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN
-        && s_op->req->u.create.num_dfiles_req > 1 )
+     */
+    if((server_type & PINT_SERVER_TYPE_IO) &&
+        fs_conf->file_stuffing &&
+        layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN &&
+        s_op->req->u.create.num_dfiles_req > 1 )
     {    
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.datafile_count = 1;
         s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
         s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
-        if(!s_op->resp.u.create.datafile_handles || !s_op->u.create.handle_array_local)
+        if(!s_op->resp.u.create.datafile_handles ||
+           !s_op->u.create.handle_array_local)
         {
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
@@ -277,18 +274,20 @@ static int check_stuffed(
 
     /* file will not be stuffed; need to allocate all datafiles */
     s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
+
     s_op->resp.u.create.datafile_handles = malloc(
-        sizeof(*s_op->resp.u.create.datafile_handles) *
-        s_op->u.create.num_io_servers);
+                    sizeof(*s_op->resp.u.create.datafile_handles) *
+                    s_op->u.create.num_io_servers);
     s_op->u.create.handle_array_local = malloc(
-        sizeof(*s_op->u.create.handle_array_local) *
-        s_op->u.create.num_io_servers);
+                    sizeof(*s_op->u.create.handle_array_local) *
+                    s_op->u.create.num_io_servers);
     s_op->u.create.handle_array_remote = malloc(
-        sizeof(*s_op->u.create.handle_array_remote) *
-        s_op->u.create.num_io_servers);
+                    sizeof(*s_op->u.create.handle_array_remote) *
+                    s_op->u.create.num_io_servers);
     s_op->u.create.remote_io_servers = malloc(
-        sizeof(char*) *
-        s_op->u.create.num_io_servers);
+                    sizeof(char*) *
+                    s_op->u.create.num_io_servers);
+
     if(!s_op->resp.u.create.datafile_handles || 
         !s_op->u.create.handle_array_local ||
         !s_op->u.create.handle_array_remote ||
@@ -299,13 +298,14 @@ static int check_stuffed(
     }
 
     /* gather list of servers to use, may include local server */
+    /* WBL V3 need to replace with a SID query */
     ret = PINT_cached_config_get_server_list(
-        s_op->req->u.create.fs_id,
-        s_op->req->u.create.attr.u.meta.dist,
-        s_op->req->u.create.num_dfiles_req,
-        &s_op->req->u.create.layout,
-        &s_op->u.create.io_servers,
-        &s_op->u.create.num_io_servers);
+                    s_op->req->u.create.fs_id,
+                    s_op->req->u.create.attr.u.meta.dist,
+                    s_op->req->u.create.num_dfiles_req,
+                    &s_op->req->u.create.layout,
+                    &s_op->u.create.io_servers,
+                    &s_op->u.create.num_io_servers);
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -313,14 +313,12 @@ static int check_stuffed(
     }
 
     /* layout may have adjusted number of datafiles */
-    s_op->req->u.create.attr.u.meta.dfile_count
-        = s_op->u.create.num_io_servers;
-    s_op->resp.u.create.datafile_count 
-        = s_op->u.create.num_io_servers;
+    s_op->req->u.create.attr.u.meta.dfile_count = s_op->u.create.num_io_servers;
+    s_op->resp.u.create.datafile_count = s_op->u.create.num_io_servers;
     for(i=0; i<s_op->u.create.num_io_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 
-            i, s_op->u.create.io_servers[i]); 
+                    i, s_op->u.create.io_servers[i]); 
     }
 
     s_op->resp.u.create.stuffed = 0;
@@ -328,8 +326,7 @@ static int check_stuffed(
     return SM_ACTION_COMPLETE;
 }
 
-static int create_local_datafiles(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -339,6 +336,7 @@ static int create_local_datafiles(
     int i;
     int tmp_index = 0;
 
+    /* WBL V3 stuffed nolonger a special case just a flag */
     if(s_op->resp.u.create.stuffed)
     {
         /* only one datafile, and it is local */
@@ -360,16 +358,16 @@ static int create_local_datafiles(
             {
                 s_op->u.create.handle_array_remote_count++;
                 s_op->u.create.remote_io_servers[tmp_index] = 
-                    s_op->u.create.io_servers[i];
+                             s_op->u.create.io_servers[i];
                 tmp_index++;
             }
         }
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d local data files\n", 
-        s_op->u.create.handle_array_local_count);
+                s_op->u.create.handle_array_local_count);
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d remote data files\n", 
-        s_op->u.create.handle_array_remote_count);
+                s_op->u.create.handle_array_remote_count);
 
     if(s_op->u.create.handle_array_local_count == 0)
     {
@@ -378,12 +376,14 @@ static int create_local_datafiles(
         return(SM_ACTION_COMPLETE);
     }
 
+    /* WBL V3 no longer need an extent array
+     * lose this
+     */
     /* find local extent array */
-    ret = PINT_cached_config_get_server(
-        s_op->req->u.create.fs_id,
-        config->host_id,
-        PINT_SERVER_TYPE_IO,
-        &data_handle_ext_array);
+    ret = PINT_cached_config_get_server(s_op->req->u.create.fs_id,
+                                        config->host_id,
+                                        PINT_SERVER_TYPE_IO,
+                                        &data_handle_ext_array);
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -394,25 +394,25 @@ static int create_local_datafiles(
      * keyvals will be synced in later states
      */
     ret = job_trove_dspace_create_list(
-        s_op->req->u.create.fs_id,
-        &data_handle_ext_array,
-        s_op->u.create.handle_array_local,
-        s_op->u.create.handle_array_local_count,
-        PVFS_TYPE_DATAFILE,
-        NULL,
-        0,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context,
-        s_op->req->hints);
+                    s_op->req->u.create.fs_id,
+                    &data_handle_ext_array,
+                    s_op->u.create.handle_array_local,
+                    s_op->u.create.handle_array_local_count,
+                    PVFS_TYPE_DATAFILE,
+                    NULL,
+                    0,
+                    smcb,
+                    0,
+                    js_p,
+                    &tmp_id,
+                    server_job_context,
+                    s_op->req->hints);
 
     return(ret);
 }
 
-static PINT_sm_action request_datafiles(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action request_datafiles(struct PINT_smcb *smcb,
+                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1, h = 0;
@@ -426,6 +426,7 @@ static PINT_sm_action request_datafiles(
     /* this expects a list of handles that are also tied to a server */
     /* up to this point presumably the servers have been selected */
     /* via the remote_io_servers array */
+
     /* in V3 we need to generate handle_array_remote_count OIDs */
     /* and then select SIDs to go with them - two distinct tasks */
     /* but neither requires blocking so we can do it all in one */
@@ -438,11 +439,12 @@ static PINT_sm_action request_datafiles(
     }
     ret = 0;
     /* now need a SIDcache query to get SIDS */
+
     return ret;
 }
 
-static PINT_sm_action remove_metafile_object(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_metafile_object(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -454,21 +456,20 @@ static PINT_sm_action remove_metafile_object(
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
-    ret = job_trove_dspace_remove(
-        s_op->req->u.create.fs_id,
-        s_op->resp.u.create.metafile_handle,
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    ret = job_trove_dspace_remove(s_op->req->u.create.fs_id,
+                                  s_op->resp.u.create.metafile_handle,
+                                  0,
+                                  smcb,
+                                  0,
+                                  js_p,
+                                  &j_id,
+                                  server_job_context,
+                                  s_op->req->hints);
     return ret;
 }
 
-static PINT_sm_action remove_local_datafile_handles(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_local_datafile_handles(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -488,78 +489,21 @@ static PINT_sm_action remove_local_datafile_handles(
     }
 
     ret = job_trove_dspace_remove_list(s_op->req->u.create.fs_id,
-        s_op->u.create.handle_array_local,
-        NULL,
-        s_op->u.create.handle_array_local_count,
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+                                       s_op->u.create.handle_array_local,
+                                       NULL,
+                                       s_op->u.create.handle_array_local_count,
+                                       0,
+                                       smcb,
+                                       0,
+                                       js_p,
+                                       &j_id,
+                                       server_job_context,
+                                       s_op->req->hints);
 
     return ret;
 }
 
-/* WBL V3 remove precreate pool */
-#if 0
-static PINT_sm_action replace_remote_datafile_handles(
-    struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t j_id;
-    PVFS_handle pool_handle;
-
-    /* save the error code before we begin cleanup */
-    if(!s_op->u.create.saved_error_code)
-    {
-        s_op->u.create.saved_error_code = js_p->error_code;
-    }
-
-    if(s_op->u.create.handle_index < s_op->u.create.handle_array_remote_count)
-    {
-        /* find pool that this handle belongs to */
-        ret = job_precreate_pool_lookup_server(
-            s_op->u.create.remote_io_servers[s_op->u.create.handle_index],
-            PVFS_TYPE_DATAFILE,
-            s_op->req->u.create.fs_id,
-            &pool_handle);
-        if(ret < 0)
-        {
-            s_op->u.create.handle_index++;
-            js_p->error_code = ret;
-            return(SM_ACTION_COMPLETE);
-        }
-
-        /* return handle to pool */
-        ret = job_precreate_pool_fill(
-            pool_handle,
-            s_op->req->u.create.fs_id,
-            &s_op->u.create.handle_array_remote[s_op->u.create.handle_index],
-            1,
-            smcb,
-            0,
-            js_p,
-            &j_id,
-            server_job_context,
-            s_op->req->hints);
-
-        s_op->u.create.handle_index++;
-        return(ret);
-    }
-    else
-    {
-        /* all handles have been replaced */
-        js_p->error_code = REPLACE_DONE;
-        return(SM_ACTION_COMPLETE);
-    }
-}
-#endif
-
-static PINT_sm_action remove_keyvals(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -572,18 +516,26 @@ static PINT_sm_action remove_keyvals(
     }
 
     /* the keyval keys and vals should still be valid here */
-    ret = job_trove_keyval_remove_list(
-        s_op->req->u.create.fs_id,
-        s_op->resp.u.create.metafile_handle,
-        s_op->key_a, s_op->val_a, s_op->error_a,
-        2, TROVE_SYNC, NULL, smcb, 0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    ret = job_trove_keyval_remove_list(s_op->req->u.create.fs_id,
+                                       s_op->resp.u.create.metafile_handle,
+                                       s_op->key_a,
+                                       s_op->val_a,
+                                       s_op->error_a,
+                                       2,
+                                       TROVE_SYNC,
+                                       NULL,
+                                       smcb,
+                                       0,
+                                       js_p,
+                                       &j_id,
+                                       server_job_context,
+                                       s_op->req->hints);
 
     return ret;
 }
 
-static PINT_sm_action setup_local_datafile_handles(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setup_local_datafile_handles(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
@@ -593,19 +545,19 @@ static PINT_sm_action setup_local_datafile_handles(
     if(s_op->resp.u.create.stuffed)
     {
         s_op->resp.u.create.datafile_handles[0] = 
-            s_op->u.create.handle_array_local[0];
+                        s_op->u.create.handle_array_local[0];
         js_p->error_code = 0;
         return(SM_ACTION_COMPLETE);
     }
     else
     {
-        for(i=0; i<s_op->u.create.num_io_servers; i++)
+        for(i = 0; i < s_op->u.create.num_io_servers; i++)
         {
             /* find local server positions and set handles */
             if(!strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
                 s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array_local[tmp_index];
+                        s_op->u.create.handle_array_local[tmp_index];
                 tmp_index++;
             }
         }
@@ -614,8 +566,7 @@ static PINT_sm_action setup_local_datafile_handles(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action write_keyvals(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -627,13 +578,13 @@ static PINT_sm_action write_keyvals(
 
     if(s_op->u.create.handle_array_remote_count)
     {
-        for(i=0; i<s_op->u.create.num_io_servers; i++)
+        for(i = 0; i < s_op->u.create.num_io_servers; i++)
         {
             /* find remote server positions and set handles */
             if(strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
                 s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array_remote[tmp_index];
+                        s_op->u.create.handle_array_remote[tmp_index];
                 tmp_index++;
             }
         }
@@ -669,13 +620,13 @@ static PINT_sm_action write_keyvals(
 
     s_op->val_a[0].buffer = s_op->resp.u.create.datafile_handles;
     s_op->val_a[0].buffer_sz =
-         s_op->resp.u.create.datafile_count * sizeof(PVFS_handle);
+            s_op->resp.u.create.datafile_count * sizeof(PVFS_handle);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
 
     s_op->val_a[1].buffer_sz =
-        s_op->req->u.create.attr.u.meta.dist_size;
+            s_op->req->u.create.attr.u.meta.dist_size;
     s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
     if(!s_op->val_a[1].buffer)
     {
@@ -685,6 +636,11 @@ static PINT_sm_action write_keyvals(
     PINT_dist_encode(s_op->val_a[1].buffer,
                      s_op->req->u.create.attr.u.meta.dist);
 
+    /* WBL V3 again, should be no need for this complexity
+     * stuffed should just be a flag in the metadata, the cost
+     * of creating components should already be minimized
+     * so most of this should go away
+     */
     if(s_op->resp.u.create.stuffed)
     {
         s_op->key_a[2].buffer = Trove_Common_Keys[METAFILE_LAYOUT_KEY].key;
@@ -702,31 +658,38 @@ static PINT_sm_action write_keyvals(
         s_op->val_a[2].buffer_sz = (tmpbuf - (char*)s_op->val_a[2].buffer);
 
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "create storing layout of size: %d\n", 
-            s_op->val_a[2].buffer_sz);
+                    "create storing layout of size: %d\n", 
+                    s_op->val_a[2].buffer_sz);
 
         s_op->key_a[3].buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
         s_op->key_a[3].buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
 
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "create storing NUM_DFILES_REQ_KEY value of %d\n",
-            s_op->req->u.create.num_dfiles_req);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "create storing NUM_DFILES_REQ_KEY value of %d\n",
+                     s_op->req->u.create.num_dfiles_req);
+
         s_op->val_a[3].buffer = &s_op->req->u.create.num_dfiles_req;
         s_op->val_a[3].buffer_sz = sizeof(s_op->req->u.create.num_dfiles_req);
     }
 
-    ret = job_trove_keyval_write_list(
-        s_op->req->u.create.fs_id,
-        s_op->resp.u.create.metafile_handle,
-        s_op->key_a, s_op->val_a,
-        keyval_count, TROVE_SYNC, NULL, smcb,
-        0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    ret = job_trove_keyval_write_list(s_op->req->u.create.fs_id,
+                                      s_op->resp.u.create.metafile_handle,
+                                      s_op->key_a,
+                                      s_op->val_a,
+                                      keyval_count,
+                                      TROVE_SYNC,
+                                      NULL,
+                                      smcb,
+                                      0,
+                                      js_p,
+                                      &j_id,
+                                      server_job_context,
+                                      s_op->req->hints);
     return ret;
 }
 
-static PINT_sm_action setattr_setobj_attribs(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -740,7 +703,8 @@ static PINT_sm_action setattr_setobj_attribs(
 
      /* 
       * Remember that mtime is versioned on disk! so convert it here..
-      * It is better to do it here than change the PVFS_object_attr_overwrite_setable
+      * It is better to do it here than change the "
+      * PVFS_object_attr_overwrite_setable
       * macro, since there are many more users of it, I think.
       */
      if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
@@ -767,7 +731,8 @@ static PINT_sm_action setattr_setobj_attribs(
          "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
          dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
          dspace_a_p->objtype, llu(dspace_a_p->atime),
-         llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+         llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
+         llu(dspace_a_p->ctime),
          (int)dspace_a_p->u.meta.dfile_count,
          (int)dspace_a_p->u.meta.dist_size);
 
@@ -789,8 +754,7 @@ static PINT_sm_action setattr_setobj_attribs(
      return ret;
 }
 
-static int setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int setup_resp(struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 

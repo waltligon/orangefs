@@ -149,9 +149,12 @@ int iocommon_lookup_absolute(const char *abs_path,
     }
 
     errno = 0;
-    rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
-                         credential, &resp_lookup,
-                         PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+    rc = PVFS_sys_lookup(lookup_fs_id,
+                         pvfs_path,
+                         credential,
+                         &resp_lookup,
+                         PVFS2_LOOKUP_LINK_FOLLOW,
+                         NULL);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_lookup.ref;
 
@@ -1150,10 +1153,8 @@ void calc_copy_ops(
     }
 }
 
-static int cache_readorwrite(
-    enum PVFS_io_type which, 
-    struct ucache_copy_s * ucop
-)
+static int cache_readorwrite(enum PVFS_io_type which, 
+                             struct ucache_copy_s * ucop)
 {
     int rc = 0;
     if(which == PVFS_IO_READ)
@@ -1592,7 +1593,8 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
         errno = EBADF;
         return -1;
     }
-    //Ensure descriptor is used for the correct type of access
+    /* Ensure descriptor is used for the correct type of access
+     */
     if ((which==PVFS_IO_READ && (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
         (which==PVFS_IO_WRITE && (O_RDONLY == (pd->s->flags & O_ACCMODE))))
     {
@@ -1600,7 +1602,8 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
         return PVFS_FD_FAILURE;
     }
 
-    //Create the memory request of a contiguous region: 'mem_req' x count
+    /* Create the memory request of a contiguous region: 'mem_req' x count
+     */
     rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
 
     rc = iocommon_cred(&credential);
@@ -1623,7 +1626,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                       NULL);
     IOCOMMON_CHECK_ERR(rc);
 
-    assert(*ret_op_id!=-1);//TODO: handle this
+    assert(*ret_op_id != -1); /* TODO: handle this with error control */
 
     PVFS_Request_size(contig_memory_req, &req_size);
     gen_mutex_lock(&pd->s->lock);
@@ -1852,8 +1855,8 @@ int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
 }
 
 int iocommon_make_directory(const char *pvfs_path,
-                        const int mode,
-                        PVFS_object_ref *pdir)
+                            const int mode,
+                            PVFS_object_ref *pdir)
 {
     int rc = 0;
     int orig_errno = errno;
@@ -2619,11 +2622,11 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     val.buffer = (void *)val_p;
     val.buffer_sz = size;
 
-    if (flag & XATTR_CREATE)//TODO
+    if (flag & XATTR_CREATE)/* TODO */
     {
         pvfs_flag |= PVFS_XATTR_CREATE;
     }
-    if (flag & XATTR_REPLACE)//TODO
+    if (flag & XATTR_REPLACE)/* TODO */
     {
         pvfs_flag |= PVFS_XATTR_REPLACE;
     }

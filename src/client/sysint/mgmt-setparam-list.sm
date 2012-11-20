@@ -186,10 +186,10 @@ static int mgmt_setparam_list_init(
 
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    temp_ref.fs_id = sm_p->u.setparam_list.fs_id;
-    js_p->error_code = PINT_cached_config_get_root_handle(
-                           sm_p->u.setparam_list.fs_id, 
-                           &temp_ref.handle);
+    memset(&temp_ref, 0, sizeof(temp_ref));
+    js_p->error_code = PINT_cached_config_get_root_ref(
+                                        sm_p->u.setparam_list.fs_id, 
+                                        &temp_ref);
         
     assert(js_p->error_code == 0);
 
