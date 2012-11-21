@@ -213,6 +213,7 @@ setup_pvfs2() {
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
+		--logging all --tracing --logstamp datetime \
 		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
 	# generate security keys
