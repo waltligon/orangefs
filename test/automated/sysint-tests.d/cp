@@ -5,6 +5,8 @@ echo PVFS2_DEST is ${PVFS2_DEST}
 echo CVS_TAG is ${CVS_TAG}
 echo PVFS2_MOUNTPOINT is ${PVFS2_MOUNTPOINT}
 
+export PVFS2_DEBUGMASK=all
+
 # run through a bunch of possible command line arguments for pvfs2-cp:
 
 nr_errors=0
