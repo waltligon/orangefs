@@ -236,6 +236,9 @@ setup_pvfs2() {
 			fs.conf $server_conf -a $alias
 	done
 
+        # give the servers time to finish all their initialization tasks
+        sleep 3
+
 	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
