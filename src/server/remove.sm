@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "pint-security.h"
+#include "security-util.h"
 #include "pint-cached-config.h"
 #include "pint-util.h"
 
@@ -578,6 +579,7 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
     int i = 0;
     PVFS_object_attr *attr_p = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability null_cap;
 
     js_p->error_code = 0;
 
@@ -621,6 +623,8 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
         return SM_ACTION_COMPLETE;
     }
 
+    PINT_null_capability(&null_cap);
+
     /* prepare to post the getattr send/recv pairs for all dirdata*/
     foreach_msgpair(&s_op->msgarray_op, msg_p, i)
     {
@@ -632,12 +636,12 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
 
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
-            s_op->req->capability,
+            null_cap,
             s_op->req->u.remove.credential,
             s_op->req->u.remove.fs_id,
             attr_p->u.dir.dirdata_handles[i],
             PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in dirent_count */
-            NULL);
+            s_op->req->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = s_op->req->u.remove.fs_id;
@@ -744,7 +748,7 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
             s_op->req->u.remove.credential,
             s_op->req->u.remove.fs_id,
             attr_p->u.dir.dirdata_handles[i],
-            NULL);
+            s_op->req->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = s_op->req->u.remove.fs_id;
@@ -1027,7 +1031,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
         attr,
         s_op->attr.u.dir.dist_dir_attr.num_servers,
         s_op->attr.u.dir.dirdata_handles,
-        NULL);
+        s_op->req->hints);
 
     msg_p->fs_id = s_op->req->u.remove.fs_id;
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];

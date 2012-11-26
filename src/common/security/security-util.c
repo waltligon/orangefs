@@ -189,6 +189,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 {
     char sig_buf[10], mask_buf[10]; 
+    int i;
 
     assert(cap);
 
@@ -212,7 +213,11 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
                  cap->num_handles);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %llu\n",
                  cap->num_handles > 0 ? llu(cap->handle_array[0]) : 0LL);
-
+    for (i = 1; i < cap->num_handles; i++)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "\thandle %d: %llu\n",
+                     i+1, llu(cap->handle_array[i]));
+    }
 }
 
 /* PINT_cleanup_capability

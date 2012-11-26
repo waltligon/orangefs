@@ -545,9 +545,6 @@ struct PINT_server_getattr_op
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
-/*
-    PVFS_error* err_array;
-*/
     PVFS_ds_keyval_handle_info keyval_handle_info;
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
