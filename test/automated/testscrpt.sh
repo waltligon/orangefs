@@ -52,7 +52,8 @@ BENCHMARKS=benchmarks-20121017.tar.gz
 #VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
 MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 
-TESTNAME="`hostname -s`-nightly"
+HOSTNAME=`hostname -s 2> /dev/null || hostname`
+TESTNAME="${HOSTNAME}-nightly"
 
 # before starting any client apps, we need to deal with the possiblity that we
 # might have built with shared libraries
@@ -143,8 +144,8 @@ setup_vfs() {
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	echo "Mounting pvfs2 service at tcp://`hostname -s`:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
-	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
+	sudo mount -t pvfs2 tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
 
 check_openssl() {
@@ -172,7 +173,7 @@ setup_security() {
 		# output client public key to keystore, unless security 
 		# is intended to fail
 		if [ ! $SECURITY_FAIL ] ; then
-			echo "C:`hostname -s`" >> ${sec_dir}/keystore-${alias}
+			echo "C:${HOSTNAME}" >> ${sec_dir}/keystore-${alias}
 			openssl rsa -in ${sec_dir}/clientkey.pem -pubout >> \
 				${sec_dir}/keystore-${alias} 2> ${sec_dir}/error.tmp
 			check_openssl
@@ -205,8 +206,8 @@ setup_pvfs2() {
 	fi
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
-		--iospec="`hostname -s`:{3396-3399}" \
-		--metaspec="`hostname -s`:{3396-3399}"  \
+		--iospec="${HOSTNAME}:{3396-3399}" \
+		--metaspec="${HOSTNAME}:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
@@ -230,7 +231,7 @@ setup_pvfs2() {
 			fs.conf $server_conf -a $alias
 	done
 
-	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+	echo "tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
@@ -337,7 +338,7 @@ ${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 # will we be able to do VFS-related tests?
 do_vfs=0
 for s in $(echo $VFS_HOSTS); do
-	if [ `hostname -s` = $s ] ; then
+	if [ ${HOSTNAME} = $s ] ; then
 		do_vfs=1
 		break
 	fi
