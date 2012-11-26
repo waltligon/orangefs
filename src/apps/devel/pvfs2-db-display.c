@@ -288,10 +288,6 @@ void print_dspace( DBT key, DBT val )
     k = *(uint64_t *)key.data;
     v = val.data;
 
-    printf("(%llu)(%d) -> ", llu(k), key.size);
-
-    print_ds_type( v->type );
-
     if (v->ctime != 0)
     {
        r_ctime = (time_t) v->ctime;
