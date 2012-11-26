@@ -725,6 +725,8 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 	return SM_ACTION_COMPLETE;
     }
 
+    free_keyval_buffers(s_op);
+
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
 
@@ -740,8 +742,6 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 	js_p->error_code = -PVFS_ENOMEM;
 	return SM_ACTION_COMPLETE;
     }
-
-    free_keyval_buffers(s_op);
 
     s_op->val.buffer = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
