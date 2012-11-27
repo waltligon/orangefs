@@ -1230,7 +1230,11 @@ static inline struct inode *pvfs2_create_file(
                     "dentry %p for %s\n", dentry,
                     dentry->d_name.name);
 
+#ifdef HAVE_D_SET_D_OP
+        d_set_d_op(dentry, &pvfs2_dentry_operations);
+#else
         dentry->d_op = &pvfs2_dentry_operations;
+#endif
         d_instantiate(dentry, inode);
         gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Regular File) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
@@ -1317,7 +1321,11 @@ static inline struct inode *pvfs2_create_dir(
                     "dentry %p for %s\n", dentry,
                     dentry->d_name.name);
 
+#ifdef HAVE_D_SET_D_OP
+        d_set_d_op(dentry, &pvfs2_dentry_operations);
+#else
         dentry->d_op = &pvfs2_dentry_operations;
+#endif
         d_instantiate(dentry, inode);
         gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Directory) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
@@ -1413,7 +1421,11 @@ static inline struct inode *pvfs2_create_symlink(
                     "*negative* dentry %p for %s\n", dentry,
                     dentry->d_name.name);
 
+#ifdef HAVE_D_SET_D_OP
+        d_set_d_op(dentry, &pvfs2_dentry_operations);
+#else
         dentry->d_op = &pvfs2_dentry_operations;
+#endif
         d_instantiate(dentry, inode);
         gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Symlink) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
