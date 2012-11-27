@@ -176,9 +176,9 @@ PVFS_error PVFS_isys_create(
         ((attr.dfile_count < 1) ||
          (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
     {
-	gossip_err("Error: invalid number of datafiles (%d) specified "
+        gossip_err("Error: invalid number of datafiles (%d) specified "
                    "in PVFS_sys_create().\n", (int)attr.dfile_count);
-	return ret;
+        return ret;
     }
 
     if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
@@ -195,7 +195,7 @@ PVFS_error PVFS_isys_create(
 
     if (attr.group != credential->group_array[0])
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group uid %d with %d "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }

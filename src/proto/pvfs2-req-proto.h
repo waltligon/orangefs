@@ -182,7 +182,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_GROUPS 32
 /* max size of credential/capability issuer (in bytes) */
 #define PVFS_REQ_LIMIT_ISSUER 128
-
+/* max size of a certificate buffer (in bytes) */
+#define PVFS_REQ_LIMIT_CERT 8192
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -649,11 +650,12 @@ do {                                     \
 
 struct PVFS_servreq_getattr
 {
-    PVFS_handle handle;         /* handle of target object */
-    PVFS_fs_id fs_id;           /* file system */
-    uint32_t attrmask;          /* mask of desired attributes */
-    PVFS_credential credential; /* user credential */
+    PVFS_handle handle;           /* handle of target object */
+    PVFS_fs_id fs_id;             /* file system */
+    uint32_t attrmask;            /* mask of desired attributes */
+    PVFS_credential credential;   /* user credential */
 };
+
 endecode_fields_4_struct(
     PVFS_servreq_getattr,
     PVFS_handle, handle,
@@ -661,22 +663,22 @@ endecode_fields_4_struct(
     uint32_t, attrmask,
     PVFS_credential, credential);
 
-#define PINT_SERVREQ_GETATTR_FILL(__req,     \
-                                  __cap,     \
-                                  __cred,    \
-                                  __fsid,    \
-                                  __handle,  \
-                                  __amask,   \
-                                  __hints)   \
-do {                                         \
-    memset(&(__req), 0, sizeof(__req));      \
-    (__req).op = PVFS_SERV_GETATTR;          \
-    (__req).capability = (__cap);            \
-    (__req).u.getattr.credential = (__cred); \
-    (__req).hints = (__hints);               \
-    (__req).u.getattr.fs_id = (__fsid);      \
-    (__req).u.getattr.handle = (__handle);   \
-    (__req).u.getattr.attrmask = (__amask);  \
+#define PINT_SERVREQ_GETATTR_FILL(__req,             \
+                                  __cap,             \
+                                  __cred,            \
+								  __fsid,            \
+                                  __handle,          \
+                                  __amask,           \
+                                  __hints)           \
+do {                                                 \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_GETATTR;                  \
+    (__req).capability = (__cap);                    \
+    (__req).u.getattr.credential = (__cred);         \
+    (__req).hints = (__hints);                       \
+    (__req).u.getattr.fs_id = (__fsid);              \
+    (__req).u.getattr.handle = (__handle);           \
+    (__req).u.getattr.attrmask = (__amask);          \
 } while (0)
 #define extra_size_PVFS_servreq_getattr extra_size_PVFS_credential
 

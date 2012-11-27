@@ -7,7 +7,6 @@
 #ifndef _PINT_SECURITY_H_
 #define _PINT_SECURITY_H_
 
-
 #include "pvfs2-types.h"
 
 
@@ -30,7 +29,43 @@
 /* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
 
+/* TODO: error printing etc. */
+#define PINT_SECURITY_CHECK(rc, label) \
+    do { \
+        if ((rc) != 0) \
+        { \
+            PINT_security_error(__func__, (rc)); \
+            goto label; \
+        } \
+    } while (0)
 
+#define PINT_SECURITY_CHECK_RET(rc) \
+    do { \
+        if ((rc) != 0) \
+        { \
+            PINT_security_error(__func__, (rc)); \
+            return (rc); \
+        } \
+    } while (0)
+
+#define PINT_SECURITY_CHECK_NULL(ptr, label) \
+    do { \
+        if ((ptr) == NULL) \
+        { \
+            PINT_security_error(__func__, PVFS_ESECURITY); \
+            goto label; \
+        } \
+    } while (0)
+
+#define PINT_SECURITY_CHECK_NULL_RET(ptr) \
+    do { \
+        if ((ptr) == NULL) \
+        { \
+            PINT_security_error(__func__, PVFS_ESECURITY); \
+            return PVFS_ESECURITY; \
+        } \
+    } while (0)
+    
 int PINT_security_initialize(void);
 int PINT_security_finalize(void);
 
@@ -47,6 +82,8 @@ int PINT_init_credential(PVFS_credential *cred);
 int PINT_sign_credential(PVFS_credential *cred);
 int PINT_verify_credential(const PVFS_credential *cred);
 
+void PINT_security_error(const char *prefix, 
+                         int err);
 
 #endif /* _PINT_SECURITY_H_ */
 

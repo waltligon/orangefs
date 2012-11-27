@@ -131,6 +131,7 @@ static int test_permissions(int testcase){
                      "on %s\n", filename);
     }
 
+    /* TODO: needs tweaking for security mode */
     switch (testcase)
     {
     case 0:

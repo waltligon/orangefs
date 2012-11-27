@@ -8,6 +8,8 @@
 #include <string.h>
 #include <assert.h>
 
+/* TODO: TEMP */
+#include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -18,6 +20,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
 #include "dist-dir-utils.h"
+#include "pint-uid-map.h"
 
 %%
 
@@ -609,6 +612,9 @@ static PINT_sm_action mkdir_prep_sm(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    PVFS_uid uid;
+    uint32_t num_groups;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle_extent_array =
@@ -621,6 +627,34 @@ static PINT_sm_action mkdir_prep_sm(
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
+
+    /* map owner/group from credential */
+    if (a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (a_p->owner == PVFS_UID_MAX || a_p->group == PVFS_GID_MAX))
+    {
+        int ret;
+
+        ret  = PINT_map_credential(&s_op->req->u.mkdir.credential, 
+                                   &uid, &num_groups, group_array);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if (a_p->mask & PVFS_ATTR_COMMON_UID &&
+            a_p->owner == PVFS_UID_MAX)
+        {
+            a_p->owner = uid;
+        }
+
+        if (a_p->mask & PVFS_ATTR_COMMON_GID &&
+            a_p->group == PVFS_GID_MAX)
+        {
+            a_p->group = group_array[0];
+        }
+    }
+
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
                  "group = %d, perms = %o]\n", a_p->owner, a_p->group,

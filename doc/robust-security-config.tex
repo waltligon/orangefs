@@ -19,8 +19,8 @@
 \headheight 0.0in
 
 \title{PVFS\\Configuration of Robust Security}
-\author{ Michael Moore }
-\date{ Oct 25, 2011 }
+\author{ Michael Moore & Sam Sampson }
+\date{ November 26, 2012 }
 
 %
 % BEGINNING OF DOCUMENT
@@ -70,7 +70,7 @@ called \texttt{clientkey.pem}:
 
 \begin{verbatim}
     root@pvfs-client ~ # cd /usr/local/orangefs/etc/
-    root@pvfs-client ~ # openssl genrsa -out clientkey.pem 1024
+    root@pvfs-client ~ # openssl genrsa -out pvfs2-clientkey.pem 1024
     Generating RSA private key, 1024 bit long modulus
     ......................++++++
     .........++++++
@@ -91,7 +91,7 @@ impact of a compromised private key. To create a private key called
 
 \begin{verbatim}
     root@pvfs-server ~ # cd /usr/local/orangefs/etc/
-    root@pvfs-server ~ # openssl genrsa -out serverkey.pem 2048
+    root@pvfs-server ~ # openssl genrsa -out pvfs2-serverkey.pem 2048
     Generating RSA private key, 2048 bit long modulus
     ...................................+++
     ............................................+++
@@ -106,9 +106,9 @@ and client public keys in \texttt{keystore}:
 \begin{verbatim}
     root@pvfs-server ~ # cd /usr/local/orangefs/etc
     root@pvfs-server ~ # echo "S:pvfs-server" >> keystore
-    root@pvfs-server ~ # openssl rsa -in serverkey.pem -pubout >> keystore
+    root@pvfs-server ~ # openssl rsa -in pvfs2-serverkey.pem -pubout >> keystore
     root@pvfs-server ~ # echo "C:pvfs-client" >> keystore
-    root@pvfs-server ~ # openssl rsa -in clientkey.pem -pubout >> keystore
+    root@pvfs-server ~ # openssl rsa -in pvfs2-clientkey.pem -pubout >> keystore
 \end{verbatim}
 
 The actual hostname of the server and client should be substituted in the echo 
@@ -141,10 +141,10 @@ would look like:
 \subsection{Client}
 The client needs to be able to locate its private key file. The client's 
 private key is expected at the default location 
-\texttt{SYSCONFDIR/pvfs2credkey.pri}. As an example, if you ran 
+\texttt{SYSCONFDIR/pvfs2-clientkey.pem}. As an example, if you ran 
 \texttt{./configure --prefix=/usr/local/orangefs} the default location for the 
 client's private key is statically defined as 
-\texttt{/usr/local/orangefs/etc/pvfs2credkey.pri}. If you are using the kernel 
+\texttt{/usr/local/orangefs/etc/pvfs2-clientkey.pem}. If you are using the kernel 
 module and pvfs2-client to access the filesystem you can specify the private 
 key path by appending the \texttt{--keypath <key>} argument to pvfs2-client. 
 Again, assuming the above client key generation and a prefix of 
@@ -175,7 +175,7 @@ values assuming the server private key and key store generation example above
 
 \begin{verbatim}
     KeyStore /usr/local/orangefs/etc/keystore
-    ServerKey /usr/local/orangefs/etc/serverkey.pem
+    ServerKey /usr/local/orangefs/etc/pvfs2-serverkey.pem
 \end{verbatim}
 
 \section{A Word About Permissions}

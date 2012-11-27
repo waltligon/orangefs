@@ -22,14 +22,6 @@
 #include <signal.h>
 #include <libgen.h>
 
-#ifndef ENABLE_SECURITY
-#include <pwd.h>
-#include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
-#endif
-
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -46,6 +38,18 @@
 #include "pint-util.h"
 #include "security-util.h"
 #include "pvfs-path.h"
+
+#if defined(ENABLE_SECURITY_CERT) || defined(ENABLE_SECURITY_KEY)
+#define ENABLE_SECURITY_MODE
+#endif
+
+#ifndef ENABLE_SECURITY_MODE
+#include <pwd.h>
+#include <grp.h>
+#ifndef HAVE_GETGROUPLIST
+#include "getugroups.h"
+#endif
+#endif
 
 #ifdef HAVE_MNTENT_H
 
@@ -110,7 +114,7 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-#ifndef ENABLE_SECURITY
+#ifndef ENABLE_SECURITY_MODE
 static int PINT_gen_unsigned_credential(const char *user, const char *group,
                                         unsigned int timeout, PVFS_credential *cred);
 #endif
@@ -182,7 +186,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
                                     NULL, cred);
 }
 
-#ifdef ENABLE_SECURITY
+#ifdef ENABLE_SECURITY_MODE
 /* PVFS_util_gen_credential
  * 
  * Generate signed credential object using external app pvfs2-gencred.
@@ -200,11 +204,18 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     pid_t pid;
     int filedes[2], errordes[2];
     int ret;
+#ifdef ENABLE_SECURITY_CERT
+    char *certpath;
+#endif
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
         keypath = getenv("PVFS2KEY_FILE");
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    certpath = getenv("PVFS2CERT_FILE");
+#endif
 
     memset(&newsa, 0, sizeof(newsa));
     newsa.sa_handler = SIG_DFL;
@@ -261,6 +272,13 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             *ptr++ = "-k";
             *ptr++ = (char*)keypath;
         }
+#ifdef ENABLE_SECURITY_CERT
+        if (certpath)
+        {
+            *ptr++ = "-c";
+            *ptr++ = certpath;
+        }
+#endif
         *ptr++ = NULL;
         execve(BINDIR"/pvfs2-gencred", args, envp);
 
@@ -309,6 +327,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
+
+                /* on the stack */
+                tmp.issuer = NULL;
+                PINT_cleanup_credential(&tmp);
             }
             else if (WIFEXITED(rc))
             {                
@@ -350,7 +372,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     return ret;
 }
-#else /* ENABLE_SECURITY */
+#else /* ENABLE_SECURITY_MODE */
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
@@ -555,6 +577,9 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     cred->sig_size = 0;
     cred->signature = NULL;
 
+    cred->certificate.buf_size = 0;
+    cred->certificate.buf = NULL;
+
     free(pwdbuf);
     free(grpbuf);
 
@@ -578,7 +603,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
-#endif /* ENABLE_SECURITY */
+#endif /* ENABLE_SECURITY_MODE */
 
 /*
  * This function checks to see if the credential is still valid

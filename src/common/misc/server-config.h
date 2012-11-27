@@ -28,6 +28,7 @@ enum
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
+    CTX_LDAP             = (1 << 12),
 };
 
 typedef struct phys_server_desc
@@ -207,6 +208,19 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
+    char *ca_path;                   /* location of CA certificate */
+
+    char *ldap_hosts;                /* list of LDAP host URIs */
+    char *ldap_bind_dn;              /* LDAP bind user */
+    char *ldap_bind_password;        /* LDAP bind password */
+    int ldap_search_mode;            /* PVFS2_LDAP_SEARCH_CN or ..._DN */
+    char *ldap_search_root;          /* DN of LDAP search container */
+    char *ldap_search_class;         /* LDAP user class name */
+    char *ldap_search_attr;          /* LDAP naming attribute */
+    int ldap_search_scope;           /* Corresponds to SUBTREE or ONELEVEL */
+    char *ldap_uid_attr;             /* attribute that stores UID */
+    char *ldap_gid_attr;             /* attribute that stores GID */
+    int ldap_search_timeout;         /* search timeout in seconds */
 
     int security_timeout;
 

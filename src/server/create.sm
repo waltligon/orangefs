@@ -9,12 +9,14 @@
 
 #include "server-config.h"
 #include "pvfs2-server.h"
+#include "pvfs2-config.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-cached-config.h"
 #include "pint-security.h"
+#include "pint-uid-map.h"
 
 #define REPLACE_DONE 100
 
@@ -729,6 +731,11 @@ static PINT_sm_action setattr_setobj_attribs(
     PVFS_object_attr *a_p = NULL;
     PVFS_object_attr *dspace_a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+#ifdef ENABLE_SECURITY_CERT    
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t num_groups;
+#endif
 
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.create.attr;
@@ -754,6 +761,26 @@ static PINT_sm_action setattr_setobj_attribs(
         pvfs2-storage.h
         */
      PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+
+#ifdef ENABLE_SECURITY_CERT
+     /*                                                              
+      * if owner info is missing, map from credential
+      * note that user must have admin rights to set owner info
+      * to another user (see perm_create() below)
+      */
+    num_groups = PVFS_REQ_LIMIT_GROUPS;
+
+    ret = PINT_map_credential(&s_op->req->u.create.credential, &uid,
+                              &num_groups, group_array);
+    if (ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    dspace_a_p->owner = uid;
+    dspace_a_p->group = group_array[0];
+#endif
 
      gossip_debug(
          GOSSIP_SERVER_DEBUG,
@@ -873,43 +900,62 @@ PINT_GET_CREDENTIAL_DEFINE(create);
 
 static int perm_create(PINT_server_op *s_op)
 {
+#if 0
+    /*** code not needed -- see below ***/
     PVFS_object_attr *attr = &s_op->req->u.create.attr;
+    PVFS_credential *cred = &s_op->req->u.create.credential;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t num_groups = PVFS_REQ_LIMIT_GROUPS, i;
+    int ret;
+#endif
 
     if (!(s_op->req->capability.op_mask & PINT_CAP_CREATE))
     {
         return -PVFS_EACCES;
     }
 
-    if (attr->mask & PVFS_ATTR_COMMON_UID)
+#if 0
+    /*** currently the owner/group is always loaded from 
+         the credential, so this code isn't needed ***/
+    /* check if allowed to create file with different owner/group */
+    if (attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        !(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
     {
-        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN) &&
-            (s_op->req->u.create.credential.userid != attr->owner))
+        /* map the credential to the user info */
+        ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+        if (ret != 0)
         {
-            return -PVFS_EPERM;
+            return ret;
         }
-    }
 
-    if (attr->mask & PVFS_ATTR_COMMON_GID)
-    {
-        PVFS_credential *cred = &s_op->req->u.create.credential;
-        int i;
-
-        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        /* verify that the user has permission to change the file's owner */
+        if (attr->mask & PVFS_ATTR_COMMON_UID)
         {
-            for (i = 0; i < cred->num_groups; i++)
+            if (uid != attr->owner)
             {
-                if (cred->group_array[i] == attr->group)
+                return -PVFS_EPERM;
+            }
+        }
+
+        /* verify that the user has permission to change the file's group */
+        if (attr->mask & PVFS_ATTR_COMMON_GID)
+        {
+            for (i = 0; i < num_groups; i++)
+            {
+                if (group_array[i] == attr->group)
                 {
                     break;
                 }
             }
             /* no group matches */
-            if (i >= cred->num_groups)
+            if (i >= num_groups)
             {
                 return -PVFS_EPERM;
             }
         }
     }
+#endif /* #if 0 */
 
     return 0;
 }

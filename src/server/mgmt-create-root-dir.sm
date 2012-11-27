@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <unistd.h>
 
+#include "pvfs2-config.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h" 
 #include "pint-perf-counter.h"
@@ -20,7 +21,9 @@
 #include "security-util.h"
 #include "server-config.h"
 #include "dist-dir-utils.h"
-
+#ifdef ENABLE_SECURITY_CERT
+#include "cert-util.h"
+#endif
 
 /*****
 mgmt_create_root_dir.sm:
@@ -182,6 +185,11 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     server_configuration_s *user_opts = get_server_config_struct();
+#ifdef ENABLE_SECURITY_CERT
+    int ret;
+    X509 *xcert = NULL;
+    PVFS_certificate *cert = NULL;
+#endif
 
     assert(s_op);
 
@@ -210,6 +218,45 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
          user_opts->server_alias);
     s_op->u.mgmt_create_root_dir.credential.timeout =
         PINT_util_get_current_time() + user_opts->security_timeout;
+
+#ifdef ENABLE_SECURITY_CERT
+    /* use CA certificate as cert in credential */
+    ret = PINT_load_cert_from_file(user_opts->ca_path, &xcert);
+    if (ret != 0)
+    {
+        gossip_err("mgmt_create_root_dir: could not load CA "
+                     "certificate: %d\n", ret);
+
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_X509_to_cert(xcert, &cert);
+    if (ret != 0)
+    {
+        PINT_security_error(__func__, ret);
+        js_p->error_code = -PVFS_EACCES;
+        X509_free(xcert);
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_copy_cert(cert, 
+                         &s_op->u.mgmt_create_root_dir.credential.certificate);
+    if (ret != 0)
+    {
+        gossip_err("mgmt_create_root_dir: could not copy certificate\n");
+        js_p->error_code = -PVFS_EACCES;
+        PINT_cleanup_cert(cert);
+        free(cert);
+        X509_free(xcert);
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_cleanup_cert(cert);
+    free(cert);
+    X509_free(xcert);
+#endif
+
     PINT_sign_credential(&s_op->u.mgmt_create_root_dir.credential);
 
     return SM_ACTION_COMPLETE;
@@ -743,8 +790,6 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
 
     /* Need to re-sign the capability since we added a target handle. */
-    free(s_op->u.mgmt_create_root_dir.capability.signature);
-    s_op->u.mgmt_create_root_dir.capability.signature = NULL;
     ret = PINT_sign_capability(&s_op->u.mgmt_create_root_dir.capability);
     if (ret < 0)
     {

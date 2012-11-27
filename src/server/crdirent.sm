@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <math.h>
 
+/* TODO: temp */
+#include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -20,6 +22,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
 #include "security-util.h"
+#include "pint-uid-map.h"
 
 enum
 {
@@ -682,6 +685,9 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t num_groups;
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -695,6 +701,35 @@ static PINT_sm_action crdirent_update_directory_attr(
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.crdirent.dirdata_attr;
     dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
+
+    /* map owner/group from credential if necessary */
+    if (dspace_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (dspace_attr->owner == PVFS_UID_MAX || dspace_attr->group == PVFS_GID_MAX))
+    {
+        js_p->error_code = PINT_map_credential(&s_op->u.crdirent.credential, 
+                                               &uid, &num_groups, group_array);
+
+        if (js_p->error_code != 0)
+        {            
+            gossip_err("%s: could not map credential: %d\n", __func__,
+                         js_p->error_code);
+            return SM_ACTION_COMPLETE;
+        }
+
+        /* map owner from credential */
+        if (dspace_attr->mask & PVFS_ATTR_COMMON_UID &&
+            dspace_attr->owner == PVFS_UID_MAX)
+        {
+            dspace_attr->owner = uid;
+        }
+
+        /* map primary group from credential */
+        if (dspace_attr->mask & PVFS_ATTR_COMMON_GID &&
+            dspace_attr->group == PVFS_GID_MAX)
+        {
+            dspace_attr->group = group_array[0];
+        }
+    }
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
     ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);

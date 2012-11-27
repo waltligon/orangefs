@@ -13,6 +13,8 @@
 #include <malloc.h>
 #endif
 
+/* TODO: temp */
+#include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-server.h"
@@ -26,6 +28,7 @@
 #include "str-utils.h"
 #include "check.h"
 #include "security-util.h"
+#include "pint-uid-map.h"
 #include "pint-cached-config.h"
 #include "dist-dir-utils.h"
 
@@ -404,7 +407,9 @@ static PINT_sm_action lookup_check_perms(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = s_op->target_object_attr;
     PVFS_credential *cred = &(s_op->req->u.lookup_path.credential);
-    uint32_t op_mask;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t op_mask, num_groups;
     char mask_buf[16];
     int ret;
 
@@ -422,11 +427,20 @@ static PINT_sm_action lookup_check_perms(
 
     js_p->error_code = 0;
 
-    PINT_debug_credential(cred, "  lookup_check_perms");
+    /* map the user using security */
+    ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+    if (ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_debug_credential(cred, "  lookup_check_perms", uid, num_groups,
+                          group_array);
 
     /* retrieve the capabilities of the credential as a mask */
-    ret = PINT_get_capabilities(NULL, 0, cred->userid, cred->group_array,
-        cred->num_groups, a_p, &op_mask);
+    ret = PINT_get_capabilities(NULL, 0, uid, group_array, num_groups, 
+                                a_p, &op_mask);
 
     if (ret != 0)
     {
@@ -511,7 +525,9 @@ static PINT_sm_action lookup_check_acls(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = s_op->target_object_attr;
     PVFS_credential *cred = &(s_op->req->u.lookup_path.credential);
-    uint32_t op_mask;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t op_mask, num_groups;
     char mask_buf[16];
     int ret;
 
@@ -525,9 +541,16 @@ static PINT_sm_action lookup_check_acls(
         goto cleanup;
     }
 
+    ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+    if (ret != 0)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        goto cleanup;
+    }
+
     /* get the op mask given the ACLs */
     ret = PINT_get_capabilities(s_op->val.buffer, s_op->val.read_sz, 
-        cred->userid, cred->group_array, cred->num_groups, a_p, &op_mask);
+        uid, group_array, num_groups, a_p, &op_mask);
 
     if (ret != 0)
     {

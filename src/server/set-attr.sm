@@ -7,6 +7,9 @@
 #include <string.h>
 #include <assert.h>
 
+/* TODO: temp */
+#include "pvfs2-config.h"
+
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -14,6 +17,7 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-security.h"
+#include "pint-uid-map.h"
 #include "pint-cached-config.h"
 #include "dist-dir-utils.h"
 
@@ -176,6 +180,11 @@ static PINT_sm_action setattr_verify_attribs(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
+    PVFS_credential *cred = &s_op->req->u.setattr.credential;
+    PVFS_uid uid;
+    uint32_t num_groups;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    char ostr[32], gstr[32];
 
     a_p = &s_op->attr;
     req_a_p = &s_op->req->u.setattr.attr;
@@ -184,12 +193,45 @@ static PINT_sm_action setattr_verify_attribs(
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t"
-                 "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 (req_a_p->mask & PVFS_ATTR_COMMON_UID)  ? req_a_p->owner : -1,
-                 (req_a_p->mask & PVFS_ATTR_COMMON_GID)  ? req_a_p->group : -1,
+    /* debug request attrs */
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t");
+    if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
+    {
+        if (req_a_p->owner == PVFS_UID_MAX)
+        {
+            strcpy(ostr, "(mapped)");
+        }
+        else
+        {
+            snprintf(ostr, sizeof(ostr), "%d", req_a_p->owner);
+            ostr[sizeof(ostr)-1] = '\0';
+        }
+    }
+    else
+    {
+        strcpy(ostr, "(none)");
+    }
+    if (req_a_p->mask & PVFS_ATTR_COMMON_GID)
+    {
+        if (req_a_p->group == PVFS_GID_MAX)
+        {
+            strcpy(gstr, "(mapped)");
+        }
+        else
+        {
+            snprintf(gstr, sizeof(gstr), "%d", req_a_p->group);
+            gstr[sizeof(gstr)-1] = '\0';
+        }
+    }
+    else
+    {
+        strcpy(gstr, "(none)");
+    }
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "[owner = %s, group = %s, "
+                 "perms = %o, type = %d]\n", ostr, gstr, 
                  (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
                  (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
+
     /*
       here we're enforcing that no one can change the type of the
       handle/object already stored once it's been set to a non-zero
@@ -383,36 +425,36 @@ static PINT_sm_action setattr_verify_attribs(
         js_p->error_code = -PVFS_EACCES;
     }
 
-    /* verify that the user has permission to change the file's owner */
-    if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
+    /* note: verification of rights to change ownership info 
+     * moved to perm_setattr() below 
+     */
+
+    /* map credential to owner/group */
+    if (js_p->error_code >= 0 &&
+        req_a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (req_a_p->owner == PVFS_UID_MAX || req_a_p->group == PVFS_GID_MAX))
     {
-        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN) &&
-            (s_op->req->u.setattr.credential.userid != req_a_p->owner))
+        int ret;
+
+        ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+        if (ret != 0)
         {
-            js_p->error_code = -PVFS_EPERM;
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
         }
-    }
 
-    /* verify that the user has permission to change the file's group */
-    if (req_a_p->mask & PVFS_ATTR_COMMON_GID)
-    {
-        PVFS_credential *cred = &s_op->req->u.setattr.credential;
-        int i;
-
-        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        /* use uid from credential as owner */
+        if (req_a_p->mask & PVFS_ATTR_COMMON_UID &&
+            req_a_p->owner == PVFS_UID_MAX)
         {
-            for (i = 0; i < cred->num_groups; i++)
-            {
-                if (cred->group_array[i] == req_a_p->group)
-                {
-                    break;
-                }
-            }
-            /* no group matches */
-            if (i >= cred->num_groups)
-            {
-                js_p->error_code = -PVFS_EPERM;
-            }
+            req_a_p->owner = uid;
+        }
+
+        /* use primary gid from credential as group */
+        if (req_a_p->mask & PVFS_ATTR_COMMON_GID &&
+            req_a_p->group == PVFS_GID_MAX)
+        {
+            req_a_p->group = group_array[0];
         }
     }
 
@@ -1023,6 +1065,11 @@ static int perm_setattr(PINT_server_op *s_op)
 {
     int ret;
     PVFS_object_attr *attr = &s_op->attr;
+    PVFS_object_attr *req_attr = &s_op->req->u.setattr.attr;
+    PVFS_credential *cred = &s_op->req->u.setattr.credential;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t num_groups = PVFS_REQ_LIMIT_GROUPS, i;
 
     /* attrs may be set for a file with uninitialized metadata */
     if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == NULL &&
@@ -1034,6 +1081,57 @@ static int perm_setattr(PINT_server_op *s_op)
     if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
     {
         ret = 0;
+
+        /* if changing owner info, user must have admin rights, 
+         * or be changing owner info to self or a member group.
+         * note: you can only "change" the UID of a file you own to 
+         * yourself if you are not admin. This is consistent with chown. 
+         */
+        if (req_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+            !(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        {
+            /* map the credential to the user info */
+            ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+            if (ret != 0)
+            {
+                return ret;
+            }
+
+            /* check current owner */
+            if (attr->owner != uid)
+            {
+                return -PVFS_EPERM;
+            }
+
+            /* verify that the user is changing owner to self */
+            if (req_attr->mask & PVFS_ATTR_COMMON_UID &&
+                uid != req_attr->owner)
+            {
+                return -PVFS_EPERM;
+            }
+
+            /* verify that the user has permission to change the file's group 
+             * note: you may "change" group to same group with no error even
+             * if you are not a member
+             */
+            if (req_attr->mask & PVFS_ATTR_COMMON_GID &&
+                attr->group != req_attr->group)
+            {
+                for (i = 0; i < num_groups; i++)
+                {
+                    if (group_array[i] == req_attr->group)
+                    {
+                        break;
+                    }
+                }
+                /* no group matches */
+                if (i >= num_groups)
+                {
+                    return -PVFS_EPERM;
+                }
+            }
+        }
+
     }
     else
     {

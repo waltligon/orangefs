@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #ifndef WIN32
 #include <unistd.h>
+#include <strings.h>
 #endif
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -44,10 +45,8 @@ static DOTCONF_CB(get_data_path);
 static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
-#ifdef USE_TRUSTED
 static DOTCONF_CB(enter_security_context);
 static DOTCONF_CB(exit_security_context);
-#endif
 static DOTCONF_CB(enter_aliases_context);
 static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
@@ -125,9 +124,25 @@ static DOTCONF_CB(get_small_file_size);
 static DOTCONF_CB(directio_thread_num);
 static DOTCONF_CB(directio_ops_per_queue);
 static DOTCONF_CB(directio_timeout);
+
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(get_ca_path);
+static DOTCONF_CB(enter_ldap_context);
+static DOTCONF_CB(exit_ldap_context);
+static DOTCONF_CB(get_ldap_hosts);
+static DOTCONF_CB(get_ldap_bind_dn);
+static DOTCONF_CB(get_ldap_bind_password);
+static DOTCONF_CB(get_ldap_search_mode);
+static DOTCONF_CB(get_ldap_search_root);
+static DOTCONF_CB(get_ldap_search_class);
+static DOTCONF_CB(get_ldap_search_attr);
+static DOTCONF_CB(get_ldap_search_scope);
+static DOTCONF_CB(get_ldap_uid_attr);
+static DOTCONF_CB(get_ldap_gid_attr);
+static DOTCONF_CB(get_ldap_search_timeout);
+
 static DOTCONF_CB(get_init_num_dirdata_handles);
 static DOTCONF_CB(split_mem_limit);
 static DOTCONF_CB(tree_width);
@@ -245,18 +260,20 @@ static const configoption_t options[] =
      */
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
 
-#ifdef USE_TRUSTED
-    /* Options specified within the Security context are used to dictate 
-     * whether the pvfs2
-     * servers will accept or handle file-system requests.
-     * This section is optional and does not need to be specified.
+    /*********** SECURITY OPTIONS ************/
+
+    /* Options specified within the Security context are used to configure
+     * settings related to key- or certificate-based security options.
+     * These options are ignored if security mode is not compiled in.
      */
-    {"<Security>",ARG_NONE, enter_security_context,NULL,CTX_GLOBAL,NULL},
+    {"<Security>", ARG_NONE, enter_security_context, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
 
     /* Specifies the end-tag for the Security context.
      */
-    {"</Security>",ARG_NONE, exit_security_context,NULL,CTX_SECURITY,NULL},
-    
+    {"</Security>", ARG_NONE, exit_security_context, NULL, CTX_SECURITY, NULL},
+
+#ifdef USE_TRUSTED
     /* Specifies the range of ports in the form of a range of 2 integers
      * from which the connections are going to be accepted and serviced.
      * The format of the TrustedPorts option is:
@@ -283,6 +300,102 @@ static const configoption_t options[] =
     {"TrustedNetwork",ARG_LIST, get_trusted_network,NULL,
         CTX_SECURITY,NULL},
 #endif
+
+    /* Note: keywords below may be in Defaults for backwards-
+       compatiblity. For new files they should go in Security. */
+
+    /* A path to a keystore file, which stores server and client 
+     * public keys for key-based security. 
+     */
+    {"KeyStore", ARG_STR, get_key_store, NULL, 
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
+
+    /* Path to the server private key file, in PEM format. Must 
+     * correspond to CA certificate in certificate mode.
+     */
+    {"ServerKey", ARG_STR, get_server_key, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
+
+    /* Security timeout in seconds (TODO)
+     */
+    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
+
+    /* Path to CA certificate file in PEM format.
+     */
+    {"CAPath", ARG_STR, get_ca_path, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
+
+    /* Open tag for LDAP options, used in certificate mode. 
+     */
+    {"<LDAP>", ARG_NONE, enter_ldap_context, NULL, 
+       CTX_SECURITY, NULL},
+
+    /* Close tag for LDAP options */
+    {"</LDAP>", ARG_NONE, exit_ldap_context, NULL,
+        CTX_LDAP, NULL},
+
+    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999"
+       TODO: make a list 
+     */
+    {"Hosts", ARG_STR, get_ldap_hosts, NULL,
+        CTX_LDAP, "ldaps://localhost"},
+
+    /* DN of LDAP user to use when binding to LDAP directory.
+     */
+    {"BindDN", ARG_STR, get_ldap_bind_dn, NULL,
+        CTX_LDAP, NULL},
+
+    /* Password of LDAP user to use when binding to LDAP directory. 
+     * May also be in form "file:{path}" which will load password from
+     * restricted file. 
+     */
+    {"BindPassword", ARG_STR, get_ldap_bind_password, NULL,
+        CTX_LDAP, NULL},
+
+    /* May be "CN" or "DN". Controls how the certificate subject DN is 
+     * used to search LDAP for a user. 
+     */
+    {"SearchMode", ARG_STR, get_ldap_search_mode, NULL,
+        CTX_LDAP, "CN"},
+
+    /* DN of top-level LDAP search container. Only used in "CN" mode.     
+     */
+    {"SearchRoot", ARG_STR, get_ldap_search_root, NULL,
+        CTX_LDAP, NULL},
+
+    /* Object class of user objects to search in LDAP.
+     */
+    {"SearchClass", ARG_STR, get_ldap_search_class, NULL,
+        CTX_LDAP, "inetOrgPerson"},
+
+    /* Attribute name to match certificate CN. Only used in "CN" mode. 
+     */
+    {"SearchAttr", ARG_STR, get_ldap_search_attr, NULL,
+        CTX_LDAP, "CN"},
+
+    /* May be "onelevel" to search only SearchRoot container, or "subtree" to
+     * search SearchRoot container and all child containers.
+     */
+    {"SearchScope", ARG_STR, get_ldap_search_scope, NULL,
+        CTX_LDAP, "subtree"},
+
+    /* Attribute name in which UID value is stored.
+     */
+    {"UIDAttr", ARG_STR, get_ldap_uid_attr, NULL,
+        CTX_LDAP, "uidNumber"},
+
+    /* Attribute name in which GID value is stored. 
+     */
+    {"GIDAttr", ARG_STR, get_ldap_gid_attr, NULL,
+        CTX_LDAP, "gidNumber"},
+
+    /* LDAP server timeout for searches (in seconds) 
+     */
+    {"SearchTimeout", ARG_INT, get_ldap_search_timeout, NULL,
+        CTX_LDAP, "15"},
+
+    /********* END SECURITY OPTIONS **********/
 
     /* This groups the Alias mapping options.
      *
@@ -1025,15 +1138,6 @@ static const configoption_t options[] =
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
 
-    {"KeyStore", ARG_STR, get_key_store, NULL, 
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
-	
-    {"ServerKey", ARG_STR, get_server_key, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
-
-    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
-        CTX_DEFAULTS, "3600"},
-
      /* Initial number of dirdata handles when creating a new directory.
       * TODO: determine the default value, use 2 as a start
       */
@@ -1198,7 +1302,7 @@ int PINT_parse_config(
         return 1;
     }
 
-#ifdef ENABLE_SECURITY
+#ifdef ENABLE_SECURITY_KEY
     if (server_alias_name && !config_s->keystore_path)
     {
         gossip_err("Configuration file error. No keystore path specified.\n");
@@ -1212,6 +1316,10 @@ int PINT_parse_config(
         return 1;
     }
 #endif /* ENABLE_SECURITY */
+
+#ifdef ENABLE_SECURITY_CERT
+    /* TODO: certificate required keywords */
+#endif
 
     return 0;
 }
@@ -1352,7 +1460,6 @@ DOTCONF_CB(exit_defaults_context)
     return NULL;
 }
 
-#ifdef USE_TRUSTED
 DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
@@ -1365,10 +1472,9 @@ DOTCONF_CB(exit_security_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
+    config_s->configuration_context = CTX_DEFAULTS;
     return NULL;
 }
-#endif
 
 DOTCONF_CB(enter_aliases_context)
 {
@@ -3102,12 +3208,16 @@ DOTCONF_CB(get_key_store)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s*)cmd->context;	
+
     if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
             config_s->my_server_options == 0)
     {
         return NULL;
     }
-    free(config_s->keystore_path);
+    if (config_s->keystore_path)
+    {
+        free(config_s->keystore_path);
+    }
     config_s->keystore_path =
             (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
@@ -3117,12 +3227,16 @@ DOTCONF_CB(get_server_key)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s*)cmd->context;	
+
     if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
             config_s->my_server_options == 0)
     {
         return NULL;
     }
-    free(config_s->serverkey_path);
+    if (config_s->serverkey_path)
+    {
+        free(config_s->serverkey_path);
+    }    
     config_s->serverkey_path =
             (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
@@ -3133,6 +3247,234 @@ DOTCONF_CB(get_security_timeout)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_ca_path)
+{ 
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->ca_path)
+    {
+        free(config_s->ca_path);
+    }
+    config_s->ca_path = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    
+    return NULL;
+}
+
+DOTCONF_CB(enter_ldap_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->configuration_context = CTX_LDAP;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile,
+        CTX_LDAP);
+}
+
+DOTCONF_CB(exit_ldap_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->configuration_context = CTX_SECURITY;
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_hosts)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    /* TODO: read as list for failover */
+    if (config_s->ldap_hosts)
+    {
+        free(config_s->ldap_hosts);
+    }
+    config_s->ldap_hosts = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_bind_dn)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_bind_dn)
+    {
+        free(config_s->ldap_bind_dn);
+    }
+    config_s->ldap_bind_dn = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_bind_password)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_bind_password)
+    {
+        free(config_s->ldap_bind_password);
+    }
+    config_s->ldap_bind_password = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_mode)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (!cmd->data.str)
+    {
+        config_s->ldap_search_mode = 0;
+        return NULL;
+    }
+
+    if (strcasecmp(cmd->data.str, "DN") == 0)
+    {
+        config_s->ldap_search_mode = 1;
+    }
+    else if (strcasecmp(cmd->data.str, "CN") == 0)
+    {
+        config_s->ldap_search_mode = 0;
+    }
+    else
+    {
+        return "SearchMode must be 'CN' or 'DN'";
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_root)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_search_root)
+    {
+        free(config_s->ldap_search_root);
+    }
+    config_s->ldap_search_root = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_class)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_search_class)
+    {
+        free(config_s->ldap_search_class);
+    }
+    config_s->ldap_search_class = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_attr)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_search_attr)
+    {
+        free(config_s->ldap_search_attr);
+    }
+    config_s->ldap_search_attr = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_scope)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (!cmd->data.str) 
+    {
+        config_s->ldap_search_scope = 2; /* subtree */
+        return NULL;
+    }
+
+    if (strncasecmp(cmd->data.str, "one", 3) == 0)
+    {
+        config_s->ldap_search_scope = 1;
+    }
+    else if (strncasecmp(cmd->data.str, "sub", 3) == 0)
+    {
+        config_s->ldap_search_scope = 2;
+    }
+    else
+    {
+        return "SearchScope must be 'onelevel' or 'subtree'";
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_uid_attr)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_uid_attr)
+    {
+        free(config_s->ldap_uid_attr);
+    }
+    config_s->ldap_uid_attr = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_gid_attr)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->ldap_gid_attr)
+    {
+        free(config_s->ldap_gid_attr);
+    }
+    config_s->ldap_gid_attr = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_ldap_search_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->ldap_search_timeout = cmd->data.value;
+
     return NULL;
 }
 

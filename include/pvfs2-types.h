@@ -779,6 +779,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ESECURITY  (9|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -901,6 +902,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
     "Path contains non-PVFS elements",                \
+    "Security error",                                 \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -912,6 +914,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
     PVFS_ENOTPVFS,  /* 8 */                           \
+    PVFS_ESECURITY, /* 9 */                           \
 }
 
 /*
@@ -1039,10 +1042,28 @@ struct profiler
  * New types for robust security implementation.
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
-#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
+#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
+
+typedef unsigned char *PVFS_cert_data;
+
+/* PVFS_certificate simply stores a buffer with the buffer size.
+   The buffer can be converted to an OpenSSL X509 struct for use. */
+typedef struct PVFS_certificate PVFS_certificate;
+struct PVFS_certificate
+{
+    uint32_t buf_size;
+    PVFS_cert_data buf;
+};
+endecode_fields_1a_struct (
+    PVFS_certificate,
+    skip4,,
+    uint32_t, buf_size,
+    PVFS_cert_data, buf);
+#define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
 
 typedef unsigned char *PVFS_signature;
 
+/* A capability defines permissions for a set of handles. */
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability
 {
@@ -1071,6 +1092,8 @@ endecode_fields_3a2a_struct (
                                     PVFS_REQ_LIMIT_ISSUER        + \
                                     PVFS_REQ_LIMIT_SIGNATURE)
 
+/* A credential identifies a user and is signed by the client/user 
+   private key. */
 typedef struct PVFS_credential PVFS_credential;
 struct PVFS_credential 
 {
@@ -1081,8 +1104,9 @@ struct PVFS_credential
     PVFS_time timeout;         /* seconds after epoch to time out */
     uint32_t sig_size;         /* length of the signature in bytes */
     PVFS_signature signature;  /* digital signature */
+    PVFS_certificate certificate; /* user certificate buffer */
 };
-endecode_fields_3a2a_struct (
+endecode_fields_3a2a1_struct (
     PVFS_credential,
     skip4,,
     skip4,,
@@ -1092,17 +1116,20 @@ endecode_fields_3a2a_struct (
     string, issuer,
     PVFS_time, timeout,
     uint32_t, sig_size,
-    PVFS_signature, signature);
+    PVFS_signature, signature,
+    PVFS_certificate, certificate);
 #define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
                                     sizeof(PVFS_gid)         + \
                                     PVFS_REQ_LIMIT_ISSUER    + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
+                                    PVFS_REQ_LIMIT_SIGNATURE + \
+                                    extra_size_PVFS_certificate)
 
 /* 
  * NOTE: for backwards compatibility only. 
  * For all new code use PVFS_credential.
  */
 typedef PVFS_credential PVFS_credentials;
+
 
 #endif /* __PVFS2_TYPES_H */
 

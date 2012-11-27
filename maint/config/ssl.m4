@@ -28,7 +28,7 @@
 #
 # --with-ssl={directory}
 #
-# AX_OPENSSL([MINIMUM-VERSION], [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
+# AX_OPENSSL()
 #
 # configure.in
 #   :AC_SUBST(OPENSSL_CPPFLAGS)
@@ -43,7 +43,7 @@ AC_DEFUN([AX_OPENSSL],
 [
 	AC_ARG_WITH([ssl],
 				AS_HELP_STRING([--with-ssl=DIR],
-				[use ssl (default is yes) specify the root directory for ssl library (optional)]),
+				[Location of the OpenSSL installation (if custom)]),
 				[
 				if test "$withval" = "no"; then
 					want_ssl="no"

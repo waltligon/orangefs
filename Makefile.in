@@ -91,7 +91,8 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
-ENABLE_SECURITY = @ENABLE_SECURITY@
+ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
+ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -124,7 +125,7 @@ build_static = @build_static@
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
 
-# PHONEY targets are targets that do not result in the generation
+# PHONY targets are targets that do not result in the generation
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
@@ -194,7 +195,7 @@ CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
@@ -343,7 +344,10 @@ SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 # OpenSSL support
 SERVERCFLAGS += @OPENSSL_CPPFLAGS@
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm
+# LDAP support
+SERVERCFLAGS += @LDAP_CPPFLAGS@
+
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
