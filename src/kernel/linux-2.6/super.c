@@ -1292,12 +1292,21 @@ int pvfs2_fill_sb(
     gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
+#ifdef HAVE_D_ALLOC_ROOT
     root_dentry = d_alloc_root(root);
     if (!root_dentry)
     {
         iput(root);
         return -ENOMEM;
     }
+#else
+    root_dentry = d_make_root(root);
+    if (!root_dentry)
+    {
+        iput(root);
+        return -ENOMEM;
+    }
+#endif
 #ifdef HAVE_D_SET_D_OP
     d_set_d_op(root_dentry, &pvfs2_dentry_operations);
 #else

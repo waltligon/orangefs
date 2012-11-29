@@ -1261,7 +1261,7 @@ int fputc(int c, FILE *stream)
 
 int fputc_unlocked(int c, FILE *stream)
 {
-    int rc;
+    int rc __attribute__((unused));
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
 #ifndef PVFS_STDIO_REDEFSTREAM
@@ -1576,7 +1576,7 @@ int getchar_unlocked(void)
  */
 int getw(FILE *stream)
 {
-    int rc, wd;
+    int rc __attribute__((unused)), wd;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "getw %p\n", stream);
 #ifndef PVFS_STDIO_REDEFSTREAM
@@ -2113,7 +2113,7 @@ int fileno_unlocked (FILE *stream)
  */
 int remove (const char *path)
 {
-    int rc;
+    int rc __attribute__((unused));
     struct stat buf;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "remove %s\n", path);

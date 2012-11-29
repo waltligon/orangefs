@@ -104,7 +104,7 @@ int pvfs_open64(const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints;
+    PVFS_hint hints __attribute__((unused));
 
     debug("pvfs_open64: called with %s\n", path);
     if (!path)
@@ -205,7 +205,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints;
+    PVFS_hint hints __attribute__((unused));
 
     debug("pvfs_openat64: called with %s\n", path);
     if (dirfd < 0)
@@ -1882,7 +1882,7 @@ int pvfs_fcntl(int fd, int cmd, ...)
     int rc = 0;
     va_list ap;
     /* long arg; */
-    struct flock *lock;
+    struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
 
     debug("pvfs_fcntl: called with %d\n", fd);

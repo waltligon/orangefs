@@ -236,8 +236,8 @@ int PINT_decode(void* input_buffer,
 	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
             == enc_type_recved))
        	{
-	    struct PVFS_server_req* tmp_req;
-	    struct PVFS_server_req* tmp_resp;
+	    //struct PVFS_server_req* tmp_req;
+	    //struct PVFS_server_req* tmp_resp;
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {
@@ -245,7 +245,7 @@ int PINT_decode(void* input_buffer,
 		    size_index,
 		    target_msg,
 		    target_addr);
-		tmp_req = target_msg->buffer;
+		//tmp_req = target_msg->buffer;
 		return(ret);
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
@@ -254,7 +254,7 @@ int PINT_decode(void* input_buffer,
 		    size_index,
 		    target_msg,
 		    target_addr);
-		tmp_resp = target_msg->buffer;
+		//tmp_resp = target_msg->buffer;
 		return(ret);
 	    }
 	    else
