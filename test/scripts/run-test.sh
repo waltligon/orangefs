@@ -1,5 +1,5 @@
 #!/bin/bash
-script runtest.txt
+#script runtest.txt
 export RUN_MPI_TEST
 export RUN_VFS_TEST
 export SVNBRANCH
