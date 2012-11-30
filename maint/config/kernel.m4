@@ -100,25 +100,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             CFLAGS="-Os $CFLAGS"
         fi
 
-
-
-	dnl In versions 3.3 and higher, d_alloc_root() was changed to d_make_root().  To work around this issue, 
-	dnl we will define HAVE_D_ALLOC_ROOT when d_alloc_root() exists.
-	AC_MSG_CHECKING(for d_alloc_root in kernel)
-	dnl if this test passes, the kernel does not have it
-	dnl if this test fails, the kernel already defined it
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/fs.h>
-		struct dentry *d_alloc_root(struct inode *root_inode)
-		{
-			return;
-		}
-	], [],
-		AC_MSG_RESULT(no),
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_D_ALLOC_ROOT, 1, Define if kernel has d_alloc_root),
-	)
+dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
+        AC_MSG_CHECKING(for d_alloc_root)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+        ], [
+                struct inode  *root_inode;
+		struct dentry *root_dentry;
+                root_dentry=d_alloc_root(root_inode);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_ALLOC_ROOT, 1, [Define if kernel defines
+                  d_alloc_root]),
+        AC_MSG_RESULT(no)
+        )
 
 
 

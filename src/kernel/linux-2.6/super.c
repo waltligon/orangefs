@@ -1053,6 +1053,7 @@ struct super_block* pvfs2_get_sb(
             root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
+#ifdef HAVE_D_ALLOC_ROOT
     root_dentry = d_alloc_root(root);
     if (!root_dentry)
     {
@@ -1060,6 +1061,16 @@ struct super_block* pvfs2_get_sb(
         ret = -ENOMEM;
         goto error_exit;
     }
+#else
+    root_dentry = d_make_root(root);
+    if (!root_dentry)
+    {
+        iput(root);
+        ret = -ENOMEM;
+        goto error_exit;
+    }
+#endif
+
 #ifdef HAVE_D_SET_D_OP
     d_set_d_op(root_dentry, &pvfs2_dentry_operations);
 #else
