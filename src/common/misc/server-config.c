@@ -1280,9 +1280,9 @@ int PINT_parse_config(
 
     if (!config_s->bmi_modules)
     {
-	gossip_err("Configuration file error. "
+        gossip_err("Configuration file error. "
                    "No BMI modules specified.\n");
-	return 1;
+        return 1;
     }
 
     /* We set to the default flow module since there's only one.
@@ -1290,7 +1290,7 @@ int PINT_parse_config(
     if (!config_s->flow_modules)
     {
         gossip_err("Configuration file error. No flow module specified\n");
-	return 1;
+        return 1;
     }
     
     /* Users don't need to learn about this unless they want to
@@ -1303,13 +1303,13 @@ int PINT_parse_config(
     }
 
 #ifdef ENABLE_SECURITY_KEY
-    if (server_alias_name && !config_s->keystore_path)
+    if (server_flag && !config_s->keystore_path)
     {
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
 
-    if (server_alias_name && !config_s->serverkey_path)
+    if (server_flag && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
@@ -1318,7 +1318,12 @@ int PINT_parse_config(
 #endif /* ENABLE_SECURITY */
 
 #ifdef ENABLE_SECURITY_CERT
-    /* TODO: certificate required keywords */
+    if (server_flag && !config_s->ca_path)
+    {
+        gossip_err("Configuration file error. No CA certificate path "
+                   "specified.\n");
+        return 1;
+    }
 #endif
 
     return 0;
@@ -2006,11 +2011,11 @@ DOTCONF_CB(get_event_tracing)
     }
     if(!strcmp(cmd->data.str, "yes"))
     {
-	config_s->enable_events = 1;
+        config_s->enable_events = 1;
     }
     else
     {
-	config_s->enable_events = 0;
+        config_s->enable_events = 0;
     }
     return NULL;
 }
@@ -2563,7 +2568,7 @@ DOTCONF_CB(get_attr_cache_keywords_list)
     {
         char ** tokens;
         int token_count, j;
-        
+
         token_count = PINT_split_string_list(
             &tokens, fs_conf->attr_cache_keywords);
 
@@ -2578,7 +2583,7 @@ DOTCONF_CB(get_attr_cache_keywords_list)
                 ptr += len + 1;
             }
         }
-                       
+       
         PINT_free_string_list(tokens, token_count);
         free(fs_conf->attr_cache_keywords);
     }
@@ -2587,7 +2592,7 @@ DOTCONF_CB(get_attr_cache_keywords_list)
     {
         char ** tokens;
         int token_count, j;
-        
+
         token_count = PINT_split_string_list(
             &tokens, cmd->data.list[i]);
 
@@ -2882,12 +2887,12 @@ DOTCONF_CB(get_alias_list)
     cur_alias->bmi_address = (char *)calloc(1, 2048);
     ptr = cur_alias->bmi_address;
     for (i=1; i < cmd->arg_count; i++) {
-	strncat(ptr, cmd->data.list[i], 2048 - len);
- 	len += strlen(cmd->data.list[i]);
+        strncat(ptr, cmd->data.list[i], 2048 - len);
+         len += strlen(cmd->data.list[i]);
         if (i+1 < cmd->arg_count) {
             strncat(ptr, ",", 2048 - len);
         }
- 	len++;
+         len++;
     }
 
     if (!config_s->host_aliases)
@@ -3207,7 +3212,7 @@ DOTCONF_CB(directio_timeout)
 DOTCONF_CB(get_key_store)
 {
     struct server_configuration_s *config_s =
-            (struct server_configuration_s*)cmd->context;	
+            (struct server_configuration_s*)cmd->context;
 
     if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
             config_s->my_server_options == 0)
@@ -3226,7 +3231,7 @@ DOTCONF_CB(get_key_store)
 DOTCONF_CB(get_server_key)
 {
     struct server_configuration_s *config_s =
-            (struct server_configuration_s*)cmd->context;	
+            (struct server_configuration_s*)cmd->context;
 
     if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
             config_s->my_server_options == 0)
@@ -3538,7 +3543,7 @@ DOTCONF_CB(tree_threshold)
  *
  * Synopsis: De-allocates memory consumed internally
  *           by the specified server_configuration_s
- *           
+ *   
  */
 void PINT_config_release(struct server_configuration_s *config_s)
 {
@@ -3550,7 +3555,7 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->host_id = NULL;
         }
 
-	if (config_s->data_path)
+        if (config_s->data_path)
         {
             free(config_s->data_path);
             config_s->data_path = NULL;
@@ -4314,7 +4319,7 @@ int PINT_config_get_allowed_networks(
  * Returns:  char * (bmi_address) on success; NULL on failure
  *
  * Synopsis: retrieve the bmi_address matching the specified alias
- *           
+ *   
  */
 char *PINT_config_get_host_addr_ptr(
     struct server_configuration_s *config_s,
@@ -4357,7 +4362,7 @@ char *PINT_config_get_host_addr_ptr(
  * Returns:  char * (alias) on success; NULL on failure
  *
  * Synopsis: retrieve the alias matching the specified bmi_address
- *           
+ *   
  */
 char *PINT_config_get_host_alias_ptr(
     struct server_configuration_s *config_s,
@@ -4401,7 +4406,7 @@ char *PINT_config_get_host_alias_ptr(
  *
  * Synopsis: return the meta handle range (string) on the specified
  *           filesystem that matches the host specific configuration
- *           
+ *   
  */
 char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
@@ -4495,7 +4500,7 @@ int PINT_config_get_meta_handle_extent_array(
  *
  * Synopsis: return the data handle range (string) on the specified
  *           filesystem that matches the host specific configuration
- *           
+ *   
  */
 char *PINT_config_get_data_handle_range_str(
     struct server_configuration_s *config_s,
@@ -4517,7 +4522,7 @@ char *PINT_config_get_data_handle_range_str(
  * Synopsis: return the meta handle range and data handle range strings
  *           on the specified filesystem that matches the host specific
  *           configuration merged as one single handle range
- *           
+ *   
  */
 char *PINT_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
@@ -4595,7 +4600,7 @@ static int cache_config_files(
          * now we'll leave the code this way in cases there
          * is some corner case we don't know about.
          */
-	gossip_err("Failed to find global config file %s.  This "
+        gossip_err("Failed to find global config file %s.  This "
                    "file does not exist!\n", my_global_fn);
         goto error_exit;
     }
@@ -4627,7 +4632,7 @@ static int cache_config_files(
         }
         else
         {
-	    gossip_err("Failed to stat global config file %s.", my_global_fn);
+            gossip_err("Failed to stat global config file %s.", my_global_fn);
             goto error_exit;
         }
     }
@@ -5190,7 +5195,7 @@ int PINT_config_pvfs2_rmspace(
                 (remove_collection_only ? "collection" :
                  "storage space"));
             ret = pvfs2_rmspace(config->data_path,
-				config->meta_path,
+                                config->meta_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,
