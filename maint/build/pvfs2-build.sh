@@ -12,7 +12,11 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma --with-db=/opt/db4"
+with_db_arg=""
+if [ $WITH_DB ] ; then
+	with_db_arg=--with-db=$WITH_DB
+fi
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma $with_db_arg"
 
 
 #
@@ -78,6 +82,8 @@ usage()
     echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
+    echo "  -s: build with key-based security"
+    echo "  -c: build with certificate-based security"
     echo "  -t: build test programs"
     echo "  -v: name of tag or branch in CVS"
     echo ""
@@ -86,11 +92,13 @@ usage()
 }
 
 # get command line arguments
-while getopts k:r:tv: opt
+while getopts k:r:cstv: opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
+	c) enable_certs="true";;
+	s) enable_keys="true";;
 	t) build_tests="true";;
 	v) full_cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
@@ -104,6 +112,18 @@ cvs_tag=`echo $full_cvs_tag | awk -F"/" '{print $NF}'`
 
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
+fi
+
+if [ "$enable_keys" = "true" ]
+then
+	configureopts="${configureopts} --enable-security-key"
+fi
+
+if [ "$enable_certs" = "true" ]
+then
+# TODO
+	echo "certificate support not yet implemented"
+	exit 1
 fi
 
 date=`date "+%Y-%m-%d-%H-%M"`

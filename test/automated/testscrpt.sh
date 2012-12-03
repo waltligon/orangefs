@@ -78,10 +78,10 @@ pull_and_build_pvfs2 () {
 	if  [ $do_vfs -eq 1 ] ; then
 		with_kernel="-k /lib/modules/`uname -r`/build"
 	fi
-   with_security=""
-   if [ $ENABLE_SECURITY ] ; then
-      with_security="-s"
-   fi
+	with_security=""
+	if [ $ENABLE_SECURITY ] ; then
+		with_security="-s"
+	fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
@@ -146,7 +146,7 @@ setup_vfs() {
 	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
 	sudo mount -t pvfs2 tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 	
-		if [ $? -ne 0 ]
+	if [ $? -ne 0 ]
 	then
 		echo "Something has gone wrong. Mount failed."
 	fi
@@ -196,6 +196,12 @@ setup_security() {
 			check_openssl
 		done
 	done
+        # permissions on client key
+	sudo chown root:root ${sec_dir}/clientkey.pem
+	sudo chmod 600 ${sec_dir}/clientkey.pem
+	# setuid/setgid on pvfs2-gencred
+	sudo chown root:root INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-gencred
+	sudo chmod ug+s INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-gencred
 	# set client key location
 	export PVFS2KEY_FILE=${sec_dir}/clientkey.pem
 	rm -f ${sec_dir}/error.tmp
