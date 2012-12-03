@@ -126,16 +126,15 @@ teardown_vfs() {
 }
 
 setup_vfs() {
-	sudo dmesg -c >/dev/null
-	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
+	#sudo dmesg -c >/dev/null
+	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log
+	sudo /sbin/lsmod >> pvfs2-kernel-module.log
 #	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 #		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 #		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
 	keypath=""
-	echo "Turning on EventLogging"
-	sed -i s/EventLogging\ none/EventLogging\ sm/g fs.conf
 	if [ $ENABLE_SECURITY ] ; then
 		keypath="--keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/clientkey.pem"
 	fi
@@ -146,6 +145,12 @@ setup_vfs() {
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
 	sudo mount -t pvfs2 tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	
+		if [ $? -ne 0 ]
+	then
+		echo "Something has gone wrong. Mount failed."
+	fi
+	mount > allmount.log
 }
 
 check_openssl() {
@@ -198,6 +203,7 @@ setup_security() {
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
+	mkdir mount
 	rm -f fs.conf 
 	sec_args=""
 	if [ $ENABLE_SECURITY ] ; then
@@ -231,7 +237,10 @@ setup_pvfs2() {
 			fs.conf $server_conf -a $alias
 	done
 
-	echo "tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+        # give the servers time to finish all their initialization tasks
+        sleep 3
+
+		echo "tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
@@ -401,7 +410,7 @@ fi
 
 echo "Run MPI test is $RUN_MPI_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
-echo "do_vfs is $do_vfs"
+#echo "do_vfs is $do_vfs"
 
 if [ $do_vfs -eq 1 ] ; then 
 	echo "setup_vfs"
@@ -419,6 +428,13 @@ fi
 # - an entry in /etc/fstab (that was a prerequisite for this script after all)
 # - the VFS mounted at $PVFS2_MOUNTPOINT
 
+echo "Checking if pvfs is running"
+
+ps aux | grep pvfs
+
+echo "Checking mount"
+mount 
+
 nr_passed=0
 nr_failed=0
 
@@ -428,6 +444,10 @@ exec 7<&2
 
 exec 1> ${REPORT_LOG}
 exec 2> ${REPORT_ERR}
+
+# print current environment to env.log
+env > env.log
+
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
