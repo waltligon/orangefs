@@ -29,7 +29,7 @@ gpgcheck=1' > ~/atrpms.repo
 
 sudo cp ~/atrpms.repo /etc/yum.repos.d/
 sudo rpm --import http://packages.atrpms.net/RPM-GPG-KEY.atrpms &> importkey.out
-sudo yum -y install torque torque-server tee torque.out
+sudo yum -y install torque torque-server | tee torque.out
 
 exit
 exit
