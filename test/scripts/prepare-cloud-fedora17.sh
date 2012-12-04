@@ -21,8 +21,6 @@ sudo make install &> db4install.out
 
 echo "Installing TORQUE..."
 
-echo "Installing TORQUE..."
-
 wget -q -np -r -nd http://devorange.clemson.edu/pvfs/fedora17/RPMS/x86_64/
 
 rpm -i torque*.rpms
