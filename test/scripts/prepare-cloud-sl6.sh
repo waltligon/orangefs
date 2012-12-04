@@ -23,7 +23,7 @@ echo "Installing TORQUE..."
 
 wget -q -np -r -nd http://devorange.clemson.edu/pvfs/rhel6/RPMS/x86_64/
 
-rpm -i torque*.rpms
+sudo rpm -i torque*.rpms
 
 exit
 exit
