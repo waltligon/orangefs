@@ -21,15 +21,9 @@ sudo make install &> db4install.out
 
 echo "Installing TORQUE..."
 
-echo '[atrpms]
-name=Fedora Core $releasever - $basearch - ATrpms
-baseurl=http://dl.atrpms.net/el$releasever-$basearch/atrpms/stable
-gpgkey=http://ATrpms.net/RPM-GPG-KEY.atrpms
-gpgcheck=1' > ~/atrpms.repo
+wget -q -np -r -nd http://devorange.clemson.edu/pvfs/rhel6/RPMS/x86_64/
 
-sudo cp ~/atrpms.repo /etc/yum.repos.d/
-sudo rpm --import http://packages.atrpms.net/RPM-GPG-KEY.atrpms &> importkey.out
-sudo yum -y install torque torque-server | tee torque.out
+rpm -i torque*.rpms
 
 exit
 exit
