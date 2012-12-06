@@ -187,7 +187,7 @@ do
 done
 
 # install all system updates and reboot
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-${VMSYSTEM}.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
 
 echo "Waiting for image to reboot..."
 sleep 20
@@ -205,7 +205,7 @@ done
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 echo "Preparing the image for testing..."
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-${VMSYSTEM}.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-cloud.sh 
 
 echo ""
 echo "Running tests..."
