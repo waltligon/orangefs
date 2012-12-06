@@ -22,18 +22,7 @@ $SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
 # ubuntu/debian based distributions
 
 case $CHOICE in
-	cloud-ubuntu-12.04)
-	cloud-ubuntu-11.04)
-	cloud-ubuntu-10.10)
-	cloud-ubuntu-8.04)
-	cloud-ubuntu-12.04-i386)
-	cloud-ubuntu-11.10)
-	cloud-ubuntu-11.10-i386)
-	cloud-ubuntu-10.04)
-	cloud-ubuntu-11.04-i386)
-	cloud-ubuntu-10.10-i386)
-	cloud-ubuntu-10.04-i386)
-	cloud-ubuntu-8.04-i386)
+	cloud-*buntu*|cloud-*mint*|cloud-debian*)
 
 		echo "Preparing Ubuntu based distribution $CHOICE"
 	
@@ -57,7 +46,7 @@ case $CHOICE in
 
 		#break
 		;;
-	cloud-opensuse-12.2)
+	cloud-*suse*)
 
 		echo "Preparing SUSE based distribution $CHOICE"
 	
@@ -84,14 +73,7 @@ case $CHOICE in
 		# break
 		;;
 		
-	cloud-rhel6)
-	cloud-rhel5)
-	cloud-centos6)
-	cloud-rhel5-i386)
-	cloud-sl6-i386)
-	cloud-sl6)
-	cloud-fedora17)
-	cloud-fedora17-i386)
+	cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*)
 	
 		echo "Preparing RedHat based distribution $CHOICE"
 		
