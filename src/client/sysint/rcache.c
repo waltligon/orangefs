@@ -96,7 +96,7 @@ void PINT_rcache_enable_perf_counter(
 
 /**
  * Initializes the rcache 
- * \return pointer to tcache on success, NULL on failure
+ * \return 0 on success, NULL on failure
  */
 int PINT_rcache_initialize(void)
 {
@@ -325,6 +325,18 @@ int PINT_rcache_insert(
     int status;
     int purged;
     unsigned int enabled;
+
+    /* Check if rcache is initialized. Initialize rcache if pointer is null. */
+    if(!rcache)
+    {
+        gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: trying to insert when rcache is NULL!\n");
+        PINT_rcache_initialize();
+        if(!rcache)
+        {
+            gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: initialization caused by insert and null rcache failed!\n");
+            return 0;
+        }
+    }
 
     /* skip out immediately if the cache is disabled */
     PINT_tcache_get_info(rcache, TCACHE_ENABLE, &enabled);
