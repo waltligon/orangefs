@@ -15,7 +15,7 @@ else
 	ARCH=x86_64
 fi
 	
-$SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
+SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
 
 # switch on Choice
 
