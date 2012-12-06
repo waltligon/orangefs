@@ -49,7 +49,7 @@ case $CHOICE in
 		sudo rpm -e kernel-`uname -r`
 		#Update grub from current kernel to installed kernel
 		echo "Updating /boot/grub/grub.conf to kernel `rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel`"
-				sudo perl -e "s/`uname -r`/`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel`/g" -p -i /boot/grub/grub.conf 
+		sudo perl -e "s/`uname -r`/`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel`/g" -p -i /boot/grub/grub.conf 
 		echo "Update successful. Rebooting image..."
 		sudo reboot
 		# break

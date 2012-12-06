@@ -63,9 +63,10 @@ case $CHOICE in
 
 
 		echo "Installing TORQUE from devorange: "
-		echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}"
-		wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}
+		echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
+		wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
 		#cd  devorange.clemson.edu/pvfs/openSUSE-12.2/RPMS/x86_64
+		ls *.rpm
 		sudo rpm -e libtorque2
 		sudo rpm -ivh *.rpm
 		cd -
@@ -82,8 +83,9 @@ case $CHOICE in
 
 
 		echo "Installing TORQUE from devorange: "
-		echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}"
-		wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}
+		echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
+		wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
+		ls *.rpm
 		sudo rpm -ivh torque*.rpm
 
 		;;
