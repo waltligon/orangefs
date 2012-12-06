@@ -9,9 +9,10 @@ sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make lin
 
 
 #prepare source
-cd /usr/src/linux-source-3.2.0/
-sudo tar -xjf linux-source-3.2.0.tar.bz2  &> /dev/null
-cd linux-source-3.2.0/
+SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
+cd /usr/src/${SOURCENAME}
+sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
+cd ${SOURCENAME}/
 sudo cp /boot/config-`uname -r` .config
 sudo make oldconfig &> /dev/null
 sudo make prepare &>/dev/null

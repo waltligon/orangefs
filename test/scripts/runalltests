@@ -93,16 +93,28 @@ export DELETE_INSTANCE
 #Determine VM User from system
 case $VMSYSTEM in 
 
-	cloud-rhel6)
-		VMUSER=ec2-user
-		;;
 	cloud-ubuntu-12.04)
+	cloud-ubuntu-11.04)
+	cloud-ubuntu-10.10)
+	cloud-ubuntu-8.04)
+	cloud-ubuntu-12.04-i386)
+	cloud-ubuntu-11.10)
+	cloud-ubuntu-11.10-i386)
+	cloud-ubuntu-10.04)
+	cloud-ubuntu-11.04-i386)
+	cloud-ubuntu-10.10-i386)
+	cloud-ubuntu-10.04-i386)
+	cloud-ubuntu-8.04-i386)
 		VMUSER=ubuntu
 		;;
+	cloud-rhel6)
+	cloud-rhel5)
+	cloud-centos6)
+	cloud-rhel5-i386)
+	cloud-sl6-i386)
 	cloud-sl6)
-		VMUSER=ec2-user
-		;;
 	cloud-fedora17)
+	cloud-fedora17-i386)
 		VMUSER=ec2-user
 		;;
 	*)
@@ -193,7 +205,7 @@ do
 done
 
 # install all system updates and reboot
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < update-${VMSYSTEM}.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-${VMSYSTEM}.sh 
 
 echo "Waiting for image to reboot..."
 sleep 20
@@ -211,7 +223,7 @@ done
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 echo "Preparing the image for testing..."
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-${VMSYSTEM}.sh 
 
 echo ""
 echo "Running tests..."
