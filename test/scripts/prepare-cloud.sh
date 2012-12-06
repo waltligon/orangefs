@@ -10,9 +10,9 @@ CHOICE=$VMSYSTEM
 # get the architecture
 if [[ $CHOICE =~ 'i386' ]]
 then
-	$ARCH=i386
+	ARCH=i386
 else
-	$ARCH=x86_64
+	ARCH=x86_64
 fi
 	
 $SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
