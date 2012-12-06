@@ -1,5 +1,5 @@
 /* 
- * (C) 2011 Clemson University
+ * (C) 2012 Clemson University
  *
  * See COPYING in top-level directory.
  */
@@ -25,9 +25,6 @@ public class OrangeFileSystemInputStream
     public long filePtr;
     public long bufferPtr;
     public long fileSize;
-
-    /* FileSystem Statistics */
-    //public FileSystem.Statistics statistics;
 
     public OrangeFileSystemInputStream(
             String path,
@@ -151,7 +148,11 @@ public class OrangeFileSystemInputStream
         }
         byte c[] = new byte[len];
         int ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
-        if(ret < len) {
+        System.out.println("orange.stdio.fread ret = " + ret);
+
+        /* TODO make this == 0 ? */
+        if(ret <= 0) {
+            System.out.println("Nothing read -> " + ret + " / " + len);
             /* Check for EOF */
             if(orange.stdio.feof(filePtr) != 0) {
                 orange.stdio.clearerr(filePtr);
@@ -164,11 +165,11 @@ public class OrangeFileSystemInputStream
                     ret + " of " + len + "): " + path);
             }
         }
-        /*
-        if(statistics != null) {
-            statistics.incrementBytesRead(ret);
+
+        if(ret < len) {
+            System.out.println("Short item count!-> " + ret + " / " + len);
         }
-        */
+
         System.arraycopy(c, 0, b, off, ret);
         return ret;
     }

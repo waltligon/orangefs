@@ -126,12 +126,14 @@ public class PVFS2STDIOJNI {
     }
     
     static {
+        String ldlpath = System.getenv("JNI_LIBRARY_PATH");
+        //System.out.println("ldlpath=" + ldlpath);
         try {
-            System.loadLibrary("PVFS2STDIOJNI");
+            System.load(ldlpath + "/libPVFS2STDIOJNI.so");
         } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load libPVFS2STDIOJNI.so.");
-            System.err.println("java.library.path = " + System.getProperty("java.library.path"));
+            System.err.println("JNI_LIBRARY_PATH = " + System.getenv("JNI_LIBRARY_PATH"));
             System.exit(-1);
         }
     }

@@ -225,7 +225,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
 
-    DIR*dirp = NULL;
+    DIR * dirp = NULL;
     struct dirent * direntp = NULL;
 
     /* Open the directory specified by cpath */
@@ -654,6 +654,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fread(JNIEnv *env, jobject obj, jbyteArra
 err:
     /* copy back and free the ptr using 0 */
     (*env)->ReleaseByteArrayElements(env, ptr, cptr, 0);
+    JNI_FLUSH
     return (jlong) rc;
 }
 
@@ -685,10 +686,8 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fwrite(JNIEnv *env,
     }
     else
     {
-        /*
         if(JNI_DBG) jni_printf("\twrote %llu bytes\n", 
             ((long long unsigned int) rc * (long long unsigned int) size));
-        */
     }
 err:
     /* copy back and free the ptr using 0 */

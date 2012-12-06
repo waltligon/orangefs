@@ -73,9 +73,6 @@ public class OrangeFileSystemOutputStream extends OutputStream {
         if(filePtr == 0 ) {
             return; 
         }
-
-        //TODO: Determine if flush should be called here
-
         if(orange.stdio.fclose(filePtr) != 0) {
             throw new IOException("Couldn't close stream: " + path);
         }

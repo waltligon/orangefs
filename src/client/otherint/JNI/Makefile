@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# (C) 2012 Clemson University and The University of Chicago.
+# (C) 2012 Clemson University
 # See COPYING in top-level directory.
 
 # Purpose: create a shared library that can be loaded by a Java class exposing 
@@ -22,10 +22,12 @@ JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
 OFS_JNI =$(INSTALL)/lib/ofs_jni.jar
 #Path to OFS-Hadoop Code
 OFS_HADOOP=org/apache/hadoop/fs/ofs
+#HADOOP VERSION
+HADOOP_VERSION="1.1.1"
 #Dir containing Hadoop files
-HADOOP_DIR=$(HOME)/hadoop-1.0.3
+HADOOP_DIR=$(HOME)/hadoop-$(HADOOP_VERSION)
 #Name of Hadoop Core Jar File
-CORE_NAME=hadoop-core-1.0.3.jar
+CORE_NAME=hadoop-core-$(HADOOP_VERSION).jar
 #Path to Hadoop's core Jar
 HADOOP_CORE=$(HADOOP_DIR)/$(CORE_NAME)
 

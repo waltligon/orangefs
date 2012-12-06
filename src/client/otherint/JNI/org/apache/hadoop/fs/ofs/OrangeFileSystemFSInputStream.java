@@ -35,7 +35,11 @@ public class OrangeFileSystemFSInputStream
         displayMethodInfo(true, false);
         int ret = super.read();
         if(ret != -1 && statistics != null) {
+            System.out.println("<<<<< OrangeFileSystemFSInputStream: int ret = " + ret + " >>>>>");
             statistics.incrementBytesRead(1);
+        }
+        if(statistics == null) {
+            System.out.println("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }
@@ -46,7 +50,12 @@ public class OrangeFileSystemFSInputStream
         int ret = super.read(b);
         if(ret > 0 && statistics != null) {
             statistics.incrementBytesRead(ret);
+            System.out.println("<<<<< OrangeFileSystemFSInputStream: byte[] ret = " + ret + " >>>>>");
         }
+        if(statistics == null) {
+            System.out.println("couldn't increment statistics: statistics is null!");
+        }
+
         return ret;
     }
 
@@ -55,7 +64,11 @@ public class OrangeFileSystemFSInputStream
         displayMethodInfo(true, false);
         int ret = super.read(b, off, len);
         if(ret > 0 && statistics != null) {
+            System.out.println("<<<<< OrangeFileSystemFSInputStream: off ret = " + ret + " >>>>>");
             statistics.incrementBytesRead(ret);
+        }
+        if(statistics == null) {
+            System.out.println("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }

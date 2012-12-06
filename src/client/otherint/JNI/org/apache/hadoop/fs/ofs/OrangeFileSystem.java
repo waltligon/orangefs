@@ -34,10 +34,10 @@ public class OrangeFileSystem extends FileSystem {
     public PVFS2STDIOJNIFlags sf;
 
     private URI uri;
+    private String ofsMount;
     private Path workingDirectory;
-    private Path ofsDirectory;
-    //TODO: is the local file system necessary for OrangeFS
-    //private FileSystem localFS;
+
+    private FileSystem localFS;
 
     public OrangeFileSystem()
     {
@@ -55,17 +55,53 @@ public class OrangeFileSystem extends FileSystem {
     public void initialize(URI uri, Configuration conf) throws IOException {
         displayMethodInfo(true, false);
 
-        //System.out.println("uri: " + uri.toString());
-        //System.out.println("conf: " + conf.toString());
+        System.out.println("uri: " + uri.toString());
+        System.out.println("conf: " + conf.toString());
 
-        ofsDirectory = new Path(conf.get("fs.ofs.mntLocation", "/mnt/orangefs"));
-        workingDirectory = new Path(ofsDirectory.toString() + "/user/" + 
-            System.getProperty("user.name"));
-        System.out.println("workingDirectory = " + workingDirectory.toString());
+        workingDirectory = new Path("/");
         this.uri = uri;
-        System.out.println("this.uri: " + this.uri.toString());
+        this.ofsMount = conf.get("fs.ofs.mntLocation", "/mnt/pvfs2");
 
-        System.exit(-1);
+        workingDirectory = new Path(
+            ofsMount + "/user/" + 
+            System.getProperty("user.name")).makeQualified(this);
+
+        System.out.println("workingDirectory = " + workingDirectory.toString());
+
+        /* Set the configuration for this file system in case methods need 
+         * access to its values later.
+         */
+        setConf(conf);
+
+        /* Set the local file system */
+        this.localFS = FileSystem.getLocal(conf);
+
+        /* Get OFS statistics */
+        statistics = getStatistics(uri.getScheme(), getClass());
+        //System.out.println("FileSystem.statistics: " + this.statistics.toString());
+        
+        System.out.println("getHomeDirectory = " + getHomeDirectory().toString());
+        //System.exit(-1);
+    }
+
+    private Path absolutePath(Path path) {
+        displayMethodInfo(true, false);
+
+        if(path.isAbsolute()) {
+            return path;
+        }
+        return new Path(workingDirectory, path);
+    }
+
+    /* Return a Path as a String that OrangeFS can use */
+    private String getOFSPath(Path path) {
+        Path absolutePath = absolutePath(path);
+        return absolutePath.toUri().getPath();
+    }
+
+    public Path getHomeDirectory() {
+        return this.makeQualified(
+        new Path(ofsMount + "/user/"+System.getProperty("user.name")));
     }
 
     /* Returns a list of parent directories of a given path that don't exist,
@@ -74,6 +110,8 @@ public class OrangeFileSystem extends FileSystem {
      */
     public Path [] getNonexistentParentPaths(Path f) throws IOException {
         displayMethodInfo(true, false);
+
+        f = absolutePath(f);
 
         System.out.println("Path f = " + f);
         System.out.println("depth = " + f.depth());
@@ -90,37 +128,19 @@ public class OrangeFileSystem extends FileSystem {
         return (Path []) list.toArray(new Path[0]);
     }
 
-    /* Return the current user's home directory in this filesystem. 
-     */
-    public Path getHomeDirectory() {
-        displayMethodInfo(true, false);
-
-        return this.ofsDirectory;
-    }
-
-    private Path absolutePath(Path path) {
-        displayMethodInfo(true, false);
-
-        if(path.isAbsolute()) {
-            return path;
-        }
-        return new Path(workingDirectory, path);
-    } 
-
     // Append to an existing file (optional operation).
     public FSDataOutputStream append(Path f, int bufferSize,
         Progressable progress) throws IOException {
         displayMethodInfo(true, false);
 
-        System.out.println("append parameters: {\n\tPath f= " +  f.toString() +
-            "\n\tint bufferSize= " + bufferSize +
-            "\n\tProgressable progress= IDK");
+        String fOFS = getOFSPath(f);
 
-        Path fAbs = absolutePath(f);
+        System.out.println("append parameters: {\n\tPath f= " +  fOFS +
+            "\n\tint bufferSize= " + bufferSize);
 
         OrangeFileSystemOutputStream ofsOutputStream =
             new OrangeFileSystemOutputStream(
-                fAbs.toString(), bufferSize, (short) 0, false);
+                fOFS, bufferSize, (short) 0, false);
 
         FSDataOutputStream ofsDataOutputStream = new FSDataOutputStream(
             ofsOutputStream, statistics);
@@ -134,34 +154,33 @@ public class OrangeFileSystem extends FileSystem {
         Progressable progress) throws IOException {
         displayMethodInfo(true, false);
 
-        System.out.println("create parameters: {\n\tPath f= " +  f.toString() +
+        f = absolutePath(f);
+        String fOFS = getOFSPath(f);
+
+        System.out.println("create parameters: {\n\tPath f= " +  fOFS +
             "\n\tFsPermission permission= " + permission.toString() +
             "\n\tboolean overwrite= " + overwrite +
             "\n\tint bufferSize= " + bufferSize +
             "\n\tshort replication= " + replication +
-            "\n\tlong blockSize= " + blockSize +
-            "\n\tProgressable progress= IDK");
-
-        Path fAbs = absolutePath(f);
+            "\n\tlong blockSize= " + blockSize);
 
         /* Does this file exist*/
-        if(exists(fAbs))
+        if(exists(f))
         {
             if(overwrite) {
-                delete(fAbs);
+                delete(f);
             }
             else {
-                throw new IOException("The file: " + fAbs.toString() + 
+                throw new IOException("The file: " + fOFS + 
                     " exists and overwrite wasn't specified.");
             }
         }
         else {
-            Path fParent = fAbs.getParent();
+            Path fParent = f.getParent();
             /* Check if parent directory exists.. if it doesn't call mkdirs on it */
             if(fParent != null && !exists(fParent))
             {
-                //TODO add permission instead of null
-                if(!mkdirs(fParent, null)) {
+                if(!mkdirs(fParent, permission)) {
                     throw new IOException(
                         "Failed to create parent directorie(s)");
                 }
@@ -170,7 +189,7 @@ public class OrangeFileSystem extends FileSystem {
 
         OrangeFileSystemOutputStream ofsOutputStream = 
             new OrangeFileSystemOutputStream(
-                fAbs.toString(), bufferSize, replication, false);
+                fOFS, bufferSize, replication, false);
 
         FSDataOutputStream ofsDataOutputStream = new FSDataOutputStream(
             ofsOutputStream, statistics);
@@ -186,29 +205,27 @@ public class OrangeFileSystem extends FileSystem {
 
         System.out.println((recursive) ? "Recursive Delete!" : "Standard Delete");
 
-        Path fAbs = absolutePath(f);
-        String fAbs_string = fAbs.toUri().getPath();
-        if(isDir(fAbs)) {
+        String fOFS = getOFSPath(f);
+
+        if(isDir(f)) {
             if(recursive) {
-                ret = (orange.stdio.recursiveDelete(fAbs_string) == 0) ? true : false;
+                ret = (orange.stdio.recursiveDelete(fOFS) == 0) ? true : false;
                 try {
                     /* TODO: determine why the delete takes a while to 
                      * actually occurr. 
                      */
                     Thread.sleep(3000);
                 } catch (InterruptedException e){
-                    //
+                    //TODO
                 }
             }
             else {
-                ret = (orange.posix.rmdir(fAbs_string) == 0) ? true : false;
+                ret = (orange.posix.rmdir(fOFS) == 0) ? true : false;
             }
         }
         else {
-            ret = (orange.posix.unlink(fAbs_string) == 0) ? true : false;
+            ret = (orange.posix.unlink(fOFS) == 0) ? true : false;
         }
-        //
-        //System.exit(-1);
         return ret;
     }
 
@@ -234,9 +251,9 @@ public class OrangeFileSystem extends FileSystem {
     public boolean isDir(Path f) throws FileNotFoundException {
         displayMethodInfo(true, false);
 
-        Path p = absolutePath(f);
-        String s = p.toUri().getPath();
-        Stat stats = orange.posix.stat(s);
+        String fOFS = getOFSPath(f);
+
+        Stat stats = orange.posix.stat(fOFS);
         if(stats == null)
         {
             throw new FileNotFoundException();
@@ -249,24 +266,32 @@ public class OrangeFileSystem extends FileSystem {
         throws FileNotFoundException, IOException {
         displayMethodInfo(true, false);
 
+        String fOFS = getOFSPath(f);
         Stat stats = null;
-        Path p = absolutePath(f);
-        String s = p.toUri().getPath();
         boolean isdir = false;
 
         //Stat file through JNI
-        stats = orange.posix.stat(s);
+        stats = orange.posix.stat(fOFS);
         if(stats == null)
         {
-            System.out.println("getFileStats not found path: " + s);
+            System.out.println("getFileStats not found path: " + fOFS);
             throw new FileNotFoundException();
         }
 
         isdir = orange.posix.isDir(stats.st_mode) == 0 ? false : true;
 
-        //TODO deal with these two parameters later
+        //TODO: handle block replication later
         int block_replication = 0;
-        FsPermission perm = new FsPermission("700");
+
+        //Get UGO permissions out of st_mode...
+        int intPermission = stats.st_mode & 0777;
+        String octal = Integer.toOctalString(intPermission);
+
+        System.out.println("stats.st_mode: " + stats.st_mode);
+        System.out.println("intPermission: " + intPermission);
+        System.out.println("octal perms: " + octal);
+        FsPermission permission = new FsPermission(octal);
+        System.out.println(permission.toString());
 
         String [] ug = orange.stdio.getUsernameGroupname((int) stats.st_uid,
             (int) stats.st_gid);
@@ -275,38 +300,36 @@ public class OrangeFileSystem extends FileSystem {
             throw new IOException();
         }   
 
-        /*
+        /**/
         System.out.println("uid, username = <" + stats.st_uid + 
             ", " + ug[0] + ">"); 
         System.out.println("gid, groupname = <" + stats.st_gid + 
             ", " + ug[1] + ">");
-        */
+        /**/
 
-        FileStatus fileStatus = new FileStatus(stats.st_size, isdir, 
-            block_replication, stats.st_blksize, stats.st_mtime, 
-            stats.st_atime, perm, ug[0], ug[1], p);  
+        FileStatus fileStatus = new FileStatus(
+            stats.st_size, 
+            isdir, 
+            block_replication, 
+            stats.st_blksize, 
+            stats.st_mtime * 1000, //got seconds from pvfs, hadoop expects milliseconds
+            stats.st_atime * 1000, //same here
+            permission, 
+            ug[0], 
+            ug[1], 
+            absolutePath(f).makeQualified(this));  
         return fileStatus;
     }
 
     // Returns a URI whose scheme and authority identify this FileSystem.
     public URI getUri() {
         displayMethodInfo(true, false);
-
-        /*
-        try {
-            URI u = new URI("");
-            return u;
-        } catch(URISyntaxException e) {
-
-        }*/
         return uri;
     }
 
     // Get the current working directory for the given file system.
     public Path getWorkingDirectory() {
         displayMethodInfo(true, false);
-
-        //return new Path("");
         return workingDirectory;
     }
 
@@ -315,17 +338,16 @@ public class OrangeFileSystem extends FileSystem {
     public FileStatus[] listStatus(Path f) throws IOException {
         displayMethodInfo(true, false);
 
-        Path absolutePath = absolutePath(f);
-        String s = absolutePath.toUri().getPath();
-        System.out.println(s);
+        String fOFS = getOFSPath(f);
+        System.out.println(fOFS);
 
-        String [] fileNames = orange.stdio.getFilesInDir(s);
+        String [] fileNames = orange.stdio.getFilesInDir(fOFS);
         if(fileNames == null)
             return null;
 
         for(int i = 0; i < fileNames.length; i++) {
             System.out.println(fileNames[i]);
-            fileNames[i] = s + "/" + fileNames[i];
+            fileNames[i] = fOFS + "/" + fileNames[i];
         }
 
         FileStatus[] statusArray = new FileStatus[fileNames.length];
@@ -333,54 +355,53 @@ public class OrangeFileSystem extends FileSystem {
             try {
                 statusArray[i] = getFileStatus(new Path(fileNames[i]));
             } catch(FileNotFoundException e) {
+                //TODO
                 return null;
             } catch(IOException e) {
+                //TODO
                 return null;
             }
         }
         return statusArray;
     }
 
-    // Make sure that a path specifies a FileSystem.
-    public Path makeQualified(Path path) {
-        displayMethodInfo(true, false);
-        // TODO: fix this later
-        return path;
-    }
-
     // Make the given file and all non-existent parents into directories.
     public boolean mkdirs(Path f, FsPermission permission) throws IOException {
         displayMethodInfo(true, false);
 
-        Path absolutePath = absolutePath(f);
-        String s = absolutePath.toUri().getPath();
+        String fOFS = getOFSPath(f);
 
-        System.out.println("mkdirs attempting to create directory: " + s);
+        System.out.println("mkdirs attempting to create directory: " + fOFS);
+        short shortPermission = permission.toShort();
+        //String octal_string_perm = Integer.toOctalString(short_perm);
+        //octal_string_perm = "0" + octal_string_perm;
+        //long long_perm = Long.parseLong(octal_string_perm, 8);
+        //System.out.println("permission as octal string = " + octal_string_perm);
+
+        long longPermission = (long) shortPermission;
         System.out.println("permission toString() = " + permission.toString());
-        System.out.println("permission umask String = " + permission.UMASK_LABEL);
-        System.out.println("permission umask int = " + permission.DEFAULT_UMASK);
-        System.out.println("permission dep = " + permission.DEPRECATED_UMASK_LABEL);
+        System.out.println("permission toShort() = " + shortPermission);
+        System.out.println("permission as long = " + longPermission);
 
         /* Check to see if the directory already exists. */
-        if(exists(absolutePath)) {
-            System.err.println("mkdirs failed: " + s + " already exists");
+        if(exists(f)) {
+            System.err.println("mkdirs failed: " + fOFS + " already exists");
             return false;
         }
 
         /* Check to see if any parent Paths don't exists */
-        Path [] nonPaths = getNonexistentParentPaths(absolutePath);
+        Path [] nonPaths = getNonexistentParentPaths(f);
         int toMkdir = nonPaths.length;
         for(int i = 0; i < toMkdir; i++)
         {
-            //TODO adjust permissions
-            int rc  = orange.posix.mkdir(nonPaths[i].toString(), pf.S_IRWXU | pf.S_IRWXG);
+            int rc  = orange.posix.mkdir(getOFSPath(nonPaths[i]), longPermission);
             if(rc != 0) {
                 throw new IOException("The parent directory: " + 
                     nonPaths[i].toString() + " couldn't be created.");
             }
         }
 
-        int rc  = orange.posix.mkdir(s, pf.S_IRWXU);
+        int rc  = orange.posix.mkdir(fOFS, longPermission);
         if(rc == 0) {
             return true;
         }
@@ -391,16 +412,16 @@ public class OrangeFileSystem extends FileSystem {
     public FSDataInputStream open(Path f, int bufferSize)
         throws IOException {
         displayMethodInfo(true, false);
-        Path absolutePath = absolutePath(f);
-        String s = absolutePath.toUri().getPath();
-        return new FSDataInputStream(new OrangeFileSystemFSInputStream(s, bufferSize, statistics)); 
+
+        String fOFS = getOFSPath(f);
+        return new FSDataInputStream(new OrangeFileSystemFSInputStream(fOFS, bufferSize, statistics)); 
     }
 
     // Renames Path src to Path dst.
     public boolean rename(Path src, Path dst) throws IOException {
         displayMethodInfo(true, false);
-        String src_string = absolutePath(src).toUri().getPath();
-        String dst_string = absolutePath(dst).toUri().getPath();
+        String src_string = getOFSPath(src);
+        String dst_string = getOFSPath(dst);
         return (orange.posix.rename(src_string, dst_string) == 0);
     }
 
@@ -413,15 +434,31 @@ public class OrangeFileSystem extends FileSystem {
     public void copyFromLocalFile(boolean delSrc, Path src, Path dst)
             throws IOException {
         displayMethodInfo(true, false);
-        //FileUtil.copy(localFS, src, this, dst, delSrc, getConf());
-        FileUtil.copy(this, src, this, dst, delSrc, getConf());
+
+        //TODO unnecessary???
+        String dstOFS = getOFSPath(dst);
+
+        FileUtil.copy(localFS, src, this, new Path(dstOFS), delSrc, getConf());
     }
 
     public void copyToLocalFile(boolean delSrc, Path src, Path dst)
             throws IOException {
         displayMethodInfo(true, false);
-        //FileUtil.copy(this, src, localFS, dst, delSrc, getConf());
-        FileUtil.copy(this, src, this, dst, delSrc, getConf());
+
+        //TODO unnecessary???
+        String srcOFS = getOFSPath(src);
+        FileUtil.copy(this, new Path(srcOFS), localFS, dst, delSrc, getConf());
+    }
+
+    public Path startLocalOutput(Path fsOutputFile, Path tmpLocalFile) throws IOException {
+        displayMethodInfo(true, true);
+        return tmpLocalFile;
+    }
+
+    public void completeLocalOutput(Path fsOutputFile, Path tmpLocalFile) throws IOException {
+        displayMethodInfo(true, true);
+        String fsOutputFileOFS = getOFSPath(fsOutputFile);
+        moveFromLocalFile(tmpLocalFile, new Path(fsOutputFileOFS));
     }
 
     // Deprecated. Use delete(Path, boolean) instead
