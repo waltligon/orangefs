@@ -12,12 +12,16 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.PositionedReadable;
 import java.io.Closeable;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class OrangeFileSystemFSInputStream 
         extends OrangeFileSystemInputStream 
         implements Closeable, Seekable, PositionedReadable {
 
     private FileSystem.Statistics statistics;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemFSInputStream.class);
 
     /* Constructor Passes Params to Parent Class and initializes stats */
     public OrangeFileSystemFSInputStream(
@@ -35,11 +39,11 @@ public class OrangeFileSystemFSInputStream
         displayMethodInfo(true, false);
         int ret = super.read();
         if(ret != -1 && statistics != null) {
-            System.out.println("<<<<< OrangeFileSystemFSInputStream: int ret = " + ret + " >>>>>");
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: int ret = " + ret + " >>>>>");
             statistics.incrementBytesRead(1);
         }
         if(statistics == null) {
-            System.out.println("couldn't increment statistics: statistics is null!");
+            OFSLOG.debug("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }
@@ -50,10 +54,10 @@ public class OrangeFileSystemFSInputStream
         int ret = super.read(b);
         if(ret > 0 && statistics != null) {
             statistics.incrementBytesRead(ret);
-            System.out.println("<<<<< OrangeFileSystemFSInputStream: byte[] ret = " + ret + " >>>>>");
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: byte[] ret = " + ret + " >>>>>");
         }
         if(statistics == null) {
-            System.out.println("couldn't increment statistics: statistics is null!");
+            OFSLOG.debug("couldn't increment statistics: statistics is null!");
         }
 
         return ret;
@@ -64,11 +68,11 @@ public class OrangeFileSystemFSInputStream
         displayMethodInfo(true, false);
         int ret = super.read(b, off, len);
         if(ret > 0 && statistics != null) {
-            System.out.println("<<<<< OrangeFileSystemFSInputStream: off ret = " + ret + " >>>>>");
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: off ret = " + ret + " >>>>>");
             statistics.incrementBytesRead(ret);
         }
         if(statistics == null) {
-            System.out.println("couldn't increment statistics: statistics is null!");
+            OFSLOG.debug("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }
@@ -142,11 +146,12 @@ public class OrangeFileSystemFSInputStream
             String methodName =
                 Thread.currentThread().getStackTrace()[2].getMethodName();
             if(showName) {
-                System.out.println("method=[" + methodName + "]");
+                OFSLOG.debug("method=[" + methodName + "]");
+                
             }
             if(showStack) {
-                System.out.print("\t");
-                Thread.currentThread().dumpStack();
+                //System.out.print("\t");
+                //Thread.currentThread().dumpStack();
             }
         }
     }

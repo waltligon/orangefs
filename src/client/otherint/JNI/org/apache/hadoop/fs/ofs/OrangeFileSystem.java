@@ -24,6 +24,9 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.orangefs.usrint.*;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /* An extension of the Hadoop FileSystem class utilizing OrangeFS as the
  * file system.
  */
@@ -38,6 +41,8 @@ public class OrangeFileSystem extends FileSystem {
     private Path workingDirectory;
 
     private FileSystem localFS;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystem.class);
 
     public OrangeFileSystem()
     {
@@ -55,8 +60,8 @@ public class OrangeFileSystem extends FileSystem {
     public void initialize(URI uri, Configuration conf) throws IOException {
         displayMethodInfo(true, false);
 
-        System.out.println("uri: " + uri.toString());
-        System.out.println("conf: " + conf.toString());
+        OFSLOG.info("uri: " + uri.toString());
+        OFSLOG.info("conf: " + conf.toString());
 
         workingDirectory = new Path("/");
         this.uri = uri;
@@ -66,7 +71,7 @@ public class OrangeFileSystem extends FileSystem {
             ofsMount + "/user/" + 
             System.getProperty("user.name")).makeQualified(this);
 
-        System.out.println("workingDirectory = " + workingDirectory.toString());
+        OFSLOG.info("workingDirectory = " + workingDirectory.toString());
 
         /* Set the configuration for this file system in case methods need 
          * access to its values later.
@@ -78,10 +83,9 @@ public class OrangeFileSystem extends FileSystem {
 
         /* Get OFS statistics */
         statistics = getStatistics(uri.getScheme(), getClass());
-        //System.out.println("FileSystem.statistics: " + this.statistics.toString());
-        
-        System.out.println("getHomeDirectory = " + getHomeDirectory().toString());
-        //System.exit(-1);
+        OFSLOG.debug("OrangeFileSystem.statistics: " + this.statistics.toString());        
+
+        OFSLOG.info("home directory = " + getHomeDirectory().toString());
     }
 
     private Path absolutePath(Path path) {
@@ -113,17 +117,17 @@ public class OrangeFileSystem extends FileSystem {
 
         f = absolutePath(f);
 
-        System.out.println("Path f = " + f);
-        System.out.println("depth = " + f.depth());
+        OFSLOG.debug("Path f = " + f);
+        OFSLOG.debug("depth = " + f.depth());
 
         ArrayList<Path> list = new ArrayList<Path>();
         Path temp = new Path(f.getParent().toString());
         while(!exists(temp)) {
-                System.out.println("Parent path: " + temp.toString() + " is missing.");
+                OFSLOG.debug("Parent path: " + temp.toString() + " is missing.");
                 list.add(temp);
                 temp = new Path(temp.getParent().toString());
         }
-        System.out.println("Missing " + list.size() + " parent directories.");
+        OFSLOG.debug("Missing " + list.size() + " parent directories.");
         Collections.reverse(list);
         return (Path []) list.toArray(new Path[0]);
     }
@@ -135,7 +139,7 @@ public class OrangeFileSystem extends FileSystem {
 
         String fOFS = getOFSPath(f);
 
-        System.out.println("append parameters: {\n\tPath f= " +  fOFS +
+        OFSLOG.debug("append parameters: {\n\tPath f= " +  fOFS +
             "\n\tint bufferSize= " + bufferSize);
 
         OrangeFileSystemOutputStream ofsOutputStream =
@@ -157,7 +161,7 @@ public class OrangeFileSystem extends FileSystem {
         f = absolutePath(f);
         String fOFS = getOFSPath(f);
 
-        System.out.println("create parameters: {\n\tPath f= " +  fOFS +
+        OFSLOG.debug("create parameters: {\n\tPath f= " +  fOFS +
             "\n\tFsPermission permission= " + permission.toString() +
             "\n\tboolean overwrite= " + overwrite +
             "\n\tint bufferSize= " + bufferSize +
@@ -203,7 +207,7 @@ public class OrangeFileSystem extends FileSystem {
         int rc = 0;
         boolean ret = false;
 
-        System.out.println((recursive) ? "Recursive Delete!" : "Standard Delete");
+        OFSLOG.debug((recursive) ? "Recursive Delete!" : "Standard Delete");
 
         String fOFS = getOFSPath(f);
 
@@ -237,12 +241,13 @@ public class OrangeFileSystem extends FileSystem {
         try { 
             FileStatus status = getFileStatus(f);
             if(status == null) {
-                System.out.println(f.toString() + " not found\n!");
+                OFSLOG.debug(f.toString() + " not found\n!");
             }
         } catch (FileNotFoundException e) {
-            //throw new IOException("Couldn't stat file.");
+            //TODO
             return false;
         } catch (IOException e) {
+            //TODO
             return false;
         }
         return true;
@@ -274,7 +279,7 @@ public class OrangeFileSystem extends FileSystem {
         stats = orange.posix.stat(fOFS);
         if(stats == null)
         {
-            System.out.println("getFileStats not found path: " + fOFS);
+            OFSLOG.debug("getFileStats not found path: " + fOFS);
             throw new FileNotFoundException();
         }
 
@@ -287,23 +292,24 @@ public class OrangeFileSystem extends FileSystem {
         int intPermission = stats.st_mode & 0777;
         String octal = Integer.toOctalString(intPermission);
 
-        System.out.println("stats.st_mode: " + stats.st_mode);
-        System.out.println("intPermission: " + intPermission);
-        System.out.println("octal perms: " + octal);
+        OFSLOG.debug("stats.st_mode: " + stats.st_mode);
+        OFSLOG.debug("intPermission: " + intPermission);
+        OFSLOG.debug("octal perms: " + octal);
+
         FsPermission permission = new FsPermission(octal);
-        System.out.println(permission.toString());
+        OFSLOG.debug(permission.toString());
 
         String [] ug = orange.stdio.getUsernameGroupname((int) stats.st_uid,
             (int) stats.st_gid);
         if(ug == null) {
-            System.out.println("getUsernameGroupname returned null");
+            OFSLOG.warn("getUsernameGroupname returned null");
             throw new IOException();
         }   
 
         /**/
-        System.out.println("uid, username = <" + stats.st_uid + 
-            ", " + ug[0] + ">"); 
-        System.out.println("gid, groupname = <" + stats.st_gid + 
+        OFSLOG.debug("uid, username = <" + stats.st_uid +
+            ", " + ug[0] + ">");
+        OFSLOG.debug("gid, groupname = <" + stats.st_gid +
             ", " + ug[1] + ">");
         /**/
 
@@ -339,14 +345,14 @@ public class OrangeFileSystem extends FileSystem {
         displayMethodInfo(true, false);
 
         String fOFS = getOFSPath(f);
-        System.out.println(fOFS);
+        OFSLOG.debug(fOFS);
 
         String [] fileNames = orange.stdio.getFilesInDir(fOFS);
         if(fileNames == null)
             return null;
 
         for(int i = 0; i < fileNames.length; i++) {
-            System.out.println(fileNames[i]);
+            OFSLOG.debug(fileNames[i]);
             fileNames[i] = fOFS + "/" + fileNames[i];
         }
 
@@ -371,21 +377,16 @@ public class OrangeFileSystem extends FileSystem {
 
         String fOFS = getOFSPath(f);
 
-        System.out.println("mkdirs attempting to create directory: " + fOFS);
+        OFSLOG.debug("mkdirs attempting to create directory: " + fOFS);
         short shortPermission = permission.toShort();
-        //String octal_string_perm = Integer.toOctalString(short_perm);
-        //octal_string_perm = "0" + octal_string_perm;
-        //long long_perm = Long.parseLong(octal_string_perm, 8);
-        //System.out.println("permission as octal string = " + octal_string_perm);
-
         long longPermission = (long) shortPermission;
-        System.out.println("permission toString() = " + permission.toString());
-        System.out.println("permission toShort() = " + shortPermission);
-        System.out.println("permission as long = " + longPermission);
+        OFSLOG.debug("permission toString() = " + permission.toString());
+        OFSLOG.debug("permission toShort() = " + shortPermission);
+        OFSLOG.debug("permission as long = " + longPermission);
 
         /* Check to see if the directory already exists. */
         if(exists(f)) {
-            System.err.println("mkdirs failed: " + fOFS + " already exists");
+            OFSLOG.warn("mkdirs failed: " + fOFS + " already exists");
             return false;
         }
 
@@ -473,12 +474,14 @@ public class OrangeFileSystem extends FileSystem {
             String methodName =
                 Thread.currentThread().getStackTrace()[2].getMethodName();
             if(showName) {
-                System.out.println("method=[" + methodName + "]");
+                OFSLOG.debug("method=[" + methodName + "]");
             }
+            /*
             if(showStack) {
                 System.out.print("\t");
                 Thread.currentThread().dumpStack();
             }
+            */
         }
     }
 }

@@ -8,6 +8,8 @@ package org.orangefs.usrint;
 
 import java.io.OutputStream;
 import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /* An OFS compatible File Output Stream */
 public class OrangeFileSystemOutputStream extends OutputStream {
@@ -24,6 +26,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
     public long filePtr;
     public long bufferPtr;
     public boolean append;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemOutputStream.class);
 
     public OrangeFileSystemOutputStream (
         String path,
@@ -130,11 +134,11 @@ public class OrangeFileSystemOutputStream extends OutputStream {
             String methodName =
                 Thread.currentThread().getStackTrace()[2].getMethodName();
             if(showName) {
-                System.out.println("method=[" + methodName + "]");
+                OFSLOG.debug("method=[" + methodName + "]");
             }
             if(showStack) {
-                System.out.print("\t");
-                Thread.currentThread().dumpStack();
+                //System.out.print("\t");
+                //Thread.currentThread().dumpStack();
             }
         }
     }

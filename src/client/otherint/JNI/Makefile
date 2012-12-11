@@ -12,9 +12,10 @@
 INSTALL=$(HOME)/trunk
 #Folder containing OrangeFS src, etc.
 TOP=$(HOME)/trunk/ofs
-# JAVA: Found by running: 
-#    readlink -f /usr/bin/javac | sed "s:bin/javac::"
-JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
+# Java found by running: 
+#`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
+JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
+COMMONS_LOGGING=$(HOME)/commons-logging-1.1.1/commons-logging-1.1.1.jar
 
 #Hadoop Only Related Configuration Values
 #------------------------------------------------------------------------------
@@ -30,6 +31,7 @@ HADOOP_DIR=$(HOME)/hadoop-$(HADOOP_VERSION)
 CORE_NAME=hadoop-core-$(HADOOP_VERSION).jar
 #Path to Hadoop's core Jar
 HADOOP_CORE=$(HADOOP_DIR)/$(CORE_NAME)
+HADOOP_LIB_DIR=$(HADOOP_DIR)/lib
 
 #Don't Modify the following:
 #------------------------------------------------------------------------------
@@ -58,7 +60,7 @@ install : ofs_jni.jar
 
 #Generate class files for I/O Streams
 $(IOSTREAM_CLASS) : $(IOSTREAM_JAVA)
-	javac $(IOSTREAM_JAVA)
+	javac -cp "$(COMMONS_LOGGING):." $(IOSTREAM_JAVA)
 
 #Hadoop Only Related Classes
 #==============================================================================
@@ -69,7 +71,7 @@ OFS_CLASS=$(OFS_HADOOP)/OrangeFileSystem.class \
     $(OFS_HADOOP)/OrangeFileSystemFSInputStream.class
 
 $(OFS_CLASS) : $(OFS_JAVA)
-	javac -cp "$(HADOOP_CORE):$(OFS_JNI):." $(OFS_JAVA)
+	javac -cp "$(HADOOP_CORE):$(OFS_JNI):$(COMMONS_LOGGING):." $(OFS_JAVA)
 
 ofs.jar : ofs_jni.jar $(OFS_CLASS)
 	jar cf ofs.jar $(OFS_CLASS)

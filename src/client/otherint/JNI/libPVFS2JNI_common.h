@@ -2,7 +2,7 @@
 #define LIBPVFS2JNI_COMMON_H
 
 /* Debug Ouput On/OFF */
-#define JNI_DBG 1
+#define JNI_DBG 0
 
 /* NULL jobject */
 #define NULL_OBJ ((jobject) 0)

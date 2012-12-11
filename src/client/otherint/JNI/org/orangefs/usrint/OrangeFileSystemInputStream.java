@@ -9,6 +9,8 @@ package org.orangefs.usrint;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.Closeable;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class OrangeFileSystemInputStream 
         extends InputStream 
@@ -25,6 +27,9 @@ public class OrangeFileSystemInputStream
     public long filePtr;
     public long bufferPtr;
     public long fileSize;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemInputStream.class);
+
 
     public OrangeFileSystemInputStream(
             String path,
@@ -148,11 +153,11 @@ public class OrangeFileSystemInputStream
         }
         byte c[] = new byte[len];
         int ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
-        System.out.println("orange.stdio.fread ret = " + ret);
+        OFSLOG.debug("orange.stdio.fread ret = " + ret);
 
         /* TODO make this == 0 ? */
         if(ret <= 0) {
-            System.out.println("Nothing read -> " + ret + " / " + len);
+            OFSLOG.debug("Nothing read -> " + ret + " / " + len);
             /* Check for EOF */
             if(orange.stdio.feof(filePtr) != 0) {
                 orange.stdio.clearerr(filePtr);
@@ -167,7 +172,7 @@ public class OrangeFileSystemInputStream
         }
 
         if(ret < len) {
-            System.out.println("Short item count!-> " + ret + " / " + len);
+            OFSLOG.debug("Short item count!-> " + ret + " / " + len);
         }
 
         System.arraycopy(c, 0, b, off, ret);
@@ -198,11 +203,11 @@ public class OrangeFileSystemInputStream
             String methodName =
                 Thread.currentThread().getStackTrace()[2].getMethodName();
             if(showName) {
-                System.out.println("method=[" + methodName + "]");
+                OFSLOG.debug("method=[" + methodName + "]");
             }
             if(showStack) {
-                System.out.print("\t");
-                Thread.currentThread().dumpStack();
+                //System.out.print("\t");
+                //Thread.currentThread().dumpStack();
             }
         }
     }

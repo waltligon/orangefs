@@ -267,7 +267,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(
     }
     if(rc < 0)
     {
-        perror("jni_open error");
+        if(JNI_DBG) perror("jni_open error");
         rc = -1;
     }
     JNI_FLUSH
@@ -298,7 +298,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open64 (JNIEnv *env, jobject obj, jstring
 
     if(rc < 0)
     {
-        perror("jni_open64 error");
+        if(JNI_DBG) perror("jni_open64 error");
         rc -1;
     }
     JNI_FLUSH
@@ -335,7 +335,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_openat (
     
     if(rc < 0)
     {
-        perror("jni_openat error");
+        if(JNI_DBG) perror("jni_openat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -371,7 +371,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_openat64 (JNIEnv *env,
 
     if(rc < 0)
     {
-        perror("jni_openat64 error");
+        if(JNI_DBG) perror("jni_openat64 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -392,7 +392,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_creat(JNIEnv *env, jobject obj, jstring p
     rc = jni_creat(cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_creat error");
+        if(JNI_DBG) perror("jni_creat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -413,7 +413,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_creat64(JNIEnv *env, jobject obj, jstring
     rc = jni_creat64(cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_creat error");
+        if(JNI_DBG) perror("jni_creat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -435,7 +435,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_unlink(JNIEnv *env, jobject obj, jstring 
     rc = jni_unlink(cpath);
     if(rc == -1)
     {
-        perror("jni_unlink error");
+        if(JNI_DBG) perror("jni_unlink error");
     }
     JNI_FLUSH
     return rc;
@@ -455,7 +455,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_unlinkat (JNIEnv *env, jobject obj, int d
     rc = jni_unlinkat(dirfd, cpath, (int) flags);
     if(rc < 0)
     {
-        perror("jni_unlinkat error");
+        if(JNI_DBG) perror("jni_unlinkat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -481,7 +481,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_rename(JNIEnv *env,
     rc = jni_rename(coldpath, cnewpath);
     if(rc < 0)
     {
-        perror("jni_rename error");
+        if(JNI_DBG) perror("jni_rename error");
         rc = -1;
     }
     JNI_FLUSH
@@ -509,7 +509,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_renameAt(JNIEnv *env,
     rc = jni_renameat(olddirfd, coldpath, newdirfd, cnewpath);
     if(rc < 0)
     {
-        perror("jni_renameat error");
+        if(JNI_DBG) perror("jni_renameat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -525,7 +525,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_close(JNIEnv *env, jobject obj, int fd)
     rc = jni_close(fd);
     if(rc < 0)
     {
-        perror("jni_close error");
+        if(JNI_DBG) perror("jni_close error");
         rc = -1;
     }
     JNI_FLUSH
@@ -541,7 +541,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_flush(JNIEnv *env, jobject obj, int fd)
     rc = jni_flush(fd);
     if(rc < 0)
     {
-        perror("jni_close error");
+        if(JNI_DBG) perror("jni_close error");
         rc = -1;
     }
     JNI_FLUSH
@@ -560,7 +560,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_prdwr64(JNIEnv *env, jobject obj, int fd,
     rc = jni_prdwr64(fd, bufc, countc, offsetc, (int) which);
     if(rc < 0)
     {
-        perror("jni_prdwr64 error");
+        if(JNI_DBG) perror("jni_prdwr64 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -578,7 +578,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lseek(JNIEnv *env, jobject obj, int fd, j
     jlong op = (jlong)rc;
     if(op < 0)
     {
-        perror("jni_lseek error");
+        if(JNI_DBG) perror("jni_lseek error");
         op = -1;
     }
     JNI_FLUSH
@@ -596,7 +596,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lseek64(JNIEnv *env, jobject obj, int fd,
     jlong op = (jlong)rc;
     if(op < 0)
     {
-        perror("jni_lseek64 error");
+        if(JNI_DBG) perror("jni_lseek64 error");
         op = -1;
     }
     JNI_FLUSH
@@ -615,7 +615,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_truncate(JNIEnv *env, jobject obj, jstrin
     int rc = jni_truncate(cpath, clength);
     if(rc < 0)
     {
-        perror("jni_truncate error");
+        if(JNI_DBG) perror("jni_truncate error");
         rc = -1;
     }
     JNI_FLUSH
@@ -635,7 +635,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_truncate64(JNIEnv *env, jobject obj, jstr
     rc = jni_truncate64(cpath, clength);
     if(rc < 0)
     {
-        perror("jni_truncate64 error");
+        if(JNI_DBG) perror("jni_truncate64 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -653,7 +653,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fallocate(JNIEnv *env, jobject obj, int f
     rc = jni_fallocate(fd, coffset, clength);
     if(rc < 0)
     {
-        perror("jni_fallocate error");
+        if(JNI_DBG) perror("jni_fallocate error");
         rc = -1;
     }
     JNI_FLUSH
@@ -670,7 +670,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_ftruncate(JNIEnv *env, jobject obj, int f
     rc = jni_ftruncate(fd, clength);
     if(rc < 0)
     {
-        perror("jni_ftruncate error");
+        if(JNI_DBG) perror("jni_ftruncate error");
         rc = -1;
     }
     JNI_FLUSH
@@ -687,7 +687,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_ftruncate64(JNIEnv *env, jobject obj, int
     rc = jni_ftruncate(fd, clength);
     if(rc < 0)
     {
-        perror("jni_ftruncate64 error");
+        if(JNI_DBG) perror("jni_ftruncate64 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -703,7 +703,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_dup(JNIEnv *env, jobject obj, int oldfd)
     rc = jni_dup(oldfd);
     if(rc < 0)
     {
-        perror("jni_dup error");
+        if(JNI_DBG) perror("jni_dup error");
         rc = -1;
     }
     JNI_FLUSH
@@ -719,7 +719,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_dup2(JNIEnv *env, jobject obj, int oldfd,
     rc = jni_dup_descriptor(oldfd, newfd);
     if(rc < 0)
     {
-        perror("jni_dup2 error");
+        if(JNI_DBG) perror("jni_dup2 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -739,7 +739,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_chown(JNIEnv *env, jobject obj, jstring p
     int rc = jni_chown(cpath, cowner, cgroup);
     if(rc < 0)
     {
-        perror("jni_chown error");
+        if(JNI_DBG) perror("jni_chown error");
         rc = -1;
     }
     JNI_FLUSH
@@ -756,7 +756,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchown(JNIEnv *env, jobject obj, int fd, 
     int rc = jni_fchown(fd, cowner, cgroup);
     if(rc < 0)
     {
-        perror("jni_fchown error");
+        if(JNI_DBG) perror("jni_fchown error");
         rc = -1;
     }
     JNI_FLUSH
@@ -777,7 +777,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchownat(JNIEnv *env, jobject obj, int fd
     int rc = jni_fchownat(fd, cpath, cowner, cgroup, (int) flag);
     if(rc < 0)
     {
-        perror("jni_fchownat error");
+        if(JNI_DBG) perror("jni_fchownat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -797,7 +797,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_chmod(JNIEnv *env, jobject obj, jstring p
     int rc = jni_chmod(cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_chmod error");
+        if(JNI_DBG) perror("jni_chmod error");
         rc = -1;
     }
     JNI_FLUSH
@@ -812,7 +812,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchmod(JNIEnv *env, jobject obj, int fd, 
     int rc = jni_fchmod(fd, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_fchmod error");
+        if(JNI_DBG) perror("jni_fchmod error");
         rc = -1;
     }
     JNI_FLUSH
@@ -831,7 +831,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchmodat (JNIEnv *env, jobject obj, int f
     int rc = jni_fchmodat(fd, cpath, (mode_t) mode, (int) flag);
     if(rc < 0)
     {
-        perror("jni_fchmodat error");
+        if(JNI_DBG) perror("jni_fchmodat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -852,7 +852,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdir (JNIEnv *env, jobject obj, jstring 
     rc = jni_mkdir(cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_mkdir error");
+        if(JNI_DBG) perror("jni_mkdir error");
         rc = -1;
     }
     JNI_FLUSH
@@ -873,7 +873,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdirat (JNIEnv *env, jobject obj, int di
     rc = jni_mkdirat(dirfd, cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_mkdirat error");
+        if(JNI_DBG) perror("jni_mkdirat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -892,7 +892,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_rmdir(JNIEnv *env, jobject obj, jstring p
     rc = jni_rmdir(cpath);
     if(rc < 0)
     {
-        perror("jni_rmdir error");
+        if(JNI_DBG) perror("jni_rmdir error");
         rc = -1;
     }
     JNI_FLUSH
@@ -916,7 +916,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_readlink (JNIEnv *env, jobject obj, jstri
     jlong op = (jlong) rc;
     if(op < 0)
     {
-        perror("jni_readlink error");
+        if(JNI_DBG) perror("jni_readlink error");
         op = -1;
     }
     JNI_FLUSH
@@ -940,7 +940,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_readlinkat (JNIEnv *env, jobject obj, int
     jlong op = (jlong) rc;
     if(op < 0)
     {
-        perror("jni_readlinkat error");
+        if(JNI_DBG)  perror("jni_readlinkat error");
         op = -1;
     }
     JNI_FLUSH
@@ -962,7 +962,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_symlink(JNIEnv *env, jobject obj, jstring
     rc = jni_symlink(coldpath, cnewpath);
     if(rc < 0)
     {
-        perror("jni_symlink error");
+        if(JNI_DBG) perror("jni_symlink error");
         rc = -1;
     }
     JNI_FLUSH
@@ -984,7 +984,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_symlinkat(JNIEnv *env, jobject obj, jstri
     rc = jni_symlinkat(coldpath, newdirfd, cnewpath);
     if(rc < 0)
     {
-        perror("jni_symlinkat error");
+        if(JNI_DBG) perror("jni_symlinkat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1006,7 +1006,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_link(JNIEnv *env, jobject obj, jstring ol
     rc = jni_link(coldpath, cnewpath);
     if(rc < 0)
     {
-        perror("jni_link error");
+        if(JNI_DBG) perror("jni_link error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1036,7 +1036,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_linkat(
     rc = jni_linkat(olddirfd, coldpath, newdirfd, cnewpath, (int) flags);
     if(rc < 0)
     {
-        perror("jni_linkat error");
+        if(JNI_DBG) perror("jni_linkat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1056,7 +1056,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_access (JNIEnv *env, jobject obj, jstring
     int rc = jni_access(cpath, (mode_t) mode);
     if(rc < 0)
     {
-        perror("jni_access error");
+        if(JNI_DBG) perror("jni_access error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1076,7 +1076,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_faccessat (JNIEnv *env, jobject obj, int 
     int rc = jni_faccessat(fd, cpath, (mode_t) mode, (int) flags);
     if(rc < 0)
     {
-        perror("jni_faccessat error");
+        if(JNI_DBG) perror("jni_faccessat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1092,7 +1092,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_flock (JNIEnv *env, jobject obj, int fd, 
     int rc = jni_flock(fd, (int) op);
     if(rc < 0)
     {
-        perror("jni_flock error");
+        if(JNI_DBG) perror("jni_flock error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1109,7 +1109,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fcntl(JNIEnv *env, jobject obj, int fd, j
     int rc = jni_fcntl(fd, (int) cmd);
     if(rc < 0)
     {
-        perror("jni_fcntl error");
+        if(JNI_DBG) perror("jni_fcntl error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1124,7 +1124,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fsync  (JNIEnv *env, jobject obj, int fd)
     int rc = jni_fsync(fd);
     if(rc < 0)
     {
-        perror("jni_fsync error");
+        if(JNI_DBG) perror("jni_fsync error");
         fflush(stdout);
         rc = -1;
     }
@@ -1140,7 +1140,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fdatasync  (JNIEnv *env, jobject obj, int
     int rc = jni_fdatasync(fd);
     if(rc < 0)
     {
-        perror("jni_fdatasync error");
+        if(JNI_DBG) perror("jni_fdatasync error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1155,7 +1155,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fadvise  (JNIEnv *env, jobject obj, int f
     int rc = jni_fadvise(fd, (off_t) offset, (off_t) len, (int) advice);
     if(rc < 0)
     {
-        perror("jni_fadvise error");
+        if(JNI_DBG) perror("jni_fadvise error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1170,7 +1170,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fadvise64  (JNIEnv *env, jobject obj, int
     int rc = jni_fadvise64(fd, (off_t) offset, (off_t) len, (int) advice);
     if(rc < 0)
     {
-        perror("jni_fadvise64 error");
+        if(JNI_DBG) perror("jni_fadvise64 error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1192,7 +1192,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mknod  (JNIEnv *env, jobject obj, jstring
     int rc = jni_mknod(cpath, (mode_t) mode, cdev);
     if(rc < 0)
     {
-        perror("jni_mknod error");
+        if(JNI_DBG) perror("jni_mknod error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1213,7 +1213,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mknodat (JNIEnv *env, jobject obj, int di
     int rc = jni_mknodat(dirfd, cpath, (mode_t) mode, cdev);
     if(rc < 0)
     {
-        perror("jni_mknodat error");
+        if(JNI_DBG) perror("jni_mknodat error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1231,7 +1231,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_chdir  (JNIEnv *env, jobject obj, jstring
     int rc = jni_chdir(cpath);
     if(rc < 0)
     {
-        perror("jni_chdir error");
+        if(JNI_DBG) perror("jni_chdir error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1246,7 +1246,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchdir  (JNIEnv *env, jobject obj, int fd
     int rc = jni_fchdir(fd);
     if(rc < 0)
     {
-        perror("jni_fchdir error");
+        if(JNI_DBG) perror("jni_fchdir error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1261,7 +1261,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_umask  (JNIEnv *env, jobject obj, jlong m
     mode_t rc = jni_umask((mode_t) mask);
     if(rc < 0)
     {
-        perror("jni_umask error");
+        if(JNI_DBG) perror("jni_umask error");
         rc = -1;
     }
     JNI_FLUSH
@@ -1283,7 +1283,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_read(JNIEnv *env, jobject obj, int fd, jb
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto done;
@@ -1291,7 +1291,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_read(JNIEnv *env, jobject obj, int fd, jb
     rc = jni_read(fd, (void *) buffer, (size_t) count);
     if(rc < 0)
     {
-        perror("jni jni_read");
+        if(JNI_DBG) perror("jni jni_read");
         rc = -1;
         goto done;
     }
@@ -1323,7 +1323,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pread(JNIEnv *env, jobject obj, int fd, j
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto done;
@@ -1331,7 +1331,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pread(JNIEnv *env, jobject obj, int fd, j
     rc = jni_pread(fd, (void *) buffer, (size_t) count, (off_t) offset);
     if(rc < 0)
     {
-        perror("jni jni_pread");
+        if(JNI_DBG) perror("jni jni_pread");
     }
     else
     {
@@ -1361,7 +1361,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pread64(JNIEnv *env, jobject obj, int fd,
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto done;
@@ -1369,11 +1369,11 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pread64(JNIEnv *env, jobject obj, int fd,
     rc = jni_pread64(fd, (void *) buffer, (size_t) count, (off64_t) offset);
     if(rc < 0)
     {
-        perror("jni jni_pread64");
+        if(JNI_DBG) perror("jni jni_pread64");
     }
     else
     {
-        printf("\tread %lld bytes\n", (long long int) rc);
+        if(JNI_DBG) printf("\tread %lld bytes\n", (long long int) rc);
     }
 done:
     /* copy back and free the buffer using 0 */
@@ -1399,7 +1399,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_write(JNIEnv *env, jobject obj, int fd, j
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto done;
@@ -1407,11 +1407,11 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_write(JNIEnv *env, jobject obj, int fd, j
     rc = jni_write(fd, (void *) buffer, (size_t) count);
     if(rc < 0)
     {
-        perror("jni jni_write");
+        if(JNI_DBG) perror("jni jni_write");
     }
     if(rc > 0)
     {
-        printf("\twrote %lld bytes\n", (long long int) rc);
+        if(JNI_DBG) printf("\twrote %lld bytes\n", (long long int) rc);
     }
 done:
     /* free the buffer without copying back the possible changes in buffer
@@ -1440,14 +1440,14 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pwrite(JNIEnv *env, jobject obj, int fd, 
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
     }
     rc = jni_pwrite(fd, (void *) buffer, (size_t) count, (off_t) offset);
     if(rc < 0)
     {
-        perror("jni jni_pwrite");
+        if(JNI_DBG) perror("jni jni_pwrite");
     }
     else
     {
@@ -1479,7 +1479,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pwrite64(JNIEnv *env, jobject obj, int fd
     }
     if(!buffer)
     {
-        perror("GetByteArrayElements");
+        if(JNI_DBG) perror("GetByteArrayElements");
         errno = EFAULT;
         rc = -1;
         goto done;
@@ -1487,7 +1487,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_pwrite64(JNIEnv *env, jobject obj, int fd
     rc = jni_pwrite64(fd, (void *) buffer, (size_t) count, (off_t) offset);
     if(rc < 0)
     {
-        perror("jni jni_pwrite64");
+        if(JNI_DBG) perror("jni jni_pwrite64");
     }
     else
     {
@@ -1593,14 +1593,14 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat(JNIEnv *env, jobject obj, jstring pa
     int rc = jni_stat(cpath, ptr);
     if(rc != 0)
     {
-        perror("jni_stat error");
+        if(JNI_DBG) perror("jni_stat error");
         fill_error((void *) ptr);
         goto err;
     }
     //TODO remove later
     else 
     {
-        printf("jni_stat successful on %s\n", cpath);
+        if(JNI_DBG) printf("jni_stat successful on %s\n", cpath);
     }
 
     jobject stat_obj;
@@ -1629,7 +1629,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstat(JNIEnv *env, jobject obj, int fd)
     int rc = jni_fstat(fd, ptr);
     if(rc != 0)
     {
-        perror("jni_fstat error");
+        if(JNI_DBG) perror("jni_fstat error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1665,7 +1665,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatat(JNIEnv *env, jobject obj, int fd,
     int rc = jni_fstatat(fd, cpath, ptr, (int) flag);
     if(rc < 0)
     {
-        perror("jni_fstatat error");
+        if(JNI_DBG) perror("jni_fstatat error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1698,7 +1698,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lstat(JNIEnv *env, jobject obj, jstring p
     int rc = jni_lstat(cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_lstat error");
+        if(JNI_DBG) perror("jni_lstat error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1791,7 +1791,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat64(JNIEnv *env, jobject obj, jstring 
     int rc = jni_stat64(cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_stat64 error");
+        if(JNI_DBG) perror("jni_stat64 error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1822,7 +1822,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstat64(JNIEnv *env, jobject obj, int fd)
     int rc = jni_fstat64(fd, ptr);
     if(rc < 0)
     {
-        perror("jni_fstat64 error");
+        if(JNI_DBG) perror("jni_fstat64 error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1858,7 +1858,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatat64(JNIEnv *env, jobject obj, int f
     int rc = jni_fstatat64(fd, cpath, ptr, (int) flag);
     if(rc < 0)
     {
-        perror("jni_fstatat64 error");
+        if(JNI_DBG) perror("jni_fstatat64 error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -1891,7 +1891,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lstat64(JNIEnv *env, jobject obj, jstring
     int rc = jni_lstat64(cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_lstat64 error");
+        if(JNI_DBG) perror("jni_lstat64 error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2013,8 +2013,6 @@ int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
     {
         cbuf1[jval]=ptr[jval].tv_usec;
     }
-    //printf("cbuf[0]=%ld",cbuf[0]);
-    //printf("cbuf[0]=%ld",cbuf[]);
     ar = (*env)->GetObjectField(env, *inst , fids[0]);
     (*env)->SetLongArrayRegion(env, ar, 0, 2, cbuf);
     ar1 = (*env)->GetObjectField(env, *inst , fids[1]);
@@ -2045,7 +2043,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utimes (JNIEnv *env, jobject obj, jstring
     int rc = jni_utimes(cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_utimes error");
+        if(JNI_DBG) perror("jni_utimes error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2075,7 +2073,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimes (JNIEnv *env, jobject obj, int fd
     int rc = jni_futimes(fd, ptr);
     if(rc < 0)
     {
-        perror("jni_futimes error");
+        if(JNI_DBG) perror("jni_futimes error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2108,7 +2106,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimesat (JNIEnv *env, jobject obj, int 
     int rc = jni_futimesat(dirfd,cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_futimesat error");
+        if(JNI_DBG) perror("jni_futimesat error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2184,7 +2182,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utime(JNIEnv *env, jobject obj, jstring p
     int rc = jni_utime(cpath, ptr);
     if(rc < 0)
     {
-        perror("jni_utime error");
+        if(JNI_DBG) perror("jni_utime error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2214,7 +2212,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_listxattr (JNIEnv *env, jobject obj, jstr
     rc = jni_listxattr(cpath, clist, csize);
     if(rc < 0)
     {
-        perror("jni_listxattr error");
+        if(JNI_DBG) perror("jni_listxattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2237,7 +2235,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_llistxattr (JNIEnv *env, jobject obj, jst
     rc = jni_llistxattr(cpath, clist, csize);
     if(rc < 0)
     {
-        perror("jni_llistxattr error");
+        if(JNI_DBG) perror("jni_llistxattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2257,7 +2255,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_flistxattr (JNIEnv *env, jobject obj, int
     rc = jni_flistxattr(fd, clist, csize);
     if(rc < 0)
     {
-        perror("jni_flistxattr error");
+        if(JNI_DBG) perror("jni_flistxattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2279,7 +2277,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_removexattr(JNIEnv *env, jobject obj, jst
     rc = jni_removexattr(cpath, cname);
     if(rc < 0)
     {
-        perror("jni_removexattr error");
+        if(JNI_DBG) perror("jni_removexattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2301,7 +2299,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lremovexattr(JNIEnv *env, jobject obj, js
     rc = jni_lremovexattr(cpath, cname);
     if(rc < 0)
     {
-        perror("jni_Lremovexattr error");
+        if(JNI_DBG) perror("jni_Lremovexattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2320,7 +2318,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fremovexattr(JNIEnv *env, jobject obj, in
     rc = jni_fremovexattr(fd, cname);
     if(rc < 0)
     {
-        perror("jni_fremovexattr error");
+        if(JNI_DBG) perror("jni_fremovexattr error");
         rc = -1;
     }
     JNI_FLUSH
@@ -2458,7 +2456,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_statfs(JNIEnv *env, jobject obj, jstring 
     
     if(rc < 0)
     {
-        perror("jni_statfs error");
+        if(JNI_DBG) perror("jni_statfs error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
@@ -2489,7 +2487,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, int fd)
     int rc = jni_fstatfs(fd, ptr);
     if(rc < 0)
     {
-        perror("jni_fstatfs error");
+        if(JNI_DBG) perror("jni_fstatfs error");
         fill_error((void *) ptr);
         return NULL_OBJ;
     }
