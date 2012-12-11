@@ -40,6 +40,8 @@ case $CHOICE in
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
 
+                cd -
+                
                 #install torque
                 echo "Installing TORQUE from apt-get"
                 sudo apt-get install -y torque-server torque-scheduler torque-client &> torque.out
