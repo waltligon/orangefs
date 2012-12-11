@@ -254,8 +254,8 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        sm_p->readdir.pos_token,
-        sm_p->readdir.dirent_limit,
+        sm_p->readdir_state.pos_token,
+        sm_p->readdir_state.dirent_limit,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
