@@ -50,7 +50,7 @@ enum PVFS_server_op
     PVFS_SERV_REMOVE = 2,
     PVFS_SERV_IO = 3,
     PVFS_SERV_GETATTR = 4,
-    PVFS_SERV_SETATTR = 5,    
+    PVFS_SERV_SETATTR = 5,
     PVFS_SERV_LOOKUP_PATH = 6,
     PVFS_SERV_CRDIRENT = 7,
     PVFS_SERV_RMDIRENT = 8,
@@ -143,7 +143,7 @@ enum PVFS_server_op
 /* max count of dirent handles associated with a directory */
 #define PVFS_REQ_LIMIT_DIRENT_FILE_COUNT    1024
 /* max count of directory entries per readdir request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT        512
+#define PVFS_REQ_LIMIT_DIRENT_COUNT        60
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */
@@ -169,7 +169,7 @@ enum PVFS_server_op
 /* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 113
+#define PVFS_REQ_LIMIT_LISTATTR PVFS_REQ_LIMIT_DIRENT_COUNT
 /* max number of bytes in an extended attribute key including null term */
 #define PVFS_REQ_LIMIT_EATTR_KEY_LEN    PVFS_MAX_XATTR_NAMELEN
 /* max number of bytes in an extended attribute value including null term */
