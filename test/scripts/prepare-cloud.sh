@@ -62,7 +62,7 @@ case $CHOICE in
                 sudo make oldconfig &> /dev/null
                 sudo make modules_prepare &>/dev/null
                 sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
-
+                cd -
 
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
@@ -71,7 +71,7 @@ case $CHOICE in
                 ls *.rpm
                 sudo rpm -e libtorque2
                 sudo rpm -ivh *.rpm
-                cd -
+                
                 
                 # break
                 ;;
