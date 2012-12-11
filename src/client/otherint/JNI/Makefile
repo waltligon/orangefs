@@ -9,9 +9,9 @@
 #    Setup - adjust these values accordingly...
 #------------------------------------------------------------------------------
 #Path to OrangeFS libs, binaries, etc.
-INSTALL=$(HOME)/trunk
+OFS_INSTALL=$(HOME)/trunk
 #Folder containing OrangeFS src, etc.
-TOP=$(HOME)/trunk/ofs
+OFS_TOP=$(HOME)/trunk/ofs
 # Java found by running: 
 #`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
 JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
@@ -20,7 +20,7 @@ COMMONS_LOGGING=$(HOME)/commons-logging-1.1.1/commons-logging-1.1.1.jar
 #Hadoop Only Related Configuration Values
 #------------------------------------------------------------------------------
 #Location of OFS JNI Jar
-OFS_JNI =$(INSTALL)/lib/ofs_jni.jar
+OFS_JNI =$(OFS_INSTALL)/lib/ofs_jni.jar
 #Path to OFS-Hadoop Code
 OFS_HADOOP=org/apache/hadoop/fs/ofs
 #HADOOP VERSION
@@ -55,8 +55,8 @@ ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so \
 
 #Install all Jars and Generated Shared Libs to OFS lib dir
 install : ofs_jni.jar
-	cp *.so $(INSTALL)/lib
-	cp *.jar $(INSTALL)/lib
+	cp *.so $(OFS_INSTALL)/lib
+	cp *.jar $(OFS_INSTALL)/lib
 
 #Generate class files for I/O Streams
 $(IOSTREAM_CLASS) : $(IOSTREAM_JAVA)
@@ -108,7 +108,7 @@ libPVFS2POSIXJNI.so : $(POSIX_CLASS) $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2POSIXJN
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2POSIXJNI.o \
-	  -L$(INSTALL)/lib \
+	  -L$(OFS_INSTALL)/lib \
 	  -lofs \
 	  -lpvfs2 \
 	  -lpthread \
@@ -125,8 +125,8 @@ $(ORGUNDER)_PVFS2POSIXJNI.h : $(ORGDIR)/PVFS2POSIXJNI.java libPVFS2POSIXJNI.c
 #Preprocess, Compile, and Assemble in one step
 libPVFS2POSIXJNI.o : libPVFS2POSIXJNI.c $(ORGUNDER)_PVFS2POSIXJNI.h
 	cc -fPIC -c \
-      -I$(INSTALL)/include \
-      -I$(TOP)/src/client/usrint \
+      -I$(OFS_INSTALL)/include \
+      -I$(OFS_TOP)/src/client/usrint \
       -I$(JAVA_HOME)include \
       -I$(JAVA_HOME)include/linux \
       libPVFS2POSIXJNI.c
@@ -148,7 +148,7 @@ libPVFS2STDIOJNI.so : $(STDIO_CLASS) $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJN
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2STDIOJNI.o \
-	  -L$(INSTALL)/lib \
+	  -L$(OFS_INSTALL)/lib \
 	  -lofs \
 	  -lpvfs2 \
 	  -lpthread \
@@ -166,8 +166,8 @@ $(ORGUNDER)_PVFS2STDIOJNI.h : $(ORGDIR)/PVFS2STDIOJNI.java libPVFS2STDIOJNI.c
 #Preprocess, Compile, and Assemble in one step
 libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 	cc -fPIC -c \
-	  -I$(INSTALL)/include \
-	  -I$(TOP)/src/client/usrint \
+	  -I$(OFS_INSTALL)/include \
+	  -I$(OFS_TOP)/src/client/usrint \
 	  -I$(JAVA_HOME)include \
 	  -I$(JAVA_HOME)include/linux \
 	  libPVFS2STDIOJNI.c
@@ -176,5 +176,5 @@ libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 clean :
 	rm -f *.o org_*.h *.so *.jar org/orangefs/usrint/*.class \
 		org/apache/hadoop/fs/ofs/*.class \
-		$(INSTALL)/lib/libPVFS2POSIXJNI.so \
-		$(INSTALL)/lib/libPVFS2STDIOJNI.so 
+		$(OFS_INSTALL)/lib/libPVFS2POSIXJNI.so \
+		$(OFS_INSTALL)/lib/libPVFS2STDIOJNI.so 
