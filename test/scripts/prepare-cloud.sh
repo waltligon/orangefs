@@ -40,7 +40,7 @@ case $CHOICE in
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
 
-                cd -
+                cd ~ 
                 
                 #install torque
                 echo "Installing TORQUE from apt-get"
@@ -62,7 +62,7 @@ case $CHOICE in
                 sudo make oldconfig &> /dev/null
                 sudo make modules_prepare &>/dev/null
                 sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
-                cd -
+                cd ~
 
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
