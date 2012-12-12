@@ -2,8 +2,9 @@
 
 # use: prepare-cloud <system>
 
-# must script to work around sudo issue
+# must script to work around issue
 script prepare.txt
+
 
 CHOICE=$VMSYSTEM
 
@@ -24,47 +25,48 @@ SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
 case $CHOICE in 
         cloud-*buntu*|cloud-*mint*|cloud-debian*) 
                 echo "Preparing Ubuntu based distribution $CHOICE" 
-                sudo apt-get update > /dev/null 
-                sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-server torque-scheduler torque-client
+                aptitude update > /dev/null 
+                aptitude -y install gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-client torque-server torque-scheduler
+                echo "Finished installing packages" 
                 SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
                 cd /usr/src/${SOURCENAME}
-                sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
+                tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
                 cd ${SOURCENAME}/
-                sudo cp /boot/config-`uname -r` .config
-                sudo make oldconfig &> /dev/null
-                sudo make prepare &>/dev/null
+                cp /boot/config-`uname -r` .config
+                make oldconfig &> /dev/null
+                make prepare &>/dev/null
                 cd ~ 
                 #echo "Installing TORQUE from apt-get"
-                #sudo apt-get install -y 
+                #apt-get install -y 
                 ;;
         cloud-*suse*)
                 echo "Preparing SUSE based distribution $CHOICE"
                 echo "Installing prereqs via zypper..."
-                #sudo yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
+                #yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
                 zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip
                 #install db4
                 cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
-                sudo cp /boot/config-`uname -r` .config
-                sudo make oldconfig &> /dev/null
-                sudo make modules_prepare &>/dev/null
-                sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
+                cp /boot/config-`uname -r` .config
+                make oldconfig &> /dev/null
+                make modules_prepare &>/dev/null
+                ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
                 cd ~
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
                 wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
                 ls *.rpm
-                sudo rpm -e libtorque2
-                sudo rpm -ivh *.rpm
+                rpm -e libtorque2
+                rpm -ivh *.rpm
                 ;;
         cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*)
                 echo "Preparing RedHat based distribution $CHOICE"
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
+                yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
                 wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
                 ls *.rpm
-                sudo rpm -ivh torque*.rpm
+                rpm -ivh torque*.rpm
                 ;;
         *)
                 echo "System $CHOICE not supported."
@@ -85,7 +87,7 @@ echo "Configuring Berkeley DB 4.8.30..."
 echo "Building Berkeley DB 4.8.30..."
 make &> db4make.out
 echo "Installing Berkeley DB 4.8.30 to /opt/db4..."
-sudo make install &> db4install.out
+make install &> db4install.out
 exit
 exit
 
