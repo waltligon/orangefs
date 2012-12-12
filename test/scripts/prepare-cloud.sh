@@ -21,17 +21,11 @@ SYSTEM=`echo $CHOICE | sed s/^cloud-// | sed s/-i386//`
 
 # ubuntu/debian based distributions
 
-case $CHOICE in
-        cloud-*buntu*|cloud-*mint*|cloud-debian*)
-
-                echo "Preparing Ubuntu based distribution $CHOICE"
-        
-                sudo apt-get update > /dev/null
-                #documentation needs to be updated. linux-headers needs to be added for ubuntu!
+case $CHOICE in 
+        cloud-*buntu*|cloud-*mint*|cloud-debian*) 
+                echo "Preparing Ubuntu based distribution $CHOICE" 
+                sudo apt-get update > /dev/null 
                 sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf &> apt.out
-
-
-                #prepare source
                 SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
                 cd /usr/src/${SOURCENAME}
                 sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
@@ -39,57 +33,38 @@ case $CHOICE in
                 sudo cp /boot/config-`uname -r` .config
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
-
                 cd ~ 
-                
-                #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo apt-get install -y torque-server torque-scheduler torque-client &> torque.out
-
-                #break
+                sudo apt-get install -y torque-server torque-scheduler torque-client
                 ;;
         cloud-*suse*)
-
                 echo "Preparing SUSE based distribution $CHOICE"
-        
                 echo "Installing prereqs via zypper..."
                 #sudo yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
                 zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip
                 #install db4
-
                 cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
                 sudo cp /boot/config-`uname -r` .config
                 sudo make oldconfig &> /dev/null
                 sudo make modules_prepare &>/dev/null
                 sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
                 cd ~
-
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
                 wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
-                #cd  devorange.clemson.edu/pvfs/openSUSE-12.2/RPMS/x86_64
                 ls *.rpm
                 sudo rpm -e libtorque2
                 sudo rpm -ivh *.rpm
-                
-                
-                # break
                 ;;
-                
         cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*)
-        
                 echo "Preparing RedHat based distribution $CHOICE"
-                
                 echo "Installing prereqs via yum..."
                 sudo yum -y install gcc gcc-c++ flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip &> yum.out
-
-
                 echo "Installing TORQUE from devorange: "
                 echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
                 wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
                 ls *.rpm
                 sudo rpm -ivh torque*.rpm
-
                 ;;
         *)
                 echo "System $CHOICE not supported."
