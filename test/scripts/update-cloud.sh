@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 # must script to work around issue
-script update.txt
+#script update.txt
 
 CHOICE=$VMSYSTEM
 

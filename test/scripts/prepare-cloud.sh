@@ -3,7 +3,7 @@
 # use: prepare-cloud <system>
 
 # must script to work around issue
-script prepare.txt
+#script prepare.txt
 
 
 CHOICE=$VMSYSTEM
@@ -26,7 +26,7 @@ case $CHOICE in
         cloud-*buntu*|cloud-*mint*|cloud-debian*) 
                 echo "Preparing Ubuntu based distribution $CHOICE" 
                 aptitude update > /dev/null 
-                aptitude -y install gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-client torque-server torque-scheduler
+                aptitude -y install gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-client torque-server torque-scheduler 
                 echo "Finished installing packages" 
                 SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
                 cd /usr/src/${SOURCENAME}
