@@ -25,7 +25,7 @@ case $CHOICE in
         cloud-*buntu*|cloud-*mint*|cloud-debian*) 
                 echo "Preparing Ubuntu based distribution $CHOICE" 
                 sudo apt-get update > /dev/null 
-                sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf &> apt.out
+                sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-server torque-scheduler torque-client
                 SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
                 cd /usr/src/${SOURCENAME}
                 sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
@@ -34,8 +34,8 @@ case $CHOICE in
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
                 cd ~ 
-                echo "Installing TORQUE from apt-get"
-                sudo apt-get install -y torque-server torque-scheduler torque-client
+                #echo "Installing TORQUE from apt-get"
+                #sudo apt-get install -y 
                 ;;
         cloud-*suse*)
                 echo "Preparing SUSE based distribution $CHOICE"
@@ -72,6 +72,7 @@ case $CHOICE in
                 exit 1
                 ;;
 esac
+
 
 #install db4 - all systems
 echo "Downloading Berkeley DB 4.8.30 from devorange.clemson.edu..."
