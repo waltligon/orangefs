@@ -2,8 +2,6 @@
 
 # use: prepare-cloud <system>
 
-# must script to work around issue
-#script prepare.txt
 
 
 CHOICE=$VMSYSTEM
