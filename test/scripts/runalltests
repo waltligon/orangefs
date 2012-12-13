@@ -165,6 +165,11 @@ then
 		RUNNING=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
 		sleep 10
 		echo "Instance ${VMINSTANCEID} is ${RUNNING}"
+		if [ $RUNNING == "error" ]
+		then
+			echo "Error in creating ${VMINSTANCEID}. Bailing out."
+			exit 1
+		fi
 	done
 	
 	#Now grab the IP Address of the new instance
@@ -216,13 +221,15 @@ echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
- 
-echo "Processing the logs" 
-./checklogs.pl `pwd`/logs-$DATETIME/alltests-${SVNBRANCH_SHORT}.log
 
 # create link to latest logs so that buildbot can find them.
 rm `pwd`/logs-current
 ln -s `pwd`/logs-$DATETIME `pwd`/logs-current
+
+echo "Processing the logs" 
+./checklogs.pl `pwd`/logs-$DATETIME/alltests-${SVNBRANCH_SHORT}.log
+
+
 
 if [ $? -ne 0 ]
 then
