@@ -131,7 +131,7 @@ enum PVFS_server_op
 ((dfile_count > 0) && (dfile_count < PVFS_REQ_LIMIT_DFILE_COUNT))
 #define PVFS_REQ_LIMIT_MIRROR_DFILE_COUNT 1024
 /* max count of directory entries per readdir request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT        512
+#define PVFS_REQ_LIMIT_DIRENT_COUNT        60
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */
@@ -157,7 +157,7 @@ enum PVFS_server_op
 /* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 60
+#define PVFS_REQ_LIMIT_LISTATTR PVFS_REQ_LIMIT_DIRENT_COUNT
 /* max number of bytes in an extended attribute key including null term */
 #define PVFS_REQ_LIMIT_EATTR_KEY_LEN    PVFS_MAX_XATTR_NAMELEN
 /* max number of bytes in an extended attribute value including null term */

@@ -41,7 +41,7 @@
 
 #ifndef UCACHE_MAX_REQ 
 #define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * UCACHE_MAX_BLK_REQ)
-#endif 
+#endif
 
 /* Define multiple NILS to there's no need to cast for different types */
 #define NIL8  0XFF

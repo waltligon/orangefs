@@ -18,6 +18,9 @@
 #define inline         _inline
 #define __func__       __FUNCTION__
 
+/* ignore the __attribute__ keyword */
+#define __attribute__(x)  
+
 /*
  * gettimeofday
  */

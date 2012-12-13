@@ -476,7 +476,7 @@ int pvfs_sys_init(void)
  */
 void pvfs_sys_init_doit(void) {
     struct rlimit rl; 
-	int rc;
+	int rc __attribute__((unused));
 
     /* this allows system calls to run */
     load_glibc();
@@ -551,8 +551,9 @@ void pvfs_sys_init_doit(void) {
     /* ucache initialization - assumes shared memory previously 
      * aquired (using ucache daemon) 
      */
-    rc = ucache_initialize();
-    if (rc < 0)
+    int rc1;
+    rc1 = ucache_initialize();
+    if (rc1 < 0)
     {
         /* ucache failed to initialize, so continue without it */
         /* Write a warning message in the ucache.log letting programmer know */

@@ -35,6 +35,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src_source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
+
 	dnl kernels > 2.6.32 now use generated/autoconf.h
         dnl look in lk_src for the generated autoconf.h
 	if test -f $lk_src/include/generated/autoconf.h ; then
@@ -42,6 +43,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	else
 		CFLAGS="$CFLAGS -imacros $lk_src/include/linux/autoconf.h"
 	fi
+
 
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
@@ -65,6 +67,13 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
             CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include -I$lk_src_source/arch/${ARCH}/include/asm/mach-default"
 
+	fi
+
+
+	dnl kernel 3.6 (and possibly earlier) create arch/x86/include/generated/asm
+	dnl directory for files such as unistd_64.h.
+	if test -d ${lk_src}/arch/${ARCH}/include/generated ; then
+		CFLAGS="$CFLAGS -I${lk_src}/arch/${ARCH}/include/generated"
 	fi
        
         dnl if there are two different include paths (lk_src/include and 
@@ -90,6 +99,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         if test $need_optimize_flag -eq 1; then
             CFLAGS="-Os $CFLAGS"
         fi
+
+dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
+        AC_MSG_CHECKING(for d_alloc_root)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+        ], [
+                struct inode  *root_inode;
+		struct dentry *root_dentry;
+                root_dentry=d_alloc_root(root_inode);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_ALLOC_ROOT, 1, [Define if kernel defines
+                  d_alloc_root]),
+        AC_MSG_RESULT(no)
+        )
+
+
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -771,10 +798,13 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <linux/ioctl32.h>
 		 ] )
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
 	AC_CHECK_HEADERS([linux/compat.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/compat.h>
 		 ] )
+	CFLAGS=$tmp_cflags
 	AC_CHECK_HEADERS([linux/syscalls.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/syscalls.h>
@@ -1596,7 +1626,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl newer 2.6 kernels (2.6.29-ish) use current_fsuid() macro instead
         dnl of accessing task struct fields directly
         tmp_cflags=$CFLAGS
-        CFLAGS="$CFLAGS -Werror"
+        CFLAGS="$CFLAGS -Werror "
         AC_MSG_CHECKING(for current_fsuid)
         AC_TRY_COMPILE([
                 #define __KERNEL__

@@ -5,7 +5,8 @@
 
 
 
-DATE=`date +'%Y%m%d'`
+DATE=`date -u +'%Y%m%d'`
+DATETIME=`date -u +'%Y%m%d-%H.%M.%S'`
 #export VMUSER=ec2-user
 VMUSER=ubuntu
 #export VMSYSTEM=sl6-mpi
@@ -92,13 +93,10 @@ export DELETE_INSTANCE
 #Determine VM User from system
 case $VMSYSTEM in 
 
-	cloud-rhel6)
-		VMUSER=ec2-user
-		;;
-	cloud-ubuntu-12.04)
+	cloud-*buntu*|cloud-*mint*)
 		VMUSER=ubuntu
 		;;
-	cloud-sl6)
+	cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
 		VMUSER=ec2-user
 		;;
 	*)
@@ -108,6 +106,9 @@ esac
 
 echo "VMUSER is $VMUSER"
 export VMUSER
+
+
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
@@ -126,7 +127,7 @@ euca-describe-keypairs --config=${EC2CONFFILE} --filter key-name=$KEYNAME
 
 if [ $? != 0 ]
 then
-	echo "Keyname $KEYNAME not found in EC2"
+	echo "Keyname $KEYNAME not found."
 	exit 1
 fi
 
@@ -143,51 +144,97 @@ then
 	echo "Generating new instance of $VMSYSTEM"
 	echo "euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err"
 
-	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err || exit 1
+	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err 
 
+	if [ $? -ne 0 ]
+	then
+		echo "Could not create instance of $VMSYSTEM. Exiting"
+		exit 1
+	fi
+	
 	VMINSTANCEID=`cat newinstance.out | grep INSTANCE | awk '{print $2}'`
 
-	echo "VM Instance id is ${VMINSTANCEID}"
-	#wait 30 seconds to start instance
-	sleep 30
+	echo "VM Instance of $VMSYSTEM created. Instance id is ${VMINSTANCEID}"
+	#wait 20 seconds to start instance
+	sleep 20
 
+	RUNNING=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
+	
+	until [ "$RUNNING" == "running" ]
+	do
+		RUNNING=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
+		sleep 10
+		echo "Instance ${VMINSTANCEID} is ${RUNNING}"
+		if [ $RUNNING == "error" ]
+		then
+			echo "Error in creating ${VMINSTANCEID}. Bailing out."
+			exit 1
+		fi
+	done
+	
+	#Now grab the IP Address of the new instance
 	VMIPADDR=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $13 }'`
-	sleep 30
+	
 fi
 
 echo "VM IP ADDRESS is ${VMIPADDR}"
-#grab vm parameters
-#need instance name and IP addresses
 
-#check to make sure instance is running
+echo "Removing obsolete ssh host records at ~/.ssh/known_hosts for $VMIPADDR."
+ssh-keygen -f ~/.ssh/known_hosts -R ${VMIPADDR}
 
-#need to make sure key can import itself automatically
+ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 
-ssh-keygen -f "~/.ssh/known_hosts" -R ${VMIPADDR}
+#is SSH responding?
+until [ $? -eq 0 ]
+do
+	sleep 10
+	ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
+done
+
+# install all system updates and reboot
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
+
+echo "Waiting for image to reboot..."
+sleep 20
+
+ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
+
+#is SSH responding?
+until [ $? -eq 0 ]
+do
+	sleep 10
+	ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
+done
 
 
-#prepare the image for testing
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < prepare-${VMSYSTEM}.sh || exit 1
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
-#run the test
-#echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'bash -s' < ./run-test.sh ${SVNBRANCH}
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'cat | bash /dev/stdin' "${SVNBRANCH}" < ./run-test.sh || exit 1
+echo "Preparing the image for testing..."
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-cloud.sh 
 
-#grab the logs
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs || exit 1
+echo ""
+echo "Running tests..."
 
-#grab the scripts
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt scripts || exit 1
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
- 
-#process the logs 
-SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
-./checklogs.pl "`pwd`/logs/alltests-${SVNBRANCH_SHORT}.log"
+echo "Grabbing logs and scripts from server"
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
+
+# create link to latest logs so that buildbot can find them.
+rm `pwd`/logs-current
+ln -s `pwd`/logs-$DATETIME `pwd`/logs-current
+
+echo "Processing the logs" 
+./checklogs.pl `pwd`/logs-$DATETIME/alltests-${SVNBRANCH_SHORT}.log
+
+
 
 if [ $? -ne 0 ]
 then
 	#if the log check failed, bailout before deleteing instance
-	echo "Some tests failed. Please check `pwd`/logs/alltests-$SVNBRANCH_SHORT for more details."
+	echo "Some tests failed. Please check `pwd`/logs-$DATETIME/alltests-$SVNBRANCH_SHORT for more details."
 	echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
 	exit 1
 fi

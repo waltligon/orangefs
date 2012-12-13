@@ -598,7 +598,8 @@ typedef struct PINT_client_sm
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
     /* generic dirent array used by both readdir and readdirplus state machines */
-    PINT_sm_readdir_state readdir;
+    PINT_sm_readdir_state readdir_state;
+    struct PINT_client_readdir_sm readdir;
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
@@ -622,7 +623,6 @@ typedef struct PINT_client_sm
 	struct PINT_client_setattr_sm setattr;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
-	struct PINT_client_readdir_sm readdir;
         struct PINT_client_readdirplus_sm readdirplus;
 	struct PINT_client_lookup_sm lookup;
 	struct PINT_client_rename_sm rename;
