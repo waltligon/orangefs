@@ -187,9 +187,7 @@ do
 done
 
 # install all system updates and reboot
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ./*.sh ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/
-
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} ./update-cloud.sh" 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
 
 echo "Waiting for image to reboot..."
 sleep 20
@@ -203,19 +201,19 @@ do
 	ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 done
 
- 
+
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 echo "Preparing the image for testing..."
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} ./prepare-cloud.sh" 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-cloud.sh 
 
 echo ""
 echo "Running tests..."
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
 echo "Grabbing logs and scripts from server"
-/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
+rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
  
