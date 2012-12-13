@@ -189,7 +189,7 @@ done
 # install all system updates and reboot
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ./*.sh ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} update-cloud.sh" 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} ./update-cloud.sh" 
 
 echo "Waiting for image to reboot..."
 sleep 20
@@ -207,7 +207,7 @@ done
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 echo "Preparing the image for testing..."
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} prepare-cloud.sh" 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "sudo VMSYSTEM=${VMSYSTEM} ./prepare-cloud.sh" 
 
 echo ""
 echo "Running tests..."
