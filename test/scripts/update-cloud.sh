@@ -23,8 +23,8 @@ case $CHOICE in
         cloud-*buntu*|cloud-*mint*|cloud-debian*)
         
                 echo "Downloading system updates for ubuntu based system $CHOICE..."
-                sudo apt-get -y update &> update.out
-                sudo apt-get -y dist-upgrade &> dist-upgrade.out
+                sudo apt-get -y -q update 
+                sudo apt-get -y -q dist-upgrade < /dev/null 
                 echo "Update successful. Rebooting image..."
                 sudo reboot 
                 # break

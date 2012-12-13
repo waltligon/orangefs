@@ -28,7 +28,7 @@ case $CHOICE in
         
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo apt-get install -y gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf &> apt.out
+                sudo apt-get install -y -q gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf < /dev/null
 
 
                 #prepare source
@@ -42,7 +42,7 @@ case $CHOICE in
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo apt-get install -y torque-server torque-scheduler torque-client &> torque.out
+                sudo apt-get install -y -q torque-server torque-scheduler torque-client < /dev/null 
 
                 #break
                 ;;
