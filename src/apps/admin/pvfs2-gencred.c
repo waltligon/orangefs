@@ -257,6 +257,7 @@ static int create_credential(const struct passwd *pwd,
     if (bio_mem == NULL)
     {
         ERR_print_errors_fp(stderr);
+        X509_free(cert);
         return ENOMEM;
     }
 
@@ -283,6 +284,7 @@ static int create_credential(const struct passwd *pwd,
     memcpy(cred->certificate.buf, cert_buf, cred->certificate.buf_size);
 
     BIO_free(bio_mem);
+    X509_free(cert);
 #else  /* !ENABLE_SECURITY_CERT */
     cred->certificate.buf_size = 0;
     cred->certificate.buf = NULL;
