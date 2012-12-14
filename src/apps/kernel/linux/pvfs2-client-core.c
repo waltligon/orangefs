@@ -4443,6 +4443,49 @@ static void reset_ncache_timeout(void)
     }
 }
 
+static void reset_rcache_timeout(void)
+{
+    int min_stored_timeout = 0, max_rcache_timeout_ms = 0;
+
+    min_stored_timeout =
+        PINT_server_config_mgr_get_abs_min_handle_recycle_time();
+
+    /*
+      if all file systems have been unmounted, this value will be -1,
+      so don't do anything in that case
+    */
+    if (min_stored_timeout != -1)
+    {
+        /*
+          determine the new maximum rcache timeout value based on server
+          handle recycle times and what the user specified on the command
+          line.  if they differ then reset the entire rcache to be sure
+          there are no entries in the cache that could exceed the new
+          timeout.
+        */
+        max_rcache_timeout_ms = PVFS_util_min(
+            (min_stored_timeout * 1000), s_opts.rcache_timeout);
+
+        if (max_rcache_timeout_ms != s_opts.rcache_timeout)
+        {
+            gossip_debug(
+                GOSSIP_CLIENTCORE_DEBUG, "Resetting rcache timeout to %d"
+                " milliseconds\n (based on new dynamic configuration "
+                "handle recycle time value)\n", max_rcache_timeout_ms);
+
+            PINT_rcache_finalize();
+            PINT_rcache_initialize();
+            s_opts.rcache_timeout = max_rcache_timeout_ms;
+            set_rcache_parameters(&s_opts);
+        }
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
+                     "unmounted. Not resetting the rcache.\n");
+    }
+}
+
 static void finalize_perf_items(int n, ... )
 {
 

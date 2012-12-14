@@ -540,6 +540,7 @@ static int readdir_msg_comp_fn(void *v_p,
         sm_p->readdir.pos_token = resp_p->u.readdir.token;
         *(sm_p->readdir_state.directory_version) =
             resp_p->u.readdir.directory_version;
+        sm_p->readdir_state.dirdata_index = sm_p->readdir.dirdata_index;
 
         gossip_debug(GOSSIP_READDIR_DEBUG, 
                 "*** update token value to %llu from dirdata readdir[%d]\n", 
