@@ -131,7 +131,7 @@ PVFS_error PVFS_isys_readdirplus(
         return ret;
     }
 
-    if (pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT)
+    if (pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS)
     {
         gossip_lerr("PVFS_isys_readdirplus unable to handle request "
                     "for %d entries.\n", pvfs_dirent_incount);
