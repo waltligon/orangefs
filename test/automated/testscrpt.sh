@@ -67,7 +67,7 @@ VFS_HOSTS="`hostname`"
 #
 export MALLOC_CHECK_=2
 
-. ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testfunctions.sh
+source ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testfunctions.sh
 ###
 ### entry point for script
 ###

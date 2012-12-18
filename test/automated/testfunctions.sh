@@ -1,3 +1,7 @@
+# #!/bin/bash
+# testfunction - list of common functions for test programs
+
+
 # takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
 	# debugging aide... when we run this script repeatedly, we don't 
