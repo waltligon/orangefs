@@ -1,10 +1,46 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
-Stable
+orangefs-2.8.6 (Subversion Tag v2.8.7)
 
-Revs 9399 thru 9470
-* Defects corrected for usrint library and ucache system.
+Revs 9399 thru 9763
+
+* WARNINGS:
+*	- The pvfs kernel module is NOT compatible with linux kernel versions
+*	  3.4 and higher.  Work is currently underway.
+*	- A known linux kernel bug causing kernel panics when a PVFS
+*	  filesystem is unmounted was found in RHEL releases 2.6.18-308.1.1 thru
+*	  2.6.18-308.20.1.  The OrangeFS team recommends using 2.6.18-308 (RHEL 5.8) or
+*	  2.6.32-71 (RHEL 6,0) and up.  This kernel bug affects other
+*	  filesystems as well.
+
+* Corrected issues with the readdirplus operations effecting the dokan
+interface for Windows.
+
+* Corrected memory overwrite that resulted from using both readdir and
+readdirplus members of a union whenever the readdir state machine was called
+from the readdirplus state machine.
+
+* Starting in linux kernels 3.4, d_make_root is used instead of d_alloc_root.
+Configure changes were added to account for this change in the kernel module.
+
+* Fixed a bug in pvfs_readdir associated with the usrint library.
+
+* Modified kernel module to accommodate the RCU walk initiated by the system
+in pvfs2_d_validate.  This fixes a deadlock occurring in kernel versions
+2.6.38 and later.
+
+* Fixed bug in usrint library where a dir is opened and the fd is passed to
+fchdir but the path is missing.
+
+* Added support for fts interface in usrint library.
+
+* Fixed errors with invalid objects in the kernel module.
+
+* Performance improvements for Windows Client.
+
+* Defects corrected for ucache system.
+
 * Changes to Makefile:
 *   - Using glibtool instead of glib on MAC-Darwin OS when making libpvfs2.a
 *   - Ensure that sbin dir is creatd before moving ucache system into it.
@@ -12,12 +48,14 @@ Revs 9399 thru 9470
 *     make with the -j option to operate correctly.
 *   - Renamed liborange to liborangefs.
 
-* New Feature: added human readable times to pvfs2-db-display.  Rev 9366.
+* New Feature: added human readable times to pvfs2-db-display.
 
 * New Feature:  when setting the mode (admin or normal) of a filesystem 
-* using pvfs2-set-mode, you can now do so for individual servers.  Prior
-* to this change, the mode was set for all the servers within a particular 
-* filesystem.
+using pvfs2-set-mode, you can now do so for individual servers.  Prior
+to this change, the mode was set for all the servers within a particular 
+filesystem.
+
+
 
 orangefs-2.8.6 (Rev v2.8.6)
 
