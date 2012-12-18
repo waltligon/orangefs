@@ -60,7 +60,10 @@ TESTNAME="${HOSTNAME}-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
+if [ ! $VFS_HOSTS ]
+then
 VFS_HOSTS="`hostname`"
+fi
 #VFS_HOSTS="badname"
 #
 # Detect basic heap corruption
