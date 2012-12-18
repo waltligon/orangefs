@@ -3,6 +3,13 @@
 #arguments will come from calling program
 #runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]
 
+# subroutine for generating instances.
+
+# euca create instance
+# verify instance is running
+# return ip address of instance.
+
+
 
 
 DATE=`date -u +'%Y%m%d'`
@@ -138,13 +145,12 @@ fi
 
 #create the VM
 #exit 0
- 
 if [ ${NEWINSTANCE} != 0 ]
 then
 	echo "Generating new instance of $VMSYSTEM"
-	echo "euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err"
+	echo "euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t c1.small $VMSYSTEM > newinstance.out 2> newinstance.err"
 
-	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t m1.medium $VMSYSTEM > newinstance.out 2> newinstance.err 
+	euca-run-instances -n 1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t c1.small $VMSYSTEM > newinstance.out 2> newinstance.err 
 
 	if [ $? -ne 0 ]
 	then
@@ -177,6 +183,7 @@ then
 	
 fi
 
+
 echo "VM IP ADDRESS is ${VMIPADDR}"
 
 echo "Removing obsolete ssh host records at ~/.ssh/known_hosts for $VMIPADDR."
@@ -190,6 +197,11 @@ do
 	sleep 10
 	ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 done
+
+# for each auxiliary instance, generate a c1.small image.
+#
+
+
 
 # install all system updates and reboot
 ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
