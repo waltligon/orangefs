@@ -71,7 +71,7 @@ pwd
 ls -l
 #ls -l ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testfunctions.sh
 
-. ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testfunctions.sh
+. `pwd`/testfunctions.sh
 ###
 ### entry point for script
 ###
