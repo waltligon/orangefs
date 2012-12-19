@@ -1,7 +1,74 @@
 # #!/bin/bash
 # testfunction - list of common functions for test programs
+# i'm not married to bash. just wanted to get things prototyped
+
+# prereqs: 
+#   - $user needs to be in the sudoers file
+#   - $user needs to be able to sudo w/o prompting
+#   - please don't cheat and run this as root: will not catch permissions bugs
+
+# set ENABLE_SECURITY to build with security
+# set SECURITY_FAIL to test that security will fail - SSS
+
+# you can override these settings in nightly-tests.cfg 
+export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_MOUNTPOINT=/pvfs2-nightly
+export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
+#export EXTRA_TESTS=/tmp/src/benchmarks
+export URL=http://devorange.clemson.edu/pvfs
+export BENCHMARKS=benchmarks-20121017.tar.gz
+
+# look for a 'nightly-test.cfg' in the same directory as this script
+if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
+	. /tmp/$USER/nightly-tests.cfg
+fi
 
 
+# need to make this a command line arugment:
+export CVS_TAG="${CVS_TAG:-HEAD}"
+
+if [ $ENABLE_SECURITY ] ; then
+	sec_dir=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc
+fi
+
+export CVS_TAG_FULL="${CVS_TAG:-HEAD}"
+export CVS_TAG=`echo $CVS_TAG_FULL | awk -F"/" '{print $NF}'`
+# no need to modify these. they make their own gravy
+STARTTIME=`date +%s`
+TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
+#SYSINT_SCRIPTS=~+/sysint-tests.d
+SYSINT_SCRIPTS=`pwd`/sysint-tests.d
+VFS_SCRIPTS=`pwd`/vfs-tests.d
+#VFS_SCRIPTS=~+/vfs-tests.d
+VFS_SCRIPT="dbench"
+MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
+REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+REPORT_ERR=${PVFS2_DEST}/alltests-${CVS_TAG}.err
+BENCHMARKS=benchmarks-20121017.tar.gz
+
+# for debugging and testing, you might need to set the above to your working
+# direcory.. .unless you like checking in broken scripts
+#SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
+#VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
+MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
+
+HOSTNAME=`hostname -s 2> /dev/null || hostname`
+TESTNAME="${HOSTNAME}-nightly"
+
+# before starting any client apps, we need to deal with the possiblity that we
+# might have built with shared libraries
+export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+
+# we only have a few hosts that meet all the earlier stated prereqs
+if [ ! $VFS_HOSTS ]
+then
+VFS_HOSTS="`hostname`"
+fi
+#VFS_HOSTS="badname"
+#
+# Detect basic heap corruption
+#
+export MALLOC_CHECK_=2
 # takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
 	# debugging aide... when we run this script repeatedly, we don't 
@@ -272,3 +339,4 @@ run_one() {
       echo "FAILED"
    fi
 }
+
