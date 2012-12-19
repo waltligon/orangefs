@@ -17,7 +17,7 @@ check_instance() {
 generate_instances() {
 
 	# Parameter $1 number of instances
-	echo "Generating new instance of $VMSYSTEM"
+	echo "Generating $1 new instances of $VMSYSTEM"
 	echo "euca-run-instances -n $1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t c1.small $VMSYSTEM > newinstance.out 2> newinstance.err"
 
 	euca-run-instances -n $1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t c1.small $VMSYSTEM > newinstance.out 2> newinstance.err 
@@ -34,13 +34,14 @@ generate_instances() {
 	# primary instance is first instance
 	VMINSTANCEID=${VMINSTANCEARR[0]}
 	
-	echo "VM Instance of $VMSYSTEM created. Instance id is ${VMINSTANCEID}"
 	#wait 20 seconds to start instance
 	sleep 20
 
 	# now verify the instance is running
 	for i in ${VMINSTANCEARR[@]}
 	do
+		echo "VM Instance of $VMSYSTEM requested. Instance id is ${i}"
+	
 		RUNNING=`euca-describe-instances instance-id=${i} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
 	
 		until [ "$RUNNING" == "running" ]
