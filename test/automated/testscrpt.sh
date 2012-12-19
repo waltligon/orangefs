@@ -84,6 +84,7 @@ ${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 
 # will we be able to do VFS-related tests?
 do_vfs=0
+echo "Looking for host ${HOSTNAME}, in VFS_HOSTS list ${VFS_HOSTS}"
 for s in $(echo $VFS_HOSTS); do
 	if [ ${HOSTNAME} = $s ] ; then
 		do_vfs=1
@@ -91,11 +92,12 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
-
 if [ ! $RUN_VFS_TEST ] 
 then
 	do_vfs=0;
 fi
+
+
 
 # "install" benchmark software, if EXTRA_TESTS is not null
 if [ $EXTRA_TESTS ] 
@@ -158,6 +160,8 @@ if [ $do_vfs -eq 1 ] ; then
 		echo "setup failed"
 		setupfail
 	fi
+else	
+	echo "Unable to do VFS test for ${VFS_HOSTS}"
 fi
 
 # at this point we've got 
