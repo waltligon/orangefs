@@ -160,6 +160,7 @@ echo "VM IP ADDRESS is ${VMIPADDR}"
 
 VFS_HOSTS=`echo ${VMINSTANCENAMEARR[@]}`
 
+echo "VFS_HOSTS are $VFS_HOSTS"
 
 for i in ${VMIPADDRARR[@]}
 do
