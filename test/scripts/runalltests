@@ -147,19 +147,27 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-	generate_instances 1
+	generate_instances 4
 	
 fi
+#Now grab the IP Address of the new instance
+VMIPADDRARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $13 }') )
+VMINSTANCENAMEARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $4 }') ) 
+
+VMIPADDR=${VMIPADDRARR[0]}
+	
+echo "VM IP ADDRESS is ${VMIPADDR}"
+
+VFS_HOSTS=`echo ${VMINSTANCENAMEARR[@]}`
 
 
-check_instance 
+for i in ${VMIPADDRARR[@]}
+do
+	echo "Removing obsolete ssh host records at ~/.ssh/known_hosts for $i."
+	ssh-keygen -f ~/.ssh/known_hosts -R $i
+	prepare_instance $i
+done
 
-# for each auxiliary instance, generate a c1.small image.
-#
-
-
-
-prepare_instance
 
 echo ""
 echo "Running tests..."

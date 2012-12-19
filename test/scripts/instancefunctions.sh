@@ -1,13 +1,16 @@
 #!/bin/bash
 
 check_instance() {
-	ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
+
+	#$1 = ipaddress
+	
+	ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 
 	#is SSH responding?
 	until [ $? -eq 0 ]
 	do
 		sleep 10
-		ssh -i $KEYFILE ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
+		ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 	done
 }
 
@@ -25,55 +28,51 @@ generate_instances() {
 		exit 1
 	fi
 	
-	cat newinstance.out | grep INSTANCE | awk '{print $2}' > instanceids.txt
+	VMINSTANCEARR=( $(cat newinstance.out | grep INSTANCE | awk '{print $2}') )
 	
 	
-	# for each instance in instance id
+	# primary instance is first instance
+	VMINSTANCEID=${VMINSTANCEARR[0]}
 	
-	VMINSTANCEID=`cat newinstance.out | grep INSTANCE | awk '{print $2}'`
-
 	echo "VM Instance of $VMSYSTEM created. Instance id is ${VMINSTANCEID}"
 	#wait 20 seconds to start instance
 	sleep 20
 
-	RUNNING=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
-	
-	until [ "$RUNNING" == "running" ]
+	# now verify the instance is running
+	for i in ${VMINSTANCEARR[@]}
 	do
-		RUNNING=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
-		sleep 10
-		echo "Instance ${VMINSTANCEID} is ${RUNNING}"
-		if [ $RUNNING == "error" ]
-		then
-			echo "Error in creating ${VMINSTANCEID}. Bailing out."
-			exit 1
-		fi
+		RUNNING=`euca-describe-instances instance-id=${i} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
+	
+		until [ "$RUNNING" == "running" ]
+		do
+			RUNNING=`euca-describe-instances instance-id=${i} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $6 }'`
+			sleep 10
+			echo "Instance ${i} is ${RUNNING}"
+			if [ $RUNNING == "error" ]
+			then
+				echo "Error in creating ${i}. Bailing out."
+				exit 1
+			fi
+		done
 	done
 	
-	#Now grab the IP Address of the new instance
-	VMIPADDR=`euca-describe-instances instance-id=${VMINSTANCEID} --config ${EC2CONFFILE} | grep INSTANCE | awk '{ print $13 }'`
 
-
-	echo "VM IP ADDRESS is ${VMIPADDR}"
-
-	VFS_HOSTS=$VMIPADDR
-
-	echo "Removing obsolete ssh host records at ~/.ssh/known_hosts for $VMIPADDR."
-	ssh-keygen -f ~/.ssh/known_hosts -R ${VMIPADDR}
-	
-	check_instance
 }
 
 
 
 prepare_instance() {
+	
+	# $1 = ipaddress
 	# install all system updates and reboot
-	ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
+	check_instance $i
+	
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
 
-	check_instance
+	check_instance $i
 
-	ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 	echo "Preparing the image for testing..."
-	ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-cloud.sh 
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < prepare-cloud.sh 
 }
