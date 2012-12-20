@@ -68,6 +68,10 @@ prepare_instance() {
 	# install all system updates and reboot
 	check_instance $i
 	
+	#upload keyfile to instance - will need later
+	rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${KEYFILE} ${VMUSER}@${i}:/home/${VMUSER}/
+	
+	#update the instance
 	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
 
 	check_instance $i

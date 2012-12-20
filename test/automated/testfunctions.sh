@@ -340,3 +340,38 @@ run_one() {
    fi
 }
 
+copy_pvfs2()
+{
+#$1 is list of vfs servers
+
+VFS_ARRAY=($VFS_HOSTS)
+
+KEYFILESHORT=`basename $KEYFILE`
+
+for host in $VFS_HOSTS
+do
+
+	# verify /home/${VMUSER}/${KEYFILESHORT} exists
+
+	if [ $host != ${HOSTNAME} ]
+	then
+		ssh -i /home/${VMUSER}/${KEYFILESHORT} ${VMUSER}@${host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
+		rsync -a -e "ssh -i /home/${VMUSER}/${KEYFILESHORT} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${host}:${PVFS2_DEST} &
+		
+	fi
+done
+wait
+
+for host in $VFS_HOSTS
+do
+
+	if [ $host != ${HOSTNAME} ]
+	then
+		#start pvfs servers remotely. not sure how to do this...
+		#ssh -i ${KEYFILE} ${VMUSER}@${host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$PVFS2_DEST
+		
+	fi
+done
+
+}
+

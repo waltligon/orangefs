@@ -166,9 +166,13 @@ for i in ${VMIPADDRARR[@]}
 do
 	echo "Removing obsolete ssh host records at ~/.ssh/known_hosts for $i."
 	ssh-keygen -f ~/.ssh/known_hosts -R $i
+	
+	# prepare each instance on a separate process.
 	prepare_instance $i &
+
 done
 wait
+
 
 echo ""
 echo "Running tests..."
