@@ -361,16 +361,16 @@ do
 done
 wait
 
-for host in $VFS_HOSTS
-do
+#for host in $VFS_HOSTS
+#do
 
-	if [ $host != ${HOSTNAME} ]
-	then
+#	if [ $host != ${HOSTNAME} ]
+#	then
 		#start pvfs servers remotely. not sure how to do this...
 		#ssh -i ${KEYFILE} ${VMUSER}@${host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$PVFS2_DEST
 		
-	fi
-done
+#	fi
+#done
 
 }
 
