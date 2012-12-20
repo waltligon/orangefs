@@ -173,11 +173,21 @@ do
 done
 wait
 
+for i in ${VMIPADDRARR[@]}
+do
+
+	#Verify all instances are running before continuing.
+	check_instance $i
+
+done
+
 
 echo ""
 echo "Running tests..."
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS=\"${VFS_HOSTS}\" RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS=\'${VFS_HOSTS}\' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
+
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS=\'${VFS_HOSTS}\' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
 echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
