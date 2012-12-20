@@ -68,7 +68,7 @@ pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
 for my_host in $VFS_HOSTS
 do
-	copy_pvfs $my_host &
+	copy_pvfs2 $my_host &
 done
 wait
 
