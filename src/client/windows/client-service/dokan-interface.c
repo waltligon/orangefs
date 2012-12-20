@@ -1568,7 +1568,7 @@ static int add_dir_entries(
     return 0;
 }
 
-/* max files per request - based on PVFS_REQ_LIMIT_DIRENT_COUNT in 
+/* max files per request - based on PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS in 
    pvfs2-req-proto.h */
 #define PVFS2_FIND_FILES_MAX    60
 
