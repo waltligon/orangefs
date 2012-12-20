@@ -340,8 +340,7 @@ run_one() {
    fi
 }
 
-copy_pvfs2()
-{
+copy_pvfs2() {
 #$1 is list of vfs servers
 
 VFS_ARRAY=($VFS_HOSTS)
