@@ -11,7 +11,7 @@ Revs 9399 thru 9763
 *	- A known linux kernel bug causing kernel panics when a PVFS
 *	  filesystem is unmounted was found in RHEL releases 2.6.18-308.1.1 thru
 *	  2.6.18-308.20.1.  The OrangeFS team recommends using 2.6.18-308 (RHEL 5.8) or
-*	  2.6.32-71 (RHEL 6,0) and up.  This kernel bug affects other
+*	  2.6.32-71 (RHEL 6.0) and up.  This kernel bug affects other
 *	  filesystems as well.
 
 * Corrected issues with the readdirplus operations effecting the dokan
@@ -26,7 +26,7 @@ Configure changes were added to account for this change in the kernel module.
 
 * Fixed a bug in pvfs_readdir associated with the usrint library.
 
-* Modified kernel module to accommodate the RCU walk initiated by the system
+* Modified kernel module to accommodate the RCU walk initiated by the kernel
 in pvfs2_d_validate.  This fixes a deadlock occurring in kernel versions
 2.6.38 and later.
 
