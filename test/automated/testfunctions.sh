@@ -204,6 +204,7 @@ setup_security() {
 }
 
 setup_pvfs2() {
+	echo "PVFS2_DEST is $PVFS2_DEST"
 	cd $PVFS2_DEST
 	mkdir mount
 	rm -f fs.conf 
