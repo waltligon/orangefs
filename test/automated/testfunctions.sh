@@ -343,6 +343,7 @@ run_one() {
 copy_pvfs2() {
 #$1 is list of vfs servers
 echo  "Copying PVFS2..."
+echo $VFS_HOSTS
 VFS_ARRAY=(`echo $VFS_HOSTS`)
 
 KEYFILESHORT=`basename $KEYFILE`
