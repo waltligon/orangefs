@@ -344,11 +344,11 @@ copy_pvfs2() {
 #$1 is list of vfs servers
 echo  "Copying PVFS2..."
 echo $VFS_HOSTS
-VFS_ARRAY=(`echo $VFS_HOSTS`)
+#VFS_ARRAY=(`echo $VFS_HOSTS`)
 
 KEYFILESHORT=`basename $KEYFILE`
 
-for host in ${VFS_ARRAY[@]}
+for host in $VFS_HOSTS
 do
 
 	# verify /home/${VMUSER}/${KEYFILESHORT} exists
