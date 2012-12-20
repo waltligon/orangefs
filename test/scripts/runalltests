@@ -147,7 +147,7 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-	generate_instances 1
+	generate_instances 2
 	
 fi
 #Now grab the IP Address of the new instance
