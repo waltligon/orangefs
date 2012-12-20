@@ -344,7 +344,7 @@ copy_pvfs2()
 {
 #$1 is list of vfs servers
 
-VFS_ARRAY=($VFS_HOSTS)
+VFS_ARRAY=( ${VFS_HOSTS} )
 
 KEYFILESHORT=`basename $KEYFILE`
 
