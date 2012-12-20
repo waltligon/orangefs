@@ -14,17 +14,9 @@ check ()
 ./pvfs2-test-cert-ca.sh
 check "Error: could not create CA certificate"
 
-# Remove passphrase from CA certificate key
-./pvfs2-test-cert-rm-pass.sh pvfs2-test-ca-key-pass.pem pvfs2-test-ca-key.pem
-check "Error: could not remove passphrase from CA certificate key"
-
 # Generate user certificate request
 ./pvfs2-test-cert-req.sh
 check "Error: could not generate certificate request"
-
-# Remove passphrase from user certificate key
-./pvfs2-test-cert-rm-pass.sh pvfs2-test-cert-key-pass.pem pvfs2-test-cert-key.pem
-check "Error: could not remove passphrase from user certificate key"
 
 # Generate and sign user certificate with CA
 ./pvfs2-test-cert-sign.sh

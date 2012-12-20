@@ -25,7 +25,7 @@ oid_section                    = new_oids
 # Add a simple OID like this:
 # testoid1                     = 1.2.3.4
 # Or use config file substitution like this:
-# testoid2                     = ${testoid1}.5.6
+# testoid2=${testoid1}.5.6
 
 ####################################################################
 [ req ]
@@ -33,8 +33,7 @@ default_bits                   = 2048
 default_keyfile                = pvfs2-ca-key-pass.pem
 distinguished_name             = req_distinguished_name
 attributes                     = req_attributes
-x509_extensions                = v3_ca     # The extensions to add to the self signed cert
-prompt                         = no        # use values from file
+x509_extensions                = v3_ca        # The extentions to add to the self signed cert
 
 # Passwords for private keys if not present they will be prompted for
 # input_password               = secret
@@ -44,20 +43,36 @@ prompt                         = no        # use values from file
 # default: PrintableString, T61String, BMPString.
 # pkix: PrintableString, BMPString.
 # utf8only: only UTF8Strings.
-# nombstr: PrintableString, T61String (no BMPStrings or UTF8Strings).
+# nombstr : PrintableString, T61String (no BMPStrings or UTF8Strings).
 # MASK:XXXX a literal mask value.
 # WARNING: current versions of Netscape crash on BMPStrings or UTF8Strings
 # so use this option with caution!
 string_mask                    = nombstr
 
-# req_extensions = v3_req # The extensions to add to a certificate request
+# req_extensions               = v3_req # The extensions to add to a certificate request
 
 [ req_distinguished_name ]
-0.DC                           = org
-1.DC                           = orangefs
-O                              = Security
-OU                             = Testing
-CN                             = Test CA
+countryName                    = Country Name (2 letter code)
+countryName_default            = US
+countryName_min                = 2
+countryName_max                = 2
+
+stateOrProvinceName            = State or Province Name (full name)
+
+localityName                   = Locality Name (eg, city)
+
+organizationName               = Organization Name (eg, company)
+organizationName_default       = ACME Inc.
+
+organizationalUnitName         = Organizational Unit Name (eg, section)
+organizationalUnitName_default = OrangeFS
+
+commonName                     = Common Name
+commonName_default             = OrangeFS CA
+commonName_min                 = 1
+commonName_max                 = 64
+
+# SET-ex3                      = SET extension number 3
 
 [ req_attributes ]
 #challengePassword             = A challenge password
@@ -75,6 +90,7 @@ keyUsage                       = nonRepudiation, digitalSignature, keyEncipherme
 
 [ v3_ca ]
 
+
 # Extensions for a typical CA
 
 
@@ -86,7 +102,7 @@ authorityKeyIdentifier         = keyid:always,issuer:always
 
 # This is what PKIX recommends but some broken software chokes on critical
 # extensions.
-#basicConstraints = critical,CA:true
+#basicConstraints              = critical,CA:true
 # So we do this instead.
 basicConstraints               = CA:true
 
