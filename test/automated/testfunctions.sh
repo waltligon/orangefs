@@ -60,9 +60,9 @@ TESTNAME="${HOSTNAME}-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-if [ ! $VFS_HOSTS ]
+if [ ! "$VFS_HOSTS" ]
 then
-VFS_HOSTS="`hostname`"
+VFS_HOSTS=$HOSTNAME
 fi
 #VFS_HOSTS="badname"
 #
@@ -348,7 +348,7 @@ VFS_ARRAY=($VFS_HOSTS)
 
 KEYFILESHORT=`basename $KEYFILE`
 
-for host in $VFS_HOSTS
+for host in $VFS_ARRAY
 do
 
 	# verify /home/${VMUSER}/${KEYFILESHORT} exists
