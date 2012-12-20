@@ -11,8 +11,8 @@ ${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 # will we be able to do VFS-related tests?
 do_vfs=0
 echo "Looking for host ${HOSTNAME}, in VFS_HOSTS list ${VFS_HOSTS}"
-VFS_ARR=($VFS_HOSTS)
-for s in ${VFS_ARR}; do
+
+for s in ${VFS_HOSTS}; do
 	if [ ${HOSTNAME} = $s ] ; then
 		do_vfs=1
 		break
