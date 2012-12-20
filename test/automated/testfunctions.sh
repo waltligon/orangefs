@@ -343,25 +343,17 @@ run_one() {
 
 copy_pvfs2() {
 #$1 is list of vfs servers
-echo  "Copying PVFS2..."
-echo $VFS_HOSTS
-#VFS_ARRAY=(`echo $VFS_HOSTS`)
-
-KEYFILESHORT=`basename $KEYFILE`
-
-for host in $VFS_HOSTS
-do
-
+$my_host=$1
+echo  "Copying PVFS2... to $my_host"
 	# verify /home/${VMUSER}/${KEYFILESHORT} exists
 
-	if [ $host != ${HOSTNAME} ]
+	if [ $my_host != ${HOSTNAME} ]
 	then
-		ssh -i /home/${VMUSER}/${KEYFILESHORT} ${VMUSER}@${host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
-		rsync -a -e "ssh -i /home/${VMUSER}/${KEYFILESHORT} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${host}:${PVFS2_DEST} &
+		ssh -i /home/${VMUSER}/${KEYFILESHORT} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
+		rsync -a -e "ssh -i /home/${VMUSER}/${KEYFILESHORT} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
 		
 	fi
-done
-wait
+
 
 #for host in $VFS_HOSTS
 #do

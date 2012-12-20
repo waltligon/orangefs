@@ -24,8 +24,53 @@ then
 	do_vfs=0;
 fi
 
+# "install" benchmark software, if EXTRA_TESTS is not null
+if [ $EXTRA_TESTS ] 
+then
+   echo "Installing benchmark software...."
+   my_cwd=`pwd`
+
+   #create directory, if not already there
+   mkdir -p $EXTRA_TESTS
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: mkdir failed"
+      setupfail
+   fi
+
+   #remove existing tar file and/or subdirectories
+   cd $EXTRA_TESTS/..
+   sudo /bin/rm -rf *
+
+   #get new tar file
+   wget ${URL}/${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: wget failed"
+      setupfail
+   fi
+
+   #untar the file
+   tar -xzf ${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: tar failed"
+      setupfail
+   fi
+
+   #go back to original working directory
+   cd $my_cwd
+fi
+
+echo "pull_and_build_pvfs2"
+pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
 
+for my_host in $VFS_HOSTS
+do
+	copy_pvfs $my_host &
+done
+wait
 
 echo "setup_pvfs2"
 teardown_pvfs2 && setup_pvfs2 
