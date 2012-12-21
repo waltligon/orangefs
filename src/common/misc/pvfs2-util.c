@@ -359,9 +359,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             /* print errors */
             if (etotal > 0)
             {
-                char gbuf[600];
-                snprintf(gbuf, sizeof(gbuf), "pvfs2_gencred: %s", ebuf);
-                gossip_err(gbuf);
+                gossip_err("pvfs2_gencred: %s", ebuf);
             }
         }
     }

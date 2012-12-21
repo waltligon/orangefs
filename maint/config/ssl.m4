@@ -41,88 +41,93 @@
 
 AC_DEFUN([AX_OPENSSL],
 [
-	AC_ARG_WITH([ssl],
-				AS_HELP_STRING([--with-ssl=DIR],
-				[Location of the OpenSSL installation (if custom)]),
-				[
-				if test "$withval" = "no"; then
-					want_ssl="no"
-				elif test "$withval" = "yes"; then
-					want_ssl="yes"
-					ac_ssl_path=""
-				else
-					want_ssl="yes"
-					ac_ssl_path="$withval"
-				fi
-				],
-				[want_ssl="yes"])
+    AC_ARG_WITH([ssl],
+                AS_HELP_STRING([--with-ssl=DIR],
+                [Location of the OpenSSL installation (if custom)]),
+                [
+                if test "$withval" = "no"; then
+                    want_ssl="no"
+                elif test "$withval" = "yes"; then
+                    want_ssl="yes"
+                    ac_ssl_path=""
+                else
+                    want_ssl="yes"
+                    ac_ssl_path="$withval"
+                fi
+                ],
+                [want_ssl="yes"])
 
-	if test "x$want_ssl" = "xyes"; then
-		AC_REQUIRE([AC_PROG_CC])
-		AC_MSG_CHECKING(for openssl/md5.h)
+    if test "x$want_ssl" = "xyes"; then
+        AC_REQUIRE([AC_PROG_CC])
+        AC_MSG_CHECKING(for openssl/md5.h)
 
-		if test "$ac_ssl_path" != ""; then
-			OPENSSL_CPPFLAGS="-I$ac_ssl_path/include"
+        if test "$ac_ssl_path" != ""; then
+            OPENSSL_CPPFLAGS="-I$ac_ssl_path/include"
             if test -d "$ac_ssl_path/lib64"; then
                 OPENSSL_LDFLAGS="-L$ac_ssl_path/lib64"
             fi
-			OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path/lib"
-		else
-			for ac_ssl_path_tmp in /usr /usr/local /opt ; do
-				if test -d "$ac_ssl_path_tmp" && test -r "$ac_ssl_path_tmp/include/openssl/md5.h"; then
-					OPENSSL_CPPFLAGS="-I$ac_ssl_path_tmp/include"
+            OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path/lib"
+        else
+            for ac_ssl_path_tmp in /usr /usr/local /opt ; do
+                if test -d "$ac_ssl_path_tmp" && test -r "$ac_ssl_path_tmp/include/openssl/md5.h"; then
+                    OPENSSL_CPPFLAGS="-I$ac_ssl_path_tmp/include"
                     if test -d "$ac_ssl_path_tmp/lib64"; then
                         OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib64"
                     fi
-					OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path_tmp/lib"
-					break;
-				fi
-			done
-		fi
+                    OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path_tmp/lib"
+                    break;
+                fi
+            done
+        fi
 
-		if test "$OPENSSL_CPPFLAGS" = "";then
-			AC_MSG_RESULT(no)
-			AC_MSG_WARN('*** openssl/md5.h does not exist')
-		else
-			AC_MSG_RESULT(yes)
+        if test "$OPENSSL_CPPFLAGS" = "";then
+            AC_MSG_RESULT(no)
+            AC_MSG_WARN('*** openssl/md5.h does not exist')
+        else
+            AC_MSG_RESULT(yes)
 
-			CPPFLAGS="$CPPFLAGS $OPENSSL_CPPFLAGS"
-			export CPPFLAGS
-			LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
-			export LDFLAGS
+            CPPFLAGS="$CPPFLAGS $OPENSSL_CPPFLAGS"
+            export CPPFLAGS
+            LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+            export LDFLAGS
 
-			AC_SUBST(OPENSSL_CPPFLAGS)
-			AC_SUBST(OPENSSL_LDFLAGS)
+            AC_SUBST(OPENSSL_CPPFLAGS)
+            AC_SUBST(OPENSSL_LDFLAGS)
 
-			ax_lib=ssl
-			AC_CHECK_LIB($ax_lib, SSLv2_method,
-				[link_ssl="yes";break], [link_ssl="no"])
-			if test "x$link_ssl" = "xno"; then
-				AC_MSG_WARN(Could not link against lib$ax_lib !)
-			else
-				AC_DEFINE(HAVE_OPENSSL, ,
-					[Define to 1 if the libssl is available])
-			fi
+            ax_lib=ssl
+            AC_CHECK_LIB($ax_lib, SSLv23_method,
+                [link_ssl="yes";break], [link_ssl="no"])
+            if test "x$link_ssl" = "xno"; then
+                AC_MSG_WARN(Could not link against lib$ax_lib !)
+            else
+                AC_DEFINE(HAVE_OPENSSL, ,
+                    [Define to 1 if OpenSSL is available])
+            fi
 
-			ax_lib=crypto
-			AC_CHECK_LIB($ax_lib, MD5_Init,
-				[link_crypto="yes";break], [link_crypto="no"])
-			if test "x$link_crypto" = "xno"; then
-				AC_MSG_WARN(Could not link against lib$ax_lib !)
-			fi
+            ax_lib=crypto
+            AC_CHECK_LIB($ax_lib, MD5_Init,
+                [link_crypto="yes";break], [link_crypto="no"])
+            if test "x$link_crypto" = "xno"; then
+                AC_MSG_WARN(Could not link against lib$ax_lib !)
+            else
+                if test "x$link_ssl" = "xno"; then
+                    AC_DEFINE(HAVE_OPENSSL, ,
+                        [Define to 1 if OpenSSL is available])
+                fi
+            fi
 
-			if test "x$link_ssl" = "xyes"; then
-				OPENSSL_LIB="$OPENSSL_LIB -lssl"
-			fi
-			if test "x$link_crypto" = "xyes"; then
-				OPENSSL_LIB="$OPENSSL_LIB -lcrypto"
-			fi
-			AC_SUBST(OPENSSL_LIB)
+            if test "x$link_ssl" = "xyes"; then
+                OPENSSL_LIB="$OPENSSL_LIB -lssl"
+            fi
+            if test "x$link_crypto" = "xyes"; then
+                OPENSSL_LIB="$OPENSSL_LIB -lcrypto"
+            fi
+            AC_SUBST(OPENSSL_LIB)
 
-			if test -d "/usr/kerberos/include" ; then
-			    OPENSSL_CPPFLAGS="$OPENSSL_CPPFLAGS -I/usr/kerberos/include"
-			    AC_SUBST(OPENSSL_CPPFLAGS)
-			fi
-		fi
-	fi
+            if test -d "/usr/kerberos/include" ; then
+                OPENSSL_CPPFLAGS="$OPENSSL_CPPFLAGS -I/usr/kerberos/include"
+                AC_SUBST(OPENSSL_CPPFLAGS)
+            fi
+        fi
+    fi
 ])

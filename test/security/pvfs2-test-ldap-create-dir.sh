@@ -75,6 +75,9 @@ echo -n "Writing slapd.conf... "
 sed "s%__PREFIX__%${prefix}%;s%__ADMINDN__%${admindn}%;s%__ADMINPW__%${encpwd}%;s%__SUFFIX__%${suffix}%" slapd.conf.in > slapd.conf
 if [ $? -eq 0 ]; then
     echo "ok"
+else
+    echo "Error: could not create slapd.conf"
+    exit 1
 fi
 
 chmod 600 slapd.conf

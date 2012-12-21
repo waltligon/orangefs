@@ -27,7 +27,7 @@ AC_DEFUN([AX_LDAP],
 [
     AC_ARG_WITH([ldap],
                 AC_HELP_STRING([--with-ldap=DIR],
-				               [Location of OpenLDAP installation (for certificate-based security)]),
+                               [Location of OpenLDAP installation (for certificate-based security)]),
                 [ if test "$withval" = "no"; then
                       want_ldap="no"
                       _libldap_with="no"
@@ -39,14 +39,14 @@ AC_DEFUN([AX_LDAP],
                       _libldap_with=$withval
                   fi
                 ],
-				[ if test "x$ENABLE_SECURITY_CERT" = "x1"; then
-				      want_ldap="yes"
-				      _libldap_with="yes"
-				  else
-				      want_ldap="no"
-					  _libldap_with="no"
-				  fi
-				])
+                [ if test "x$ENABLE_SECURITY_CERT" = "x1"; then
+                      want_ldap="yes"
+                      _libldap_with="yes"
+                  else
+                      want_ldap="no"
+                      _libldap_with="no"
+                  fi
+                ])
 
     if test "x$_libldap_with" != x"no"; then
         AC_MSG_CHECKING(for LDAP support)
@@ -58,19 +58,19 @@ AC_DEFUN([AX_LDAP],
                 found_ldap="yes"
             elif test -f /usr/include/ldap.h; then
                 LDAP_INCDIR=/usr/include
-				if test -d /usr/lib64; then
-				    LDAP_LIBDIR=/usr/lib64
-				else
-				    LDAP_LIBDIR=/usr/lib
-				fi
+                if test -d /usr/lib64; then
+                    LDAP_LIBDIR=/usr/lib64
+                else
+                    LDAP_LIBDIR=/usr/lib
+                fi
                 found_ldap="yes"
             elif test -f /usr/local/include/ldap.h; then
                 LDAP_INCDIR=/usr/local/include
-				if test -d /usr/local/lib64; then
-				    LDAP_LIBDIR=/usr/local/lib64
-				else
+                if test -d /usr/local/lib64; then
+                    LDAP_LIBDIR=/usr/local/lib64
+                else
                     LDAP_LIBDIR=/usr/local/lib
-				fi
+                fi
                 found_ldap="yes"
             else
                 found_ldap="no"
@@ -89,9 +89,9 @@ AC_DEFUN([AX_LDAP],
 
        if test "x$found_ldap" != "xno" ; then
            if test "$_libldap_with" != "yes"; then
-		        LDAP_CPPFLAGS="I$LDAP_INCDIR"
+                LDAP_CPPFLAGS="I$LDAP_INCDIR"
                 LDAP_LDFLAGS="-L$LDAP_LIBDIR"
-		   fi
+           fi
 
            found_ldap="yes"           
 # set in src/common/security/module.mk.in:
@@ -99,10 +99,13 @@ AC_DEFUN([AX_LDAP],
            AC_MSG_RESULT(yes)
            
            # avoid adding libraries to LIBS w/dummy line
-           AC_CHECK_LIB(lber, ber_init, [_dummy=x], AC_MSG_ERROR([Could not link against liblber.so]))
-		   AC_CHECK_LIB(ldap, ldap_init, [_dummy=x], AC_MSG_ERROR([Could not link against libldap.so]))
+           AC_CHECK_LIB(lber, ber_init, [_dummy=x], 
+                        AC_MSG_ERROR([Could not link against liblber.so]))
+           AC_CHECK_LIB(ldap, ldap_init, [_dummy=x], 
+                        AC_MSG_ERROR([Could not link against libldap.so]),
+                        [-llber])
 
-		   LDAP_LIB="-lldap -llber"
+           LDAP_LIB="-lldap -llber"
        fi
   fi
 
