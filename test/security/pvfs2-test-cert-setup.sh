@@ -33,4 +33,18 @@ if [ "x$PVFS2_TEST_CERT_NO_COPY" = "x" -a -d ~ ]; then
     chmod 600 ~/.pvfs2-cert.pem ~/.pvfs2-cert-key.pem
 fi
 
+# Setup LDAP directory
+./pvfs2-test-ldap-create-dir.sh
+check "Error: could not create LDAP directory"
+
+# Create non-root user
+if [ "x$EUID" != "x0" ]; then
+    # Compute LDAP container and admin dn
+    hn=`hostname -f`
+    base="dc=${hn/./,dc=}"
+    admindn="cn=admin,${base}"
+    container="ou=Users,${base}"
+
+    ./pvfs2-test-ldap-add-user.sh -a "$admindn" -w "ldappwd" "$USER" "$container"
+fi
 
