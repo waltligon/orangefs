@@ -74,6 +74,7 @@ prepare_instance() {
 	#update the instance
 	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
 
+	# add sleep to fix timing issue on rhel6 based distros.
 	sleep 15
 	check_instance $i
 
@@ -82,9 +83,6 @@ prepare_instance() {
 	echo "Preparing the image for testing..."
 	echo "ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"VMSYSTEM=${VMSYSTEM} bash -s\" < prepare-cloud.sh "
 	
-	#until [ $? -eq 0 ]
-	#do
-	#	sleep 10
-		ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < ./prepare-cloud.sh 
-	#done
+
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < ./prepare-cloud.sh 
 }
