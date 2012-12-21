@@ -348,7 +348,7 @@ my_host=$1
 if [ ! $KEYFILE ]
 then
 	#A bit naive, but there should only be one keyfile in the home directory.
-	$KEYFILE=`ls ~/*.pem`
+	KEYFILE=`ls ~/*.pem`
 fi
 VMUSER=`basename ~`
 
@@ -357,14 +357,13 @@ echo  "Copying PVFS2... to $my_host"
 
 	if [ $my_host != ${HOSTNAME} ]
 	then
-		echo ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"
+		echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"mkdir -p ${PVFS2_DEST}\""
 		ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
 		
-		echo rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
+		echo "rsync -a -e \"ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST}"
 		rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
 		
 	fi
-
 
 #for host in $VFS_HOSTS
 #do
