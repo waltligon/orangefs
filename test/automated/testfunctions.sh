@@ -343,9 +343,13 @@ run_one() {
 
 copy_pvfs2() {
 #$1 is list of vfs servers
-$my_host=$1
+my_host=$1
 
-KEYFILESHORT=`basename $KEYFILE`
+if [ ! $KEYFILE ]
+then
+	#A bit naive, but there should only be one keyfile in the home directory.
+	$KEYFILE=`ls ~/*.pem`
+fi
 VMUSER=`basename ~`
 
 echo  "Copying PVFS2... to $my_host"
@@ -353,11 +357,11 @@ echo  "Copying PVFS2... to $my_host"
 
 	if [ $my_host != ${HOSTNAME} ]
 	then
-		echo ssh -i /home/${VMUSER}/${KEYFILESHORT} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"
-		ssh -i /home/${VMUSER}/${KEYFILESHORT} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
+		echo ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"
+		ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
 		
-		echo rsync -a -e "ssh -i /home/${VMUSER}/${KEYFILESHORT} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
-		rsync -a -e "ssh -i /home/${VMUSER}/${KEYFILESHORT} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
+		echo rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
+		rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
 		
 	fi
 
