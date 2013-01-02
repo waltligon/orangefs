@@ -249,15 +249,15 @@ start_pvfs2() {
 	done
 
         # give the servers time to finish all their initialization tasks
-        sleep 3
+        sleep 10
 
 		echo "tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
-	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
-		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-	fi
+	#if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
+	#	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+	#fi
 	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	echo "....setting server-side debug mask"
