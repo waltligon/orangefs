@@ -203,7 +203,9 @@ setup_security() {
 	rm -f ${sec_dir}/error.tmp
 }
 
-setup_pvfs2() {
+
+configure_pvfs2() {
+
 	echo "PVFS2_DEST is $PVFS2_DEST"
 	cd $PVFS2_DEST
 	mkdir mount
@@ -213,10 +215,11 @@ setup_pvfs2() {
 		sec_args="--keystore=${sec_dir}/keystore-_ALIAS_ "
 		sec_args+="--serverkey=${sec_dir}/serverkey-_ALIAS_.pem"
 	fi
+	MY_VFS_HOSTS=`echo $VFS_HOSTS | sed s/' '/', '/g`
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
-		--iospec="${HOSTNAME}:{3396-3399}" \
-		--metaspec="${HOSTNAME}:{3396-3399}"  \
+		--iospec="{${MY_VFS_HOSTS}}:{3396-3399}" \
+		--metaspec="{${MY_VFS_HOSTS}}:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
@@ -227,6 +230,11 @@ setup_pvfs2() {
 			return 1
 		fi
 	fi
+
+}	
+
+start_pvfs2() {
+
 	# clean up any artifacts from earlier runs
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
@@ -362,6 +370,9 @@ echo  "Copying PVFS2... to $my_host"
 		
 		echo "rsync -a -e \"ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST}"
 		rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
+		
+		echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
+		ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh"	
 		
 	fi
 
