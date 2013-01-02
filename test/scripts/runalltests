@@ -147,7 +147,7 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-	generate_instances 2
+	generate_instances 4
 	
 fi
 #Now grab the IP Address of the new instance
@@ -214,8 +214,11 @@ fi
 #if successful, delete the VM
 if [ ${DELETE_INSTANCE} ]
 then
-		echo "Deleting instance $VMINSTANCEID at $VMIPADDR."
-		#euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
+		for my_instance in ${VMINSTANCEARR[@]}
+		do
+			echo "Deleting instance $my_instance."
+			euca-terminate-instances --config=$EC2CONFFILE $my_instance
+		done
 
 fi
 
