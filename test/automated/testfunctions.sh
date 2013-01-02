@@ -410,7 +410,7 @@ start_all_pvfs2() {
 
 	echo  "Starting PVFS2 on $my_host"
 	echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
-	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "PVFS2_DEST=$PVFS2_DEST CVS_TAG=$CVS_TAG cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh"	
+	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
 		
 	else
 		echo  "Starting PVFS2 on $my_host"
