@@ -85,7 +85,7 @@ pull_and_build_pvfs2 () {
       with_security="-s"
    fi
 	# a bit of gross shell hackery, but cuts down on the number of
-	# variables we have to set.  Assumes we ran this script out of a
+	# v-ariables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
 	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -t -v $1 \
 		$with_kernel $with_security -r $PVFS2_DEST
@@ -262,6 +262,11 @@ start_pvfs2() {
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	echo "....setting server-side debug mask"
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
+}
+
+setup_pvfs2() {
+	configure_pvfs2 && start_pvfs2
+
 }
 
 teardown_pvfs2() {
