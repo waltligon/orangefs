@@ -215,11 +215,11 @@ configure_pvfs2() {
 		sec_args="--keystore=${sec_dir}/keystore-_ALIAS_ "
 		sec_args+="--serverkey=${sec_dir}/serverkey-_ALIAS_.pem"
 	fi
-	MY_VFS_HOSTS=`echo $VFS_HOSTS | sed s/' '/','/g`
+	MY_VFS_HOSTS=`echo $VFS_HOSTS | sed s/' '/':{3396-3399},'/g`
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
-		--iospec="{${MY_VFS_HOSTS}}:{3396-3399}" \
-		--metaspec="{${MY_VFS_HOSTS}}:{3396-3399}"  \
+		--iospec="${MY_VFS_HOSTS}:{3396-3399}" \
+		--metaspec="${MY_VFS_HOSTS}:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
