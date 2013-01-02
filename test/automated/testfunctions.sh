@@ -239,7 +239,7 @@ start_pvfs2() {
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
-	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
+	for alias in `grep 'Alias ' fs.conf | grep ${HOSTNAME} | cut -d ' ' -f 2`; do
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid \
 			-f fs.conf -a $alias
@@ -378,16 +378,7 @@ VMUSER=`basename ~`
 		rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
 		
 	fi
-#for host in $VFS_HOSTS
-#do
 
-#	if [ $host != ${HOSTNAME} ]
-#	then
-		#start pvfs servers remotely. not sure how to do this...
-		#ssh -i ${KEYFILE} ${VMUSER}@${host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$PVFS2_DEST
-		
-#	fi
-#done
 
 }
 
