@@ -66,7 +66,7 @@ echo "pull_and_build_pvfs2"
 pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
 echo "setup_pvfs2"
-teardown_pvfs2 && setup_pvfs2 
+teardown_pvfs2 && configure_pvfs2 
 
 for my_host in $VFS_HOSTS
 do
@@ -74,7 +74,11 @@ do
 done
 wait
 
-
+for my_host in $VFS_HOSTS
+do
+	start_all_pvfs2 $my_host &
+done
+wait
 
 if [ $? != 0 ] ; then
 	echo "setup failed"

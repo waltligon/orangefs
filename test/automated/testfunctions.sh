@@ -355,7 +355,7 @@ run_one() {
 }
 
 copy_pvfs2() {
-#$1 is list of vfs servers
+#$1 is the vfs server
 my_host=$1
 
 if [ ! $KEYFILE ]
@@ -365,22 +365,19 @@ then
 fi
 VMUSER=`basename ~`
 
-echo  "Copying PVFS2... to $my_host"
+
 	# verify /home/${VMUSER}/${KEYFILESHORT} exists
 
 	if [ $my_host != ${HOSTNAME} ]
 	then
+		echo  "Copying PVFS2... to $my_host"
 		echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"mkdir -p ${PVFS2_DEST}\""
 		ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "mkdir -p ${PVFS2_DEST}"	
 		
 		echo "rsync -a -e \"ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST}"
 		rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${PVFS2_DEST}/ ${VMUSER}@${my_host}:${PVFS2_DEST} 
 		
-		echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
-		ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh"	
-		
 	fi
-
 #for host in $VFS_HOSTS
 #do
 
@@ -394,3 +391,30 @@ echo  "Copying PVFS2... to $my_host"
 
 }
 
+start_all_pvfs2() {
+
+	#$1 is the vfs server
+
+	my_host=$1
+
+	if [ ! $KEYFILE ]
+	then
+		#A bit naive, but there should only be one keyfile in the home directory.
+		KEYFILE=`ls ~/*.pem`
+	fi
+	VMUSER=`basename ~`
+
+
+	if [ $my_host != ${HOSTNAME} ]
+	then
+
+	echo  "Starting PVFS2 on $my_host"
+	echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
+	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "PVFS2_DEST=$PVFS2_DEST CVS_TAG=$CVS_TAG cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh"	
+		
+	else
+		echo  "Starting PVFS2 on $my_host"
+		start_pvfs2
+	fi
+
+}
