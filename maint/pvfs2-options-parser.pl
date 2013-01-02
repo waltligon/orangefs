@@ -41,7 +41,7 @@ my ($optsdoc, $optdef) = $optstr =~ /\/\*((?:[^*]*(?:\*(?!\/))?[^*]*)*)\*\/\s*st
 print << "EOF"
 <? include("../../../header.php"); ?>
 
-<title>PVFS2 $version: Config File Description</title>
+<title>OrangeFS $version: Config File Description</title>
 <style type="text/css">
 <!--
 table.tabletype1 {
@@ -169,7 +169,7 @@ body {
 <? include("../../../top.php"); ?>
 
 <body id="documentation">
-<h1>PVFS2 $version: Config File Description</h1>
+<h1>OrangeFS $version: Config File Description</h1>
 <p>
 $optsdoc
 <p>
@@ -263,7 +263,7 @@ print <<"EOF"
 <p>
 <a name="ContextsList"><h2>Context List</h2></a>
 This is the list of possible Contexts that can be used in the config
-files in this version of PVFS2.
+files in this version of OrangeFS.
 <p>
 EOF
 	;;
