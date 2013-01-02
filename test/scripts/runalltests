@@ -215,7 +215,7 @@ fi
 if [ ${DELETE_INSTANCE} ]
 then
 		echo "Deleting instance $VMINSTANCEID at $VMIPADDR."
-		euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
+		#euca-terminate-instances --config=$EC2CONFFILE $VMINSTANCEID
 
 fi
 
