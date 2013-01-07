@@ -22,16 +22,16 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts i:a:hc:n:k:f: arguments
+while getopts i:a:hc:n:k:f:t: arguments
 do
 	case $arguments in
 	h)
 		echo "This script creates prepared instances (with all updates and prereqs) for Orange FS"
-		echo "cpi.sh [-n NUMBER_INSTANCES][-i IMAGE][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "cpi.sh [-n NUMBER_INSTANCES][-i IMAGE][-t FLAVOR][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
-		echo "cpi.sh -n 2 -i cloud-ubuntu-12.04 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo "cpi.sh -n 2 -i cloud-ubuntu-12.04 -t c1.small -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
 		echo ""
 		
 		;;
@@ -50,6 +50,9 @@ do
 	n)
 		NUMBER_INSTANCES=$OPTARG
 		;;
+	t)
+		VMTYPE=$OPTARG
+		;;
 	esac
 done
 	
@@ -60,6 +63,8 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
+echo "VMTTYPE  is $VMTYPE"
+echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
@@ -128,7 +133,7 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-	generate_instances $NUMBER_INSTANCES
+	generate_instances $NUMBER_INSTANCES $VMTYPE
 	
 fi
 #Now grab the IP Address of the new instance

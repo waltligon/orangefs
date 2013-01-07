@@ -22,19 +22,19 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvhmc:k:f: arguments
+while getopts s:i:a:dvhmc:k:f:n:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
-		echo "runalltests -vmd -s branches/stable -i cloud-ubuntu-12.04 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo "runalltests -vmd -s branches/stable -i cloud-ubuntu-12.04 -t c1.small -n 2 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
 		echo ""
 		echo "This runs all tests against branches/stable, including vfs and mpi, on an new instance of Ubuntu 12.04LTS and deletes the instance upon completion."
 		echo ""
-		echo "runalltests -vmd -s trunk -i cloud-rhel6 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo "runalltests -vmd -s trunk -i cloud-rhel6 -t c1.small -n 2 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
 		echo ""
 		echo "This runs just the sysint and build tests against trunk on a running Redhat Enterprise Linux 6 instance at 10.20.102.30"
 		echo ""
@@ -69,6 +69,12 @@ do
 	d)
 		DELETE_INSTANCE=1
 		;;
+	n)
+		NUMBER_INSTANCES=$OPTARG
+		;;
+	t)
+		VMTYPE=$OPTARG
+		;;
 	esac
 done
 	
@@ -79,6 +85,8 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
+echo "VMTTYPE  is $VMTYPE"
+echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
@@ -147,7 +155,10 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-	generate_instances 4
+
+	generate_instances $NUMBER_INSTANCES $VMTYPE
+	
+fi
 	
 fi
 #Now grab the IP Address of the new instance
