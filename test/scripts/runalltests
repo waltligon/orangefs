@@ -85,7 +85,7 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
-echo "VMTTYPE  is $VMTYPE"
+echo "VMTYPE  is $VMTYPE"
 echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
@@ -160,7 +160,6 @@ then
 	
 fi
 	
-fi
 #Now grab the IP Address of the new instance
 VMIPADDRARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $13 }') )
 VMINSTANCENAMEARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $4 }') ) 

@@ -19,7 +19,7 @@ generate_instances() {
 	# Parameter $1 number of instances
 	# Parameter $2 type of system
 	echo "Generating $1 new instances of $VMSYSTEM"
-	echo "euca-run-instances -n $1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t c1.small $VMSYSTEM > newinstance.out 2> newinstance.err"
+	echo "euca-run-instances -n $1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t $2 $VMSYSTEM > newinstance.out 2> newinstance.err"
 
 	euca-run-instances -n $1 --config ${EC2CONFFILE} --debug -k $KEYNAME -t $2 $VMSYSTEM > newinstance.out 2> newinstance.err 
 
