@@ -15,13 +15,15 @@
 #include "pint-util.h"
 #include "pint-cached-config.h"
 #include "pint-security.h"
+#include "replication-common-utils.h"
 
 #define REPLACE_DONE 100
 
-int replication_calculate_layout_size( int32_t *layout_size
-                                      ,PVFS_sys_layout *replication_layout) ;
-int replication_copy_layout( PVFS_sys_layout *src
-                            ,void *dest );
+/* This macro is defined in replication-utils.h and defines a printable string for
+ * each type of layout algorithm.
+ */
+//LAYOUT_MAPPING()
+
 enum
 {
     LOCAL_OPERATION  = 2,
@@ -943,7 +945,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    assert( key_count < xattr_req->u.seteattr.nkey);
 
 
-   /* setup user.pvfs2.mirror.layout_size - this contains the total size of the layout stored in the
+   /* setup user.pvfs2.mirror.layout_size - this contains the total size of the layout stored 
     * in user.pvfs2.mirror.layout.  This size is needed to retrieve the layout.
     */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT_SIZE);
@@ -953,7 +955,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    rc = replication_calculate_layout_size( &(xattr_req->u.seteattr.val[key_count].buffer_sz)
                                           ,&(req->u.create.replication_layout)
                                          );
-   if (!rc)
+   if (rc)
    {
       gossip_lerr("Error calculating layout size for replication.\n");
       goto err_out;
@@ -972,10 +974,15 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count,xattr_layout->algorithm
+   xattr_layout=(PVFS_sys_layout *)xattr_req->u.seteattr.val[key_count].buffer;
+   gossip_lerr("val[%d]:%s \tsize:%d\n",key_count
+                                       ,get_algorithm_string_value(xattr_layout->algorithm)
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
 
    key_count++;
+
+   rc=0;
+   goto err_out;
 
 
    /* Fill in set-eattr request. */
@@ -1093,52 +1100,6 @@ static int cleanup(
 
     return(server_state_machine_complete(smcb));
 }
-
-
-int replication_calculate_layout_size( int32_t *layout_size
-                                      ,PVFS_sys_layout *replication_layout )
-{
-   /* size of replication_layout structure */
-   *layout_size = sizeof(PVFS_sys_layout);
-    
-   /* add in size of the server list, if it is present. */ 
-   if ( replication_layout->algorithm == PVFS_SYS_LAYOUT_LIST )
-   {
-      *layout_size += replication_layout->server_list.count *
-                      sizeof(*replication_layout->server_list.servers);
-   }
-
-   gossip_lerr("layout size is %d\n",*(int *)layout_size);
-
-   return(0);   
-}/*end replication_calculate_layout_size*/
-
-
-int replication_copy_layout( PVFS_sys_layout *src
-                            ,void *dest )
-{
-   PVFS_sys_layout *dest_layout = (PVFS_sys_layout *)dest;
-
-   dest_layout->algorithm         = src->algorithm;
-   dest_layout->server_list.count = src->server_list.count;
-
-   if ( src->algorithm == PVFS_SYS_LAYOUT_LIST )
-   {
-      memcpy (  dest_layout->server_list.servers,
-                src->server_list.servers,
-                src->server_list.count * 
-                sizeof(*src->server_list.servers)
-             );
-   }
-   else
-   {
-      dest_layout->server_list.servers = NULL;
-   }
-
-   return(0);
-}/*end replication_copy_layout*/
-
-
 
 
 static inline int PINT_get_object_ref_create(
