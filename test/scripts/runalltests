@@ -217,8 +217,8 @@ if [ $? -ne 0 ]
 then
 	#if the log check failed, bailout before deleteing instance
 	echo "Some tests failed. Please check `pwd`/logs-$DATETIME/alltests-$SVNBRANCH_SHORT for more details."
-	echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
-	exit 1
+	#echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
+	#exit 1
 fi
 
 #if successful, delete the VM
