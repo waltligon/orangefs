@@ -1,4 +1,3 @@
-
 /* 
  *  (C) 2001 Clemson University 
  *  
@@ -35,6 +34,9 @@ int copy_replication_info(replication_s *src_p, replication_s *dest_p);
 
 /* helper function to print the replication structure */
 void print_replication_structure(replication_s *replication_p);
+
+/* helper function to print PVFS_sys_layout structure */
+void print_sys_layout_structure ( PVFS_sys_layout *layout_p );
 
 #endif /* __REPLICATION_COMMON_UTILS_H */
 /*

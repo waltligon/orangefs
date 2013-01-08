@@ -135,6 +135,29 @@ void print_replication_structure(replication_s *replication_p)
 
 }/*end print_replication_structure*/
 
+/* helper function to print PVFS_sys_layout structure */
+void print_sys_layout_structure ( PVFS_sys_layout *layout_p )
+{
+   int i;
+
+   gossip_err("sys layout structure pointer : %p.\n",layout_p);
+   gossip_err("                   algorithm : %s.\n",get_algorithm_string_value(layout_p->algorithm));
+ 
+
+   if (!layout_p->server_list.servers)
+   {
+      return;
+   }
+
+   for (i=0; i<layout_p->server_list.count; i++)
+   {
+       /* TO DO: convert server numbers into aliases */
+       gossip_err("                 server[%d] : %ld\n",i,(int64_t)&layout_p->server_list.servers[i]);
+   }
+
+   return;
+} /* end print_sys_layout_structure */
+
 /*
  * Local variables:
  *   c-indent-level: 4

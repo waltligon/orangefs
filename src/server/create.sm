@@ -815,7 +815,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    struct PINT_server_op *xattr_s_op = NULL;
    struct PVFS_server_req *xattr_req = NULL;
 
-   int key_count, rc, i;
+   int key_count, rc, i, layout_size_index;
    PVFS_sys_layout *xattr_layout = NULL;
 
    /* Do we need to set the replication extended attributes? */
@@ -951,7 +951,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT_SIZE);
    xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_LAYOUT_SIZE); 
 
-   /* calculate the size of the replication layout */
+   /* calculate the total size of the replication layout */
    rc = replication_calculate_layout_size( &(xattr_req->u.seteattr.val[key_count].buffer_sz)
                                           ,&(req->u.create.replication_layout)
                                          );
@@ -961,25 +961,56 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
       goto err_out;
    }
    
-   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,xattr_req->u.seteattr.val[key_count].buffer_sz);
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(xattr_req->u.seteattr.val[key_count].buffer_sz));
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer)
    {
       gossip_lerr("Unable to allocate memory.\n");
       goto err_out;
    }
 
+   memcpy(xattr_req->u.seteattr.val[key_count].buffer
+         ,&xattr_req->u.seteattr.val[key_count].buffer_sz
+         ,sizeof(xattr_req->u.seteattr.val[key_count].buffer_sz));
+
+   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
+
+   gossip_lerr("val[%d]:%d \tsize:%lu\n",key_count
+                                       ,*(int32_t *)xattr_req->u.seteattr.val[key_count].buffer
+                                       ,sizeof(xattr_req->u.seteattr.val[key_count].buffer_sz));
+
+   /* retain the index to user.pvfs2.mirror.layout_size */
+   layout_size_index=key_count++;
+   assert( key_count < xattr_req->u.seteattr.nkey);
+
+   /* setup user.pvfs2.mirror.layout - this kev/val pair contains the layout information.
+    */
+   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_LAYOUT);
+   xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_LAYOUT);
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,xattr_req->u.seteattr.val[layout_size_index].buffer_sz); 
+   xattr_req->u.seteattr.val[key_count].buffer_sz = xattr_req->u.seteattr.val[layout_size_index].buffer_sz;
+
+   if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
+   {
+      gossip_lerr("Unable to allocate memory.\n");
+      goto err_out;
+   }
+
+   /* this function assumes that memory for entire layout structure has already been allocated. */
    rc = replication_copy_layout( &(req->u.create.replication_layout)
                                 ,xattr_req->u.seteattr.val[key_count].buffer
                                );
 
-   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
-                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
    xattr_layout=(PVFS_sys_layout *)xattr_req->u.seteattr.val[key_count].buffer;
+   gossip_lerr("val[%d]:%s \tsize:%d\n",key_count
+                                       ,(char *)xattr_req->u.seteattr.key[key_count].buffer
+                                       ,xattr_req->u.seteattr.key[key_count].buffer_sz);
    gossip_lerr("val[%d]:%s \tsize:%d\n",key_count
                                        ,get_algorithm_string_value(xattr_layout->algorithm)
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+   
+   print_sys_layout_structure( xattr_layout );
 
-   key_count++;
 
    rc=0;
    goto err_out;
@@ -988,9 +1019,9 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    /* Fill in set-eattr request. */
    PINT_SERVREQ_SETEATTR_FILL( *xattr_req
                               ,s_op->req->capability /* will not be checked */
-                              ,xattr_req->u.create.fs_id
+                              ,s_op->req->u.create.fs_id
                               ,s_op->resp.u.create.metafile_handle
-                              ,xattr_req->u.seteattr.flags
+                              ,0
                               ,xattr_req->u.seteattr.nkey
                               ,xattr_req->u.seteattr.key
                               ,xattr_req->u.seteattr.val
