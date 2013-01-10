@@ -145,8 +145,8 @@ setup_vfs() {
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3399/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
-	sudo mount -t pvfs2 tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
+	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
 	
 		if [ $? -ne 0 ]
 	then
@@ -215,11 +215,11 @@ configure_pvfs2() {
 		sec_args="--keystore=${sec_dir}/keystore-_ALIAS_ "
 		sec_args+="--serverkey=${sec_dir}/serverkey-_ALIAS_.pem"
 	fi
-	MY_VFS_HOSTS=`echo $VFS_HOSTS | sed s/' '/':{3396-3399},'/g`
+	MY_VFS_HOSTS=`echo $VFS_HOSTS | sed s/' '/':3396,'/g`
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
-		--iospec="${MY_VFS_HOSTS}:{3396-3399}" \
-		--metaspec="${MY_VFS_HOSTS}:{3396-3399}"  \
+		--iospec="${MY_VFS_HOSTS}:3396" \
+		--metaspec="${MY_VFS_HOSTS}:3396"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
@@ -251,7 +251,7 @@ start_pvfs2() {
         # give the servers time to finish all their initialization tasks
         sleep 10
 
-		echo "tcp://${HOSTNAME}:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+		echo "tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
