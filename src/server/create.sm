@@ -19,16 +19,15 @@
 
 #define REPLACE_DONE 100
 
-/* This macro is defined in replication-utils.h and defines a printable string for
- * each type of layout algorithm.
- */
-//LAYOUT_MAPPING()
+static inline void cleanup_seteattr_request(struct PVFS_server_req *req);
+
 
 enum
 {
     LOCAL_OPERATION  = 2,
     REMOTE_OPERATION = 3,
-    LOCAL_XATTR      = 4
+    LOCAL_XATTR      = 4,
+    IF_NOT_NEEDED    = 5
 };
 
 %%
@@ -80,22 +79,34 @@ machine pvfs2_create_sm
     state write_keyvals
     {
         run write_keyvals;
-        success => setobj_attribs;
+        success => write_replication_xattrs_if_needed;
         default => replace_remote_datafile_handles;
+    }
+
+
+    state write_replication_xattrs_if_needed
+    {
+        pjmp write_replication_xattrs_if_needed
+        {
+           LOCAL_XATTR => pvfs2_pjmp_seteattr_fast_sm;
+        }
+        IF_NOT_NEEDED => setobj_attribs;
+        success => analyze_replication_xattrs;
+        default => remove_keyvals;
+    }
+
+    state analyze_replication_xattrs
+    {
+        run analyze_replication_xattrs;
+        success => setobj_attribs;
+        default => remove_keyvals;
     }
 
     state setobj_attribs
     {
         run setattr_setobj_attribs;
-        success => write_replication_xattrs_if_needed;
-        default => remove_keyvals;
-    }
-
-    state write_replication_xattrs_if_needed
-    {
-        run write_replication_xattrs_if_needed;
         success => setup_resp;
-        default => remove_keyvals;
+        default => remove_replication_xattrs_if_needed;
     }
 
     state setup_resp
@@ -104,10 +115,17 @@ machine pvfs2_create_sm
         default => setup_final_response;
     }
 
-    state remove_local_datafile_handles
+    state remove_replication_xattrs_if_needed
     {
-        run remove_local_datafile_handles;
-        default => remove_metafile_object;
+        run remove_replication_xattrs_if_needed;
+        default => remove_keyvals;
+    }
+
+    state remove_keyvals
+    {
+        run remove_keyvals;
+        success => replace_remote_datafile_handles;
+        default => setup_final_response;
     }
 
     state replace_remote_datafile_handles
@@ -117,18 +135,19 @@ machine pvfs2_create_sm
         default => replace_remote_datafile_handles;
     }
 
+    state remove_local_datafile_handles
+    {
+        run remove_local_datafile_handles;
+        default => remove_metafile_object;
+    }
+
+
     state remove_metafile_object
     {
         run remove_metafile_object;
         default => setup_final_response;
     }
 
-    state remove_keyvals
-    {
-        run remove_keyvals;
-        success => replace_remote_datafile_handles;
-        default => setup_final_response;
-    }
 
     state setup_final_response
     {
@@ -161,7 +180,7 @@ static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = s_op->u.create.saved_error_code;
     }
 
-    /* otherwise propigate the js_p->error code */
+    /* otherwise propagate the js_p->error code */
     return(SM_ACTION_COMPLETE);
 }
 
@@ -594,6 +613,21 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     return ret;
 }
 
+
+
+
+static PINT_sm_action remove_replication_xattrs_if_needed(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    return SM_ACTION_COMPLETE;
+
+}/* end remove_replication_xattrs_if_needed */
+
+
+
+
+
 static PINT_sm_action setup_local_datafile_handles(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
@@ -815,15 +849,18 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    struct PINT_server_op *xattr_s_op = NULL;
    struct PVFS_server_req *xattr_req = NULL;
 
-   int key_count, rc, i, layout_size_index;
+   int key_count, rc, layout_size_index;
    PVFS_sys_layout *xattr_layout = NULL;
+
+
+   js_p->error_code = 0;
 
    /* Do we need to set the replication extended attributes? */
    gossip_lerr("request attribute mask: 0x%08x.\n",req_attr_mask);
    if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
    {
       gossip_lerr("replication is OFF.\n");
-      js_p->error_code = 0;
+      js_p->error_code = IF_NOT_NEEDED;
       return SM_ACTION_COMPLETE;
    }
 
@@ -840,6 +877,25 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
                                         ,xattr_req
                                         ,LOCAL_XATTR
                                        );
+
+   /* replace the locations of nkey, key, and val with create structure's seteattr locations;
+    * in later steps, these values can be reused during a recovery procedure.
+    */
+   s_op->u.create.seteattr_nkey = &(xattr_req->u.seteattr.nkey);
+   s_op->u.create.seteattr_key  = &(xattr_req->u.seteattr.val);
+   s_op->u.create.seteattr_val  = &(xattr_req->u.seteattr.key);
+
+   /* Fill in what we have of the set-eattr request. */
+   PINT_SERVREQ_SETEATTR_FILL( *xattr_req
+                              ,s_op->req->capability /* will not be checked */
+                              ,s_op->req->u.create.fs_id
+                              ,s_op->resp.u.create.metafile_handle
+                              ,PVFS_XATTR_CREATE    /* Give error if values already exist. */
+                              ,0    /* fill in number of keys below */
+                              ,NULL /* fill in key array below */
+                              ,NULL /* fill in val array below */
+                              ,s_op->req->hints /* will not be checked */ 
+                             );
 
    /* Allocate and populate the key/val pairs */
    xattr_req->u.seteattr.nkey = 6;
@@ -1012,42 +1068,46 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    print_sys_layout_structure( xattr_layout );
 
 
-   rc=0;
-   goto err_out;
-
-
-   /* Fill in set-eattr request. */
-   PINT_SERVREQ_SETEATTR_FILL( *xattr_req
-                              ,s_op->req->capability /* will not be checked */
-                              ,s_op->req->u.create.fs_id
-                              ,s_op->resp.u.create.metafile_handle
-                              ,0
-                              ,xattr_req->u.seteattr.nkey
-                              ,xattr_req->u.seteattr.key
-                              ,xattr_req->u.seteattr.val
-                              ,s_op->req->hints /* will not be checked */ 
-                             );
-
-
    return SM_ACTION_COMPLETE;
 
 err_out:
-   for (i=0; i<xattr_req->u.seteattr.nkey; i++)
-   {
-      if (xattr_req->u.seteattr.key[i].buffer)
-         free(xattr_req->u.seteattr.key[i].buffer);
-      if (xattr_req->u.seteattr.val[i].buffer)
-         free(xattr_req->u.seteattr.val[i].buffer);
-   }   
-   if (xattr_req->u.seteattr.key)
-      free(xattr_req->u.seteattr.key);
-   if (xattr_req->u.seteattr.val)
-      free(xattr_req->u.seteattr.val);
+   cleanup_seteattr_request(xattr_req);
+   free(xattr_s_op);
 
    return SM_ACTION_COMPLETE;
 }/*end write_replication_xattrs_if_needed*/
 
 
+static int analyze_replication_xattrs( struct PINT_smcb *smcb, 
+                                           job_status_s *js_p)
+{
+   struct PINT_server_op *s_op     = PINT_sm_frame(smcb,PINT_FRAME_CURRENT)
+                        ,*xattr_op = NULL;
+
+   int task_id, error_code, remaining;
+
+   /* js_p->error_code will be zero upon entering this function*/
+
+   /* error_code will have the value returned in js_p->error_code via the
+    * fast_seteattr_cleanup state in pvfs2_seteattr_fast_sm.
+    */
+   xattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+
+   assert(xattr_op->req->op == PVFS_SERV_SETEATTR);
+
+   /* zero error_code means the replication attributes were successfully set.
+    * non-zero is a fatal error.
+    */ 
+   js_p->error_code = error_code; 
+
+   /* keep a copy of the seteattr request key/value pairs, in case we need to
+    * remove them during a recovery process.
+    */ 
+   free(xattr_op); 
+
+  return SM_ACTION_COMPLETE;
+
+}/*end analyze_replication_xattrs*/
 
 
 
@@ -1131,6 +1191,27 @@ static int cleanup(
 
     return(server_state_machine_complete(smcb));
 }
+
+
+/* helper function that deallocates memory for the seteattr request */
+static inline void cleanup_seteattr_request(struct PVFS_server_req *req)
+{
+   int i;
+
+   for (i=0; i<req->u.seteattr.nkey; i++)
+   {
+      if (req->u.seteattr.key[i].buffer)
+         free(req->u.seteattr.key[i].buffer);
+      if (req->u.seteattr.val[i].buffer)
+         free(req->u.seteattr.val[i].buffer);
+   }   
+   if (req->u.seteattr.key)
+      free(req->u.seteattr.key);
+   if (req->u.seteattr.val)
+      free(req->u.seteattr.val);
+
+   return;
+}/*end cleanup_seteattr_request*/
 
 
 static inline int PINT_get_object_ref_create(

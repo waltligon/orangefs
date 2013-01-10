@@ -17,7 +17,7 @@
 #include "pvfs2-mirror.h"
 #include "pint-security.h"
 
-/*helper functions' prototypes*/
+/*helper functions prototypes*/
 static void init_keyval_structs(PINT_server_op *s_op, int free_val);
 
 /*data structures*/
@@ -28,6 +28,35 @@ enum {
 };
 
 %%
+
+nested machine pvfs2_seteattr_fast_sm
+{
+    state fast_prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => fast_verify_eattrib;
+        default => fast_cleanup;
+    }
+
+    state fast_verify_eattrib
+    {
+        run seteattr_verify_eattribs;
+        success => fast_setobj_eattrib;
+        default => fast_cleanup;
+    }
+
+    state fast_setobj_eattrib
+    {
+        run seteattr_setobj_eattribs;
+        default => fast_cleanup;
+    }
+
+    state fast_cleanup
+    {
+        run fast_seteattr_cleanup;
+        default => return;
+    }
+}
 
 machine pvfs2_set_eattr_sm
 {
@@ -183,6 +212,7 @@ static int seteattr_verify_eattribs(
 
     return SM_ACTION_COMPLETE;
 }
+
 
 /*
  * This is where the actual extended attrib gets written.
@@ -591,6 +621,31 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
     return SM_ACTION_COMPLETE;
 }/*end action check_immutable*/
 
+
+
+/*
+ * Function: fast_seteattr_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static int fast_seteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /*free key/val structs from the s_op*/
+    init_keyval_structs(s_op,s_op->free_val);
+
+    gossip_debug(GOSSIP_SETEATTR_DEBUG,"js_p->error_code is %d.\n",js_p->error_code);
+
+    return(SM_ACTION_COMPLETE);
+}
 
 
 

@@ -171,6 +171,13 @@ struct PINT_server_create_op
     int handle_array_remote_count;
     PVFS_error saved_error_code;
     int handle_index;
+
+    /* saved extended key/val pairs from write_replication step; to be used
+     * when the data needs to be removed in a recovery step.
+     */
+    int32_t *seteattr_nkey;
+    PVFS_ds_keyval **seteattr_key;
+    PVFS_ds_keyval **seteattr_val;
 };
 
 /*MIRROR structures*/
@@ -779,6 +786,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_seteattr_fast_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
@@ -796,6 +804,7 @@ extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_seteattr_fast_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
