@@ -1339,6 +1339,13 @@ ifdef BUILD_SERVER
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
+	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
+    ifdef ENABLE_SECURITY_KEY
+	touch $(bindir)/.pvfs2-genconfig-key    
+    endif
+    ifdef ENABLE_SECURITY_CERT
+	touch $(bindir)/.pvfs2-genconfig-cert
+    endif
 endif
 endif
 
