@@ -22,40 +22,21 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvhmc:k:f:n:t: arguments
+while getopts i:a:hc:n:k:f:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "This script creates prepared instances (with all updates and prereqs) for Orange FS"
+		echo "cpi.sh [-n NUMBER_INSTANCES][-i IMAGE][-t FLAVOR][-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
-		echo "runalltests -vmd -s branches/stable -i cloud-ubuntu-12.04 -t c1.small -n 2 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
+		echo "cpi.sh -n 2 -i cloud-ubuntu-12.04 -t c1.small -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
 		echo ""
-		echo "This runs all tests against branches/stable, including vfs and mpi, on an new instance of Ubuntu 12.04LTS and deletes the instance upon completion."
-		echo ""
-		echo "runalltests -vmd -s trunk -i cloud-rhel6 -t c1.small -n 2 -c ~/ec2rc.sh -k JamesB -f ~/jamesb.pem"
-		echo ""
-		echo "This runs just the sysint and build tests against trunk on a running Redhat Enterprise Linux 6 instance at 10.20.102.30"
-		echo ""
-		;;
-	s)	
-		SVNBRANCH=$OPTARG
-		;;
-	a)	
-		VMIPADDR=$OPTARG
-		NEWINSTANCE=0
+		
 		;;
 	i)
 		VMSYSTEM=$OPTARG
-		;;
-	v)
-		#echo "Running VFS tests"
-		RUN_VFS_TEST=1
-		;;
-	m)
-		#echo "Running MPI tests"
-		RUN_MPI_TEST=1
 		;;
 	c)
 		EC2CONFFILE=$OPTARG
@@ -65,9 +46,6 @@ do
 		;;
 	f)	
 		KEYFILE=$OPTARG
-		;;
-	d)
-		DELETE_INSTANCE=1
 		;;
 	n)
 		NUMBER_INSTANCES=$OPTARG
@@ -85,7 +63,7 @@ echo "NEWINSTANCE is ${NEWINSTANCE}"
 echo "EC2CONFFILE is $EC2CONFFILE"
 echo "KEYNAME is $KEYNAME"
 echo "VMSYSTEM is $VMSYSTEM"
-echo "VMTYPE  is $VMTYPE"
+echo "VMTTYPE  is $VMTYPE"
 echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
@@ -155,11 +133,9 @@ fi
 #exit 0
 if [ ${NEWINSTANCE} != 0 ]
 then
-
 	generate_instances $NUMBER_INSTANCES $VMTYPE
 	
 fi
-	
 #Now grab the IP Address of the new instance
 VMIPADDRARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $13 }') )
 VMINSTANCENAMEARR=( $(for i in ${VMINSTANCEARR[@]}; do euca-describe-instances instance-id=$i --config ${EC2CONFFILE}; done | grep INSTANCE | awk '{ print $4 }') ) 
@@ -190,45 +166,3 @@ do
 	check_instance $i
 
 done
-
-
-echo ""
-echo "Running tests..."
-
-echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
-
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
-
-echo "Grabbing logs and scripts from server"
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
-rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
-
-# create link to latest logs so that buildbot can find them.
-rm `pwd`/logs-current
-ln -s `pwd`/logs-$DATETIME `pwd`/logs-current
-
-echo "Processing the logs" 
-./checklogs.pl `pwd`/logs-$DATETIME/alltests-${SVNBRANCH_SHORT}.log
-
-
-
-if [ $? -ne 0 ]
-then
-	#if the log check failed, bailout before deleteing instance
-	echo "Some tests failed. Please check `pwd`/logs-$DATETIME/alltests-$SVNBRANCH_SHORT for more details."
-	#echo "Instance $VMINSTANCEID at $VMIPADDR NOT deleted."
-	#exit 1
-fi
-
-#if successful, delete the VM
-if [ ${DELETE_INSTANCE} ]
-then
-		for my_instance in ${VMINSTANCEARR[@]}
-		do
-			echo "Deleting instance $my_instance."
-			euca-terminate-instances --config=$EC2CONFFILE $my_instance
-		done
-
-fi
-
