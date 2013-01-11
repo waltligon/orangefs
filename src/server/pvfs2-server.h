@@ -175,9 +175,10 @@ struct PINT_server_create_op
     /* saved extended key/val pairs from write_replication step; to be used
      * when the data needs to be removed in a recovery step.
      */
-    int32_t *seteattr_nkey;
-    PVFS_ds_keyval **seteattr_key;
-    PVFS_ds_keyval **seteattr_val;
+    int32_t seteattr_nkey;
+    PVFS_ds_keyval *seteattr_key;
+    PVFS_ds_keyval *seteattr_val;
+    int *seteattr_error;
 };
 
 /*MIRROR structures*/

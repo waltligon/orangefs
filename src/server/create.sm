@@ -19,10 +19,9 @@
 
 #define REPLACE_DONE 100
 
-static inline void cleanup_seteattr_request(struct PVFS_server_req *req);
+static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val, int *error);
 
-
-enum
+enum 
 {
     LOCAL_OPERATION  = 2,
     REMOTE_OPERATION = 3,
@@ -594,13 +593,22 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
+    s_op->error_a = calloc(1,sizeof(*s_op->error_a) * s_op->keyval_count);
+    if (!s_op->error_a)
+    {
+       gossip_lerr("Error allocating memory.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+
+
     /* the keyval keys and vals should still be valid here */
     ret = job_trove_keyval_remove_list(s_op->req->u.create.fs_id,
                                        s_op->resp.u.create.metafile_handle,
                                        s_op->key_a,
                                        s_op->val_a,
                                        s_op->error_a,
-                                       2,
+                                       s_op->keyval_count,
                                        TROVE_SYNC,
                                        NULL,
                                        smcb,
@@ -619,8 +627,44 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action remove_replication_xattrs_if_needed(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t j_id;
 
-    return SM_ACTION_COMPLETE;
+    if (s_op->u.create.seteattr_nkey <= 0)
+       /* no xattrs to remove */
+       return SM_ACTION_COMPLETE;
+
+    if (!s_op->u.create.saved_error_code)
+    {
+         s_op->u.create.saved_error_code = js_p->error_code;
+    }
+
+    s_op->u.create.seteattr_error = calloc(1,sizeof(*s_op->u.create.seteattr_error) * s_op->u.create.seteattr_nkey);
+    if (!s_op->u.create.seteattr_error)
+    {
+       gossip_lerr("Error allocating memory.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+
+
+    ret = job_trove_keyval_remove_list(s_op->req->u.create.fs_id,
+                                       s_op->resp.u.create.metafile_handle,
+                                       s_op->u.create.seteattr_key,
+                                       s_op->u.create.seteattr_val,
+                                       s_op->u.create.seteattr_error,
+                                       s_op->u.create.seteattr_nkey,
+                                       TROVE_SYNC,
+                                       NULL,
+                                       smcb,
+                                       0,
+                                       js_p,
+                                       &j_id,
+                                       server_job_context,
+                                       NULL);
+
+  
+    return ret;
 
 }/* end remove_replication_xattrs_if_needed */
 
@@ -686,29 +730,30 @@ static PINT_sm_action write_keyvals(
     }
 
     /* start with 2 keyvals: the distribution and the datafile handles */
-    int keyval_count = 2;
+    s_op->keyval_count = 2;
 
     if(s_op->resp.u.create.stuffed)
     {
         /* also need to set the layout as a keyval */
-        keyval_count+= 2;
+        s_op->keyval_count+= 2;
     }
 
-    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
     if(!s_op->key_a)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->key_a,0,sizeof(PVFS_ds_keyval) * s_op->keyval_count);
 
-    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
     if(!s_op->val_a)
     {
         free(s_op->key_a);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * s_op->keyval_count);
 
     s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
@@ -764,7 +809,7 @@ static PINT_sm_action write_keyvals(
                                       s_op->resp.u.create.metafile_handle,
                                       s_op->key_a,
                                       s_op->val_a,
-                                      keyval_count,
+                                      s_op->keyval_count,
                                       TROVE_SYNC,
                                       NULL,
                                       smcb,
@@ -852,6 +897,8 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    int key_count, rc, layout_size_index;
    PVFS_sys_layout *xattr_layout = NULL;
 
+   int server_location = LOCAL_OPERATION;
+
 
    js_p->error_code = 0;
 
@@ -868,22 +915,14 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    
    /* Create and prepare a new server frame in order to call set-eattr.sm */
-   js_p->error_code = LOCAL_OPERATION;
    PINT_CREATE_SUBORDINATE_SERVER_FRAME( smcb
                                         ,xattr_s_op
                                         ,s_op->resp.u.create.metafile_handle
                                         ,s_op->req->u.create.fs_id
-                                        ,js_p->error_code
+                                        ,server_location
                                         ,xattr_req
                                         ,LOCAL_XATTR
                                        );
-
-   /* replace the locations of nkey, key, and val with create structure's seteattr locations;
-    * in later steps, these values can be reused during a recovery procedure.
-    */
-   s_op->u.create.seteattr_nkey = &(xattr_req->u.seteattr.nkey);
-   s_op->u.create.seteattr_key  = &(xattr_req->u.seteattr.val);
-   s_op->u.create.seteattr_val  = &(xattr_req->u.seteattr.key);
 
    /* Fill in what we have of the set-eattr request. */
    PINT_SERVREQ_SETEATTR_FILL( *xattr_req
@@ -906,6 +945,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key || !xattr_req->u.seteattr.val )
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
 
@@ -917,6 +957,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
        gossip_lerr("Unable to allocate memory.\n");
+       js_p->error_code = -PVFS_ENOMEM;
        goto err_out;
    }
    memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
@@ -942,6 +983,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
    memcpy(xattr_req->u.seteattr.val[key_count].buffer, &req->u.create.replication_number_of_copies,
@@ -966,6 +1008,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
    memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
@@ -988,6 +1031,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
    *(MIRROR_MODE *)xattr_req->u.seteattr.val[key_count].buffer = MIRROR_ON_WRITE;
@@ -1014,6 +1058,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if (rc)
    {
       gossip_lerr("Error calculating layout size for replication.\n");
+      js_p->error_code = -PVFS_EINVAL;
       goto err_out;
    }
    
@@ -1021,6 +1066,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer)
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
 
@@ -1049,6 +1095,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
 
@@ -1071,7 +1118,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    return SM_ACTION_COMPLETE;
 
 err_out:
-   cleanup_seteattr_request(xattr_req);
+   cleanup_keyval_pairs(&key_count,xattr_req->u.seteattr.key,xattr_req->u.seteattr.val,NULL);
    free(xattr_s_op);
 
    return SM_ACTION_COMPLETE;
@@ -1081,8 +1128,9 @@ err_out:
 static int analyze_replication_xattrs( struct PINT_smcb *smcb, 
                                            job_status_s *js_p)
 {
-   struct PINT_server_op *s_op     = PINT_sm_frame(smcb,PINT_FRAME_CURRENT)
-                        ,*xattr_op = NULL;
+   struct PINT_server_op *s_op       = PINT_sm_frame(smcb,PINT_FRAME_CURRENT)
+                        ,*xattr_op   = NULL;
+   struct PVFS_server_req *xattr_req = NULL;
 
    int task_id, error_code, remaining;
 
@@ -1095,14 +1143,21 @@ static int analyze_replication_xattrs( struct PINT_smcb *smcb,
 
    assert(xattr_op->req->op == PVFS_SERV_SETEATTR);
 
+   xattr_req = xattr_op->req;
+
    /* zero error_code means the replication attributes were successfully set.
     * non-zero is a fatal error.
     */ 
    js_p->error_code = error_code; 
 
-   /* keep a copy of the seteattr request key/value pairs, in case we need to
-    * remove them during a recovery process.
-    */ 
+   /* save the key/val pairs in case we need to remove them later in a recovery step.
+    * the "cleanup" state will deallocate the memory at the end of this state machine.
+    */
+   s_op->u.create.seteattr_nkey = xattr_req->u.seteattr.nkey;
+   s_op->u.create.seteattr_key  = xattr_req->u.seteattr.key;
+   s_op->u.create.seteattr_val  = xattr_req->u.seteattr.val;
+
+   /* cleanup allocated memory from subordinate frame*/
    free(xattr_op); 
 
   return SM_ACTION_COMPLETE;
@@ -1146,23 +1201,8 @@ static int cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if(s_op->key_a)
-    {
-        free(s_op->key_a);
-    }
-
-    if(s_op->val_a)
-    {
-        if(s_op->val_a[1].buffer)
-        {
-            free(s_op->val_a[1].buffer);
-        }
-        if(s_op->resp.u.create.stuffed && s_op->val_a[2].buffer)
-        {
-            free(s_op->val_a[2].buffer);
-        }
-        free(s_op->val_a);
-    }
+    /* cleanup metdata keyval pairs */
+    //cleanup_keyval_pairs(&s_op->keyval_count,s_op->key_a,s_op->val_a,s_op->error_a);
 
     if(s_op->resp.u.create.datafile_handles)
     {
@@ -1189,29 +1229,63 @@ static int cleanup(
         free(s_op->u.create.remote_io_servers);
     }
 
+    /* cleanup key/val pairs for replication xattrs */
+    cleanup_keyval_pairs(&s_op->u.create.seteattr_nkey, s_op->u.create.seteattr_key, s_op->u.create.seteattr_val,
+                          s_op->u.create.seteattr_error);
+
     return(server_state_machine_complete(smcb));
 }
 
 
-/* helper function that deallocates memory for the seteattr request */
-static inline void cleanup_seteattr_request(struct PVFS_server_req *req)
+static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val, int *error)
 {
-   int i;
+    int i;
 
-   for (i=0; i<req->u.seteattr.nkey; i++)
-   {
-      if (req->u.seteattr.key[i].buffer)
-         free(req->u.seteattr.key[i].buffer);
-      if (req->u.seteattr.val[i].buffer)
-         free(req->u.seteattr.val[i].buffer);
-   }   
-   if (req->u.seteattr.key)
-      free(req->u.seteattr.key);
-   if (req->u.seteattr.val)
-      free(req->u.seteattr.val);
+    gossip_err("Executing cleanup_keyval_pairs...\n");
 
-   return;
-}/*end cleanup_seteattr_request*/
+    /* no keyval pairs if nkey doesn't have a positive value. */
+    if (*nkey <= 0)
+    {
+       return;
+    }
+
+    gossip_err("#1\n");
+
+    for (i=0; i<*nkey; i++)
+    {
+        gossip_err("i is %d.\n",i);
+        if (key[i].buffer)
+        {
+           free(key[i].buffer);
+        }
+        if (val[i].buffer)
+        {
+           free(val[i].buffer);
+        }
+    }
+       
+    gossip_err("#2\n");
+
+    if (key)
+    {
+        free(key);
+    }
+    if (val)
+    {
+        free(val);
+    }
+
+    if (error)
+    {
+        free(error);
+    }
+
+
+    gossip_err("#3\n");
+    *nkey=0;
+
+    return;
+}/* end cleanup_keyval_pairs */
 
 
 static inline int PINT_get_object_ref_create(
