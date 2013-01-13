@@ -1,0 +1,1081 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-types.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-eattr.h"
+#include "pvfs2-mirror.h"
+#include "pint-security.h"
+#include "pvfs2-usrint.h"
+
+/*helper functions' prototypes*/
+static void init_keyval_structs(PINT_server_op *s_op, int free_val);
+
+/*data structures*/
+enum {
+   PVFS2_MAKE_IMMUTABLE_COPIES = 200,
+   CREATE_IMM_COPIES = 300,
+   SKIP_UPDATE = 400
+};
+
+/* NOTICE: I have followed the structure of get-eattr and set-eattr for this
+ *         file.  The default set-eattr does not have a response struct so
+ *         there is no err_array for it.  Because of this I chose not to modify
+ *         the responses err array when errors occur during the set.  If you
+ *         choose to modify the err_array yourself please note that once I start
+ *         moving val/key/sz triplets around in the req, it becomes complicated
+ *         to determine if the ith error in the req comes from ith response or
+ *         not. -- ADP
+ */
+
+/* TODO: Find out when the key/val/valsz arrays get malloc'd and when they get freed? */
+
+%%
+
+machine pvfs2_atomic_eattr_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_resp;
+        default => final_response;
+    }
+    
+    state setup_resp
+    {
+        run atomiceattr_setup_resp;
+        success => read_eattrib;
+        default => final_response;
+    }
+
+    state read_eattrib
+    {
+        run atomiceattr_read_eattrib;
+        default => check_resp;
+    }
+
+    state check_resp
+    {
+        run atomiceattr_check_resp;
+        default => modify_eattrib;
+    }
+
+    state modify_eattrib
+    {
+        run atomiceattr_modify_eattrib;
+        default => verify_eattrib;
+    }
+    
+    state verify_eattrib
+    {
+        run atomiceattr_verify_eattribs;
+        success => setobj_eattrib;
+        default => final_response;
+    }
+
+    state setobj_eattrib
+    {
+        run atomiceattr_setobj_eattribs;
+        success => check_mirror_mode; 
+        default => final_response;
+    }
+
+    state check_mirror_mode
+    {
+        run atomiceattr_get_metahint_flag;
+        SKIP_UPDATE => check_immutable;
+        default     => update_flag;
+    }
+
+    state update_flag
+    {
+        run atomiceattr_set_metahint_flag;
+        success => check_immutable;
+        default => final_response;
+    }
+
+    state check_immutable
+    {
+        run check_immutable;
+        PVFS2_MAKE_IMMUTABLE_COPIES => generate_copies;
+        default => final_response;
+    }
+
+    state generate_copies
+    {
+        pjmp setup_create_immutable_copies
+        {
+           CREATE_IMM_COPIES => pvfs2_pjmp_create_immutable_copies_sm;
+        }
+        success => inspect_imm_copies;
+        default => final_response;
+    }
+
+    state inspect_imm_copies
+    {
+         run inspect_imm_copies;
+         default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run atomiceattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * atomiceattr_setup_resp()
+ * Set up the response - allocate needed resources
+ */
+static PINT_sm_action atomiceattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"atomiceattr requesting %d keys\n",
+            s_op->req->u.atomiceattr.nkey);
+
+    js_p->error_code = 0;
+
+    /* ensure not too many keys were requested */
+    if( s_op->req->u.atomiceattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* iterate through the keys and see if they fall into valid name spaces */
+    for(i=0; i<s_op->req->u.atomiceattr.nkey; i++)
+    {
+        gossip_debug(GOSSIP_GETEATTR_DEBUG, "atomiceattr key %d : %s\n", i, 
+                (char *) s_op->req->u.atomiceattr.key[i].buffer);
+
+        /* ensure no buffer_sz is too large */
+        if( s_op->req->u.atomiceattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+
+        js_p->error_code = PINT_eattr_check_access(
+            &s_op->req->u.atomiceattr.key[i],
+            NULL);
+        if(js_p->error_code != 0)
+        {
+            /* not prefixed: treat this as if the key does not exist */
+            js_p->error_code = -PVFS_ENOENT;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    s_op->resp.u.atomiceattr.val =
+        malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.atomiceattr.val)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.atomiceattr.err =
+        malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_error));
+    if (!s_op->resp.u.atomiceattr.err)
+    {
+        free(s_op->resp.u.atomiceattr.val);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.atomiceattr.nkey = s_op->req->u.atomiceattr.nkey;
+    for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+    {
+        s_op->resp.u.atomiceattr.val[i].buffer = malloc(
+            s_op->req->u.atomiceattr.valsz[i]);
+        if (!s_op->resp.u.atomiceattr.val[i].buffer)
+        {
+            for(--i; i >= 0; --i)
+            {
+                free(s_op->resp.u.atomiceattr.val[i].buffer);
+            }
+            s_op->resp.u.atomiceattr.nkey = 0;
+            free (s_op->resp.u.atomiceattr.val);
+            free (s_op->resp.u.atomiceattr.err);
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        s_op->resp.u.atomiceattr.val[i].buffer_sz = s_op->req->u.atomiceattr.valsz[i];
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * atomiceattr_read_eattrib()
+ * Here is where the eattrib get read.  Not much to this.
+ */
+static PINT_sm_action atomiceattr_read_eattrib(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    js_p->error_code = 0;
+
+    ret = job_trove_keyval_read_list(
+        s_op->req->u.atomiceattr.fs_id,
+        s_op->req->u.atomiceattr.handle,
+        s_op->req->u.atomiceattr.key,
+        s_op->resp.u.atomiceattr.val,
+        s_op->resp.u.atomiceattr.err,
+        s_op->req->u.atomiceattr.nkey,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+/*
+ * atomiceattr_check_resp()
+ * Check the response - handle any errors
+ */
+static PINT_sm_action atomiceattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int k;
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"atomiceattr returning %d values\n",
+            s_op->resp.u.atomiceattr.nkey);
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"status %d error_code %d nkeys %d\n",
+            s_op->resp.status, js_p->error_code, s_op->resp.u.atomiceattr.nkey);
+    /* it is the only thing returned across the wire */
+    for (k = 0; k < s_op->resp.u.atomiceattr.nkey; k++)
+    {
+        /* this is all or nothing */
+        /* why not use s_op->resp.u.atomiceattr.err */
+        /* which seems to be filled in by Trove? */
+        /* NOTE: Exactly as stated above.  Why not use the err array? */
+        if (js_p->error_code == 0)
+        {
+            /* this checks to see if the attr is a */
+            /* PVFS specific attr and if so encodes */
+            /* it because it is binary */
+            ret = PINT_eattr_encode(
+                &s_op->req->u.atomiceattr.key[k],
+                &s_op->resp.u.atomiceattr.val[k]);
+            if(ret != 0)
+            {
+                gossip_err("%s: failed encoding extended attribute: %s\n",
+                           __func__, (char *)s_op->req->u.atomiceattr.key[k].buffer);
+                s_op->resp.u.atomiceattr.err[k] = ret;
+            }
+
+            /* put the returned read buffer size in buffer_sz */
+            s_op->resp.u.atomiceattr.val[k].buffer_sz =
+                s_op->resp.u.atomiceattr.val[k].read_sz;
+            gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
+                (char *) s_op->req->u.atomiceattr.key[k].buffer, 
+                s_op->resp.u.atomiceattr.val[k].buffer_sz);
+        }
+        /* in case of any errors, we initialize it to 0 */
+        else
+        {
+            s_op->resp.u.atomiceattr.val[k].buffer_sz = 0;
+        }
+    }
+    
+    return SM_ACTION_COMPLETE;
+}
+
+/* 
+ * Initially the val array in req holds the operands for the operation we are
+ * to perform with the currently set eattribs.  For simplicity, we perform the
+ * operation and store the result back into the val array.  At this point the
+ * val array now holds the values we want to set so that the code below is
+ * essentially the same as in set-eattr.sm
+ * 
+ * Part of the error logic is that if we couldn't read an attribute then we 
+ * don't write to that attribute.  This is accomplished by eliminating the
+ * key/value/valsz entries from the request that correspond to incorrectly
+ * read attributes.  We do the same thing for other errors as well such as
+ * improperly sized attributes.  Finally, we adjust the request nkey
+ * accordingly.
+ */
+static int atomiceattr_modify_eattrib(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+    
+    char *error = (char *)malloc(s_op->req->u.atomiceattr.nkey * sizeof(char));
+    if(!error)
+    {
+        gossip_lerr("Cannot allocate memory for temporary error array\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    switch(s_op->req->u.atomiceattr.opcode)
+    {
+        case PVFS_TEST_AND_SET:
+        {
+            for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+            {
+                error[i] = 0;
+                
+                if(s_op->resp.u.atomiceattr.err[i])
+                {
+                    error[i] = 1;
+                    continue;
+                }
+                
+                /* Determine if the buffers are big enough to hold ints before
+                 * we point ints to them and use integer arithmetic. We do not
+                 * want to read from or write to memory outside the buffer.
+                 */
+                if((s_op->resp.u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)) || (s_op->req->u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)))
+                {
+                    gossip_debug(GOSSIP_SETEATTR_DEBUG,"error: test and set requires 32-bit operands\n");
+                    error[i] = 1;
+                    continue;
+                }
+                int32_t *oldval = (int32_t *)s_op->resp.u.atomiceattr.val[i].buffer;
+                int32_t *newval = (int32_t *)s_op->req->u.atomiceattr.val[i].buffer;
+            
+                /* Perform the test */
+                if(*oldval == 0)
+                {
+                    *newval = 1;
+                }
+                else
+                {
+                    /* NOTE: Not a true error but a no-op instead */
+                    error[i] = 1;
+                    continue;
+                }
+            }
+            break;
+        }
+        case PVFS_SWAP:
+        {
+            /* The values to set are not modified */
+            for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+            {
+                error[i] = 0;
+                
+                if(s_op->resp.u.atomiceattr.err[i])
+                {
+                    error[i] = 1;
+                }
+            }
+            break;
+        }
+        case PVFS_FETCH_AND_ADD:
+        {            
+            /* Add each of the current eattrib by the requested value
+             * The results are stored in the request and these results will be 
+             * set to eattribs later
+             */       
+            for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+            {
+                error[i] = 0;
+                
+                if(s_op->resp.u.atomiceattr.err[i])
+                {
+                    error[i] = 1;
+                    continue;
+                }
+                
+                /* Determine if the buffers are big enough to hold ints before
+                 * we point ints to them and use integer arithmetic. We do not
+                 * want to read from or write to memory outside the buffer.
+                 */
+                if((s_op->resp.u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)) || (s_op->req->u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)))
+                {
+                    gossip_debug(GOSSIP_SETEATTR_DEBUG,"error: fetch and add requires 32-bit operands\n");
+                    error[i] = 1;
+                    continue;
+                }
+                
+                int32_t *lval = (int32_t *)s_op->req->u.atomiceattr.val[i].buffer;
+                int32_t *rval = (int32_t *)s_op->resp.u.atomiceattr.val[i].buffer;
+                *lval += *rval;
+            }
+            break;
+        }
+        default:
+        {
+            /* Invalid opcode */
+            s_op->req->u.atomiceattr.nkey = 0;
+            break;
+        }
+    }
+    
+    
+    /* Rearrage request array to remove any erroneous entries */
+    int num_errors = 0;
+    PVFS_ds_keyval tmp_key;
+    PVFS_ds_keyval tmp_val;
+    PVFS_size tmp_valsz;
+    
+    for(i = 0; i < s_op->resp.u.atomiceattr.nkey; i++)
+    {
+        if(error[i])
+            num_errors++;
+        else if(num_errors > 0)
+        {
+            tmp_key = s_op->req->u.atomiceattr.key[i-num_errors];
+            s_op->req->u.atomiceattr.key[i-num_errors] = 
+                                        s_op->req->u.atomiceattr.key[i];
+            s_op->req->u.atomiceattr.key[i] = tmp_key;
+            
+            tmp_val = s_op->req->u.atomiceattr.val[i-num_errors];
+            s_op->req->u.atomiceattr.val[i-num_errors] = 
+                                        s_op->req->u.atomiceattr.val[i];
+            s_op->req->u.atomiceattr.val[i] = tmp_val;
+            
+            tmp_valsz = s_op->req->u.atomiceattr.valsz[i-num_errors];
+            s_op->req->u.atomiceattr.valsz[i-num_errors] = 
+                                        s_op->req->u.atomiceattr.valsz[i];
+            s_op->req->u.atomiceattr.valsz[i] = tmp_valsz;
+        }
+    }
+    
+    s_op->req->u.atomiceattr.nkey -= num_errors;
+    
+    free(error);
+    
+    return SM_ACTION_COMPLETE;
+}
+
+
+/*
+ * This routine checks keys to confirm that the name spaces are valid.
+ */
+static int atomiceattr_verify_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i; 
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in atomic-eattr.sm "
+                                     "is %p.\n",s_op);       
+
+    PVFS_object_attr *a_p = NULL;
+    a_p = &s_op->attr;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                 "  ext attr list write to handle %llu refers to a %s\n\t"
+                 "[owner = %d, group = %d, perms = %o, type = %d]\n",
+                 llu(s_op->req->u.atomiceattr.handle),
+                 PINT_util_get_object_type(a_p->objtype),
+                 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
+
+    /* We already checked the number of args and the name lengths before
+     * retrieving the currently set attributes
+     * So checking the value lengths is all that we need to do here
+     */
+    for( i = 0; i < s_op->req->u.atomiceattr.nkey; i++ )
+    {
+        if( s_op->req->u.atomiceattr.val[i].buffer_sz > PVFS_MAX_XATTR_VALUELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    /* iterate through the keys that are being written */
+    int j = 0;
+    char *valBuf = NULL;
+    for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+    {
+#ifndef GOSSIP_DISABLE_DEBUG
+        if (gossip_debug_on)
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG
+                    ,"\tkey:%s\n"
+                    ,(char *)s_op->req->u.atomiceattr.key[i].buffer);
+            valBuf = (char *)s_op->req->u.atomiceattr.val[i].buffer;
+            for (j=0; j<s_op->req->u.atomiceattr.val[i].buffer_sz; j++)
+            {
+                gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
+                                            ,j
+                                            ,(unsigned int)valBuf[j]);
+            }
+        }
+#endif
+        js_p->error_code = PINT_eattr_namespace_verify(
+            &s_op->req->u.atomiceattr.key[i],
+            &s_op->req->u.atomiceattr.val[i]);
+
+        if(js_p->error_code)
+        {
+            return SM_ACTION_COMPLETE;
+        }
+
+    } /*end for*/
+
+
+    return SM_ACTION_COMPLETE;
+}
+
+
+/*
+ * This is where the actual extended attrib gets written.
+ * Not much to this, its pretty straight-forward.
+ * 
+ * Since atomiceattr is always doing a replace, we set trove flag
+ * TROVE_ONLYOVERWRITE
+ * 
+ * NOTE: Currently we are not using the flags passed in the request
+ */
+static int atomiceattr_setobj_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    PVFS_ds_flags trove_flags = 0;
+    job_id_t j_id;
+
+    gossip_debug(
+        GOSSIP_SETEATTR_DEBUG,
+        "  writing keylist [%llu,%d,len %d flags %d]\n",
+        llu(s_op->req->u.atomiceattr.handle),
+        s_op->req->u.atomiceattr.fs_id,
+        s_op->req->u.atomiceattr.nkey, s_op->req->u.atomiceattr.flags);
+
+    trove_flags |= TROVE_ONLYOVERWRITE;
+    trove_flags |= TROVE_SYNC;
+
+    ret = job_trove_keyval_write_list(
+        s_op->req->u.atomiceattr.fs_id,
+        s_op->req->u.atomiceattr.handle,
+        s_op->req->u.atomiceattr.key,
+        s_op->req->u.atomiceattr.val,
+        s_op->req->u.atomiceattr.nkey,
+        trove_flags,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
+
+    return ret;
+}
+
+/*This function determines if the meta-hint flag should be updated and 
+ *retrieves it, if necessary.
+*/
+static PINT_sm_action atomiceattr_get_metahint_flag(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_servreq_atomiceattr *atomiceattr = &(s_op->req->u.atomiceattr);
+    char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
+    char meta_hint_key[] = "user.pvfs2.meta_hint";
+    int ret = 0;
+    job_id_t j_id;
+    int i;
+
+    for (i=0; i<atomiceattr->nkey; i++)
+    {
+        if (strncmp(mir_mode_key,atomiceattr->key[i].buffer,strlen(mir_mode_key)) == 0)
+        {
+            break;
+        }
+    }
+
+    if (i == atomiceattr->nkey)
+    {
+        /*mirror.mode key not found, so we don't need to change meta-hint*/
+        js_p->error_code = SKIP_UPDATE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*setup call to retrieve meta-hint*/
+    init_keyval_structs(s_op,s_op->free_val);
+
+    /*setup key for user.pvfs2.meta_hint*/
+    s_op->key.buffer = malloc(strlen(meta_hint_key) + 1);
+    if (!s_op->key.buffer)
+    {
+        gossip_lerr("Cannot allocation memory for key.buffer\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
+    memset(s_op->key.buffer,0,strlen(meta_hint_key) + 1);
+    memcpy(s_op->key.buffer,meta_hint_key,strlen(meta_hint_key));
+    s_op->key.buffer_sz = strlen(meta_hint_key) + 1;
+
+    /*assign space for key retrieval*/
+    s_op->val.buffer = &(s_op->attr.u.meta.hint.flags);
+    memset(s_op->val.buffer,0,sizeof(s_op->attr.u.meta.hint.flags));
+    s_op->val.buffer_sz = sizeof(s_op->attr.u.meta.hint.flags);
+    s_op->free_val = 0;
+
+    /*retrieve meta-hint key/value pair*/
+    ret = job_trove_keyval_read(
+        atomiceattr->fs_id,
+        atomiceattr->handle,
+        &s_op->key,
+        &s_op->val,
+        TROVE_SYNC,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
+
+    return ret;
+
+error_exit:
+   init_keyval_structs(s_op,s_op->free_val);
+
+   return SM_ACTION_COMPLETE;
+}/*end atomiceattr_get_metahint_flag*/
+
+
+/*This function updates the meta-hint flag, whenever the mirroring mode  
+ *changes.
+*/
+static PINT_sm_action atomiceattr_set_metahint_flag(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_servreq_atomiceattr *atomiceattr = &(s_op->req->u.atomiceattr);
+    char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
+    char meta_hint_key[] = "user.pvfs2.meta_hint";
+    enum MIRROR_MODE_t mir_mode;
+    PVFS_flags *hint_flags = &(s_op->attr.u.meta.hint.flags);
+    PVFS_flags flags = 0;
+    int ret = 0;
+    job_id_t j_id;
+    int i;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCurrent value of hints:%0x\n"
+                                    ,(unsigned int)*hint_flags);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAttribute object type:%d\n"
+                                    ,s_op->attr.objtype);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAttribute mask:%x\n"
+                                    ,s_op->attr.mask);
+    /*check return code: if we have an error other than a not found condition,
+        *then return the error; otherwise, keep processing.
+    */
+    if (js_p->error_code < 0 && js_p->error_code != -TROVE_ENOENT)
+        return SM_ACTION_COMPLETE;
+
+    for (i=0; i<atomiceattr->nkey; i++)
+    {
+        if (strncmp(mir_mode_key,atomiceattr->key[i].buffer,strlen(mir_mode_key)) == 0)
+        {
+            mir_mode = *(enum MIRROR_MODE_t *)atomiceattr->val[i].buffer;
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tMirroring Mode is %d.\n"
+                                            ,mir_mode);
+            if (mir_mode == NO_MIRRORING)
+                /*turn off mirroring*/
+                flags = *hint_flags & ~PVFS_MIRROR_FL;
+            else
+                /*turn on mirroring*/
+                flags = *hint_flags | PVFS_MIRROR_FL;
+            break;
+        }
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of flags:%0x\n"
+                                    ,(unsigned int)flags);
+
+    /*setup job to modify user.pvfs2.meta-hints flag*/
+    init_keyval_structs(s_op,s_op->free_val);
+    s_op->keyval_count = 1;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+    if (!(s_op->key_a && s_op->val_a))
+    {
+        gossip_lerr("Cannot allocate memory for key_a and/or val_a\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
+
+    i=0; /*setup key user.pvfs2.meta_hint*/
+    s_op->key_a[i].buffer = malloc(strlen(meta_hint_key) + 1);
+    if (!s_op->key_a[i].buffer)
+    {
+        gossip_lerr("Cannot allocation memory for key_a[%d].buffer\n",i);
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
+    memset(s_op->key_a[i].buffer,0,strlen(meta_hint_key) + 1);
+    memcpy(s_op->key_a[i].buffer,meta_hint_key,strlen(meta_hint_key));
+    s_op->key_a[i].buffer_sz = strlen(meta_hint_key) + 1;
+
+    /*add/remove PVFS_MIRROR_FL from user.pvfs2.meta_hint*/
+    s_op->val_a[i].buffer = malloc(sizeof(PVFS_flags));
+    if (!s_op->val_a[i].buffer)
+    {
+        gossip_lerr("Cannot allocate memory for val_a[%d].buffer\n",i);
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
+    memset(s_op->val_a[i].buffer,0,sizeof(PVFS_flags));
+    memcpy(s_op->val_a[i].buffer,&flags,sizeof(PVFS_flags));
+    s_op->val_a[i].buffer_sz = sizeof(PVFS_flags);
+
+    s_op->free_val = 1;
+
+    /*make update to key/value pair*/
+    ret = job_trove_keyval_write_list(
+        atomiceattr->fs_id,
+        atomiceattr->handle,
+        s_op->key_a,
+        s_op->val_a,
+        s_op->keyval_count,
+        TROVE_SYNC,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
+    
+    return ret;
+
+error_exit:
+   init_keyval_structs(s_op,s_op->free_val);
+   return SM_ACTION_COMPLETE;
+}/*end atomiceattr_set_metahint_flag*/
+
+
+
+
+
+static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
+                                                   ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing setup_create_immutable_copies.."
+                                     "\n");
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    int ret;
+  
+    js_p->error_code = 0;
+
+    struct PINT_server_op *new_op = malloc(sizeof(struct PINT_server_op));
+    if (!new_op)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(new_op,0,sizeof(struct PINT_server_op));
+
+    PVFS_SERVOP_IMM_COPIES_FILL(new_op,s_op);
+    new_op->u.create_copies.expected_mirror_mode = MIRROR_ON_IMMUTABLE;
+
+    ret = PINT_sm_push_frame(smcb,CREATE_IMM_COPIES,new_op);
+    if (ret != 0)
+    {
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tatomiceattr: failed to setup "
+                                        "nested sm.\n");
+       js_p->error_code = ret;
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tatomiceattr:s_op:%p "
+                                     "\tnew_op:%p\n",s_op,new_op);
+    return SM_ACTION_COMPLETE;
+}/*end action setup_create_immutable_copies*/
+
+
+static PINT_sm_action inspect_imm_copies(struct PINT_smcb *smcb
+                                        ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing inspect_imm_copies....\n");
+
+    struct PINT_server_op *s_op   = PINT_sm_frame(smcb,PINT_FRAME_CURRENT)
+                         ,*imm_op = NULL;
+    int task_id, error_code, remaining;
+
+    /*js_p->error_code will be zero upon entering this function*/
+
+    /*error_code will have the value returned in js_p->error_code via the */
+    /*cleanup function in create-immutable-copies.sm                      */
+    imm_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+
+    assert(imm_op->op == PVFS_SERV_IMM_COPIES);
+
+    /*check error codes from mirror copies*/
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tstatus of copies:%d\n",error_code);    
+
+    if ( PVFS_get_errno_mapping(error_code) == EPERM )
+    {
+        /*If EPERM, then create-immutable-copies detected that the  */
+        /*mirror mode is NO_MIRRORING or the mode didn't exist.     */
+        js_p->error_code = 0;
+    }
+    else
+    {
+      /*set error_code based on return from copies.                      */
+      /*this error_code will then be passed to the caller of atomic-eattr*/
+      js_p->error_code = error_code;
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tfrom pop, imm_op:%p\n"
+                                    ,imm_op);
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tcurrent, s_op:%p\n",s_op);
+
+    if (js_p->error_code)
+    {
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"File NOT mirrored "
+                                        "successfully(%d)\n"
+                                       ,js_p->error_code);
+    }
+    else
+    {
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"File successfully mirrored.\n");
+    }
+
+    /*free memory from popped stack frame*/
+    free(imm_op);
+
+    return SM_ACTION_COMPLETE;
+}/*end action inspect_imm_copies*/
+
+
+
+
+/*
+ * Function: check_immutable
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *js_p
+ *
+ * Returns:  SM_action
+ *
+ * Synopsis: If the immutable flag is set, then make a mirror.
+ *           
+ */
+static PINT_sm_action check_immutable(struct PINT_smcb *smcb
+                                         ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_immutable....\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i; 
+
+    PVFS_flags         immutable_is_on = 0;
+    PVFS_metafile_hint hint;
+    PVFS_ds_keyval    *k=NULL, *v=NULL;
+
+    js_p->error_code = 0;
+   
+    for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+    {
+        v = &s_op->req->u.atomiceattr.val[i];
+        k = &s_op->req->u.atomiceattr.key[i];
+
+        /* Are we working with the correct namespace?  The immutable flag is */
+        /* a hint that can be set in the "user.pvfs2.meta_hint" namespace.   */
+        if (strcmp(k->buffer,"user.pvfs2.meta_hint") != 0)
+        {
+            continue;
+        }
+
+        memset(&hint, 0, sizeof(hint));
+        memcpy(&hint, v->buffer, sizeof(v->buffer));
+
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"My converted buffer is %llu.\n"
+                                        ,llu(hint.flags));
+
+        immutable_is_on = hint.flags & PVFS_IMMUTABLE_FL;
+
+        gossip_debug(GOSSIP_MIRROR_DEBUG
+                     ,"My key is %s.  My key value is %llu"
+                      "\n"
+                      "PVFS_IMMUTABLE_FL is %llu.\n"
+                     ,(char *)k->buffer
+                     ,llu(hint.flags)
+                     ,llu(PVFS_IMMUTABLE_FL) );
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"immutable_is_on is %llu.\n"
+                                        ,llu(immutable_is_on));
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"IMMUTABLE is %s.\n",
+                                          immutable_is_on ? "ON" : "OFF");
+
+        if (immutable_is_on)
+        {
+            js_p->error_code = PVFS2_MAKE_IMMUTABLE_COPIES;
+            break; 
+        }
+    } /*end for*/
+
+    return SM_ACTION_COMPLETE;
+}/*end action check_immutable*/
+
+
+
+
+/*
+ * Function: atomiceattr_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static int atomiceattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    for(i = 0; i < s_op->resp.u.atomiceattr.nkey; i++)
+    {
+        free(s_op->resp.u.atomiceattr.val[i].buffer);
+    }
+    if (s_op->resp.u.atomiceattr.val)
+        free(s_op->resp.u.atomiceattr.val);
+    if (s_op->resp.u.atomiceattr.err)
+        free(s_op->resp.u.atomiceattr.err);
+
+    /*free key/val structs from the s_op*/
+    init_keyval_structs(s_op,s_op->free_val);
+
+
+    return(server_state_machine_complete(smcb));
+}
+
+/*This function initializes the keyval structures. It also assumes that the key
+ *is always allocated, while the val may not be.  free_val is turned on, if
+ *the val must be deallocated; otherwise, val is not deallocated, just initial-
+ *ized.
+*/
+static void init_keyval_structs(PINT_server_op *s_op, int free_val)
+{
+   int i;
+
+   /*initialize val*/
+   if (free_val)
+   {
+      if (s_op->val.buffer)
+      {
+         free(s_op->val.buffer);
+         memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      }
+      memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      for (i=0; i<s_op->keyval_count; i++)
+      {
+          if (s_op->val_a && s_op->val_a[i].buffer)
+              free(s_op->val_a[i].buffer);
+      }
+      if (s_op->val_a)
+          free(s_op->val_a);
+      s_op->val_a = NULL;
+   } 
+   else
+   {
+      memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      if (s_op->val_a)
+          free(s_op->val_a);
+      s_op->val_a = NULL;
+   }
+
+   /*initialize key*/
+   if (s_op->key.buffer)
+   {
+      free(s_op->key.buffer);
+      memset(&(s_op->key),0,sizeof(PVFS_ds_keyval));
+   }
+   for (i=0; i<s_op->keyval_count; i++)
+   {
+       if (s_op->key_a && s_op->key_a[i].buffer)
+           free(s_op->key_a[i].buffer);
+   }
+   if (s_op->key_a)
+   {
+       free(s_op->key_a);
+       s_op->key_a = NULL;
+   } 
+
+   /*initialize the rest*/
+   if (s_op->error_a)
+       free(s_op->error_a);
+   s_op->error_a = NULL;
+   s_op->keyval_count = 0;
+   s_op->free_val = 0;
+
+   return;
+}/*end init_keyval_structs*/
+
+static int perm_atomiceattr(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
+PINT_GET_OBJECT_REF_DEFINE(atomiceattr);
+
+struct PINT_server_req_params pvfs2_atomic_eattr_params =
+{
+    .string_name = "atomic_eattr",
+    .perm = perm_atomiceattr,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_atomiceattr,
+    .state_machine = &pvfs2_atomic_eattr_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
