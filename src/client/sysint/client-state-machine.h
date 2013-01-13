@@ -554,6 +554,18 @@ struct PINT_client_seteattr_sm
     PVFS_ds_keyval *val_array;
 };
 
+struct PINT_client_atomiceattr_sm
+{
+    int32_t nkey;
+    int32_t flags; /* flags specify if attrs should not exist (XATTR_CREATE) or
+                      if they should exist (XATTR_REPLACE) or neither */
+    int32_t opcode;
+    PVFS_ds_keyval *key_array;
+    PVFS_size *size_array;
+    PVFS_sysresp_geteattr *resp_p;
+    PVFS_ds_keyval *val_array;    
+};
+
 struct PINT_client_deleattr_sm
 {
     PVFS_ds_keyval *key_p;
@@ -668,6 +680,7 @@ typedef struct PINT_client_sm
         struct PINT_server_get_config_sm get_config;
         struct PINT_client_geteattr_sm geteattr;
         struct PINT_client_seteattr_sm seteattr;
+        struct PINT_client_atomiceattr_sm atomiceattr;
         struct PINT_client_deleattr_sm deleattr;
         struct PINT_client_listeattr_sm listeattr;
         struct PINT_client_perf_count_timer_sm perf_count_timer;
@@ -758,6 +771,7 @@ enum
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
+    PVFS_SYS_ATOMICEATTR           = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -777,7 +791,7 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
-#define PVFS_OP_SYS_MAXVALID  21
+#define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
 #define PVFS_OP_MGMT_MAXVALID 83
 #define PVFS_OP_MGMT_MAXVAL 199
@@ -878,6 +892,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_create_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_atomic_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;

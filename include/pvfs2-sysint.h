@@ -199,7 +199,7 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/** Holds results of a geteattr_list operation (attributes of object). */
+/** Holds results of geteattr_list and atomiceattr_list operations (attributes of object). */
 struct PVFS_sysresp_geteattr_s
 {
     PVFS_ds_keyval *val_array;
@@ -209,6 +209,9 @@ typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
 
 /* seteattr */
 /* no data returned in seteattr response */
+
+/* atomiceattr */
+/* currently uses the sysresp_geteattr */
 
 /* deleattr */
 /* no data returned in deleattr response */
@@ -614,6 +617,40 @@ PVFS_error PVFS_sys_seteattr_list(
     PVFS_ds_keyval *val_array,
     int32_t flags,
     PVFS_hint hints);
+
+PVFS_error PVFS_sys_atomiceattr(
+        PVFS_object_ref ref,
+        const PVFS_credential *credential,
+        PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p,
+        PVFS_ds_keyval *response,
+        int32_t flags,
+        int32_t opcode,
+        PVFS_hint hints);
+
+PVFS_error PVFS_isys_atomiceattr_list(
+        PVFS_object_ref ref,
+        const PVFS_credential *credential,
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
+        PVFS_ds_keyval *val_array,
+        PVFS_sysresp_geteattr *resp_p,
+        int32_t flags,
+        PVFS_sys_op_id *op_id,
+        int32_t opcode,
+        PVFS_hint hints,
+        void *user_ptr);
+
+PVFS_error PVFS_sys_atomiceattr_list(
+        PVFS_object_ref ref,
+        const PVFS_credential *credential,
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
+        PVFS_ds_keyval *val_array,
+        PVFS_sysresp_geteattr *resp_p,
+        int32_t flags,
+        int32_t opcode,
+        PVFS_hint hints);
 
 PVFS_error PVFS_isys_deleattr(
     PVFS_object_ref ref,

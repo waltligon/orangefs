@@ -93,6 +93,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_GET_DIRENT = 45,
     PVFS_SERV_MGMT_CREATE_ROOT_DIR = 46,
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
+    PVFS_SERV_ATOMICEATTR = 48,
+
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1985,6 +1987,80 @@ do {                                           \
     (__req).u.seteattr.val = (__val_array);    \
 } while (0)
 
+/* atomiceattr *************************************************/
+/* - gets current list of extended attributes and then sets new
+ * list of attributes
+ */
+
+struct PVFS_servreq_atomiceattr
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    int32_t flags;
+    int32_t opcode;
+    int32_t nkey;
+    PVFS_ds_keyval *key;    /* attribute key */
+    PVFS_ds_keyval *val;    /* attribute value to set */
+    PVFS_size *valsz;       /* array of value buffer sizes for recv */
+};
+endecode_fields_4aaa_struct(
+    PVFS_servreq_atomiceattr,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    int32_t, flags,
+    int32_t, opcode,
+    int32_t, nkey,
+    PVFS_ds_keyval, key,
+    PVFS_ds_keyval, val,
+    PVFS_size, valsz);
+#define extra_size_PVFS_servreq_atomiceattr \
+    ((PVFS_REQ_LIMIT_EATTR_KEY_LEN  + PVFS_REQ_LIMIT_EATTR_VAL_LEN) \
+        * PVFS_REQ_LIMIT_EATTR_LIST + sizeof(PVFS_size) \
+        * PVFS_REQ_LIMIT_EATTR_LIST)
+
+#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,    \
+                                  __cap,        \
+                                  __fsid,       \
+                                  __handle,     \
+                                  __flags,      \
+                                  __nkey,       \
+                                  __key_array,  \
+                                  __val_array,  \
+                                  __size_array, \
+                                  __opcode,     \
+                                  __hints)      \
+do {                                              \
+    memset(&(__req), 0, sizeof(__req));           \
+    (__req).op = PVFS_SERV_ATOMICEATTR;           \
+    (__req).capability = (__cap);                 \
+    (__req).hints = (__hints);                    \
+    (__req).u.atomiceattr.fs_id = (__fsid);       \
+    (__req).u.atomiceattr.handle = (__handle);    \
+    (__req).u.atomiceattr.flags = (__flags);      \
+    (__req).u.atomiceattr.nkey = (__nkey);        \
+    (__req).u.atomiceattr.key = (__key_array);    \
+    (__req).u.atomiceattr.val = (__val_array);    \
+    (__req).u.atomiceattr.valsz = (__size_array); \
+    (__req).u.atomiceattr.opcode = (__opcode);    \
+} while (0)
+
+
+struct PVFS_servresp_atomiceattr
+{
+    int32_t nkey;           /* number of values returned */
+    PVFS_ds_keyval *val;    /* array of values returned */
+    PVFS_error *err;        /* array of error codes */
+};
+endecode_fields_1aa_struct(
+    PVFS_servresp_atomiceattr,
+    skip4,,
+    int32_t, nkey,
+    PVFS_ds_keyval, val,
+    PVFS_error, err);
+#define extra_size_PVFS_servresp_atomiceattr \
+    ((PVFS_REQ_LIMIT_EATTR_VAL_LEN + sizeof(PVFS_error)) \
+     * PVFS_REQ_LIMIT_EATTR_LIST)
+
 /* deleattr ****************************************************/
 /* - deletes extended attributes */
 
@@ -2274,6 +2350,7 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
         struct PVFS_servreq_geteattr geteattr;
         struct PVFS_servreq_seteattr seteattr;
+        struct PVFS_servreq_atomiceattr atomiceattr;
         struct PVFS_servreq_deleattr deleattr;
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
@@ -2337,6 +2414,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servresp_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
         struct PVFS_servresp_geteattr geteattr;
+        struct PVFS_servresp_atomiceattr atomiceattr;
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;

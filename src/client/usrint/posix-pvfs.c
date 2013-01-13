@@ -2385,6 +2385,71 @@ ssize_t pvfs_fgetxattr(int fd,
     return iocommon_geteattr(pd, name, value, size);
 }
 
+ssize_t pvfs_atomicxattr(const char *path,
+                          const char *name,
+                          void *value,
+                          size_t valsize,
+                          void *response,
+                          size_t respsize,
+                          int flags,
+                          int opcode)
+{
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
+                           respsize, flags, opcode);
+    pvfs_close(fd);
+    return rc;
+}
+
+ssize_t pvfs_latomicxattr(const char *path,
+                          const char *name,
+                          void *value,
+                          size_t valsize,
+                          void *response,
+                          size_t respsize,
+                          int flags,
+                          int opcode)
+{
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
+                           respsize, flags, opcode);
+    pvfs_close(fd);
+    return rc;
+}
+
+ssize_t pvfs_fatomicxattr(int fd,
+                          const char *name,
+                          void *value,
+                          size_t valsize,
+                          void *response,
+                          size_t respsize,
+                          int flags,
+                          int opcode)
+{
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    return iocommon_atomiceattr(pd, name, value, valsize, response,
+                                respsize, flags, opcode);
+}
+
 ssize_t pvfs_listxattr(const char *path,
                        char *list,
                        size_t size)

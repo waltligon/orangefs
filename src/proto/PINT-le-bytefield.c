@@ -266,6 +266,12 @@ static void lebf_initialize(void)
                 req.u.seteattr.nkey = 0;
                 reqsize = extra_size_PVFS_servreq_seteattr;
                 break;
+            case PVFS_SERV_ATOMICEATTR:
+                req.u.atomiceattr.nkey = 0;
+                resp.u.atomiceattr.nkey = 0;
+                reqsize = extra_size_PVFS_servreq_atomiceattr;
+                respsize = extra_size_PVFS_servresp_atomiceattr;
+                break;
             case PVFS_SERV_DELEATTR:
                 req.u.deleattr.key.buffer_sz = 0;
                 reqsize = extra_size_PVFS_servreq_deleattr;
@@ -484,6 +490,7 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_SETEATTR, seteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
@@ -586,6 +593,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
@@ -706,6 +714,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_SETEATTR, seteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
@@ -798,6 +807,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
@@ -991,6 +1001,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.geteattr.key);
                 decode_free(req->u.geteattr.valsz);
                 break;
+                
+            case PVFS_SERV_ATOMICEATTR:
+                decode_free(req->u.atomiceattr.key);
+                decode_free(req->u.atomiceattr.val);
+                decode_free(req->u.atomiceattr.valsz);
+                break;
 
             case PVFS_SERV_UNSTUFF:
                 decode_free(req->u.unstuff.credential.group_array);
@@ -1120,6 +1136,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
                 case PVFS_SERV_GETEATTR:
                     /* need a loop here?  WBL */
+                    if (resp->u.geteattr.val)
+                        decode_free(resp->u.geteattr.val);
+                    break;
+                case PVFS_SERV_ATOMICEATTR:
+                    /* need a loop here? */
                     if (resp->u.geteattr.val)
                         decode_free(resp->u.geteattr.val);
                     break;

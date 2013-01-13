@@ -20,6 +20,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-setattr.c \
 	$(DIR)/sys-get-eattr.c \
 	$(DIR)/sys-set-eattr.c \
+	$(DIR)/sys-atomic-eattr.c \
 	$(DIR)/sys-del-eattr.c \
 	$(DIR)/sys-list-eattr.c \
 	$(DIR)/sys-lookup.c \

@@ -42,6 +42,7 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-dirdata-handle.c \
 		$(DIR)/get-eattr.c \
 		$(DIR)/set-eattr.c \
+		$(DIR)/atomic-eattr.c \
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
