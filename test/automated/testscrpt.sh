@@ -85,9 +85,9 @@ if [ $? != 0 ] ; then
 	setupfail
 fi
 
-export RUN_USER_LIB_TEST=1
+export RUN_USERLIB_TEST=1
 
-echo "Run Userlib test is $RUN_USER_LIB_TEST"
+echo "Run Userlib test is $RUN_USERLIB_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
 echo "Run MPI test is $RUN_MPI_TEST"
 
@@ -132,7 +132,7 @@ env > env.log
 
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
-if [ $RUN_USER_LIB_TEST ]
+if [ $RUN_USERLIB_TEST ]
 then
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
@@ -143,12 +143,15 @@ then
 	fi
 	echo ""
 	echo "running userlib tests"
-	run_parts ${VFS_SCRIPTS}
+	run_parts ${USERLIB_SCRIPTS}
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
 
 if [ $do_vfs -eq 1 ] ; then
-	
+	# restore file descriptors and close temporary fds
+	exec 1<&6 6<&-
+	exec 2<&7 7<&-
+
 	echo "setup_vfs"
 	teardown_vfs && setup_vfs
 
@@ -158,6 +161,13 @@ if [ $do_vfs -eq 1 ] ; then
 	fi
 	echo "Checking mount"
 	mount 
+	# save file descriptors for later
+	exec 6<&1
+	exec 7<&2
+	
+	exec 1> ${REPORT_LOG}
+	exec 2> ${REPORT_ERR}
+
 	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS

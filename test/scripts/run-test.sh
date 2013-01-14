@@ -4,6 +4,7 @@ script run-test.txt
 export VFS_HOSTS
 export RUN_MPI_TEST
 export RUN_VFS_TEST
+export RUN_USERLIB_TEST
 export SVNBRANCH
 export WITH_DB=/opt/db4
 export LD_LIBRARY_PATH=$WITH_DB/lib
