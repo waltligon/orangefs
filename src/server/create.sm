@@ -21,7 +21,7 @@
 
 static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val, int *error);
 
-enum 
+enum misc
 {
     LOCAL_OPERATION  = 2,
     REMOTE_OPERATION = 3,
@@ -898,7 +898,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    int key_count, rc, layout_size_index;
    PVFS_sys_layout *xattr_layout = NULL;
 
-   int server_location = LOCAL_OPERATION;
+   enum misc request_location = LOCAL_OPERATION;
 
 
    js_p->error_code = 0;
@@ -920,7 +920,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
                                         ,xattr_s_op
                                         ,s_op->resp.u.create.metafile_handle
                                         ,s_op->req->u.create.fs_id
-                                        ,server_location
+                                        ,request_location
                                         ,xattr_req
                                         ,LOCAL_XATTR
                                        );
