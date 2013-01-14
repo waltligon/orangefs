@@ -25,12 +25,14 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-req-proto.h"
+#include "replication-common-utils.h"
 
 #include "xattr-utils.h"
 
 #include "pvfs2-mirror.h"
 
-#define VALBUFSZ 1024
+/* the maximum size of an xattr value is set in pvfs2-types.h */
+#define VALBUFSZ PVFS_MAX_XATTR_VALUELEN
 
 /* extended attribute name spaces supported in PVFS2 */
 const char *PINT_eattr_namespaces[] =
@@ -270,6 +272,11 @@ int main(int argc, char **argv)
                     printf("Create Mirror when IMMUTABLE is set\n");
                     break;
                 }
+                case MIRROR_ON_WRITE :
+                {
+                    printf("Create mirror data on each write\n");
+                    break;
+                }
                 default:
                 {
                     printf("Unknown mode(%d)\n"
@@ -277,6 +284,18 @@ int main(int argc, char **argv)
                     break;
                 }
              }/*end switch*/
+        } else if ( strncmp(user_opts->key[0].buffer
+                   ,"user.pvfs2.mirror.layout_size"
+                   ,user_opts->key[0].buffer_sz) == 0)
+        {
+            int32_t *myLayoutSize = (int32_t *)user_opts->val[0].buffer;
+            printf("Layout Size : %d\n",*myLayoutSize);
+        } else if ( strncmp(user_opts->key[0].buffer
+                   ,"user.pvfs2.mirror.layout"
+                   ,user_opts->key[0].buffer_sz) == 0)
+        {
+            PVFS_sys_layout *myLayout = (PVFS_sys_layout *)user_opts->val[0].buffer;
+            print_sys_layout_structure( myLayout );
         } else {
             printf("key : \"%s\" \tValue : \"%s\"\n",
                     (char *)user_opts->key[0].buffer,
@@ -578,8 +597,9 @@ static struct options* parse_args(int argc, char* argv[])
                          "\tValid Modes\n"
                          "\t1. %d == No Mirroring\n"
                          "\t2. %d == Mirroring on Immutable\n"
+                         "\t3. %d == Mirroring on Write\n"
                         ,*(int *)tmp_opts->val[0].buffer
-                        ,NO_MIRRORING,MIRROR_ON_IMMUTABLE);
+                        ,NO_MIRRORING,MIRROR_ON_IMMUTABLE,MIRROR_ON_WRITE);
 
           exit(EXIT_FAILURE);
        }
@@ -587,15 +607,19 @@ static struct options* parse_args(int argc, char* argv[])
 
     if (tmp_opts->get == 1)
     {
-        /*if user wants mirror.handles or mirror.status, then we must also */
-        /*retrieve the number of copies, so we know how to display the     */
-        /*information properly.                                            */
+        /*if user wants mirror.handles, mirror.status, or mirror.layout then we must also */
+        /*retrieve the number of copies (or layout size), so we know how to display the   */
+        /*information properly.                                                           */
+
         if (strncmp(tmp_opts->key[0].buffer
                    ,"user.pvfs2.mirror.handles"
                    ,tmp_opts->key[0].buffer_sz) == 0 ||
             strncmp(tmp_opts->key[0].buffer
                     ,"user.pvfs2.mirror.status"
-                    ,tmp_opts->key[0].buffer_sz) == 0 )
+                    ,tmp_opts->key[0].buffer_sz) == 0 ||
+            strncmp(tmp_opts->key[0].buffer
+                   ,"user.pvfs2.mirror.layout"
+                   ,tmp_opts->key[0].buffer_sz) == 0 )
         {
            tmp_opts->key_count = 2;
            PVFS_ds_keyval *myKeys = malloc(tmp_opts->key_count * 
@@ -607,8 +631,25 @@ static struct options* parse_args(int argc, char* argv[])
            }
            memset(myKeys,0,tmp_opts->key_count*sizeof(PVFS_ds_keyval));
            myKeys[0] = *tmp_opts->key;
-           myKeys[1].buffer = strdup("user.pvfs2.mirror.copies");
-           myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.copies");
+        
+           if ( strncmp(tmp_opts->key[0].buffer
+                       ,"user.pvfs2.mirror.handles"
+                       ,tmp_opts->key[0].buffer_sz) == 0 ||
+                strncmp(tmp_opts->key[0].buffer
+                       ,"user.pvfs2.mirror.status"
+                       ,tmp_opts->key[0].buffer_sz) == 0 )
+           {
+              myKeys[1].buffer = strdup("user.pvfs2.mirror.copies");
+              myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.copies");
+           } 
+           else if (strncmp(tmp_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.layout"
+                           ,tmp_opts->key[0].buffer_sz) == 0)
+           {
+              myKeys[1].buffer = strdup("user.pvfs2.mirror.layout_size");
+              myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.layout_size");
+           }
+
            free(tmp_opts->key);
            tmp_opts->key = myKeys;
         }/*end if handles or status*/
