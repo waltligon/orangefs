@@ -85,8 +85,12 @@ if [ $? != 0 ] ; then
 	setupfail
 fi
 
-echo "Run MPI test is $RUN_MPI_TEST"
+export RUN_USER_LIB_TEST=1
+
+echo "Run Userlib test is $RUN_USER_LIB_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
+echo "Run MPI test is $RUN_MPI_TEST"
+
 #echo "do_vfs is $do_vfs"
 
 if [ $do_vfs -eq 1 ] ; then 
@@ -111,8 +115,7 @@ echo "Checking if pvfs is running"
 
 ps aux | grep pvfs
 
-echo "Checking mount"
-mount 
+
 
 nr_passed=0
 nr_failed=0
@@ -129,8 +132,32 @@ env > env.log
 
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
+if [ $RUN_USER_LIB_TEST ]
+then
+	OLD_LD_PRELOAD=$LD_PRELOAD
+	if [ $LD_PRELOAD ]
+	then
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
+	else
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+	fi
+	echo ""
+	echo "running userlib tests"
+	run_parts ${VFS_SCRIPTS}
+	LD_PRELOAD=$OLD_LD_PRELOAD
+fi
 
 if [ $do_vfs -eq 1 ] ; then
+	
+	echo "setup_vfs"
+	teardown_vfs && setup_vfs
+
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+	echo "Checking mount"
+	mount 
 	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
