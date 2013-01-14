@@ -750,6 +750,7 @@ static PINT_sm_action write_keyvals(
     if(!s_op->val_a)
     {
         free(s_op->key_a);
+        s_op->key_a = NULL;
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -1200,9 +1201,28 @@ static int cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
 
-    /* cleanup metdata keyval pairs */
-    //cleanup_keyval_pairs(&s_op->keyval_count,s_op->key_a,s_op->val_a,s_op->error_a);
+    /* cleanup metdata keyval pairs. 
+     * NOTE: except for the pairs below, all other pairs used statically created 
+     * strings instead of allocating new memory. 
+     */
+    for (i=0; i<s_op->keyval_count; i++)
+    {
+       if (i == 2 && s_op->val_a[2].buffer)
+       {
+          free(s_op->val_a[2].buffer);
+       }
+
+       if (i == 1 && s_op->val_a[1].buffer)
+       {
+          free(s_op->val_a[1].buffer);
+       }
+    }
+    if (s_op->error_a)
+    {
+       free(s_op->error_a);
+    }
 
     if(s_op->resp.u.create.datafile_handles)
     {
@@ -1283,6 +1303,8 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
 
     gossip_err("#3\n");
     *nkey=0;
+     key=NULL;
+     val=NULL;
 
     return;
 }/* end cleanup_keyval_pairs */
