@@ -159,6 +159,8 @@ if [ $do_vfs -eq 1 ] ; then
 		echo "setup failed"
 		setupfail
 	fi
+	echo "Verify pvfs client is running"
+	ps aux | grep pvfs
 	echo "Checking mount"
 	mount 
 	# save file descriptors for later
