@@ -91,19 +91,6 @@ echo "Run Userlib test is $RUN_USERLIB_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
 echo "Run MPI test is $RUN_MPI_TEST"
 
-#echo "do_vfs is $do_vfs"
-
-if [ $do_vfs -eq 1 ] ; then 
-	echo "setup_vfs"
-	teardown_vfs && setup_vfs
-
-	if [ $? != 0 ] ; then
-		echo "setup failed"
-		setupfail
-	fi
-else	
-	echo "Unable to do VFS test for ${VFS_HOSTS}"
-fi
 
 # at this point we've got 
 # - pvfs2 servers running
@@ -175,7 +162,10 @@ if [ $do_vfs -eq 1 ] ; then
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
 #        run_one ${VFS_SCRIPTS} ${VFS_SCRIPT}
+else	
+	echo "Unable to do VFS test for ${VFS_HOSTS}"
 fi
+
 
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
