@@ -248,15 +248,19 @@ struct PVFS_servresp_create
     PVFS_capability capability;
     int32_t stuffed;
     int32_t datafile_count;
+    int32_t total_number_of_replication_handles; /* (# of copies) * (# of datafiles) */
     PVFS_handle *datafile_handles;
+    PVFS_handle *replication_handles;
 };
-endecode_fields_3a_struct(
+endecode_fields_3aa_struct(
     PVFS_servresp_create,
     PVFS_handle, metafile_handle,
     PVFS_capability, capability,
     int32_t, stuffed,
     int32_t, datafile_count,
-    PVFS_handle, datafile_handles);
+    int32_t, total_number_of_replication_handles,
+    PVFS_handle, datafile_handles,
+    PVFS_handle, replication_handles);
 #define extra_size_PVFS_servresp_create \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
     extra_size_PVFS_capability)

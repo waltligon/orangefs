@@ -181,7 +181,6 @@ struct PINT_server_create_op
     int *seteattr_error;
 };
 
-/*MIRROR structures*/
 typedef struct 
 {
    /* session identifier created in the PVFS_SERV_IO request.  also used as  */
