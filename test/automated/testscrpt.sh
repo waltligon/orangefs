@@ -132,7 +132,15 @@ then
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
 
-
+for f in ./${USERLIB_SCRIPTS}/*; do
+		# skip CVS
+		[ -d $f ] && continue
+		if [ -x $f ] ; then 
+			
+			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log userlib-${PVFS2_DEST}/${f}-${CVS_TAG}.log
+			
+		fi
+	done
 
 
 if [ $do_vfs -eq 1 ] ; then
