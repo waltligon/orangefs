@@ -2008,12 +2008,6 @@ if (!$opt_quiet) {
 emit_defaults($output_target, $num_unexp_reqs,
     $bmi_module, $default_logfile, $logging, $tracing,
     $logstamp, $server_job_timeout, $client_job_timeout);
-# TODO: moved
-#if ($opt_trusted == 1) 
-#{
-#    emit_trusted($output_target, $opt_trusted_port, 
-#        $opt_trusted_network, $opt_trusted_netmask);
-#}
 emit_aliases($output_target);
 emit_filesystem($output_target, $fsname , $fsid, $root_handle, 
     $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
