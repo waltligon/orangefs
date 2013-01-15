@@ -98,7 +98,7 @@ echo "Run MPI test is $RUN_MPI_TEST"
 # - an entry in /etc/fstab (that was a prerequisite for this script after all)
 # - the VFS mounted at $PVFS2_MOUNTPOINT
 
-echo "Checking if pvfs is running"
+echo "Checking if pvfs2 is running. Client should NOT be running at this point."
 
 ps aux | grep pvfs
 
@@ -129,7 +129,7 @@ then
 		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
 	fi
 	echo ""
-	echo "running userlib tests"
+	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
@@ -146,7 +146,7 @@ if [ $do_vfs -eq 1 ] ; then
 		echo "setup failed"
 		setupfail
 	fi
-	echo "Verify pvfs client is running"
+	echo "Checking if pvfs2 client is running"
 	ps aux | grep pvfs
 	echo "Checking mount"
 	mount 
@@ -154,8 +154,9 @@ if [ $do_vfs -eq 1 ] ; then
 	exec 6<&1
 	exec 7<&2
 	
-	exec 1> ${REPORT_LOG}
-	exec 2> ${REPORT_ERR}
+	# Add output to the end of the log.
+	exec 1>> ${REPORT_LOG}
+	exec 2>> ${REPORT_ERR}
 
 	echo ""
 	echo "running vfs scripts"
