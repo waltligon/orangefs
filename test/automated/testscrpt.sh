@@ -117,8 +117,6 @@ exec 2> ${REPORT_ERR}
 # print current environment to env.log
 env > env.log
 
-echo "running sysint scripts"
-run_parts ${SYSINT_SCRIPTS}
 if [ $RUN_USERLIB_TEST ]
 then
 	OLD_LD_PRELOAD=$LD_PRELOAD
@@ -133,6 +131,9 @@ then
 	run_parts ${USERLIB_SCRIPTS}
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
+
+
+
 
 if [ $do_vfs -eq 1 ] ; then
 	# restore file descriptors and close temporary fds
@@ -157,6 +158,9 @@ if [ $do_vfs -eq 1 ] ; then
 	# Add output to the end of the log.
 	exec 1>> ${REPORT_LOG}
 	exec 2>> ${REPORT_ERR}
+
+	echo "running sysint scripts"
+	run_parts ${SYSINT_SCRIPTS}
 
 	echo ""
 	echo "running vfs scripts"
