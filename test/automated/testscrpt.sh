@@ -132,13 +132,16 @@ then
 	run_parts ${USERLIB_SCRIPTS}
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
-
+	# restore file descriptors and close temporary fds
+	exec 1<&6 6<&-
+	exec 2<&7 7<&-
 # now rename the logfiles so they don't get overwritten
-for f in ./${USERLIB_SCRIPTS}/*; do
+for f in ${USERLIB_SCRIPTS}/*; do
 	# skip CVS
 	[ -d $f ] && continue
 	if [ -x $f ] ; then 
 		
+		echo mv "${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log"
 		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
 		
 	fi
@@ -146,9 +149,7 @@ done
 
 
 
-	# restore file descriptors and close temporary fds
-	exec 1<&6 6<&-
-	exec 2<&7 7<&-
+
 
 	echo "setup_vfs"
 	teardown_vfs && setup_vfs
