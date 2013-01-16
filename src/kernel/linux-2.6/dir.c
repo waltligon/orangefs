@@ -118,8 +118,8 @@ static int pvfs2_readdir(
     filldir_t filldir)
 {
     int ret = 0, buffer_index;
+    PVFS_ds_position *ptoken = file->private_data;
     PVFS_ds_position pos = 0;
-    PVFS_ds_position token = PVFS_READDIR_START;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -131,9 +131,9 @@ static int pvfs2_readdir(
     char *current_entry = NULL;
     long bytes_decoded;
 
-    gossip_ldebug(GOSSIP_DIR_DEBUG,"Entering %s.\n",__func__);
-
-    gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
+    gossip_ldebug(GOSSIP_DIR_DEBUG,
+        "%s: file->f_pos:%lld, token = %llu\n",
+        __func__,lld(file->f_pos), llu(*ptoken));
 
     pos = (PVFS_ds_position)file->f_pos;
 
@@ -190,9 +190,11 @@ static int pvfs2_readdir(
      * 1. pvfs2 doesn't include the "." and ".." entries that are added below.  
      * 2. the introduction of distributed directory logic makes token no
      *    longer be related to f_pos and pos. Instead an independent variable
-     *    is used inside the function.
+     *    is used inside the function and stored in the private_data of
+     *    the file structure.
      */
-    new_op->upcall.req.readdir.token = token;
+    new_op->upcall.req.readdir.token = *ptoken;
+
 
 get_new_buffer_index:
     ret = readdir_index_get(&buffer_index);
@@ -327,7 +329,7 @@ get_new_buffer_index:
     if (i == rhandle.readdir_response.pvfs_dirent_outcount)
     {
         /* update token */
-        token = rhandle.readdir_response.token;
+        *ptoken = rhandle.readdir_response.token;
     }
     else 
     {
@@ -365,7 +367,7 @@ get_new_buffer_index:
 
     gossip_debug(GOSSIP_DIR_DEBUG,"pos = %llu, token = %llu, file->f_pos should have been %lld\n",
                                   llu(pos),
-                                  llu(token),
+                                  llu(*ptoken),
                                   lld(file->f_pos));
 
     if (ret == 0)

@@ -326,6 +326,7 @@ int PINT_rcache_insert(
     int purged;
     unsigned int enabled;
 
+#if 0
     /* Check if rcache is initialized. Initialize rcache if pointer is null. */
     if(!rcache)
     {
@@ -338,14 +339,16 @@ int PINT_rcache_insert(
         }
     }
 
-    /* skip out immediately if the cache is disabled */
+    /* Make sure the cache is enabled */
     PINT_tcache_get_info(rcache, TCACHE_ENABLE, &enabled);
     if(!enabled)
     {
-        gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: disabled! I should not be here!!\n");
-
-        return(0);
+assert(enabled == 1);
+        gossip_debug(GOSSIP_RCACHE_DEBUG, "PINT_rcache_insert: enabling rcache\n");
+        enabled = 1;
+        PINT_tcache_set_info(rcache, TCACHE_ENABLE, enabled);
     }
+#endif
     
     gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: insert(): handle=%llu, token=%llu\n", llu(ref->handle), llu(token));
   
