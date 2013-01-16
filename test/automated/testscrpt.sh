@@ -141,6 +141,8 @@ for f in ${USERLIB_SCRIPTS}/*; do
 	[ -d $f ] && continue
 	if [ -x $f ] ; then 
 		
+		pwd
+		ls
 		echo mv "${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log"
 		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
 		
