@@ -135,7 +135,8 @@ fi
 	# restore file descriptors and close temporary fds
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
-# now rename the logfiles so they don't get overwritten
+# now rename the lfiles so they don't get overwritten
+cd ..
 for f in ${USERLIB_SCRIPTS}/*; do
 	# skip CVS
 	[ -d $f ] && continue
