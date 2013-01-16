@@ -897,12 +897,26 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
    struct PVFS_server_req *req = s_op->req;
    uint32_t req_attr_mask = req->u.create.attr.mask;
    uint32_t copies = req->u.create.replication_number_of_copies;
-   const char ***replication_servers = NULL;
+   const char ***replication_servers_2d = NULL;
+   const char **replication_servers_1d = NULL;
    int num_io_servers = s_op->u.create.num_io_servers;
    const char **io_servers = s_op->u.create.io_servers;
 
+   const char **local_array = NULL;
+   const char **remote_array = NULL;
 
-   int copy,start,i;
+   PVFS_handle *local_dh_array = NULL;
+
+   uint32_t local_array_size=0, remote_array_size=0;
+            
+   server_configuration_s *config = get_server_config_struct();
+
+   int copy,start,i,ret;
+   int replication_count=num_io_servers*copies;
+
+   job_id_t tmp_id;
+
+   PVFS_handle_extent_array data_handle_ext_array;
 
    js_p->error_code = 0;
 
@@ -920,18 +934,18 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       {
           /* Create a set of servers using round-robin algorithm */
           /* NOTE:  this is a very simple approach using only the same set of servers
-           * from the primary datahandles.
+           * used for the primary datahandles.
            */
-          replication_servers = calloc(copies,sizeof(char *));
+          replication_servers_2d = calloc(copies,sizeof(char *));
           for (i=0; i<num_io_servers; i++)
           {
-              replication_servers[i] = calloc(num_io_servers,sizeof(char *));
+              replication_servers_2d[i] = calloc(num_io_servers,sizeof(char *));
           }
           for (copy=0,start=1; copy<copies; copy++,start++)
           {
               for (i=0; i<num_io_servers; i++)
               {
-                replication_servers[copy][i] = io_servers[ (start+i)%num_io_servers ];
+                replication_servers_2d[copy][i] = io_servers[ (start+i)%num_io_servers ];
               }
           }
 
@@ -941,10 +955,33 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
              for (i=0; i<num_io_servers; i++)
              {
                 gossip_err("replication_servers[%d][%d]:%s.\n"
-                          ,copy,i,replication_servers[copy][i]);
+                          ,copy,i,replication_servers_2d[copy][i]);
              }
           }
 
+          /* Create linear list of replication servers for later calculations. */
+          replication_servers_1d = calloc(replication_count,sizeof(char *));
+          if (!replication_servers_1d)
+          {
+             gossip_lerr("Error allocating memory.\n");
+             js_p->error_code = -PVFS_ENOMEM;
+             return SM_ACTION_COMPLETE;
+          }
+
+          for (copy=0; copy<copies; copy++)
+          {
+             for (i=0; i<num_io_servers; i++)
+             {
+                replication_servers_1d[(copy*num_io_servers)+i] = replication_servers_2d[copy][i];
+             }
+          }
+
+          for (i=0; i<replication_count; i++)
+          {
+             gossip_err("replication_servers[%d]:%s.\n",i,replication_servers_1d[i]);
+          }
+
+          /* note to self: remember to update the response structure if no errors occur */
 
           break;
       }
@@ -954,7 +991,91 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       }
    }/*end switch*/
 
-   return SM_ACTION_COMPLETE;
+   /* Now that we have a set of replication servers, separate them into two arrays by location, local or remote */
+   for (i=0; i<replication_count; i++)
+   {
+       if ( !strcmp(replication_servers_1d[i], config->host_id) )
+       {
+          local_array_size++;
+       } 
+       else
+       {
+          remote_array_size++;
+       }
+   }
+
+    local_array   = calloc(replication_count,sizeof(char *));
+   local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
+   remote_array   = calloc(replication_count,sizeof(char *));
+
+   if ( !local_array || !remote_array || !local_dh_array)
+   {
+      gossip_lerr("Error allocating memeory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
+      return SM_ACTION_COMPLETE;
+   }
+
+   for (i=0; i<replication_count; i++)
+   {
+      if ( !strcmp(replication_servers_1d[i], config->host_id) )
+      {
+          local_array[i] = replication_servers_1d[i];
+      }
+      else
+      {
+          remote_array[i] = replication_servers_1d[i];
+      }
+   }
+
+
+   gossip_lerr("Local and Remote Arrays...\n");
+   for (i=0; i<replication_count; i++)
+   {
+      if ( local_array[i] )
+      {
+         gossip_err("local_array[%d]:%s\n",i,local_array[i]);
+      }
+      if ( remote_array[i] )
+      {
+         gossip_err("remote_array[%d]:%s\n",i,remote_array[i]);
+      }
+   }
+
+   /* Now, ask for local data handles from trove */
+   if ( local_array_size == 0 )
+   {
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* find local extent array */
+   ret = PINT_cached_config_get_server(s_op->req->u.create.fs_id,
+                                       config->host_id,
+                                       PINT_SERVER_TYPE_IO,
+                                       &data_handle_ext_array);
+   if (ret < 0)
+   {
+      js_p->error_code = ret;
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* save pertinent data to the frame before moving to the next state */
+   s_op->u.create.local_replication_handles      = local_dh_array;
+   s_op->u.create.local_replication_handle_count = local_array_size;
+
+   ret = job_trove_dspace_create_list(s_op->req->u.create.fs_id,
+                                      &data_handle_ext_array,
+                                      local_dh_array,
+                                      local_array_size,
+                                      PVFS_TYPE_DATAFILE,
+                                      NULL,
+                                      0,
+                                      smcb,
+                                      0,
+                                      js_p,
+                                      &tmp_id,
+                                      server_job_context,
+                                      s_op->req->hints);
+   return ret;
 }/* gather_replication_datahandles_if_needed */
 
 
@@ -977,6 +1098,9 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    enum misc request_location = LOCAL_OPERATION;
 
+   PVFS_handle *local_handles = s_op->u.create.local_replication_handles;
+   uint32_t local_count = s_op->u.create.local_replication_handle_count;
+   int i;
 
    js_p->error_code = 0;
 
@@ -991,6 +1115,11 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    gossip_lerr("replication is ON.\n");
 
+   gossip_lerr("Local replication handles...\n");
+   for (i=0; i<local_count; i++)
+   {
+      gossip_err("local_handles[%d]:%llu\n",i,llu(local_handles[i]));
+   }
    
    /* Create and prepare a new server frame in order to call set-eattr.sm */
    PINT_CREATE_SUBORDINATE_SERVER_FRAME( smcb

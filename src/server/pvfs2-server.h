@@ -181,6 +181,8 @@ struct PINT_server_create_op
     int *seteattr_error;
 
     const char ***replication_servers;
+    PVFS_handle *local_replication_handles;
+    uint32_t local_replication_handle_count;
 };
 
 typedef struct 
