@@ -146,6 +146,7 @@ setup_vfs() {
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+	sleep 10
 	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
 	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
 	
