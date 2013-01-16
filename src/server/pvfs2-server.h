@@ -179,6 +179,8 @@ struct PINT_server_create_op
     PVFS_ds_keyval *seteattr_key;
     PVFS_ds_keyval *seteattr_val;
     int *seteattr_error;
+
+    const char ***replication_servers;
 };
 
 typedef struct 

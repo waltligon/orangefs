@@ -128,6 +128,10 @@ static void lebf_initialize(void)
             case PVFS_SERV_CREATE:
                 zero_credential(&req.u.create.credential);
                 zero_capability(&resp.u.create.capability);
+                req.u.create.replication_number_of_copies = 0;
+                resp.u.create.datafile_count = 0;
+                resp.u.create.total_number_of_replication_handles = 0;
+                resp.u.create.stuffed = 0;
                 /* can request a range of handles */
                 reqsize = extra_size_PVFS_servreq_create;
                 respsize = extra_size_PVFS_servresp_create;
