@@ -117,6 +117,7 @@ exec 2> ${REPORT_ERR}
 # print current environment to env.log
 env > env.log
 
+# run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
 	OLD_LD_PRELOAD=$LD_PRELOAD
@@ -132,18 +133,19 @@ then
 	LD_PRELOAD=$OLD_LD_PRELOAD
 fi
 
+# now rename the logfiles so they don't get overwritten
 for f in ./${USERLIB_SCRIPTS}/*; do
-		# skip CVS
-		[ -d $f ] && continue
-		if [ -x $f ] ; then 
-			
-			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log userlib-${PVFS2_DEST}/${f}-${CVS_TAG}.log
-			
-		fi
-	done
+	# skip CVS
+	[ -d $f ] && continue
+	if [ -x $f ] ; then 
+		
+		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+		
+	fi
+done
 
 
-if [ $do_vfs -eq 1 ] ; then
+
 	# restore file descriptors and close temporary fds
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
@@ -167,9 +169,11 @@ if [ $do_vfs -eq 1 ] ; then
 	exec 1>> ${REPORT_LOG}
 	exec 2>> ${REPORT_ERR}
 
+	echo ""
 	echo "running sysint scripts"
 	run_parts ${SYSINT_SCRIPTS}
-
+	
+if [ $do_vfs -eq 1 ] ; then
 	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
