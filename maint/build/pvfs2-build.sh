@@ -16,8 +16,8 @@ with_db_arg=""
 if [ $WITH_DB ] ; then
 	with_db_arg=--with-db=$WITH_DB
 fi
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --enable-shared --enable-ucache --disable-karma $with_db_arg"
-
+#configureopts="$PVFS2_CONFIGOPTS --enable-strict --enable-shared --enable-ucache --disable-karma $with_db_arg"
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma $with_db_arg"
 
 #
 # use this method if you want to test a release
