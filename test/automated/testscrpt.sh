@@ -74,11 +74,6 @@ do
 done
 wait
 
-for my_host in $VFS_HOSTS
-do
-	start_all_pvfs2 $my_host &
-done
-wait
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
@@ -92,27 +87,10 @@ echo "Run VFS test is $RUN_VFS_TEST"
 echo "Run MPI test is $RUN_MPI_TEST"
 
 
-# at this point we've got 
-# - pvfs2 servers running
-# on hosts in our whitelist
-# - an entry in /etc/fstab (that was a prerequisite for this script after all)
-# - the VFS mounted at $PVFS2_MOUNTPOINT
-
-echo "Checking if pvfs2 is running. Client should NOT be running at this point."
-
-ps aux | grep pvfs
-
-
 
 nr_passed=0
 nr_failed=0
 
-# save file descriptors for later
-exec 6<&1
-exec 7<&2
-
-exec 1> ${REPORT_LOG}
-exec 2> ${REPORT_ERR}
 
 # print current environment to env.log
 env > env.log
@@ -120,6 +98,13 @@ env > env.log
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
+	# save file descriptors for later
+	exec 6<&1
+	exec 7<&2
+
+	exec 1> ${REPORT_LOG}
+	exec 2> ${REPORT_ERR}
+
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
 	then
@@ -127,55 +112,82 @@ then
 	else
 		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
 	fi
+
+	
+
+	for my_host in $VFS_HOSTS
+	do
+		start_all_pvfs2 $my_host &
+	done
+	wait
+
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+
 	echo ""
 	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
 	LD_PRELOAD=$OLD_LD_PRELOAD
-fi
 	# restore file descriptors and close temporary fds
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
+
+fi
 # now rename the lfiles so they don't get overwritten
-cd ..
-for f in ${USERLIB_SCRIPTS}/*; do
+
+for f in *; do
 	# skip CVS
 	[ -d $f ] && continue
 	if [ -x $f ] ; then 
 		
 		pwd
 		ls
-		echo mv "${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log"
+		echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
 		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
 		
 	fi
 done
 
+#now restart pvfs2 and run the remaining tests
+
+for my_host in $VFS_HOSTS
+do
+	start_all_pvfs2 $my_host &
+done
+wait
+
+
+if [ $? != 0 ] ; then
+	echo "setup failed"
+	setupfail
+fi
 
 
 
+echo "setup_vfs"
+teardown_vfs && setup_vfs
 
-	echo "setup_vfs"
-	teardown_vfs && setup_vfs
-
-	if [ $? != 0 ] ; then
-		echo "setup failed"
-		setupfail
-	fi
-	echo "Checking if pvfs2 client is running"
-	ps aux | grep pvfs
-	echo "Checking mount"
-	mount 
-	# save file descriptors for later
-	exec 6<&1
-	exec 7<&2
+if [ $? != 0 ] ; then
+	echo "setup failed"
+	setupfail
+fi
+echo "Checking if pvfs2 client is running"
+ps aux | grep pvfs
+echo "Checking mount"
+mount 
+# save file descriptors for later
+exec 6<&1
+exec 7<&2
 	
-	# Add output to the end of the log.
-	exec 1>> ${REPORT_LOG}
-	exec 2>> ${REPORT_ERR}
+# Add output to the end of the log.
+exec 1>> ${REPORT_LOG}
+exec 2>> ${REPORT_ERR}
 
-	echo ""
-	echo "running sysint scripts"
-	run_parts ${SYSINT_SCRIPTS}
+echo ""
+echo "running sysint scripts"
+run_parts ${SYSINT_SCRIPTS}
 	
 if [ $do_vfs -eq 1 ] ; then
 	echo ""
