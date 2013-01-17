@@ -324,9 +324,10 @@ int PINT_rcache_insert(
     struct rcache_key entry_key;
     int status;
     int purged;
-    unsigned int enabled;
 
 #if 0
+    int enabled;
+
     /* Check if rcache is initialized. Initialize rcache if pointer is null. */
     if(!rcache)
     {
