@@ -98,12 +98,7 @@ env > env.log
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
-	# save file descriptors for later
-	exec 6<&1
-	exec 7<&2
 
-	exec 1> ${REPORT_LOG}
-	exec 2> ${REPORT_ERR}
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
@@ -125,7 +120,12 @@ then
 		echo "setup failed"
 		setupfail
 	fi
+	# save file descriptors for later
+	exec 6<&1
+	exec 7<&2
 
+	exec 1> ${REPORT_LOG}
+	exec 2> ${REPORT_ERR}
 	echo ""
 	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
