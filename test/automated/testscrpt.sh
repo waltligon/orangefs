@@ -74,131 +74,69 @@ do
 done
 wait
 
-
-if [ $? != 0 ] ; then
-	echo "setup failed"
-	setupfail
-fi
-
-#export RUN_USERLIB_TEST=1
-
-echo "Run Userlib test is $RUN_USERLIB_TEST"
-echo "Run VFS test is $RUN_VFS_TEST"
-echo "Run MPI test is $RUN_MPI_TEST"
-
-
-
-nr_passed=0
-nr_failed=0
-
-
-# print current environment to env.log
-env > env.log
-
-# run userlib tests first before starting client
-if [ $RUN_USERLIB_TEST ]
-then
-
-
-	OLD_LD_PRELOAD=$LD_PRELOAD
-	if [ $LD_PRELOAD ]
-	then
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
-	else
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
-	fi
-
-	
-
-	for my_host in $VFS_HOSTS
-	do
-		start_all_pvfs2 $my_host &
-	done
-	wait
-
-	if [ $? != 0 ] ; then
-		echo "setup failed"
-		setupfail
-	fi
-	# save file descriptors for later
-	exec 6<&1
-	exec 7<&2
-
-	exec 1> ${REPORT_LOG}
-	exec 2> ${REPORT_ERR} 
-	echo ""
-	echo "running userlib scripts"
-	run_parts ${USERLIB_SCRIPTS}
-	LD_PRELOAD=$OLD_LD_PRELOAD
-	# restore file descriptors and close temporary fds
-	exec 1<&6 6<&-
-	exec 2<&7 7<&-
-
-fi
-# now rename the lfiles so they don't get overwritten
-
-for f in *; do
-	# skip CVS
-	[ -d $f ] && continue
-	if [ -x $f ] ; then 
-		
-		pwd
-		ls
-		echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
-		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
-		
-	fi
-done
-
-#now restart pvfs2 and run the remaining tests
-
 for my_host in $VFS_HOSTS
 do
 	start_all_pvfs2 $my_host &
 done
 wait
 
-
 if [ $? != 0 ] ; then
 	echo "setup failed"
 	setupfail
 fi
 
+echo "Run MPI test is $RUN_MPI_TEST"
+echo "Run VFS test is $RUN_VFS_TEST"
+#echo "do_vfs is $do_vfs"
 
+if [ $do_vfs -eq 1 ] ; then 
+	echo "setup_vfs"
+	teardown_vfs && setup_vfs
 
-echo "setup_vfs"
-teardown_vfs && setup_vfs
-
-if [ $? != 0 ] ; then
-	echo "setup failed"
-	setupfail
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+else	
+	echo "Unable to do VFS test for ${VFS_HOSTS}"
 fi
-echo "Checking if pvfs2 client is running"
+
+# at this point we've got 
+# - pvfs2 servers running
+# on hosts in our whitelist
+# - an entry in /etc/fstab (that was a prerequisite for this script after all)
+# - the VFS mounted at $PVFS2_MOUNTPOINT
+
+echo "Checking if pvfs is running"
+
 ps aux | grep pvfs
+
 echo "Checking mount"
 mount 
+
+nr_passed=0
+nr_failed=0
+
 # save file descriptors for later
 exec 6<&1
 exec 7<&2
-	
-# Add output to the end of the log.
-exec 1>> ${REPORT_LOG}
-exec 2>> ${REPORT_ERR}
 
-echo ""
+exec 1> ${REPORT_LOG}
+exec 2> ${REPORT_ERR}
+
+# print current environment to env.log
+env > env.log
+
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
-	
+
 if [ $do_vfs -eq 1 ] ; then
 	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
 #        run_one ${VFS_SCRIPTS} ${VFS_SCRIPT}
-else	
-	echo "Unable to do VFS test for ${VFS_HOSTS}"
 fi
-
 
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
@@ -221,6 +159,51 @@ fi
 # restore file descriptors and close temporary fds
 exec 1<&6 6<&-
 exec 2<&7 7<&-
+
+RUN_USERLIB_TEST=1
+# run userlib tests first before starting client
+if [ $RUN_USERLIB_TEST ]
+then
+
+	[ $do_vfs -eq 1 ] && teardown_vfs
+
+	OLD_LD_PRELOAD=$LD_PRELOAD
+	if [ $LD_PRELOAD ]
+	then
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
+	else
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+	fi
+
+	
+
+	for my_host in $VFS_HOSTS
+	do
+		
+		start_all_pvfs2 $my_host &
+	done
+	wait
+
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+	# save file descriptors for later
+	exec 6<&1
+	exec 7<&2
+
+	exec 1> ${REPORT_LOG}
+	exec 2> ${REPORT_ERR} 
+	echo ""
+	echo "running userlib scripts"
+	run_parts ${USERLIB_SCRIPTS}
+	LD_PRELOAD=$OLD_LD_PRELOAD
+	# restore file descriptors and close temporary fds
+	exec 1<&6 6<&-
+	exec 2<&7 7<&-
+
+	
+fi
 
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
 	-f ${PVFS2_DEST}/pvfs2-test-built-with-warnings ] ; then
