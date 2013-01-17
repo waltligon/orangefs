@@ -80,7 +80,7 @@ if [ $? != 0 ] ; then
 	setupfail
 fi
 
-export RUN_USERLIB_TEST=1
+#export RUN_USERLIB_TEST=1
 
 echo "Run Userlib test is $RUN_USERLIB_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
@@ -125,7 +125,7 @@ then
 	exec 7<&2
 
 	exec 1> ${REPORT_LOG}
-	exec 2> ${REPORT_ERR}
+	exec 2> ${REPORT_ERR} 
 	echo ""
 	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
