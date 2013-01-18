@@ -192,8 +192,8 @@ then
 	exec 6<&1
 	exec 7<&2
 
-	exec 1> ${REPORT_LOG}
-	exec 2> ${REPORT_ERR} 
+	exec 1>> ${REPORT_LOG}
+	exec 2>> ${REPORT_ERR} 
 	echo ""
 	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
