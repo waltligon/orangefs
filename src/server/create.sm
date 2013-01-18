@@ -23,10 +23,10 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
 
 enum misc
 {
-    LOCAL_OPERATION  = 2,
-    REMOTE_OPERATION = 3,
-    LOCAL_XATTR      = 4,
-    IF_NOT_NEEDED    = 5
+    LOCAL_OPERATION    = 2,
+    REMOTE_OPERATION   = 3,
+    LOCAL_XATTR        = 4,
+    REPLICATION_IS_OFF = 5
 };
 
 %%
@@ -78,48 +78,52 @@ machine pvfs2_create_sm
     state write_keyvals
     {
         run write_keyvals;
-        success => gather_replication_datahandles_if_needed;
+        success => check_for_replication;
         default => replace_remote_datafile_handles;
     }
 
-    state gather_replication_datahandles_if_needed
+    state check_for_replication
     {
-        run gather_replication_datahandles_if_needed;
+        run check_for_replication;
+        success => get_local_replication_datahandles;
+        default => setobj_attribs;
+    }
+
+    state get_local_replication_datahandles
+    {
+        run get_local_replication_datahandles;
         success => get_remote_replication_datahandles;
-        IF_NOT_NEEDED => setobj_attribs;
         default => remove_keyvals;
     }
 
     state get_remote_replication_datahandles
     {
         run get_remote_replication_datahandles;
-        success => write_replication_xattrs_if_needed;
+        success => write_replication_xattrs;
         default => remove_local_replication_datahandles;
     }
 
-    state write_replication_xattrs_if_needed
+    state write_replication_xattrs
     {
-        pjmp write_replication_xattrs_if_needed
+        pjmp write_replication_xattrs
         {
            LOCAL_XATTR => pvfs2_pjmp_seteattr_fast_sm;
         }
-        IF_NOT_NEEDED => setobj_attribs;
-        success => analyze_replication_xattrs;
-        default => remove_keyvals;
+        default => analyze_replication_xattrs;
     }
 
     state analyze_replication_xattrs
     {
         run analyze_replication_xattrs;
         success => setobj_attribs;
-        default => remove_keyvals;
+        default => replace_remote_replication_datahandles;
     }
 
     state setobj_attribs
     {
         run setattr_setobj_attribs;
         success => setup_resp;
-        default => remove_replication_xattrs_if_needed;
+        default => check_error_path;
     }
 
     state setup_resp
@@ -128,15 +132,28 @@ machine pvfs2_create_sm
         default => setup_final_response;
     }
 
+    state check_error_path
+    {
+        run check_for_replication;
+        REPLICATION_IS_OFF => remove_keyvals;
+        default => remove_replication_xattrs;
+    }
+    
+    state remove_replication_xattrs
+    {
+        run remove_replication_xattrs;
+        default => replace_remote_replication_datahandles;
+    }
+
+    state replace_remote_replication_datahandles
+    {
+        run replace_remote_replication_datahandles;
+        default => remove_local_replication_datahandles;
+    }
+
     state remove_local_replication_datahandles
     {
         run remove_local_replication_datahandles;
-        default => remove_keyvals;
-    }
-
-    state remove_replication_xattrs_if_needed
-    {
-        run remove_replication_xattrs_if_needed;
         default => remove_keyvals;
     }
 
@@ -564,6 +581,16 @@ static PINT_sm_action remove_local_replication_datahandles(
 
 
 
+static PINT_sm_action replace_remote_replication_datahandles(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    return SM_ACTION_COMPLETE;
+}/* end replace_remote_replication_datahandles */
+
+
+
 
 
 static PINT_sm_action replace_remote_datafile_handles(
@@ -662,7 +689,9 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 
 
 
-static PINT_sm_action remove_replication_xattrs_if_needed(struct PINT_smcb *smcb, job_status_s *js_p)
+
+static PINT_sm_action remove_replication_xattrs(struct PINT_smcb *smcb, 
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -704,7 +733,7 @@ static PINT_sm_action remove_replication_xattrs_if_needed(struct PINT_smcb *smcb
   
     return ret;
 
-}/* end remove_replication_xattrs_if_needed */
+}/* end remove_replication_xattrs */
 
 
 
@@ -921,13 +950,33 @@ static PINT_sm_action setattr_setobj_attribs(
 }
 
 
+static int check_for_replication( struct PINT_smcb *smcb, 
+                                      job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   uint32_t req_attr_mask = s_op->req->u.create.attr.mask;
 
-static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb, 
-                                                     job_status_s *js_p)
+   js_p->error_code = 0;
+
+   /* Is replication turned on? */
+   if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
+   {
+       gossip_lerr("replication is off.\n");
+       js_p->error_code = REPLICATION_IS_OFF;
+   }
+
+   return SM_ACTION_COMPLETE;
+   
+}/*end check_for_replication*/
+
+
+
+
+static int get_local_replication_datahandles(struct PINT_smcb *smcb, 
+                                                 job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
    struct PVFS_server_req *req = s_op->req;
-   uint32_t req_attr_mask = req->u.create.attr.mask;
    uint32_t copies = req->u.create.replication_number_of_copies;
    const char ***replication_servers_2d = NULL;
    const char **replication_servers_1d = NULL;
@@ -943,7 +992,7 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
             
    server_configuration_s *config = get_server_config_struct();
 
-   int copy,start,i,ret;
+   int copy,start,i,j,k,ret;
    int replication_count=num_io_servers*copies;
 
    job_id_t tmp_id;
@@ -952,13 +1001,6 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
 
    js_p->error_code = 0;
 
-   /* Is replication turned on? */
-   if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
-   {
-       gossip_lerr("replication is off.\n");
-       js_p->error_code = IF_NOT_NEEDED;
-       return SM_ACTION_COMPLETE;
-   }
 
    /* Gather replication datahandles based on replication layout algorithm */
    switch( s_op->req->u.create.replication_layout.algorithm)
@@ -1037,9 +1079,9 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
        }
    }
 
-   local_array    = calloc(replication_count,sizeof(char *));
+   local_array    = calloc(local_array_size,sizeof(char *));
    local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
-   remote_array   = calloc(replication_count,sizeof(char *));
+   remote_array   = calloc(remote_array_size,sizeof(char *));
 
    if ( !local_array || !remote_array || !local_dh_array)
    {
@@ -1048,30 +1090,29 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       return SM_ACTION_COMPLETE;
    }
 
-   for (i=0; i<replication_count; i++)
+   for (i=0,j=0,k=0; i<replication_count; i++)
    {
       if ( !strcmp(replication_servers_1d[i], config->host_id) )
       {
-          local_array[i] = replication_servers_1d[i];
+          local_array[k++] = replication_servers_1d[i];
       }
       else
       {
-          remote_array[i] = replication_servers_1d[i];
+          remote_array[j++] = replication_servers_1d[i];
       }
    }
 
 
-   gossip_lerr("Local and Remote Arrays...\n");
-   for (i=0; i<replication_count; i++)
+   gossip_lerr("Local Array...\n");
+   for (i=0; i<local_array_size; i++)
    {
-      if ( local_array[i] )
-      {
-         gossip_err("local_array[%d]:%s\n",i,local_array[i]);
-      }
-      if ( remote_array[i] )
-      {
-         gossip_err("remote_array[%d]:%s\n",i,remote_array[i]);
-      }
+      gossip_err("local_array[%d]:%s.\n",i,local_array[i]);
+   }
+
+   gossip_lerr("Remote Array...\n");
+   for (i=0; i<remote_array_size; i++)
+   {
+      gossip_err("remote_array[%d]:%s.\n",i,remote_array[i]);
    }
 
    /* save pertinent data to the frame */
@@ -1114,7 +1155,7 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
                                       server_job_context,
                                       s_op->req->hints);
    return ret;
-}/* gather_replication_datahandles_if_needed */
+}/*end get_local_replication_datahandles*/
 
 
 
@@ -1169,12 +1210,11 @@ static int get_remote_replication_datahandles( struct PINT_smcb *smcb,
 
 
 
-static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb, 
-                                               job_status_s *js_p)
+static int write_replication_xattrs( struct PINT_smcb *smcb, 
+                                         job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
    struct PVFS_server_req *req = s_op->req;
-   uint32_t req_attr_mask = req->u.create.attr.mask;
 
    struct PINT_server_op *xattr_s_op = NULL;
    struct PVFS_server_req *xattr_req = NULL;
@@ -1190,7 +1230,11 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    PVFS_handle *remote_handles = s_op->u.create.remote_replication_handles;
    uint32_t remote_count = s_op->u.create.remote_replication_handle_count;
 
+   /* this is the number of servers * the number of copies */
    uint32_t total_servers = s_op->u.create.replication_servers_count;
+
+   /* this is the number of servers */
+   int servers_per_copy = s_op->u.create.num_io_servers;
 
    PVFS_handle *merged_handles = NULL;
 
@@ -1204,17 +1248,6 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
 
    js_p->error_code = 0;
-
-   /* Do we need to set the replication extended attributes? */
-   gossip_lerr("request attribute mask: 0x%08x.\n",req_attr_mask);
-   if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
-   {
-      gossip_lerr("replication is OFF.\n");
-      js_p->error_code = IF_NOT_NEEDED;
-      return SM_ACTION_COMPLETE;
-   }
-
-   gossip_lerr("replication is ON.\n");
 
    gossip_lerr("Local replication handles...\n");
    for (i=0; i<local_count; i++)
@@ -1280,15 +1313,17 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    merged_handles = (PVFS_handle *)xattr_req->u.seteattr.val[key_count].buffer;
    for (copy=0,j=0,k=0; copy<copies; copy++)  
    {
-       for (i=0; i<total_servers; i++)
+       for (i=0; i<servers_per_copy; i++)
        {
            if ( !strcmp(replication_servers_2d[copy][i],config->host_id) )
            {
-              merged_handles[ (copy*total_servers) + i ] = local_handles[j++];
+              gossip_err("Merging local handle into slot #%d...\n",(copy*servers_per_copy)+i);
+              merged_handles[ (copy*servers_per_copy) + i ] = local_handles[j++];
            }
            else
            {
-              merged_handles[ (copy*total_servers) + i ] = remote_handles[k++];
+              gossip_err("Merging remote handle into slot #%d...\n",(copy*servers_per_copy)+i);
+              merged_handles[ (copy*servers_per_copy) + i ] = remote_handles[k++];
            }
        }
    }
@@ -1299,7 +1334,7 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    gossip_lerr("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                                ,xattr_req->u.seteattr.key[key_count].buffer_sz);
    gossip_lerr("Buffer of handles...\n");
-   for (i=0; i<copy*total_servers; i++)
+   for (i=0; i<total_servers; i++)
    {
        gossip_err("merged_handles[%d]:%llu\n",i,llu(merged_handles[i]));
        PVFS_handle tmp = ((PVFS_handle *)(xattr_req->u.seteattr.val[key_count].buffer))[i];
@@ -1457,7 +1492,7 @@ err_out:
    free(xattr_s_op);
 
    return SM_ACTION_COMPLETE;
-}/*end write_replication_xattrs_if_needed*/
+}/*end write_replication_xattrs*/
 
 
 static int analyze_replication_xattrs( struct PINT_smcb *smcb, 

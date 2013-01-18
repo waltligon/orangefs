@@ -274,7 +274,8 @@ int main(int argc, char **argv)
                 }
                 case MIRROR_ON_WRITE :
                 {
-                    printf("Create mirror data on each write\n");
+                    printf("Create Mirror on write\n");
+
                     break;
                 }
                 default:

@@ -373,6 +373,7 @@ static int create_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
 
@@ -402,7 +403,8 @@ static int create_comp_fn(void *v_p,
 
     gossip_lerr("Looking at returned replication handles...\n");
     gossip_err("total_number_of_replication_handles is %d.\n",resp_p->u.create.total_number_of_replication_handles);
-    gossip_err("replication_handles[0] is %llu.\n",llu(resp_p->u.create.replication_handles[0]));
+    for (i=0; i<resp_p->u.create.total_number_of_replication_handles; i++)
+        gossip_err("replication_handles[%d] is %llu.\n",i,llu(resp_p->u.create.replication_handles[i]));
 
 
 
