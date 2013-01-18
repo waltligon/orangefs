@@ -85,8 +85,16 @@ machine pvfs2_create_sm
     state gather_replication_datahandles_if_needed
     {
         run gather_replication_datahandles_if_needed;
-        success => write_replication_xattrs_if_needed;
+        success => get_remote_replication_datahandles;
+        IF_NOT_NEEDED => setobj_attribs;
         default => remove_keyvals;
+    }
+
+    state get_remote_replication_datahandles
+    {
+        run get_remote_replication_datahandles;
+        success => write_replication_xattrs_if_needed;
+        default => remove_local_replication_datahandles;
     }
 
     state write_replication_xattrs_if_needed
@@ -118,6 +126,12 @@ machine pvfs2_create_sm
     {
         run setup_resp;
         default => setup_final_response;
+    }
+
+    state remove_local_replication_datahandles
+    {
+        run remove_local_replication_datahandles;
+        default => remove_keyvals;
     }
 
     state remove_replication_xattrs_if_needed
@@ -534,6 +548,24 @@ static PINT_sm_action remove_local_datafile_handles(struct PINT_smcb *smcb,
     return ret;
 }
 
+
+
+
+
+
+static PINT_sm_action remove_local_replication_datahandles(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    return SM_ACTION_COMPLETE;
+}/* end remove_local_replication_datahandles */
+
+
+
+
+
+
 static PINT_sm_action replace_remote_datafile_handles(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -924,6 +956,7 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
    if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) )
    {
        gossip_lerr("replication is off.\n");
+       js_p->error_code = IF_NOT_NEEDED;
        return SM_ACTION_COMPLETE;
    }
 
@@ -991,7 +1024,7 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       }
    }/*end switch*/
 
-   /* Now that we have a set of replication servers, separate them into two arrays by location, local or remote */
+   /* Now that we have a set of replication servers, how many of each, local or remote, do we have. */
    for (i=0; i<replication_count; i++)
    {
        if ( !strcmp(replication_servers_1d[i], config->host_id) )
@@ -1004,7 +1037,7 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
        }
    }
 
-    local_array   = calloc(replication_count,sizeof(char *));
+   local_array    = calloc(replication_count,sizeof(char *));
    local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
    remote_array   = calloc(replication_count,sizeof(char *));
 
@@ -1041,6 +1074,14 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       }
    }
 
+   /* save pertinent data to the frame */
+   s_op->u.create.local_replication_handles       = local_dh_array;
+   s_op->u.create.local_replication_handle_count  = local_array_size;
+   s_op->u.create.remote_replication_io_servers   = remote_array;
+   s_op->u.create.remote_replication_handle_count = remote_array_size;
+   s_op->u.create.replication_servers_count       = replication_count;
+   s_op->u.create.replication_servers_2d          = replication_servers_2d;
+
    /* Now, ask for local data handles from trove */
    if ( local_array_size == 0 )
    {
@@ -1058,9 +1099,6 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
       return SM_ACTION_COMPLETE;
    }
 
-   /* save pertinent data to the frame before moving to the next state */
-   s_op->u.create.local_replication_handles      = local_dh_array;
-   s_op->u.create.local_replication_handle_count = local_array_size;
 
    ret = job_trove_dspace_create_list(s_op->req->u.create.fs_id,
                                       &data_handle_ext_array,
@@ -1078,6 +1116,54 @@ static int gather_replication_datahandles_if_needed( struct PINT_smcb *smcb,
    return ret;
 }/* gather_replication_datahandles_if_needed */
 
+
+
+
+static int get_remote_replication_datahandles( struct PINT_smcb *smcb, 
+                                               job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   int ret = -1;
+   job_id_t j_id;
+
+   PVFS_handle *remote_handles;
+   uint32_t handle_count = s_op->u.create.remote_replication_handle_count;
+
+   js_p->error_code = 0;
+
+   if (s_op->u.create.remote_replication_handle_count == 0)
+   {
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* allocate memory for remote-replication-handles */
+   remote_handles = calloc(handle_count,sizeof(*remote_handles));
+   if (!remote_handles)
+   {
+      gossip_lerr("Error allocating memory.\n");
+      js_p->error_code = -PVFS_ENOMEM;
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* save data to frame structure */
+   s_op->u.create.remote_replication_handles = remote_handles;
+
+
+   ret = job_precreate_pool_get_handles( s_op->req->u.create.fs_id,
+                                         handle_count,
+                                         PVFS_TYPE_DATAFILE,
+                                         s_op->u.create.remote_replication_io_servers,
+                                         remote_handles,
+                                         0,
+                                         smcb,
+                                         0,
+                                         js_p,
+                                         &j_id,
+                                         server_job_context,
+                                         s_op->req->hints);
+
+   return ret;
+}/* end get_remote_replication_datahandles */
 
 
 
@@ -1100,7 +1186,22 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
 
    PVFS_handle *local_handles = s_op->u.create.local_replication_handles;
    uint32_t local_count = s_op->u.create.local_replication_handle_count;
-   int i;
+
+   PVFS_handle *remote_handles = s_op->u.create.remote_replication_handles;
+   uint32_t remote_count = s_op->u.create.remote_replication_handle_count;
+
+   uint32_t total_servers = s_op->u.create.replication_servers_count;
+
+   PVFS_handle *merged_handles = NULL;
+
+   uint32_t copies = req->u.create.replication_number_of_copies;
+
+   int i,j,k,copy;
+
+   server_configuration_s *config = get_server_config_struct();
+
+   const char ***replication_servers_2d = s_op->u.create.replication_servers_2d;
+
 
    js_p->error_code = 0;
 
@@ -1119,6 +1220,11 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    for (i=0; i<local_count; i++)
    {
       gossip_err("local_handles[%d]:%llu\n",i,llu(local_handles[i]));
+   }
+   gossip_lerr("Remote replication handles...\n");
+   for (i=0; i<remote_count; i++)
+   {
+      gossip_err("remote_handles[%d]:%llu\n",i,llu(remote_handles[i]));
    }
    
    /* Create and prepare a new server frame in order to call set-eattr.sm */
@@ -1157,25 +1263,50 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    }
 
    /* setup user.pvfs2.mirror.handles.  these are the replicated handles. */
-   xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_HANDLES);
+   xattr_req->u.seteattr.key[key_count].buffer =    strdup(USER_PVFS2_MIRROR_HANDLES);
    xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_HANDLES);
-   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
-   xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
+
+
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(total_servers,sizeof(PVFS_handle));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = total_servers*sizeof(PVFS_handle);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
        gossip_lerr("Unable to allocate memory.\n");
        js_p->error_code = -PVFS_ENOMEM;
        goto err_out;
    }
-   memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
-          1 * sizeof(s_op->resp.u.create.metafile_handle));
-  
-   gossip_lerr("metafile_handle:%llu\n",llu(s_op->resp.u.create.metafile_handle)); 
+
+   /* Now, we have to merge the local and remote handle arrays based on the layout specified by the replication-servers */
+   merged_handles = (PVFS_handle *)xattr_req->u.seteattr.val[key_count].buffer;
+   for (copy=0,j=0,k=0; copy<copies; copy++)  
+   {
+       for (i=0; i<total_servers; i++)
+       {
+           if ( !strcmp(replication_servers_2d[copy][i],config->host_id) )
+           {
+              merged_handles[ (copy*total_servers) + i ] = local_handles[j++];
+           }
+           else
+           {
+              merged_handles[ (copy*total_servers) + i ] = remote_handles[k++];
+           }
+       }
+   }
+
+   /* save merged handles */
+   s_op->u.create.replication_handles_1d = merged_handles;
+
    gossip_lerr("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                                ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d].val:%llu. \tsize:%d\n",key_count
-                                              ,llu(*(uint64_t *)xattr_req->u.seteattr.val[key_count].buffer)
-                                              ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+   gossip_lerr("Buffer of handles...\n");
+   for (i=0; i<copy*total_servers; i++)
+   {
+       gossip_err("merged_handles[%d]:%llu\n",i,llu(merged_handles[i]));
+       PVFS_handle tmp = ((PVFS_handle *)(xattr_req->u.seteattr.val[key_count].buffer))[i];
+       gossip_err("val[%d].buffer[%d]:%llu\n",key_count,i,llu(tmp));
+   }
+   gossip_err("val[%d].buffer_sz:%d\n",key_count,xattr_req->u.seteattr.val[key_count].buffer_sz);
+
 
    key_count++;
    assert(key_count < xattr_req->u.seteattr.nkey);
@@ -1210,21 +1341,18 @@ static int write_replication_xattrs_if_needed( struct PINT_smcb *smcb,
    /* setup user.pvfs2.mirror.status - the status of each handle in the replication. */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_STATUS);
    xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_STATUS);
-   xattr_req->u.seteattr.val[key_count].buffer = calloc(1,sizeof(s_op->resp.u.create.metafile_handle));
-   xattr_req->u.seteattr.val[key_count].buffer_sz = 1 * sizeof(s_op->resp.u.create.metafile_handle);
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(total_servers,sizeof(PVFS_handle));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = total_servers*sizeof(PVFS_handle);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
       js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
-   memcpy(xattr_req->u.seteattr.val[key_count].buffer, &s_op->resp.u.create.metafile_handle,
-          1 * sizeof(s_op->resp.u.create.metafile_handle));
 
    gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d]:%llu \tsize:%d\n",key_count,llu(*(uint64_t *)xattr_req->u.seteattr.val[key_count].buffer)
-                                         ,xattr_req->u.seteattr.val[key_count].buffer_sz);
+   
 
    key_count++;
    assert(key_count < xattr_req->u.seteattr.nkey);
@@ -1366,6 +1494,10 @@ static int analyze_replication_xattrs( struct PINT_smcb *smcb,
 
    /* cleanup allocated memory from subordinate frame*/
    free(xattr_op); 
+
+   /* populate create response with replication_handles */
+   s_op->resp.u.create.total_number_of_replication_handles = s_op->u.create.replication_servers_count;
+   s_op->resp.u.create.replication_handles = s_op->u.create.replication_handles_1d;
 
   return SM_ACTION_COMPLETE;
 

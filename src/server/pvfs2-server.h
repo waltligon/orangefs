@@ -180,9 +180,18 @@ struct PINT_server_create_op
     PVFS_ds_keyval *seteattr_val;
     int *seteattr_error;
 
-    const char ***replication_servers;
+    const char ***replication_servers_2d;
+    const char **replication_servers_1d;
+    PVFS_handle *replication_handles_1d;
+    uint32_t replication_servers_count;
+
+    const char **local_replication_io_servers;
     PVFS_handle *local_replication_handles;
     uint32_t local_replication_handle_count;
+
+    const char **remote_replication_io_servers;
+    PVFS_handle *remote_replication_handles;
+    uint32_t remote_replication_handle_count;
 };
 
 typedef struct 
