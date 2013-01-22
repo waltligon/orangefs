@@ -184,8 +184,9 @@ struct PINT_server_create_op
     const char **replication_servers_1d;
     PVFS_handle *replication_handles_1d;
     uint32_t replication_servers_count;
+    uint32_t replication_servers_index;    /*needed for cleanup*/
+    uint32_t replication_number_of_copies; /*needed for cleanup*/
 
-    const char **local_replication_io_servers;
     PVFS_handle *local_replication_handles;
     uint32_t local_replication_handle_count;
 
