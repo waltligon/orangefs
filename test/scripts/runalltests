@@ -128,7 +128,6 @@ then
 	VMUSER=$USER
 	VFS_HOSTS=`hostname -s`
 	bash -s " < ./run-test.sh "
-fi
 else
 	case $VMSYSTEM in 
 
