@@ -26,7 +26,7 @@ while getopts s:i:a:duvhmc:k:f:n:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-L][-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
@@ -79,8 +79,21 @@ do
 	t)
 		VMTYPE=$OPTARG
 		;;
+	L)
+		RUN_LOCAL=1
+		
 	esac
 done
+
+if [ RUN_LOCAL ]
+then
+	uname -a | grep buntu && VMSYSTEM=cloud-ubuntu-12.04 
+	uname -a | grep el5 && VMSYSTEM=cloud-rhel5
+	uname -a | grep el6 && VMSYSTEM=cloud-rhel6
+	VMIPADDR=127.0.0.1
+	VMUSER=$USER
+	VFS_HOSTS=`hostname -s`
+fi
 	
 #the parameters will change, but the basic functionality will not
 echo "DATE is ${DATE}"
@@ -110,25 +123,30 @@ export KEYNAME
 export EC2CONFFILE
 export DELETE_INSTANCE
 
-#Determine VM User from system
-case $VMSYSTEM in 
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 
-	cloud-*buntu*|cloud-*mint*)
-		VMUSER=ubuntu
-		;;
-	cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
-		VMUSER=ec2-user
-		;;
-	*)
-		echo "System $VMSYSTEM not supported."
-		exit 1
-esac
+#Determine VM User from system
+if [ ! RUN_LOCAL ]
+then
+	case $VMSYSTEM in 
+
+		cloud-*buntu*|cloud-*mint*)
+			VMUSER=ubuntu
+			;;
+		cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
+			VMUSER=ec2-user
+			;;
+		*)
+			echo "System $VMSYSTEM not supported."
+			exit 1
+	esac
+
 
 echo "VMUSER is $VMUSER"
 export VMUSER
 
 
-SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
+
 
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
@@ -195,7 +213,7 @@ do
 	check_instance $i
 
 done
-
+fi
 
 echo ""
 echo "Running tests..."
