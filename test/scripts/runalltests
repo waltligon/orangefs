@@ -81,6 +81,7 @@ do
 		;;
 	L)
 		RUN_LOCAL=1
+		;;
 		
 	esac
 done
