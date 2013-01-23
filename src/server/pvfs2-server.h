@@ -181,7 +181,6 @@ struct PINT_server_create_op
     int *seteattr_error;
 
     const char ***replication_servers_2d;
-    const char **replication_servers_1d;
     PVFS_handle *replication_handles_1d;
     uint32_t replication_servers_count;
     uint32_t replication_servers_index;    /*needed for cleanup*/

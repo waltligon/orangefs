@@ -629,7 +629,7 @@ static PINT_sm_action replace_remote_replication_datahandles(
        return SM_ACTION_COMPLETE;
     }
 
-    if (s_op->u.create.replication_servers_index < s_op->u.create.replication_servers_count)
+    if (s_op->u.create.replication_servers_index < s_op->u.create.remote_replication_handle_count)
     {
        ret = job_precreate_pool_lookup_server(
                s_op->u.create.remote_replication_io_servers[s_op->u.create.replication_servers_index],
@@ -1180,7 +1180,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    }
 
    local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
-   remote_array   = calloc(remote_array_size,sizeof(char *));
+   remote_array   = calloc(remote_array_size,sizeof(*remote_array));
 
    if ( !remote_array || !local_dh_array)
    {
@@ -1430,8 +1430,14 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
        }
    }
 
-   /* save merged handles */
+   /* save merged handles to frame */
    s_op->u.create.replication_handles_1d = merged_handles;
+   gossip_lerr("s_op->u.create.replication_handles_1d : %p \t"
+               "merged_handles : %p \t"
+               "xattr_req->u.seteattr.val[key_count].buffer : %p\n"
+               ,s_op->u.create.replication_handles_1d
+               ,merged_handles
+               ,xattr_req->u.seteattr.val[key_count].buffer);
 
    gossip_lerr("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                                ,xattr_req->u.seteattr.key[key_count].buffer_sz);
@@ -1635,12 +1641,19 @@ static int analyze_replication_xattrs( struct PINT_smcb *smcb,
    /* cleanup allocated memory from subordinate frame*/
    free(xattr_op); 
 
+
    /* populate create response with replication_handles */
    if ( error_code == 0 )
    {
       s_op->resp.u.create.total_number_of_replication_handles = s_op->u.create.replication_servers_count;
       s_op->resp.u.create.replication_handles = s_op->u.create.replication_handles_1d;
    }
+   else
+   {  
+      s_op->resp.u.create.total_number_of_replication_handles = 0;
+      s_op->resp.u.create.replication_handles = NULL;
+   }
+ 
 
   return SM_ACTION_COMPLETE;
 
@@ -1682,7 +1695,7 @@ static int cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i,j;
+    int i;
 
     /* cleanup metdata keyval pairs. 
      * NOTE: except for the pairs below, all other pairs used statically created 
@@ -1738,23 +1751,16 @@ static int cleanup(
        cleanup_keyval_pairs(&s_op->u.create.seteattr_nkey, s_op->u.create.seteattr_key, s_op->u.create.seteattr_val,
                              s_op->u.create.seteattr_error);
 
-       for (i=0; i<s_op->u.create.replication_number_of_copies; i++)
+       for (i=0; s_op->u.create.replication_servers_2d && i<s_op->u.create.replication_number_of_copies; i++)
        {
-           for (j=0; j<s_op->u.create.num_io_servers; j++)
-           {
-               if (s_op->u.create.replication_servers_2d && s_op->u.create.replication_servers_2d[i][j])
-                  free((void *)s_op->u.create.replication_servers_2d[i][j]);
-           }
+           if (s_op->u.create.replication_servers_2d[i])
+              free(s_op->u.create.replication_servers_2d[i]);
        }
     
        if (s_op->u.create.replication_servers_2d)
           free(s_op->u.create.replication_servers_2d);
 
-       if (s_op->u.create.replication_servers_1d)
-          free(s_op->u.create.replication_servers_1d);
-
-       if (s_op->u.create.replication_handles_1d)
-          free(s_op->u.create.replication_handles_1d);
+       /* replication_handles_1d is handled by cleanup_keyval_pairs */
 
        if (s_op->u.create.local_replication_handles)
           free(s_op->u.create.local_replication_handles);
@@ -1786,16 +1792,20 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
 
     gossip_err("#1\n");
 
-    for (i=0; i<*nkey; i++)
+    for (i=0; key && val && i<*nkey; i++)
     {
         gossip_err("i is %d.\n",i);
         if (key[i].buffer)
         {
            free(key[i].buffer);
+           key[i].buffer = NULL;
         }
         if (val[i].buffer)
         {
+           gossip_err("val[%d].buffer : %p\n",i,val[i].buffer);
            free(val[i].buffer);
+           val[i].buffer = NULL;
+           gossip_err("val[%d].buffer : %p\n",i,val[i].buffer);
         }
     }
        
@@ -1804,22 +1814,23 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
     if (key)
     {
         free(key);
+        key=NULL;
     }
     if (val)
     {
         free(val);
+        key=NULL;
     }
 
     if (error)
     {
         free(error);
+        error=NULL;
     }
 
 
     gossip_err("#3\n");
     *nkey=0;
-     key=NULL;
-     val=NULL;
 
     return;
 }/* end cleanup_keyval_pairs */

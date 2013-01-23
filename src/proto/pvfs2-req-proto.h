@@ -248,7 +248,7 @@ struct PVFS_servresp_create
     PVFS_capability capability;
     int32_t stuffed;
     int32_t datafile_count;
-    int32_t total_number_of_replication_handles; /* (# of copies) * (# of datafiles) */
+    int32_t total_number_of_replication_handles; /* (# of copies) * (# of datafiles per copy) */
     PVFS_handle *datafile_handles;
     PVFS_handle *replication_handles;
 };
