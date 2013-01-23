@@ -128,6 +128,7 @@ then
 	VMIPADDR=127.0.0.1
 	VMUSER=$USER
 	VFS_HOSTS=`hostname -s`
+	echo "Running locally"
 	bash -s " < ./run-test.sh "
 else
 	case $VMSYSTEM in 
