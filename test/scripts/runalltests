@@ -129,7 +129,9 @@ then
 	VMUSER=$USER
 	VFS_HOSTS=`hostname -s`
 	echo "Running locally"
-	bash -s " < ./run-test.sh "
+	pwd
+	ls
+	bash -s  < ./run-test.sh 
 else
 	case $VMSYSTEM in 
 
