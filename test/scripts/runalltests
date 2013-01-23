@@ -85,15 +85,7 @@ do
 	esac
 done
 
-if [ RUN_LOCAL ]
-then
-	uname -a | grep buntu && VMSYSTEM=cloud-ubuntu-12.04 
-	uname -a | grep el5 && VMSYSTEM=cloud-rhel5
-	uname -a | grep el6 && VMSYSTEM=cloud-rhel6
-	VMIPADDR=127.0.0.1
-	VMUSER=$USER
-	VFS_HOSTS=`hostname -s`
-fi
+
 	
 #the parameters will change, but the basic functionality will not
 echo "DATE is ${DATE}"
@@ -110,6 +102,7 @@ echo "RUN_VFS_TEST is $RUN_VFS_TEST"
 echo "RUN_USERLIB_TEST is $RUN_USERLIB_TEST"
 echo "VMIPADDR is $VMIPADDR"
 echo "DELETE_INSTANCE is $DELETE_INSTANCE"
+echo "RUN_LOCAL is $RUN_LOCAL"
 
 
 export SVNBRANCH
@@ -126,8 +119,17 @@ export DELETE_INSTANCE
 SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 
 #Determine VM User from system
-if [ ! RUN_LOCAL ]
+if [ RUN_LOCAL ]
 then
+	uname -a | grep buntu && VMSYSTEM=cloud-ubuntu-12.04 
+	uname -a | grep el5 && VMSYSTEM=cloud-rhel5
+	uname -a | grep el6 && VMSYSTEM=cloud-rhel6
+	VMIPADDR=127.0.0.1
+	VMUSER=$USER
+	VFS_HOSTS=`hostname -s`
+	bash -s " < ./run-test.sh "
+fi
+else
 	case $VMSYSTEM in 
 
 		cloud-*buntu*|cloud-*mint*)
@@ -213,7 +215,6 @@ do
 	check_instance $i
 
 done
-fi
 
 echo ""
 echo "Running tests..."
@@ -226,6 +227,11 @@ echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
+
+fi
+
+
+
 
 # create link to latest logs so that buildbot can find them.
 rm `pwd`/logs-current
