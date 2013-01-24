@@ -187,8 +187,12 @@ struct PINT_client_create_sm
 
     PVFS_handle handles[2];
 
-    /* replication information */
+    /* replication information used in the create request */
     replication_s replication;
+
+    /* returned replication data */
+   int32_t total_number_of_replication_handles;
+   PVFS_handle *replication_handles;
 };
 
 struct PINT_client_mkdir_sm

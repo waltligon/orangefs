@@ -401,12 +401,25 @@ static int create_comp_fn(void *v_p,
            resp_p->u.create.datafile_count));
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
 
-    gossip_lerr("Looking at returned replication handles...\n");
-    gossip_err("total_number_of_replication_handles is %d.\n",resp_p->u.create.total_number_of_replication_handles);
-    for (i=0; i<resp_p->u.create.total_number_of_replication_handles; i++)
-        gossip_err("replication_handles[%d] is %llu.\n",i,llu(resp_p->u.create.replication_handles[i]));
 
-
+    /* if we have replication handles, store them with the frame */
+    if ( resp_p->u.create.total_number_of_replication_handles != 0 )
+    {
+       sm_p->u.create.total_number_of_replication_handles = resp_p->u.create.total_number_of_replication_handles;
+       sm_p->u.create.replication_handles = calloc(resp_p->u.create.total_number_of_replication_handles,
+                                                   sizeof(*resp_p->u.create.replication_handles));
+       if (!sm_p->u.create.replication_handles)
+       {
+          gossip_lerr("Error allocating memory.\n");
+          return -PVFS_ENOMEM;
+       }
+       memcpy(sm_p->u.create.replication_handles,resp_p->u.create.replication_handles,
+              sm_p->u.create.total_number_of_replication_handles * sizeof(*sm_p->u.create.replication_handles));
+       gossip_lerr("Looking at returned replication handles...\n");
+       gossip_err("total_number_of_replication_handles is %d.\n",sm_p->u.create.total_number_of_replication_handles);
+       for (i=0; i<sm_p->u.create.total_number_of_replication_handles; i++)
+           gossip_err("replication_handles[%d] is %llu.\n",i,llu(sm_p->u.create.replication_handles[i]));
+    }
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
