@@ -1036,6 +1036,11 @@ static int check_for_replication( struct PINT_smcb *smcb,
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
    uint32_t req_attr_mask = s_op->req->u.create.attr.mask;
 
+   if (!s_op->u.create.saved_error_code)
+   {
+      s_op->u.create.saved_error_code = js_p->error_code;
+   }
+
    js_p->error_code = 0;
 
    /* Is replication turned on? If on but file is being stuffed, then we can't replicate until 
@@ -1047,10 +1052,7 @@ static int check_for_replication( struct PINT_smcb *smcb,
        js_p->error_code = REPLICATION_IS_OFF;
    }
 
-   s_op->u.create.replication_number_of_copies = s_op->req->u.create.replication_number_of_copies;
-
    return SM_ACTION_COMPLETE;
-   
 }/*end check_for_replication*/
 
 
@@ -1060,10 +1062,9 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   uint32_t copies = s_op->u.create.replication_number_of_copies;
+   uint32_t copies = s_op->req->u.create.replication_number_of_copies;
    const char ***replication_servers_2d = NULL;
-   const char **replication_servers_1d = NULL;
-   int num_io_servers = s_op->u.create.num_io_servers;
+   int servers_per_copy = s_op->u.create.num_io_servers;
    const char **io_servers = s_op->u.create.io_servers;
 
    const char **remote_array = NULL;
@@ -1075,7 +1076,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    server_configuration_s *config = get_server_config_struct();
 
    int copy,server_num,i,j,ret;
-   int replication_count=num_io_servers*copies;
+   int replication_count=servers_per_copy*copies;
 
    job_id_t tmp_id;
 
@@ -1103,9 +1104,9 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
              goto err_out;
           }
 
-          for (i=0; i<num_io_servers; i++)
+          for (i=0; i<copies; i++)
           {
-              replication_servers_2d[i] = calloc(num_io_servers,sizeof(char *));
+              replication_servers_2d[i] = calloc(servers_per_copy,sizeof(char *));
               if ( !replication_servers_2d[i] )
               {
                  gossip_lerr("Error allocating memory");
@@ -1118,45 +1119,21 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
           /* load 2d array with the server names, in round-robin order */
           for (copy=0,server_num=1; copy<copies; copy++,server_num++)
           {
-              for (i=0; i<num_io_servers; i++)
+              for (i=0; i<servers_per_copy; i++)
               {
-                replication_servers_2d[copy][i] = io_servers[ (server_num+i)%num_io_servers ];
+                replication_servers_2d[copy][i] = io_servers[ (server_num+i)%servers_per_copy ];
               }
           }
 
           gossip_lerr("printing the replication servers...\n");
           for (copy=0; copy<copies; copy++)
           {
-             for (i=0; i<num_io_servers; i++)
+             for (i=0; i<servers_per_copy; i++)
              {
                 gossip_err("replication_servers[%d][%d]:%s.\n"
                           ,copy,i,replication_servers_2d[copy][i]);
              }
           }
-
-          /* Create linear list of replication servers for later calculations. */
-          replication_servers_1d = calloc(replication_count,sizeof(char *));
-          if (!replication_servers_1d)
-          {
-             gossip_lerr("Error allocating memory.\n");
-             js_p->error_code = -PVFS_ENOMEM;
-             goto err_out;
-          }
-
-          for (copy=0; copy<copies; copy++)
-          {
-             for (i=0; i<num_io_servers; i++)
-             {
-                replication_servers_1d[(copy*num_io_servers)+i] = replication_servers_2d[copy][i];
-             }
-          }
-
-          for (i=0; i<replication_count; i++)
-          {
-             gossip_err("replication_servers[%d]:%s.\n",i,replication_servers_1d[i]);
-          }
-
-          /* note to self: remember to update the response structure if no errors occur */
 
           break;
       }
@@ -1167,15 +1144,18 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    }/*end switch*/
 
    /* Now that we have a set of replication servers, how many of each, local or remote, do we have. */
-   for (i=0; i<replication_count; i++)
+   for (copy=0; copy<copies; copy++)
    {
-       if ( !strcmp(replication_servers_1d[i], config->host_id) )
+       for (i=0; i<servers_per_copy; i++)
        {
-          local_array_size++;
-       } 
-       else
-       {
-          remote_array_size++;
+           if ( !strcmp(replication_servers_2d[copy][i], config->host_id) )
+           {
+              local_array_size++;
+           }
+           else
+           {
+              remote_array_size++;
+           }
        }
    }
 
@@ -1190,14 +1170,16 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    }
 
    /* load remote replication servers */
-   for (i=0,j=0; i<replication_count; i++)
+   for (copy=0,j=0; copy<copies; copy++)
    {
-      if ( strcmp(replication_servers_1d[i], config->host_id) )
-      {
-          remote_array[j++] = replication_servers_1d[i];
-      }
+       for (i=0; i<servers_per_copy; i++)
+       {
+           if ( strcmp(replication_servers_2d[copy][i], config->host_id) )
+           {
+              remote_array[j++] = replication_servers_2d[copy][i];
+           }
+       }
    }
-
 
    gossip_lerr("Remote Array...\n");
    for (i=0; i<remote_array_size; i++)
@@ -1212,6 +1194,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    s_op->u.create.remote_replication_handle_count = remote_array_size;
    s_op->u.create.replication_servers_2d          = replication_servers_2d;
    s_op->u.create.replication_servers_count       = replication_count;
+   s_op->u.create.replication_number_of_copies    = copies;
 
    /* Do we need any local data handles? */
    if ( local_array_size == 0 )
@@ -1252,11 +1235,11 @@ err_out:
       free(remote_array);
    if (local_dh_array)
       free(local_dh_array);
-   if (replication_servers_1d)
-      free(replication_servers_1d); 
-   for (i=0; i<num_io_servers; i++)
+   for (i=0; i<copies; i++)
+   {
       if (replication_servers_2d[i])
          free(replication_servers_2d[i]);
+   }
    if (replication_servers_2d)
       free(replication_servers_2d);
 
@@ -1641,19 +1624,12 @@ static int analyze_replication_xattrs( struct PINT_smcb *smcb,
    /* cleanup allocated memory from subordinate frame*/
    free(xattr_op); 
 
-
    /* populate create response with replication_handles */
    if ( error_code == 0 )
    {
       s_op->resp.u.create.total_number_of_replication_handles = s_op->u.create.replication_servers_count;
       s_op->resp.u.create.replication_handles = s_op->u.create.replication_handles_1d;
    }
-   else
-   {  
-      s_op->resp.u.create.total_number_of_replication_handles = 0;
-      s_op->resp.u.create.replication_handles = NULL;
-   }
- 
 
   return SM_ACTION_COMPLETE;
 
@@ -1790,27 +1766,19 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
        return;
     }
 
-    gossip_err("#1\n");
-
     for (i=0; key && val && i<*nkey; i++)
     {
         gossip_err("i is %d.\n",i);
         if (key[i].buffer)
         {
            free(key[i].buffer);
-           key[i].buffer = NULL;
         }
         if (val[i].buffer)
         {
-           gossip_err("val[%d].buffer : %p\n",i,val[i].buffer);
            free(val[i].buffer);
-           val[i].buffer = NULL;
-           gossip_err("val[%d].buffer : %p\n",i,val[i].buffer);
         }
     }
        
-    gossip_err("#2\n");
-
     if (key)
     {
         free(key);
@@ -1828,8 +1796,6 @@ static inline void cleanup_keyval_pairs(int *nkey, PVFS_ds_keyval *key, PVFS_ds_
         error=NULL;
     }
 
-
-    gossip_err("#3\n");
     *nkey=0;
 
     return;
