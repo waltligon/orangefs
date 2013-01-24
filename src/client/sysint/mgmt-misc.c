@@ -128,6 +128,8 @@ PVFS_error PVFS_mgmt_setparam_all(
 	return ret;
     }
 
+    gossip_lerr("number of servers is %d.\n",count);
+
     addr_array = (PVFS_BMI_addr_t *)malloc(
         (count * sizeof(PVFS_BMI_addr_t)));
     if (addr_array == NULL)

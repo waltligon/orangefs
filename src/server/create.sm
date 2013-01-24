@@ -1210,7 +1210,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
    if (ret < 0)
    {
       js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
+      goto err_out;
    }
 
 
