@@ -44,6 +44,33 @@ machine pvfs2_pjmp_seteattr_fast_sm
 }
 
 
+machine pvfs2_pjmp_set_attr_work_sm
+{
+    state pjmp_set_attr_work_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_prelude_sm;
+    }
+
+    state pjmp_call_prelude_sm
+    {
+        jump pvfs2_prelude_sm;
+        default => pjmp_call_set_attr_work_sm;
+    }
+
+    state pjmp_call_set_attr_work_sm
+    {
+        jump pvfs2_set_attr_work_sm;
+        default => pjmp_set_attr_work_execute_terminate;
+    }
+
+    state pjmp_set_attr_work_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
 machine pvfs2_pjmp_get_attr_work_sm
 {
     state pjmp_get_attr_work_initialize

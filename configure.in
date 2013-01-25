@@ -243,26 +243,53 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
+dnl locate OpenSSL libraries
 AX_OPENSSL
 
 dnl check to see if the "fast" getgrouplist function is available
 AX_GETGROUPLIST
 
-AC_ARG_ENABLE(security,
-[  --enable-security       Enables robust security features],
+dnl check for key-based security
+AC_ARG_ENABLE(security-key,
+[  --enable-security-key   Enables key-based security],
 [if test "x$enableval" = "xyes" ; then
-    ENABLE_SECURITY=1
-    AC_DEFINE(ENABLE_SECURITY, 1, Define if robust security is enabled)
+    ENABLE_SECURITY_KEY=1
+    AC_DEFINE(ENABLE_SECURITY_KEY, 1, Define if key-based security is enabled)
 else
-    ENABLE_SECURITY=
+    ENABLE_SECURITY_KEY=
 fi],
-[ENABLE_SECURITY=]
+[ENABLE_SECURITY_KEY=]
 )
-AC_SUBST(ENABLE_SECURITY)
+AC_SUBST(ENABLE_SECURITY_KEY)
+
+dnl check for cert-based-security 
+AC_ARG_ENABLE(security-cert,
+[  --enable-security-cert  Enables certificate-based security],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY_CERT=1
+    AC_DEFINE(ENABLE_SECURITY_CERT, 1, Define if certificate-based security is enabled)
+else
+    ENABLE_SECURITY_CERT=
+fi],
+[ENABLE_SECURITY_CERT=]
+)
+AC_SUBST(ENABLE_SECURITY_CERT)
+
+if test "x$ENABLE_SECURITY_KEY" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x1"; then
+    AC_MSG_ERROR([Only one of --enable-security-key and --enable-security-cert may be used])
+fi
 
 dnl OpenSSL is required for robust security
-if test "x$ENABLE_SECURITY" = "x1" && test "x$OPENSSL_CPPFLAGS" = "x"; then
-    AC_MSG_ERROR("OpenSSL required for robust security (use --with-ssl)")
+if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) -a "x$OPENSSL_CPPFLAGS" = "x"; then
+    AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
+fi
+
+dnl locate LDAP libraries
+AX_LDAP
+
+dnl certificate security requires LDAP
+if test "x$ENABLE_SECURITY_CERT" = "x1" -a "x$LDAP_LIB" = "x"; then
+    AC_MSG_ERROR([OpenLDAP required for certificate-based security (use --with-ldap)])
 fi
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
@@ -1563,10 +1590,16 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
-if test "x$ENABLE_SECURITY" = "x1"; then
-   AC_MSG_RESULT([PVFS2 configured with robust security             : yes])
+if test "x$ENABLE_SECURITY_KEY" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with key-based security          : yes])
 else
-   AC_MSG_RESULT([PVFS2 configured with robust security             :  no])
+   AC_MSG_RESULT([PVFS2 configured with key-based security          :  no])
+fi
+
+if test "x$ENABLE_SECURITY_CERT" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with certificate-based security  : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with certificate-based security  :  no])
 fi
 
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then

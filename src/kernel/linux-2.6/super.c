@@ -1060,7 +1060,11 @@ struct super_block* pvfs2_get_sb(
         ret = -ENOMEM;
         goto error_exit;
     }
+#ifdef HAVE_D_SET_D_OP
+    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
+#else
     root_dentry->d_op = &pvfs2_dentry_operations;
+#endif
     sb->s_root = root_dentry;
 
     /* finally, add this sb to our list of known pvfs2 sb's */
@@ -1145,7 +1149,11 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
    }
 #endif
 
+#ifdef HAVE_D_SET_D_OP
+   d_set_d_op(dentry, &pvfs2_dentry_operations);
+#else
    dentry->d_op = &pvfs2_dentry_operations;
+#endif
    return dentry;
 }
 #endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
@@ -1290,7 +1298,11 @@ int pvfs2_fill_sb(
         iput(root);
         return -ENOMEM;
     }
+#ifdef HAVE_D_SET_D_OP
+    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
+#else
     root_dentry->d_op = &pvfs2_dentry_operations;
+#endif
 
     sb->s_export_op = &pvfs2_export_ops;
     sb->s_root = root_dentry;

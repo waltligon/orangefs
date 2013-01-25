@@ -1,4 +1,4 @@
-#!/bin/sh  
+#/bin/sh  
 #
 # requires: 
 #  cvs (if pulling from CVS
@@ -12,7 +12,11 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma"
+with_db_arg=""
+if [ $WITH_DB ] ; then
+	with_db_arg=--with-db=$WITH_DB
+fi
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma $with_db_arg"
 
 
 #
@@ -43,12 +47,23 @@ get_dist() {
 # pulls from CVS the tag or branch specified by the first argument.  returns
 # nonzero on error.
 get_cvs() {
-	cvs -Q -d $cvsroot co -r $1 pvfs2 
+	#cvs -Q -d $cvsroot co -r $1 pvfs2 
+	
+	echo "Current directory is `pwd`"
+	svn export --force -q http://www.orangefs.org/svn/orangefs/$1/
 	if [ $? -ne 0 ] ; then
-		echo "Pulling PVFS2 from $cvsroot failed."
+		echo "Pulling PVFS2 from http://www.orangefs.org/svn/orangefs/$1/ failed."
 		exit 1
 	fi
-	mv pvfs2 pvfs2-$1
+	#ls -l 
+	
+	#mv pvfs2 pvfs2-$1
+	#split off last element in path
+	BRANCH=`echo $1 | awk -F"/" '{print $NF}'`
+	
+	echo "Branch is ${BRANCH}"
+	
+	mv $BRANCH pvfs2-$BRANCH
 }
 
 # end of user defines
@@ -67,7 +82,8 @@ usage()
     echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
-    echo "  -s: enable security"
+    echo "  -s: build with key-based security"
+    echo "  -c: build with certificate-based security"
     echo "  -t: build test programs"
     echo "  -v: name of tag or branch in CVS"
     echo ""
@@ -76,27 +92,38 @@ usage()
 }
 
 # get command line arguments
-while getopts k:r:stv: opt
+while getopts k:r:cstv: opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
-        s) enablesecurity="true";;
+	c) enable_certs="true";;
+	s) enable_keys="true";;
 	t) build_tests="true";;
-	v) cvs_tag="$OPTARG";;
+	v) full_cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
     esac
 done   
 
 echo "PVFS2 will be built in ${rootdir}."
 
+#cvs tag is final element of full cvs tag
+cvs_tag=`echo $full_cvs_tag | awk -F"/" '{print $NF}'`
+
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
 fi
 
-if [ "$enablesecurity" = "true" ]
+if [ "$enable_keys" = "true" ]
 then
-    configureopts="${configureopts} --enable-security"
+	configureopts="${configureopts} --enable-security-key"
+fi
+
+if [ "$enable_certs" = "true" ]
+then
+# TODO
+	echo "certificate support not yet implemented"
+	exit 1
 fi
 
 date=`date "+%Y-%m-%d-%H-%M"`
@@ -116,18 +143,21 @@ rm -rf $rootdir/pvfs2
 cd $rootdir
 
 # could make this some sort of command line option... 
-get_cvs $cvs_tag || exit 1
+get_cvs $full_cvs_tag || exit 1
 
 
 # create build and install directories, configure
 mkdir $builddir
 mkdir $installdir
+cd $srcdir
+$srcdir/prepare
 cd $builddir
+#ls $srcdir
 if [ $build_kernel = "true" ] ; then
-	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
+	$srcdir/configure $configureopts  --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all"
 fi
 

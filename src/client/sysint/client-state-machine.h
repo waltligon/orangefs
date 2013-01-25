@@ -108,6 +108,12 @@ typedef struct PINT_sm_getattr_state
 
     PVFS_ds_type ref_type;
 
+    /* used with sys-readdir to get dirent_count of all dirdata handles,
+     * will be set to 0 in PINT_SM_GETATTR_STATE_FILL,
+     * now only used with sys-readdir.sm */
+    int keep_size_array;
+    int *active_dirdata_index;
+
     PVFS_size * size_array;
     PVFS_size size;
 
@@ -123,6 +129,7 @@ typedef struct PINT_sm_getattr_state
         (_state).req_attrmask = _mask; \
         (_state).ref_type = _reftype; \
         (_state).flags = _flags; \
+        (_state).keep_size_array = 0; \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
@@ -185,6 +192,9 @@ struct PINT_client_create_sm
     int stuffed;
     PVFS_object_attr store_attr;
 
+    int dirent_file_count;
+    PVFS_handle *dirent_handle;
+
     PVFS_handle handles[2];
 
     /* replication information used in the create request */
@@ -207,6 +217,11 @@ struct PINT_client_mkdir_sm
     int stored_error_code;
     PVFS_handle metafile_handle;
     PINT_sm_getattr_state metafile_getattr;
+
+    /* keep first */
+    PINT_dist *dist;
+    PVFS_sys_layout layout;
+    int num_dirent_files;
 };
 
 struct PINT_client_symlink_sm
@@ -343,9 +358,12 @@ struct PINT_client_flush_sm
 
 struct PINT_client_readdir_sm
 {
-    PVFS_ds_position pos_token;         /* input parameter */
+    PVFS_ds_position pos_token;         /* in/out parameter */
     int dirent_limit;                   /* input parameter */
+    int dirdata_index;                  /* in/out parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
+
+    int num_dirdata_needed; /* tmp parameter */
 };
 
 struct handle_to_index {
@@ -358,7 +376,7 @@ struct PINT_client_readdirplus_sm
 {
     PVFS_ds_position pos_token;         /* input parameter */
     int dirent_limit;                   /* input parameter */
-    int attrmask;                       /* input parameter */
+    uint32_t attrmask;                    /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
     /* scratch variables */
     int nhandles;  
@@ -425,6 +443,7 @@ struct PINT_client_rename_sm
     PVFS_object_ref refns[2];        /* old/new object refns */
     PVFS_ds_type types[2];           /* old/new object types */
     PVFS_capability caps[2];         /* old/new capabilities */
+    PVFS_handle dirent_handle[2];    /* old/new dirent handles for parent dirs */
     int retry_count;
     int stored_error_code;
     int rmdirent_index;
@@ -494,6 +513,12 @@ struct PINT_client_mgmt_get_dfile_array_sm
     int dfile_count;
 };
 
+struct PINT_client_mgmt_get_dirdata_array_sm
+{
+    PVFS_handle *dirdata_array;
+    int dirdata_count;
+};
+
 struct PINT_client_truncate_sm
 {
     PVFS_size size; /* new logical size of object*/
@@ -534,6 +559,18 @@ struct PINT_client_seteattr_sm
                       if they should exist (XATTR_REPLACE) or neither */
     PVFS_ds_keyval *key_array;
     PVFS_ds_keyval *val_array;
+};
+
+struct PINT_client_atomiceattr_sm
+{
+    int32_t nkey;
+    int32_t flags; /* flags specify if attrs should not exist (XATTR_CREATE) or
+                      if they should exist (XATTR_REPLACE) or neither */
+    int32_t opcode;
+    PVFS_ds_keyval *key_array;
+    PVFS_size *size_array;
+    PVFS_sysresp_geteattr *resp_p;
+    PVFS_ds_keyval *val_array;    
 };
 
 struct PINT_client_deleattr_sm
@@ -582,8 +619,9 @@ typedef struct
     uint32_t      *dirent_outcount;
     PVFS_ds_position *token;
     uint64_t         *directory_version;
-    PVFS_ds_position pos_token;     /* input parameter */
+    PVFS_ds_position pos_token;     /* input/output parameter */
     int32_t      dirent_limit;      /* input parameter */
+    int32_t      dirdata_index;      /* input parameter */
 } PINT_sm_readdir_state;
 
 typedef struct PINT_client_sm
@@ -607,7 +645,8 @@ typedef struct PINT_client_sm
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
     /* generic dirent array used by both readdir and readdirplus state machines */
-    PINT_sm_readdir_state readdir;
+    PINT_sm_readdir_state readdir_state;
+    struct PINT_client_readdir_sm readdir;
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
@@ -631,7 +670,6 @@ typedef struct PINT_client_sm
         struct PINT_client_setattr_sm setattr;
         struct PINT_client_io_sm io;
         struct PINT_client_flush_sm flush;
-        struct PINT_client_readdir_sm readdir;
         struct PINT_client_readdirplus_sm readdirplus;
         struct PINT_client_lookup_sm lookup;
         struct PINT_client_rename_sm rename;
@@ -642,12 +680,14 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
         struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
         struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
+        struct PINT_client_mgmt_get_dirdata_array_sm get_dirdata_array;
         struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
         struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
         struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
         struct PINT_server_get_config_sm get_config;
         struct PINT_client_geteattr_sm geteattr;
         struct PINT_client_seteattr_sm seteattr;
+        struct PINT_client_atomiceattr_sm atomiceattr;
         struct PINT_client_deleattr_sm deleattr;
         struct PINT_client_listeattr_sm listeattr;
         struct PINT_client_perf_count_timer_sm perf_count_timer;
@@ -738,6 +778,7 @@ enum
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
+    PVFS_SYS_ATOMICEATTR           = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -750,15 +791,16 @@ enum
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_GET_UID_LIST         = 81, 
+    PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
     PVFS_DEV_UNEXPECTED            = 400
 };
 
-#define PVFS_OP_SYS_MAXVALID  21
+#define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
-#define PVFS_OP_MGMT_MAXVALID 82
+#define PVFS_OP_MGMT_MAXVALID 83
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
@@ -857,11 +899,13 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_create_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_atomic_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_uid_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_array_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

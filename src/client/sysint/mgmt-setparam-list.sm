@@ -117,13 +117,6 @@ PVFS_error PVFS_imgmt_setparam_list(
     sm_p->u.setparam_list.count = count;
     sm_p->u.setparam_list.details = details;
 
-    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, count);
-    if(ret != 0)
-    {
-        PINT_smcb_free(smcb);
-        return ret;
-    }
-
     if (sm_p->u.setparam_list.root_check_status_array)
     {
         free(sm_p->u.setparam_list.root_check_status_array);
@@ -215,11 +208,11 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
                  "mgmt_setparam_list_setup_msgpair\n");
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
-                                 sm_p->u.setparam_list.count);
-    if (ret != 0)
+                                  sm_p->u.setparam_list.count);
+    if(ret != 0)
     {
-       js_p->error_code = ret;
-       return SM_ACTION_COMPLETE;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     /* setup msgpair array */

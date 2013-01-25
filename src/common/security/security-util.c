@@ -16,6 +16,7 @@
 #include "gossip.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "server-config.h"
 
 /* PINT_print_op_mask
  *
@@ -188,6 +189,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 {
     char sig_buf[10], mask_buf[10]; 
+    int i;
 
     assert(cap);
 
@@ -211,7 +213,11 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
                  cap->num_handles);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %llu\n",
                  cap->num_handles > 0 ? llu(cap->handle_array[0]) : 0LL);
-
+    for (i = 1; i < cap->num_handles; i++)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "\thandle %d: %llu\n",
+                     i+1, llu(cap->handle_array[i]));
+    }
 }
 
 /* PINT_cleanup_capability
@@ -300,6 +306,9 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     dest->issuer = NULL;
     dest->signature = NULL;
     dest->group_array = NULL;
+#ifdef ENABLE_SECURITY_CERT
+    dest->certificate.buf = NULL;
+#endif
 
     dest->issuer = strdup(src->issuer);
     if (!dest->issuer)
@@ -330,7 +339,26 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
         memcpy(dest->group_array, src->group_array,
                src->num_groups * sizeof(PVFS_gid));
     }
-    
+
+#ifdef ENABLE_SECURITY_CERT
+    if (src->certificate.buf_size)
+    {
+        dest->certificate.buf = malloc(src->certificate.buf_size);
+        if (!dest->certificate.buf)
+        {
+            free(dest->signature);
+            free(dest->issuer);
+            if (dest->group_array)
+            {
+                free(dest->group_array);
+            }
+            return -PVFS_ENOMEM;
+        }
+        memcpy(dest->certificate.buf, src->certificate.buf, 
+               src->certificate.buf_size);
+    }
+#endif /* ENABLE_SECURITY_CERT */
+
     return 0;
 }
 
@@ -339,21 +367,36 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
  * Outputs the fields of a credential.
  * Set prefix to descriptive text.
  */
-void PINT_debug_credential(const PVFS_credential *cred, const char *prefix)
+void PINT_debug_credential(const PVFS_credential *cred,
+                           const char *prefix,
+                           PVFS_uid uid,
+                           uint32_t num_groups,
+                           const PVFS_gid *group_array)
 {
-    char sig_buf[10], group_buf[512], temp_buf[16];
+    char group_buf[512], temp_buf[16];
     unsigned int i, buf_left, count;
-
+#ifdef ENABLE_SECURITY_CERT 
+    uint32_t local_num_groups = num_groups;
+    const PVFS_gid *local_group_array = group_array;
+#else
+    uint32_t local_num_groups = cred->num_groups;
+    const PVFS_gid *local_group_array = cred->group_array;
+#endif
     assert(cred);
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s:\n", prefix);
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cred->issuer);
+#ifdef ENABLE_SECURITY_CERT
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tuserid (mapped): %u\n", uid);
+#else
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tuserid: %u\n", cred->userid);
+#endif
+
     /* output groups */
-    for (i = 0, group_buf[0] = '\0', buf_left = 512; i < cred->num_groups; i++)
+    for (i = 0, group_buf[0] = '\0', buf_left = 512; i < local_num_groups; i++)
     {
-        count = sprintf(temp_buf, "%u ", cred->group_array[i]);
+        count = sprintf(temp_buf, "%u ", local_group_array[i]);
         if (count > buf_left)
         {
             break;
@@ -361,12 +404,22 @@ void PINT_debug_credential(const PVFS_credential *cred, const char *prefix)
         strcat(group_buf, temp_buf);
         buf_left -= count;
     }
+#ifdef ENABLE_SECURITY_CERT
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tgroups (mapped): %s\n", group_buf);
+#else
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tgroups: %s\n", group_buf);
+#endif
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cred->sig_size);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
-                 PINT_util_bytes2str(cred->signature, sig_buf, 4));
+                 PINT_util_bytes2str(cred->signature, temp_buf, 4));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n", 
                  (int) cred->timeout);
+#ifdef ENABLE_SECURITY_CERT
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tcertificate.buf_size: %u\n",
+                 cred->certificate.buf_size);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tcertificate.buf: %s\n",
+                 PINT_util_bytes2str(cred->certificate.buf, temp_buf, 4));
+#endif
 
 }
 
@@ -397,6 +450,16 @@ void PINT_cleanup_credential(PVFS_credential *cred)
         cred->issuer = NULL;
         cred->signature = NULL;
         cred->sig_size = 0;
+
+#ifdef ENABLE_SECURITY_CERT
+       if (cred->certificate.buf)
+       {
+           free(cred->certificate.buf);
+       }
+       cred->certificate.buf = NULL;
+       cred->certificate.buf_size = 0;
+#endif
+
     }
 }
 

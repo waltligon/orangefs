@@ -131,7 +131,7 @@ PVFS_error PVFS_isys_readdirplus(
         return ret;
     }
 
-    if (pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT)
+    if (pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS)
     {
         gossip_lerr("PVFS_isys_readdirplus unable to handle request "
                     "for %d entries.\n", pvfs_dirent_incount);
@@ -154,13 +154,14 @@ PVFS_error PVFS_isys_readdirplus(
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     /* point the sm dirent array and outcount to the readdirplus response field */
-    sm_p->readdir.dirent_array = &resp->dirent_array;
-    sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
-    sm_p->readdir.token = &resp->token;
-    sm_p->readdir.directory_version = &resp->directory_version;
+    sm_p->readdir_state.dirent_array = &resp->dirent_array;
+    sm_p->readdir_state.dirent_outcount = &resp->pvfs_dirent_outcount;
+    sm_p->readdir_state.token = &resp->token;
+    sm_p->readdir_state.directory_version = &resp->directory_version;
 
-    sm_p->readdir.pos_token = sm_p->u.readdirplus.pos_token = token;
-    sm_p->readdir.dirent_limit = sm_p->u.readdirplus.dirent_limit = pvfs_dirent_incount;
+    sm_p->readdir_state.pos_token = sm_p->readdir.pos_token =
+              sm_p->u.readdirplus.pos_token = token;
+    sm_p->readdir_state.dirent_limit = sm_p->u.readdirplus.dirent_limit = pvfs_dirent_incount;
     /* We store the object attr mask in the sm structure */
     sm_p->u.readdirplus.attrmask = PVFS_util_sys_to_object_attr_mask(attrmask);
     sm_p->u.readdirplus.readdirplus_resp = resp;

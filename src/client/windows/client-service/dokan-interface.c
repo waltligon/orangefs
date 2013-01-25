@@ -1568,6 +1568,10 @@ static int add_dir_entries(
     return 0;
 }
 
+/* max files per request - based on PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS in 
+   pvfs2-req-proto.h */
+#define PVFS2_FIND_FILES_MAX    60
+
 static int __stdcall
 PVFS_Dokan_find_files_with_pattern(
     LPCWSTR          PathName,
@@ -1598,8 +1602,8 @@ PVFS_Dokan_find_files_with_pattern(
     if (fs_path == NULL)
         return -1;
 
-    /* TODO: make configurable */
-    incount = 256;
+    /* max files per request */
+    incount = PVFS2_FIND_FILES_MAX;
 
     /* allocate filename buffers */
     filename_array = (char **) malloc(incount * sizeof(char *));

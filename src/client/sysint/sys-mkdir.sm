@@ -26,13 +26,16 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-dist-simple-stripe.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
 enum
 {
     MKDIR_RETRY = 180,
-    MKDIR_SKIP_EATTR = 181
+    MKDIR_SKIP_EATTR = 181,
+    CRDIRENT_RETRY = 182
 };
 
 static int mkdir_msg_comp_fn(
@@ -137,9 +140,17 @@ machine pvfs2_client_mkdir_sm
     state mkdir_crdirent_failure
     {
         run mkdir_crdirent_failure;
+        success => mkdir_crdirent_retry_getattr;
         default => delete_handle_setup_msgpair;
     }
 
+    state mkdir_crdirent_retry_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => mkdir_crdirent_setup_msgpair;
+        default => mkdir_crdirent_failure;
+    }   
+    
     state delete_handle_setup_msgpair
     {
         run mkdir_delete_handle_setup_msgpair;
@@ -223,6 +234,9 @@ PVFS_error PVFS_isys_mkdir(
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
+/* TODO: For now, just use round robin layout. */
+    sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
                  "under parent handle %llu on fs %d\n", object_name,
                  llu(parent_ref.handle), parent_ref.fs_id);
@@ -283,7 +297,8 @@ static PINT_sm_action mkdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY), 
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+            PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR), 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -363,7 +378,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req, "
+            "[num_dirent_files=%d]\n", sm_p->u.mkdir.num_dirent_files);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -386,6 +402,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
         sm_p->u.mkdir.sys_attr,
+        sm_p->u.mkdir.num_dirent_files,
+        sm_p->u.mkdir.layout,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
@@ -413,18 +431,36 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.mkdir.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.mkdir.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index =
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%llu) under "
-                 "parent handle %llu\n", sm_p->u.mkdir.object_name,
+                 "parent handle %llu, dirdata_handle %llu with server_no=%d\n",
+                 sm_p->u.mkdir.object_name,
                  llu(sm_p->u.mkdir.metafile_handle),
-                 llu(sm_p->object_ref.handle));
+                 llu(sm_p->object_ref.handle),
+                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]),
+                 dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -432,19 +468,23 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
+        *sm_p->cred_p,
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    /* send to dirdata server */
+    msg_p->handle =
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->object_ref.handle,
+        &msg_p->svr_addr, msg_p->handle,
         sm_p->object_ref.fs_id);
 
     if (ret)
@@ -461,6 +501,28 @@ static PINT_sm_action mkdir_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
@@ -499,6 +561,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
+        *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.mkdir.metafile_handle,
         sm_p->hints);
@@ -537,6 +600,7 @@ static PINT_sm_action mkdir_cleanup(
     }
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
+    PINT_free_object_attr(&sm_p->getattr.attr);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metafile_getattr);
     
@@ -591,14 +655,24 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
+    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: parent_getattr_inspect\n");
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
-        (int)attr->owner, (int)attr->group, (int)attr->perms);
+    /* !!! change later */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+        "parent owner: %d, group: %d, perms: %d, dirdata_server_count: %d\n",
+        (int)attr->owner, (int)attr->group, (int)attr->perms,
+        attr->u.dir.dist_dir_attr.num_servers);
+    for (i = 0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "                           dirdata_handle[%d] = %llu\n",
+                     i, llu(attr->u.dir.dirdata_handles[i]));
+    }
 
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)
@@ -609,6 +683,17 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
         sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
         /* note that permission checking is left to server even in this case */
     }
+
+    /* set value of num_dirent_files,
+     * not considering parent_# since it doesn't have direct relation.
+     * here, if user has inputs, send it, otherwise, send 0. 
+     * on server side, if met 0, use config_file data, otherwise use user set value   */
+
+    /* get command line value of NumDirdata from sys_attr */
+    sm_p->u.mkdir.num_dirent_files = sm_p->u.mkdir.sys_attr.dirdata_count;
+
+
+    /* note: if select less # of dirdata servers, need to modify getattr, etc. to contact only active servers, not all dirdata servers */
 
     return SM_ACTION_COMPLETE;
 }

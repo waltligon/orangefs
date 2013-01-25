@@ -412,6 +412,7 @@ typedef struct
 
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
+#define PVFS_ATTR_SYS_DISTDIR_ATTR          (1 << 21)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
@@ -438,16 +439,19 @@ typedef struct
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
@@ -541,6 +545,38 @@ endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
     PVFS_handle, handle);
+
+/* Distributed directory attributes struct
+ * will be stored in keyval space under DIST_DIR_ATTR
+ */
+typedef struct {
+        /* global info */
+        int32_t tree_height; /* ceil(log2(num_servers)) */
+        int32_t num_servers; /* total number of servers */
+        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype stored under the key DIST_DIR_BITMAP */
+        int32_t split_size; /* maximum number of entries before a split */
+
+        /* local info */
+        int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
+        int32_t branch_level; /* level of branching on this server */
+} PVFS_dist_dir_attr;
+endecode_fields_6(
+    PVFS_dist_dir_attr,
+    int32_t, tree_height,
+    int32_t, num_servers,
+    int32_t, bitmap_size,
+    int32_t, split_size,
+    int32_t, server_no,
+    int32_t, branch_level);
+
+typedef uint32_t PVFS_dist_dir_bitmap_basetype;
+typedef uint32_t *PVFS_dist_dir_bitmap;
+typedef uint64_t PVFS_dist_dir_hash_type;
+
+#define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
+#define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
+#define encode_PVFS_dist_dir_hash_type encode_uint64_t
+#define decode_PVFS_dist_dir_hash_type decode_uint64_t
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.
@@ -745,6 +781,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ESECURITY  (9|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -867,6 +904,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
     "Path contains non-PVFS elements",                \
+    "Security error",                                 \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -878,6 +916,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
     PVFS_ENOTPVFS,  /* 8 */                           \
+    PVFS_ESECURITY, /* 9 */                           \
 }
 
 /*
@@ -1005,10 +1044,28 @@ struct profiler
  * New types for robust security implementation.
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
-#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
+#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
+
+typedef unsigned char *PVFS_cert_data;
+
+/* PVFS_certificate simply stores a buffer with the buffer size.
+   The buffer can be converted to an OpenSSL X509 struct for use. */
+typedef struct PVFS_certificate PVFS_certificate;
+struct PVFS_certificate
+{
+    uint32_t buf_size;
+    PVFS_cert_data buf;
+};
+endecode_fields_1a_struct (
+    PVFS_certificate,
+    skip4,,
+    uint32_t, buf_size,
+    PVFS_cert_data, buf);
+#define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
 
 typedef unsigned char *PVFS_signature;
 
+/* A capability defines permissions for a set of handles. */
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability
 {
@@ -1037,6 +1094,8 @@ endecode_fields_3a2a_struct (
                                     PVFS_REQ_LIMIT_ISSUER        + \
                                     PVFS_REQ_LIMIT_SIGNATURE)
 
+/* A credential identifies a user and is signed by the client/user 
+   private key. */
 typedef struct PVFS_credential PVFS_credential;
 struct PVFS_credential 
 {
@@ -1047,8 +1106,9 @@ struct PVFS_credential
     PVFS_time timeout;         /* seconds after epoch to time out */
     uint32_t sig_size;         /* length of the signature in bytes */
     PVFS_signature signature;  /* digital signature */
+    PVFS_certificate certificate; /* user certificate buffer */
 };
-endecode_fields_3a2a_struct (
+endecode_fields_3a2a1_struct (
     PVFS_credential,
     skip4,,
     skip4,,
@@ -1058,17 +1118,20 @@ endecode_fields_3a2a_struct (
     string, issuer,
     PVFS_time, timeout,
     uint32_t, sig_size,
-    PVFS_signature, signature);
+    PVFS_signature, signature,
+    PVFS_certificate, certificate);
 #define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
                                     sizeof(PVFS_gid)         + \
                                     PVFS_REQ_LIMIT_ISSUER    + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
+                                    PVFS_REQ_LIMIT_SIGNATURE + \
+                                    extra_size_PVFS_certificate)
 
 /* 
  * NOTE: for backwards compatibility only. 
  * For all new code use PVFS_credential.
  */
 typedef PVFS_credential PVFS_credentials;
+
 
 #endif /* __PVFS2_TYPES_H */
 

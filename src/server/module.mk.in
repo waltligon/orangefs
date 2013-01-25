@@ -42,13 +42,17 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-dirdata-handle.c \
 		$(DIR)/get-eattr.c \
 		$(DIR)/set-eattr.c \
+		$(DIR)/atomic-eattr.c \
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
 		$(DIR)/precreate-pool-refiller.c \
 		$(DIR)/unstuff.c \
-        $(DIR)/tree-communicate.c \
-		$(DIR)/mgmt-get-uid.c
+                $(DIR)/tree-communicate.c \
+		$(DIR)/mgmt-get-uid.c \
+                $(DIR)/mgmt-get-dirent.c \
+                $(DIR)/mgmt-create-root-dir.c \
+                $(DIR)/mgmt-split-dirent.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

@@ -16,6 +16,7 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 #include "check.h"
+#include "pint-uid-map.h"
 #include "security-util.h"
 
 /* prelude state machine:
@@ -423,16 +424,28 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL && cred != NULL)
     {
-        PVFS_uid translated_uid;
-        PVFS_gid translated_gid;
+        PVFS_uid uid, translated_uid;
+        PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS], translated_gid;
+        uint32_t num_groups;
+        
+        /* map the credential */
+        ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+
+            return SM_ACTION_COMPLETE;
+        }
 
         /* Translate the uid and gid's in case we need to do some squashing 
          * based on the export and the client address
          */
-        if (translate_ids(s_op->target_fs_id, cred->userid, 
-                          cred->group_array[0], &translated_uid, 
+        /* TODO: testing */
+        if (translate_ids(s_op->target_fs_id, uid, 
+                          group_array[0], &translated_uid, 
                           &translated_gid, s_op->addr) == 1)
         {
+            /* TODO: not applicable to certificates */
             /* modify the credential. doesn't support secondary groups */
             cred->userid = translated_uid;
             cred->group_array[0] = translated_gid;
@@ -449,7 +462,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
             }
-            
+
+            /* TODO: this needs to be reworked */
             /* certain requests rely on the request attributes having the
              * same uid/gid as the client 
              */
@@ -484,7 +498,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                      "Capability (%s) from %s failed verification.\n",
                      PINT_util_bytes2str(s_op->req->capability.signature,
                                          sig_buf, 4),
-                     cred->issuer);
+                     s_op->req->capability.issuer);
 
         /* have client try again on timeout */
         if (PINT_util_get_current_time() >= s_op->req->capability.timeout)

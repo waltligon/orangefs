@@ -29,6 +29,7 @@
 #include "pvfs2-dist-varstrip.h"
 #include "replication-common-utils.h"
 #include "replication-client-utils.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -105,9 +106,17 @@ machine pvfs2_client_create_sm
     state crdirent_failure
     {
         run create_crdirent_failure;
+        success => crdirent_getattr;
         default => delete_handles_setup_msgpair_array;
     }
 
+    state crdirent_getattr
+    {   
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => crdirent_failure;
+    }              
+        
     state delete_handles_setup_msgpair_array
     {
         run create_delete_handles_setup_msgpair_array;
@@ -171,9 +180,9 @@ PVFS_error PVFS_isys_create(
         ((attr.dfile_count < 1) ||
          (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
     {
-	gossip_err("Error: invalid number of datafiles (%d) specified "
+        gossip_err("Error: invalid number of datafiles (%d) specified "
                    "in PVFS_sys_create().\n", (int)attr.dfile_count);
-	return ret;
+        return ret;
     }
 
     if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
@@ -190,7 +199,7 @@ PVFS_error PVFS_isys_create(
 
     if (attr.group != credential->group_array[0])
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group uid %d with %d "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }
@@ -348,21 +357,32 @@ static PINT_sm_action create_init(
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
-
     if (js_p->error_code == CREATE_RETRY)
     {
         js_p->error_code = 0;
 
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
         return job_req_sched_post_timer(
             sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
-    }    
+    }
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+        PVFS_TYPE_DIRECTORY,
+        0);
 
    return SM_ACTION_COMPLETE;
 }
@@ -519,18 +539,34 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: encrypt dirent %s into hash value %llu.\n",                         
+            sm_p->u.create.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
+            dirdata_server_index);
+        
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: %s: posting crdirent req: parent handle: %llu, "
-                 "name: %s, handle: %llu\n",
+                 "name: %s, handle: %llu, dirdata_handle: %llu\n",
                  __func__,
                  llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
-                 llu(sm_p->u.create.metafile_handle));
+                 llu(sm_p->u.create.metafile_handle),
+                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));       
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -538,19 +574,23 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
+        *sm_p->cred_p,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    /* send to dirdata server */
+    msg_p->handle =
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->object_ref.handle,
+        &msg_p->svr_addr, msg_p->handle,
         sm_p->object_ref.fs_id);
 
     if (ret)
@@ -568,6 +608,27 @@ static PINT_sm_action create_crdirent_failure(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
+
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
 
     sm_p->u.create.stored_error_code = js_p->error_code;
 
@@ -684,6 +745,12 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.datafile_handles = NULL;
     }
 
+    if(sm_p->u.create.dirent_handle)
+    {
+        free(sm_p->u.create.dirent_handle);
+        sm_p->u.create.dirent_handle = NULL;
+    }
+
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
@@ -700,6 +767,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     PVFS_object_attr *attr = NULL;
     int ret = 0;
     int num_dfiles_requested = 0;
+    int tmp_i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 
@@ -718,14 +786,38 @@ static PINT_sm_action create_parent_getattr_inspect(
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
+    /* !!! change more later */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
+        "dirdata_server_count = %d "
         "dfile_count     = %d "
         "dist_name_len   = %d "
         "dist_params_len = %d\n",
         attr,
+        attr->u.dir.dist_dir_attr.num_servers,
         attr->u.dir.hint.dfile_count,
         attr->u.dir.hint.dist_name_len,
         attr->u.dir.hint.dist_params_len);
+
+    /* !!! change more later */
+    for (tmp_i = 0; tmp_i < attr->u.dir.dist_dir_attr.num_servers; tmp_i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "                           dirdata_handle[%d] = %llu\n",
+                     tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
+    }
+
+    /* may just use sm_p->getattr.attr.u.dir...
+    sm_p->u.create.dirent_handle = malloc(
+        sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
+    if (!sm_p->u.create.dirent_handle)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memcpy(sm_p->u.create.dirent_handle,
+           attr->u.dir.dirdata_handles,
+           sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
+    sm_p->u.create.dirent_file_count = attr->u.dir.dist_dir_attr.num_servers;
+    */
 
     /* We have an overriding distribution name for this directory.. honor that 
      * IFF the user did not specify a distribution on the PVFS_sys_create() call.
@@ -735,6 +827,7 @@ static PINT_sm_action create_parent_getattr_inspect(
         gossip_debug(GOSSIP_CLIENT_DEBUG,"Using the user-specified distribution:%s.\n"
                                         ,sm_p->u.create.dist->dist_name);
     }
+
     if (!sm_p->u.create.dist && attr->u.dir.hint.dist_name_len > 0)
     {
         PINT_dist *new_dist = NULL;
@@ -1043,6 +1136,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
                 sm_p->getattr.attr.capability,
+                *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.metafile_handle,
                 sm_p->hints);
@@ -1060,6 +1154,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
                 sm_p->getattr.attr.capability,
+                *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.datafile_handles[i],
                 sm_p->hints);

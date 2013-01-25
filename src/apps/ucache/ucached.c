@@ -2,9 +2,6 @@
 #include <usrint.h>
 #include "ucached.h"
 
-/* prototypes */
-void check_rc(int rc);
-
 /* FIFO  */
 static int readfd = 0;  /* Command File Descriptor */
 static int writefd = 0; /* Response File Descriptor */
@@ -40,6 +37,7 @@ static int create_ucache_shmem(void);
 static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
 static void clean_up(void);
 static int ucached_lockchk(void);
+void check_rc(int rc);
 
 void check_rc(int rc)
 {

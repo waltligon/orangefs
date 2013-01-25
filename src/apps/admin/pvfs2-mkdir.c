@@ -38,6 +38,7 @@ struct options
     char ** dir_array;  /* array of directories to create */
     int     numdirs; /* number of directories to create */
     int     mode;    /* mode of directories */
+    int     init_num_dirdata; /* init num of dirdata handles */
     int     verbose; 
     int     make_parent_dirs; /* Create missing parents */
 };
@@ -48,9 +49,11 @@ static int parse_args(int argc, char** argv, struct options * opts);
 static void enable_verbose(struct options * opts);
 static void enable_parents(struct options * opts);
 static int read_mode(struct options * opts, const char * buffer);
+static int read_init_num_dirdata(struct options * opts, const char * buffer);
 static int make_directory(PVFS_credential      * credentials,
                           const PVFS_fs_id       fs_id,
                           const int              mode,
+                          const int              init_num_dirdata,
                           const char           * dir,
                           const char           * pvfs_path,
                           const int              make_parent_dirs,
@@ -144,6 +147,7 @@ int main(int argc, char **argv)
         ret = make_directory(&credentials,
                              pfs_id[i],
                              user_opts.mode,
+                             user_opts.init_num_dirdata,
                              user_opts.dir_array[i],
                              pvfs_path[i],
                              user_opts.make_parent_dirs,
@@ -189,6 +193,7 @@ int main(int argc, char **argv)
 static int make_directory(PVFS_credential      * credentials,
                           const PVFS_fs_id       fs_id,
                           const int              mode,
+                          const int              init_num_dirdata,
                           const char           * dir,
                           const char           * pvfs_path,
                           const int              make_parent_dirs,
@@ -234,6 +239,11 @@ static int make_directory(PVFS_credential      * credentials,
     attr.group = credentials->group_array[0];
     attr.perms = mode;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+    /* sys_attr.dirdata_count is meant to be the total number of dirdata handles.
+     * introduced for pvfs2_fs_dump & pvfs2_fsck.
+     * here it's used to pass the initial number of dirdata handles
+     */
+    attr.dirdata_count = init_num_dirdata;
         
     /* Clear out any info from previous calls */
     memset(&resp_lookup,  0, sizeof(resp_lookup));
@@ -269,6 +279,7 @@ static int make_directory(PVFS_credential      * credentials,
         ret = make_directory(credentials,
                              fs_id,
                              mode,
+                             init_num_dirdata,
                              dirname(realpath),
                              dirname(parent_dir),
                              make_parent_dirs,
@@ -303,11 +314,12 @@ static int make_directory(PVFS_credential      * credentials,
     if(verbose)
     {
         fprintf(stderr, "Creating Directory\n");
-        fprintf(stderr, "\t basename_ptr = [%s]\n", basename_ptr);
-        fprintf(stderr, "\t fs_id       = [%d]\n", fs_id);
-        fprintf(stderr, "\t Mode        = [%o]\n", mode);
-        fprintf(stderr, "\t DirName     = [%s]\n", dir);
-        fprintf(stderr, "\t pvfs path   = [%s]\n", pvfs_path);
+        fprintf(stderr, "\t basename_ptr    = [%s]\n", basename_ptr);
+        fprintf(stderr, "\t fs_id           = [%d]\n", fs_id);
+        fprintf(stderr, "\t Mode            = [%o]\n", mode);
+        fprintf(stderr, "\t InitNumDirdata  = [%d]\n", init_num_dirdata);
+        fprintf(stderr, "\t DirName         = [%s]\n", dir);
+        fprintf(stderr, "\t pvfs path       = [%s]\n", pvfs_path);
 
         fprintf(stdout, "Directory Attributes\n");
         fprintf(stdout, "\t owner [%d]\n",  attr.owner);
@@ -339,8 +351,9 @@ static int make_directory(PVFS_credential      * credentials,
 static int parse_args(int argc, char** argv, struct options * opts)
 {
     int i = 0, ret = 0,option_index = 0, mode_requested = 0;
+    int init_num_dirdata_requested = 0;
     const char * cur_option = NULL;
-    char flags[] = "hm:pvV";  /* Options available on command line */
+    char flags[] = "hm:n:pvV";  /* Options available on command line */
 
     static struct option long_opts[] =
     {
@@ -348,6 +361,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"mode",1,0,0},
+        {"init-num-dirdata",1,0,0},
         {0,0,0,0}
     };
 
@@ -387,6 +401,17 @@ static int parse_args(int argc, char** argv, struct options * opts)
                     }
                     mode_requested = 1;
                 }
+                else if(strcmp("init-num-dirdata", cur_option) == 0)
+                {
+                    ret = read_init_num_dirdata(opts, optarg);
+                    if(ret == 0)
+                    {
+                        fprintf(stderr, "Unable to read initial number of dirdata handles\n");
+                        usage(argc, argv);
+                        return(-1);
+                    }
+                    init_num_dirdata_requested = 1; 
+                }
                 else
                 {
                     usage(argc, argv);
@@ -408,6 +433,17 @@ static int parse_args(int argc, char** argv, struct options * opts)
                     return(-1);
                 }
                 mode_requested = 1;
+                break;
+
+            case 'n': /* --init-num-dirdata */
+                ret = read_init_num_dirdata(opts, optarg);
+                if(ret == 0)
+                {
+                    fprintf(stderr, "Unable to read initial number of dirdata handles\n");
+                    usage(argc, argv);
+                    return(-1);
+                }
+                init_num_dirdata_requested = 1;
                 break;
 
             case 'p': /* --parents */ 
@@ -464,6 +500,16 @@ static int parse_args(int argc, char** argv, struct options * opts)
         opts->mode = PVFS_util_translate_mode(mode & ~PVFS_util_get_umask(), 0);
     }
     
+    if(!init_num_dirdata_requested)
+    {           
+        opts->init_num_dirdata = 0;
+    }                   else if(opts->init_num_dirdata <=0 )
+    {               
+        fprintf(stderr, "init-num-dirdata has to be a positive integer!\n");
+        usage(argc, argv);
+        return(-1);
+    }           
+
     /* Allocate memory to hold the filenames */
     opts->dir_array = (char **)calloc(opts->numdirs, sizeof(char *));
  
@@ -482,12 +528,13 @@ static int parse_args(int argc, char** argv, struct options * opts)
     if(opts->verbose)
     {
         fprintf(stdout, "Options Specified\n");
-        fprintf(stdout, "\t Verbose  [%d]\n", opts->verbose);
-        fprintf(stdout, "\t Mode     [%o]\n", opts->mode);
-        fprintf(stdout, "\t Num Dirs [%d]\n", opts->numdirs);
+        fprintf(stdout, "\t Verbose             [%d]\n", opts->verbose);
+        fprintf(stdout, "\t Mode                [%o]\n", opts->mode);
+        fprintf(stdout, "\t Init Num Dirdata    [%d]\n", opts->init_num_dirdata);
+        fprintf(stdout, "\t Num Dirs            [%d]\n", opts->numdirs);
         for(i=0; i<opts->numdirs; i++)
         {
-            fprintf(stdout, "\t Direcotory #%d = [%s]\n", i, opts->dir_array[i]);
+            fprintf(stdout, "\t Directory #%d = [%s]\n", i, opts->dir_array[i]);
         }   
     }
     return(0);
@@ -498,12 +545,13 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "Usage: %s [OPTION] DIRECTORY\n", argv[0]);
     fprintf(stderr, "Create the DIRECTORY(ies), if they do not already exist.\n\n");
 
-    fprintf(stderr,"  -m, --mode          set permission mode (as in chmod), "
-                                          "not rwxrwxrwx - umask\n");
-    fprintf(stderr,"  -p, --parents       make parent directories as needed\n");
-    fprintf(stderr,"  -V, --verbose       turns on verbose messages\n");
-    fprintf(stderr,"  -v, --version       output version information and exit\n");
-    fprintf(stderr,"  -h, --help          print help\n");
+    fprintf(stderr,"  -m, --mode                set permission mode (as in chmod), "
+                                                "not rwxrwxrwx - umask\n");
+    fprintf(stderr,"  -n, --init-num-dirdata    set initial number of dirdata handles for the directory,\n");
+    fprintf(stderr,"  -p, --parents             make parent directories as needed\n");
+    fprintf(stderr,"  -V, --verbose             turns on verbose messages\n");
+    fprintf(stderr,"  -v, --version             output version information and exit\n");
+    fprintf(stderr,"  -h, --help                print help\n");
     return;
 }
 
@@ -523,6 +571,15 @@ static int read_mode(struct options * opts, const char * buffer)
     
     ret = sscanf(buffer, "%o", &opts->mode);
     
+    return(ret);
+}
+
+static int read_init_num_dirdata(struct options * opts, const char * buffer)
+{
+    int ret = 0;
+
+    ret = sscanf(buffer, "%d", &opts->init_num_dirdata);
+
     return(ret);
 }
 

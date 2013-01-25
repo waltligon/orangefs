@@ -364,6 +364,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
+    {&pvfs2_client_atomic_eattr_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -379,7 +380,8 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_remove_dirent_sm},
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
-    {&pvfs2_client_mgmt_get_uid_list_sm}
+    {&pvfs2_client_mgmt_get_uid_list_sm},
+    {&pvfs2_client_mgmt_get_dirdata_array_sm}
 };
 
 
@@ -1194,7 +1196,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_SYMLINK, "PVFS_SYS_SYMLINK" },
         { PVFS_SYS_READDIR, "PVFS_SYS_READDIR" },
         { PVFS_SYS_LOOKUP, "PVFS_SYS_LOOKUP" },
-	{ PVFS_SYS_RENAME, "PVFS_SYS_RENAME" },
+        { PVFS_SYS_RENAME, "PVFS_SYS_RENAME" },
         { PVFS_SYS_GETATTR, "PVFS_SYS_GETATTR" },
         { PVFS_SYS_SETATTR, "PVFS_SYS_SETATTR" },
         { PVFS_SYS_IO, "PVFS_SYS_IO" },
@@ -1215,8 +1217,11 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_MGMT_GET_DIRDATA_HANDLE,
           "PVFS_MGMT_GET_DIRDATA_HANDLE" },
         { PVFS_MGMT_GET_UID_LIST, "PVFS_MGMT_GET_UID_LIST" },
+        { PVFS_MGMT_GET_DIRDATA_ARRAY,
+          "PVFS_MGMT_GET_DIRDATA_ARRAY" },
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
+        { PVFS_SYS_ATOMICEATTR, "PVFS_SYS_ATOMICEATTR" },
         { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },
         { PVFS_SYS_LISTEATTR, "PVFS_SYS_LISTEATTR" },
         { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },

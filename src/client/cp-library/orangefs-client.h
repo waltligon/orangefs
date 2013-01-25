@@ -29,6 +29,69 @@ typedef unsigned char *OrangeFS_signature;
 #define ORANGEFS_PATH_MAX 4096
 #define MAX_LINKS 256
 
+/* masks to set lower level server and client debugging with gossip */
+#define OrangeFS_NO_DEBUG                (uint64_t)0
+#define OrangeFS_BMI_DEBUG_TCP           ((uint64_t)1 << 0)
+#define OrangeFS_BMI_DEBUG_CONTROL       ((uint64_t)1 << 1)
+#define OrangeFS_BMI_DEBUG_OFFSETS       ((uint64_t)1 << 2)
+#define OrangeFS_BMI_DEBUG_GM            ((uint64_t)1 << 3)
+#define OrangeFS_JOB_DEBUG               ((uint64_t)1 << 4)
+#define OrangeFS_SERVER_DEBUG            ((uint64_t)1 << 5)
+#define OrangeFS_STO_DEBUG_CTRL          ((uint64_t)1 << 6)
+#define OrangeFS_STO_DEBUG_DEFAULT       ((uint64_t)1 << 7)
+#define OrangeFS_FLOW_DEBUG              ((uint64_t)1 << 8)
+#define OrangeFS_BMI_DEBUG_GM_MEM        ((uint64_t)1 << 9)
+#define OrangeFS_REQUEST_DEBUG           ((uint64_t)1 << 10)
+#define OrangeFS_FLOW_PROTO_DEBUG        ((uint64_t)1 << 11)
+#define OrangeFS_NCACHE_DEBUG            ((uint64_t)1 << 12)
+#define OrangeFS_CLIENT_DEBUG            ((uint64_t)1 << 13)
+#define OrangeFS_REQ_SCHED_DEBUG         ((uint64_t)1 << 14)
+#define OrangeFS_ACACHE_DEBUG            ((uint64_t)1 << 15)
+#define OrangeFS_TROVE_DEBUG             ((uint64_t)1 << 16)
+#define OrangeFS_TROVE_OP_DEBUG          ((uint64_t)1 << 17)
+#define OrangeFS_DIST_DEBUG              ((uint64_t)1 << 18)
+#define OrangeFS_BMI_DEBUG_IB            ((uint64_t)1 << 19)
+#define OrangeFS_DBPF_ATTRCACHE_DEBUG    ((uint64_t)1 << 20)
+#define OrangeFS_MMAP_RCACHE_DEBUG       ((uint64_t)1 << 21)
+#define OrangeFS_LOOKUP_DEBUG            ((uint64_t)1 << 22)
+#define OrangeFS_REMOVE_DEBUG            ((uint64_t)1 << 23)
+#define OrangeFS_GETATTR_DEBUG           ((uint64_t)1 << 24)
+#define OrangeFS_READDIR_DEBUG           ((uint64_t)1 << 25)
+#define OrangeFS_IO_DEBUG                ((uint64_t)1 << 26)
+#define OrangeFS_DBPF_OPEN_CACHE_DEBUG   ((uint64_t)1 << 27)
+#define OrangeFS_PERMISSIONS_DEBUG       ((uint64_t)1 << 28)
+#define OrangeFS_CANCEL_DEBUG            ((uint64_t)1 << 29)
+#define OrangeFS_MSGPAIR_DEBUG           ((uint64_t)1 << 30)
+#define OrangeFS_CLIENTCORE_DEBUG        ((uint64_t)1 << 31)
+#define OrangeFS_CLIENTCORE_TIMING_DEBUG ((uint64_t)1 << 32)
+#define OrangeFS_SETATTR_DEBUG           ((uint64_t)1 << 33)
+#define OrangeFS_MKDIR_DEBUG             ((uint64_t)1 << 34)
+#define OrangeFS_VARSTRIP_DEBUG          ((uint64_t)1 << 35)
+#define OrangeFS_GETEATTR_DEBUG          ((uint64_t)1 << 36)
+#define OrangeFS_SETEATTR_DEBUG          ((uint64_t)1 << 37)
+#define OrangeFS_ENDECODE_DEBUG          ((uint64_t)1 << 38)
+#define OrangeFS_DELEATTR_DEBUG          ((uint64_t)1 << 39)
+#define OrangeFS_ACCESS_DEBUG            ((uint64_t)1 << 40)
+#define OrangeFS_ACCESS_DETAIL_DEBUG     ((uint64_t)1 << 41)
+#define OrangeFS_LISTEATTR_DEBUG         ((uint64_t)1 << 42)
+#define OrangeFS_PERFCOUNTER_DEBUG       ((uint64_t)1 << 43)
+#define OrangeFS_STATE_MACHINE_DEBUG     ((uint64_t)1 << 44)
+#define OrangeFS_DBPF_KEYVAL_DEBUG       ((uint64_t)1 << 45)
+#define OrangeFS_LISTATTR_DEBUG          ((uint64_t)1 << 46)
+#define OrangeFS_DBPF_COALESCE_DEBUG     ((uint64_t)1 << 47)
+#define OrangeFS_ACCESS_HOSTNAMES        ((uint64_t)1 << 48)
+#define OrangeFS_FSCK_DEBUG              ((uint64_t)1 << 49)
+#define OrangeFS_BMI_DEBUG_MX            ((uint64_t)1 << 50)
+#define OrangeFS_BSTREAM_DEBUG           ((uint64_t)1 << 51)
+#define OrangeFS_BMI_DEBUG_PORTALS       ((uint64_t)1 << 52)
+#define OrangeFS_USER_DEV_DEBUG          ((uint64_t)1 << 53)
+#define OrangeFS_DIRECTIO_DEBUG          ((uint64_t)1 << 54)
+#define OrangeFS_MGMT_DEBUG              ((uint64_t)1 << 55)
+#define OrangeFS_MIRROR_DEBUG            ((uint64_t)1 << 56)
+#define OrangeFS_WIN_CLIENT_DEBUG        ((uint64_t)1 << 57)
+#define OrangeFS_SECURITY_DEBUG          ((uint64_t)1 << 58)
+#define OrangeFS_USRINT_DEBUG            ((uint64_t)1 << 59)
+
 /* gossip debugging-type masks */
 #define OrangeFS_DEBUG_SYSLOG (1 << 0)
 #define OrangeFS_DEBUG_STDERR (1 << 1)
@@ -157,6 +220,7 @@ typedef struct
 #define ORANGEFS_ENCODING_DEFAULT ENCODING_LE_BFIELD
 
 /* figure out the size of a pointer */
+/*
 #if defined(__WORDSIZE)
   #define ORANGEFS_SIZEOF_VOIDP __WORDSIZE
 #elif defined(BITS_PER_LONG)
@@ -173,6 +237,13 @@ typedef struct
   #define ORANGEFS_SIZEOF_VOIDP 32
 #else
   #error "Unhandled size of void pointer"
+#endif
+  */
+
+#ifdef _WIN64
+#define ORANGEFS_SIZEOF_VOIDP 64
+#else
+#define ORANGEFS_SIZEOF_VOIDP 32
 #endif
 
 /* we need to align some variables in 32bit case to match alignment
@@ -254,7 +325,7 @@ void DLL_CODE orangefs_credential_add_group(OrangeFS_credential *cred, OrangeFS_
 void DLL_CODE orangefs_cleanup_credentials(OrangeFS_credential *cred);
 int DLL_CODE orangefs_credential_in_group(OrangeFS_credential *cred, OrangeFS_gid group);
 void DLL_CODE orangefs_credential_set_timeout(OrangeFS_credential *cred, OrangeFS_time timeout);
-void DLL_CODE orangefs_enable_debug(int debugType, const char *filePath);
+void DLL_CODE orangefs_enable_debug(int debugType, const char *filePath, int64_t gossip_mask);
 void DLL_CODE orangefs_debug_print(const char *format, ...);
 #ifdef __cplusplus
 }

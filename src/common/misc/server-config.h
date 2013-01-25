@@ -29,6 +29,7 @@ enum
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
     CTX_REPLICATION      = (1 << 12),
+    CTX_LDAP             = (1 << 13),
 };
 
 typedef struct phys_server_desc
@@ -128,6 +129,8 @@ typedef struct filesystem_configuration_s
     uint32_t        replication_switch;
     PVFS_sys_layout replication_layout;
     uint32_t        replication_number_of_copies;
+
+    int32_t split_mem_limit;
 } filesystem_configuration_s;
 
 typedef struct replication_s
@@ -175,6 +178,7 @@ typedef struct server_configuration_s
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */
     uint32_t  *precreate_low_threshold; /* threshold for each ds type */
+    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles when creating a new directory */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -218,6 +222,19 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
+    char *ca_path;                   /* location of CA certificate */
+
+    char *ldap_hosts;                /* list of LDAP host URIs */
+    char *ldap_bind_dn;              /* LDAP bind user */
+    char *ldap_bind_password;        /* LDAP bind password */
+    int ldap_search_mode;            /* PVFS2_LDAP_SEARCH_CN or ..._DN */
+    char *ldap_search_root;          /* DN of LDAP search container */
+    char *ldap_search_class;         /* LDAP user class name */
+    char *ldap_search_attr;          /* LDAP naming attribute */
+    int ldap_search_scope;           /* Corresponds to SUBTREE or ONELEVEL */
+    char *ldap_uid_attr;             /* attribute that stores UID */
+    char *ldap_gid_attr;             /* attribute that stores GID */
+    int ldap_search_timeout;         /* search timeout in seconds */
 
     int security_timeout;
 

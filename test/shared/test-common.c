@@ -314,7 +314,7 @@ int stat_file(
     PVFS_sysresp_lookup  lk_response;
     PVFS_object_ref      ref;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credential      credentials;
+    PVFS_credential      credential;
     PVFS_fs_id           fs_id;
 
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
@@ -351,17 +351,17 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
 
-        ret = PVFS_util_gen_credential_defaults(&credentials);
+        ret = PVFS_util_gen_credential_defaults(&credential);
         if( ret < 0 )
         {
-            print_error("Error: could not get credentials (%d)\n", ret);
+            print_error("Error: could not get credential (%d)\n", ret);
             PVFS_perror("PVFS_util_gen_credential_defaults", ret);
             return(TEST_COMMON_FAIL);
         }
 
         ret = PVFS_sys_lookup(fs_id,
                               szPvfsPath,
-                              &credentials,
+                              &credential,
                               &lk_response,
                               (followLink ? PVFS2_LOOKUP_LINK_FOLLOW :
                                             PVFS2_LOOKUP_LINK_NO_FOLLOW),
@@ -377,7 +377,7 @@ int stat_file(
 
         ret = PVFS_sys_getattr(ref,
                                PVFS_ATTR_SYS_ALL,
-                               &credentials,
+                               &credential,
                                &getattr_response,
                                NULL);
         if(ret < 0)
@@ -474,7 +474,7 @@ int create_file(
     int  ret=0;
     char szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id fs_id;
-    PVFS_credential credentials;
+    PVFS_credential credential;
     struct file_ref stFileRef;
    
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
@@ -492,11 +492,17 @@ int create_file(
             return(TEST_COMMON_FAIL);
         }
 
-        PVFS_util_gen_credential_defaults(&credentials);
+        ret = PVFS_util_gen_credential_defaults(&credential);
+        if( ret < 0 )
+        {
+            print_error("Error: could not get credential (%d)\n", ret);
+            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+            return(TEST_COMMON_FAIL);
+        }
 
         ret = pvfs2_create_file(szPvfsPath,
                                 fs_id,
-                                &credentials,
+                                &credential,
                                 mode,
                                 verbose,
                                 &stFileRef);
@@ -991,12 +997,12 @@ int pvfs2_open(
     int                  ret=0;
     char                 szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id           fs_id;
-    PVFS_credential     credentials;
+    PVFS_credential     credential;
     PVFS_sysresp_lookup  resp_lookup;
 
     /* Initialize memory */
     memset(&fs_id,        0, sizeof(fs_id));
-    memset(&credentials,  0, sizeof(credentials));
+    memset(&credential,  0, sizeof(credential));
     memset(&resp_lookup,  0, sizeof(resp_lookup));
 
     ret = PVFS_util_resolve(fileName, 
@@ -1010,13 +1016,19 @@ int pvfs2_open(
         return(ret);
     }
 
-    PVFS_util_gen_credential_defaults(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credential);
+    if( ret < 0 )
+    {
+        print_error("Error: could not get credential (%d)\n", ret);
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(TEST_COMMON_FAIL);
+    }
 
     if(followLink)
     {
         ret = PVFS_sys_lookup(fs_id, 
                               szPvfsPath, 
-                              &credentials, 
+                              &credential, 
                               &resp_lookup, 
                               PVFS2_LOOKUP_LINK_FOLLOW,
                               NULL);
@@ -1025,7 +1037,7 @@ int pvfs2_open(
     {
         ret = PVFS_sys_lookup(fs_id, 
                               szPvfsPath, 
-                              &credentials, 
+                              &credential, 
                               &resp_lookup, 
                               PVFS2_LOOKUP_LINK_NO_FOLLOW,
                               NULL);
@@ -1044,7 +1056,7 @@ int pvfs2_open(
     {
         ret = pvfs2_create_file(szPvfsPath,
                                 fs_id,
-                                &credentials,
+                                &credential,
                                 mode,
                                 verbose,
                                 pstFileRef);
@@ -1066,7 +1078,7 @@ int pvfs2_open(
  */
 int pvfs2_create_file(const char             * fileName,    /**< File Name */
                       const PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                      const PVFS_credential  * credentials, /**< Struct with user/group permissions for operation */
+                      const PVFS_credential  * credential, /**< Struct with user/group permissions for operation */
                       const int                mode,        /**< open mode flags */
                       const int                verbose,     /**< Turns on verbose prints if set to non-zero value */
                       struct file_ref        * pstFileRef)  /**< File descriptor (or handle) for an open file*/
@@ -1086,8 +1098,8 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     memset(&parent_ref,  0, sizeof(parent_ref));
     memset(&attr,        0, sizeof(attr));
    
-    attr.owner = credentials->userid; 
-    attr.group = credentials->group_array[0];
+    attr.owner = credential->userid; 
+    attr.group = credential->group_array[0];
     attr.perms = PVFS_util_translate_mode(mode,0);
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
@@ -1107,7 +1119,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
 
     ret = PVFS_sys_lookup(fs_id, 
                           parentDirectory, 
-                          (PVFS_credential *) credentials, 
+                          (PVFS_credential *) credential, 
                           &resp_lookup, 
                           PVFS2_LOOKUP_LINK_FOLLOW,
                           NULL);
@@ -1133,7 +1145,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     ret = PVFS_sys_create(baseName, 
                           parent_ref,     /* handle & fs_id of parent  */
                           attr, 
-                          (PVFS_credential *) credentials,
+                          (PVFS_credential *) credential,
                           NULL,           /* Accept default distribution for fs */
                           &resp_create,
                           NULL,
@@ -1171,7 +1183,7 @@ void copy_pvfs2_to_stat(const PVFS_sys_attr * attr,
  */
 int lookup_parent(char             * filename,    /**< File Name */
                   PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                  PVFS_credential  * credentials, /**< Struct with user/group permissions for operation */
+                  PVFS_credential  * credential, /**< Struct with user/group permissions for operation */
                   PVFS_handle      * handle,      /**< PVFS2 handle  */
                   int                verbose)     /**< Turns on verbose prints if set to non-zero value */
 {
@@ -1193,7 +1205,7 @@ int lookup_parent(char             * filename,    /**< File Name */
 
     ret = PVFS_sys_lookup(fs_id, 
                           szSegment, 
-                          credentials, 
+                          credential, 
                           &resp_look, 
                           PVFS2_LOOKUP_LINK_FOLLOW,
                           NULL);

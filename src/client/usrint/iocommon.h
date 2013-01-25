@@ -237,6 +237,8 @@ extern int iocommon_seteattr(pvfs_descriptor *pd, const char *key, const void *v
 
 extern int iocommon_geteattr(pvfs_descriptor *pd, const char *key, void *val, int size);
 
+extern int iocommon_atomiceattr(pvfs_descriptor *pd, const char *key, void *val, int valsize, void *response, int respsize, int flag, int opcode);
+
 extern int iocommon_listeattr(pvfs_descriptor *pd, char *list, int size, int *numkeys);
 
 extern int iocommon_deleattr(pvfs_descriptor *pd, const char * key);

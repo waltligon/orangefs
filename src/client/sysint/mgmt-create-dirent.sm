@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -56,6 +57,14 @@ machine pvfs2_client_mgmt_create_dirent_sm
     state create_dirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
+        success => cleanup;
+        default => create_dirent_retry_or_fail;
+    }
+
+    state create_dirent_retry_or_fail
+    {
+        run mgmt_create_dirent_retry_or_fail;
+        success => create_dirent_get_capability;
         default => cleanup;
     }
 
@@ -162,18 +171,17 @@ PVFS_error PVFS_mgmt_create_dirent(
 static int mgmt_create_dirent_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_create_dirent_init called\n");
-
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->parent_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+            PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -187,8 +195,23 @@ static int mgmt_create_dirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     js_p->error_code = 0;
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.mgmt_create_dirent.entry);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.mgmt_create_dirent.entry,
+            llu(dirdata_hash));
+
+    dirdata_server_index =
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -200,17 +223,22 @@ static int mgmt_create_dirent_setup_msgpair(
         llu(sm_p->u.mgmt_create_dirent.entry_handle),
         llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
 
+    /* TODO: Need to call PINT_free_object_attr? */
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
+        *sm_p->cred_p,
         sm_p->u.mgmt_create_dirent.entry,
         sm_p->u.mgmt_create_dirent.entry_handle,
         sm_p->parent_ref.handle,
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    /* send to dirdata server */
+    msg_p->handle =
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_create_dirent_comp_fn;
 
@@ -251,6 +279,39 @@ static int mgmt_create_dirent_comp_fn(
     return resp_p->status;
 }
 
+static PINT_sm_action mgmt_create_dirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{       
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+           "mgmt-create-dirent: received -PVFS_EAGAIN,"
+           " will retry getattr and mgmt-create-dirent.\n");
+ 
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+        
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->parent_ref,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+                
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }   
+    
+    PVFS_perror_gossip("mgmt-create-dirent failed", js_p->error_code);
+    return SM_ACTION_COMPLETE;
+}   
+
 static PINT_sm_action mgmt_create_dirent_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -258,6 +319,8 @@ static PINT_sm_action mgmt_create_dirent_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mgmt_create_dirent_cleanup called\n");
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    
     sm_p->error_code = js_p->error_code;
 
     PINT_SET_OP_COMPLETE;

@@ -3140,6 +3140,84 @@ errorout:
     return rc;
 }
 
+/** Implelments atomic operations on an extended attribute
+ *
+ *  The flag parameter is currently not implemented.
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
+ */
+int iocommon_atomiceattr(pvfs_descriptor *pd,
+                         const char *key_p,
+                         void *val_p,
+                         int valsize,
+                         void *response,
+                         int respsize,
+                         int flag,
+                         int opcode)
+{
+    int rc = 0;
+    int pvfs_flag = 0;
+    int orig_errno = errno;
+    PVFS_credential *credential;
+    PVFS_ds_keyval key, val, resp;
+
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Initialize */
+    memset(&key, 0, sizeof(key));
+    memset(&val, 0, sizeof(val));
+    memset(&resp, 0, sizeof(resp));
+
+    /* check credential */
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
+
+    key.buffer = (char *)key_p;
+    key.buffer_sz = strlen(key_p) + 1;
+    val.buffer = (void *)val_p;
+    val.buffer_sz = valsize;
+    resp.buffer = (void *)response;
+    resp.buffer_sz = respsize;
+    
+
+    /* now perform atomic operation on attributes */
+    errno = 0;
+    rc = PVFS_sys_atomiceattr(pd->s->pvfs_ref,
+                              credential,
+                              &key,
+                              &val,
+                              &resp,
+                              pvfs_flag,
+                              opcode,
+                              NULL);
+    
+    /* NOTE: Are these really the only values we need to translate? */
+    switch (rc)
+    {
+        case -PVFS_ENOENT:
+            /* file exists if we have a pd */
+            /* either attr does not exist or */
+            /* we do not have access to it */
+            rc = -PVFS_ENODATA;
+            break;
+        case -PVFS_EMSGSIZE:
+        /* buffer was too small for the attribute value */
+        rc = -PVFS_ERANGE;
+    }
+    IOCOMMON_CHECK_ERR(rc);
+    rc = val.read_sz;
+    
+errorout:
+    return rc;
+}
+
 /** Implements an extended attribute delete or remove
  *
  *  The PVFS server enforces namespaces as prefixes on the

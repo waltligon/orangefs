@@ -427,9 +427,10 @@ static int generic_open(file_object *obj, PVFS_credential *credentials)
             return -1;
         }
 
-        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE)
+        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE &&
+            resp_getattr.attr.objtype != PVFS_TYPE_DIRECTORY)
         {
-            fprintf(stderr, "Not a meta file!\n");
+            fprintf(stderr, "Not a meta file or directory!\n");
             return -1;
         }
         obj->u.pvfs2.perms = resp_getattr.attr.perms;
