@@ -165,7 +165,7 @@ RUN_USERLIB_TEST=1
 if [ $RUN_USERLIB_TEST ]
 then
 
-	[ $do_vfs -eq 1 ] && teardown_vfs
+	teardown_vfs
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
