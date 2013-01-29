@@ -15,7 +15,7 @@ run_nightly_scripts="pvfs2/test/run-nightly pvfs2/maint/build pvfs2/test/automat
 
 #remove existing files
 cd $PATH_SUFFIX
-sudo /bin/rm -rf `pwd`/pvfs2
+/bin/rm -rf `pwd`/pvfs2
 mkdir -p pvfs2/test
 mkdir -p pvfs2/maint/build
 
