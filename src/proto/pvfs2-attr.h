@@ -95,6 +95,11 @@ struct PVFS_metafile_attr_s
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
 
+    /* list of replicated datafiles */
+    PVFS_handle *replication_dfile_array;
+    uint32_t replication_dfile_array_count;
+    uint32_t replication_number_of_copies;
+
     int32_t stuffed_size;
 
     PVFS_metafile_hint hint;

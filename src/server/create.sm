@@ -739,7 +739,7 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
-    s_op->error_a = calloc(1,sizeof(*s_op->error_a) * s_op->keyval_count);
+    s_op->error_a = calloc(s_op->keyval_count,sizeof(*s_op->error_a));
     if (!s_op->error_a)
     {
        gossip_lerr("Error allocating memory.\n");

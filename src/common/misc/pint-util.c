@@ -425,7 +425,17 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     free(attr->u.meta.mirror_dfile_array);
                     attr->u.meta.mirror_dfile_array = NULL;
                 }
+                
             }
+            if (attr->mask & PVFS_ATTR_META_REPLICATION)
+            {
+               if (attr->u.meta.replication_dfile_array)
+               {
+                  free(attr->u.meta.replication_dfile_array);
+                  attr->u.meta.replication_dfile_array = NULL;
+               }
+            }
+       
             if (attr->mask & PVFS_ATTR_META_DIST)
             {
                 if (attr->u.meta.dist)

@@ -99,7 +99,8 @@ machine pvfs2_client_create_sm
     state crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup;
+        /*success => cleanup;*/
+        success => delete_handles_setup_msgpair_array;
         default => crdirent_failure;
     }
 
@@ -645,7 +646,7 @@ static PINT_sm_action create_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
-    PVFS_size tmp_size = 0;
+    PVFS_size *file_size = NULL;
     int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
@@ -679,6 +680,18 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.u.meta.dfile_count =
             sm_p->u.create.datafile_count;
 
+        /* add replicated handles to the acache, if necessary */
+        if (sm_p->u.create.total_number_of_replication_handles > 0)
+        {
+           sm_p->u.create.attr.mask |= PVFS_ATTR_META_REPLICATION;
+           sm_p->u.create.attr.u.meta.replication_dfile_array = 
+               sm_p->u.create.replication_handles;
+           sm_p->u.create.attr.u.meta.replication_dfile_array_count =
+               sm_p->u.create.total_number_of_replication_handles;
+           sm_p->u.create.attr.u.meta.replication_number_of_copies =
+               sm_p->u.create.replication.replication_number_of_copies;
+        }
+
         if(sm_p->u.create.stuffed)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created stuffed file\n");
@@ -708,7 +721,7 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
-                                 &tmp_size);
+                                 file_size);
         if(ret < 0)
         {
             js_p->error_code = ret;
@@ -750,6 +763,13 @@ static PINT_sm_action create_cleanup(
         free(sm_p->u.create.dirent_handle);
         sm_p->u.create.dirent_handle = NULL;
     }
+
+    if(sm_p->u.create.replication_handles)
+    {
+        free(sm_p->u.create.replication_handles);
+        sm_p->u.create.replication_handles = NULL;
+    }
+
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 

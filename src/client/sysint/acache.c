@@ -68,6 +68,9 @@ struct acache_payload
     uint32_t dfile_count;
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
+    PVFS_handle *replication_dfile_array;
+    uint32_t replication_dfile_array_count;
+    uint32_t replication_number_of_copies;
 
     /* Additional time stamps */
     #if 0
@@ -601,6 +604,23 @@ int PINT_acache_update(
                   attr->u.meta.mirror_copies_count);
            tmp_payload->mirror_copies_count =
                 attr->u.meta.mirror_copies_count;
+        }
+        if(attr->mask & PVFS_ATTR_META_REPLICATION)
+        {
+           tmp_payload->replication_dfile_array = 
+              calloc(attr->u.meta.replication_dfile_array_count,
+                     sizeof(*attr->u.meta.replication_dfile_array));
+           if (!tmp_payload->replication_dfile_array)
+           {
+              ret = -PVFS_ENOMEM;
+              goto err;
+           }
+           memcpy(tmp_payload->replication_dfile_array
+                 ,attr->u.meta.replication_dfile_array
+                 ,attr->u.meta.replication_dfile_array_count *
+                  sizeof(*attr->u.meta.replication_dfile_array));
+           tmp_payload->replication_dfile_array_count = attr->u.meta.replication_dfile_array_count;
+           tmp_payload->replication_number_of_copies = attr->u.meta.replication_number_of_copies;
         }
         if(attr->mask & PVFS_ATTR_META_DIST)
         {
