@@ -758,11 +758,11 @@ int fstatat(int fd, const char *path, struct stat *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = pvfs_lstat(path, buf);
+            rc = lstat(path, buf);
         }
         else
         {
-            rc = pvfs_stat(path, buf);
+            rc = stat(path, buf);
         }
     }
     else
@@ -795,11 +795,11 @@ int fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = pvfs_lstat64(path, buf);
+            rc = lstat64(path, buf);
         }
         else
         {
-            rc = pvfs_stat64(path, buf);
+            rc = stat64(path, buf);
         }
     }
     else
@@ -1881,7 +1881,7 @@ int setxattr(const char *path, const char *name,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -1914,7 +1914,7 @@ int lsetxattr(const char *path, const char *name,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -1941,7 +1941,7 @@ int fsetxattr(int fd, const char *name,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             rc = -1;
         }
     }
@@ -1974,7 +1974,7 @@ ssize_t getxattr(const char *path, const char *name,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2007,7 +2007,7 @@ ssize_t lgetxattr(const char *path, const char *name,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2034,7 +2034,7 @@ ssize_t fgetxattr(int fd, const char *name, void *value,
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             rc = -1;
         }
     }
@@ -2066,7 +2066,7 @@ ssize_t listxattr(const char *path, char *list, size_t size)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2098,7 +2098,7 @@ ssize_t llistxattr(const char *path, char *list, size_t size)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2124,7 +2124,7 @@ ssize_t flistxattr(int fd, char *list, size_t size)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             rc = -1;
         }
     }
@@ -2156,7 +2156,7 @@ int removexattr(const char *path, const char *name)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2188,7 +2188,7 @@ int lremovexattr(const char *path, const char *name)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             goto errorout;
         }
     }
@@ -2214,7 +2214,7 @@ int fremovexattr(int fd, const char *name)
         }
         else
         {
-            errno = ENOPKG;
+            errno = ENOTSUP;
             rc = -1;
         }
     }
