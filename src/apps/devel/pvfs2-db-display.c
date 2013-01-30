@@ -397,8 +397,15 @@ void print_keyval( DBT key, DBT val )
         case DBPF_ATTRIBUTE_TYPE:
             if( strncmp(k->key, "dh", 3) == 0) /* datafile handle */
             {
-                vh = *(uint64_t *)val.data;
-                printf("(dh)(%d) -> (%llu)(%d)\n", key.size, llu(vh), val.size);
+               printf("(dh)(%d) -> ",key.size);
+               int s = 0;
+               while (s < val.size)
+               {
+                   vh = *(uint64_t *)(val.data + s);
+                   printf("(%llu) ", llu(vh));
+                   s += sizeof(TROVE_handle);
+               }
+               printf("(%d)\n",val.size);
             }
             else if( strncmp(k->key, "md", 3) == 0 ) /* metafile dist */
             {
@@ -493,7 +500,9 @@ void print_keyval( DBT key, DBT val )
             }
             else if (key.size == 17)
             {
-                kh = *(uint64_t *)k->key;
+                char *tmp;
+                tmp = k->key;
+                kh = *(uint64_t *)tmp;
                 printf("(%llu)(%d) -> (%d)\n", llu(kh), key.size, val.size);
             }
             else
