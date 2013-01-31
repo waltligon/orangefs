@@ -99,8 +99,8 @@ machine pvfs2_client_create_sm
     state crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup;
-        /*success => delete_handles_setup_msgpair_array;*/
+        /*success => cleanup;*/
+        success => delete_handles_setup_msgpair_array;
         default => crdirent_failure;
     }
 

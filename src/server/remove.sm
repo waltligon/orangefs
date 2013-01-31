@@ -37,8 +37,9 @@
  * 2) check_object_type
  * 3) verify_object_metadata
  * 4) remove_dspace
- * 5) final_response
- * 6) cleanup
+ * 5) remove attributes from keyval, includes extended attributes.
+ * 6) final_response
+ * 7) cleanup
  *
  * For dirdata, the path is:
  * 1) prelude
@@ -73,8 +74,9 @@ static int remove_remove_dirdata_handles_comp_fn(
 enum
 {
     STATE_TYPE_DIRECTORY = 1,
-    STATE_TYPE_DATAFILE = 2,
-    STATE_TYPE_DIRDATA = 3,
+    STATE_TYPE_DATAFILE  = 2,
+    STATE_TYPE_DIRDATA   = 3,
+    STATE_TYPE_METAFILE  = 4,
     REBUILD_DONE
 };
 
@@ -194,6 +196,7 @@ nested machine pvfs2_remove_work_sm
     state verify_object_metadata
     {
         run remove_verify_object_metadata;
+        STATE_TYPE_METAFILE => remove_metafile_dspace;
         STATE_TYPE_DIRECTORY => remove_dirdata_handles;
         success => remove_dspace;
         default => return;
@@ -201,7 +204,27 @@ nested machine pvfs2_remove_work_sm
 
     state remove_dspace
     {
+       run remove_remove_dspace;
+       default => return;
+    }
+
+    state remove_metafile_dspace
+    {
         run remove_remove_dspace;
+        success => remove_metafile_keyvals;
+        default => return;
+    }
+
+    state remove_metafile_keyvals
+    {
+        run remove_metafile_keyvals;
+        success => check_metafile_keyvals;
+        default => return;
+    }
+
+    state check_metafile_keyvals
+    {
+        run check_metafile_keyvals;
         default => return;
     }
 
@@ -340,6 +363,11 @@ static PINT_sm_action remove_verify_object_metadata(
             "dirdata object before removing directory itself.\n");
     }
 
+    if (a_p->objtype == PVFS_TYPE_METAFILE)
+    {
+       js_p->error_code = STATE_TYPE_METAFILE;
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -356,6 +384,13 @@ static PINT_sm_action remove_get_dirent_count(
     }
     js_p->error_code = 0;
 
+    s_op->u.remove.key = calloc(1,sizeof(*s_op->u.remove.key));
+    if (!s_op->u.remove.key)
+    {
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+
     gossip_debug(
             GOSSIP_SERVER_DEBUG,
             "remove: getting dirdata dirent_count...\n");
@@ -364,7 +399,7 @@ static PINT_sm_action remove_get_dirent_count(
         s_op->req->u.remove.fs_id,
         s_op->req->u.remove.handle, /* it's a dirdata handle */
         PVFS_ITERATE_START,
-        &s_op->u.remove.key,
+        s_op->u.remove.key,
         1,
         TROVE_KEYVAL_DIRECTORY_ENTRY,
         NULL,
@@ -1165,6 +1200,106 @@ static PINT_sm_action remove_remove_dspace(
 
     return ret;
 }
+
+/*
+ * Function: remove_metafile_keyvals
+ *
+ * Retrieve the keys in the keyval db associated with the given metafile handle.
+ */
+static PINT_sm_action remove_metafile_keyvals( struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   int ret = -PVFS_EINVAL;
+   int i;
+   job_id_t job_id;
+
+   js_p->error_code = 0;
+
+   /*If this is the first time through, we must initialize some variables */
+   if (s_op->u.remove.pos == 0)
+   {
+      s_op->u.remove.key_count = 10;
+      s_op->u.remove.key = calloc(s_op->u.remove.key_count,sizeof(*s_op->u.remove.key));
+      if (!s_op->u.remove.key)
+      {
+         js_p->error_code = -PVFS_ENOMEM;
+         return SM_ACTION_COMPLETE;
+      }
+      for (i=0; i<s_op->u.remove.key_count; i++)
+      {
+         s_op->u.remove.key[i].buffer = calloc(PVFS_MAX_XATTR_NAMELEN,sizeof(char));
+         s_op->u.remove.key[i].buffer_sz = sizeof(char)*PVFS_MAX_XATTR_NAMELEN;
+         if (!s_op->u.remove.key[i].buffer)
+         {
+            js_p->error_code = -PVFS_ENOMEM;
+            goto err_out;
+         }
+      }/*end for*/
+      s_op->u.remove.pos = PVFS_ITERATE_START;
+   }
+   else
+   {
+      for (i=0; i<s_op->u.remove.key_count; i++)
+      {
+          memset(&(s_op->u.remove.key[i].buffer),0,PVFS_MAX_XATTR_NAMELEN*sizeof(char));
+      }
+      memset(&s_op->u.remove.key,0,s_op->u.remove.key_count * sizeof(s_op->u.remove.key));
+   }
+
+   gossip_lerr("hande(%llu),position(%u),count(%d),buffer_sz(%d).\n"
+              ,llu(s_op->req->u.remove.handle)
+              ,(unsigned int)s_op->u.remove.pos
+              ,s_op->u.remove.key_count
+              ,s_op->u.remove.key[0].buffer_sz);
+
+   ret = job_trove_keyval_iterate_keys( s_op->req->u.remove.fs_id
+                                       ,s_op->req->u.remove.handle
+                                       ,s_op->u.remove.pos
+                                       ,s_op->u.remove.key
+                                       ,s_op->u.remove.key_count
+                                       ,0
+                                       ,NULL
+                                       ,smcb
+                                       ,0
+                                       ,js_p
+                                       ,&job_id
+                                       ,server_job_context
+                                       ,s_op->req->hints);
+   return ret;
+
+err_out:
+
+   return SM_ACTION_COMPLETE;
+}/*end remove_metafile_keyvals*/
+
+
+
+/*
+ * Function: check_metafile_keyvals
+ *
+ * Inspect keys returned from keyval iterate.
+ */
+static PINT_sm_action check_metafile_keyvals( struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+
+
+   gossip_lerr("Entering check_metafile_keyvals...\n");
+
+   gossip_lerr("js_p->count : %d.\n",js_p->count);
+   gossip_lerr("js_p->position : %u.\n",(unsigned int)js_p->position);
+
+   if (js_p->count > 0)
+   {
+      gossip_lerr("key[0].buffer:%s.\n",(char *)s_op->u.remove.key[0].buffer);
+   }
+
+
+   return SM_ACTION_COMPLETE;
+}/*end check_metafile_keyvals*/
 
 /*
  * Function: remove_cleanup
