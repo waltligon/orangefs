@@ -17,8 +17,8 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
-PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=6
+PVFS2_VERSION_MINOR=9
+PVFS2_VERSION_SUB=0
 #PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
@@ -78,7 +78,7 @@ AC_CHECK_HEADER([linux/types.h],
 AC_CHECK_HEADER([linux/malloc.h],
         [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
 
-dnl These are kernel headers checked in maint/config/kernel.m4
+dnl Kernel Headers checked in maint/config/kernel.m4
 dnl AC_CHECK_HEADERS([linux/compat.h])
 dnl AC_CHECK_HEADERS([linux/exportfs.h])
 dnl AC_CHECK_HEADERS([linux/ioctl32.h])
@@ -243,14 +243,54 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
-AC_ARG_WITH(openssl,
-    [  --with-openssl=<dir>    Build with openssl (default=/usr)
-       --without-openssl       Don't build with openssl.],
-    [AX_OPENSSL(${withval})],
-    [AX_OPENSSL_OPTIONAL])
+dnl locate OpenSSL libraries
+AX_OPENSSL
 
 dnl check to see if the "fast" getgrouplist function is available
-dnl AX_GETGROUPLIST
+AX_GETGROUPLIST
+
+dnl check for key-based security
+AC_ARG_ENABLE(security-key,
+[  --enable-security-key   Enables key-based security],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY_KEY=1
+    AC_DEFINE(ENABLE_SECURITY_KEY, 1, Define if key-based security is enabled)
+else
+    ENABLE_SECURITY_KEY=
+fi],
+[ENABLE_SECURITY_KEY=]
+)
+AC_SUBST(ENABLE_SECURITY_KEY)
+
+dnl check for cert-based-security 
+AC_ARG_ENABLE(security-cert,
+[  --enable-security-cert  Enables certificate-based security],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY_CERT=1
+    AC_DEFINE(ENABLE_SECURITY_CERT, 1, Define if certificate-based security is enabled)
+else
+    ENABLE_SECURITY_CERT=
+fi],
+[ENABLE_SECURITY_CERT=]
+)
+AC_SUBST(ENABLE_SECURITY_CERT)
+
+if test "x$ENABLE_SECURITY_KEY" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x1"; then
+    AC_MSG_ERROR([Only one of --enable-security-key and --enable-security-cert may be used])
+fi
+
+dnl OpenSSL is required for robust security
+if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) -a "x$OPENSSL_CPPFLAGS" = "x"; then
+    AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
+fi
+
+dnl locate LDAP libraries
+AX_LDAP
+
+dnl certificate security requires LDAP
+if test "x$ENABLE_SECURITY_CERT" = "x1" -a "x$LDAP_LIB" = "x"; then
+    AC_MSG_ERROR([OpenLDAP required for certificate-based security (use --with-ldap)])
+fi
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -911,7 +951,7 @@ fi])
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
 AC_LINK_IFELSE(
-[
+[AC_LANG_SOURCE([
 #define _GNU_SOURCE 1
 #include <dlfcn.h>
 main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
@@ -921,11 +961,12 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
     AC_MSG_RESULT(yes)
     LIBS="$LIBS -ldl"
 ])
+])
 
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
-[  --enable-ucache         Do not enable user user interface data cache.],
+[  --enable-ucache         Enable user interface data cache.],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
       [Should we enable user interface data cache.])
@@ -938,6 +979,23 @@ AC_SUBST(BUILD_UCACHE)],
 [AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
     [Should we enable user interface data cache.])
 AC_SUBST(BUILD_UCACHE)])
+
+dnl Method to enable JNI prefixed stdio and posix calls
+BUILD_JNI=
+AC_ARG_ENABLE(jni,
+[  --enable-jni         Enable PVFS Client JNI.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_JNI_ENABLE, 1,
+      [Should we enable PVFS Client JNI.])
+   BUILD_JNI=1
+else
+   AC_DEFINE(PVFS_JNI_ENABLE, 0,
+      [Should we enable PVFS Client JNI.])
+fi
+AC_SUBST(BUILD_JNI)],
+[AC_DEFINE(PVFS_JNI_ENABLE, 0,
+    [Should we enable PVFS Client JNI.])
+AC_SUBST(BUILD_JNI)])
 
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
@@ -1022,10 +1080,10 @@ AC_ARG_WITH(valgrind,
     save_cppflags="$CPPFLAGS"
     AC_MSG_CHECKING(for valgrind.h usability)
     if test "x$withval" = xyes ; then
-	AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes)
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes)
 	if test x$found = xno ; then
 	    CPPFLAGS="$CPPFLAGS -I/usr/include/valgrind"
-	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+	    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes,
 		CPPFLAGS="$save_cppflags")
 	fi
     else
@@ -1033,7 +1091,7 @@ AC_ARG_WITH(valgrind,
 	         $withval/valgrind $withval/include/valgrind
 	do
 	    CPPFLAGS="$CPPFLAGS -I$d"
-	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+	    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes,
 		CPPFLAGS="$save_cppflags")
 	    if test x$found = xyes ; then
 		break
@@ -1417,6 +1475,7 @@ src/common/llist/module.mk
 src/common/statecomp/module.mk
 src/common/events/module.mk
 src/common/mgmt/module.mk
+src/common/security/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -1532,6 +1591,18 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
+if test "x$ENABLE_SECURITY_KEY" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with key-based security          : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with key-based security          :  no])
+fi
+
+if test "x$ENABLE_SECURITY_CERT" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with certificate-based security  : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with certificate-based security  :  no])
+fi
+
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 server will be built                        : yes])
 else
@@ -1550,6 +1621,13 @@ if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
+
+fi
+
+if test "x$BUILD_JNI" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
+else
+   AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
 
 fi
 
