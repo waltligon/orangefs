@@ -19,6 +19,7 @@
 #include "trove-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-mirror.h"
 
 #define COLLECTION_FILE         "collections.db"
 #define STORAGE_FILE            "storage_attributes.db"
@@ -379,7 +380,6 @@ void print_keyval( DBT key, DBT val )
     uint64_t vh, kh;
     uint32_t vi;
 
-
     k = key.data;
     if (hex)
         printf("(%llx)", llu(k->handle));
@@ -495,6 +495,100 @@ void print_keyval( DBT key, DBT val )
                 {
                     c = (unsigned char *)(val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
+                }
+                printf("\n");
+            }
+            else if( strncmp(k->key, USER_PVFS2_MIRROR_MODE, sizeof(USER_PVFS2_MIRROR_MODE)) == 0)
+            {
+                int32_t mirror_mode = *(int32_t *)val.data;
+                printf("(%s)(%d) -> ", USER_PVFS2_MIRROR_MODE, key.size);
+                switch( mirror_mode )
+                {
+                   case NO_MIRRORING:
+                   {
+                      printf("Mirroring is OFF.\n");
+                      break;
+                   }
+                   case MIRROR_ON_IMMUTABLE:
+                   {
+                      printf("Mirror on Immutable.\n");
+                      break;
+                   }
+                   case MIRROR_ON_WRITE:
+                   {
+                      printf("Mirror on Write.\n");
+                      break;
+                   }
+                   default:
+                   {
+                      printf("Unrecognized mirroring mode(%d).\n",mirror_mode);
+                      break;
+                   }
+                }/*end switch*/
+            }
+            else if( strncmp(k->key,USER_PVFS2_MIRROR_COPIES,sizeof(USER_PVFS2_MIRROR_COPIES))==0)
+            {
+                printf("(%s)(%d) -> %u.\n",USER_PVFS2_MIRROR_COPIES,key.size
+                                          ,*(unsigned int *)val.data);
+                
+            }
+            else if( strncmp(k->key,USER_PVFS2_MIRROR_LAYOUT_SIZE,sizeof(USER_PVFS2_MIRROR_LAYOUT_SIZE))==0)
+            {
+                printf("(%s)(%d) -> %d.\n",USER_PVFS2_MIRROR_LAYOUT_SIZE,key.size
+                                          ,*(int *)val.data);
+            }
+            else if( strncmp(k->key,USER_PVFS2_MIRROR_LAYOUT,sizeof(USER_PVFS2_MIRROR_LAYOUT))==0)
+            {
+                printf("(%s)(%d) -> ",USER_PVFS2_MIRROR_LAYOUT,key.size);
+                PVFS_sys_layout *layout = (PVFS_sys_layout *)val.data;
+                int32_t algorithm = (int32_t)layout->algorithm;
+                switch(algorithm)
+                {  
+                   case PVFS_SYS_LAYOUT_NONE:
+                   {
+                      printf("PVFS_SYS_LAYOUT_NONE.\n");
+                      break;
+                   }
+                   case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+                   {
+                      printf("PVFS_SYS_LAYOUT_ROUND_ROBIN.\n");
+                      break;
+                   }
+                   case PVFS_SYS_LAYOUT_RANDOM:
+                   {
+                      printf("PVFS_SYS_LAYOUT_RANDOM.\n");
+                      break;
+                   }
+                   case PVFS_SYS_LAYOUT_LIST:
+                   {
+                      printf("PVFS_SYS_LAYOUT_LIST.\n");
+                      break;
+                   }
+                   default:
+                   {
+                      printf("Unrecognized replication layout(%d).\n",algorithm);
+                      break;
+                   }
+                }/*end switch*/
+            }
+            else if ( strncmp(k->key,USER_PVFS2_MIRROR_HANDLES,sizeof(USER_PVFS2_MIRROR_HANDLES))==0)
+            {
+                printf("(%s)(%d) -> ",USER_PVFS2_MIRROR_HANDLES,key.size);
+                PVFS_handle *handle;
+                for (handle=(PVFS_handle *)val.data; (char *)handle < (char *)val.data + val.size; handle++)
+                {
+                    printf("(%llu) ",llu(*handle));
+                }
+                printf("\n");
+            }
+            else if ( strncmp(k->key,USER_PVFS2_MIRROR_STATUS,sizeof(USER_PVFS2_MIRROR_STATUS))==0)
+            {
+                printf("(%s)(%d) -> ",USER_PVFS2_MIRROR_STATUS,key.size);
+                uint64_t *status;
+                int i;
+                for (status=(uint64_t *)val.data,i=0; (char *)status < (char *)val.data + val.size; status++,i++)
+                {
+                    printf("(handle %d)(%llu) ",i,llu(*status));
                 }
                 printf("\n");
             }
