@@ -1494,8 +1494,8 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
    /* setup user.pvfs2.mirror.status - the status of each handle in the replication. */
    xattr_req->u.seteattr.key[key_count].buffer = strdup(USER_PVFS2_MIRROR_STATUS);
    xattr_req->u.seteattr.key[key_count].buffer_sz = sizeof(USER_PVFS2_MIRROR_STATUS);
-   xattr_req->u.seteattr.val[key_count].buffer = calloc(total_servers,sizeof(PVFS_handle));
-   xattr_req->u.seteattr.val[key_count].buffer_sz = total_servers*sizeof(PVFS_handle);
+   xattr_req->u.seteattr.val[key_count].buffer = calloc(total_servers,sizeof(uint64_t));
+   xattr_req->u.seteattr.val[key_count].buffer_sz = total_servers*sizeof(uint64_t);
    if ( !xattr_req->u.seteattr.key[key_count].buffer || !xattr_req->u.seteattr.val[key_count].buffer )
    {
       gossip_lerr("Unable to allocate memory.\n");
