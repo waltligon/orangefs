@@ -1591,7 +1591,7 @@ int PINT_dbpf_keyval_iterate(
     TROVE_keyval_s *val = NULL;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "Entered: PINT_dpbf_keyval_iterate\n");
+                 "Entered: PINT_dpbf_keyval_iterate...handle(%llu)\n",llu(handle));
 
     skey.buffer = keybuffer;
     skey.buffer_sz = PVFS_NAME_MAX;

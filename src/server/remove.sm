@@ -37,9 +37,8 @@
  * 2) check_object_type
  * 3) verify_object_metadata
  * 4) remove_dspace
- * 5) remove attributes from keyval, includes extended attributes.
- * 6) final_response
- * 7) cleanup
+ * 5) final_response
+ * 6) cleanup
  *
  * For dirdata, the path is:
  * 1) prelude
@@ -76,7 +75,6 @@ enum
     STATE_TYPE_DIRECTORY = 1,
     STATE_TYPE_DATAFILE  = 2,
     STATE_TYPE_DIRDATA   = 3,
-    STATE_TYPE_METAFILE  = 4,
     REBUILD_DONE
 };
 
@@ -196,7 +194,6 @@ nested machine pvfs2_remove_work_sm
     state verify_object_metadata
     {
         run remove_verify_object_metadata;
-        STATE_TYPE_METAFILE => remove_metafile_dspace;
         STATE_TYPE_DIRECTORY => remove_dirdata_handles;
         success => remove_dspace;
         default => return;
@@ -206,26 +203,6 @@ nested machine pvfs2_remove_work_sm
     {
        run remove_remove_dspace;
        default => return;
-    }
-
-    state remove_metafile_dspace
-    {
-        run remove_remove_dspace;
-        success => remove_metafile_keyvals;
-        default => return;
-    }
-
-    state remove_metafile_keyvals
-    {
-        run remove_metafile_keyvals;
-        success => check_metafile_keyvals;
-        default => return;
-    }
-
-    state check_metafile_keyvals
-    {
-        run check_metafile_keyvals;
-        default => return;
     }
 
     state getattr_of_dirdata_handle
@@ -361,11 +338,6 @@ static PINT_sm_action remove_verify_object_metadata(
 	gossip_debug(
             GOSSIP_SERVER_DEBUG, "  type is directory; removing "
             "dirdata object before removing directory itself.\n");
-    }
-
-    if (a_p->objtype == PVFS_TYPE_METAFILE)
-    {
-       js_p->error_code = STATE_TYPE_METAFILE;
     }
 
     return SM_ACTION_COMPLETE;
