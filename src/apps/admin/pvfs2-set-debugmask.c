@@ -257,24 +257,41 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "\t[ disable debugging on the specified server only "
             " ]\n\n");
     fprintf(stderr, "Available masks include:\n");
-
+    
+    int max_dbg_keyword_len = 0;
     while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
     {
-        if (strlen(mask) < 6)
+        int length = strlen(mask);
+        if(length > max_dbg_keyword_len)
         {
-            fprintf(stderr,"\t%s  \t",mask);
+            max_dbg_keyword_len = length;
         }
-        else
-        {
-            fprintf(stderr,"\t%s  ",mask);
-        }
+    }
 
+    i = 0;
+    mask = NULL;
+    int spacing = max_dbg_keyword_len + 4;
+    while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
+    {
+        if((i % 4) == 1)
+        {
+            fprintf(stderr, "    ");
+        }
+        fprintf(stderr,"%s",mask);
+        if((i % 4) != 0)
+        {
+            int j;
+            for(j = 0; j < (spacing - strlen(mask)); j++)
+            {
+                putc((int) ' ', stderr);
+            }
+        }
         if ((i % 4) == 0)
         {
             fprintf(stderr,"\n");
         }
     }
-    fprintf(stderr, "\n");
+    fprintf(stderr,"\n");
 }
 
 /*
