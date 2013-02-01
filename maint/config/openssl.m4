@@ -15,7 +15,7 @@ AC_DEFUN([AX_OPENSSL],
         LIBS="$LIBS -lcrypto -lssl"
     
         AC_COMPILE_IFELSE(
-    	    [#include "openssl/bio.h"],
+    	    [AC_LANG_SOURCE([[#include "openssl/bio.h"]])],
     	    [],
     	    [AC_MSG_ERROR(Invalid openssl path specified.  No openssl/bio.h found.)])
     
@@ -40,7 +40,7 @@ AC_DEFUN([AX_OPENSSL_OPTIONAL],
     LIBS="$LIBS -lcrypto -lssl"
 
     AC_COMPILE_IFELSE(
-      [#include "openssl/bio.h"],
+      [AC_LANG_SOURCE([[#include "openssl/bio.h"]])],
       [],
       [AC_MSG_WARN(No openssl headers found.)])
 

@@ -17,14 +17,14 @@ AC_DEFUN([AX_BERKELEY_DB],
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
 		AC_COMPILE_IFELSE(
-			[#include "$dbpath/include/$dbheader/db.h"],
+			[AC_LANG_SOURCE([[#include "$dbpath/include/$dbheader/db.h"]])],
 			[DB_CFLAGS="-I$dbpath/include/$dbheader/"
 			 break])
 	done
 
 	if test "x$dbheader" = "xnotfound"; then
 		AC_COMPILE_IFELSE(
-			[#include "$dbpath/include/db.h"],
+			[AC_LANG_SOURCE([[#include "$dbpath/include/db.h"]])],
 			[DB_CFLAGS="-I$dbpath/include/"],
 			[AC_MSG_FAILURE(
 				Invalid libdb path specified. No db.h found.)])
