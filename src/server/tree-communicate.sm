@@ -282,7 +282,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     s_op->req->u.tree_remove.credential,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[i],
-                    s_op->req->hints);
+                    s_op->req->hints,
+                    0,
+                    NULL);
 
                 break;
             }

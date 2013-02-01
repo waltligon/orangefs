@@ -888,7 +888,7 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
         s_op->u.mgmt_create_root_dir.credential,
         s_op->target_fs_id,
         s_op->u.mgmt_create_root_dir.lost_and_found_handle,
-        NULL);
+        NULL,0,NULL);
 
     msg_p->fs_id = s_op->target_fs_id;
     msg_p->handle = 

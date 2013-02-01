@@ -72,9 +72,10 @@ static int remove_remove_dirdata_handles_comp_fn(
 
 enum
 {
-    STATE_TYPE_DIRECTORY = 1,
-    STATE_TYPE_DATAFILE  = 2,
-    STATE_TYPE_DIRDATA   = 3,
+    STATE_TYPE_DIRECTORY   = 1,
+    STATE_TYPE_DATAFILE    = 2,
+    STATE_TYPE_DIRDATA     = 3,
+    STATE_TYPE_POOL_RETURN = 4,
     REBUILD_DONE
 };
 
@@ -186,8 +187,15 @@ nested machine pvfs2_remove_work_sm
     {
         run remove_check_object_type;
         success => verify_object_metadata;
+        STATE_TYPE_POOL_RETURN => get_preallocate_pools;
         STATE_TYPE_DATAFILE => remove_dspace;
         STATE_TYPE_DIRDATA => getattr_of_dirdata_handle;
+        default => return;
+    }
+
+    state get_preallocate_pools
+    {
+        run get_preallocate_pools;
         default => return;
     }
 
@@ -294,6 +302,12 @@ static PINT_sm_action remove_check_object_type(
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "  type is dirdata; checking "
             "dirent_count before removing dirdata itself.\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    if ( (s_op->attr.objtype == PVFS_TYPE_METAFILE) && (s_op->req->u.remove.pool_count == 0) )
+    {
+        js_p->error_code = STATE_TYPE_POOL_RETURN;
         return SM_ACTION_COMPLETE;
     }
 
@@ -755,7 +769,9 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
             s_op->req->u.remove.credential,
             s_op->req->u.remove.fs_id,
             attr_p->u.dir.dirdata_handles[i],
-            s_op->req->hints);
+            s_op->req->hints,
+            0,
+            NULL);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = s_op->req->u.remove.fs_id;
@@ -1174,104 +1190,21 @@ static PINT_sm_action remove_remove_dspace(
 }
 
 /*
- * Function: remove_metafile_keyvals
+ * Function: get_preallocate_pools
  *
- * Retrieve the keys in the keyval db associated with the given metafile handle.
+ * Retrieve the handles that identify the preallocated handle pools.
  */
-static PINT_sm_action remove_metafile_keyvals( struct PINT_smcb *smcb,
-                                               job_status_s *js_p)
-{
-   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   int ret = -PVFS_EINVAL;
-   int i;
-   job_id_t job_id;
-
-   js_p->error_code = 0;
-
-   /*If this is the first time through, we must initialize some variables */
-   if (s_op->u.remove.pos == 0)
-   {
-      s_op->u.remove.key_count = 10;
-      s_op->u.remove.key = calloc(s_op->u.remove.key_count,sizeof(*s_op->u.remove.key));
-      if (!s_op->u.remove.key)
-      {
-         js_p->error_code = -PVFS_ENOMEM;
-         return SM_ACTION_COMPLETE;
-      }
-      for (i=0; i<s_op->u.remove.key_count; i++)
-      {
-         s_op->u.remove.key[i].buffer = calloc(PVFS_MAX_XATTR_NAMELEN,sizeof(char));
-         s_op->u.remove.key[i].buffer_sz = sizeof(char)*PVFS_MAX_XATTR_NAMELEN;
-         if (!s_op->u.remove.key[i].buffer)
-         {
-            js_p->error_code = -PVFS_ENOMEM;
-            goto err_out;
-         }
-      }/*end for*/
-      s_op->u.remove.pos = PVFS_ITERATE_START;
-   }
-   else
-   {
-      for (i=0; i<s_op->u.remove.key_count; i++)
-      {
-          memset(&(s_op->u.remove.key[i].buffer),0,PVFS_MAX_XATTR_NAMELEN*sizeof(char));
-      }
-      memset(&s_op->u.remove.key,0,s_op->u.remove.key_count * sizeof(s_op->u.remove.key));
-   }
-
-   gossip_lerr("hande(%llu),position(%u),count(%d),buffer_sz(%d).\n"
-              ,llu(s_op->req->u.remove.handle)
-              ,(unsigned int)s_op->u.remove.pos
-              ,s_op->u.remove.key_count
-              ,s_op->u.remove.key[0].buffer_sz);
-
-   ret = job_trove_keyval_iterate_keys( s_op->req->u.remove.fs_id
-                                       ,s_op->req->u.remove.handle
-                                       ,s_op->u.remove.pos
-                                       ,s_op->u.remove.key
-                                       ,s_op->u.remove.key_count
-                                       ,0
-                                       ,NULL
-                                       ,smcb
-                                       ,0
-                                       ,js_p
-                                       ,&job_id
-                                       ,server_job_context
-                                       ,s_op->req->hints);
-   return ret;
-
-err_out:
-
-   return SM_ACTION_COMPLETE;
-}/*end remove_metafile_keyvals*/
-
-
-
-/*
- * Function: check_metafile_keyvals
- *
- * Inspect keys returned from keyval iterate.
- */
-static PINT_sm_action check_metafile_keyvals( struct PINT_smcb *smcb,
-                                              job_status_s *js_p)
+static PINT_sm_action get_preallocate_pools( struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 
-
-   gossip_lerr("Entering check_metafile_keyvals...\n");
-
-   gossip_lerr("js_p->count : %d.\n",js_p->count);
-   gossip_lerr("js_p->position : %u.\n",(unsigned int)js_p->position);
-
-   if (js_p->count > 0)
-   {
-      gossip_lerr("key[0].buffer:%s.\n",(char *)s_op->u.remove.key[0].buffer);
-   }
-
-
    return SM_ACTION_COMPLETE;
-}/*end check_metafile_keyvals*/
+}/*end get_preallocate_pools*/
+
+
+
 
 /*
  * Function: remove_cleanup

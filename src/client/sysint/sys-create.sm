@@ -1194,7 +1194,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
      {
         gossip_lerr("Error allocating memory..\n");
         js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
+        goto err_out;
      } 
 
      /* checking the primary list */
@@ -1292,7 +1292,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
            *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             msgpair_handle,
-            sm_p->hints);
+            sm_p->hints,0,NULL);
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = msgpair_handle;
@@ -1308,8 +1308,16 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 
 err_out:
+    if (remote_handles)
+       free(remote_handles);
+    if (local_handles)
+       free(local_handles);
+    if (remote_bmi_addrs)
+       free(remote_bmi_addrs);
+    if (local_bmi_addrs)
+       free(local_bmi_addrs);
     return SM_ACTION_COMPLETE;
-}
+}/*end create_delete_handles_setup_msgpair_array*/
 
 
 /*

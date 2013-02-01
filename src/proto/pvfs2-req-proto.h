@@ -345,25 +345,34 @@ endecode_fields_1a_struct(
 
 /* remove *****************************************************/
 /* - used to remove an existing metafile or datafile object */
+/* - and to return preallocated datafile handles to their respective pools */
 
 struct PVFS_servreq_remove
 {
     PVFS_handle handle;
     PVFS_fs_id  fs_id;
     PVFS_credential credential;
+    uint64_t pool_count;
+    PVFS_handle *pool_handles;
 };
-endecode_fields_3_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_remove,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    PVFS_credential, credential);
+    PVFS_credential, credential,
+    uint64_t,pool_count,
+    PVFS_handle,pool_handles);
+#define extra_size_PVFS_servreq_remove \
+    (sizeof(PVFS_handle)*PVFS_REQ_LIMIT_HANDLES_COUNT)
 
 #define PINT_SERVREQ_REMOVE_FILL(__req,   \
                                  __cap,   \
                                  __cred,  \
                                  __fsid,  \
                                  __handle,\
-                                 __hints) \
+                                 __hints, \
+                                 __pool_count, \
+                                 __pool_handles) \
 do {                                      \
     memset(&(__req), 0, sizeof(__req));   \
     (__req).op = PVFS_SERV_REMOVE;        \
@@ -372,6 +381,8 @@ do {                                      \
     (__req).hints = (__hints);            \
     (__req).u.remove.fs_id = (__fsid);    \
     (__req).u.remove.handle = (__handle); \
+    (__req).u.remove.pool_count = (__pool_count); \
+    (__req).u.remove.pool_handles = (__pool_handles); \
 } while (0)
 
 struct PVFS_servreq_batch_remove

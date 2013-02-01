@@ -145,7 +145,9 @@ static void lebf_initialize(void)
             case PVFS_SERV_IMM_COPIES:
                  break;
             case PVFS_SERV_REMOVE:
-                /* nothing special, let normal encoding work */
+                 req.u.remove.pool_count = 0;
+                 /* can return pool handles to preallocation pools */
+                 reqsize = extra_size_PVFS_servreq_remove;
                 break;
             case PVFS_SERV_BATCH_REMOVE:
                 req.u.batch_remove.handles = NULL;
