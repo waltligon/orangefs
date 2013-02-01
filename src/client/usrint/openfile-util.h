@@ -49,6 +49,8 @@ extern int pvfs_free_descriptor(int fd);
 
 extern int pvfs_descriptor_table_size(void);
 
+extern int pvfs_descriptor_table_next(int start);
+
 extern int pvfs_create_file(const char *filename,
                             mode_t mode,
                             PVFS_object_ref parent_ref,

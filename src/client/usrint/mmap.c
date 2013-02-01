@@ -93,11 +93,10 @@ int pvfs_munmap(void *start, size_t length)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if (defined(__SIZEOF_POINTER__) && defined(__SIZEOF_LONG__)) && \
-    (__SIZEOF_POINTER__ == __SIZEOF_LONG__)
-    if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
+#if PVFS2_SIZEOF_VOIDP == 64
+    if (((uint64_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
-    if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)
+    if (((uint32_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #endif
     {
         errno = EINVAL;
@@ -138,11 +137,10 @@ int pvfs_msync(void *start, size_t length, int flags)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if (defined(__SIZEOF_POINTER__) && defined(__SIZEOF_LONG__)) && \
-    (__SIZEOF_POINTER__ == __SIZEOF_LONG__)
-    if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
+#if PVFS2_SIZEOF_VOIDP == 64
+    if (((uint64_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
-    if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)
+    if (((uint32_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #endif
     {
         errno = EINVAL;
