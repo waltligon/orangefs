@@ -236,7 +236,10 @@ static struct options *parse_args(int argc, char **argv)
 static void usage(int argc, char **argv)
 {
     int i = 0;
+    int j = 0;
     const char *mask = NULL;
+    int max_dbg_keyword_len = 0;
+    int spacing = 0;
 
     fprintf(stderr, "Usage: %s [OPTION] <mask_list>\n\n",
             argv[0]);
@@ -258,7 +261,6 @@ static void usage(int argc, char **argv)
             " ]\n\n");
     fprintf(stderr, "Available masks include:\n");
     
-    int max_dbg_keyword_len = 0;
     while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
     {
         int length = strlen(mask);
@@ -270,7 +272,7 @@ static void usage(int argc, char **argv)
 
     i = 0;
     mask = NULL;
-    int spacing = max_dbg_keyword_len + 4;
+    spacing = max_dbg_keyword_len + 4;
     while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
     {
         if((i % 4) == 1)
@@ -280,7 +282,6 @@ static void usage(int argc, char **argv)
         fprintf(stderr,"%s",mask);
         if((i % 4) != 0)
         {
-            int j;
             for(j = 0; j < (spacing - strlen(mask)); j++)
             {
                 putc((int) ' ', stderr);
