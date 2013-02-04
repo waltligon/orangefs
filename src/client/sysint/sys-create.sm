@@ -100,7 +100,7 @@ machine pvfs2_client_create_sm
     {
         jump pvfs2_msgpairarray_sm;
         /*success => cleanup;*/
-        success => delete_handles_setup_msgpair_array;
+        success => return_remote_handles_setup_msgpair;
         default => crdirent_failure;
     }
 
@@ -108,7 +108,8 @@ machine pvfs2_client_create_sm
     {
         run create_crdirent_failure;
         success => crdirent_getattr;
-        default => delete_handles_setup_msgpair_array;
+        /*default => delete_local_handles_setup_msgpair_array;*/
+        default => return_remote_handles_setup_msgpair;
     }
 
     state crdirent_getattr
@@ -117,8 +118,22 @@ machine pvfs2_client_create_sm
         success => crdirent_setup_msgpair;
         default => crdirent_failure;
     }              
+
+    state return_remote_handles_setup_msgpair
+    {
+        run return_remote_handles_setup_msgpair;
+        success => return_remote_handles_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state return_remote_handles_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => delete_local_handles_setup_msgpair_array;
+        /*default => cleanup;*/
+    }
         
-    state delete_handles_setup_msgpair_array
+    state delete_local_handles_setup_msgpair_array
     {
         run create_delete_handles_setup_msgpair_array;
         success => delete_handles_xfer_msgpair_array;
@@ -1108,20 +1123,38 @@ static int create_delete_handles_comp_fn(void *v_p,
                                          struct PVFS_server_resp *resp_p,
                                          int index)
 {
+    PINT_smcb *smcb = (PINT_smcb *)v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb,PINT_MSGPAIR_PARENT_SM);
+    struct PVFS_server_req *req = &(sm_p->msgarray_op.msgarray[index].req);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_delete_handles_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
 
     if (resp_p->status != 0)
     {
+        gossip_lerr( "Msgpair %d failed with status:%d\n", index,resp_p->status);
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "Failed to remove handle number %d\n", index);
+                     "Msgpair %d failed with status:%d\n", index,resp_p->status);
     }
+
+    if (req->u.remove.pool_count > 0)
+    {
+        gossip_lerr("Remote handles successfully returned to preallocate pools.\n");
+        gossip_err("cleaning up pool handles..\n");
+        free(req->u.remove.pool_handles);
+    } 
+
     return resp_p->status;
 }
 
-/* delete the newly created meta and data handles */
-static PINT_sm_action create_delete_handles_setup_msgpair_array(
+/* Setup local and remote handle arrays and then send a "remove" msgpair to the
+ * metadata server that returns the remote handles to their respective preallocated
+ * pools.  After the remote handles have been processed by the 
+ * server, then we can safely remove the local handles.  The remote handle return
+ * requires the metafile information on the server, so must be done first.
+ */
+static PINT_sm_action return_remote_handles_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1131,8 +1164,6 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     PVFS_BMI_addr_t metafile_bmi_addr=0;
     PVFS_BMI_addr_t datafile_bmi_addr=0;
     PVFS_handle metafile_handle=sm_p->u.create.metafile_handle;
-    const char *metafile_host=NULL;
-    int metafile_server_type;
 
     PVFS_handle *remote_handles=NULL;
     PVFS_handle *local_handles=NULL;
@@ -1151,13 +1182,6 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
 
     js_p->error_code = 0;
 
-    /* Send separate msgpairs for each local datahandle and one for the metafile
-     * handle.  Local data handles reside on the same server as the metafile handle
-     * as long as that server is a metadata AND I/O server.  Any non-local data
-     * handles will be returned to their respective pools on the metafile handle 
-     * server.
-     */
-
     /*Get the metafile handle's BMI address*/
     ret = PINT_cached_config_map_to_server(&metafile_bmi_addr
                                           ,metafile_handle
@@ -1170,100 +1194,167 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
        return SM_ACTION_COMPLETE;
     }
 
-    /*Get the metafile server's type information: I/O,META,BOTH?*/
-    metafile_host = PINT_cached_config_map_addr(sm_p->object_ref.fs_id
-                                               ,metafile_bmi_addr
-                                               ,&metafile_server_type);
-    if (!metafile_host)
-    {
-       gossip_lerr("Error mapping metafile bmi address(%d) to server type.\n",(int)metafile_bmi_addr);
-       js_p->error_code = -PVFS_EINVAL;
-       return SM_ACTION_COMPLETE;
-    }
-
     /*Create list of "remote" and "local" handles.  Check both the primary list of handles and
      *the replication list.
      */
-     remote_handles = calloc(local_remote_count, sizeof(*remote_handles));
-     local_handles  = calloc(local_remote_count, sizeof(*local_handles));    
+    remote_handles = calloc(local_remote_count, sizeof(*remote_handles));
+    local_handles  = calloc(local_remote_count, sizeof(*local_handles));    
 
-     remote_bmi_addrs = calloc(local_remote_count, sizeof(*remote_bmi_addrs));
-     local_bmi_addrs  = calloc(local_remote_count, sizeof(*local_bmi_addrs));
+    remote_bmi_addrs = calloc(local_remote_count, sizeof(*remote_bmi_addrs));
+    local_bmi_addrs  = calloc(local_remote_count, sizeof(*local_bmi_addrs));
                               
-     if (!remote_handles || !local_handles || !remote_bmi_addrs || !local_bmi_addrs)
-     {
-        gossip_lerr("Error allocating memory..\n");
-        js_p->error_code = -PVFS_ENOMEM;
+    if (!remote_handles || !local_handles || !remote_bmi_addrs || !local_bmi_addrs)
+    {
+       gossip_lerr("Error allocating memory..\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto err_out;
+    } 
+
+    /* checking the primary list; this list should ALWAYS have handles. */
+    for (i=0; i<sm_p->u.create.datafile_count; i++)
+    {
+        datafile_bmi_addr=0;
+        ret = PINT_cached_config_map_to_server(&datafile_bmi_addr
+                                              ,sm_p->u.create.datafile_handles[i]
+                                              ,sm_p->object_ref.fs_id);
+        if (ret)
+        {
+           gossip_lerr("Error mapping datafile handle(%llu) to bmi address\n"
+                      ,llu(sm_p->u.create.datafile_handles[i]));
+           js_p->error_code = -PVFS_EINVAL;
+           goto err_out;
+        }
+         
+        if ( datafile_bmi_addr == metafile_bmi_addr )
+        {
+           /*datafile resides on the same server as the metafile*/
+           local_handles[local_count]     = sm_p->u.create.datafile_handles[i];
+           local_bmi_addrs[local_count++] = datafile_bmi_addr;
+        }
+        else
+        {
+           /*datafile came from preallocate pool on metafile server*/
+           remote_handles[remote_count]     = sm_p->u.create.datafile_handles[i];
+           remote_bmi_addrs[remote_count++] = datafile_bmi_addr;
+        }
+    }/*end for*/
+
+
+    /* checking the replication handle list; this list could be empty. */
+    for (i=0; i<sm_p->u.create.total_number_of_replication_handles; i++)
+    {
+        ret = PINT_cached_config_map_to_server(&datafile_bmi_addr
+                                              ,sm_p->u.create.replication_handles[i]
+                                              ,sm_p->object_ref.fs_id);
+        if (ret)
+        {
+           gossip_lerr("Error mapping datafile handle(%llu) to bmi address\n"
+                      ,llu(sm_p->u.create.replication_handles[i]));
+           js_p->error_code = -PVFS_EINVAL;
+           goto err_out;
+        }
+        
+        if ( datafile_bmi_addr == metafile_bmi_addr )
+        {
+           /*datafile resides on the same server as the metafile*/
+           local_handles[local_count]     = sm_p->u.create.replication_handles[i];
+           local_bmi_addrs[local_count++] = datafile_bmi_addr;
+        }
+        else
+        {
+           /*datafile came from preallocate pool on metafile server*/
+           remote_handles[remote_count]     = sm_p->u.create.replication_handles[i];
+           remote_bmi_addrs[remote_count++] = datafile_bmi_addr;
+        }
+    }/*end for*/
+
+
+    /* The remote handles will be returned to their respective preallocation pools on
+     * the metadata server.
+     */
+   
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 1);
+    if(ret != 0)
+    {
+        gossip_err("Failed to initialize %d msgpairs\n", 1);
+        js_p->error_code = ret;
         goto err_out;
-     } 
+    }
 
-     /* checking the primary list */
-     for (i=0; i<sm_p->u.create.datafile_count; i++)
-     {
-         datafile_bmi_addr=0;
-         ret = PINT_cached_config_map_to_server(&datafile_bmi_addr
-                                               ,sm_p->u.create.datafile_handles[i]
-                                               ,sm_p->object_ref.fs_id);
-         if (ret)
-         {
-            gossip_lerr("Error mapping datafile handle(%llu) to bmi address\n"
-                       ,llu(sm_p->u.create.datafile_handles[i]));
-            js_p->error_code = -PVFS_EINVAL;
-            goto err_out;
-         }
-         
-         if ( datafile_bmi_addr == metafile_bmi_addr )
-         {
-            /*datafile resides on the same server as the metafile*/
-            local_handles[local_count]     = sm_p->u.create.datafile_handles[i];
-            local_bmi_addrs[local_count++] = datafile_bmi_addr;
-         }
-         else
-         {
-            /*datafile came from preallocate pool on metafile server*/
-            remote_handles[remote_count]     = sm_p->u.create.datafile_handles[i];
-            remote_bmi_addrs[remote_count++] = datafile_bmi_addr;
-         }
-     }/*end for*/
+    msg_p = &sm_p->msgarray_op.msgarray[0];
 
+    PINT_SERVREQ_REMOVE_FILL(
+        msg_p->req,
+        sm_p->getattr.attr.capability,
+       *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        metafile_handle,
+        sm_p->hints,
+        remote_count,
+        remote_handles);
 
-     /* checking the replication list */
-     for (i=0; i<sm_p->u.create.total_number_of_replication_handles; i++)
-     {
-         ret = PINT_cached_config_map_to_server(&datafile_bmi_addr
-                                               ,sm_p->u.create.replication_handles[i]
-                                               ,sm_p->object_ref.fs_id);
-         if (ret)
-         {
-            gossip_lerr("Error mapping datafile handle(%llu) to bmi address\n"
-                       ,llu(sm_p->u.create.datafile_handles[i]));
-            js_p->error_code = -PVFS_EINVAL;
-            goto err_out;
-         }
-         
-         if ( datafile_bmi_addr == metafile_bmi_addr )
-         {
-            /*datafile resides on the same server as the metafile*/
-            local_handles[local_count]     = sm_p->u.create.replication_handles[i];
-            local_bmi_addrs[local_count++] = datafile_bmi_addr;
-         }
-         else
-         {
-            /*datafile came from preallocate pool on metafile server*/
-            remote_handles[remote_count]     = sm_p->u.create.replication_handles[i];
-            remote_bmi_addrs[remote_count++] = datafile_bmi_addr;
-         }
-     }/*end for*/
+    msg_p->fs_id      = sm_p->object_ref.fs_id;
+    msg_p->handle     = metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn    = create_delete_handles_comp_fn;
+    msg_p->svr_addr   = metafile_bmi_addr;
 
+    ret=PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    if (ret)
+    {
+        gossip_lerr("Error pushing msgpair frame onto state machine stack.\n");
+        js_p->error_code = ret;
+        goto err_out;
+    }
+
+    /*save data to frame for the next recovery state*/
+    sm_p->u.create.cleanup_local_handles   = local_handles;
+    sm_p->u.create.cleanup_local_bmi_addrs = local_bmi_addrs;
+    sm_p->u.create.cleanup_local_count     = local_count;
+    sm_p->u.create.metafile_bmi_addr       = metafile_bmi_addr;
+
+    return SM_ACTION_COMPLETE;
+
+err_out:
+    if (remote_handles)
+       free(remote_handles);
+    if (local_handles)
+       free(local_handles);
+    if (remote_bmi_addrs)
+       free(remote_bmi_addrs);
+    if (local_bmi_addrs)
+       free(local_bmi_addrs);
+    return SM_ACTION_COMPLETE;
+}/*end return_remote_handles_setup_msgpair*/
+
+static PINT_sm_action create_delete_handles_setup_msgpair_array (
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_handle *local_handles        = sm_p->u.create.cleanup_local_handles;
+    PVFS_BMI_addr_t *local_bmi_addrs  = sm_p->u.create.cleanup_local_bmi_addrs;
+    unsigned int local_count          = sm_p->u.create.cleanup_local_count;
+    PVFS_BMI_addr_t metafile_bmi_addr = sm_p->u.create.metafile_bmi_addr;
+    PVFS_handle metafile_handle       = sm_p->u.create.metafile_handle;
+
+    PVFS_handle            msgpair_handle = 0;
+    PVFS_BMI_addr_t        msgpair_addr   = 0;
+    PINT_sm_msgpair_state *msg_p          = NULL;
+
+    int ret,i;
 
     /* Each local data handle and the metadata handle will be given their own
      * msg pair with a PVFS_SERV_REMOVE operation.  On the server side, the remove
      * state machine will remove the dspace entry associated with each data handle
      * and will remove the dspace entry AND keyval entries for the metafile handle.
-     * The remote data handles will be sent as a set to the metafile server and
-     * will be returned to their respective preallocation pools.
+     * NOTE: the keyval entries MAY include replication xattrs if replication had been
+     * enabled a the time of the create.
      */
    
+    js_p->error_code = 0;
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, (local_count+1));
     if(ret != 0)
     {
@@ -1281,8 +1372,8 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "create: posting data file remove req %d\n",i);
  
-        PVFS_handle msgpair_handle   = (i==local_count)?metafile_handle  :local_handles[i];
-        PVFS_BMI_addr_t msgpair_addr = (i==local_count)?metafile_bmi_addr:local_bmi_addrs[i];
+        msgpair_handle = (i==local_count)?metafile_handle  :local_handles[i];
+        msgpair_addr   = (i==local_count)?metafile_bmi_addr:local_bmi_addrs[i];
 
         gossip_lerr("Creating msgpair for handle(%llu)\n",llu(msgpair_handle));
 
@@ -1304,21 +1395,28 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                          "datafile handle %llu\n", llu(msg_p->handle));
     }/*end for*/
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
+    ret=PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    if (ret)
+    {
+        gossip_lerr("Error pushing msgpair frame onto state machine stack.\n");
+        js_p->error_code = ret;
+        goto err_out;
+    }
 
 err_out:
-    if (remote_handles)
-       free(remote_handles);
+
+    /*free unneeded resources*/
     if (local_handles)
        free(local_handles);
-    if (remote_bmi_addrs)
-       free(remote_bmi_addrs);
     if (local_bmi_addrs)
        free(local_bmi_addrs);
-    return SM_ACTION_COMPLETE;
-}/*end create_delete_handles_setup_msgpair_array*/
+    sm_p->u.create.cleanup_local_handles = NULL;
+    sm_p->u.create.cleanup_local_bmi_addrs = NULL;
+    sm_p->u.create.cleanup_local_count = 0;
 
+    return SM_ACTION_COMPLETE;
+
+}/*end create_delete_handles_setup_msgpair_array*/
 
 /*
  *

@@ -1264,7 +1264,7 @@ int PINT_cached_config_get_server_name(
     PVFS_handle handle,
     PVFS_fs_id fsid)
 {
-    const struct handle_lookup_entry* tmp_entry;
+    const struct handle_lookup_entry* tmp_entry=NULL;
 
     tmp_entry = find_handle_lookup_entry(handle, fsid);
 

@@ -203,6 +203,12 @@ struct PINT_client_create_sm
     /* returned replication data */
    int32_t total_number_of_replication_handles;
    PVFS_handle *replication_handles;
+
+   /* data needed during recovery/cleanup process */
+   PVFS_handle     *cleanup_local_handles;
+   PVFS_BMI_addr_t *cleanup_local_bmi_addrs;
+   unsigned int     cleanup_local_count;
+   PVFS_BMI_addr_t  metafile_bmi_addr;
 };
 
 struct PINT_client_mkdir_sm

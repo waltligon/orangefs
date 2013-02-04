@@ -76,6 +76,7 @@ enum
     STATE_TYPE_DATAFILE    = 2,
     STATE_TYPE_DIRDATA     = 3,
     STATE_TYPE_POOL_RETURN = 4,
+    REPLACE_DONE           = 5,
     REBUILD_DONE
 };
 
@@ -187,16 +188,17 @@ nested machine pvfs2_remove_work_sm
     {
         run remove_check_object_type;
         success => verify_object_metadata;
-        STATE_TYPE_POOL_RETURN => get_preallocate_pools;
+        STATE_TYPE_POOL_RETURN => return_handles_to_pools;
         STATE_TYPE_DATAFILE => remove_dspace;
         STATE_TYPE_DIRDATA => getattr_of_dirdata_handle;
         default => return;
     }
 
-    state get_preallocate_pools
+    state return_handles_to_pools
     {
-        run get_preallocate_pools;
-        default => return;
+        run return_handles_to_pools;
+        REPLACE_DONE => return;
+        default => return_handles_to_pools;
     }
 
     state verify_object_metadata
@@ -305,7 +307,7 @@ static PINT_sm_action remove_check_object_type(
         return SM_ACTION_COMPLETE;
     }
 
-    if ( (s_op->attr.objtype == PVFS_TYPE_METAFILE) && (s_op->req->u.remove.pool_count == 0) )
+    if ( (s_op->attr.objtype == PVFS_TYPE_METAFILE) && (s_op->req->u.remove.pool_count > 0) )
     {
         js_p->error_code = STATE_TYPE_POOL_RETURN;
         return SM_ACTION_COMPLETE;
@@ -1176,9 +1178,15 @@ static PINT_sm_action remove_remove_dspace(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
+    /*gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
                  "object %llu,%d\n", s_op, llu(s_op->req->u.remove.handle),
                  s_op->req->u.remove.fs_id);
+    */
+    gossip_lerr("(%p) remove: removing dspace "
+                 "object %llu,%d\n", s_op, llu(s_op->req->u.remove.handle),
+                 s_op->req->u.remove.fs_id);
+
+    js_p->error_code = 0;
 
     ret = job_trove_dspace_remove(
         s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
@@ -1190,18 +1198,79 @@ static PINT_sm_action remove_remove_dspace(
 }
 
 /*
- * Function: get_preallocate_pools
+ * Function: return_handles_to_pools
  *
  * Retrieve the handles that identify the preallocated handle pools.
  */
-static PINT_sm_action get_preallocate_pools( struct PINT_smcb *smcb,
-                                             job_status_s *js_p)
+static PINT_sm_action return_handles_to_pools( struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   int i,ret;
+   job_id_t job_id;
+   PVFS_handle pool_handle;
+   char data_server_name[PVFS_MAX_SERVER_ADDR_LEN] = {0};
+   int *index = &s_op->u.remove.index;
+
+   
+   if (*index == s_op->req->u.remove.pool_count)
+   {
+      js_p->error_code = REPLACE_DONE;
+      return SM_ACTION_COMPLETE;
+   }
+
+   js_p->error_code = 0;
+
+   gossip_lerr("Replication handles returned from client...\n");
+   for (i=0; i<s_op->req->u.remove.pool_count; i++)
+       gossip_err("handle[%d]:(%llu)\n",i,llu(s_op->req->u.remove.pool_handles[i]));
+
+   /* To return preallocated data handles to their respective pools, we must first find 
+    * out where they live!
+    */
+
+   gossip_lerr("PVFS_MAX_SERVER_ADDR_LEN(%d) \tpool_handle(%llu) \tfs_id(%d)\n"
+              ,PVFS_MAX_SERVER_ADDR_LEN
+              ,llu(s_op->req->u.remove.pool_handles[*index])
+              ,s_op->target_fs_id);
+
+   ret=PINT_cached_config_get_server_name( data_server_name
+                                          ,PVFS_MAX_SERVER_ADDR_LEN
+                                          ,s_op->req->u.remove.pool_handles[*index]
+                                          ,s_op->target_fs_id );
+   if (ret)
+   {
+      gossip_lerr("Error in PINT_cached_config_get_server_name for handle(%llu)\n"
+                 ,llu(s_op->req->u.remove.pool_handles[*index]));
+      js_p->error_code = ret;
+      return SM_ACTION_COMPLETE;
+   } 
+
+   gossip_lerr("data_server_name(%s) \tfs_id(%d)\n",data_server_name,s_op->target_fs_id);
 
 
-   return SM_ACTION_COMPLETE;
-}/*end get_preallocate_pools*/
+   /* this function DOES NOT call the job system. */
+   ret = job_precreate_pool_lookup_server( data_server_name
+                                          ,PVFS_TYPE_DATAFILE
+                                          ,s_op->target_fs_id
+                                          ,&pool_handle);
+
+   ret = job_precreate_pool_fill( pool_handle
+                                 ,s_op->target_fs_id
+                                 ,&s_op->req->u.remove.pool_handles[*index]
+                                 ,1
+                                 ,smcb
+                                 ,0
+                                 ,js_p
+                                 ,&job_id
+                                 ,server_job_context
+                                 ,s_op->req->hints );
+
+   (*index)++;
+
+   return (ret);
+
+}/*end return_handles_to_pools*/
 
 
 
