@@ -31,24 +31,6 @@ tail
 vfs-cp
 );
 
-#userlib tests - same as vfs test
-my @userlib_tests = qw(
-append
-append2
-bonnie
-dbench
-fdtree
-fstest
-fsx
-iozone
-ltp
-mkdir-vfs
-shelltest
-symlink-vfs
-tail
-vfs-cp
-);
-
 #mpi tests
 my @mpi_tests = qw(
 functions
@@ -74,7 +56,6 @@ stadler-file-view-test );
 my $sysint_idx = -1;
 my $vfs_idx = -1;
 my $mpi_idx = -1;
-my $userlib_idx = -1;
 
 # number of tests passed and failed
 my $failed = 0;
@@ -123,32 +104,7 @@ while (<LOGFILE>)
 		$sysint_idx++;
 		next;
 		}
-	# did we run vfs tests?
-	if ($line =~ /running userlib scripts/)
-		{
-		#print "vfs found";
-		$userlib_idx = 0;
-		next;
-		}
-	#print "checking sysint test number $sysint_idx $sysint_tests[$sysint_idx]\n";
-	
-	# test all the vfs scripts in the table
-	if ( $userlib_idx >= 0 && $userlib_idx < @userlib_tests)
-		{
-		#print "checking vfs test number $vfs_idx $vfs_tests[$vfs_idx]\n";
-		if ($line =~ /${userlib_tests[$userlib_idx]}(.*)FAILED/)
-			{
-			print "Test ${userlib_tests[$userlib_idx]} FAILED!\n";
-			$failed++;
-			
-			}
-		elsif ($line =~ /${userlib_tests[$userlib_idx]}(.*)OK/)
-			{
-			$passed++;
-			}
-		$userlib_idx++;
-		next;
-		}
+
 	# did we run vfs tests?
 	if ($line =~ /running vfs scripts/)
 		{
@@ -176,8 +132,6 @@ while (<LOGFILE>)
 		next;
 		}
 
-	
-		
 	# did we run mpi tests?
 	if ($line =~ /running mpi scripts/)
 		{

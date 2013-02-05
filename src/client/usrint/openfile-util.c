@@ -860,16 +860,21 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 
             memset(procpath, 0, 50);
             memset(dirpath, 0, PVFS_PATH_MAX);
-            sprintf(procpath, "/proc/self/%d", fd);
+            sprintf(procpath, "/proc/self/fd/%d", fd);
             len = glibc_ops.readlink(procpath, dirpath, PVFS_PATH_MAX);
             if (len < 0)
             {
                 /* error reading link */
+                /* silent for now */
+                /* we just won't have the path for this dir */
             }
-            /* stash the path */
-            pd->s->dpath = (char *)malloc(len + 1);
-            memset(pd->s->dpath, 0, len + 1);
-            memcpy(pd->s->dpath, procpath, len);
+            else
+            {
+                /* stash the path */
+                pd->s->dpath = (char *)malloc(len + 1);
+                memset(pd->s->dpath, 0, len + 1);
+                memcpy(pd->s->dpath, procpath, len);
+            }
         }
 	    pd->s->file_pointer = 0;
 	    pd->s->token = 0;

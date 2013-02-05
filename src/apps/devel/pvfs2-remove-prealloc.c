@@ -247,7 +247,9 @@ void print_keyval( DBT key, DBT val )
     }
     else if( key.size == 16 )
     {
-        kh = *(uint64_t *)k->key;
+        char *tmp;
+        tmp = k->key;
+        kh = *(uint64_t *)tmp;
         printf("(%llu)(%d) -> ", llu(kh), key.size);
     }
     else

@@ -39,7 +39,6 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 #SYSINT_SCRIPTS=~+/sysint-tests.d
 SYSINT_SCRIPTS=`pwd`/sysint-tests.d
 VFS_SCRIPTS=`pwd`/vfs-tests.d
-USERLIB_SCRIPTS=`pwd`/userlib-tests.d
 #VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
@@ -146,7 +145,6 @@ setup_vfs() {
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	sleep 10
 	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
 	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
 	
@@ -403,7 +401,7 @@ start_all_pvfs2() {
 
 	echo  "Starting PVFS2 on $my_host"
 	echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
-	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && LD_PRELOAD=$LD_PRELOAD ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
+	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
 		
 	else
 		echo  "Starting PVFS2 on $my_host"

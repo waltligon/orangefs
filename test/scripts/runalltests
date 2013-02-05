@@ -22,11 +22,11 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:duvhmLc:k:f:n:t: arguments
+while getopts s:i:a:dvhmc:k:f:n:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-L][-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
@@ -57,10 +57,6 @@ do
 		#echo "Running MPI tests"
 		RUN_MPI_TEST=1
 		;;
-	u)
-		#echo "Running MPI tests"
-		RUN_USERLIB_TEST=1
-		;;
 	c)
 		EC2CONFFILE=$OPTARG
 		;;
@@ -79,14 +75,8 @@ do
 	t)
 		VMTYPE=$OPTARG
 		;;
-	L)
-		RUN_LOCAL=1
-		;;
-		
 	esac
 done
-
-
 	
 #the parameters will change, but the basic functionality will not
 echo "DATE is ${DATE}"
@@ -100,10 +90,8 @@ echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
-echo "RUN_USERLIB_TEST is $RUN_USERLIB_TEST"
 echo "VMIPADDR is $VMIPADDR"
 echo "DELETE_INSTANCE is $DELETE_INSTANCE"
-echo "RUN_LOCAL is $RUN_LOCAL"
 
 
 export SVNBRANCH
@@ -117,41 +105,25 @@ export KEYNAME
 export EC2CONFFILE
 export DELETE_INSTANCE
 
-SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
-
 #Determine VM User from system
-if [ RUN_LOCAL ]
-then
-	uname -a | grep buntu && VMSYSTEM=cloud-ubuntu-12.04 
-	uname -a | grep el5 && VMSYSTEM=cloud-rhel5
-	uname -a | grep el6 && VMSYSTEM=cloud-rhel6
-	VMIPADDR=127.0.0.1
-	VMUSER=$USER
-	VFS_HOSTS=`hostname -s`
-	echo "Running locally"
-	pwd
-	ls
-	bash -s  < ./run-test.sh 
-else
-	case $VMSYSTEM in 
+case $VMSYSTEM in 
 
-		cloud-*buntu*|cloud-*mint*)
-			VMUSER=ubuntu
-			;;
-		cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
-			VMUSER=ec2-user
-			;;
-		*)
-			echo "System $VMSYSTEM not supported."
-			exit 1
-	esac
-
+	cloud-*buntu*|cloud-*mint*)
+		VMUSER=ubuntu
+		;;
+	cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
+		VMUSER=ec2-user
+		;;
+	*)
+		echo "System $VMSYSTEM not supported."
+		exit 1
+esac
 
 echo "VMUSER is $VMUSER"
 export VMUSER
 
 
-
+SVNBRANCH_SHORT=`echo $SVNBRANCH | awk -F"/" '{print $NF}'`
 
 #Look for configuration file
 if [ ! -f ${EC2CONFFILE} ] ; then 
@@ -219,22 +191,18 @@ do
 
 done
 
+
 echo ""
 echo "Running tests..."
 
-echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.sh 
 
 echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.txt logs-$DATETIME/
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/home/${VMUSER}/*.out logs-$DATETIME/
-
-fi
-
-
-
 
 # create link to latest logs so that buildbot can find them.
 rm `pwd`/logs-current

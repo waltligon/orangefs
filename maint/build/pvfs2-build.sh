@@ -12,12 +12,8 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-with_db_arg=""
-if [ $WITH_DB ] ; then
-	with_db_arg=--with-db=$WITH_DB
-fi
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --enable-shared --disable-karma $with_db_arg"
-#configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma $with_db_arg"
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma --with-db=/opt/db4"
+
 
 #
 # use this method if you want to test a release

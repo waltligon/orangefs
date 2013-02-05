@@ -160,7 +160,6 @@ fi
 exec 1<&6 6<&-
 exec 2<&7 7<&-
 
-RUN_USERLIB_TEST=1
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
@@ -192,8 +191,8 @@ then
 	exec 6<&1
 	exec 7<&2
 
-	exec 1>> ${REPORT_LOG}
-	exec 2>> ${REPORT_ERR} 
+	exec 1> ${REPORT_LOG}
+	exec 2> ${REPORT_ERR} 
 	echo ""
 	echo "running userlib scripts"
 	run_parts ${USERLIB_SCRIPTS}
@@ -202,7 +201,18 @@ then
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
 
-	
+	for f in *; do
+	# skip CVS
+		[ -d $f ] && continue
+		if [ -x $f ] ; then 
+		
+			pwd
+			ls
+			echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
+			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+		
+		fi
+	done
 fi
 
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
