@@ -39,6 +39,7 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 #SYSINT_SCRIPTS=~+/sysint-tests.d
 SYSINT_SCRIPTS=`pwd`/sysint-tests.d
 VFS_SCRIPTS=`pwd`/vfs-tests.d
+USERLIB_SCRIPTS=`pwd`/userint-tests.d
 #VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
