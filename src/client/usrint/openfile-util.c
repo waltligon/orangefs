@@ -577,6 +577,24 @@ int pvfs_descriptor_table_size(void)
     return descriptor_table_size;
 }
 
+int pvfs_descriptor_table_next(int start)
+{
+    int flags;
+    int i;
+    for (i = start; i < descriptor_table_size; i++)
+    {
+        if (!descriptor_table[i])
+        {
+            flags = glibc_ops.fcntl(i, F_GETFL);
+            if (flags < 0)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
 /*
  * Allocate a new pvfs_descriptor
  * initialize fsops to the given set

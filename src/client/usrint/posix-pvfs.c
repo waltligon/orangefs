@@ -20,7 +20,8 @@
 
 #define PVFS_ATTR_DEFAULT_MASK \
         (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE |\
-         PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET)
+         PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET |\
+         PVFS_ATTR_SYS_DIRENT_COUNT)
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
 static char pvfs_cwd[PVFS_PATH_MAX];
@@ -1884,6 +1885,8 @@ int pvfs_fcntl(int fd, int cmd, ...)
     /* long arg; */
     struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
+    long larg;
+    int tsz;
 
     debug("pvfs_fcntl: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
@@ -1897,6 +1900,30 @@ int pvfs_fcntl(int fd, int cmd, ...)
     switch (cmd)
     {
     case F_DUPFD :
+        larg = va_arg(ap, long);
+        tsz = pvfs_descriptor_table_size();
+        if (larg < 0 || larg > tsz)
+        {
+            errno = EINVAL;
+            rc = -1;
+            break;
+        }
+        while (rc <= 0)
+        {
+            larg = pvfs_descriptor_table_next(larg);
+            if (larg > 0 && larg < tsz)
+            {
+                rc = pvfs_dup2(fd, larg);
+            }
+            else
+            {
+                /* apparently could not find a free descriptor */
+                errno = EMFILE;
+                rc = -1;
+                break;
+            }
+        }
+        break;
     case F_GETFD :
         rc = pd->fdflags;
         break;
