@@ -100,6 +100,7 @@ export VMSYSTEM
 
 export RUN_VFS_TEST
 export RUN_MPI_TEST
+export RUN_USERLIB_TEST=1
 export KEYFILE
 export KEYNAME
 export EC2CONFFILE
