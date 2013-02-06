@@ -950,12 +950,11 @@ fi])
 
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
-AC_LINK_IFELSE(
-[
+AC_LINK_IFELSE([AC_LANG_SOURCE([
 #define _GNU_SOURCE 1
 #include <dlfcn.h>
 main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
-],[
+])],[
     AC_MSG_RESULT(no)
 ],[
     AC_MSG_RESULT(yes)
@@ -1079,10 +1078,10 @@ AC_ARG_WITH(valgrind,
     save_cppflags="$CPPFLAGS"
     AC_MSG_CHECKING(for valgrind.h usability)
     if test "x$withval" = xyes ; then
-	AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes)
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes)
 	if test x$found = xno ; then
 	    CPPFLAGS="$CPPFLAGS -I/usr/include/valgrind"
-	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+	    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes,
 		CPPFLAGS="$save_cppflags")
 	fi
     else
@@ -1090,7 +1089,7 @@ AC_ARG_WITH(valgrind,
 	         $withval/valgrind $withval/include/valgrind
 	do
 	    CPPFLAGS="$CPPFLAGS -I$d"
-	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+	    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <valgrind.h>]])], found=yes,
 		CPPFLAGS="$save_cppflags")
 	    if test x$found = xyes ; then
 		break

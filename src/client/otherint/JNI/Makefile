@@ -9,9 +9,9 @@
 #    Setup - adjust these values accordingly...
 #------------------------------------------------------------------------------
 #Path to OrangeFS libs, binaries, etc.
-OFS_INSTALL=$(HOME)/trunk
+OFS_INSTALL=/opt/orangefs
 #Folder containing OrangeFS src, etc.
-OFS_TOP=$(HOME)/trunk/ofs
+OFS_TOP=$(HOME)/trunk
 # Java found by running: 
 #`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
 JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
