@@ -1057,6 +1057,7 @@ static PINT_sm_action setattr_setobj_attribs(
 }
 
 
+
 static int check_for_replication( struct PINT_smcb *smcb, 
                                       job_status_s *js_p)
 {
@@ -1070,8 +1071,9 @@ static int check_for_replication( struct PINT_smcb *smcb,
 
    js_p->error_code = 0;
 
-   /* Is replication turned on? If on but file is being stuffed, then we can't replicate until 
-    * unstuffing is done in the I/O state machine.
+   /* Replication is an invalid option if file stuffing is turned on and the file being created 
+    * qualifies for file stuffing.  NOTE: a file does not qualify for file stuffing if the
+    * metadata server is NOT also a data server.  
     */
    if ( !(req_attr_mask & PVFS_ATTR_META_REPLICATION) || s_op->resp.u.create.stuffed )
    {
