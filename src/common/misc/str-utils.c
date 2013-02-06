@@ -32,7 +32,7 @@ void PINT_string_rm_extra_slashes(char *s)
  * 
  * Remove extra slashes from the string pointed to by pathname.
  * 
- * If rts == 1, removes trailing slash.
+ * If rts is true, removes trailing slash.
  *
  */
 void PINT_string_rm_extra_slashes_rts(char *s, int rts)
