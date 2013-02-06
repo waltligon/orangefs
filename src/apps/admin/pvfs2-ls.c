@@ -547,7 +547,14 @@ int do_list(
 
     if (opts->list_recursive || opts->num_starts > 1)
     {
-        printf("%s%s:\n",full_path,start);
+        if(*start == '/' && *(start + 1) == '\0')
+        {
+            printf("%s%s:\n",full_path, start + 1);
+        }
+        else
+        {
+            printf("%s%s:\n",full_path,start);
+        }
     }
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
@@ -1214,6 +1221,8 @@ int main(int argc, char **argv)
         }
 
         user_opts->start[i][++j] = '\0';
+
+        PINT_string_rm_extra_slashes_rts(user_opts->start[i], 1);
 
         do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts, entry_buffer);
 
