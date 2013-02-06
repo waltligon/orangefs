@@ -10,6 +10,11 @@
 #include "pvfs2-types.h"
 #include "pvfs2-config.h"
 
+void PINT_string_rm_extra_slashes(
+    char *s);
+void PINT_string_rm_extra_slashes_rts(
+    char *s,
+    int rts);
 int PINT_get_path_element(
     char *pathname,
     int segment_num,
