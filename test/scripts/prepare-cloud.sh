@@ -3,7 +3,6 @@
 # use: prepare-cloud <system>
 
 # must script to work around sudo issue
-script prepare.txt
 
 CHOICE=$VMSYSTEM
 

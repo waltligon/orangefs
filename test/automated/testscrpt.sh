@@ -160,6 +160,61 @@ fi
 exec 1<&6 6<&-
 exec 2<&7 7<&-
 
+# run userlib tests first before starting client
+if [ $RUN_USERLIB_TEST ]
+then
+
+	teardown_vfs
+
+	OLD_LD_PRELOAD=$LD_PRELOAD
+	if [ $LD_PRELOAD ]
+	then
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
+	else
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+	fi
+
+	
+
+	for my_host in $VFS_HOSTS
+	do
+		
+		start_all_pvfs2 $my_host &
+	done
+	wait
+
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+	# save file descriptors for later
+	exec 6<&1
+	exec 7<&2
+
+	exec 1>> ${REPORT_LOG}
+	exec 2>> ${REPORT_ERR} 
+	echo ""
+	echo "running userlib scripts"
+	run_parts ${USERLIB_SCRIPTS}
+	LD_PRELOAD=$OLD_LD_PRELOAD
+	# restore file descriptors and close temporary fds
+	exec 1<&6 6<&-
+	exec 2<&7 7<&-
+
+	for f in *; do
+	# skip CVS
+		[ -d $f ] && continue
+		if [ -x $f ] ; then 
+		
+			pwd
+			ls
+			echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
+			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+		
+		fi
+	done
+fi
+
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
 	-f ${PVFS2_DEST}/pvfs2-test-built-with-warnings ] ; then
 	tinder_report successwarn

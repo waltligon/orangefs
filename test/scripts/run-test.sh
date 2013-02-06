@@ -1,6 +1,4 @@
 #!/bin/bash
-#script call needed to workaround requirement for tty for sudo
-script run-test.txt
 export VFS_HOSTS
 export RUN_MPI_TEST
 export RUN_VFS_TEST

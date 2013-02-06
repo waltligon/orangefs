@@ -1,0 +1,17 @@
+#!/bin/bash 
+#
+#
+# runalltestslocal
+# 
+# This is the local version of the runalltests script.
+#
+#	This sets the following variables
+# 
+export VFSHOSTS=`hostname -s`
+export HOSTNAME=$VFSHOSTS
+export SVNBRANCH=$1
+export RUN_VFS_TEST=1
+export RUN_MPI_TEST=1
+export RUN_USERLIB_TEST=1
+export WITH_DB=/opt/db4
+./run-test.sh
