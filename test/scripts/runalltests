@@ -22,11 +22,11 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvhmc:k:f:n:t: arguments
+while getopts s:i:a:dvhumc:k:f:n:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
@@ -56,6 +56,10 @@ do
 	m)
 		#echo "Running MPI tests"
 		RUN_MPI_TEST=1
+		;;
+	u)
+		#echo "Running userlib tests"
+		RUN_USERLIB_TEST=1
 		;;
 	c)
 		EC2CONFFILE=$OPTARG
@@ -100,7 +104,7 @@ export VMSYSTEM
 
 export RUN_VFS_TEST
 export RUN_MPI_TEST
-export RUN_USERLIB_TEST=1
+export RUN_USERLIB_TEST
 export KEYFILE
 export KEYNAME
 export EC2CONFFILE
