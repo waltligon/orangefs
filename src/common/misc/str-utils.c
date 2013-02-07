@@ -18,6 +18,55 @@
 #include "str-utils.h"
 #include "pvfs-path.h"
 
+/* PINT_string_rm_extra_slashes()
+ * 
+ * Remove extra slashes from the string pointed to by 's'.
+ *
+ */
+void PINT_string_rm_extra_slashes(char *s)
+{
+    PINT_string_rm_extra_slashes_rts(s, 0);
+}
+
+/* PINT_string_rm_extra_slashes_rts()
+ * 
+ * Remove extra slashes from the string pointed to by 's'.
+ * 
+ * If rts is true, removes trailing slash.
+ *
+ */
+void PINT_string_rm_extra_slashes_rts(char *s, int rts)
+{
+    char *reader = (char *) NULL;
+    char *writer = (char *) NULL;
+    
+    if(!s)
+        return;
+    
+    /* Initially, reader and writer refer to the beginning of 's' */
+    /* Loop until *reader is NULL */
+    for(reader = s, writer = s; *reader; reader++)
+    {
+        if(*reader != '/' || *(reader + 1) != '/')
+        {
+            /* set char @ writer to char @ reader, then increment writer */
+            *writer++ = *reader;
+        }
+    }
+    *writer = '\0';
+    writer--;
+    
+    /* Strip trailing slash if:
+     *  rts is true, and if
+     *  the '/' isn't the only character in the string, and if
+     *  the last char is a '/'.
+     */
+    if(rts && (s != writer) && (*writer == '/'))
+    {
+        *writer = '\0';
+    }
+}
+
 /* PINT_string_count_segments()
  *
  * Count number of segments in a path.
