@@ -181,12 +181,6 @@ then
 
 	teardown_vfs
 
-	for my_host in $VFS_HOSTS
-	do
-		
-		start_all_pvfs2 $my_host &
-	done
-	wait
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
@@ -197,7 +191,12 @@ then
 	fi
 
 	
-
+	for my_host in $VFS_HOSTS
+	do
+		
+		start_all_pvfs2 $my_host &
+	done
+	wait
 	
 
 	if [ $? != 0 ] ; then
