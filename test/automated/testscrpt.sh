@@ -162,7 +162,7 @@ exec 2<&7 7<&-
 
 echo "Run userlib test = $RUN_USERLIB_TEST"
 # run userlib tests first before starting client
-if [ $RUN_USERLIB_TEST -eq 1 ]
+if [ $RUN_USERLIB_TEST ]
 then
 
 	teardown_vfs

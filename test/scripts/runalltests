@@ -94,6 +94,7 @@ echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
+echo "RUN_USERLIB_TEST is $RUN_USERLIB_TEST"
 echo "VMIPADDR is $VMIPADDR"
 echo "DELETE_INSTANCE is $DELETE_INSTANCE"
 
@@ -203,9 +204,9 @@ echo "Running tests..."
 # run scripted via bash -s to work around remote issues
 (echo "script run-test.txt" && cat ./run-test.sh) > run-test.scr
 
-echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr 
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr 
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr
 
 echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
