@@ -165,6 +165,17 @@ echo "Run userlib test = $RUN_USERLIB_TEST"
 if [ $RUN_USERLIB_TEST ]
 then
 
+	# move vfs test logs into temp files
+	for f in *; do
+		[ -d $f ] && continue
+		if [ -x $f ] ; then 
+		
+			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log
+		
+		fi
+	done
+
+
 	teardown_vfs
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
@@ -206,11 +217,10 @@ then
 	# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
-		
-			pwd
-			ls
-			echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
+			#restore vfs logs and rename userlib logs
 			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+			mv ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+		
 		
 		fi
 	done
