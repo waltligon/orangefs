@@ -87,6 +87,7 @@ fi
 
 echo "Run MPI test is $RUN_MPI_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
+echo "Run USERLIB test is $RUN_USERLIB_TEST"
 #echo "do_vfs is $do_vfs"
 
 if [ $do_vfs -eq 1 ] ; then 
@@ -117,6 +118,9 @@ mount
 nr_passed=0
 nr_failed=0
 
+echo "Environment variables for sysint"
+env | tee sysint-env.log
+
 # save file descriptors for later
 exec 6<&1
 exec 7<&2
@@ -124,8 +128,7 @@ exec 7<&2
 exec 1> ${REPORT_LOG}
 exec 2> ${REPORT_ERR}
 
-# print current environment to env.log
-env > env.log
+
 
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
@@ -199,6 +202,11 @@ then
 		echo "setup failed"
 		setupfail
 	fi
+
+	# print out the current environment to a logfile
+	echo "Environment for userlib testing"
+	env | tee userlib-env.log
+
 	# save file descriptors for later
 	exec 6<&1
 	exec 7<&2
