@@ -2440,10 +2440,7 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -2497,10 +2494,7 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
