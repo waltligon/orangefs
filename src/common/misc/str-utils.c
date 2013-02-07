@@ -24,7 +24,7 @@
 
 /* PINT_string_rm_extra_slashes()
  * 
- * Remove extra slashes from the string pointed to by pathname.
+ * Remove extra slashes from the string pointed to by 's'.
  *
  */
 void PINT_string_rm_extra_slashes(char *s)
@@ -34,20 +34,20 @@ void PINT_string_rm_extra_slashes(char *s)
 
 /* PINT_string_rm_extra_slashes_rts()
  * 
- * Remove extra slashes from the string pointed to by pathname.
+ * Remove extra slashes from the string pointed to by 's'.
  * 
  * If rts is true, removes trailing slash.
  *
  */
 void PINT_string_rm_extra_slashes_rts(char *s, int rts)
 {
-    /* Initially, reader and writer refer to the beginning of 's' */
     char *reader = (char *) NULL;
     char *writer = (char *) NULL;
     
     if(!s)
         return;
     
+    /* Initially, reader and writer refer to the beginning of 's' */
     /* Loop until *reader is NULL */
     for(reader = s, writer = s; *reader; reader++)
     {
@@ -60,8 +60,11 @@ void PINT_string_rm_extra_slashes_rts(char *s, int rts)
     *writer = '\0';
     writer--;
     
-    /* Strip trailing slash if rts is true, the last char is a '/',
-     * and if the '/' isn't the only character in the string. */
+    /* Strip trailing slash if:
+     *  rts is true, and if
+     *  the '/' isn't the only character in the string, and if
+     *  the last char is a '/'.
+     */
     if(rts && (s != writer) && (*writer == '/'))
     {
         *writer = '\0';
