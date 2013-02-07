@@ -168,18 +168,25 @@ echo "Run userlib test = $RUN_USERLIB_TEST"
 if [ $RUN_USERLIB_TEST ]
 then
 
-	# move vfs test logs into temp files
-	for f in *; do
-		[ -d $f ] && continue
-		if [ -x $f ] ; then 
-		
-			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log
-		
-		fi
-	done
+	# move vfs test logs into temp files - should not be necessary
+	#for f in *; do
+	#	[ -d $f ] && continue
+	#	if [ -x $f ] ; then 
+	#	
+	#		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log
+	#	
+	#	fi
+	#done
 
 
 	teardown_vfs
+
+	for my_host in $VFS_HOSTS
+	do
+		
+		start_all_pvfs2 $my_host &
+	done
+	wait
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
@@ -191,12 +198,7 @@ then
 
 	
 
-	for my_host in $VFS_HOSTS
-	do
-		
-		start_all_pvfs2 $my_host &
-	done
-	wait
+	
 
 	if [ $? != 0 ] ; then
 		echo "setup failed"
@@ -221,17 +223,17 @@ then
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
 
-	for f in *; do
+	#for f in *; do
 	# skip CVS
-		[ -d $f ] && continue
-		if [ -x $f ] ; then 
-			#restore vfs logs and rename userlib logs
-			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
-			mv ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log ${PVFS2_DEST}/${f}-${CVS_TAG}.log
-		
-		
-		fi
-	done
+	#	[ -d $f ] && continue
+	#	if [ -x $f ] ; then 
+	#		#restore vfs logs and rename userlib logs
+	#		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+	#		mv ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+	#	
+	#	
+	#	fi
+	#done
 fi
 
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \

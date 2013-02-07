@@ -327,13 +327,13 @@ run_parts() {
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== `date` == running $f ..."
-			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+			./$f > ${PVFS2_DEST}/${1}-${f}-${CVS_TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${CVS_TAG}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${1}-${f}-${CVS_TAG}.log"
 				echo "FAILED"
 			fi
 		fi
