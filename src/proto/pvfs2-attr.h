@@ -43,7 +43,7 @@
 #define PVFS_ATTR_META_REPLICATION   (1 << 14)
 #define PVFS_ATTR_META_ALL \
 (PVFS_ATTR_META_DIST          | PVFS_ATTR_META_DFILES | \
- PVFS_ATTR_META_MIRROR_DFILES )
+ PVFS_ATTR_META_MIRROR_DFILES | PVFS_ATTR_META_REPLICATION)
 
 
 
@@ -113,6 +113,32 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
     decode_PINT_dist(pptr, &(x)->dist); \
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); \
 } while (0)
+#define encode_PVFS_metafile_attr_replication(pptr,x) do {              \
+  int copy_i;                                                           \
+  encode_uint32_t(pptr, &(x)->replication_dfile_array_count);           \
+  encode_skip4(pptr,);                                                  \
+  for (copy_i=0; copy_i<(x)->replication_dfile_array_count; copy_i++)   \
+    {                                                                   \
+       encode_PVFS_handle(pptr, &(x)->replication_dfile_array[copy_i]); \
+    }                                                                   \
+  encode_uint32_t(pptr, &(x)->replication_number_of_copies);            \
+  encode_skip4(pptr,);                                                  \
+} while (0)
+
+#define decode_PVFS_metafile_attr_replication(pptr,x) do {              \
+  int copy_i;                                                           \
+  decode_uint32_t(pptr, &(x)->replication_dfile_array_count);           \
+  decode_skip4(pptr,);                                                  \
+  (x)->replication_dfile_array =                                        \
+           decode_malloc((x)->replication_dfile_array_count *           \
+                         sizeof(*(x)->replication_dfile_array));        \
+  for (copy_i=0; copy_i<(x)->replication_dfile_array_count; copy_i++)   \
+    {                                                                   \
+       decode_PVFS_handle(pptr, &(x)->replication_dfile_array[copy_i]); \
+    }                                                                   \
+  decode_uint32_t(pptr, &(x)->replication_number_of_copies);            \
+  decode_skip4(pptr,);                                                  \
+} while (0)
 #define encode_PVFS_metafile_attr_mirror_dfiles(pptr,x) do {            \
   int dfiles_i, copy_i, handle_i;                                       \
   encode_uint32_t(pptr, &(x)->mirror_copies_count);                     \
@@ -124,6 +150,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
        encode_PVFS_handle(pptr, &(x)->mirror_dfile_array[handle_i]);    \
     }                                                                   \
 } while (0)
+
 #define decode_PVFS_metafile_attr_mirror_dfiles(pptr,x) do {            \
   int dfiles_i, copy_i, handle_i;                                       \
   decode_uint32_t(pptr, &(x)->mirror_copies_count);                     \
@@ -293,6 +320,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES) \
         encode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_META_REPLICATION) \
+        encode_PVFS_metafile_attr_replication(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
@@ -326,6 +355,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_MIRROR_DFILES) \
         decode_PVFS_metafile_attr_mirror_dfiles(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_META_REPLICATION) \
+        decode_PVFS_metafile_attr_replication(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
