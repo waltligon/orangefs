@@ -2411,6 +2411,7 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -2441,6 +2442,7 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -2465,6 +2467,7 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat64));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -2495,6 +2498,7 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
