@@ -43,10 +43,12 @@ void PINT_string_rm_extra_slashes_rts(char *s, int rts)
 {
     char *reader = (char *) NULL;
     char *writer = (char *) NULL;
-    
+
     if(!s)
+    {
         return;
-    
+    }
+
     /* Initially, reader and writer refer to the beginning of 's' */
     /* Loop until *reader is NULL */
     for(reader = s, writer = s; *reader; reader++)
@@ -57,9 +59,8 @@ void PINT_string_rm_extra_slashes_rts(char *s, int rts)
             *writer++ = *reader;
         }
     }
-    *writer = '\0';
-    writer--;
-    
+    *writer-- = '\0'; /* set char @ writer to null, then decrement writer */
+
     /* Strip trailing slash if:
      *  rts is true, and if
      *  the '/' isn't the only character in the string, and if
