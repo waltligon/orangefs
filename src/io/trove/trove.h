@@ -371,7 +371,7 @@ int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
                                  PVFS_hint hints);
 
 int trove_dspace_create(TROVE_coll_id coll_id,
-                        TROVE_handle_extent_array *handle_extent_array,
+                        TROVE_handle handle,
                         TROVE_handle *out_handle,
                         TROVE_ds_type type,
                         TROVE_keyval_s *hint,
@@ -382,7 +382,7 @@ int trove_dspace_create(TROVE_coll_id coll_id,
                         PVFS_hint hints);
 
 int trove_dspace_create_list(TROVE_coll_id coll_id,
-                             TROVE_handle_extent_array *handle_extent_array,
+                             TROVE_handle *handle_array,
                              TROVE_handle *out_handle_array,
                              int count,
                              TROVE_ds_type type,

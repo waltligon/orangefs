@@ -169,10 +169,9 @@ static PINT_sm_action msgpairarray_post(struct PINT_smcb *smcb,
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
 
-    gossip_debug(
-                GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
-                "%d total message(s) with %d incomplete\n", __func__, smcb,
-                mop->count * 2, mop->params.comp_ct);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
+                 "%d total message(s) with %d incomplete\n", __func__, smcb,
+                 mop->count * 2, mop->params.comp_ct);
 
     js_p->error_code = 0;
 
@@ -361,7 +360,7 @@ static PINT_sm_action msgpairarray_post(struct PINT_smcb *smcb,
                                 msg_p->encoded_req.buffer_type,
                                 1,
                                 smcb,
-                                mop->count+i,
+                                mop->count + i,
                                 &msg_p->send_status,
                                 &msg_p->send_id,
                                 mop->params.job_context,
@@ -416,6 +415,9 @@ static PINT_sm_action msgpairarray_post(struct PINT_smcb *smcb,
     return SM_ACTION_DEFERRED;
 }
 
+/* This state action inserts a delay before we go back and issue retry
+ * message pairs - this allows transient errors to clear
+ */
 static PINT_sm_action msgpairarray_post_retry(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
@@ -434,6 +436,12 @@ static PINT_sm_action msgpairarray_post_retry(struct PINT_smcb *smcb,
                                     mop->params.job_context);
 }
 
+/* This state action runs when a message post is complete - could be
+ * either a send or a receive posted.  This will run once for EACH
+ * post.  Only when all posts are complete do we proceed to 
+ * msgpairarray_completion_fn which reviews the results
+ * and initiates retries if needed
+ */
 static PINT_sm_action msgpairarray_complete(struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
@@ -445,7 +453,7 @@ static PINT_sm_action msgpairarray_complete(struct PINT_smcb *smcb,
 
     /* match operation with something in the msgpair array */
     /* the first N tags are receives, the second N are sends */
-    assert(js_p->status_user_tag < mop->count*2);
+    assert(js_p->status_user_tag < mop->count * 2);
 
     if (js_p->status_user_tag < mop->count)
     {
@@ -508,6 +516,12 @@ static PINT_sm_action msgpairarray_complete(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* This is not a true completion function but the state action that runs
+ * when all of the posted jobs have completed.  It reviews results and
+ * initiates retries if needed.  We submit posts in groups, then wait
+ * for them to finish - if all complete the first time we will only run
+ * this function once, but if we retry we may run this multiple times.
+ */
 static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
@@ -525,16 +539,16 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
                  "completion_fn\n", smcb);
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_completion_fn..\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing msgpairarray_completion_fn..\n");
 
     for (i = 0; i < mop->count; i++)
     {
         PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
         assert(msg_p);
 
-	/*
-	 * Can take multiple trips through this function as we retry
-	 * ones that failed.
+	/* Can take multiple trips through this function as we retry
+	 * ones that failed.  These are previously completed posts.
 	 */
 	if (msg_p->complete)
         {
@@ -544,6 +558,7 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
         if (msg_p->op_status != 0)
         {
             char s[1024];
+            /* this just deals with printing error warnings */
             PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
             server_string = PINT_cached_config_map_addr(msg_p->fs_id,
                                                         msg_p->svr_addr,
@@ -555,11 +570,16 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
 
             gossip_err("Warning: msgpair failed to %s, will retry: %s\n",
                        server_string, s);
-                       
+
+            /* this identifies we might need a retry but does not check
+             * the actual error codes to see if it is a retriable
+             * failure.
+             */
             ++need_retry;
             continue;
         }
 
+        /* this decodes what should be a successful response */
         ret = PINT_serv_decode_resp(msg_p->fs_id,
                                     msg_p->encoded_resp_p,
                                     &decoded_resp,
@@ -611,6 +631,9 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
                          "%s: error code %d from PINT_serv_decode_resp, "
                          "from server %d\n", __func__, msg_p->op_status, i);
             js_p->error_code = msg_p->op_status;
+            /* V3 We may want to revisit retrying some of these errors
+             * with a replicant rather than just bailing out 
+             */
             break;
         }
         else if (resp_p->status != 0)
@@ -626,6 +649,10 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
             /* If we don't have a completion function, there is no point
              * in continuing to process after seeing a failure.
              */
+            /* V3 We may want to revisit retrying some of these errors
+             * with a replicant rather than just bailing out 
+             */
+            /* Not sure why we have this if - it should always be true */
             if (js_p->error_code)
             {
                 break;
@@ -649,19 +676,18 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
 
-        /*
-          mark that this msgpair has been completed and should not be
-          retried in the case of possible future retries
-        */
+        /* mark that this msgpair has been completed and should not be
+         * retried in the case of possible future retries
+         */
         msg_p->complete = 1;
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
                      "marked complete\n", __func__, smcb, i);
-    }/*end for*/
+    } /* end for */
 
-    if (need_retry) {
-        /*
-         * We only retry msgpairs that are not yet complete.  Factor
+    if (need_retry)
+    {
+        /* We only retry msgpairs that are not yet complete.  Factor
          * of two since they are pairs.  If over the count, do not
          * retry, just return one of the error codes.
          */
@@ -673,8 +699,13 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
             PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
 
             if (msg_p->complete)
+            {
                 continue;
+            }
 
+            /* Now we check the error codes, retry count, and if retries
+             * were requested to see if we really want to retry
+             */
             if (msg_p->retry_flag == PVFS_MSGPAIR_RETRY
                 && PVFS_ERROR_CLASS(-msg_p->op_status) == PVFS_ERROR_BMI
                 && msg_p->retry_count < mop->params.retry_limit)
@@ -704,6 +735,7 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
             }
             else
             {
+                /* Not going to retry so log it */
                 char s[1024];
                 server_string = PINT_cached_config_map_addr(msg_p->fs_id,
                                                             msg_p->svr_addr,
@@ -733,7 +765,6 @@ static PINT_sm_action msgpairarray_completion_fn(struct PINT_smcb *smcb,
                     js_p->error_code = msg_p->op_status;
                 }
             }
-
         }
     }
     return SM_ACTION_COMPLETE;
@@ -858,6 +889,8 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
     return ret;
 }
 
+/* V3 this isn't used any more, but could be resurected if needed */
+#if 0
 /* PINT_serv_msgpair_array_resolve_addrs()
  *
  * fills in BMI address of server for each entry in the msgpair array,
@@ -894,6 +927,7 @@ int PINT_serv_msgpairarray_resolve_addrs(PINT_sm_msgarray_op *mop)
     }
     return ret;
 }
+#endif
 
 /*
  * Local variables:

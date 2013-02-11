@@ -264,16 +264,16 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
 
 struct dbpf_dspace_create_op
 {
-    TROVE_handle_extent_array extent_array;
-    TROVE_handle *out_handle_p;
+    TROVE_handle handle;
+    TROVE_handle *out_handle;
     TROVE_ds_type type;
     /* hint? */
 };
 
 struct dbpf_dspace_create_list_op
 {
-    TROVE_handle_extent_array extent_array;
-    TROVE_handle *out_handle_array_p;
+    TROVE_handle *handle_array;
+    TROVE_handle *out_handle_array;
     TROVE_ds_type type;
     int count;
     /* hint? */

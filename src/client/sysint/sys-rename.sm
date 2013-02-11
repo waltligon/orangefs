@@ -27,6 +27,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "ncache.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -453,10 +454,9 @@ static int rename_lookups_comp_fn(void *v_p,
             resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
             sm_p->u.rename.parent_refns[index].fs_id;
-    sm_p->u.rename.refns[index].sid_count =
-            resp_p->u.lookup_path.sid_count[0];
+    sm_p->u.rename.refns[index].sid_count = resp_p->u.lookup_path.sid_count;
     sm_p->u.rename.refns[index].sid_array = (PVFS_SID *)malloc(
-                    resp_p->u.lookup_path.sid_count[0] * sizeof(PVFS_SID));
+                    resp_p->u.lookup_path.sid_count * sizeof(PVFS_SID));
 
     if (index == 0)
     {
@@ -705,6 +705,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                                       sm_p->hints);
 
         /* fill in msgpair structure components */
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
         msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
         msg_p->sid_count = sm_p->u.rename.parent_refns[i].sid_count;
@@ -713,8 +715,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = rename_lookups_comp_fn;
 
-        ret = PVFS_SID_get_addr(&msg_p->scr_addr,
-                                &sm_p->u.rename.parent_refns[i].sid_array[0]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -766,6 +767,8 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.rename.refns[0].sid_array,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
     msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
@@ -774,8 +777,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->scr_addr,
-                            &sm_p->u.rename.parent_refns[1].sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -822,6 +824,8 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
           sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->u.rename.parent_refns[
                             sm_p->u.rename.rmdirent_index].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[
@@ -830,13 +834,11 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.rename.rmdirent_index].sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.rename.parent_refns[
-                            sm_p->u.rename.rmdirent_index].array;
+                            sm_p->u.rename.rmdirent_index].sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
  
-    ret = PVFS_SID_get_addr(&msg_p->scr_addr,
-                            &sm_p->u.rename.parent_refns[
-                                  sm_p->u.renamed.rmdirent_index].sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -963,6 +965,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.rename.entries[1],
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
     msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
@@ -971,8 +975,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = rename_chdirent_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr,
-                            sm_p->u.rename.parent_refns[1].sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

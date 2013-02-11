@@ -65,7 +65,7 @@ struct PVFS_sys_mntent
     char **pvfs_config_servers;	/**< addresses of servers with config info */
     int32_t num_pvfs_config_servers; /**< changed to int32_t so that size of structure does not change */
     char *the_pvfs_config_server; /**< first of the entries above that works */
-    char *pvfs_fs_name;		/**< name of PVFS2 file system */
+    char *pvfs_fs_name;		  /**< name of PVFS2 file system */
     enum PVFS_flowproto_type flowproto;	/**< flow protocol */
     enum PVFS_encoding_type encoding;   /**< wire data encoding */
     PVFS_fs_id fs_id; /**< fs id, filled in by system interface when it looks up the fs */
@@ -81,8 +81,8 @@ struct PVFS_sys_mntent
 /** Describes file distribution parameters. */
 struct PVFS_sys_dist_s
 {
-    char* name;
-    void* params;
+    char *name;
+    void *params;
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 
@@ -175,8 +175,8 @@ struct PVFS_sysresp_readdirplus_s
 {
     PVFS_ds_position token;
     PVFS_dirent   *dirent_array;
-    uint32_t        pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
-    uint64_t       directory_version;
+    uint32_t      pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
+    uint64_t      directory_version;
     PVFS_error    *stat_err_array; 
     PVFS_sys_attr *attr_array;
 };
@@ -228,18 +228,17 @@ typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 /* system interface function prototypes */
 /****************************************/
 
-int PVFS_sys_initialize(
-    uint64_t default_debug_mask);
-int PVFS_sys_fs_add(
-    struct PVFS_sys_mntent* mntent);
-int PVFS_isys_fs_add(
-    struct PVFS_sys_mntent* mntent,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
-int PVFS_sys_fs_remove(
-    struct PVFS_sys_mntent* mntent);
-int PVFS_sys_finalize(
-    void);
+int PVFS_sys_initialize(uint64_t default_debug_mask);
+
+int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent);
+
+int PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
+                     PVFS_sys_op_id *op_id,
+                     void *user_ptr);
+
+int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent);
+
+int PVFS_sys_finalize(void);
 
 /*
   NOTE: the following values are to be used by
@@ -282,7 +281,7 @@ PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id,
     char *name,
     const PVFS_credential *credential,
-    PVFS_sysresp_lookup * resp,
+    PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints);
 
@@ -533,16 +532,16 @@ PVFS_error PVFS_sys_statfs(
     PVFS_sysresp_statfs *resp,
     PVFS_hint hints);
 
-PVFS_sys_dist* PVFS_sys_dist_lookup(
-    const char* dist_identifier);
+PVFS_sys_dist *PVFS_sys_dist_lookup(
+    const char *dist_identifier);
 
 PVFS_error PVFS_sys_dist_free(
-    PVFS_sys_dist* dist);
+    PVFS_sys_dist *dist);
 
 PVFS_error PVFS_sys_dist_setparam(
-    PVFS_sys_dist* dist,
-    const char* param,
-    void* value);
+    PVFS_sys_dist *dist,
+    const char *param,
+    void *value);
 
 PVFS_error PVFS_isys_geteattr(
     PVFS_object_ref ref,
@@ -654,7 +653,7 @@ PVFS_error PVFS_sys_set_info(
 
 PVFS_error PVFS_sys_get_info(
     enum PVFS_sys_setinfo_opt option,
-    unsigned int* arg);
+    unsigned int *arg);
 
 /* exported test functions for isys calls */
 int PVFS_sys_testany(

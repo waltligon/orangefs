@@ -864,8 +864,10 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     int ret = 0;
     int i;
 
-    PVFS_handle_extent_array data_handle_ext_array;
+    PVFS_handle *data_handle_array = NULL;
+#if 0
     server_configuration_s *config = get_server_config_struct();
+#endif
 
     js_p->error_code = 0;
 
@@ -883,16 +885,24 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n",
                  sm_p->target_object_attr->u.meta.dfile_array);
 
+    /* V3
+     * We should already know the handle for all copies so this is
+     * nolonger used.  Instead we need to either pass in the handles or
+     * if they are not allocated yet, allocate them here.
+     */
+#if 0
     /* find local IO extent array for this file system for metadata host */
     ret = PINT_cached_config_get_server( imm_p->fs_id,
                                          config->host_id,
                                          PINT_SERVER_TYPE_IO,
                                          &data_handle_ext_array );
+#endif
     if (ret)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     } 
+#if 0
     for (i = 0;i < data_handle_ext_array.extent_count; i++)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -902,6 +912,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
                      PVFS_OID_str(&data_handle_ext_array.extent_array[i].first),
                      PVFS_OID_str(&data_handle_ext_array.extent_array[i].last));
     }
+#endif
 
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of copies: %d \tlocation:%p\n",
                                       imm_p->copies,&imm_p->copies);
@@ -909,20 +920,20 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
 
     /*i create local datahandles - will be used as destination handles for 
      * copies*/
-    ret = job_trove_dspace_create_list( imm_p->fs_id,
-                                        &data_handle_ext_array,
-                                        imm_p->handle_array_copies_local,
-                                        imm_p->handle_array_copies_local_count *
-                                        imm_p->copies,
-                                        PVFS_TYPE_DATAFILE,
-                                        NULL,
-                                        TROVE_SYNC,
-                                        smcb,
-                                        0,
-                                        js_p,
-                                        &job_id,
-                                        server_job_context,
-                                        NULL );
+    ret = job_trove_dspace_create_list(
+                        imm_p->fs_id,
+                        data_handle_array,
+                        imm_p->handle_array_copies_local,
+                        imm_p->handle_array_copies_local_count * imm_p->copies,
+                        PVFS_TYPE_DATAFILE,
+                        NULL,
+                        TROVE_SYNC,
+                        smcb,
+                        0,
+                        js_p,
+                        &job_id,
+                        server_job_context,
+                        NULL);
     return ret;
 } /* end action create_local_datahandles */
 

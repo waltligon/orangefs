@@ -70,8 +70,12 @@ int SID_get_attr (DB *pri,
 
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
-                       int copies,
+                       int *copies,
                        SID_server_list_t *sid_list);
+
+extern SID_policy_t SID_policies[]; /* defined in compiled policy files */
+
+#define PVFS_POLICY_MAX 10 /* FIXME */
 
 #endif
 

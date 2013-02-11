@@ -28,7 +28,7 @@
 
 static char *lost_and_found_string = "lost+found";
 
-/* NEXT remove this struct and all references to it */
+/* V3 NEXT remove this struct and all references to it */
 
 static TROVE_handle s_used_handles[4] =
 {
@@ -44,7 +44,7 @@ do {                                                \
    fprintf(stderr,format, ##f);                     \
 } while(0)
 
-/* NEXT remove this func and all references to it */
+/* V3 NEXT remove this func and all references to it */
 #if 0
 static int handle_is_excluded(
     TROVE_handle handle, TROVE_handle *handles_to_exclude,
@@ -65,11 +65,12 @@ static int handle_is_excluded(
 }
 #endif
 
-/* NEXT remove this func and all refersnce to it */
-
-static void get_handle_extent_from_ranges(
-    char *handle_ranges, TROVE_handle_extent *out_extent,
-    TROVE_handle *handles_to_exclude, int num_handles_to_exclude)
+/* V3 NEXT remove this func and all refersnce to it */
+#if 0
+static void get_handle_extent_from_ranges(char *handle_ranges,
+                                          TROVE_handle_extent *out_extent,
+                                          TROVE_handle *handles_to_exclude,
+                                          int num_handles_to_exclude)
 {
     PINT_llist *cur = NULL;
     TROVE_handle_extent *tmp_extent = NULL;
@@ -122,27 +123,30 @@ if (1)
         }
     }
 }
+#endif
 
-int pvfs2_mkspace(
-    char *data_path,
-    char *meta_path,
-    char *collection,
-    TROVE_coll_id coll_id,
-    TROVE_handle root_handle,
-    char *meta_handle_ranges,
-    char *data_handle_ranges,
-    int create_collection_only,
-    int verbose)
+int pvfs2_mkspace(char *data_path,
+                  char *meta_path,
+                  char *collection,
+                  TROVE_coll_id coll_id,
+                  TROVE_handle root_handle,
+                  char *meta_handle_ranges,
+                  char *data_handle_ranges,
+                  int create_collection_only,
+                  int verbose)
 {
     int ret = - 1, count = 0;
     TROVE_op_id op_id;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     TROVE_ds_attributes_s attr;
+/* V3 */
+#if 0
     TROVE_handle_extent cur_extent;
     TROVE_handle_extent_array extent_array;
-    TROVE_context_id trove_context = -1;
     char *merged_handle_ranges = NULL;
+#endif
+    TROVE_context_id trove_context = -1;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
@@ -163,15 +167,15 @@ int pvfs2_mkspace(
     new_root_handle = root_handle;
 
     /*
-      if we're only creating a collection inside an existing
-      storage space, we need to assume that it exists already
-    */
+     * if we're only creating a collection inside an existing
+     * storage space, we need to assume that it exists already
+     */
     if (!create_collection_only)
     {
         /*
-          try to initialize; fails if storage space isn't there, which
-          is exactly what we're expecting in this case.
-        */
+         * try to initialize; fails if storage space isn't there, which
+         * is exactly what we're expecting in this case.
+         */
         ret = trove_initialize(TROVE_METHOD_DBPF, 
 			       NULL, 
 			       data_path,
@@ -184,7 +188,11 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        ret = trove_storage_create(TROVE_METHOD_DBPF, data_path, meta_path, NULL, &op_id);
+        ret = trove_storage_create(TROVE_METHOD_DBPF,
+                                   data_path,
+                                   meta_path,
+                                   NULL,
+                                   &op_id);
         if (ret != 1)
         {
             gossip_err("error: storage create failed; aborting!\n");
@@ -193,9 +201,11 @@ int pvfs2_mkspace(
     }
 
     /* now that the storage space exists, initialize trove properly */
-    ret = trove_initialize(
-	TROVE_METHOD_DBPF, NULL, 
-	data_path, meta_path, 0);
+    ret = trove_initialize(TROVE_METHOD_DBPF,
+                           NULL, 
+	                   data_path,
+                           meta_path,
+                           0);
     if (ret < 0)
     {
 	gossip_err("error: trove initialize failed; aborting!\n");
@@ -208,8 +218,11 @@ int pvfs2_mkspace(
                   meta_path);
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(
-	TROVE_METHOD_DBPF, collection, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(TROVE_METHOD_DBPF,
+                                  collection,
+                                  &coll_id,
+                                  NULL,
+                                  &op_id);
     if (ret == 1)
     {
 	mkspace_print(verbose, "warning: collection lookup succeeded "
@@ -228,8 +241,11 @@ int pvfs2_mkspace(
     }
 
     /* make sure a collection lookup succeeds */
-    ret = trove_collection_lookup(
-	TROVE_METHOD_DBPF, collection, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(TROVE_METHOD_DBPF,
+                                  collection,
+                                  &coll_id,
+                                  NULL,
+                                  &op_id);
     if (ret != 1)
     {
 	mkspace_print(verbose,"error: collection lookup failed for "
@@ -246,14 +262,15 @@ int pvfs2_mkspace(
         return -1;
     }
 
-/* NEXT handle range stuff to remove */
-
+/* V3 handle range stuff to remove */
+#if 0
     /* merge the specified ranges to pass to the handle allocator */
     if ((meta_handle_ranges && strlen(meta_handle_ranges)) &&
         (data_handle_ranges && strlen(data_handle_ranges)))
     {
         merged_handle_ranges = PINT_merge_handle_range_strs(
-            meta_handle_ranges, data_handle_ranges);
+                                                meta_handle_ranges,
+                                                data_handle_ranges);
     }
     else if (meta_handle_ranges && strlen(meta_handle_ranges))
     {
@@ -269,14 +286,14 @@ int pvfs2_mkspace(
         gossip_err("Failed to merge the handle range!  Format invalid\n");
         return -1;
     }
-
     /*
       set the trove handle ranges; this initializes the handle
       allocator with the ranges we were told to use
     */ 
-    ret = trove_collection_setinfo(
-        coll_id, trove_context, TROVE_COLLECTION_HANDLE_RANGES,
-        merged_handle_ranges);
+    ret = trove_collection_setinfo(coll_id,
+                                   trove_context,
+                                   TROVE_COLLECTION_HANDLE_RANGES,
+                                   merged_handle_ranges);
 
     if (ret < 0)
     {
@@ -290,29 +307,48 @@ int pvfs2_mkspace(
                   merged_handle_ranges);
 
     free(merged_handle_ranges);
+#endif
  
 
     /*
-      if a root_handle is specified, 1) create a dataspace to hold the
-      root directory 2) create the dspace for dir entries, 3) set
-      attributes on the dspace
-    */
+     * if a root_handle is specified, 1) create a dataspace to hold the
+     * root directory 2) create the dspace for dir entries, 3) set
+     * attributes on the dspace
+     */
     if (PVFS_OID_cmp(&new_root_handle, &TROVE_HANDLE_NULL))
     {
+        PVFS_handle tmp_handle;
+        /* new_root_handle is not NULL */
+
+        /* V3 */
+#if 0
         cur_extent.first = cur_extent.last = new_root_handle;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
+#endif
 
-        ret = trove_dspace_create(
-            coll_id, &extent_array, &new_root_handle,
-            PVFS_TYPE_DIRECTORY, NULL,
-            (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-            NULL, trove_context, &op_id, NULL);
+        tmp_handle = new_root_handle;
+
+        ret = trove_dspace_create(coll_id, 
+                                  tmp_handle,
+                                  &new_root_handle,
+                                  PVFS_TYPE_DIRECTORY,
+                                  NULL,
+                                  (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
+                                  NULL,
+                                  trove_context,
+                                  &op_id,
+                                  NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state,
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
@@ -332,13 +368,23 @@ int pvfs2_mkspace(
         key.buffer_sz = ROOT_HANDLE_KEYLEN;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
-        ret = trove_collection_seteattr(coll_id, &key, &val, 0,
-                                        NULL, trove_context, &op_id);
+        ret = trove_collection_seteattr(coll_id,
+                                        &key,
+                                        &val,
+                                        0,
+                                        NULL,
+                                        trove_context,
+                                        &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -357,15 +403,25 @@ int pvfs2_mkspace(
 	attr.atime = attr.ctime = PINT_util_get_current_time();
         attr.mtime = PINT_util_mktime_version(attr.ctime);
 
-        ret = trove_dspace_setattr(
-            coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
-            trove_context, &op_id, NULL);
+        ret = trove_dspace_setattr(coll_id,
+                                   new_root_handle,
+                                   &attr,
+                                   TROVE_SYNC,
+                                   NULL,
+                                   trove_context,
+                                   &op_id,
+                                   NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -376,19 +432,22 @@ int pvfs2_mkspace(
         }
 
         /*
-          create a dataspace to hold directory entries; if we have a
-          meta handle range, use that one of those ranges (being
-          careful to make sure the range has enough space for an
-          allocation) to allocate a dataspace to hold directory
-          entries.  if we don't have a meta handle range, use
-          TROVE_HANDLE_NULL which tells the allocator to use any
-          handle available
-        */
+         * create a dataspace to hold directory entries; if we have a
+         * meta handle range, use that one of those ranges (being
+         * careful to make sure the range has enough space for an
+         * allocation) to allocate a dataspace to hold directory
+         * entries.  if we don't have a meta handle range, use
+         * TROVE_HANDLE_NULL which tells the allocator to use any
+         * handle available
+         */
+#if 0
         cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         if (meta_handle_ranges)
         {
-            get_handle_extent_from_ranges(
-                meta_handle_ranges, &cur_extent, s_used_handles, 1);
+            get_handle_extent_from_ranges(meta_handle_ranges,
+                                          &cur_extent,
+                                          s_used_handles,
+                                          1);
 
             if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
                 (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
@@ -407,17 +466,25 @@ int pvfs2_mkspace(
 
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
+#endif
 
-        ret = trove_dspace_create(
-            coll_id, &extent_array, &root_dirdata_handle,
-            PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id, NULL);
+        tmp_handle = TROVE_HANDLE_NULL;
+
+        ret = trove_dspace_create(coll_id,
+                                  tmp_handle,
+                                  &root_dirdata_handle,
+                                  PVFS_TYPE_DIRDATA,
+                                  NULL,
+                                  TROVE_SYNC,
+                                  NULL,
+                                  trove_context,
+                                  &op_id,
+                                  NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
+                                    &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if ((ret != 1) && (state != 0))
@@ -435,16 +502,27 @@ int pvfs2_mkspace(
         val.buffer = &root_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
-        ret = trove_keyval_write(
-            coll_id, new_root_handle, &key, &val, 
-            TROVE_SYNC, 0, NULL,
-            trove_context, &op_id, NULL);
+        ret = trove_keyval_write(coll_id,
+                                 new_root_handle,
+                                 &key,
+                                 &val, 
+                                 TROVE_SYNC,
+                                 0,
+                                 NULL,
+                                 trove_context,
+                                 &op_id,
+                                 NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -461,11 +539,14 @@ int pvfs2_mkspace(
           at this point we need to create and initialize the
           lost+found directory as well
         *****************************************************/
+#if 0
         cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         if (meta_handle_ranges)
         {
-            get_handle_extent_from_ranges(
-                meta_handle_ranges, &cur_extent, s_used_handles, 2);
+            get_handle_extent_from_ranges(meta_handle_ranges,
+                                          &cur_extent,
+                                          s_used_handles,
+                                          2);
 
             if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
                 (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
@@ -484,17 +565,31 @@ int pvfs2_mkspace(
         }
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
+#endif
 
-        ret = trove_dspace_create(
-            coll_id, &extent_array, &lost_and_found_handle,
-            PVFS_TYPE_DIRECTORY, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id, NULL);
+        tmp_handle = TROVE_HANDLE_NULL;
+
+        ret = trove_dspace_create(coll_id,
+                                  tmp_handle,
+                                  &lost_and_found_handle,
+                                  PVFS_TYPE_DIRECTORY,
+                                  NULL,
+                                  TROVE_SYNC,
+                                  NULL,
+                                  trove_context,
+                                  &op_id,
+                                  NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if ((ret != 1) && (state != 0))
@@ -518,15 +613,25 @@ int pvfs2_mkspace(
 	attr.atime = attr.ctime = PINT_util_get_current_time();
         attr.mtime = PINT_util_mktime_version(attr.ctime);
 
-        ret = trove_dspace_setattr(
-            coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,
-            trove_context, &op_id, NULL);
+        ret = trove_dspace_setattr(coll_id,
+                                   lost_and_found_handle,
+                                   &attr,
+                                   TROVE_SYNC,
+                                   NULL,
+                                   trove_context,
+                                   &op_id,
+                                   NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -537,11 +642,14 @@ int pvfs2_mkspace(
         }
 
         /* create a dataspace to hold directory entries */
+#if 0
         cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         if (meta_handle_ranges)
         {
-            get_handle_extent_from_ranges(
-                meta_handle_ranges, &cur_extent, s_used_handles, 3);
+            get_handle_extent_from_ranges(meta_handle_ranges,
+                                          &cur_extent,
+                                          s_used_handles,
+                                          3);
 
             if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
                 (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
@@ -560,17 +668,31 @@ int pvfs2_mkspace(
         }
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
+#endif
 
-        ret = trove_dspace_create(
-            coll_id, &extent_array, &lost_and_found_dirdata_handle,
-            PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id, NULL);
+        tmp_handle = TROVE_HANDLE_NULL;
+
+        ret = trove_dspace_create(coll_id,
+                                  tmp_handle,
+                                  &lost_and_found_dirdata_handle,
+                                  PVFS_TYPE_DIRDATA,
+                                  NULL,
+                                  TROVE_SYNC,
+                                  NULL,
+                                  trove_context,
+                                  &op_id,
+                                  NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if ((ret != 1) && (state != 0))
@@ -589,16 +711,27 @@ int pvfs2_mkspace(
         val.buffer = &lost_and_found_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
-        ret = trove_keyval_write(
-            coll_id, lost_and_found_handle, &key, &val, 
-            TROVE_SYNC,
-            0, NULL, trove_context, &op_id, NULL);
+        ret = trove_keyval_write(coll_id,
+                                 lost_and_found_handle,
+                                 &key,
+                                 &val, 
+                                 TROVE_SYNC,
+                                 0,
+                                 NULL,
+                                 trove_context,
+                                 &op_id,
+                                 NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -621,17 +754,28 @@ int pvfs2_mkspace(
         val.buffer = &lost_and_found_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
-        ret = trove_keyval_write(
-            coll_id, root_dirdata_handle, &key, &val, 
-            TROVE_SYNC | TROVE_NOOVERWRITE | TROVE_KEYVAL_HANDLE_COUNT, 
-	    0,
-            NULL, trove_context, &op_id, NULL);
+        ret = trove_keyval_write(coll_id,
+                                 root_dirdata_handle,
+                                 &key,
+                                 &val, 
+                                 TROVE_SYNC | TROVE_NOOVERWRITE |
+                                              TROVE_KEYVAL_HANDLE_COUNT, 
+	                         0,
+                                 NULL,
+                                 trove_context,
+                                 &op_id,
+                                 NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL,
-                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &count,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -660,13 +804,12 @@ int pvfs2_mkspace(
     return 0;
 }
 
-int pvfs2_rmspace(
-    char *data_path,
-    char *meta_path,
-    char *collection,
-    TROVE_coll_id coll_id,
-    int remove_collection_only,
-    int verbose)
+int pvfs2_rmspace(char *data_path,
+                  char *meta_path,
+                  char *collection,
+                  TROVE_coll_id coll_id,
+                  int remove_collection_only,
+                  int verbose)
 {
     int ret = -1;
     TROVE_op_id op_id;

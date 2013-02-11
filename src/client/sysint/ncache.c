@@ -407,7 +407,7 @@ int PINT_ncache_update(
         return(-PVFS_ENOMEM);
     }
     memcpy(tmp_payload->parent_ref.sid_array,
-           parent_ref.sid_array,
+           parent_ref->sid_array,
            parent_ref->sid_count * sizeof(PVFS_SID));
 
     tmp_payload->entry_ref.fs_id = entry_ref->fs_id;
@@ -421,7 +421,7 @@ int PINT_ncache_update(
         return(-PVFS_ENOMEM);
     }
     memcpy(tmp_payload->entry_ref.sid_array,
-           entry_ref.sid_array,
+           entry_ref->sid_array,
            entry_ref->sid_count * sizeof(PVFS_SID));
 
     tmp_payload->entry_status = 0;

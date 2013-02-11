@@ -26,6 +26,7 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -304,8 +305,8 @@ static int mkdir_msg_comp_fn(void *v_p,
     /* also insert entry into attr cache */
     PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
     /* V3 need to put capability into the acache */
-    attr.capability = sm_p->u.mkdir.mkdir_resp->capabiity;
-    PINT_acache_update(sm_p->object, &attr, NULL);
+    attr.capability = resp_p->u.mkdir.capability;
+    PINT_acache_update(sm_p->object_ref, &attr, NULL);
 
     return 0;
 }
@@ -382,13 +383,14 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
 
     /* V3 add the OID and SIDs for this create 
      * this also sets the correct number of replicants
+     * creating one object
      */
-    PVFS_OBJ_gen_meta(&sm_p->object_ref, 1); /* creating one object */
+    PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
 
     PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
     msg_p = &sm_p->msgarray_op.msgarray[0];
 
-    foreach_msgpair(sm_p->msgarray_op, msg_p, i)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                                 sm_p->getattr.attr.capability,
@@ -400,16 +402,18 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                                 sm_p->u.mkdir.sys_attr,
                                 sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->parent_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
         /* V3 this assumes fan out from client */
         msg_p->sid_count = 1;
         msg_p->sid_index = 0;
-        msg_p->sid_array = sm_p->object_ref.sid_array[i];
+        msg_p->sid_array = &sm_p->object_ref.sid_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = mkdir_msg_comp_fn;
 
-        PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[i]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -531,7 +535,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_delete_handle_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svt_addr, &sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
     if (ret)
     {
         gossip_err("failed to translate server address");
@@ -583,9 +587,9 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
         sm_p->u.mkdir.mkdir_resp->ref.sid_array = sm_p->object_ref.sid_array;
 
         /* insert newly created directory handle into the ncache */
-        PINT_ncache_update((const char*) sm_p->u.mkdir.object_name, 
-                           (const PVFS_parent_ref*) &sm_p->object_ref, 
-                           (const PVFS_parent_ref*) &(sm_p->parent_ref));
+        PINT_ncache_update((const char*)sm_p->u.mkdir.object_name, 
+                           (const PVFS_object_ref *)&sm_p->object_ref, 
+                           (const PVFS_object_ref *)&(sm_p->parent_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.mkdir.retry_count < sm_p->msgarray_op.params.retry_limit))
@@ -796,6 +800,8 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.mkdir.val_array,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -804,7 +810,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     /* NOTE: no comp_fn needed. */
 
-    ret = PVFS_SID_get_addr(&msg_p->svt_addr, &sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

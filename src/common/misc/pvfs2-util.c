@@ -635,7 +635,6 @@ int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr,
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
-        dest_attr->sid_count = src_attr->sid_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -862,6 +861,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
     memset(current_tab->mntent_array,
            0,
            (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+
     for (i = 0; i < tmp_mntent_count; i++)
     {
         current_tab->mntent_array[i].fs_id = PVFS_FS_ID_NULL;
@@ -875,13 +875,15 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
     i = 0;
     while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
     {
-       if(!(PINT_FSTAB_NAME(tmp_ent)) || !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+       if(!(PINT_FSTAB_NAME(tmp_ent)) ||
+          !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
        {
            PINT_fstab_entry_destroy(tmp_ent);
            continue;
         }
 
-        if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) && (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
+        if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) &&
+            (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
         {
             struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
             char *cp;
@@ -889,22 +891,31 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
 	    char *rewrite_pointer;
 
 	    /* Entries in mtab may be prefixed by a process name and '#' */
-	    /* If detected, remove prefix.  */
-	    for(rewrite_pointer=cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++,rewrite_pointer++) {
-		if (*cp == '#') {
+	    /* If detected, remove prefix.
+             */
+	    for(rewrite_pointer = cp = PINT_FSTAB_NAME(tmp_ent);
+                *cp;
+                cp++, rewrite_pointer++)
+            {
+		if (*cp == '#')
+                {
 		    rewrite_pointer = PINT_FSTAB_NAME(tmp_ent) - 1;
 		    continue;
 		}
-		if (rewrite_pointer == cp) continue;
+		if (rewrite_pointer == cp)
+                {
+                    continue;
+                }
 		*rewrite_pointer = *cp;
 	    }
 	    *rewrite_pointer = '\0';
 	       
             /* Enable integrity checks by default */
             me->integrity_check = 1;
+
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
-            for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
+            for (cp = PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
             {
                 if (*cp == ',')
                 {
@@ -913,14 +924,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
             }
 
             /* allocate room for our copies of the strings */
-            me->pvfs_config_servers = malloc(me->num_pvfs_config_servers
-                                      * sizeof(*me->pvfs_config_servers));
+            me->pvfs_config_servers = malloc(me->num_pvfs_config_servers *
+                                             sizeof(*me->pvfs_config_servers));
             if (!me->pvfs_config_servers)
             {
                 goto error_exit;
             }
-            memset(me->pvfs_config_servers, 0, me->num_pvfs_config_servers
-                                            * sizeof(*me->pvfs_config_servers));
+            memset(me->pvfs_config_servers,
+                   0,
+                   me->num_pvfs_config_servers *
+                        sizeof(*me->pvfs_config_servers));
+
             me->mnt_dir = malloc(strlen(PINT_FSTAB_PATH(tmp_ent)) + 1);
             me->mnt_opts = malloc(strlen(PINT_FSTAB_OPTS(tmp_ent)) + 1);
 
@@ -933,8 +947,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
             /* parse server list and make sure fsname is same */
             cp = PINT_FSTAB_NAME(tmp_ent);
 
-            cur_server = 0;
-            for (;;)
+            for (cur_server = 0; ; ++cur_server)
             {
                 char *tok;
                 int slashcount;
@@ -942,7 +955,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
                 char *last_slash;
 
                 tok = strsep(&cp, ",");
-                if (!tok) break;
+                if (!tok)
+                {
+                    break;
+                }
 
                 slash = tok;
                 slashcount = 0;
@@ -960,7 +976,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
                      */
                     if(!strcmp(targetfile, "/etc/mtab"))
                     {
-                        gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
+                        gossip_err("Error: could not find any "
+                                   "pvfs2 tabfile entries.\n");
                         gossip_err("Error: tried the following tabfiles:\n");
                         for (j = 0; j < file_count; j++)
                         {
@@ -1011,23 +1028,21 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
                         goto error_exit;
                     }
                 }
-                ++cur_server;
             }
 
             /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
-                                    PINT_FSTAB_PATH(tmp_ent));
+                   PINT_FSTAB_PATH(tmp_ent));
             strcpy(current_tab->mntent_array[i].mnt_opts,
-                                    PINT_FSTAB_OPTS(tmp_ent));
+                   PINT_FSTAB_OPTS(tmp_ent));
 
             /* find out if a particular flow protocol was specified */
             if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
             {
-                ret = parse_flowproto_string(
-                                        PINT_FSTAB_OPTS(tmp_ent),
-                                        &(current_tab->
-                                        mntent_array[i].flowproto));
+                ret = parse_flowproto_string(PINT_FSTAB_OPTS(tmp_ent),
+                                             &(current_tab->
+                                                   mntent_array[i].flowproto));
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -1035,32 +1050,31 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(const char *tabfile)
             }
             else
             {
-                current_tab->mntent_array[i].flowproto =
-                                        FLOWPROTO_DEFAULT;
+                current_tab->mntent_array[i].flowproto = FLOWPROTO_DEFAULT;
             }
 
             /* pick an encoding to use with the server */
-            current_tab->mntent_array[i].encoding =
-                                    PVFS2_ENCODING_DEFAULT;
+            current_tab->mntent_array[i].encoding = PVFS2_ENCODING_DEFAULT;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
                 ret = parse_encoding_string(
-                                   cp, &current_tab->mntent_array[i].encoding);
+                                     cp,
+                                     &current_tab->mntent_array[i].encoding);
                 if (ret < 0)
                 {
                     goto error_exit;
                 }
             }
 
-            /* find out if a particular flow protocol was specified */
+            /* find out if a num_defiles default was specified */
             current_tab->mntent_array[i].default_num_dfiles = 0;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "num_dfiles");
             if (cp)
             {
                 ret = parse_num_dfiles_string(
-                    cp,
-                    &(current_tab->mntent_array[i].default_num_dfiles));
+                            cp,
+                            &(current_tab->mntent_array[i].default_num_dfiles));
 
                 if (ret < 0)
                 {

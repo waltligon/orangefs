@@ -166,7 +166,7 @@ frames can also be poped from the stack in the usual LIFO manner.
 
 When there are frames pushed on the frame stack and a state machine executes a
 jump to a nested state machine it is assumed that the top frame on the stack
-is intended as the new current frame.  Once the jump is exected, inside the
+is intended as the new current frame.  Once the jump is executed, inside the
 nested state machine the top of stack becomes the current frame at index 0, and
 there will be no frames on top of it (unless and until it chooses to push some).
 When the nested state machine return, the frame stack is restored to its

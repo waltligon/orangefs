@@ -22,6 +22,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 /* The small-io state machine should only be invoked/jumped-to from the
  * sys-io state machine.  We make this assumption and expect io parameters
@@ -82,17 +83,20 @@ static int small_io_completion_fn(void *user_args,
                                   int index)
 {
     struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    PINT_sm_msgarray_op   *mop   = &(sm_p->msgarray_op);
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_sm_msgpair_state *msg_p = &(mop->msgarray[index]);
-    PINT_client_small_io_ctx *ctx = 
-            &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
+    /* V3 don't think we need this any more */
+    /* PINT_client_small_io_ctx *ctx = 
+            &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]); */
     uint32_t server_nr = msg_p->req.u.small_io.server_nr;
 #ifdef WIN32
-    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    /* PVFS_object_attr *attr = &(sm_p->getattr.attr); */
+    PVFS_object_attr *attr = mop->flow_params->getattr.attr;
     PVFS_metafile_attr *meta = &(attr->u.meta);
 #else
-    PVFS_object_attr *attr __attribute__((unused)) = &(sm_p->getattr.attr);
+    /*PVFS_object_attr *attr __attribute__((unused)) = &(sm_p->getattr.attr);*/
+    PVFS_object_attr *attr __attribute__((unused)) =
+                                        mop->flow_params->getattr.attr;
     PVFS_metafile_attr *meta __attribute__((unused)) = &(attr->u.meta);
 #endif
 
@@ -109,7 +113,8 @@ static int small_io_completion_fn(void *user_args,
     {
         PVFS_size sizes[IO_MAX_REGIONS];
         PVFS_offset offsets[IO_MAX_REGIONS];
-        PVFS_object_attr *attr = &sm_p->getattr.attr;
+        /* V3 redundant */
+        /* PVFS_object_attr *attr = &sm_p->getattr.attr; */
         PINT_request_file_data fdata;
         PINT_Request_result result;
         PINT_Request_state *file_req_state;
@@ -134,15 +139,18 @@ static int small_io_completion_fn(void *user_args,
             result.size_array = sizes;
             result.offset_array = offsets;
 
-            file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
-            mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+            /* V3 get info from mop not sm_p */
+            /* file_req_state = PINT_new_request_state(sm_p->u.io.file_req); */
+            /* mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req); */
+            file_req_state = PINT_new_request_state(mop->flow_params->file_req);
+            mem_req_state = PINT_new_request_state(mop->flow_params->mem_req);
 
             PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
-                                          sm_p->u.io.file_req_offset);
+                                          mop->flow_params->file_req_offset);
             PINT_REQUEST_STATE_SET_FINAL(
                          file_req_state,
-                         sm_p->u.io.file_req_offset + 
-                               PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+                         mop->flow_params->file_req_offset + 
+                           PINT_REQUEST_TOTAL_BYTES(mop->flow_params->mem_req));
 
             do
             {
@@ -166,7 +174,7 @@ static int small_io_completion_fn(void *user_args,
                     char *src_ptr;
                     char *dest_ptr;
 
-                    dest_ptr = (char *)sm_p->u.io.buffer + offsets[i];
+                    dest_ptr = (char *)mop->flow_params->buffer + offsets[i];
                     src_ptr = (char *)resp_p->u.small_io.buffer + 
                                                          bytes_processed;
 
@@ -200,13 +208,16 @@ static int small_io_completion_fn(void *user_args,
         }
     } /*if PVFS_IO_READ*/
 
-    sm_p->u.io.dfile_size_array[server_nr] = resp_p->u.small_io.bstream_size;
-    /*sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;*/
+    /* sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size; */
+    mop->flow_params->dfile_size_array[server_nr] =
+                            resp_p->u.small_io.bstream_size;
 
-    sm_p->u.io.total_size += resp_p->u.small_io.result_size;
+
+    /* moved to MPA completed message */
+    /* sm_p->u.io.total_size += resp_p->u.small_io.result_size; */
 
     /* Lets SMALL-IO know that the msg completed. */
-    ctx->msg_completed = 1;
+    /* ctx->msg_completed = 1; */
 
     /* To test fail-over with small-io, uncomment the following code.  This
      * will force each primary handle to have each of its mirrored handles
@@ -378,6 +389,8 @@ static PINT_sm_action small_io_setup_msgpairs(struct PINT_smcb *smcb,
                                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
                                    sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_SMALL_IO;
+        msg_p->msgdir = sm_p->u.io.io_type;
         msg_p->fs_id  = sm_p->object_ref.fs_id;
         msg_p->handle = datafile_handle;
         /* should also be able to get SID info from object_ref
@@ -405,7 +418,7 @@ static PINT_sm_action small_io_setup_msgpairs(struct PINT_smcb *smcb,
         }
         msg_p->comp_fn = small_io_completion_fn;
 
-        ret = PINT_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         if(ret < 0)
         {
             gossip_lerr("Failed to map data server address\n");
@@ -539,7 +552,7 @@ static PINT_sm_action small_io_check_for_retries(struct PINT_smcb *smcb,
             msg->sid_count             = 0; /* where to get these? */
             msg->sid_index             = 0;
             msg->sid_array             = 0;
-            ret = PINT_SID_get_addr(&msg->svr_addr, msg->sid_array);
+            ret = PVFS_SID_get_addr(&msg->svr_addr, &msg->sid_array[0]);
 
             if (ret)
             {

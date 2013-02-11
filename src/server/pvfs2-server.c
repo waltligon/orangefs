@@ -1491,9 +1491,9 @@ static void reload_config(void)
     }
 }
 
-static int server_shutdown(
-    PINT_server_status_flag status,
-    int ret, int siglevel)
+static int server_shutdown(PINT_server_status_flag status,
+                           int ret,
+                           int siglevel)
 {
     if (siglevel == SIGSEGV)
     {
@@ -1946,20 +1946,28 @@ int server_post_unexpected_recv(void)
     struct PINT_smcb *smcb = NULL;
     struct PINT_server_op *s_op;
 
-    /* The job status structure js that is sent into PINT_state_machine_start() below is used until
-     * the job_bmi_unexp() function call is executed in pvfs2_unexpected_sm.unexpected_post.  Once
-     * job_bmi_unexp() puts the unexp job on the job queue, then a job_status_s structure will be
-     * assigned from the global structure, server_job_status_array, when the job system processes it.
-     * (The job system performs this task in a later call to job_testcontext()). It is THIS job_status_s
-     * structure that carries into the next state of pvfs2_unexpected_sm.  Thus, the original js
-     * structure is ONLY used by job_bmi_unexp() to return an error if something within job_bmi_unexp()
-     * fails, like a memory issue.  It is NOT forwarded through the job system. In the case of an error,
-     * ret (below) will be SM_ACTION_TERMINATE upon return from PINT_state_machine_start() and the error_code
+    /* The job status structure js that is sent into
+     * PINT_state_machine_start() below is used until
+     * the job_bmi_unexp() function call is executed in
+     * pvfs2_unexpected_sm.unexpected_post.  Once
+     * job_bmi_unexp() puts the unexp job on the job queue,
+     * then a job_status_s structure will be assigned from
+     * the global structure, server_job_status_array, when
+     * the job system processes it.  (The job system performs
+     * this task in a later call to job_testcontext()). It is
+     * THIS job_status_s structure that carries into the next
+     * state of pvfs2_unexpected_sm.  Thus, the original js
+     * structure is ONLY used by job_bmi_unexp() to return an
+     * error if something within job_bmi_unexp() fails, like a
+     * memory issue.  It is NOT forwarded through the job system.
+     * In the case of an error, ret (below) will be SM_ACTION_TERMINATE
+     * upon return from PINT_state_machine_start() and the error_code
      * is then properly propagated.
      *
-     * NOTE: If an error occurs when this function is called during server_initialize() time, then the 
-     * server will not start.  If an error occurs during the pvfs2_unexpected_sm.unexpected_map state, the
-     * error is noted but the system continues to run.
+     * NOTE: If an error occurs when this function is called
+     * during server_initialize() time, then the server will not start.
+     * If an error occurs during the pvfs2_unexpected_sm.unexpected_map
+     * state, the error is noted but the system continues to run.
      */
     job_status_s js={0};
 
@@ -2039,9 +2047,7 @@ static int server_purge_unexpected_recv_machines(void)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-int server_state_machine_start(
-    PINT_smcb *smcb,
-    job_status_s *js_p)
+int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -2117,8 +2123,8 @@ int server_state_machine_start(
 
     if (!ret)
     {
-        /* ret will be zero when PINT_smcb_set_op cannot find the state machine associated
-         * with the request's op.
+        /* ret will be zero when PINT_smcb_set_op cannot find the
+         * state machine associated with the request's op.
          */ 
         gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);
@@ -2251,7 +2257,8 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: smcb op code (%d).\n"
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
+                                       "smcb op code (%d).\n"
                                       ,s_op->op);
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
                                        "s_op->unexp_bmi_buff.buffer (%p) "
@@ -2259,24 +2266,25 @@ int server_state_machine_complete(PINT_smcb *smcb)
                                       ,s_op->unexp_bmi_buff.buffer
                                       ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
 
-    /* BMI_unexpected_free MUST execute BEFORE BMI_set_info, because BMI_set_info will */
-    /* remove the addr info from the cur_ref_list if BMI_DEC_ADDR_REF causes the ref   */
-    /* count to become zero.  The addr info holds the "unexpected-free" function       */
-    /* pointer.                                                                        */
+    /* BMI_unexpected_free MUST execute BEFORE BMI_set_info,
+     * because BMI_set_info will remove the addr info from the
+     * cur_ref_list if BMI_DEC_ADDR_REF causes the ref count to
+     * become zero.  The addr info holds the "unexpected-free"
+     * function pointer.
+     */
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
     BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
     s_op->unexp_bmi_buff.buffer = NULL;
 
 
-   /* Remove s_op from the inprogress_sop_list */
+    /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
 
     return SM_ACTION_TERMINATE;
 }
 
-int server_state_machine_terminate(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* free the operation structure itself */
     gossip_debug(GOSSIP_SERVER_DEBUG,

@@ -961,11 +961,18 @@ void PVFS_error_details_free(PVFS_error_details *details);
 
 /** PVFS I/O operation types, used in both system and server interfaces.
  */
-enum PVFS_io_type
+typedef enum PVFS_io_type
 {
     PVFS_IO_READ  = 1,
     PVFS_IO_WRITE = 2
-};
+} PVFS_io_type;
+
+typedef enum PVFS_io_class
+{
+    PVFS_IO_IO  = 1,
+    PVFS_IO_SMALL_IO = 2,
+    PVFS_IO_METADATA = 3
+} PVFS_io_class;
 
 /*
  * Filesystem "magic" number unique to PVFS2 kernel interface.  Used by

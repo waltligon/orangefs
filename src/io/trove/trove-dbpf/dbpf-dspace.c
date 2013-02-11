@@ -106,8 +106,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p);
 
 static int dbpf_dspace_create(TROVE_coll_id coll_id,
-                              TROVE_handle_extent_array *extent_array,
-                              TROVE_handle *handle_p,
+                              TROVE_handle handle,
+                              TROVE_handle *out_handle,
                               TROVE_ds_type type,
                               TROVE_keyval_s *hint,
                               TROVE_ds_flags flags,
@@ -135,8 +135,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                                            &q_op_p,
                                            DSPACE_CREATE,
                                            coll_p,
-                                           (handle_p ? *handle_p :
-                                                       TROVE_HANDLE_NULL),
+                                           handle,
                                            dbpf_dspace_create_op_svc,
                                            flags,
                                            NULL,
@@ -146,11 +145,6 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     if(ret < 0)
     {
         return ret;
-    }
-
-    if (!extent_array || (extent_array->extent_count < 1))
-    {
-        return -TROVE_EINVAL;
     }
 
     event_type = trove_dbpf_dspace_create_event_id;
@@ -165,22 +159,10 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
      * in dbpf_queue_or_service in the case of immediate completion */
-    op_p->u.d_create.extent_array.extent_count =
-                    extent_array->extent_count;
-    op_p->u.d_create.extent_array.extent_array =
-                    malloc(extent_array->extent_count * sizeof(TROVE_extent));
+    op_p->u.d_create.handle = handle;
+    op_p->u.d_create.out_handle = out_handle;
     op_p->hints = hints;
 
-    if (op_p->u.d_create.extent_array.extent_array == NULL)
-    {
-        return -TROVE_ENOMEM;
-    }
-
-    memcpy(op_p->u.d_create.extent_array.extent_array,
-           extent_array->extent_array,
-           extent_array->extent_count * sizeof(TROVE_extent));
-
-    op_p->u.d_create.out_handle_p = handle_p;
     op_p->u.d_create.type = type;
 
     PINT_perf_count(PINT_server_pc,
@@ -196,53 +178,29 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
     TROVE_handle new_handle = TROVE_HANDLE_NULL;
-    TROVE_extent cur_extent;
+    TROVE_handle cur_handle;
 
-    cur_extent = op_p->u.d_create.extent_array.extent_array[0];
+    cur_handle = op_p->u.d_create.handle;
 
-    /* check if we got a single specific handle */
-    if ((op_p->u.d_create.extent_array.extent_count == 1) &&
-        (!PVFS_OID_cmp(&cur_extent.first, &cur_extent.last)))
+    /* V3 FORCE doesn't make sense any more either handle is given or not */
+    /* if ((op_p->flags & TROVE_FORCE_REQUESTED_HANDLE) */
+
+    if (PVFS_OID_cmp(&cur_handle, &TROVE_HANDLE_NULL))
     {
         /*
-          check if we MUST use the exact handle value specified;
-          if caller requests a specific handle, honor it
-        */
-        if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
-        {
-            /*
-             * currently the only way to check for an already
-             * used handle is to look into the DB - which we
-             * will do later, so we test for that error then
-             */
-            new_handle = cur_extent.first;
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "new_handle was FORCED to be %s\n",
-                         PVFS_OID_str(&new_handle));
-        }
-        else if (!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL))
-        {
-            /*
-              if we got TROVE_HANDLE_NULL, the caller doesn't care
-              where the handle comes from
-            */
-            PVFS_OID_gen(&new_handle);
-        }
+         * currently the only way to check for an already
+         * used handle is to look into the DB - which we
+         * will do later, so we test for that error then
+         */
+        new_handle = cur_handle;
     }
     else
     {
-        /*
-          otherwise, we have to try to allocate a handle from
-          the specified range that we're given
-        */
         PVFS_OID_gen(&new_handle);
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %s "
-                 "(cur_extent is %s - %s)\n",
-                 op_p->u.d_create.extent_array.extent_count,
-                 PVFS_OID_str(&new_handle), PVFS_OID_str(&cur_extent.first),
-                 PVFS_OID_str(&cur_extent.last));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle is %s\n ",
+                 PVFS_OID_str(&new_handle));
     /*
       if we got a zero handle, we're either completely out of handles
       -- or else something terrible has happened
@@ -262,18 +220,20 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
+    *op_p->u.d_create.out_handle = new_handle;
+
     PINT_perf_count(PINT_server_pc,
                     PINT_PERF_METADATA_DSPACE_OPS,
                     1,
                     PINT_PERF_SUB);
 
-    *op_p->u.d_create.out_handle_p = new_handle;
+    *op_p->u.d_create.out_handle = new_handle;
     return DBPF_OP_COMPLETE;
 }
 
 static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
-                                   TROVE_handle_extent_array *extent_array,
-                                   TROVE_handle *handle_array_p,
+                                   TROVE_handle *handle_array,
+                                   TROVE_handle *out_handle_array,
                                    int count,
                                    TROVE_ds_type type,
                                    TROVE_keyval_s *hint,
@@ -297,14 +257,6 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    if (flags & TROVE_FORCE_REQUESTED_HANDLE ||
-        !PVFS_OID_cmp(&extent_array->extent_array[0].first, &TROVE_HANDLE_NULL))
-    {
-        gossip_err("Error: dbpf_dspace_create_list() does not "
-                   "support forced handles or empty extent specifier.\n");
-        return(-TROVE_EINVAL);
-    }
-
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
                                            DSPACE_CREATE,
@@ -321,11 +273,6 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return ret;
     }
 
-    if (!extent_array || (extent_array->extent_count < 1))
-    {
-        return -TROVE_EINVAL;
-    }
-
     event_type = trove_dbpf_dspace_create_event_id;
     DBPF_EVENT_START(coll_p,
                      q_op_p,
@@ -338,28 +285,24 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
      * in dbpf_queue_or_service in the case of immediate completion */
-    op_p->u.d_create_list.extent_array.extent_count =
-                    extent_array->extent_count;
-    op_p->u.d_create_list.extent_array.extent_array =
-                    malloc(extent_array->extent_count * sizeof(TROVE_extent));
+    op_p->u.d_create_list.count = count;
+    op_p->u.d_create_list.handle_array =
+                    malloc(count * sizeof(TROVE_handle));
+    op_p->u.d_create_list.out_handle_array = out_handle_array;
 
-    if (op_p->u.d_create_list.extent_array.extent_array == NULL)
+    if (op_p->u.d_create_list.handle_array == NULL)
     {
         return -TROVE_ENOMEM;
     }
 
-    memcpy(op_p->u.d_create_list.extent_array.extent_array,
-           extent_array->extent_array,
-           extent_array->extent_count * sizeof(TROVE_extent));
+    memcpy(op_p->u.d_create_list.handle_array,
+           handle_array,
+           count * sizeof(TROVE_handle));
 
-    op_p->u.d_create_list.out_handle_array_p = handle_array_p;
-    op_p->u.d_create_list.count = count;
     op_p->u.d_create_list.type = type;
 
-    /* memset handle array for safety if we have to clean up later */
-    memset(handle_array_p, 0, count*sizeof(TROVE_handle));
-
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
     return dbpf_queue_or_service(op_p,
@@ -380,16 +323,20 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
 
     for(i=0; i<op_p->u.d_create_list.count; i++)
     {
+        new_handle = op_p->u.d_create_list.handle_array[i];
+
+        if (!PVFS_OID_cmp(&new_handle, &TROVE_HANDLE_NULL))
+        {
+            /*
+             * user passed in NULL so allocate a handle
+             */
+            PVFS_OID_gen(&new_handle);
+        }
 
         /*
-          try to allocate a handle from the specified range that we're given
-        */
-        PVFS_OID_gen(&new_handle);
-
-        /*
-          if we got a zero handle, we're either completely out of handles
-          -- or else something terrible has happened
-        */
+         *  if we got a zero handle, we're either completely out of handles
+         *  -- or else something terrible has happened
+         */
         if (!PVFS_OID_cmp(&new_handle, &TROVE_HANDLE_NULL))
         {
             gossip_err("Error: handle allocator returned a zero handle.\n");
@@ -404,24 +351,23 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
             /* release any handles we grabbed so far */
             for(j = 0; j <= i; j++)
             {
-                if(PVFS_OID_cmp(&op_p->u.d_create_list.out_handle_array_p[j],
+                if(PVFS_OID_cmp(&op_p->u.d_create_list.out_handle_array[j],
                                 &TROVE_HANDLE_NULL))
                 {
                     memset(&key, 0, sizeof(key));
-                    key.data = &op_p->u.d_create_list.out_handle_array_p[j];
+                    key.data = &op_p->u.d_create_list.out_handle_array[j];
                     key.size = key.ulen = sizeof(TROVE_handle);
                     op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, 
                                              NULL,
                                              &key,
                                              0);
 
-                    PVFS_OID_init(&op_p->u.d_create_list.out_handle_array_p[j]);
+                    PVFS_OID_init(&op_p->u.d_create_list.out_handle_array[j]);
                 }
             }
             return(ret);
         }
-
-        op_p->u.d_create_list.out_handle_array_p[i] = new_handle;
+        op_p->u.d_create_list.out_handle_array[i] = new_handle;
     }
 
     PINT_perf_count(PINT_server_pc,

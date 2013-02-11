@@ -81,7 +81,7 @@ static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_event_tracing);
-static DOTCONF_CB(get_filesystem_replicate);
+static DOTCONF_CB(get_filesystem_replication);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(check_this_server);
@@ -1523,8 +1523,9 @@ DOTCONF_CB(exit_filesystem_context)
 DOTCONF_CB(enter_rootsrvs_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
-    static first_time = 1;
+                    (struct server_configuration_s *)cmd->context;
+    static int first_time = 1;
+
     if (!first_time)
     {
         /* can only specify root servers once, this is an error */
@@ -1533,6 +1534,7 @@ DOTCONF_CB(enter_rootsrvs_context)
         return("Config file format error - only one RootServers context "
                "can be specified\n");
     }
+
     first_time = 0;
     config_s->configuration_context = CTX_ROOTSERVERS;
     return NULL;
@@ -1574,8 +1576,8 @@ DOTCONF_CB(exit_rootsrvs_context)
             break;
         }
         /* convert SID into array */
-        PVFS_SID_str2bin(&fs_conf->root_sid_array[i],
-                         cur_root_server->host_sid_text);
+        PVFS_SID_str2bin(cur_root_server->host_sid_text,
+                         &fs_conf->root_sid_array[i]);
         
         cur = PINT_llist_next(cur);
     }
@@ -3640,6 +3642,7 @@ static int is_populated_filesystem_configuration(
 }
  
 /* V3 this function is obsolete - remove it */
+#if 0
 static int is_root_handle_in_a_meta_range(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
@@ -3696,6 +3699,7 @@ static int is_root_handle_in_a_meta_range(
     }
     return ret;
 }
+#endif
 
 static int is_valid_filesystem_configuration(
         struct server_configuration_s *config,
@@ -3756,7 +3760,7 @@ static void free_host_alias(void *ptr)
 
 static void free_root_server(void *ptr)
 {
-    struct root_server_s *root_sersver = (struct root_server_s *)ptr;
+    struct root_server_s *root_server = (struct root_server_s *)ptr;
     if (root_server)
     {
         free(root_server->host_sid_text);
@@ -3871,7 +3875,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
             if (!dest_fs->root_sid_array)
             {
                 gossip_err("Failed to allocate memory for root_sid_array\n");
-                return -1;
+                return;
             }
             memcpy(dest_fs->root_sid_array,
                    src_fs->root_sid_array,
@@ -3887,7 +3891,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
         }
 
         dest_fs->default_num_dfiles = src_fs->default_num_dfiles;
-        dest_fs->metadata_repliation_factor = 
+        dest_fs->metadata_replication_factor = 
                                    src_fs->metadata_replication_factor;
         dest_fs->flowproto = src_fs->flowproto;
         dest_fs->encoding = src_fs->encoding;
@@ -3981,11 +3985,11 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
             if (!new_root_server)
             {
                 gossip_err("failed to alloacte memory for a root server\n");
-                return -1;
+                return;
             }
 
             new_root_server->host_sid_text =
-                            strdup(cur_roor_server->host_sid_text);
+                            strdup(cur_root_server->host_sid_text);
 
             PINT_llist_add_to_tail(dest_fs->root_servers, new_root_server);
             cur = PINT_llist_next(cur);

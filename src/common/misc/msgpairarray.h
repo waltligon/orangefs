@@ -4,6 +4,14 @@
  * See COPYING in top-level directory.
  */
 
+/* mps.h
+ *
+ * This modified version is for PVFS v3/OrangeFS Next it combines the
+ * old msgpairarray functionality with io and smallio and adds mirrored
+ * objects capability.
+ */
+
+
 #ifndef __MSGPAIRARRAY_H
 #define __MSGPAIRARRAY_H
 
@@ -12,6 +20,19 @@
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 
+/* these are used as the status_user_tag for bmi jobs */
+typedef enum msgphase_t {
+    PVFS_MPA_SEND,
+    PVFS_MPA_RECV,
+    PVFS_MPA_FLOW,
+    PVFS_MPA_ACK
+} msgphase_t;
+
+typedef enum msgaction_t {
+    PVFS_MPA_OK,
+    PVFS_MPA_RETRY,
+    PVFS_MPA_FAIL
+} msgaction_t;
 
 extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 
@@ -32,10 +53,15 @@ extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
  */
 typedef struct PINT_sm_msgpair_state_s
 {
+    /* These should be set before starting MPA */
+    PVFS_io_class msgclass; /* is this regular IO, SMALL_IO, or METADATA */
+    PVFS_io_type  msgdir;   /* READ or WRITE */
+
     /* NOTE: fs_id, handle, retry flag, and comp_fn, should be filled
      * in prior to going into the msgpair code path.
      */
-    PVFS_fs_id fs_id;
+    int         server_nr; /* for IO and SMALL_IO */
+    PVFS_fs_id  fs_id;
     PVFS_handle handle;
 
     /* should be either PVFS_MSGPAIR_RETRY, or PVFS_MSGPAIR_NO_RETRY*/
@@ -50,10 +76,12 @@ typedef struct PINT_sm_msgpair_state_s
     /* initialize to address of sid_array[0] */
     PVFS_BMI_addr_t svr_addr;
     /* number of sids in the array */
+    /* if this is 1 should never try to access sid_array */
     int sid_count;
     /* which SID we are using - always initialize to 0 */
     int sid_index;
     /* pointer to alternate sids for the target object */
+    /* if this is NULL there are no alternates, sid_count should be 1 */
     PVFS_SID *sid_array;
 
     /* session identifier between send and rcvs*/
@@ -62,31 +90,38 @@ typedef struct PINT_sm_msgpair_state_s
     bmi_msg_tag_t session_tag;
 
     /* req and encoded_req are used to send a request */
-    struct PVFS_server_req req;
+    struct PVFS_server_req  req;
     struct PINT_encoded_msg encoded_req;
 
     /* the encoding type to use for the req */
     enum PVFS_encoding_type enc_type;
 
     /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
-    int max_resp_sz;
+    int  max_resp_sz;
     void *encoded_resp_p;
 
     /* send_id, recv_id used to track completion of operations */
-    job_id_t send_id, recv_id;
+    job_id_t send_id, recv_id, flow_id, ack_id;
+
     /* send_status, recv_status used for error handling etc. */
-    job_status_s send_status, recv_status;
+    job_status_s send_status, recv_status, flow_status, ack_status;
+
+    /* descriptor for flows */
+    flow_descriptor flow_desc;
 
     /* op_status is the code returned from the server, if the
      * operation was actually processed (recv_status.error_code == 0)
      */
-    PVFS_error op_status;
+    PVFS_error  op_status;
+    msgaction_t op_action;
 
-    /*
-      used in the retry code path to know if we've already completed
-      or not (to avoid re-doing the work we've already done)
-    */
+    /* used in the retry code path to know if we've already completed
+     * or not (to avoid re-doing the work we've already done)
+     */
     int complete;
+
+    /* variables used to be in sm_p */
+    int dfile_size;
 
 } PINT_sm_msgpair_state;
 
@@ -100,16 +135,37 @@ typedef struct
     int quiet_flag;   /* if set, cuts down on error messages during retry */
 
     /* comp_ct used to keep up with number of operations remaining */
-    int comp_ct;
+    int send_ct;
+    int recv_ct;
+    int flow_ct;
+    int ack_ct;
 
 } PINT_sm_msgpair_params;
 
+/* flow parameters - not needed for SMALL_IO or METADATA */
 typedef struct
 {
-    PINT_sm_msgpair_params params;
-    int count;
-    PINT_sm_msgpair_state *msgarray;
-    PINT_sm_msgpair_state msgpair;
+    enum PVFS_flowproto_type flowproto_type;
+    enum PVFS_io_type io_type;
+    PVFS_Request mem_req;
+    PVFS_Request file_req;
+    PVFS_offset file_req_offset;
+    void *buffer;
+    PVFS_size *dfile_size_array;
+    PVFS_object_attr *attr;
+    enum PVFS_encoding_type encoding;
+    PVFS_hint hints;
+} PINT_sm_msgpair_flow;
+
+typedef struct PINT_sm_msgarray_op
+{
+    PINT_sm_msgpair_params params;   /* these are shared */
+    int count;                       /* the same for all message pairs */
+    int index;                       /* this is unique for each message pair */
+    PINT_sm_msgpair_state *msgarray; /* these are shared */
+    PINT_sm_msgpair_state msgpair;   /* for single message pair jobs */
+    int total_size;
+    PINT_sm_msgpair_flow *flow_params;
 } PINT_sm_msgarray_op;
 
 #define PINT_msgpair_init(op)                                     \

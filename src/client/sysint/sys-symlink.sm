@@ -23,6 +23,7 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -295,8 +296,8 @@ static int symlink_create_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    /* PINT_smcb *smcb = v_p; */
+    /* PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM); */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
@@ -318,14 +319,12 @@ static int symlink_setattr_comp_fn(void *v_p,
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr attr;
 
-    memset(&tmp_ref, 0, sizeof(tmp_ref));
-
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_setattr_comp_fn\n");
 
     if(resp_p->status == 0)
     {
         PINT_CONVERT_ATTR(&attr, &sm_p->u.sym.sys_attr, 0);
-        PINT_acache_update(&(sm_p->object_ref), &attr, NULL);
+        PINT_acache_update(sm_p->object_ref, &attr, NULL);
     }
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
@@ -407,10 +406,10 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
     PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
 
     /* initialize the msgarray struct */
-    PINT_msgpairarray_init(&sm_p->msgarray_op, &sm_p->object_ref.sid_count);
+    PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
 
     /* use msgpair array to send create to each SID */
-    foreach_msgpair(sm_p->msgarray_op, msg_p, i)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         /* we need to pass the handle of the object!!! */
         PINT_SERVREQ_BATCH_CREATE_FILL(msg_p->req,
@@ -418,22 +417,23 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
                                        PVFS_TYPE_SYMLINK,
                                        sm_p->parent_ref.fs_id,
                                        sm_p->parent_ref.handle, /* bak ptr */
-                                       &sm_p->parent_ref.sid_array[0],
+                                       sm_p->parent_ref.sid_array[0],
                                        1,
                                        &sm_p->object_ref.handle, /* array */
                                        sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
         /* each message has only one sid to send to */
         msg_p->sid_count = 1;
         msg_p->sid_index = 0;
-        smg_p->sid_array = &sm_p->object_ref.sid_array[i];
+        msg_p->sid_array = &sm_p->object_ref.sid_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = symlink_create_comp_fn;
 
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
-                                &sm_p->object_ref.sid_array[i]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         /* V3 how to process error in this loop?  Just bail? */
     }
 
@@ -494,6 +494,8 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->object_ref.sid_array,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     msg_p->sid_count = sm_p->parent_ref.sid_count;
@@ -578,6 +580,8 @@ static PINT_sm_action symlink_setattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.setattr.attr.u.sym.target_path_len =
                               strlen(sm_p->u.sym.link_target) + 1;
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -627,6 +631,8 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
                              sm_p->object_ref.sid_array,
                              sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;

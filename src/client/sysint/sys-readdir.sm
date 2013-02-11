@@ -18,10 +18,13 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-cached-config.h"
+#include "server-config.h"
+#include "pint-sysint-utils.h"
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -108,6 +111,8 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
+    struct server_configuration_s *server_config = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
 
@@ -147,10 +152,8 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
     /*
      * Find metadata replication factor from configuration
      */
-    server_config = PINT_get_server_config_stgruct(
-                                  sm_p->u.lookup.starting_refn.fs_id);
-    cur_fs = PINT_config_find_fs_id(server_config,
-                                    sm_p->u.lookup.starting_refn.fs_id);
+    server_config = PINT_get_server_config_struct(ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
     sm_p->u.readdir.meta_sid_count = cur_fs->metadata_replication_factor;
     PINT_put_server_config_struct(server_config);
 
@@ -264,7 +267,6 @@ static int readdir_msg_comp_fn(void *v_p,
         memcpy(*(sm_p->readdir.dirent_array),
                resp_p->u.readdir.dirent_array,
                dirent_array_len);
-        /* V3 Need to copy SIDs */
     }
 
     if (*sm_p->readdir.sid_count > 0)
@@ -278,7 +280,6 @@ static int readdir_msg_comp_fn(void *v_p,
         memcpy(*sm_p->readdir.sid_array,
                resp_p->u.readdir.sid_array,
                sid_array_len);
-        /* V3 Need to copy SIDs */
     }
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
@@ -344,6 +345,8 @@ static PINT_sm_action readdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                               sm_p->u.readdir.dirent_limit,
                               sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -352,7 +355,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

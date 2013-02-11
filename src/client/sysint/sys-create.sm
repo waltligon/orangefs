@@ -27,6 +27,7 @@
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -474,9 +475,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
-    int server_type;
+    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -511,7 +511,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
             "PVFS_isys_create() selected meta server: %s\n", 
-            PVFS_SIDstr(&sm_p->object_ref.sid_array[0]));
+            PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
     }
 
     /* note - should we allocated the OIDs and SIDs for the data files
@@ -521,7 +521,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
      * if we fan out here we certainly need to allocated all SIDs here
      * and send copies to all.
      */
-    foreach_msgpair(sm_p->msgarray_op, msg_p, i)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_CREATE_FILL(msg_p->req,
                                  sm_p->getattr.attr.capability,
@@ -535,6 +535,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                                  sm_p->u.create.layout,
                                  sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
         /* this assumes fan out from client */
@@ -548,8 +550,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->req.u.create.attr.u.meta.dist_size =
                         PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
-                                &sm_p->object_ref.sid_array[i]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         /* V3 how to handle failure here */
     }
 
@@ -591,6 +592,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->object_ref.sid_array,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     msg_p->sid_count = sm_p->parent_ref.sid_count;
@@ -599,7 +602,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->parent_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -658,10 +661,8 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
                         sm_p->u.create.datafile_count;
         sm_p->u.create.attr.u.meta.dfile_array =
                         sm_p->u.create.datafile_handles;
-        sm_p->u.create.attr.u.meta.sid_count =
-                        sm_p->u.create.sid_count;
-        sm_p->u.create.attr.u.meta.sid_array =
-                        sm_p->u.create.sid_array;
+        sm_p->u.create.attr.u.meta.sid_count = sm_p->u.create.sid_count;
+        sm_p->u.create.attr.u.meta.sid_array = sm_p->u.create.sid_array;
 
         if(sm_p->u.create.stuffed)
         {
@@ -1070,6 +1071,8 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                                      sm_p->object_ref.sid_array,
                                      sm_p->hints);
 
+            msg_p->msgclass = PVFS_IO_METADATA;
+            msg_p->msgdir = PVFS_IO_WRITE;
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->object_ref.handle;
             msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -1077,7 +1080,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->sid_array = sm_p->object_ref.sid_array;
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
-            PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
+            PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                          "metafile handle %s\n", PVFS_OID_str(&msg_p->handle));
@@ -1088,10 +1091,12 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                                      sm_p->getattr.attr.capability,
                                      sm_p->object_ref.fs_id,
                                      sm_p->u.create.datafile_handles[i],
-                                     sm_p->dfilesids;
+                                     dfilesids,
                                      &sm_p->u.create.sid_array[i * dfilesids], 
                                      sm_p->hints);
 
+            msg_p->msgclass = PVFS_IO_METADATA;
+            msg_p->msgdir = PVFS_IO_WRITE;
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.datafile_handles[i];
             msg_p->sid_count = dfilesids;
@@ -1100,7 +1105,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
             PVFS_SID_get_addr(&msg_p->svr_addr,
-                              &sm_p->u.create.sid_array[i * dfilesids]); 
+                              &msg_p->sid_array[i * dfilesids]); 
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                          "datafile handle %s\n", PVFS_OID_str(&msg_p->handle));

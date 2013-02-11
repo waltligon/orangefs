@@ -58,6 +58,7 @@ job_context_id PINT_client_get_sm_context(void);
 
 /* V3 I think all of this is subsumed into the MPA struct and is not needed */
 /* This structure is used to handle mirrored retries in the small-io case*/
+#if 0
 typedef struct PINT_client_mirror_ctx
 {
   /*which copy of the mirrored handle are we using?*/
@@ -81,6 +82,7 @@ typedef struct PINT_client_mirror_ctx
  * pvfs2_client_datafile_getattr_sizes_sm is called.
  */
 typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
+#endif
 
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
@@ -101,11 +103,14 @@ typedef struct PINT_sm_getattr_state
     PVFS_object_attr attr;
 
 
+/* V3 again this SHOULD be handled in the MPA now */
+#if 0
     /* mirror retry information */
     PINT_client_getattr_mirror_ctx *mir_ctx_array;
     uint32_t mir_ctx_count;
     uint32_t retry_count;
     uint32_t *index_to_server;
+#endif
 
     PVFS_ds_type ref_type;
 
@@ -144,6 +149,8 @@ typedef struct PINT_sm_getattr_state
         *(_array) = NULL; \
     } while(0)
 
+/* V3 Don't think this needs to be a distinct type define any more */
+#if 0
 /* PINT_client_sm_recv_state_s
  *
  * This is used for extra receives, such as acknowledgements from
@@ -157,12 +164,13 @@ typedef struct PINT_client_sm_recv_state_s
     job_status_s recv_status;
     PVFS_error op_status;
 } PINT_client_sm_recv_state;
+#endif
 
 struct PINT_client_remove_sm
 {
     char *object_name;   /* input parameter */
     int stored_error_code;
-    int        retry_count;
+    int retry_count;
     PVFS_capability parent_capability;
 };
 
@@ -183,7 +191,7 @@ struct PINT_client_create_sm
     int datafile_count;        /* metaobject stored in sm_p->object_ref */
     PVFS_handle *datafile_handles;
     int sid_count;
-    PVFS_handle *sid_array;
+    PVFS_SID *sid_array;
 
     int stuffed;
     PVFS_object_attr store_attr;
@@ -239,6 +247,7 @@ struct PINT_client_mgmt_create_dirent_sm
 {
     char *entry;
     PVFS_handle entry_handle;
+    PVFS_SID *sid_array;
 };
 
 struct PINT_client_mgmt_get_dirdata_handle_sm
@@ -246,6 +255,7 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
+#if 0
 typedef struct PINT_client_io_ctx
 {
     /* the index of the current context (in the context array) */
@@ -276,24 +286,25 @@ typedef struct PINT_client_io_ctx
     PINT_client_sm_recv_state write_ack;
 
     /*
-      all *_has_been_posted fields are used at io_analyze_results time
-      to know if we should be checking for errors on particular fields
-    */
+     * all *_has_been_posted fields are used at io_analyze_results time
+     * to know if we should be checking for errors on particular fields
+     */
     int msg_send_has_been_posted;
     int msg_recv_has_been_posted;
     int flow_has_been_posted;
     int write_ack_has_been_posted;
 
     /*
-      all *_in_progress fields are used at cancellation time to
-      determine what operations are currently in flight
-    */
+     * all *_in_progress fields are used at cancellation time to
+     * determine what operations are currently in flight
+     */
     int msg_send_in_progress;
     int msg_recv_in_progress;
     int flow_in_progress;
     int write_ack_in_progress;
 
 } PINT_client_io_ctx;
+#endif
 
 struct PINT_client_io_sm
 {
@@ -313,14 +324,14 @@ struct PINT_client_io_sm
     int *datafile_index_array;
     int datafile_count;
 
-    int msgpair_completion_count;
-    int flow_completion_count;
-    int write_ack_completion_count;
+    //int msgpair_completion_count; // V3 remove
+    //int flow_completion_count; // V3 remove
+    //int write_ack_completion_count; // V3 remove
 
-    PINT_client_io_ctx *contexts;
-    int context_count;
+    //PINT_client_io_ctx *contexts; // V3 remove
+    //int context_count; // V3 remove
 
-    PINT_client_small_io_ctx *small_io_ctx;
+    //PINT_client_small_io_ctx *small_io_ctx; // V3 remove
 
     int total_cancellations_remaining;
 

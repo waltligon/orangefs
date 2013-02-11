@@ -753,7 +753,7 @@ int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
  */
 int trove_dspace_create_list(
     TROVE_coll_id coll_id,
-    TROVE_handle_extent_array* handle_extent_array,
+    TROVE_handle* handle_array,
     TROVE_handle* out_handle_array,
     int count,
     TROVE_ds_type type,
@@ -774,7 +774,7 @@ int trove_dspace_create_list(
 
     return dspace_method_table[method_id]->dspace_create_list(
            coll_id,
-           handle_extent_array,
+           handle_array,
            out_handle_array,
            count,
            type,
@@ -790,7 +790,7 @@ int trove_dspace_create_list(
  */
 int trove_dspace_create(
     TROVE_coll_id coll_id,
-    TROVE_handle_extent_array* handle_extent_array,
+    TROVE_handle handle,
     TROVE_handle* out_handle,
     TROVE_ds_type type,
     TROVE_keyval_s* hint,
@@ -810,7 +810,7 @@ int trove_dspace_create(
 
     return dspace_method_table[method_id]->dspace_create(
            coll_id,
-           handle_extent_array,
+           handle,
            out_handle,
            type,
            hint,

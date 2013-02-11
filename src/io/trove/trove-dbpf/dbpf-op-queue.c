@@ -322,7 +322,7 @@ int dbpf_queue_or_service(
 {
     int ret;
 
-    if( coll_p->immediate_completion &&
+    if(coll_p->immediate_completion &&
        (DBPF_OP_IS_KEYVAL(op_p->type) || DBPF_OP_IS_DSPACE(op_p->type)))
     {
         DB * dbp;
@@ -349,10 +349,10 @@ int dbpf_queue_or_service(
         }
 
         /* only one that allocs anything, see dbpf_queued_op_free */
-        if(op_p->type == DSPACE_CREATE || op_p->type == DSPACE_CREATE_LIST)
+        if(op_p->type == DSPACE_CREATE_LIST)
         {
-            free(op_p->u.d_create.extent_array.extent_array);
-            op_p->u.d_create.extent_array.extent_array = NULL;
+            free(op_p->u.d_create_list.handle_array);
+            op_p->u.d_create_list.handle_array = NULL;
         }
 
         ret = 1;

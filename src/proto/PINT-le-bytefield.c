@@ -119,11 +119,11 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_BATCH_CREATE:
                 /* can request a range of handles */
-                req.u.batch_create.handle_extent_array.extent_count = 0;
+                /* req.u.batch_create.handle_extent_array.extent_count = 0;
                 req.u.batch_create.object_count = 0;
                 resp.u.batch_create.handle_count = 0;
                 reqsize = extra_size_PVFS_servreq_batch_create;
-                respsize = extra_size_PVFS_servresp_batch_create;
+                respsize = extra_size_PVFS_servresp_batch_create; */
                 break;
             case PVFS_SERV_CREATE:
                 zero_credential(&req.u.create.credential);
@@ -205,7 +205,7 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_MKDIR:
                 zero_credential(&req.u.mkdir.credential);
-                req.u.mkdir.handle_extent_array.extent_count = 0;
+                /* req.u.mkdir.handle_extent_array.extent_count = 0; */
                 req.u.mkdir.attr.mask = 0;
                 zero_capability(&resp.u.mkdir.capability);
                 reqsize = extra_size_PVFS_servreq_mkdir;
@@ -550,7 +550,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
-        CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        /* CASE(PVFS_SERV_BATCH_CREATE, batch_create); */
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -582,6 +582,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_BATCH_CREATE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
@@ -654,7 +655,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
-        CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        /* CASE(PVFS_SERV_BATCH_CREATE, batch_create); */
         CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
         CASE(PVFS_SERV_REMOVE, remove);
         CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
@@ -663,7 +664,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_IO, io);
-        CASE(PVFS_SERV_SMALL_IO, small_io);
+        /* CASE(PVFS_SERV_SMALL_IO, small_io); */
         CASE(PVFS_SERV_GETATTR, getattr);
         CASE(PVFS_SERV_SETATTR, setattr);
         CASE(PVFS_SERV_CRDIRENT, crdirent);
@@ -686,6 +687,8 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
+        case PVFS_SERV_SMALL_IO:
+        case PVFS_SERV_BATCH_CREATE:
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -754,7 +757,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
-        CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        /* CASE(PVFS_SERV_BATCH_CREATE, batch_create); */
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -776,6 +779,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_BATCH_CREATE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -863,8 +867,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     decode_free(req->u.create.layout.server_list.servers);
                 break;
             case PVFS_SERV_BATCH_CREATE:
-                decode_free(
-                    req->u.batch_create.handle_extent_array.extent_array);
+                /* decode_free(
+                    req->u.batch_create.handle_extent_array.extent_array); */
                 break;
 
             case PVFS_SERV_IO:
@@ -884,7 +888,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 break;
 
             case PVFS_SERV_MKDIR:
-                decode_free(req->u.mkdir.handle_extent_array.extent_array);
+                /* decode_free(req->u.mkdir.handle_extent_array.extent_array);
+                 */
                 decode_free(req->u.mkdir.credential.group_array);
                 decode_free(req->u.mkdir.credential.signature);
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
@@ -1011,7 +1016,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 
                 case PVFS_SERV_BATCH_CREATE:
-                    decode_free(resp->u.batch_create.handle_array);
+                    /* decode_free(resp->u.batch_create.handle_array); */
                     break;
                 
                 case PVFS_SERV_CREATE:

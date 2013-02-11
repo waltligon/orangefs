@@ -28,6 +28,7 @@
 #include "ncache.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 enum {
     NO_WORK = 1
@@ -889,6 +890,8 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
                                    sm_p->u.readdirplus.handles[i],
                                    sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->sid_count = 0;
@@ -962,6 +965,8 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
                                    sm_p->u.readdirplus.handles[i],
                                    sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->sid_count = 0;
@@ -1021,7 +1026,7 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
             continue;
         }
         /* these are just convenience pointers for this loop */
-        obj_attr_i = &sm_p->u.readdurplus.obj_attr_array[i];
+        obj_attr_i = &sm_p->u.readdirplus.obj_attr_array[i];
         resp_attr_i = &readdirplus_resp->attr_array[i];
 
         /* convert into sys attributes */

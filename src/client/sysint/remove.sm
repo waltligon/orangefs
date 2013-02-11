@@ -16,6 +16,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -199,17 +200,18 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
                                   attr->u.meta.sid_count,
                                   attr->u.meta.sid_array,
                                   sm_p->hints);
-    
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = attr->u.meta.dfile_array[0];
     msg_p->sid_count = attr->u.meta.sid_count / attr->u.meta.dfile_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = attr->u.meta.array;
+    msg_p->sid_array = attr->u.meta.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;     /* TODO: Do we want retry? */
     msg_p->comp_fn = NULL;
 
     /* the first SID of the first object is the target */
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, attr->u.meta.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -236,9 +238,11 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
                              sm_p->object_ref.fs_id,
                              sm_p->object_ref.handle,
                              sm_p->object_ref.sid_count,
-                             sm_p->object_ref.sid_count,
+                             sm_p->object_ref.sid_array,
                              sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -247,7 +251,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

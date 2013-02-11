@@ -17,11 +17,13 @@
 #include "gossip.h"
 #include "pvfs2-mgmt.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
-static int get_uid_list_comp_fn(
-    void* v_p, struct PVFS_server_resp *resp_p, int i);
+static int get_uid_list_comp_fn(void* v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int i);
 
 %%
 
@@ -49,17 +51,16 @@ machine pvfs2_client_mgmt_get_uid_list_sm
 
 %%
 
-PVFS_error PVFS_imgmt_get_uid_list(
-    PVFS_fs_id fs_id,
-    PVFS_credential *credential,
-    int server_count, 
-    PVFS_BMI_addr_t *addr_array,
-    uint32_t history,
-    PVFS_uid_info_s **uid_info_array,
-    uint32_t *uid_count,
-    PVFS_mgmt_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_imgmt_get_uid_list(PVFS_fs_id fs_id,
+                                   PVFS_credential *credential,
+                                   int server_count, 
+                                   PVFS_BMI_addr_t *addr_array,
+                                   uint32_t history,
+                                   PVFS_uid_info_s **uid_info_array,
+                                   uint32_t *uid_count,
+                                   PVFS_mgmt_op_id *op_id,
+                                   PVFS_hint hints,
+                                   void *user_ptr)
 {
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
@@ -74,11 +75,12 @@ PVFS_error PVFS_imgmt_get_uid_list(
         return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_UID_LIST, 
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_GET_UID_LIST, 
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
 
     if (!smcb)
     {
@@ -89,12 +91,14 @@ PVFS_error PVFS_imgmt_get_uid_list(
 
     PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
     sm_p->u.get_uid_list.uid_statistics = uid_info_array;
     sm_p->u.get_uid_list.history = history;
     sm_p->u.get_uid_list.fs_id = fs_id;
     sm_p->u.get_uid_list.server_count = server_count;
     sm_p->u.get_uid_list.addr_array = addr_array;
     sm_p->u.get_uid_list.uid_count = uid_count;
+
     PVFS_hint_copy(hints, &sm_p->hints);
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, server_count);
@@ -104,20 +108,18 @@ PVFS_error PVFS_imgmt_get_uid_list(
        return ret;
     }
 
-    return PINT_client_state_machine_post(
-        smcb, op_id, user_ptr); 
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr); 
 }
 
-PVFS_error PVFS_mgmt_get_uid_list(
-    PVFS_fs_id fs_id,
-    PVFS_credential *credential,
-    int server_count, 
-    PVFS_BMI_addr_t *addr_array,
-    uint32_t history,
-    PVFS_uid_info_s **uid_info_array,
-    uint32_t *uid_count,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_mgmt_get_uid_list(PVFS_fs_id fs_id,
+                                  PVFS_credential *credential,
+                                  int server_count, 
+                                  PVFS_BMI_addr_t *addr_array,
+                                  uint32_t history,
+                                  PVFS_uid_info_s **uid_info_array,
+                                  uint32_t *uid_count,
+                                  PVFS_hint hints,
+                                  void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -125,8 +127,16 @@ PVFS_error PVFS_mgmt_get_uid_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_get_uid_list entered\n");
 
-    ret = PVFS_imgmt_get_uid_list(fs_id, credential, server_count, addr_array,
-              history, uid_info_array, uid_count, &op_id, hints, NULL);
+    ret = PVFS_imgmt_get_uid_list(fs_id,
+                                  credential,
+                                  server_count,
+                                  addr_array,
+                                  history,
+                                  uid_info_array,
+                                  uid_count,
+                                  &op_id,
+                                  hints,
+                                  NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_get_uid_list call", ret);
@@ -149,59 +159,11 @@ PVFS_error PVFS_mgmt_get_uid_list(
     return error;
 }
 
-static PINT_sm_action mgmt_get_uid_list_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i = 0;
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability capability;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "get_uid_list state: "
-                 "mgmt_get_uid_list_setup_msgpair\n");
-
-    /* TODO: orange-security */
-    PINT_null_capability(&capability);
-
-    /* setup msgpair array */
-    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-    {
-	PINT_SERVREQ_MGMT_GET_UID_FILL(
-            msg_p->req,
-            capability,
-            sm_p->u.get_uid_list.history,
-            sm_p->hints);
-
-	msg_p->fs_id = sm_p->u.get_uid_list.fs_id;
-	msg_p->handle = PVFS_HANDLE_NULL;
-	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-	msg_p->comp_fn = get_uid_list_comp_fn;
-	msg_p->svr_addr = sm_p->u.get_uid_list.addr_array[i];
-    }
-
-    /* immediate return: next state jumps to msgpairarray machine */
-    js_p->error_code = 0;
-
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action mgmt_get_uid_list_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-
-    sm_p->error_code  = js_p->error_code;
-
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
-}
+/* <================== COMPLETION FUNCTIONS =====================> */
 
 static int get_uid_list_comp_fn(void* v_p,
-				 struct PVFS_server_resp *resp_p,
-				 int i)
+				struct PVFS_server_resp *resp_p,
+				int i)
 {
     int j = 0;
     PINT_smcb *smcb = v_p;
@@ -213,11 +175,11 @@ static int get_uid_list_comp_fn(void* v_p,
     if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
        (sm_p->u.get_uid_list.uid_count)[i] =
-           resp_p->u.mgmt_get_uid.uid_info_array_count;
+                    resp_p->u.mgmt_get_uid.uid_info_array_count;
        memcpy(sm_p->u.get_uid_list.uid_statistics[i],
               resp_p->u.mgmt_get_uid.uid_info_array,
-              resp_p->u.mgmt_get_uid.uid_info_array_count
-              * sizeof(PVFS_uid_info_s));
+              resp_p->u.mgmt_get_uid.uid_info_array_count *
+                      sizeof(PVFS_uid_info_s));
     }
  
     /* if this is the last response, check all of the status values and 
@@ -235,6 +197,59 @@ static int get_uid_list_comp_fn(void* v_p,
     }
 
     return 0;
+}
+
+/* <================= STATE ACTION FUNCTIONS ====================> */
+
+static PINT_sm_action mgmt_get_uid_list_setup_msgpair(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "get_uid_list state: "
+                 "mgmt_get_uid_list_setup_msgpair\n");
+
+    /* TODO: orange-security */
+    PINT_null_capability(&capability);
+
+    /* setup msgpair array */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+	PINT_SERVREQ_MGMT_GET_UID_FILL(msg_p->req,
+                                       capability,
+                                       sm_p->u.get_uid_list.history,
+                                       sm_p->hints);
+
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
+	msg_p->fs_id = sm_p->u.get_uid_list.fs_id;
+	msg_p->handle = PVFS_HANDLE_NULL;
+	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+	msg_p->comp_fn = get_uid_list_comp_fn;
+	msg_p->svr_addr = sm_p->u.get_uid_list.addr_array[i];
+    }
+
+    /* immediate return: next state jumps to msgpairarray machine */
+    js_p->error_code = 0;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_get_uid_list_cleanup(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    sm_p->error_code  = js_p->error_code;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

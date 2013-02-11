@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:
@@ -354,6 +355,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.remove.object_name,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     msg_p->sid_count = sm_p->parent_ref.sid_count;
@@ -362,7 +365,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_rmdirent_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->parent_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map directory server address\n");
@@ -406,6 +409,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->object_ref.sid_array,
                                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     msg_p->sid_count = sm_p->parent_ref.sid_count;
@@ -414,7 +419,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_crdirent_comp_fn;
 
-    ref = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->parent_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map directory server address\n");

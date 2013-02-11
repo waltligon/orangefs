@@ -22,12 +22,13 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
-static int perf_mon_list_comp_fn(
-    void* v_p, struct PVFS_server_resp *resp_p, int i);
+static int perf_mon_list_comp_fn(void* v_p,
+                                 struct PVFS_server_resp *resp_p,
+                                 int i);
 
 %%
 
@@ -57,20 +58,19 @@ machine pvfs2_client_mgmt_perf_mon_list_sm
 
 /** Initiate retrieval of performance statistics from a list of servers.
  */
-PVFS_error PVFS_imgmt_perf_mon_list(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    int64_t **perf_matrix,
-    uint64_t *end_time_ms_array,
-    PVFS_BMI_addr_t *addr_array,
-    uint32_t* next_id_array,
-    int server_count,
-    int *key_count,
-    int history_count,
-    PVFS_error_details *details,
-    PVFS_mgmt_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
+                                    const PVFS_credential *credential,
+                                    int64_t **perf_matrix,
+                                    uint64_t *end_time_ms_array,
+                                    PVFS_BMI_addr_t *addr_array,
+                                    uint32_t* next_id_array,
+                                    int server_count,
+                                    int *key_count,
+                                    int history_count,
+                                    PVFS_error_details *details,
+                                    PVFS_mgmt_op_id *op_id,
+                                    PVFS_hint hints,
+                                    void *user_ptr)
 {
     PINT_smcb *smcb;
     PINT_client_sm *sm_p;
@@ -86,11 +86,12 @@ PVFS_error PVFS_imgmt_perf_mon_list(
 	return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_PERF_MON_LIST,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_PERF_MON_LIST,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (!smcb)
     {
         return -PVFS_ENOMEM;
@@ -100,6 +101,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
 
     PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
     sm_p->u.perf_mon_list.fs_id = fs_id;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
@@ -109,6 +111,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
     sm_p->u.perf_mon_list.end_time_ms_array = end_time_ms_array;
     sm_p->u.perf_mon_list.details = details;
+
     PVFS_hint_copy(hints, &sm_p->hints);
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, server_count);
@@ -118,24 +121,22 @@ PVFS_error PVFS_imgmt_perf_mon_list(
         return ret;
     }
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Obtain performance statistics from a list of servers.
  */
-PVFS_error PVFS_mgmt_perf_mon_list(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    int64_t **perf_matrix,
-    uint64_t *end_time_ms_array,
-    PVFS_BMI_addr_t *addr_array,
-    uint32_t* next_id_array,
-    int server_count,
-    int *key_count,
-    int history_count,
-    PVFS_error_details *details,
-    PVFS_hint hints)
+PVFS_error PVFS_mgmt_perf_mon_list(PVFS_fs_id fs_id,
+                                   const PVFS_credential *credential,
+                                   int64_t **perf_matrix,
+                                   uint64_t *end_time_ms_array,
+                                   PVFS_BMI_addr_t *addr_array,
+                                   uint32_t* next_id_array,
+                                   int server_count,
+                                   int *key_count,
+                                   int history_count,
+                                   PVFS_error_details *details,
+                                   PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -143,10 +144,19 @@ PVFS_error PVFS_mgmt_perf_mon_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_perf_mon_list entered\n");
 
-    ret = PVFS_imgmt_perf_mon_list(
-        fs_id, credential, perf_matrix, end_time_ms_array,
-        addr_array, next_id_array, server_count, key_count,
-        history_count, details, &op_id, hints, NULL);
+    ret = PVFS_imgmt_perf_mon_list(fs_id,
+                                   credential,
+                                   perf_matrix,
+                                   end_time_ms_array,
+                                   addr_array,
+                                   next_id_array,
+                                   server_count,
+                                   key_count,
+                                   history_count,
+                                   details,
+                                   &op_id,
+                                   hints,
+                                   NULL);
 
     if (ret)
     {
@@ -170,8 +180,51 @@ PVFS_error PVFS_mgmt_perf_mon_list(
     return error;
 }
 
-static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+/* <================== COMPLETION FUNCTIONS =====================> */
+
+static int perf_mon_list_comp_fn(void* v_p,
+				 struct PVFS_server_resp *resp_p,
+				 int i)
+{
+    int j = 0;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    /* if this particular request was successful, then store the 
+     * performance information in an array to be returned to caller
+     */
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
+    {
+	sm_p->u.perf_mon_list.next_id_array[i] = 
+	                resp_p->u.mgmt_perf_mon.suggested_next_id;
+	sm_p->u.perf_mon_list.end_time_ms_array[i] =
+	                resp_p->u.mgmt_perf_mon.end_time_ms;
+	*sm_p->u.perf_mon_list.key_count = resp_p->u.mgmt_perf_mon.key_count;
+	memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
+	       resp_p->u.mgmt_perf_mon.perf_array,
+	       resp_p->u.mgmt_perf_mon.perf_array_count * sizeof(int64_t));
+    }
+ 
+    /* if this is the last response, check all of the status values and 
+     * return error code if any requests failed 
+     */
+    if (i == (sm_p->msgarray_op.count -1))
+    {
+	for (j=0; j < sm_p->msgarray_op.count; j++)
+	{
+	    if (sm_p->msgarray_op.msgarray[j].op_status != 0)
+	    {
+		return(sm_p->msgarray_op.msgarray[j].op_status);
+	    }
+	}
+    }
+    return 0;
+}
+
+/* <================= STATE ACTION FUNCTIONS ====================> */
+
+static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
@@ -186,16 +239,20 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-	PINT_SERVREQ_MGMT_PERF_MON_FILL(
-            msg_p->req,
-            capability,
-            sm_p->u.perf_mon_list.next_id_array[i],
-            *sm_p->u.perf_mon_list.key_count,
-            sm_p->u.perf_mon_list.history_count,
-            sm_p->hints);
+	PINT_SERVREQ_MGMT_PERF_MON_FILL(msg_p->req,
+                                        capability,
+                                        sm_p->u.perf_mon_list.next_id_array[i],
+                                        *sm_p->u.perf_mon_list.key_count,
+                                        sm_p->u.perf_mon_list.history_count,
+                                        sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
 	msg_p->fs_id = sm_p->u.perf_mon_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
+	msg_p->sid_count = 1;
+	msg_p->sid_index = 0;
+	msg_p->sid_array = NULL;
 	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	msg_p->comp_fn = perf_mon_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.perf_mon_list.addr_array[i];
@@ -208,8 +265,8 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mgmt_perf_mon_list_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_perf_mon_list_cleanup(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0, errct = 0;
@@ -228,9 +285,9 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(
                     sm_p->u.perf_mon_list.details->count_allocated)
 		{
 		    sm_p->u.perf_mon_list.details->error[errct].error =
-                        sm_p->msgarray_op.msgarray[i].op_status;
+                                    sm_p->msgarray_op.msgarray[i].op_status;
 		    sm_p->u.perf_mon_list.details->error[errct].addr =
-                        sm_p->msgarray_op.msgarray[i].svr_addr;
+                                    sm_p->msgarray_op.msgarray[i].svr_addr;
 		    errct++;
 		}
 		else
@@ -249,47 +306,6 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
-}
-
-static int perf_mon_list_comp_fn(void* v_p,
-				 struct PVFS_server_resp *resp_p,
-				 int i)
-{
-    int j = 0;
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-    /* if this particular request was successful, then store the 
-     * performance information in an array to be returned to caller
-     */
-    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
-    {
-	sm_p->u.perf_mon_list.next_id_array[i] = 
-	    resp_p->u.mgmt_perf_mon.suggested_next_id;
-	sm_p->u.perf_mon_list.end_time_ms_array[i] =
-	    resp_p->u.mgmt_perf_mon.end_time_ms;
-	*sm_p->u.perf_mon_list.key_count =
-	    resp_p->u.mgmt_perf_mon.key_count;
-	memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
-	       resp_p->u.mgmt_perf_mon.perf_array,
-	       resp_p->u.mgmt_perf_mon.perf_array_count
-	       * sizeof(int64_t));
-    }
- 
-    /* if this is the last response, check all of the status values and 
-     * return error code if any requests failed 
-     */
-    if (i == (sm_p->msgarray_op.count -1))
-    {
-	for (j=0; j < sm_p->msgarray_op.count; j++)
-	{
-	    if (sm_p->msgarray_op.msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray_op.msgarray[j].op_status);
-	    }
-	}
-    }
-    return 0;
 }
 
 /*

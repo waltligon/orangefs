@@ -52,10 +52,10 @@ void dbpf_queued_op_init(
 
 void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
 {
-    if (q_op_p->op.type == DSPACE_CREATE || q_op_p->op.type == DSPACE_CREATE_LIST)
+    if (q_op_p->op.type == DSPACE_CREATE_LIST)
     {
-        free(q_op_p->op.u.d_create.extent_array.extent_array);
-        q_op_p->op.u.d_create.extent_array.extent_array = NULL;
+        free(q_op_p->op.u.d_create_list.handle_array);
+        q_op_p->op.u.d_create_list.handle_array = NULL;
     }
     else if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
              (q_op_p->op.type == BSTREAM_WRITE_LIST))

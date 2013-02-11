@@ -232,6 +232,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                              s_op->req->capability,
                              fs_id,
                              s_op->u.tree_communicate.handle_array_local[i],
+                             s_op->u.tree_communicate.sid_count, /* FIXME */
+                             s_op->u.tree_communicate.sid_array, /* FIXME */
                              s_op->req->hints);
 
                     break;
@@ -345,8 +347,8 @@ static PINT_sm_action tree_communicate_partition_handles(
              * other partitions. 
              */
             for (num_data_files_for_this_server = num_files_per_server;
-                 i*num_files_per_server + num_data_files_for_this_server >
-                 s_op->u.tree_communicate.handle_array_remote_count;
+                 i * num_files_per_server + num_data_files_for_this_server >
+                         s_op->u.tree_communicate.handle_array_remote_count;
                  num_data_files_for_this_server--)
             {
                 /* Do nothing; */ ;
@@ -365,6 +367,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                             num_data_files_for_this_server,
                             &s_op->u.tree_communicate.handle_array_remote[
                                             i * num_files_per_server],
+                            s_op->u.tree_communicate.sid_count, /* FIXME */
+                            s_op->u.tree_communicate.sid_array, /* FIXME */
                             s_op->req->hints);
                     msg_p->comp_fn = NULL;
                     break;
@@ -383,6 +387,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                           num_data_files_for_this_server,
                           &s_op->u.tree_communicate.handle_array_remote[
                                         i * num_files_per_server],
+                          s_op->u.tree_communicate.sid_count, /* FIXME */
+                          s_op->u.tree_communicate.sid_array, /* FIXME */
                           this_req->u.tree_get_file_size.retry_msgpair_at_leaf,
                           NULL);
                   msg_p->comp_fn = tree_get_file_size_comp_fn;

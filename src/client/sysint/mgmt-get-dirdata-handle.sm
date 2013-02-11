@@ -26,11 +26,13 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_get_dirdata_handle_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int mgmt_get_dirdata_handle_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int i);
 
 %%
 
@@ -67,13 +69,12 @@ machine pvfs2_client_mgmt_get_dirdata_handle_sm
 /** Initiate retrieval of handle for dirdata object for a specific
  *  directory.
  */
-PVFS_error PVFS_imgmt_get_dirdata_handle(
-    PVFS_object_ref parent_ref,
-    PVFS_handle *out_dirdata_handle,
-    const PVFS_credential *credential,
-    PVFS_mgmt_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_imgmt_get_dirdata_handle(PVFS_object_ref parent_ref,
+                                         PVFS_handle *out_dirdata_handle,
+                                         const PVFS_credential *credential,
+                                         PVFS_mgmt_op_id *op_id,
+                                         PVFS_hint hints,
+                                         void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -89,11 +90,12 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_DIRDATA_HANDLE,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_GET_DIRDATA_HANDLE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -102,6 +104,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_get_dirdata_handle.dirdata_handle = out_dirdata_handle;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -110,17 +113,15 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         GOSSIP_CLIENT_DEBUG, "Trying to get dirdata object of parent "
         "dir %s,%d\n", PVFS_OID_str(&parent_ref.handle), parent_ref.fs_id);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Obtain handle for dirdata object for a specific directory.
  */
-PVFS_error PVFS_mgmt_get_dirdata_handle(
-    PVFS_object_ref parent_ref,
-    PVFS_handle *out_dirdata_handle,
-    const PVFS_credential *credential,
-    PVFS_hint hints)
+PVFS_error PVFS_mgmt_get_dirdata_handle(PVFS_object_ref parent_ref,
+                                        PVFS_handle *out_dirdata_handle,
+                                        const PVFS_credential *credential,
+                                        PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -128,8 +129,12 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_get_dirdata_handle entered\n");
 
-    ret = PVFS_imgmt_get_dirdata_handle(
-        parent_ref, out_dirdata_handle, credential, &op_id, hints, NULL);
+    ret = PVFS_imgmt_get_dirdata_handle(parent_ref,
+                                        out_dirdata_handle,
+                                        credential,
+                                        &op_id,
+                                        hints,
+                                        NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_get_dirdata_handle call", ret);
@@ -149,15 +154,45 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     return error;
 }
 
-static int mgmt_get_dirdata_handle_init(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+/* <==================== COMPLETION FUNCTIONS ========================> */
+
+static int mgmt_get_dirdata_handle_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRDATA_HANDLE);
+
+    if (resp_p->status == 0)
+    {
+        assert(sm_p->u.mgmt_get_dirdata_handle.dirdata_handle);
+
+        *sm_p->u.mgmt_get_dirdata_handle.dirdata_handle =
+                        resp_p->u.mgmt_get_dirdata_handle.handle;
+
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "  mgmt_get_dirdata_handle_comp_fn: "
+            "got dirdata handle %s under %s,%d removed\n",
+            PVFS_OID_str(sm_p->u.mgmt_get_dirdata_handle.dirdata_handle),
+            PVFS_OID_str(&sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+    }
+    return resp_p->status;
+}
+
+/* <=================== STATE ACTION FUNCTIONS =======================> */
+
+static PINT_sm_action mgmt_get_dirdata_handle_init(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     assert(js_p->error_code == 0);
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirdata_handle_setup_msgpair(
+                                                 struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -171,24 +206,27 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(
-        msg_p->req,
-        capability,
-        sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle,
-        sm_p->hints);
+    PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(msg_p->req,
+                                              capability,
+                                              sm_p->parent_ref.fs_id,
+                                              sm_p->parent_ref.handle,
+                                              sm_p->hints);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "- doing MGMT_GET_DIRDATA_HANDLE "
                  "under %s,%d\n", PVFS_OID_str(&sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->sid_count = sm_p->parent_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->parent_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_get_dirdata_handle_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     if (ret)
     {
@@ -200,32 +238,8 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-    assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRDATA_HANDLE);
-
-    if (resp_p->status == 0)
-    {
-        assert(sm_p->u.mgmt_get_dirdata_handle.dirdata_handle);
-
-        *sm_p->u.mgmt_get_dirdata_handle.dirdata_handle =
-            resp_p->u.mgmt_get_dirdata_handle.handle;
-
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "  mgmt_get_dirdata_handle_comp_fn: "
-            "got dirdata handle %s under %s,%d removed\n",
-            PVFS_OID_str(sm_p->u.mgmt_get_dirdata_handle.dirdata_handle),
-            PVFS_OID_str(&sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
-    }
-    return resp_p->status;
-}
-
-static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 

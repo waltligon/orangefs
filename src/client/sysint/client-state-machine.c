@@ -360,7 +360,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_set_eattr_sm},
     {&pvfs2_client_del_eattr_sm},
     {&pvfs2_client_list_eattr_sm},
-    {&pvfs2_client_small_io_sm},
+    {NULL} /* {&pvfs2_client_small_io_sm} */,
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
@@ -449,8 +449,8 @@ int client_state_machine_terminate(
                  "client_state_machine_terminate smcb %p\n",smcb);
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
-            (PINT_smcb_cancelled(smcb)) &&
-            (cancelled_io_jobs_are_pending(smcb))) &&
+        (PINT_smcb_cancelled(smcb)) &&
+        (cancelled_io_jobs_are_pending(smcb))) &&
         !PINT_smcb_immediate_completion(smcb))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -646,7 +646,6 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    PINT_client_sm *sm_base_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "PINT_client_io_cancel id %lld\n",lld(id));
@@ -684,14 +683,25 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
      * occuring when a non-IO frame has been pushed on the stack, which doesn't
      * have the expected structure, it doesn't cause a segfault but leaves
      * it on the state machines stack.
+     *
+     * V3 this is based on an error in the code that is long since fixed
+     * in fact I think this code is now probably erroneous.  sm_p IS the
+     * base frame and that is what we should use.
      */ 
-    sm_base_p = PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
-    assert(sm_base_p);
-    if(sm_base_p->u.io.small_io)
+    /* sm_base_p = PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
+     */
+    /* We now have mixed large/small io so we have to check each msg_p
+     * to see if this is small io or not  ...  why don't we cancel
+     * small_io jobs?
+     */
+#if 0
+    if(sm_p->u.io.small_io)
     {
-        gossip_debug(GOSSIP_CANCEL_DEBUG,  "skipping cancellation of small I/O operation.\n");
+        gossip_debug(GOSSIP_CANCEL_DEBUG,
+                     "skipping cancellation of small I/O operation.\n");
         return(0);
     }
+#endif
 
     /* if we fall to here, the I/O operation is still in flight */
     /* first, set a flag informing the sys_io state machine that the
@@ -706,77 +716,85 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     ret = 0;
 
     /* now run through and cancel the outstanding jobs */
-    for(i = 0; i < sm_base_p->u.io.context_count; i++)
+    for(i = 0; i < sm_p->msgarray_op.count; i++)
     {
-        PINT_client_io_ctx *cur_ctx = &sm_base_p->u.io.contexts[i];
-        assert(cur_ctx);
+        /* V3 no more ctx */
+        /* PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i]; */
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray_op.msgarray[i];
+        assert(msg_p);
 
-        if (cur_ctx->msg_send_in_progress)
+        if (msg_p->msgclass == PVFS_IO_SMALL_IO)
+        {
+            /* why don't we cancel small io ??? */
+            continue;
+        }
+
+        if (msg_p->send_id)
         {
             gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Send "
                          "(Request)\n",i);
 
-            ret = job_bmi_cancel(cur_ctx->msg.send_id,
+            ret = job_bmi_cancel(msg_p->send_id,
                                  pint_client_sm_context);
             if (ret < 0)
             {
-                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                PVFS_perror_gossip("job_send_cancel failed", ret);
                 break;
             }
-            sm_base_p->u.io.total_cancellations_remaining++;
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
-        if (cur_ctx->msg_recv_in_progress)
+        if (msg_p->recv_id)
         {
             gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
                          "(Response)\n",i);
 
-            ret = job_bmi_cancel(cur_ctx->msg.recv_id,
+            ret = job_bmi_cancel(msg_p->recv_id,
                                  pint_client_sm_context);
             if (ret < 0)
             {
-                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                PVFS_perror_gossip("job_recv_cancel failed", ret);
                 break;
             }
-            sm_base_p->u.io.total_cancellations_remaining++;
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
-        if (cur_ctx->flow_in_progress)
+        if (msg_p->flow_id)
         {
             gossip_debug(GOSSIP_CANCEL_DEBUG,
                          "[%d] Posting cancellation of type: FLOW\n",i);
 
-            ret = job_flow_cancel(
-                cur_ctx->flow_job_id, pint_client_sm_context);
+            ret = job_flow_cancel(msg_p->flow_id,
+                                  pint_client_sm_context);
             if (ret < 0)
             {
                 PVFS_perror_gossip("job_flow_cancel failed", ret);
                 break;
             }
-            sm_base_p->u.io.total_cancellations_remaining++;
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
-        if (cur_ctx->write_ack_in_progress)
+        if (msg_p->ack_id)
         {
             gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
-                         "(Write Ack)\n",i);
+                         "(Write Ack)\n", i);
 
-            ret = job_bmi_cancel(cur_ctx->write_ack.recv_id,
+            ret = job_bmi_cancel(msg_p->ack_id,
                                  pint_client_sm_context);
             if (ret < 0)
             {
-                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                PVFS_perror_gossip("job_ack_cancel failed", ret);
                 break;
             }
-            sm_base_p->u.io.total_cancellations_remaining++;
+            sm_p->u.io.total_cancellations_remaining++;
         }
     }
     gossip_debug(GOSSIP_CANCEL_DEBUG, "(%p) Total cancellations "
-                 "remaining: %d\n", sm_base_p,
-                 sm_base_p->u.io.total_cancellations_remaining);
+                 "remaining: %d\n", sm_p,
+                 sm_p->u.io.total_cancellations_remaining);
     return ret;
 }
 

@@ -177,9 +177,9 @@ static PINT_sm_action pjmp_execute_terminate( struct PINT_smcb *smcb
 /* Actions for pvfs2_pjmp_call_msgpairarray_sm                              */
 /****************************************************************************/
 
-/*We use a separate nested state machine to call msgpairarray because */
-/*msgpairarray.sm is setup to work only with a "jump".  When "pjmp"   */
-/*is used, the frame stack gets corrupted.                            */
+/* We use a separate nested state machine to call msgpairarray because */
+/* msgpairarray.sm is setup to work only with a "jump".  When "pjmp"   */
+/* is used, the frame stack gets corrupted.                            */
 static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
                                         ,job_status_s *js_p)
 {   
@@ -198,16 +198,16 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
    js_p->error_code = 0;
 
    gossip_debug(GOSSIP_SERVER_DEBUG,"\tmsgarray->msgpair.req.op:%d\n"
-                                    ,msgarray->msgpair.req.op );
+                                    ,msgarray->msgpair.req.op);
 
-   PINT_sm_push_frame(smcb,0,msgarray);
+   PINT_sm_push_frame(smcb, 0, msgarray);
    
    gossip_debug(GOSSIP_SERVER_DEBUG,"\tAFTER PUSH:smcb->base_frame:%d"
                                     "\tframe_count:%d\n"
                                    ,smcb->base_frame,smcb->frame_count);
 
    return SM_ACTION_COMPLETE;
-}/*end action call_msgpairarray*/
+} /* end action call_msgpairarray */
 
 static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
                                            ,job_status_s *js_p)
@@ -233,7 +233,7 @@ static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
                                    ,s_op->resp.status);
 
    return SM_ACTION_TERMINATE;
-}/*end action cleanup_msgpairarray*/
+} /* end action cleanup_msgpairarray */
 
 static PINT_sm_action pjmp_remove_work_schedule_job(struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -258,7 +258,7 @@ static PINT_sm_action pjmp_remove_work_schedule_job(struct PINT_smcb *smcb, job_
                             ,&(s_op->scheduled_id)
                             ,server_job_context);
    return ret;
-}/*end pjmp_remove_work_schedule_job*/
+} /* end pjmp_remove_work_schedule_job */
 
 
 static PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb, job_status_s *js_p)
@@ -278,7 +278,7 @@ static PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb, job_s
                                ,server_job_context);
  
    return ret;  
-}/*end pjmp_remove_work_release_job*/
+} /* end pjmp_remove_work_release_job */
 
 static PINT_sm_action pjmp_remove_work_execute_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -287,7 +287,7 @@ static PINT_sm_action pjmp_remove_work_execute_terminate(struct PINT_smcb *smcb,
    js_p->error_code = s_op->u.remove.saved_error_code;
 
    return SM_ACTION_TERMINATE;
-}/*end pjmp_remove_execute_terminate */
+}/* end pjmp_remove_execute_terminate */
 
 
 /*

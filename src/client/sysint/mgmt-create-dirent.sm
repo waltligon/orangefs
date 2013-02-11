@@ -23,11 +23,13 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_create_dirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int mgmt_create_dirent_comp_fn(void *v_p,
+                                      struct PVFS_server_resp *resp_p,
+                                      int i);
 
 %%
 
@@ -68,16 +70,20 @@ machine pvfs2_client_mgmt_create_dirent_sm
 
 %%
 
+/* V3 we kind of need SIDs to be passed in here too - a dirent without
+ * them is of limited value, but I'm not sure where they are supposed to
+ * come from.
+ */
 /** Initiate creation of a directory entry pointing to a specific object.
  */
-PVFS_error PVFS_imgmt_create_dirent(
-    PVFS_object_ref parent_ref,
-    char *entry,
-    PVFS_handle entry_handle,
-    const PVFS_credential *credential,
-    PVFS_mgmt_op_id *op_id,
-    PVFS_hint hints,
-    void *user_ptr)
+PVFS_error PVFS_imgmt_create_dirent(PVFS_object_ref parent_ref,
+                                    char *entry,
+                                    PVFS_handle entry_handle,
+                                    PVFS_SID *sid_array,
+                                    const PVFS_credential *credential,
+                                    PVFS_mgmt_op_id *op_id,
+                                    PVFS_hint hints,
+                                    void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -94,11 +100,12 @@ PVFS_error PVFS_imgmt_create_dirent(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_CREATE_DIRENT,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_CREATE_DIRENT,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -107,30 +114,30 @@ PVFS_error PVFS_imgmt_create_dirent(
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_create_dirent.entry = entry;
     sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
+    sm_p->u.mgmt_create_dirent.sid_array = sid_array;
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
-        "Trying to create dirent %s under %s,%d\n",
-        sm_p->u.mgmt_create_dirent.entry,
-        PVFS_OID_str(&parent_ref.handle),
-        parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Trying to create dirent %s under %s,%d\n",
+                 sm_p->u.mgmt_create_dirent.entry,
+                 PVFS_OID_str(&parent_ref.handle),
+                 parent_ref.fs_id);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
 /** Create a directory entry pointing to a specific object.
  */
-PVFS_error PVFS_mgmt_create_dirent(
-    PVFS_object_ref parent_ref,
-    char *entry,
-    PVFS_handle entry_handle,
-    const PVFS_credential *credential,
-    PVFS_hint hints)
+PVFS_error PVFS_mgmt_create_dirent(PVFS_object_ref parent_ref,
+                                   char *entry,
+                                   PVFS_handle entry_handle,
+                                   PVFS_SID *sid_array,
+                                   const PVFS_credential *credential,
+                                   PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -138,8 +145,14 @@ PVFS_error PVFS_mgmt_create_dirent(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_create_dirent entered\n");
 
-    ret = PVFS_imgmt_create_dirent(
-        parent_ref, entry, entry_handle, credential, &op_id, hints, NULL);
+    ret = PVFS_imgmt_create_dirent(parent_ref,
+                                   entry,
+                                   entry_handle,
+                                   sid_array,
+                                   credential,
+                                   &op_id,
+                                   hints,
+                                   NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_create_dirent call", ret);
@@ -159,10 +172,37 @@ PVFS_error PVFS_mgmt_create_dirent(
     return error;
 }
 
-/****************************************************************/
+/* <=================== COMPLETION FUNCTIONS =====================> */
 
-static int mgmt_create_dirent_init(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int mgmt_create_dirent_comp_fn(void *v_p,
+                                      struct PVFS_server_resp *resp_p,
+                                      int index)
+{
+    PINT_smcb *smcb = v_p;
+#ifdef WIN32
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+#else
+    PINT_client_sm *sm_p __attribute__((unused)) =
+                    PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+#endif
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+    if (resp_p->status == 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  mgmt_create_dirent_comp_fn: dirent %s under %s,%d "
+                     "created\n",
+                     sm_p->u.mgmt_create_dirent.entry,
+                     PVFS_OID_str(&sm_p->parent_ref.handle),
+                     sm_p->parent_ref.fs_id);
+    }
+    return resp_p->status;
+}
+
+/* <================== STATE ACTION FUNCTIONS ====================> */
+
+static PINT_sm_action mgmt_create_dirent_init(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p;
 
@@ -172,19 +212,19 @@ static int mgmt_create_dirent_init(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->parent_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->parent_ref,
+                               PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
+                                                      PVFS_ATTR_CAPABILITY, 
+                               PVFS_TYPE_DIRECTORY,
+                               0);
 
     assert(js_p->error_code == 0);
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_create_dirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -195,30 +235,35 @@ static int mgmt_create_dirent_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
-        " creating dirent entry %s with "
-        "handle %s under parent %s,%d\n",
-        sm_p->u.mgmt_create_dirent.entry,
-        PVFS_OID_str(&sm_p->u.mgmt_create_dirent.entry_handle),
-        PVFS_OID_str(&sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                " creating dirent entry %s with "
+                "handle %s under parent %s,%d\n",
+                sm_p->u.mgmt_create_dirent.entry,
+                PVFS_OID_str(&sm_p->u.mgmt_create_dirent.entry_handle),
+                PVFS_OID_str(&sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
 
-    PINT_SERVREQ_CRDIRENT_FILL(
-        msg_p->req,
-        sm_p->getattr.attr.capability,
-        sm_p->u.mgmt_create_dirent.entry,
-        sm_p->u.mgmt_create_dirent.entry_handle,
-        sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id,
-        sm_p->hints);
+    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
+                               sm_p->getattr.attr.capability,
+                               sm_p->u.mgmt_create_dirent.entry,
+                               sm_p->parent_ref.fs_id,
+                               sm_p->parent_ref.handle,
+                               sm_p->parent_ref.sid_count,
+                               sm_p->parent_ref.sid_array,
+                               sm_p->u.mgmt_create_dirent.entry_handle,
+                               sm_p->u.mgmt_create_dirent.sid_array,
+                               sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->sid_count = sm_p->parent_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->parent_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_create_dirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     if (ret)
     {
@@ -230,34 +275,8 @@ static int mgmt_create_dirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_create_dirent_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
-{
-    PINT_smcb *smcb = v_p;
-#ifdef WIN32
-    PINT_client_sm *sm_p =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-#else
-    PINT_client_sm *sm_p __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-#endif
-    assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-    if (resp_p->status == 0)
-    {
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG,
-            "  mgmt_create_dirent_comp_fn: dirent %s under %s,%d "
-            "created\n",
-            sm_p->u.mgmt_create_dirent.entry,
-            PVFS_OID_str(&sm_p->parent_ref.handle),
-            sm_p->parent_ref.fs_id);
-    }
-    return resp_p->status;
-}
-
-static PINT_sm_action mgmt_create_dirent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_create_dirent_cleanup(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,

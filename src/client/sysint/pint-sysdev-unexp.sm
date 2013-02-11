@@ -16,6 +16,7 @@
 #include "state-machine.h"
 #include "client-state-machine.h"
 #include "job-time-mgr.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -38,42 +39,10 @@ machine pvfs2_sysdev_unexp_sm
 
 %%
 
-/* sysdev_unexp_cleanup()
- *
- * cleans up any resources consumed by this state machine and ends
- * execution of the machine
- */
-static int sysdev_unexp_cleanup(struct PINT_smcb *smcb, job_status_s* js_p)
-{
-    return SM_ACTION_TERMINATE;
-}
-
-/* sysdev_unexp_post()
- *
- * posts an unexpected message job for the client
- */
-static int sysdev_unexp_post(struct PINT_smcb *smcb, job_status_s* js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_error ret;
-    job_id_t tmpid;
-
-    memset(js_p, 0, sizeof(job_status_s));
-    ret = job_dev_unexp(sm_p->u.sysdev_unexp.info, (void *)smcb, 0, js_p,
-                        &tmpid, JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
-    if (ret < 0)
-    {
-        PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
-        return SM_ACTION_COMPLETE;
-    }
-    return SM_ACTION_DEFERRED;
-}
-
-PVFS_error PINT_sys_dev_unexp(
-    struct PINT_dev_unexp_info *info,
-    job_status_s *jstat,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr)
+PVFS_error PINT_sys_dev_unexp(struct PINT_dev_unexp_info *info,
+                              job_status_s *jstat,
+                              PVFS_sys_op_id *op_id,
+                              void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -87,11 +56,12 @@ PVFS_error PINT_sys_dev_unexp(
         return -PVFS_EINVAL;
     }
                                                                                 
-    ret = PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            client_state_machine_terminate,
-            pint_client_sm_context);
+    ret = PINT_smcb_alloc(&smcb,
+                          PVFS_DEV_UNEXPECTED,
+                          sizeof(struct PINT_client_sm),
+                          client_op_state_get_machine,
+                          client_state_machine_terminate,
+                          pint_client_sm_context);
     if (ret < 0)
     {
         gossip_lerr("Error: failed to allocate SMCB "
@@ -105,6 +75,46 @@ PVFS_error PINT_sys_dev_unexp(
     ret = PINT_client_state_machine_post(smcb, op_id, user_ptr);
 
     return ret;
+}
+
+/* <================= STATE ACTION FUNCTIONS ====================> */
+
+/* sysdev_unexp_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action sysdev_unexp_cleanup(struct PINT_smcb *smcb,
+                                           job_status_s* js_p)
+{
+    return SM_ACTION_TERMINATE;
+}
+
+/* sysdev_unexp_post()
+ *
+ * posts an unexpected message job for the client
+ */
+static PINT_sm_action sysdev_unexp_post(struct PINT_smcb *smcb,
+                                           job_status_s* js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_error ret;
+    job_id_t tmpid;
+
+    memset(js_p, 0, sizeof(job_status_s));
+    ret = job_dev_unexp(sm_p->u.sysdev_unexp.info,
+                        (void *)smcb,
+                        0,
+                        js_p,
+                        &tmpid,
+                        JOB_NO_IMMED_COMPLETE,
+                        pint_client_sm_context);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
+        return SM_ACTION_COMPLETE;
+    }
+    return SM_ACTION_DEFERRED;
 }
 
 /*

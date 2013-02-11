@@ -39,6 +39,7 @@
 #include "client-state-machine.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "sid.h"
 
 enum {
     SKIP_INTEGRITY_CHECK = 1
@@ -542,6 +543,12 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb,
      */
     js_p->error_code = (sm_p->u.get_config.mntent->integrity_check == 0)
                         ? SKIP_INTEGRITY_CHECK : 0;
+    /* For now V3 will force a skip of the integrity check until later
+     * issues are resolved - in particular what servers will we check
+     * against and how do we get that set.
+     */
+    js_p->error_code = SKIP_INTEGRITY_CHECK;
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -576,6 +583,18 @@ static PINT_sm_action fs_add_final_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
+/**
+ * At this point we have already fetched the config from a server
+ * specified in the tab file - now we will compare that config (really
+ * compare its hash signature) against the config of all other servers
+ * in the FS.  For V3 this is problematic because we don't assume to
+ * know all of the servers - though we could still compare against some
+ * reasonable subset of them servers.  This will require SIDcache query
+ * support to get a set of servers we want to compare against.
+ * Eventually the config structures will not contain a set of servers -
+ * only a set of key servers.  We could verify against these servers
+ * without chaning this much.
+ */
 static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
@@ -596,15 +615,21 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
 
         PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, capability, sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA; /* V3 is this right? */
+        msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->sid_count = 1;
         msg_p->sid_index = 0;
-        msg_p->sid_array = /* V3 what should go here */
+        msg_p->sid_array = NULL; /* V3 what should really go here? */
         /* only try once to retrieve a config file from each server */
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = server_fetch_config_comp_fn;
-        /* V3 not sure what is passed in if we need to lookup addr */
+        /* V3 not sure what is passed in if we need to lookup addr -
+         * This array contains servers specified in the config file read
+         * from a server - this will not be there in V3 - at least not
+         * the same set of servers.
+         */
         msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
     /* don't complain so much about servers we can't reach yet */

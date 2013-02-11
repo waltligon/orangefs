@@ -342,6 +342,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
+    PVFS_SID *sid_array,
     const PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     PVFS_hint hints,
@@ -351,6 +352,7 @@ PVFS_error PVFS_mgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
+    PVFS_SID *sid_array,
     const PVFS_credential *credential,
     PVFS_hint hints);
 

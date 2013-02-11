@@ -104,8 +104,7 @@ machine pvfs2_mkdir_sm
  * NOTE: returned handle will pop out in js_p->handle (the job status
  * struct).
  */
-static PINT_sm_action mkdir_create(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -114,14 +113,11 @@ static PINT_sm_action mkdir_create(
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
 
-    gossip_debug(
-        GOSSIP_MKDIR_DEBUG, " directory handle will "
-        "be in starting hrange[0] %s-%s\n",
-        PVFS_OID_str(&s_op->u.mkdir.handle_extent_array.extent_array[0].first),
-        PVFS_OID_str(&s_op->u.mkdir.handle_extent_array.extent_array[0].last));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " directory handle will be %s\n",
+                 PVFS_OID_str(&s_op->u.mkdir.handle));
 
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
-                                  &s_op->u.mkdir.handle_extent_array,
+                                  s_op->u.mkdir.handle,
                                   PVFS_TYPE_DIRECTORY,
                                   NULL,
                                   TROVE_SYNC, 
@@ -146,8 +142,8 @@ static PINT_sm_action mkdir_create(
  * Synopsis: 
  *           
  */
-static PINT_sm_action mkdir_setattrib(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -181,31 +177,18 @@ static PINT_sm_action mkdir_setattrib(
     return ret;
 }
 
-static int mkdir_create_dirdata_dspace(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int mkdir_create_dirdata_dspace(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_ENOMEM;
     job_id_t i;
-    PVFS_handle_extent_array extent_array;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
 
-    /* find our meta handle range for this create */
-    ret = PINT_config_get_meta_handle_extent_array(
-                    user_opts, s_op->u.mkdir.fs_id, &extent_array);
-    assert(ret == 0);
-    assert(extent_array.extent_count > 0);
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will "
-                 "be in starting hrange[0] %s-%s\n",
-                 PVFS_OID_str(&extent_array.extent_array[0].first),
-                 PVFS_OID_str(&extent_array.extent_array[0].last));
-
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
-                                  &extent_array,
+                                  PVFS_HANDLE_NULL,
                                   PVFS_TYPE_DIRDATA,
                                   NULL,
                                   TROVE_SYNC,
@@ -216,14 +199,11 @@ static int mkdir_create_dirdata_dspace(
                                   server_job_context,
                                   s_op->req->hints);
 
-    free(extent_array.extent_array);
-    extent_array.extent_array = NULL;
-
     return ret;
 }
 
-static PINT_sm_action mkdir_write_dirdata_handle(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_write_dirdata_handle(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -294,22 +274,19 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
  * Synopsis: free memory and return
  *           
  */
-static PINT_sm_action mkdir_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
 }
 
-static PINT_sm_action mkdir_prep_sm(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
-    s_op->u.mkdir.handle_extent_array =
-        s_op->req->u.mkdir.handle_extent_array;
+    s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
 
     a_p = &(s_op->req->u.mkdir.attr);
 
@@ -331,8 +308,9 @@ static PINT_sm_action mkdir_prep_sm(
     return SM_ACTION_COMPLETE;
 }
 
-static inline int PINT_get_object_ref_mkdir(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+static inline int PINT_get_object_ref_mkdir(struct PVFS_server_req *req,
+                                            PVFS_fs_id *fs_id,
+                                            PVFS_handle *handle)
 {
     *fs_id = req->u.mkdir.fs_id;
     *handle = PVFS_HANDLE_NULL;

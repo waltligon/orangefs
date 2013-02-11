@@ -23,6 +23,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -211,6 +212,8 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
                                     &attr->u.meta.sid_array[i * dfilesids],
                                     sm_p->hints);
 
+            msg_p->msgclass = PVFS_IO_METADATA;
+            msg_p->msgdir = PVFS_IO_READ;
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = attr->u.meta.dfile_array[i];
             msg_p->sid_count = dfilesids;
@@ -218,8 +221,7 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
             msg_p->sid_array = &attr->u.meta.sid_array[i * dfilesids];
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = NULL;
-            PVFS_SID_get_addr(&msg_p->svr_addr,
-                              &attr->u.meta.sid_array[i * dfilesids]);
+            PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         }
         else
         {
@@ -237,6 +239,8 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
                                     sm_p->object_ref.sid_array,
                                     sm_p->hints);
 
+            msg_p->msgclass = PVFS_IO_METADATA;
+            msg_p->msgdir = PVFS_IO_READ;
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->object_ref.handle;
             msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -244,7 +248,7 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
             msg_p->sid_array = sm_p->object_ref.sid_array;
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = NULL;
-            PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
+            PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         }
     }
 

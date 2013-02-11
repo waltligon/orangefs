@@ -19,6 +19,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -292,6 +293,8 @@ static PINT_sm_action list_eattr_setup_msgpair(struct PINT_smcb *smcb,
                                 sm_p->u.listeattr.size_array,
                                 sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
@@ -300,7 +303,7 @@ static PINT_sm_action list_eattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = list_eattr_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

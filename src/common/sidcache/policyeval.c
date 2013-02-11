@@ -8,11 +8,11 @@
 #include <string.h>
 #include <db.h>
 
-#include <policy.h>
-#include <sidcache.h>
-#include <policyeval.h>
-#include <sidcacheval.h>
-#include <quicklist.h>
+#include "policy.h"
+#include "sidcache.h"
+#include "policyeval.h"
+#include "sidcacheval.h"
+#include "quicklist.h"
 
 static int first_cursor_end = 0;
 
@@ -246,7 +246,7 @@ int SID_cmp(SID_cmpop_t cmpop, int v1, int v2)
     }
 }
 
-int SID_add_query_list(qlist_head *sid_list, /* SID_server_list_t */
+int SID_add_query_list(SID_server_list_t *sid_list,
                        DBT *key,
                        DBT *value)
 {
@@ -259,7 +259,7 @@ int SID_add_query_list(qlist_head *sid_list, /* SID_server_list_t */
         return -1; /* ENOMEM should be set */
     }
     INIT_QLIST_HEAD(&new->link);
-    qlist_add_tail(&new->link, sid_list);
+    qlist_add_tail(&new->link, (struct qlist_head *)sid_list);
     memcpy(&new->server_sid, key->data, sizeof(PVFS_SID));
     /* do we need this? we have nowhere to put it at the moment */
     new->server_addr = ((SID_cacheval_t *)value->data)->bmi_addr;
@@ -278,8 +278,8 @@ int SID_add_query_list(qlist_head *sid_list, /* SID_server_list_t */
 
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
-                       int copies,
-                       qlist_head *sid_list) /* SID_server_list_t */
+                       int *copies,
+                       SID_server_list_t *sid_list)
 {
     int i;
     int set;
@@ -287,6 +287,8 @@ int SID_select_servers(SID_policy_t *policy,
     DBT DBkey_s, DBval_s;
     DBT *DBkey = &DBkey_s;
     DBT *DBval = &DBval_s; /* more convenient to have pointers */
+
+    *copies = 2; /* FIXME */
 
     policy->layout = PVFS_LAYOUT_ROUND_ROBIN;
 
@@ -304,7 +306,7 @@ int SID_select_servers(SID_policy_t *policy,
     for (set = 0; set < num_servers; set++)
     {
         int i;
-        int set_size_remaining = copies;
+        int set_size_remaining = *copies;
         /* initialize counter for each rule */
         for (i = 0; i < policy->rule_count; i++)
         {

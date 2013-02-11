@@ -25,6 +25,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types-debug.h"
 #include "security-util.h"
+#include "sid.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -78,15 +79,18 @@ nested machine pvfs2_client_datafile_getattr_sizes_sm
     state datafile_getattr_xfer_msgpairarray
     {
         jump pvfs2_msgpairarray_sm;
-        default => datafile_getattr_retry;
+        /* default => datafile_getattr_retry; */
+        default => datafile_getattr_cleanup;
     }
 
+/*
     state datafile_getattr_retry
     {
         run getattr_datafile_getattr_retry;
         GETATTR_IO_RETRY => datafile_getattr_xfer_msgpairarray;
         default => datafile_getattr_cleanup;
     }
+*/
 
     state datafile_getattr_cleanup
     {
@@ -446,13 +450,15 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+/* V3 this functionality moved to MPA */
+#if 0
     PINT_sm_msgpair_state *msg = &(sm_p->msgarray_op.msgarray[index]);
     struct PVFS_servreq_tree_get_file_size *tree = 
                                               &(msg->req.u.tree_get_file_size);
-
-    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
     PINT_client_getattr_mirror_ctx *ctx = NULL;
     uint32_t server_nr = 0;
+#endif
     int i = 0;
 
     if (resp_p->status)
@@ -462,7 +468,8 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-
+/* V3 this functionality moved to MPA */
+#if 0
     /* if we are mirroring, then we need to check the error code returned from
      * each server. If an error is found, mirroring will try to get the size 
      * from a different server.  Below, we are marking which handles completed 
@@ -498,6 +505,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
     }
     else
     {
+#endif
         /* if we are NOT mirroring and an error is found for an
          * individual handle, then we must invalidate the size array
          * and return an error code.
@@ -524,12 +532,14 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
             }
 
             getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
-        }/*end for*/
+        } /* end for */
 
-    }/*end if*/
+#if 0
+    } /* end if */
+#endif
 
     return(0);
-}/*end getattr_datafile_getattr_comp_fn*/
+} /* end getattr_datafile_getattr_comp_fn */
 
 /* <====================== STATE ACTION FUNCTIONS ===================> */
 
@@ -809,15 +819,17 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);
     
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = object_ref.fs_id;
     msg_p->handle = object_ref.handle;
     msg_p->sid_count = object_ref.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = object_ref.array;
+    msg_p->sid_array = object_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->scr_addr, &sm_p->object_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -863,12 +875,12 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
     int ret = -PVFS_EINVAL;
-    int i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     uint64_t mirror_retry = (sm_p->getattr.attr.mask &
                              PVFS_ATTR_META_MIRROR_DFILES);
 #if 0
+    int i = 0;
     PVFS_handle *handles;
 #endif
     PVFS_capability capability;
@@ -899,6 +911,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,
                                      attr->u.meta.dfile_count);
 
+/* V3 this is handled in MPA */
+#if 0
     /* initialize mir_ctx_array: one context for each handle in the file */
     getattr->mir_ctx_array = malloc(attr->u.meta.dfile_count *
                                     sizeof(*getattr->mir_ctx_array));
@@ -922,7 +936,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     /* allocate handle array and populate */
     /* freed in getattr_datafile_getattr_cleanup() */
     /* V3 no good reason for this - just pass in the meta.dfile_array */
-#if 0
     handles = malloc(sizeof(PVFS_handle) * attr->u.meta.dfile_count);
     if (!handles)
     {
@@ -934,7 +947,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     memcpy(handles,
            attr->u.meta.dfile_array,
            attr->u.meta.dfile_count * sizeof(PVFS_handle));
-#endif
 
     /* allocate index-to-server array and populate */
     getattr->index_to_server = malloc(sizeof(uint32_t) *
@@ -953,6 +965,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     {
         getattr->index_to_server[i] = (uint32_t)i;
     }
+#endif
 
     /* START_PROFILER(getattr_prof); */
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(msg_p->req,
@@ -967,17 +980,19 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
                                          (mirror_retry ? 1 : 0),
                                          sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
     msg_p->handle = attr->u.meta.dfile_array[0];
-    msg_p->sid_count = attr->u.meta.sid-count;
+    msg_p->sid_count = attr->u.meta.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = attr->u.meta.sid-count;
+    msg_p->sid_array = attr->u.meta.sid_array;
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                             msg_p->handle,
                                             msg_p->fs_id);
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &attr->u.meta.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_lerr("Unable to map server address for this handle(%s) and "
@@ -1004,6 +1019,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     return SM_ACTION_COMPLETE;
 }
 
+/* V3 functionality moved to MPA */
+#if 0
 static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
                                                      job_status_s *js_p)
 {
@@ -1212,20 +1229,21 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
     js_p->error_code=GETATTR_IO_RETRY;
 
     return SM_ACTION_COMPLETE;
-} /*end datafile_getattr_retry*/
+} /* end datafile_getattr_retry */
+#endif
 
 static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*FINISH_PROFILER("getattr", getattr_prof, 1); */
-    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
 
     /* cleanup handle_array created for the one tree request */
     /* V3 this should be freed elsewhere because we no longer allocate
      * this as a special array
      */
 #if 0
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
     PINT_sm_msgpair_state *msg_p = &(sm_p->msgarray_op.msgarray[0]);
     if (msg_p->req.u.tree_get_file_size.handle_array)
     {
@@ -1236,6 +1254,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
+#if 0
     /* cleanup memory that may have been used for mirrored retries.*/
     if (getattr->mir_ctx_array)
     {
@@ -1245,6 +1264,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
     {
         free(getattr->index_to_server);
     }
+#endif
 
     return SM_ACTION_COMPLETE;
 }

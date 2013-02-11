@@ -329,16 +329,12 @@ int PINT_config_get_fs_key(
 struct server_configuration_s *PINT_get_server_config(void);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-int PINT_config_pvfs2_mkspace(
-    struct server_configuration_s *config);
-int PINT_config_pvfs2_rmspace(
-    struct server_configuration_s *config);
-int PINT_config_get_trove_sync_meta(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id);
-int PINT_config_get_trove_sync_data(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id);
+int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);
+int PINT_config_pvfs2_rmspace(struct server_configuration_s *config);
+int PINT_config_get_trove_sync_meta(struct server_configuration_s *config,
+                                    PVFS_fs_id fs_id);
+int PINT_config_get_trove_sync_data(struct server_configuration_s *config,
+                                    PVFS_fs_id fs_id);
 #endif
 
 /*

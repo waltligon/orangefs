@@ -456,7 +456,7 @@ struct PINT_server_truncate_op
 struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
-    PVFS_handle_extent_array handle_extent_array;
+    PVFS_handle handle;        /* metadata handle passed by request */
     PVFS_handle dirent_handle;
     PVFS_size init_dirdata_size;
 };
@@ -506,6 +506,8 @@ struct PINT_server_tree_communicate_op
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
+    uint32_t sid_count; /* V3 FIXME */
+    PVFS_SID *sid_array; /* V3 FIXME */
 };
 
 /* This structure is passed into the void *ptr 
@@ -605,29 +607,50 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
-    do { \
-      char server_name[1024]; \
-      struct server_configuration_s *server_config = get_server_config_struct(); \
-      __s_op = malloc(sizeof(struct PINT_server_op)); \
-      if(!__s_op) { return -PVFS_ENOMEM; } \
-      memset(__s_op, 0, sizeof(struct PINT_server_op)); \
-      __s_op->req = &__s_op->decoded.stub_dec.req; \
-      PINT_sm_push_frame(__smcb, __task_id, __s_op); \
-      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && \
-                             PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL)) { \
-        PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
-      } \
-      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || \
-             ( PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL) && ! strcmp(server_config->host_id, server_name)))) { \
-        __location = LOCAL_OPERATION; \
-        __req = __s_op->req; \
-        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
-      } \
-      else { \
-        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
-        PINT_serv_init_msgarray_params(__s_op, __fs_id); \
-      } \
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                      \
+                                             __s_op,                      \
+                                             __handle,                    \
+                                             __fs_id,                     \
+                                             __location,                  \
+                                             __req,                       \
+                                             __task_id)                   \
+    do {                                                                  \
+      char server_name[1024];                                             \
+      struct server_configuration_s *server_config =                      \
+                                    get_server_config_struct();           \
+      __s_op = malloc(sizeof(struct PINT_server_op));                     \
+      if(!__s_op)                                                         \
+      {                                                                   \
+          return -PVFS_ENOMEM;                                            \
+      }                                                                   \
+      memset(__s_op, 0, sizeof(struct PINT_server_op));                   \
+      __s_op->req = &__s_op->decoded.stub_dec.req;                        \
+      PINT_sm_push_frame(__smcb, __task_id, __s_op);                      \
+      if (__location != LOCAL_OPERATION &&                                \
+          __location != REMOTE_OPERATION &&                               \
+          PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL))                   \
+      {                                                                   \
+          PINT_cached_config_get_server_name(server_name,                 \
+                                             1024,                        \
+                                             __handle,                    \
+                                             __fs_id);                    \
+      }                                                                   \
+      if (__location != REMOTE_OPERATION &&                               \
+         (__location == LOCAL_OPERATION ||                                \
+         (PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL) &&                 \
+         !strcmp(server_config->host_id, server_name))))                  \
+      {                                                                   \
+          __location = LOCAL_OPERATION;                                   \
+          __req = __s_op->req;                                            \
+          __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE |                 \
+                                 PRELUDE_PERM_CHECK_DONE |                \
+                                 PRELUDE_LOCAL_CALL;                      \
+      }                                                                   \
+      else                                                                \
+      {                                                                   \
+        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));     \
+        PINT_serv_init_msgarray_params(__s_op, __fs_id);                  \
+      }                                                                   \
     } while (0)
 
 /* state machine permission function */

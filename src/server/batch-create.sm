@@ -68,29 +68,33 @@ static int batch_create_create(
     int ret = -1;
     job_id_t i;
 
-    if(s_op->req->u.batch_create.object_count < 1)
+    if(s_op->req->u.batch_create.handle_count < 1)
     {
         js_p->error_code = -PVFS_EINVAL;
         return(SM_ACTION_COMPLETE);
     }
 
     s_op->resp.u.batch_create.handle_count 
-        = s_op->req->u.batch_create.object_count;
+        = s_op->req->u.batch_create.handle_count; 
 
     /* allocate some space to hold the handles we create */
     s_op->resp.u.batch_create.handle_array = 
-        malloc(s_op->req->u.batch_create.object_count * sizeof(PVFS_handle));
+        malloc(s_op->req->u.batch_create.handle_count * sizeof(PVFS_handle));
     if(!s_op->resp.u.batch_create.handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }
+    memset(s_op->resp.u.batch_create.handle_array,
+           0,
+           s_op->req->u.batch_create.handle_count * sizeof(PVFS_handle));
+
 
     ret = job_trove_dspace_create_list(
         s_op->req->u.batch_create.fs_id,
-        &s_op->req->u.batch_create.handle_extent_array,
+        s_op->req->u.batch_create.handle_array,
         s_op->resp.u.batch_create.handle_array,
-        s_op->req->u.batch_create.object_count,
+        s_op->req->u.batch_create.handle_count,
         s_op->req->u.batch_create.object_type,
         NULL,
         TROVE_SYNC,
@@ -152,7 +156,7 @@ static int perm_batch_create(PINT_server_op *s_op)
         ret = 0;
     }
     else if ((s_op->req->capability.op_mask & PINT_CAP_CREATE) &&
-             (s_op->req->u.batch_create.object_count == 1))
+             (s_op->req->u.batch_create.handle_count == 1))
     {
         /* create capability allows you to create only one object */
         ret = 0;

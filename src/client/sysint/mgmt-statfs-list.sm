@@ -26,6 +26,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -263,6 +264,8 @@ static PINT_sm_action mgmt_statfs_list_setup_msgpair(struct PINT_smcb *smcb,
                                  sm_p->u.statfs_list.fs_id,
                                  sm_p->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
 	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
 	msg_p->sid_count = 0;
