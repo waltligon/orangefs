@@ -488,6 +488,11 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* If we have replication turned on for this file, then we know that
+     * file stuffing is not being used.
+     */
+
+
     /* determine if we need to unstuff or not to service this request */
     js_p->error_code = unstuff_needed(sm_p->u.io.mem_req,
                                       sm_p->u.io.file_req_offset,

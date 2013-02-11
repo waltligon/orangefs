@@ -319,18 +319,26 @@ int trove_keyval_read(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
+        gossip_lerr("method_id < 0\n");
         return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     if (key_p->buffer_sz < 2)
+    {
+        gossip_lerr("key_p->buffer_sz(%d) < 2\n",key_p->buffer_sz);
         return -TROVE_EINVAL;
+    }
     if(!(flags & TROVE_BINARY_KEY))
     {
         if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+        {
+            gossip_lerr("key_p->buffer[key_p->buffer_sz-1] != 0\n");
             return -TROVE_EINVAL;
+        }
     }
 
+    gossip_lerr("Calling keyval_read...\n");
     return keyval_method_table[method_id]->keyval_read(
            coll_id,
            handle,

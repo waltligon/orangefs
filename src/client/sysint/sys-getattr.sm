@@ -614,6 +614,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     PVFS_object_attr *attr = NULL;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i,ret;
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -630,8 +631,13 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
-    PINT_copy_object_attr(&sm_p->getattr.attr,
-                          &resp_p->u.getattr.attr);
+    ret=PINT_copy_object_attr(&sm_p->getattr.attr,
+                              &resp_p->u.getattr.attr);
+    if (ret)
+    {
+       gossip_lerr("Error copying attributes from getattr response.\n");
+       return ret;
+    }
 
     attr =  &sm_p->getattr.attr;
 
@@ -698,6 +704,20 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                    "This is okay.\n"
                    ,__func__);
                 }
+            }
+            if (attr->mask & PVFS_ATTR_META_REPLICATION)
+            {
+               gossip_lerr("Replication data returned.\n");
+               gossip_lerr("attr->u.meta.replication_number_of_copies(%d)\n"
+                          ,attr->u.meta.replication_number_of_copies);
+               gossip_lerr("attr->u.meta.replication_dfile_array_count(%d)\n"
+                          ,attr->u.meta.replication_dfile_array_count);
+               for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
+               {
+                   gossip_err("Replication Handle[%d]:(%llu)\n"
+                             ,i
+                             ,llu(attr->u.meta.replication_dfile_array[i]));
+               }
             }
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)

@@ -307,7 +307,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
 
-          if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count         *
                                           src->u.meta.mirror_copies_count *
@@ -341,6 +341,18 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                    = src->u.meta.mirror_copies_count;
             }
 
+            if(src->mask & PVFS_ATTR_META_REPLICATION)
+            {
+                dest->u.meta.replication_number_of_copies  = src->u.meta.replication_number_of_copies;
+                dest->u.meta.replication_dfile_array_count = src->u.meta.replication_dfile_array_count;
+                dest->u.meta.replication_dfile_array = calloc(dest->u.meta.replication_dfile_array_count
+                                                             ,sizeof(*dest->u.meta.replication_dfile_array));
+                if ( !dest->u.meta.replication_dfile_array )
+                {
+                   dest->u.meta.replication_number_of_copies = dest->u.meta.replication_dfile_array_count = 0;
+                   return ret;
+                }
+            }
 
             if(src->mask & PVFS_ATTR_META_DIST)
             {

@@ -45,13 +45,14 @@ static uint64_t UINT64_HIGH = 0xffffffffffffffffULL;
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
-    {"user.pvfs2.dist_name"    , SPECIAL_DIST_NAME_KEYLEN},
-    {"user.pvfs2.dist_params"  , SPECIAL_DIST_PARAMS_KEYLEN},
-    {"user.pvfs2.num_dfiles"   , SPECIAL_NUM_DFILES_KEYLEN},
-    {"user.pvfs2.meta_hint"    , SPECIAL_METAFILE_HINT_KEYLEN},
-    {"user.pvfs2.mirror.copies", SPECIAL_MIRROR_COPIES_KEYLEN},
+    {"user.pvfs2.dist_name"     , SPECIAL_DIST_NAME_KEYLEN},
+    {"user.pvfs2.dist_params"   , SPECIAL_DIST_PARAMS_KEYLEN},
+    {"user.pvfs2.num_dfiles"    , SPECIAL_NUM_DFILES_KEYLEN},
+    {"user.pvfs2.meta_hint"     , SPECIAL_METAFILE_HINT_KEYLEN},
+    {"user.pvfs2.mirror.copies" , SPECIAL_MIRROR_COPIES_KEYLEN},
     {"user.pvfs2.mirror.handles", SPECIAL_MIRROR_HANDLES_KEYLEN},
     {"user.pvfs2.mirror.status" , SPECIAL_MIRROR_STATUS_KEYLEN},
+    {"user.pvfs2.mirror.mode"   , SPECIAL_MIRROR_MODE_KEYLEN},
 };
 
 enum
@@ -65,6 +66,10 @@ enum
     STATE_CAPABILITY = 14,
     STATE_DIRDATA    = 15,
 };
+
+uint32_t REPLICATION_MODE
+        ,REPLICATION_COPIES
+        ,REPLICATION_HANDLES;
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
 static void free_keyval_buffers(struct PINT_server_op *s_op);
@@ -1170,8 +1175,13 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
         return SM_ACTION_COMPLETE;
     }
 
+    free_keyval_buffers(s_op);
+
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
+
+    gossip_lerr("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
+    gossip_lerr("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
 
     /*
       there *should* be some distribution information.  if not, dump
@@ -1191,10 +1201,8 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     /* add mask value to indicate the distribution is filled */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
-    free_keyval_buffers(s_op);
-
     s_op->val.buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size; 
-    s_op->val.buffer = malloc(s_op->val.buffer_sz);
+    s_op->val.buffer = calloc(s_op->val.buffer_sz,sizeof(char));
     if (!s_op->val.buffer)
     {
         gossip_err("Cannot allocate dist of size %d\n",
@@ -1204,12 +1212,22 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     }
     s_op->free_val = 1;
 
+    gossip_lerr("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
+    gossip_lerr("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
+    gossip_lerr("val.buffer_sz(%d)\n",s_op->val.buffer_sz);
+    gossip_lerr("s_op->u.getattr.fs_id:(%d) \ts_op->u.getattr.handle:(%llu)\n"
+               ,s_op->u.getattr.fs_id
+               ,llu(s_op->u.getattr.handle));
+
+
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &(s_op->key), &(s_op->val),
         0,
         NULL,
         smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
+
+    gossip_lerr("ret(%d)\n",ret);
 
     return ret;
 }
@@ -1370,6 +1388,7 @@ static PINT_sm_action getattr_read_acl(
 
     assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
 
+    js_p->error_code = 0;
     free_keyval_buffers(s_op);
 
     s_op->key.buffer = "system.posix_acl_access";
@@ -2278,113 +2297,102 @@ static PINT_sm_action getattr_retrieve_replication_data(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
-    int ret,kv_next=0;
-    
+    int ret,kv_index=0;
+    job_id_t job_id={0};
 
     attr = &s_op->resp.u.getattr.attr;
 
     /* Did client request replication data? */
-    if ( !(s_op->resp.u.getattr.attr & PVFS_ATTR_META_REPLICATION) )
+    if ( !(attr->mask & PVFS_ATTR_META_REPLICATION) )
     {
        js_p->error_code = SKIP_NEXT_STATE;
        return SM_ACTION_COMPLETE;
     } 
 
     js_p->error_code = 0;
+    s_op->keyval_count = 3;
+    s_op->free_val = 1;
 
-    /* if the primary dfile information was not retrieved, then we need to
-     * retrieve the dfile count.  This count represents the number of data files
-     * per copy for replication.
-     */
-    if (!resp->u.getattr.attr.meta.dfile_count)
-    {
-        s_op->keyval_count++;
-    }
+    s_op->key_a   = calloc(s_op->keyval_count,sizeof(*s_op->key_a));
+    s_op->val_a   = calloc(s_op->keyval_count,sizeof(*s_op->val_a));
+    s_op->error_a = calloc(s_op->keyval_count,sizeof(*s_op->error_a));
 
-    s_op->keyval_count += 3;
-
-    s_op->key_a = calloc(s_op->keyval_count,sizeof(*s_op->key_a));
-    s_op->val_a = calloc(s_op->keyval_count,sizeof(*s_op->val_a));
-
-    if ( !s_op->key_a || !s_op->val_a )
+    if ( !s_op->key_a || !s_op->val_a || !s_op->error_a )
     {
        gossip_lerr("Error allocating memory for keyval pairs\n");
        js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
+       goto err_out;
     }
 
-    /* Replication handles */
-    s_op->key_a[kv_next].buffer = strdup(USER_PVFS2_MIRROR_HANDLES);
-    s_op->key_a[kv_next].buffer_sz = sizeof(USER_PVFS2_MIRROR_HANDLES);
-    s_op->val_a[kv_next].buffer = calloc(PVFS_MAX_XATTR_VALUELEN,sizeof(char));
-    s_op->val_a[kv_next].buffer_sz = PVFS_MAX_XATTR_VALUELEN * sizeof(char);
-    
-    if ( !s_op->key_a[kv_next].buffer || !s_op->val_a[kv_next].buffer )
+    /* Replication/Mirror Mode */
+    s_op->key_a[kv_index].buffer    = Trove_Special_Keys[MIRROR_MODE_KEY].key;
+    s_op->key_a[kv_index].buffer_sz = Trove_Special_Keys[MIRROR_MODE_KEY].size;
+    s_op->val_a[kv_index].buffer    = calloc(1,sizeof(uint32_t));
+    s_op->val_a[kv_index].buffer_sz = sizeof(uint32_t);
+
+    if ( !s_op->key_a[kv_index].buffer || !s_op->val_a[kv_index].buffer )
     {
        gossip_lerr("Error allocating memory for keyval pairs.\n");
        js_p->error_code = -PVFS_ENOMEM;
        goto err_out;
     }
 
-    kv_next++;
-    assert(kv_next < s_op->keyval_count);
+    REPLICATION_MODE = kv_index++;
+    assert(kv_index < s_op->keyval_count);
 
     /* Replication number of copies */
-    s_op->key_a[kv_next].buffer = strdup(USER_PVFS2_MIRROR_COPIES);
-    s_op->key_a[kv_next].buffer_sz = sizeof(USER_PVFS2_MIRROR_COPIES);
-    s_op->val_a[kv_next].buffer = calloc(1,sizeof(resp->u.getattr.attr.u.meta.replication_number_of_copies));    
-    s_op->val_a[kv_next].buffer_sz = sizeof(resp->u.getattr.attr.u.meta.replication_number_of_copies);
+    s_op->key_a[kv_index].buffer    = Trove_Special_Keys[MIRROR_COPIES_KEY].key;
+    s_op->key_a[kv_index].buffer_sz = Trove_Special_Keys[MIRROR_COPIES_KEY].size;
+    s_op->val_a[kv_index].buffer    = calloc(1,sizeof(attr->u.meta.replication_number_of_copies));    
+    s_op->val_a[kv_index].buffer_sz = sizeof(attr->u.meta.replication_number_of_copies);
 
-    if ( !s_op->key_a[kv_next].buffer || !s_op->val_a[kv_next].buffer )
+    if ( !s_op->key_a[kv_index].buffer || !s_op->val_a[kv_index].buffer )
     {
        gossip_lerr("Error allocating memory for keyval pairs.\n");
        js_p->error_code = -PVFS_ENOMEM;
        goto err_out;
     }
 
-    kv_next++;
-    assert(kv_next < s_op->keyval_count)
+    REPLICATION_COPIES = kv_index++;
+    assert(kv_index < s_op->keyval_count);
 
-    /* Mirror Mode */
-    s_op->key_a[kv_next].buffer = strdup(USER_PVFS2_MIRROR_MODE);
-    s_op->key_a[kv_next].buffer_sz = sizeof(USER_PVFS2_MIRROR_MODE);
-    s_op->val_a[kv_next].buffer = calloc(1,sizeof(uint32_t));
-    s_op->val_a[kv_next].buffer_sz = sizeof(uint32_t);
-
-    if ( !s_op->key_a[kv_next].buffer || !s_op->val_a[kv_next].buffer )
-    {
-       gossip_lerr("Error allocating memory for keyval pairs.\n");
-       js_p->error_code = -PVFS_ENOMEM;
-       goto err_out;
-    }
-
-    kv_next++;
-    if (kv_next == s_op->keyval_count)
-    {
-        goto submit_job;
-    }
-
-    s_op->key_a[kv_next].buffer = calloc(1,sizeof(dfile key length));
-    s_op->key_a[kv_next].buffer_sz = sizeof(dfile_key_length);
-    s_op->val_a[kv_next].buffer = calloc(1,sizeof(dfile-count));
-    s_op->val_a[kv_next].buffer_sz = sizeof(dfile-count);
-
-    if ( !s_op->key_a[kv_next].buffer || !s_op->val_a[kv_next].buffer )
-    {
-       gossip_lerr("Error allocating memory for keyval pairs.\n");
-       js_p->error_code = -PVFS_ENOMEM;
-       goto err_out;
-    }
-
-    s_op->key_a[kv_next].buffer = key string.
+    /* Replication handles */
+    s_op->key_a[kv_index].buffer    = Trove_Special_Keys[MIRROR_HANDLES_KEY].key;
+    s_op->key_a[kv_index].buffer_sz = Trove_Special_Keys[MIRROR_HANDLES_KEY].size;
+    s_op->val_a[kv_index].buffer    = calloc(PVFS_MAX_XATTR_VALUELEN,sizeof(char));
+    s_op->val_a[kv_index].buffer_sz = PVFS_MAX_XATTR_VALUELEN * sizeof(char);
     
-    kv_next++;
+    if ( !s_op->key_a[kv_index].buffer || !s_op->val_a[kv_index].buffer )
+    {
+       gossip_lerr("Error allocating memory for keyval pairs.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto err_out;
+    }
 
-submit_job:
-    ret = job_trove_keyval_read_list();
+    REPLICATION_HANDLES = kv_index++;
+
+    ret = job_trove_keyval_read_list( s_op->target_fs_id
+                                     ,s_op->target_handle
+                                     ,s_op->key_a
+                                     ,s_op->val_a
+                                     ,s_op->error_a
+                                     ,s_op->keyval_count
+                                     ,0
+                                     ,NULL
+                                     ,smcb
+                                     ,0
+                                     ,js_p
+                                     ,&job_id
+                                     ,server_job_context
+                                     ,s_op->req->hints);
 
     return (ret);
+
 err_out:
+    
+    free_keyval_buffers(s_op);
+    attr->mask &= ~PVFS_ATTR_META_REPLICATION;
+
     return SM_ACTION_COMPLETE;
 }/*end getattr_retrieve_replication_data*/
 
@@ -2398,7 +2406,67 @@ static PINT_sm_action check_replication_data(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
 
+    PVFS_object_attr *attr = &s_op->resp.u.getattr.attr;
+
+
+    /* Check error codes for each replication keyval attempt. */
+    for (i=0; i<s_op->keyval_count; i++)
+    {
+        if (s_op->error_a[i] != 0)
+        {
+           gossip_lerr("Error retrieving keyval(%s) for metafile handle(%llu).\n"
+                      ,(char *)s_op->key_a[i].buffer
+                      ,llu(s_op->target_handle));
+           js_p->error_code = s_op->error_a[i];
+           goto err_out;
+        }
+    }
+
+    gossip_lerr("Error codes are okay.\n");
+
+    if ( *(enum MIRROR_MODE_t *)s_op->val_a[REPLICATION_MODE].buffer != MIRROR_ON_WRITE )
+    {
+       gossip_lerr("Replication requested but mirror mode on file is not MIRROR_ON_WRITE.\n");
+       js_p->error_code = 0;
+       goto err_out;
+    } 
+
+    gossip_lerr("Replication mode is correct\n");
+
+    attr->u.meta.replication_number_of_copies = *(uint32_t *)s_op->val_a[REPLICATION_COPIES].buffer;
+    attr->u.meta.replication_dfile_array_count = attr->u.meta.dfile_count *
+                                                 *(uint32_t*)s_op->val_a[REPLICATION_COPIES].buffer;
+    attr->u.meta.replication_dfile_array = calloc(attr->u.meta.replication_dfile_array_count
+                                                 ,sizeof(*attr->u.meta.replication_dfile_array));
+    if ( !attr->u.meta.replication_dfile_array )
+    {
+       gossip_lerr("Error allocating memory for replication datafile array.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto err_out;
+    }
+
+    memcpy(attr->u.meta.replication_dfile_array
+          ,s_op->val_a[REPLICATION_HANDLES].buffer
+          ,attr->u.meta.replication_dfile_array_count * sizeof(*attr->u.meta.replication_dfile_array));
+
+    gossip_lerr("Response Values:\n");
+    gossip_err("Replication Number of Copies(%d)\n",attr->u.meta.replication_number_of_copies);
+    gossip_err("Replication dfile array count(%d)\n",attr->u.meta.replication_dfile_array_count);
+    for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
+    {
+        gossip_err("Replication Handle[%d]:%llu\n",i,llu(attr->u.meta.replication_dfile_array[i]));
+    }
+
+    attr->mask |= PVFS_ATTR_META_REPLICATION;
+    return SM_ACTION_COMPLETE;
+
+err_out:
+    free_keyval_buffers(s_op);
+    s_op->keyval_count=0;
+    s_op->free_val=0;
+    attr->mask &= ~PVFS_ATTR_META_REPLICATION;
 
     return SM_ACTION_COMPLETE;
 }/*end check_replication_data*/

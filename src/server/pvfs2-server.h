@@ -128,6 +128,7 @@ enum
     MIRROR_COPIES_KEY    = 4,
     MIRROR_HANDLES_KEY   = 5,
     MIRROR_STATUS_KEY    = 6,
+    MIRROR_MODE_KEY      = 7,
 };
 
 typedef enum
