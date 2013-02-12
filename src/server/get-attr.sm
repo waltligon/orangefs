@@ -72,7 +72,7 @@ uint32_t REPLICATION_MODE
         ,REPLICATION_HANDLES;
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
-static void free_keyval_buffers(struct PINT_server_op *s_op);
+static void free_keyval_val_buffers(struct PINT_server_op *s_op);
 
 %%
 
@@ -592,7 +592,7 @@ static PINT_sm_action getattr_read_symlink_target(
         return SM_ACTION_COMPLETE;
     }
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
@@ -677,7 +677,7 @@ static PINT_sm_action getattr_read_metafile_hint(
 
     js_p->error_code = 0;
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = Trove_Special_Keys[METAFILE_HINT_KEY].key;
     s_op->key.buffer_sz = Trove_Special_Keys[METAFILE_HINT_KEY].size;
@@ -762,7 +762,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
         return SM_ACTION_COMPLETE;
     }
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
@@ -842,7 +842,7 @@ static PINT_sm_action getattr_read_mirrored_copies_count_if_required(
     /* setup job to read user.pvfs2.mirror.copies */
 
     /* initialize */
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     /* set key = user.pvfs2.mirror.copies */
     s_op->key.buffer    = Trove_Special_Keys[MIRROR_COPIES_KEY].key;
@@ -945,7 +945,7 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
    /* get mirrored handles and status of each handle */
 
    /* initialize */
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
    /* allocate space for keys and values */
    s_op->keyval_count = 2;
@@ -1029,7 +1029,7 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
    return ret;
 
 error_exit:
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
    resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
 
@@ -1120,7 +1120,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    }
 
    /*Cleanup*/
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
    js_p->error_code = 0;
    return SM_ACTION_COMPLETE;
@@ -1175,7 +1175,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
         return SM_ACTION_COMPLETE;
     }
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
@@ -1389,7 +1389,7 @@ static PINT_sm_action getattr_read_acl(
     assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
 
     js_p->error_code = 0;
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = "system.posix_acl_access";
     s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
@@ -1707,7 +1707,7 @@ static PINT_sm_action getattr_setup_resp(
 static void free_nested_getattr_data(struct PINT_server_op *s_op)
 {
     /* free up anything that was set up specifically by this nested machine */
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     if (s_op->u.getattr.mirror_dfile_status_array)
     {
@@ -1723,7 +1723,7 @@ static PINT_sm_action getattr_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
@@ -1802,7 +1802,7 @@ static PINT_sm_action getattr_get_dist_dir_attr(
          return SM_ACTION_COMPLETE;
     }
     
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
@@ -1873,7 +1873,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
 
     /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
    /* allocate space for keys and values */
    s_op->keyval_count = 2;
@@ -1935,10 +1935,12 @@ static PINT_sm_action getattr_get_dirent_count(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting dirent_count! \n");
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, "
+                                           "not getting dirent_count! \n");
         return SM_ACTION_COMPLETE;
     }
 
+    js_p->error_code = 0;
     attr = &s_op->resp.u.getattr.attr;
     
     if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
@@ -2103,7 +2105,7 @@ static PINT_sm_action getattr_get_dir_hint(
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len   = 
         PVFS_REQ_LIMIT_DIST_NAME;
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
         
     s_op->key_a = 
         (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_ds_keyval));
@@ -2269,7 +2271,7 @@ static PINT_sm_action getattr_detect_stuffed(
 
     /* we can determine stuffedness by the presence of the dfiles req key */
 
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
 
     s_op->key.buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
@@ -2308,6 +2310,8 @@ static PINT_sm_action getattr_retrieve_replication_data(
        js_p->error_code = SKIP_NEXT_STATE;
        return SM_ACTION_COMPLETE;
     } 
+
+    free_keyval_val_buffers(s_op);
 
     js_p->error_code = 0;
     s_op->keyval_count = 3;
@@ -2390,7 +2394,7 @@ static PINT_sm_action getattr_retrieve_replication_data(
 
 err_out:
     
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
     attr->mask &= ~PVFS_ATTR_META_REPLICATION;
 
     return SM_ACTION_COMPLETE;
@@ -2409,6 +2413,9 @@ static PINT_sm_action check_replication_data(
     int i;
 
     PVFS_object_attr *attr = &s_op->resp.u.getattr.attr;
+
+
+    gossip_lerr("js_p->error_code(%d).\n",js_p->error_code);
 
 
     /* Check error codes for each replication keyval attempt. */
@@ -2463,7 +2470,7 @@ static PINT_sm_action check_replication_data(
     return SM_ACTION_COMPLETE;
 
 err_out:
-    free_keyval_buffers(s_op);
+    free_keyval_val_buffers(s_op);
     s_op->keyval_count=0;
     s_op->free_val=0;
     attr->mask &= ~PVFS_ATTR_META_REPLICATION;
@@ -2474,7 +2481,7 @@ err_out:
 
 
 
-static void free_keyval_buffers(struct PINT_server_op *s_op)
+static void free_keyval_val_buffers(struct PINT_server_op *s_op)
 {
     int i = 0;
 
@@ -2485,8 +2492,6 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
             free(s_op->val.buffer);
             s_op->val.buffer = NULL;
         }
-        memset(&(s_op->val),0,sizeof(s_op->val));
-        memset(&(s_op->key),0,sizeof(s_op->key));
 
         if (s_op->val_a)
         {
@@ -2499,8 +2504,11 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
                 }
             }
         }
-        s_op->free_val = 0;
     }
+
+    s_op->free_val = 0;
+    memset(&(s_op->val),0,sizeof(s_op->val));
+    memset(&(s_op->key),0,sizeof(s_op->key));
 
     if(s_op->val_a)
     {

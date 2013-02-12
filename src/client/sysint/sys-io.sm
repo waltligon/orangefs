@@ -491,6 +491,8 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
     /* If we have replication turned on for this file, then we know that
      * file stuffing is not being used.
      */
+    gossip_lerr("Replication is turned %s for this file.\n"
+               ,sm_p->getattr.attr.mask & PVFS_ATTR_META_REPLICATION?"ON":"OFF");
 
 
     /* determine if we need to unstuff or not to service this request */
@@ -599,6 +601,12 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                 assert(attr->u.meta.mirror_dfile_array);
                 assert(attr->u.meta.mirror_copies_count);
             }
+            if (attr->mask & PVFS_ATTR_META_REPLICATION)
+            {
+                assert(attr->u.meta.replication_dfile_array_count);
+                assert(attr->u.meta.replication_dfile_array);
+                assert(attr->u.meta.replication_number_of_copies);
+            }
             break;
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = -PVFS_EISDIR;
@@ -684,8 +692,12 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
      * be changed in the future, for example, if sio_count is some
      * percentage of the target_datafile_count, then do small I/O to
      * the sio_array servers, etc.
+     * For now, if replication is turned on, then we MUST do flows.
+     * Changes for small-io will come later.     
      */
-    if(sio_count == target_datafile_count)
+
+    if( (sio_count == target_datafile_count) && 
+        !(sm_p->getattr.attr.mask & PVFS_ATTR_META_REPLICATION) )
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  %s: doing small I/O\n", __func__);
 

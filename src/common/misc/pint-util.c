@@ -352,6 +352,10 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                    dest->u.meta.replication_number_of_copies = dest->u.meta.replication_dfile_array_count = 0;
                    return ret;
                 }
+                memcpy(dest->u.meta.replication_dfile_array
+                      ,src->u.meta.replication_dfile_array
+                      ,dest->u.meta.replication_dfile_array_count *
+                       sizeof(*dest->u.meta.replication_dfile_array));
             }
 
             if(src->mask & PVFS_ATTR_META_DIST)

@@ -256,6 +256,10 @@ do {                                                                            
     {                                                                                             \
        (__req).u.create.attr.mask |= PVFS_ATTR_META_REPLICATION;                                  \
     }                                                                                             \
+    else                                                                                          \
+    {                                                                                             \
+       (__req).u.create.attr.mask &= ~PVFS_ATTR_META_REPLICATION;                                 \
+    }                                                                                             \
 } while (0)
 
 struct PVFS_servresp_create
