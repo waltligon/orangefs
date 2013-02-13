@@ -207,7 +207,7 @@ then
 
 	# print out the current environment to a logfile
 	echo "Environment for userlib testing"
-	env | tee userlib-env.log
+	#env | tee userlib-env.log
 
 	# save file descriptors for later
 	exec 6<&1
