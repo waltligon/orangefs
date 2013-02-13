@@ -60,17 +60,6 @@ void iocommon_ensure_init(void);
 
 int iocommon_cred(PVFS_credential **credential);
 
-int iocommon_ireadorwrite(enum PVFS_io_type which,
-                          pvfs_descriptor *pd,
-                          PVFS_size extra_offset,
-                          void *buf,
-                          PVFS_Request etype_req,
-                          PVFS_Request file_req,
-                          size_t count,
-                          PVFS_sys_op_id *ret_op_id,
-                          PVFS_sysresp_io *ret_resp,
-                          PVFS_Request *ret_memory_req);
-
 void calc_copy_ops( off64_t offset,
                     size_t req_size,
                     struct ucache_req_s *ureq,
