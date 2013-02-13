@@ -22,11 +22,11 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvhmc:k:f:n:t: arguments
+while getopts s:i:a:dvhumc:k:f:n:t: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
 		echo ""
 		echo "Examples: "
 		echo ""
@@ -56,6 +56,10 @@ do
 	m)
 		#echo "Running MPI tests"
 		RUN_MPI_TEST=1
+		;;
+	u)
+		#echo "Running userlib tests"
+		RUN_USERLIB_TEST=1
 		;;
 	c)
 		EC2CONFFILE=$OPTARG
@@ -90,6 +94,7 @@ echo "NUMBER_INSTANCES is $NUMBER_INSTANCES"
 
 echo "RUN_MPI_TEST is $RUN_MPI_TEST"
 echo "RUN_VFS_TEST is $RUN_VFS_TEST"
+echo "RUN_USERLIB_TEST is $RUN_USERLIB_TEST"
 echo "VMIPADDR is $VMIPADDR"
 echo "DELETE_INSTANCE is $DELETE_INSTANCE"
 
@@ -100,6 +105,7 @@ export VMSYSTEM
 
 export RUN_VFS_TEST
 export RUN_MPI_TEST
+export RUN_USERLIB_TEST
 export KEYFILE
 export KEYNAME
 export EC2CONFFILE
@@ -198,9 +204,9 @@ echo "Running tests..."
 # run scripted via bash -s to work around remote issues
 (echo "script run-test.txt" && cat ./run-test.sh) > run-test.scr
 
-echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr 
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr 
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr
 
 echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/

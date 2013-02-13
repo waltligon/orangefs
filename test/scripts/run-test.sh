@@ -3,7 +3,8 @@ export VFS_HOSTS
 export RUN_MPI_TEST
 export RUN_VFS_TEST
 export SVNBRANCH
-export LD_LIBRARY_PATH=/opt/db4/lib
+export WITH_DB=/opt/db4
+export LD_LIBRARY_PATH=$WITH_DB/lib
 mkdir ~/test2
 cd ~/test2
 echo svn export --force -q http://www.orangefs.org/svn/orangefs/${SVNBRANCH}/test/run-nightly-setup

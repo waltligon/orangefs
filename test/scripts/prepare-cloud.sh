@@ -4,6 +4,11 @@
 
 # must script to work around sudo issue
 
+if [ $1 ] 
+then
+	VMSYSTEM=$1
+fi
+
 CHOICE=$VMSYSTEM
 
 # get the architecture
