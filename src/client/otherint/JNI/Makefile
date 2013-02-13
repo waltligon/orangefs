@@ -15,7 +15,7 @@ OFS_TOP=$(HOME)/trunk
 # Java found by running: 
 #`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
 JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
-COMMONS_LOGGING=$(HOME)/commons-logging-1.1.1/commons-logging-1.1.1.jar
+COMMONS_LOGGING=lib/commons-logging-1.1.1.jar
 
 #Hadoop Only Related Configuration Values
 #------------------------------------------------------------------------------

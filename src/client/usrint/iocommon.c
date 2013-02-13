@@ -22,18 +22,9 @@
 #include <errno.h>
 #include <pint-cached-config.h>
 
-int iocommon_ireadorwrite(enum PVFS_io_type which,
-                          pvfs_descriptor *pd,
-                          PVFS_size extra_offset,
-                          void *buf,
-                          PVFS_Request etype_req,
-                          PVFS_Request file_req,
-                          size_t count,
-                          PVFS_sys_op_id *ret_op_id,
-                          PVFS_sysresp_io *ret_resp,
-                          PVFS_Request *ret_memory_req
-);
-
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
@@ -230,9 +221,12 @@ int iocommon_lookup_absolute(const char *abs_path,
     /* let's try to do the lookup */
 
     errno = 0;
-    rc = PVFS_sys_lookup(Ppath->fs_id, Ppath->pvfs_path,
-                         credential, &resp_lookup,
-                         follow_links, NULL);
+    rc = PVFS_sys_lookup(Ppath->fs_id,
+                         Ppath->pvfs_path,
+                         credential,
+                         &resp_lookup,
+                         follow_links,
+                         NULL);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_lookup.ref;
 
@@ -377,6 +371,75 @@ errorout:
 }
 
 /**
+ * Parses a simple string to find the number and select of servers
+ * for the LIST layout method
+ */
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid)
+{
+    PVFS_BMI_addr_t *server_array;
+    int count;
+    char *tok, *save_ptr;
+    int i;
+
+    /* expects slist->servers to be NULL */
+    if (!slist || slist->servers)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    tok = strtok_r(serverlist, ":", &save_ptr);
+    if (!tok)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->count = atoi(tok);
+    PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
+    if (slist->count < 1 || slist->count > count)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
+                                                slist->count);
+    if (!slist->servers)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
+    if (!server_array)
+    {
+        free(slist->servers);
+        slist->servers = NULL;
+        errno = ENOMEM;
+        return -1;
+    }
+    PINT_cached_config_get_server_array(fsid,
+                                        PINT_SERVER_TYPE_IO,
+                                        server_array,
+                                        &count);
+    for (i = 0; i < slist->count; i++)
+    {
+        tok = strtok_r(NULL, ":", &save_ptr);
+        if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
+        {
+            free(slist->servers);
+            slist->servers = NULL;
+            free(server_array);
+            errno = EINVAL;
+            return -1;
+        }
+        slist->servers[i] = server_array[atoi(tok)];
+    }
+    free(server_array);
+    return 0;
+}
+    
+
+/**
  * Create a file via the PVFS system interface
  * parent_ref is a PVFS object so we should be all
  * in PVFS space.
@@ -396,6 +459,7 @@ int iocommon_create_file(const char *filename,
     PVFS_sysresp_create resp_create;
     PVFS_sys_dist *dist = NULL;
     PVFS_sys_layout *layout = NULL;
+    PVFS_hint hints = NULL;
 
     debug("iocommon_create_file: called with %s\n", filename);
 
@@ -404,20 +468,6 @@ int iocommon_create_file(const char *filename,
     memset(&attr, 0, sizeof(attr));
     memset(&resp_create, 0, sizeof(resp_create));
 
-    /* this is not right - need to pull parameters out of hints */
-    /* investigate PVFS hint mechanism */
-#if 0
-    if (file_creation_param.striping_unit > 0)
-    {
-        dist = PVFS_sys_dist_lookup("simple_stripe");
-        if (PVFS_sys_dist_setparam(dist, "strip_size",
-                                  &(file_creation_param.striping_unit)) < 0)
-        {
-            fprintf(stderr, "Error: failed to set striping_factor\n");
-        }
-    }
-#endif
-
     attr.owner = geteuid();
     attr.group = getegid();
     attr.atime = time(NULL);
@@ -425,12 +475,78 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#if 0
-    if (file_creation_param.striping_factor > 0){
-        attributes.dfile_count = file_creation_param.striping_factor;
-        attributes.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    if (file_creation_param) /* these are hints */
+    {
+        int length;
+        void *value;
+        /* check for distribution */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DISTRIBUTION,
+                                            &length);
+        if (value)
+        {
+            dist = PVFS_sys_dist_lookup((char *)value);
+            if (!dist) /* distribution not found */
+            {
+                rc = EINVAL;
+                goto errorout;
+            }
+        }
+        /* check for dfile count */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DFILE_COUNT,
+                                            &length);
+        if (value)
+        {
+            attr.dfile_count = *(int *)value;
+            attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+        }
+        /* check for layout */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_LAYOUT,
+                                            &length);
+        if (value)
+        {
+            layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
+            layout->algorithm = *(int *)value;
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+        }
+        /* check for server list */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_SERVERLIST,
+                                            &length);
+        if (value)
+        {
+            if(!layout)
+            {
+                /* serverlist makes no sense without a layout */
+                rc = EINVAL;
+                goto errorout;
+            }
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+            rc = iocommon_parse_serverlist(value, &layout->server_list,
+                                           parent_ref.fs_id);
+            if (rc < 0)
+            {   
+                return rc;
+            }
+        }
+        /* check for nocache flag */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_NOCACHE,
+                                            &length);
+        if (value)
+        {   
+            /* this should probably move into the open routine */
+        }
+        /* look for hints handled on the server */
+        if (PVFS_hint_check_transfer(&file_creation_param))
+        {   
+            hints = file_creation_param;
+        }
     }
-#endif
 
     /* Extract the users umask (and restore it to the original value) */
     mode_mask = umask(0);
@@ -664,7 +780,22 @@ int iocommon_lookup(char *path,
             !PATH_EXPANDED(Ppath))
     {
         /* last chance to get it open */
-        Ppath = PVFS_path_from_expanded(path);
+#if 0
+        if (pdir)
+        {
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(path);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, path);
+            Ppath = PVFS_new_path(tmp_path);
+        }
+        else
+#endif
+        {
+            Ppath = PVFS_path_from_expanded(path);
+        }
         if (!VALID_PATH_MAGIC(Ppath))
         {
             /* must be a PVFS_path before we call expand */
@@ -681,6 +812,12 @@ int iocommon_lookup(char *path,
         }
         pref->fs_id = Ppath->fs_id;
         pref->handle = Ppath->handle;
+#if 0
+        if (pdir)
+#endif
+        {
+            PVFS_free_path(Ppath);
+        }
     }
     IOCOMMON_RETURN_ERR(rc);
 errorout:
@@ -745,12 +882,13 @@ pvfs_descriptor *iocommon_open(const char *path,
         goto errorout;
     }
 
+    /* see if this is a PVFS path and if so check it out completely */
     Ppath = PVFS_path_from_expanded(path);
     if (VALID_PATH_MAGIC(Ppath))
     {
         if (PATH_LOOKEDUP(Ppath))
         {
-            if (Ppath->filename && (*Ppath->filename = '\0'))
+            if (Ppath->filename && (*Ppath->filename == '\0'))
             {
                 if (PATH_FOLLOWSYM(Ppath) && (flags & O_NOFOLLOW))
                 {
@@ -762,7 +900,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                 /* object was looked up completely */
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
-                goto foundfile;
+                goto found;
             }
             /* object was partly looked up */
         }
@@ -772,17 +910,6 @@ pvfs_descriptor *iocommon_open(const char *path,
         }
     }
     /* else this was called with a plain path */
-
-    /* Split the path into a directory and file */
-    rc = split_pathname(path, &directory, &filename);
-    if (rc < 0 && errno == EISDIR)
-    {
-        /* clear error */
-        rc = 0;
-        errno = 0;
-        open_dir = 1; /* we are opening a directory filename is null */
-    }
-    IOCOMMON_RETURN_ERR(rc);
 
     /* Check the flags to determine if links are followed */
     if (flags & O_NOFOLLOW)
@@ -794,126 +921,234 @@ pvfs_descriptor *iocommon_open(const char *path,
         follow_links = PVFS2_LOOKUP_LINK_FOLLOW;
     }
 
-    /* Get reference for the parent directory */
-    if (pdir == NULL)
+    /* now we are ready to try looking things up */
+    if (!pdir)
     {
-        errno = 0;
-        rc = iocommon_lookup_absolute(directory,
-                                      PVFS2_LOOKUP_LINK_FOLLOW,
-                                      &parent_ref,
-                                      error_path,
-                                      sizeof(error_path));
-        if (rc < 0)
-        {
-            if (errno == ESTALE && !open_dir)
-            {
-                /* special case we are opening the root dir of PVFS */
-                /* which had better exist or we have a problem */
-                /* if open_dir mount point is in root dir so */
-                /* filename is NULL, so there is an error */
-                char *fullpath;
-
-                fullpath = (char *)malloc(strlen(directory) +
-                                          strlen(filename) + 1);
-                strcpy(fullpath, directory);
-                strcat(fullpath, "/");
-                strcat(fullpath, filename);
-                errno = 0;
-                rc = iocommon_lookup_absolute(fullpath,
-                                              PVFS2_LOOKUP_LINK_FOLLOW,
-                                              &file_ref,
-                                              error_path,
-                                              sizeof(error_path));
-                /* in this case we don't need to look up anything else */
-                /* jump right to found the file code */
-                free(fullpath);
-                goto foundfile;
-            }
-            if (rc < 0 && errno == EIO &&
-                    pvfs_errno == PVFS_ENOTPVFS &&
-                    !PATH_EXPANDED(Ppath))
-            {
-                /* we think we might be able to expand symlinks */
-                /* last chance to get it open */
-                rc = iocommon_expand_path(Ppath, 1, flags, mode, &pd);
-                if (rc < 0 || pd)
-                {
-                    goto errorout;
-                }
-                file_ref.fs_id = Ppath->fs_id;
-                file_ref.handle = Ppath->handle;
-                goto foundfile;
-            }
-            /* no special cases caught it must be a real error */
-            IOCOMMON_RETURN_ERR(rc);
-        }
-    }
-    else
-    {
-        if (directory)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(directory,
-                                          pdir->s->pvfs_ref,
-                                          follow_links,
-                                          &parent_ref,
-                                          error_path,
-                                          sizeof(error_path));
-            if (rc < 0 && errno == EIO &&
-                    pvfs_errno == PVFS_ENOTPVFS &&
-                    !PATH_EXPANDED(Ppath))
-            {
-                /* last chance to get it open */
-                rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
-                if (rc < 0 || pd)
-                {
-                    goto errorout;
-                }
-                file_ref.fs_id = Ppath->fs_id;
-                file_ref.handle = Ppath->handle;
-                goto foundfile;
-            }
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        {
-            parent_ref = pdir->s->pvfs_ref;
-        }
-    }
-
-    /* An open procedure safe for multiprocessing */
-
-    if (!open_dir)
-    {
-        /* Attempt to find file */
-        errno = 0;
-        rc = iocommon_lookup_relative(filename,
-                                      parent_ref,
+        /* if a simple open try the full path first */
+        rc = iocommon_lookup_absolute(path,
                                       follow_links,
                                       &file_ref,
                                       error_path,
                                       sizeof(error_path));
-        if (rc < 0 && errno == EIO &&
-                pvfs_errno == PVFS_ENOTPVFS &&
-                !PATH_EXPANDED(Ppath))
+        if (rc >= 0)
         {
-            /* last chance to get it open */
-            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
-            if (rc < 0 || pd)
+            goto found;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles links and everything
+             */
+            int need_to_free = 0;
+            if (!VALID_PATH_MAGIC(Ppath))
             {
-                goto errorout;
+                Ppath = PVFS_new_path(path);
+                need_to_free = 1;
             }
-            file_ref.fs_id = Ppath->fs_id;
-            file_ref.handle = Ppath->handle;
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                if (need_to_free)
+                {
+                    PVFS_free_path(Ppath);
+                }
+                goto found;
+            }
+            if (need_to_free)
+            {
+                PVFS_free_path(Ppath);
+            }
         }
     }
     else
     {
-        /* the parent is the file */
-        file_ref = parent_ref;
+        /* if an openat, try the full path relative to pdir */
+        rc = iocommon_lookup_relative(path,
+                                      pdir->s->pvfs_ref,
+                                      follow_links,
+                                      &file_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if (rc >= 0)
+        {
+            goto found;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles link and everything
+             */
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(path);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, path);
+            Ppath = PVFS_new_path(tmp_path);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                free(tmp_path);
+                goto found;
+            }
+            PVFS_free_path(Ppath);
+            free(tmp_path);
+        }
     }
 
-foundfile:
+    /*
+     * if we got here opening the full path failed.  see if the O_CREAT
+     * flag was given and file not found, if so try to open the parent
+     * dir then create the file
+     */
+    if (errno != ENOENT || !(flags & O_CREAT))
+    {
+        /* either file not found and no create flag */
+        /* or some other error */
+        goto errorout;
+    }
+
+    /* Split the path into a directory and file */
+    rc = split_pathname(path, &directory, &filename);
+    if (rc < 0)
+    {
+        if (errno != EISDIR)
+        {
+            goto errorout;
+        }
+        /* clear error */
+        rc = 0;
+        errno = 0;
+        open_dir = 1; /* we are opening a directory filename is null */
+    }
+
+    if (!pdir)
+    {
+        /* if a simple open try the directory path */
+        rc = iocommon_lookup_absolute(directory,
+                                      follow_links,
+                                      &parent_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if(rc >= 0)
+        {
+            goto createfile;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles links and everything
+             */
+            Ppath = PVFS_new_path(directory);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                goto createfile;
+            }
+            PVFS_free_path(Ppath);
+        }
+    }
+    else
+    {
+        /* if an openat, try the directory path relative to pdir */
+        rc = iocommon_lookup_relative(directory,
+                                      pdir->s->pvfs_ref,
+                                      follow_links,
+                                      &parent_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if(rc >= 0)
+        {
+            goto createfile;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles link and everything
+             */
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(directory);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, directory);
+            Ppath = PVFS_new_path(tmp_path);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                parent_ref.fs_id = Ppath->fs_id;
+                parent_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                free(tmp_path);
+                goto createfile;
+            }
+            PVFS_free_path(Ppath);
+            free(tmp_path);
+        }
+    }
+    /* Still nothing, must be a file not found */
+    errno = ENOENT;
+    goto errorout;
+
+createfile:
+    /* Now create the file relative to the directory */
+    errno = orig_errno;
+    errno = 0;
+    rc = iocommon_create_file(filename,
+                              mode,
+                              file_creation_param,
+                              parent_ref,
+                              &file_ref);
+    if (rc >= 0)
+    {
+        goto finish;
+    }
+    /* error on the create */
+    if (errno != EEXIST)
+    {
+        goto errorout;
+    }
+    /* 
+     * The file exists so must have been
+     * created by a different process
+     * just open it - this should open
+     * because it returned the EEXIST above
+     */
+    errno = 0;
+    rc = iocommon_lookup_relative(filename,
+                                  parent_ref,
+                                  follow_links,
+                                  &file_ref,
+                                  error_path,
+                                  sizeof(error_path));
+    if (rc >= 0)
+    {
+        goto finish;
+    }
+    goto errorout;
+
+found:
+    /* We found the file, make sure we were supposed to */
     if ((rc == 0) && (flags & O_EXCL) && (flags & O_CREAT))
     {
         /* File was found but EXCLUSIVE so fail */
@@ -921,45 +1156,9 @@ foundfile:
         errno = EEXIST;
         goto errorout;
     }
-    if (rc < 0)
-    {
-        /* if an error code was returned */
-        if (errno != ENOENT || !(flags & O_CREAT))
-        {
-            /* either file not found and no create flag */
-            /* or some other error */
-            goto errorout;
-        }
-        /* file not found but create flag */
-        /* clear errno, it was not an error */
-        errno = orig_errno;
-        errno = 0;
-        rc = iocommon_create_file(filename,
-                                  mode,
-                                  file_creation_param,
-                                  parent_ref,
-                                  &file_ref);
-        if (rc < 0)
-        {
-            /* error on the create */
-            if (errno != EEXIST)
-            {
-                goto errorout;
-            }
-            /* the file exists so must have been
-             * created by a different process
-             * just open it
-             */
-            errno = 0;
-            rc = iocommon_lookup_relative(filename,
-                                          parent_ref,
-                                          follow_links,
-                                          &file_ref,
-                                          NULL,
-                                          0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-    }
+
+finish:
+    /* We successfully looked up the file so complete the open */
 
     /* If we get here the file was created and/or opened */
     /* Translate the pvfs reference into a file descriptor */
@@ -2284,6 +2483,7 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -2296,25 +2496,25 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
     if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
+        buf->st_nlink = attr.dirent_count + 2;
     }
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
-    buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -2339,6 +2539,7 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat64));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -2351,25 +2552,25 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
     if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
+        buf->st_nlink = attr.dirent_count + 2;
     }
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
-    buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -2624,6 +2825,8 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
+    /* clear the output buffer */
+    memset(dirp, 0, size);
     /* posix deals in bytes in buffer and bytes read */
     /* PVFS deals in number of records to read or were read */
     count = size / sizeof(struct dirent);
@@ -2646,9 +2849,19 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     {
         /* copy a PVFS_dirent to a struct dirent */
         dirp->d_ino = (long)readdir_resp.dirent_array[i].handle;
+#ifdef _DIRENT_HAVE_D_OFF
         dirp->d_off = pd->s->file_pointer;
+#endif
+#ifdef _DIRENT_HAVE_D_RECLEN
         dirp->d_reclen = sizeof(PVFS_dirent);
-        memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+#endif
+#ifdef _DIRENT_HAVE_D_TYPE
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#endif
+        dirp->d_type = DT_UNKNOWN;
+#endif
+        strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
         pd->s->file_pointer += sizeof(struct dirent);
         bytes += sizeof(struct dirent);
@@ -2704,6 +2917,8 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
+    /* clear the output buffer */
+    memset(dirp, 0, size);
     count = size / sizeof(struct dirent64);
     if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
@@ -2724,9 +2939,19 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     {
         /* copy a PVFS_dirent to a struct dirent64 */
         dirp->d_ino = (uint64_t)readdir_resp.dirent_array[i].handle;
+#ifdef _DIRENT_HAVE_D_OFF
         dirp->d_off = (off64_t)pd->s->file_pointer;
+#endif
+#ifdef _DIRENT_HAVE_D_RECLEN
         dirp->d_reclen = sizeof(struct dirent64);
-        memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+#endif
+#ifdef _DIRENT_HAVE_D_TYPE
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#endif
+        dirp->d_type = DT_UNKNOWN;
+#endif
+        strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
         pd->s->file_pointer += sizeof(struct dirent64);
         bytes += sizeof(struct dirent64);

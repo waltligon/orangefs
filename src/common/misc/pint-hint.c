@@ -77,6 +77,41 @@ static const struct PINT_hint_info hint_types[] = {
      decode_func_uint32_t,
      sizeof(uint32_t)},
 
+    {PINT_HINT_DISTRIBUTION,
+     0,
+     PVFS_HINT_DISTRIBUTION_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_DFILE_COUNT,
+     0,
+     PVFS_HINT_DFILE_COUNT_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_LAYOUT,
+     0,
+     PVFS_HINT_LAYOUT_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_SERVERLIST,
+     0,
+     PVFS_HINT_SERVERLIST_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_NOCACHE,
+     0,
+     PVFS_HINT_NOCACHE_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
     {0}
 };
 
@@ -278,6 +313,28 @@ int PVFS_hint_check(PVFS_hint *hints, const char *type)
 
     info = PINT_hint_get_info_by_name(type);
     return PINT_hint_check(hints, info->type);
+}
+
+int PVFS_hint_check_transfer(PVFS_hint *hints)
+{
+    PINT_hint *tmp;
+
+    if(!hints)
+    {
+        return 0;
+    }
+
+    tmp = *hints;
+    while(tmp)
+    {
+        if (PINT_hint_get_info_by_type(tmp->type)->flags &
+                PINT_HINT_TRANSFER)
+        {
+            return 1;
+        }
+        tmp = tmp->next;
+    }
+    return 0;
 }
 
 static int PINT_hint_check(PVFS_hint *hints, enum PINT_hint_type type)

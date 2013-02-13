@@ -9,12 +9,19 @@
 
 #include "pvfs2-types.h"
 
+/* these are for tracing requests */
 #define PVFS_HINT_REQUEST_ID_NAME "pvfs.hint.request_id"
 #define PVFS_HINT_CLIENT_ID_NAME  "pvfs.hint.client_id"
 #define PVFS_HINT_HANDLE_NAME     "pvfs.hint.handle"
 #define PVFS_HINT_OP_ID_NAME      "pvfs.hint.op_id"
 #define PVFS_HINT_RANK_NAME       "pvfs.hint.rank"
 #define PVFS_HINT_SERVER_ID_NAME  "pvfs.hint.server_id"
+/* these are file creation parameters */
+#define PVFS_HINT_DISTRIBUTION_NAME  "pvfs.hint.disribution"
+#define PVFS_HINT_DFILE_COUNT_NAME   "pvfs.hint.dfile_count"
+#define PVFS_HINT_LAYOUT_NAME        "pvfs.hint.layout"
+#define PVFS_HINT_SERVERLIST_NAME    "pvfs.hint.serverlist"
+#define PVFS_HINT_NOCACHE_NAME       "pvfs.hint.nocache"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 
@@ -36,6 +43,9 @@ void PVFS_hint_free(PVFS_hint hint);
 
 /* check to see if a hint has already been added */
 int PVFS_hint_check(PVFS_hint *hints, const char *type);
+
+/* check to see if a hint should be transferred to the server */
+int PVFS_hint_check_transfer(PVFS_hint *hints);
 
 /*
  * function allows users to specify hints in an environment variable.

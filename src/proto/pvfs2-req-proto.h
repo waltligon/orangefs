@@ -467,7 +467,7 @@ endecode_fields_4a_struct(
     uint32_t, num_servers,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_setattr \
-  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) + extra_size_PVFS_object_attr)
 
 #define PINT_SERVREQ_TREE_SETATTR_FILL(__req,                            \
                                  __cap,                                \
@@ -892,7 +892,7 @@ endecode_fields_7_struct(
     PVFS_sys_layout, layout);
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
-     extra_size_PVFS_credential)
+     extra_size_PVFS_credential + extra_size_PVFS_object_attr)
 
 #define PINT_SERVREQ_MKDIR_FILL(__req,                 \
                                 __cap,                 \
