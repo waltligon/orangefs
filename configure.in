@@ -249,6 +249,22 @@ AX_OPENSSL
 dnl check to see if the "fast" getgrouplist function is available
 AX_GETGROUPLIST
 
+dnl check for Capability Cache
+AC_ARG_ENABLE(capcache,
+[  --enable-capcache   Enables server capability cache],
+[if test "x$enableval" = "xyes" ; then
+    AC_DEFINE(OFS_CAPCACHE_ENABLE, 1,
+        [Should we enable server capability cache.])
+    ENABLE_CAPCACHE=1
+else
+    AC_DEFINE(OFS_CAPCACHE_ENABLE, 0,
+        [Should we enable server capability cache.])
+    ENABLE_CAPCACHE=
+fi],
+[ENABLE_CAPCACHE=]
+)
+AC_SUBST(ENABLE_CAPCACHE)
+
 dnl check for key-based security
 AC_ARG_ENABLE(security-key,
 [  --enable-security-key   Enables key-based security],
@@ -1587,6 +1603,12 @@ if test "x$NPTL_WORKAROUND" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
+fi
+
+if test "x$ENABLE_CAPCACHE" = "x1"; then
+   AC_MSG_RESULT([PVFS2 server capability cache enabled             : yes])
+else
+   AC_MSG_RESULT([PVFS2 server capability cache enabled             :  no])
 fi
 
 if test "x$ENABLE_SECURITY_KEY" = "x1"; then

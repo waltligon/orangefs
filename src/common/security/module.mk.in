@@ -1,6 +1,7 @@
 DIR := src/common/security
 SERVERSRC += $(DIR)/security-util.c \
-             $(DIR)/pint-uid-map.c
+             $(DIR)/pint-uid-map.c \
+             $(DIR)/capcache.c
 LIBSRC += $(DIR)/security-util.c \
           $(DIR)/getugroups.c
 
