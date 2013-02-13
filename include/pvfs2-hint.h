@@ -21,7 +21,7 @@
 #define PVFS_HINT_DFILE_COUNT_NAME   "pvfs.hint.dfile_count"
 #define PVFS_HINT_LAYOUT_NAME        "pvfs.hint.layout"
 #define PVFS_HINT_SERVERLIST_NAME    "pvfs.hint.serverlist"
-#define PVFS_HINT_NOCACHE_NAME       "pvfs.hint.nocache"
+#define PVFS_HINT_CACHE_NAME         "pvfs.hint.cache"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 
