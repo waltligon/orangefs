@@ -164,9 +164,11 @@ void PINT_ncache_finalize(void)
 {
     gen_mutex_lock(&ncache_mutex);
 
-    assert(ncache != NULL);
-    PINT_tcache_finalize(ncache);
-    ncache = NULL;
+    if (ncache == NULL)
+    {
+        PINT_tcache_finalize(ncache);
+        ncache = NULL;
+    }
 
     gen_mutex_unlock(&ncache_mutex);
     return;

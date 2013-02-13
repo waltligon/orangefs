@@ -309,7 +309,7 @@ static int initialize_context(
                                  "more previous contexts available: "
                                  "failing lookup\n");
                     free(orig_pathname);
-                    return -PVFS_ENOENT;
+                    return -PVFS_ENOTPVFS;
                 }
 
                 prev_ctx = &lookup_sm->contexts[prev_ctx_index];
@@ -325,7 +325,7 @@ static int initialize_context(
                                  "more previous segments available: "
                                  "failing lookup\n");
                     free(orig_pathname);
-                    return -PVFS_ENOENT;
+                    return -PVFS_ENOTPVFS;
                 }
 
                 num_consecutive_prev_ctx_dot_dots++;
@@ -356,7 +356,7 @@ static int initialize_context(
                                  "segments in the previous context: failing "
                                  "lookup\n");
                     free(orig_pathname);
-                    return -PVFS_ENOENT;
+                    return -PVFS_ENOTPVFS;
                 }
 
                 prev_ctx_prev_seg = &prev_ctx->segments[
@@ -572,15 +572,17 @@ PVFS_error PVFS_isys_ref_lookup(
                              relative_pathname, parent);
     if (ret != 0)
     {
-        gossip_err("%s: failed to init context (path = %s)\n",
-                   __func__, relative_pathname);
-
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
+        if (ret == -PVFS_ENOTPVFS && sm_p->u.lookup.lookup_resp->error_path)
         {
             /* copy out error path */
             strncpy(sm_p->u.lookup.lookup_resp->error_path,
                     relative_pathname,
                     sm_p->u.lookup.lookup_resp->error_path_size);
+        }
+        else
+        {
+            gossip_err("%s: failed to init context (path = %s)\n",
+                    __func__, relative_pathname);
         }
         PINT_cleanup_credential(sm_p->cred_p);
         PINT_smcb_free(smcb);
