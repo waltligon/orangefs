@@ -179,7 +179,9 @@
 # define __alloca		alloca
 # define __libc_use_alloca(n) (0)
 # define alloca_account(size, var)		alloca(size)
+#ifndef __strdup
 # define __strdup		strdup
+#endif
 /* End Modifications */
 # define __stat64(fname, buf)	stat (fname, buf)
 # define struct_stat64		struct stat
