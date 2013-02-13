@@ -624,8 +624,8 @@ glob (pattern, flags, errfunc, pglob)
 	      success = getlogin_r (name, buflen) == 0;
 	      if (success)
 		{
-		  struct passwd *p;
-		  char *pwtmpbuf;
+		  struct passwd *p = NULL;
+		  char *pwtmpbuf = NULL;
 		  int malloc_pwtmpbuf = 0;
 #   if defined HAVE_GETPWNAM_R || defined _LIBC
 		  struct passwd pwbuf;

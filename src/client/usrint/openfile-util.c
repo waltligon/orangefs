@@ -704,7 +704,7 @@ int pvfs_descriptor_table_next(int start)
     pd->s->fent = NULL; /* not caching if left NULL */
 
 #if PVFS_UCACHE_ENABLE
-    if (ucache_enabled /* && use_cache*/ )
+    if (ucache_enabled && use_cache)
     {
         /* File reference won't always be passed in */
         if(file_ref != NULL)

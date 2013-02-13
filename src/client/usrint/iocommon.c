@@ -505,14 +505,6 @@ int iocommon_create_file(const char *filename,
                 return rc;
             }
         }
-        /* check for nocache flag */
-        value = PINT_hint_get_value_by_type(file_creation_param,
-                                            PINT_HINT_NOCACHE,
-                                            &length);
-        if (value)
-        {
-            /* this should probably move into the open routine */
-        }
         /* look for hints handled on the server */
         if (PVFS_hint_check_transfer(&file_creation_param))
         {
@@ -829,6 +821,9 @@ pvfs_descriptor *iocommon_open(const char *path,
     int orig_errno = errno;
     int follow_links = 0;
     int open_dir = 0;
+    int cache_flag = 1;
+    int length = 0;
+    void *value = NULL;
     char *directory = NULL;
     char *filename = NULL;
     char error_path[PVFS_NAME_MAX];
@@ -1133,7 +1128,19 @@ finish:
     /* Set the file information */
     /* create fd object */
     debug("iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
-    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, 0);
+
+    /* check for cache flag */
+    /* At the moment the default is to cache */
+    cache_flag = 1;
+    value = PINT_hint_get_value_by_type(file_creation_param, /* hints */
+                                        PINT_HINT_CACHE,
+                                        &length);
+    if (value)
+    {
+        cache_flag = *(int *)value;
+    }
+    /* now allocate file descriptor */
+    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, cache_flag);
     if (!pd)
     {
         rc = -1;
