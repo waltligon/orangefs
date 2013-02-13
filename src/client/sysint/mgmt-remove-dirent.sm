@@ -177,7 +177,7 @@ static PINT_sm_action mgmt_remove_dirent_init(
         sm_p->getattr,
         sm_p->parent_ref,
         PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-            PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR, 
+            PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR, 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -204,8 +204,8 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
 
     dirdata_server_index =
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+            &sm_p->getattr.attr.dist_dir_attr,
+            sm_p->getattr.attr.dist_dir_bitmap);
     gossip_debug(GOSSIP_REMOVE_DEBUG, " selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
@@ -218,7 +218,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         sm_p->getattr.attr.capability,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+        sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
 
@@ -229,7 +229,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle = 
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
+        sm_p->getattr.attr.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_remove_dirent_comp_fn;
 
@@ -289,7 +289,7 @@ static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
                 sm_p->getattr,
                 sm_p->parent_ref,
                 PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 

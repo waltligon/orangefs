@@ -143,7 +143,7 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
         free(s_op->val.buffer);
     }
 
-    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
+    s_op->val.buffer = &s_op->attr.dist_dir_attr;
     s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
     s_op->free_val = 0;
 
@@ -179,38 +179,38 @@ static PINT_sm_action rmdirent_get_bitmap(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
             "rmdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
-        attr_p->u.dir.dist_dir_bitmap = NULL;
-        attr_p->u.dir.dirdata_handles = NULL;
+        attr_p->dist_dir_bitmap = NULL;
+        attr_p->dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
     }   
     
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr_p->dist_dir_attr.num_servers > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "rmdirent: get dist-dir-attr for dirdata handle %llu "
             "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             llu(s_op->req->u.rmdirent.dirent_handle),
-            attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
-            attr_p->u.dir.dist_dir_attr.bitmap_size,
-            attr_p->u.dir.dist_dir_attr.split_size,
-            attr_p->u.dir.dist_dir_attr.server_no,
-            attr_p->u.dir.dist_dir_attr.branch_level);
+            attr_p->dist_dir_attr.tree_height,
+            attr_p->dist_dir_attr.num_servers,
+            attr_p->dist_dir_attr.bitmap_size,
+            attr_p->dist_dir_attr.split_size,
+            attr_p->dist_dir_attr.server_no,
+            attr_p->dist_dir_attr.branch_level);
 
     /* allocate space for dirdata bitmap */
-    attr_p->u.dir.dirdata_handles = NULL;
-    attr_p->u.dir.dist_dir_bitmap =
-        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
+    attr_p->dirdata_handles = NULL;
+    attr_p->dist_dir_bitmap =
+        malloc(attr_p->dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype));
-    if(!attr_p->u.dir.dist_dir_bitmap)
+    if(!attr_p->dist_dir_bitmap)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* set up attr->mask */
-    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     /* set up key and value structures for reading dirdata bitmap */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -220,9 +220,9 @@ static PINT_sm_action rmdirent_get_bitmap(
         free(s_op->val.buffer);
     }
 
-    s_op->val.buffer = attr_p->u.dir.dist_dir_bitmap;
+    s_op->val.buffer = attr_p->dist_dir_bitmap;
     s_op->val.buffer_sz =
-        attr_p->u.dir.dist_dir_attr.bitmap_size *
+        attr_p->dist_dir_attr.bitmap_size *
         sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
 
@@ -267,10 +267,10 @@ static int rmdirent_remove_directory_entry(
     /* gossip bitmap, since jump from get_bitmap*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "rmdirent: dist_dir_bitmap as:\n");
-    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+    for(i = attr_p->dist_dir_attr.bitmap_size - 1;
             i >= 0 ; i--)
     {       
-        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        c = (unsigned char *)(attr_p->dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);
@@ -291,14 +291,14 @@ static int rmdirent_remove_directory_entry(
             
     dirdata_server_index =
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &attr_p->u.dir.dist_dir_attr,
-            attr_p->u.dir.dist_dir_bitmap);
+            &attr_p->dist_dir_attr,
+            attr_p->dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "rmdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
             
     if(dirdata_server_index !=
-            attr_p->u.dir.dist_dir_attr.server_no)
+            attr_p->dist_dir_attr.server_no)
     {       
         gossip_debug(GOSSIP_SERVER_DEBUG,
              "rmdirent: error: WRONG dirdata object for the dirent! Returning error.\n");    

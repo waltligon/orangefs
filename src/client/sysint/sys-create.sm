@@ -369,7 +369,7 @@ static PINT_sm_action create_init(
                 sm_p->getattr,
                 sm_p->object_ref,
                 PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 
@@ -382,7 +382,7 @@ static PINT_sm_action create_init(
         sm_p->getattr,
         sm_p->object_ref,
         PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -533,8 +533,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 
     dirdata_server_index = 
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+            &sm_p->getattr.attr.dist_dir_attr,
+            sm_p->getattr.attr.dist_dir_bitmap);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
             dirdata_server_index);
         
@@ -544,7 +544,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
                  __func__,
                  llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
                  llu(sm_p->u.create.metafile_handle),
-                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));       
+                 llu(sm_p->getattr.attr.dirdata_handles[dirdata_server_index]));       
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -556,14 +556,14 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+        sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle =
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
+        sm_p->getattr.attr.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
@@ -600,7 +600,7 @@ static PINT_sm_action create_crdirent_failure(
         PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 
@@ -772,30 +772,30 @@ static PINT_sm_action create_parent_getattr_inspect(
         "dist_name_len   = %d "
         "dist_params_len = %d\n",
         attr,
-        attr->u.dir.dist_dir_attr.num_servers,
+        attr->dist_dir_attr.num_servers,
         attr->u.dir.hint.dfile_count,
         attr->u.dir.hint.dist_name_len,
         attr->u.dir.hint.dist_params_len);
 
     /* !!! change more later */
-    for (tmp_i = 0; tmp_i < attr->u.dir.dist_dir_attr.num_servers; tmp_i++)
+    for (tmp_i = 0; tmp_i < attr->dist_dir_attr.num_servers; tmp_i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "                           dirdata_handle[%d] = %llu\n",
-                     tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
+                     tmp_i, llu(attr->dirdata_handles[tmp_i]));
     }
 
     /* may just use sm_p->getattr.attr.u.dir...
     sm_p->u.create.dirent_handle = malloc(
-        sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
+        sizeof(*attr->dirdata_handles) * attr->dist_dir_attr.num_servers);
     if (!sm_p->u.create.dirent_handle)
     {
         return -PVFS_ENOMEM;
     }
     memcpy(sm_p->u.create.dirent_handle,
-           attr->u.dir.dirdata_handles,
-           sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
-    sm_p->u.create.dirent_file_count = attr->u.dir.dist_dir_attr.num_servers;
+           attr->dirdata_handles,
+           sizeof(*attr->dirdata_handles) * attr->dist_dir_attr.num_servers);
+    sm_p->u.create.dirent_file_count = attr->dist_dir_attr.num_servers;
     */
 
     current_dist = sm_p->u.create.dist;
