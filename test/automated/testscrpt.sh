@@ -87,6 +87,7 @@ fi
 
 echo "Run MPI test is $RUN_MPI_TEST"
 echo "Run VFS test is $RUN_VFS_TEST"
+echo "Run USERLIB test is $RUN_USERLIB_TEST"
 #echo "do_vfs is $do_vfs"
 
 if [ $do_vfs -eq 1 ] ; then 
@@ -117,6 +118,9 @@ mount
 nr_passed=0
 nr_failed=0
 
+echo "Environment variables for sysint"
+env | tee sysint-env.log
+
 # save file descriptors for later
 exec 6<&1
 exec 7<&2
@@ -124,8 +128,7 @@ exec 7<&2
 exec 1> ${REPORT_LOG}
 exec 2> ${REPORT_ERR}
 
-# print current environment to env.log
-env > env.log
+
 
 echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
@@ -160,11 +163,24 @@ fi
 exec 1<&6 6<&-
 exec 2<&7 7<&-
 
+echo "Run userlib test = $RUN_USERLIB_TEST"
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
 
+	# move vfs test logs into temp files - should not be necessary
+	#for f in *; do
+	#	[ -d $f ] && continue
+	#	if [ -x $f ] ; then 
+	#	
+	#		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log
+	#	
+	#	fi
+	#done
+
+
 	teardown_vfs
+
 
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
@@ -174,19 +190,25 @@ then
 		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
 	fi
 
+	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab/
 	
-
 	for my_host in $VFS_HOSTS
 	do
 		
 		start_all_pvfs2 $my_host &
 	done
 	wait
+	
 
 	if [ $? != 0 ] ; then
 		echo "setup failed"
 		setupfail
 	fi
+
+	# print out the current environment to a logfile
+	echo "Environment for userlib testing"
+	env | tee userlib-env.log
+
 	# save file descriptors for later
 	exec 6<&1
 	exec 7<&2
@@ -201,18 +223,17 @@ then
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
 
-	for f in *; do
+	#for f in *; do
 	# skip CVS
-		[ -d $f ] && continue
-		if [ -x $f ] ; then 
-		
-			pwd
-			ls
-			echo mv "../${f}-${CVS_TAG}.log ../userlib-${f}-${CVS_TAG}.log"
-			mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
-		
-		fi
-	done
+	#	[ -d $f ] && continue
+	#	if [ -x $f ] ; then 
+	#		#restore vfs logs and rename userlib logs
+	#		mv ${PVFS2_DEST}/${f}-${CVS_TAG}.log ${PVFS2_DEST}/userlib-${f}-${CVS_TAG}.log
+	#		mv ${PVFS2_DEST}/tmp-${f}-${CVS_TAG}.log ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+	#	
+	#	
+	#	fi
+	#done
 fi
 
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
