@@ -11,11 +11,12 @@
  * Experimental cache for user data. 
  *
  */
+#include <pvfs2-config.h>
+#if PVFS_UCACHE_ENABLE
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
-#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
 #include <gen-locks.h>
 #include <malloc.h>
