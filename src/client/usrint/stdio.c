@@ -2430,8 +2430,9 @@ struct dirent64 *readdir64 (DIR *dir)
     {
         int bytes_read;
         /* read a block of dirent64s into the buffer */
-        bytes_read = getdents64(dir->fileno, (struct dirent64 *)dir->buf_base,
-                               (dir->buf_end - dir->buf_base));
+        bytes_read = getdents64(dir->fileno,
+                                (struct dirent64 *)dir->buf_base,
+                                (dir->buf_end - dir->buf_base));
         if (bytes_read <= 0)
         {
             return NULL; /* EOF if errno == 0 */

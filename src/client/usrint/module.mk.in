@@ -15,7 +15,8 @@ SRC := \
 USRC := \
 	$(DIR)/posix.c \
 	$(DIR)/stdio.c \
-	$(DIR)/fts.c 
+	$(DIR)/fts.c \
+	$(DIR)/glob.c
 
 # list of all .c files (generated or otherwise) that belong in library
 LIBSRC += $(SRC)

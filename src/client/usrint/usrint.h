@@ -177,6 +177,11 @@ extern int fremovexattr(int fd, const char *name);
 #include <pvfs2-req-proto.h>
 #include <gen-locks.h>
 
+/* Just in case this is not defined - sizeof blocks reported in stat */
+#ifndef S_BLKSIZE
+#define S_BLKSIZE 512
+#endif
+
 /* magic numbers for PVFS filesystem */
 #define PVFS_FS 537068840
 #define LINUX_FS 61267

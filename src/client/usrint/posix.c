@@ -63,7 +63,7 @@ int open(const char *path, int flags, ...)
         debug("\tposix.c open: returns with %d\n", -1);
         return -1;
     }
-    if (is_pvfs_path(&path,0))
+    if (is_pvfs_path(&path, 0))
     {
         /* this handles setup of the descriptor */
         rc = pvfs_open(path, flags, mode, hints);
