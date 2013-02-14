@@ -16,6 +16,7 @@
 #include <pvfs2-types.h>
 #include <pvfs2-request.h>
 #include <pvfs2-debug.h>
+#include <pvfs-path.h>
 
 /* Define GNU's O_NOFOLLOW flag to be false if its not set */
 #ifndef O_NOFOLLOW
@@ -34,7 +35,6 @@
 struct ucache_req_s
 {
     uint64_t ublk_tag; /* ucache block tag (byte index into file) */
-    unsigned char ublk_hit; /* boolean indicating 'block found in cache' */
     void *ublk_ptr; /* where in ucache memory to read block from or write to */
     uint16_t ublk_index; /* index of ucache block in shared memory segment */
 };
@@ -44,7 +44,6 @@ struct ucache_copy_s
     void * cache_pos;
     void * buff_pos;
     size_t size;
-    unsigned char hit;
     uint16_t blk_index;
 };
 
@@ -61,13 +60,52 @@ void iocommon_ensure_init(void);
 
 int iocommon_cred(PVFS_credential **credential);
 
+void calc_copy_ops( off64_t offset,
+                    size_t req_size,
+                    struct ucache_req_s *ureq,
+                    struct ucache_copy_s *ucop,
+                    int copy_count,
+                    const struct iovec *vector
+);
+
+int calc_req_blk_cnt( uint64_t offset,
+                      size_t req_size
+);
+
+size_t sum_iovec_lengths( size_t iovec_count,
+                          const struct iovec *vector
+);
+
+unsigned char read_full_block_into_ucache( pvfs_descriptor *pd,
+                                           PVFS_size offset,
+                                           struct ucache_req_s *req,
+                                           int req_index,
+                                           uint64_t *fent_size,
+                                           size_t *req_size,
+                                           int *req_blk_cnt
+);
+
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
+
+int iocommon_expand_path (PVFS_path_t *Ppath,
+                          int follow_flag, 
+                          int flags,
+                          mode_t mode,
+                          pvfs_descriptor **pdp);
+
+int iocommon_lookup(char *path,
+                    int followflag,
+                    PVFS_object_ref *pref,
+                    PVFS_object_ref *fref,
+                    char **filename,
+                    PVFS_object_ref *pdir);
 
 /*
  * Find the PVFS handle to an object (file, dir sym) 
  * assumes an absoluate path
  */
 extern int iocommon_lookup_absolute(const char *abs_path,
+                             int follow_flag,
                              PVFS_object_ref *ref,
                              char *error_path,
                              int error_path_size);
@@ -140,6 +178,17 @@ extern int iocommon_vreadorwrite(enum PVFS_io_type which,
                          size_t count,
                          const struct iovec *vector);
 
+extern int iocommon_ireadorwrite(enum PVFS_io_type which,
+                          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+                          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req);
+
 /* do a blocking read or write
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
@@ -187,6 +236,8 @@ extern int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf);
 extern int iocommon_seteattr(pvfs_descriptor *pd, const char *key, const void *val, int size, int flag);
 
 extern int iocommon_geteattr(pvfs_descriptor *pd, const char *key, void *val, int size);
+
+extern int iocommon_atomiceattr(pvfs_descriptor *pd, const char *key, void *val, int valsize, void *response, int respsize, int flag, int opcode);
 
 extern int iocommon_listeattr(pvfs_descriptor *pd, char *list, int size, int *numkeys);
 

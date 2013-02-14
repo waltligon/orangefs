@@ -14,8 +14,8 @@
 
 #ifndef PVFS2_VERSION_MAJOR
 #define PVFS2_VERSION_MAJOR 2
-#define PVFS2_VERSION_MINOR 8
-#define PVFS2_VERSION_SUB   4
+#define PVFS2_VERSION_MINOR 9
+#define PVFS2_VERSION_SUB   0
 #endif
 
 #include "pvfs2-types.h"

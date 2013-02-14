@@ -37,6 +37,7 @@ static int create_ucache_shmem(void);
 static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
 static void clean_up(void);
 static int ucached_lockchk(void);
+void check_rc(int rc);
 
 void check_rc(int rc)
 {
@@ -69,8 +70,17 @@ static void clean_up(void)
         }
         gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: ucached exiting...PID=%d\n", pid);
+        errno = 0;
         rc = unlink(FIFO1);
+        if(rc < 0)
+        {
+            perror("unklink of FIFO1 ucached failed");
+        }
         rc = unlink(FIFO2);
+        if(rc < 0)
+        {
+            perror("unklink of FIFO2 ucached failed");
+        }
     }
 }
 
@@ -204,16 +214,12 @@ static int execute_cmd(char cmd)
             break;
         }
         /* Close Daemon */
-        case 'x': 
-            writefd = open(FIFO2, O_WRONLY); 
-            rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
-            while(rc <= 0)
-            {
-                rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
-            }
-            remove(UCACHED_STARTED);
+        case 'x':
+            writefd = open(FIFO2, O_WRONLY);
             close(writefd);
             close(readfd);
+            remove(UCACHED_STARTED);
+            printf("SUCCESS\tExiting ucached\n");
             exit(EXIT_SUCCESS);
             break;
         default:

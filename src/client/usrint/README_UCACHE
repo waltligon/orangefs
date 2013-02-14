@@ -231,7 +231,7 @@ int main(int argc, char **argv)
         the ucache is limited to 1024 blocks.
 
     5.2 File Entry Limit
-        The ucache can keep up to 682 files in memory at once. Any files beyond
+        The ucache can keep up to 512 files in memory at once. Any files beyond
         that will not use the ucache. Also, files are flushed from the ucache 
         when they are closed.
 

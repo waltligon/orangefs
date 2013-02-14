@@ -18,6 +18,7 @@
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
 #include <gen-locks.h>
+#include <malloc.h>
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
@@ -25,7 +26,7 @@ FILE *out;                   /* For Logging Purposes */
 /* static uint32_t ucache_blk_cnt = 0; */
 
 /* Global pointers to data in shared mem. Pointers set in ucache_initialize */
-union user_cache_u *ucache = 0;
+union ucache_u *ucache = 0;
 struct ucache_aux_s *ucache_aux = 0; /* All locks and stats stored here */
 
 /* ucache_aux is a pointer to the actual data summarized by the following 
@@ -47,7 +48,7 @@ char ftblInitialized = 0;
 /* Initialization */
 static void add_mtbls(uint16_t blk);
 static void init_memory_table(struct mem_table_s *mtbl);
-static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index);
+static inline void init_memory_entry(struct mem_table_s *mtbl, int16_t index);
 
 /* Gets */
 static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
@@ -177,7 +178,7 @@ int ucache_initialize(void)
         //    "ucache_initialize - ucache shmget: errno = %d\n", errno);
         return -1;
     }
-    ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
+    ucache = (union ucache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1) 
     {
         //gossip_debug(GOSSIP_UCACHE_DEBUG,        
@@ -197,7 +198,7 @@ int ucache_initialize(void)
  * Returns a pointer to the mtbl corresponding to the blk & ent. 
  * Input must be reliable otherwise invalid mtbl could be returned.
  */
-inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
+inline struct mem_table_s *ucache_get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
 {
     if( mtbl_blk < BLOCKS_IN_CACHE &&
         mtbl_ent < MEM_TABLE_ENTRY_COUNT)
@@ -316,7 +317,7 @@ int ucache_open_file(PVFS_fs_id *fs_id,
             goto done;
         }
 
-        mtbl = get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
+        mtbl = ucache_get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
         if(mtbl == (struct mem_table_s *)NILP)
         {   
             /* Error - Could not insert */
@@ -327,6 +328,7 @@ int ucache_open_file(PVFS_fs_id *fs_id,
         {
             /* File Inserted */
             mtbl->ref_cnt = 1;
+            ucache_stats->file_count++;
             rc = 0;
             goto done;
         }
@@ -350,11 +352,15 @@ done:
 inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, 
                                          uint16_t *block_ndx)
 {
+    if(DBG)
+    {
+        printf("offset = %lu\n", offset);
+    }
     void *retVal = (void *) NIL;
     if(fent)
     {
         lock_lock(ucache_lock);
-        struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent); 
+        struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent); 
         retVal = lookup_mem(mtbl, 
                             offset, 
                             block_ndx,
@@ -432,7 +438,7 @@ done:
 
 /** 
  * Externally visible wrapper of the internal flush file function.
- * This is intended to allow and external flush file call which locks the 
+ * This is intended to allow an external flush file call which locks the 
  * global lock, flushes the file, then releases the global lock.
  * To prevent deadlock, do not call this in any function that aquires the 
  * global lock.
@@ -454,10 +460,8 @@ int ucache_flush_file(struct file_ent_s *fent)
 int flush_file(struct file_ent_s *fent)
 {
     int rc = 0;
-    PVFS_object_ref ref;
-    uint16_t i;
-    uint16_t temp_next = NIL16;
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
 
     memset(&ref, 0, sizeof(ref));
 
@@ -478,19 +482,15 @@ int flush_file(struct file_ent_s *fent)
         temp_next = mtbl->mem[i].dirty_next;
         mtbl->mem[i].dirty_next = NIL16; 
 
-        ref.handle = fent->tag_handle;
-        ref.fs_id = fent->tag_id;
-        ref.sid_count = 0;
-        ref.sid_sid_array = NULL;
-        
-        /** If this is the last block needing flushing, then check the file,
-         * size, so that we know how much of the last block to write to disk.
-         */
-        struct iovec vector = 
+        struct iovec vector =
         {
             &(ucache->b[ment->item].mblk[0]),
             0
         };
+
+        /** Check the file size , so that we know how much to write to disk.
+         */
+        /* Determine how much data is left to flush based on file size */
         if((fent->size - ment->tag) < (CACHE_BLOCK_SIZE_K * 1024))
         {
             vector.iov_len = fent->size - ment->tag;
@@ -508,10 +508,8 @@ int flush_file(struct file_ent_s *fent)
            goto done; 
         }
     }
-
     mtbl->dirty_list = NIL16;
     rc = 0;
-
 done:
     return rc;
 }
@@ -554,7 +552,7 @@ int wipe_ucache(void)
         perror("wipe_ucache - ucache shmget");
         return -1;
     }
-    ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
+    ucache = (union ucache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1)
     {
         perror("wipe ucache - ucache shmat");
@@ -579,6 +577,10 @@ int ucache_close_file(struct file_ent_s *fent)
     int rc = 0;
     rc = lock_lock(ucache_lock);
     rc = remove_file(fent);
+    if(rc == 0)
+    {
+        ucache_stats->file_count--;
+    }
     lock_unlock(ucache_lock);
     return rc;
 }
@@ -652,7 +654,7 @@ int ucache_info(FILE *out, char *flags)
     unsigned char show_free = 0;
 
     int char_ndx;
-    for (char_ndx=0; char_ndx<strlen(flags); char_ndx++)
+    for (char_ndx = 0; char_ndx < strlen(flags); char_ndx++)
     {
         char c = flags[char_ndx];
         switch(c)
@@ -816,7 +818,7 @@ int ucache_info(FILE *out, char *flags)
                     fprintf(out, "index = %hu\n", fent->index);
                     fprintf(out, "size = %lu\n", fent->size);
     
-                    struct mem_table_s * mtbl = get_mtbl(fent->mtbl_blk, 
+                    struct mem_table_s * mtbl = ucache_get_mtbl(fent->mtbl_blk, 
                                                         fent->mtbl_ent);
     
                     fprintf(out, "\tMTBL LRU List ****************\n");
@@ -1136,19 +1138,15 @@ static void add_mtbls(uint16_t blk)
 /**
  * Initializes a memory entry.
  */
-static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
+static inline void init_memory_entry(struct mem_table_s *mtbl, int16_t index)
 {
-        if(index > MEM_TABLE_ENTRY_COUNT)
-        {
-            return -1;
-        }
+        assert(index < MEM_TABLE_ENTRY_COUNT);
         mtbl->mem[index].tag = NIL64;
         mtbl->mem[index].item = NIL16;
         mtbl->mem[index].next = NIL16;
         mtbl->mem[index].dirty_next = NIL16;
         mtbl->mem[index].lru_prev = NIL16;
         mtbl->mem[index].lru_next = NIL16;
-        return 0;
 }
 
 /** 
@@ -1159,7 +1157,6 @@ static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
 static void init_memory_table(struct mem_table_s *mtbl)
 {
     uint16_t i;
-    int rc = -1;
     mtbl->num_blocks = 0;
     mtbl->free_list_blk = NIL16;
     mtbl->lru_first = NIL16;
@@ -1177,12 +1174,12 @@ static void init_memory_table(struct mem_table_s *mtbl)
     mtbl->free_list = 0;
     for(i = 0; i < (MEM_TABLE_ENTRY_COUNT - 1); i++)
     {
-        rc = init_memory_entry(mtbl, i);
+        init_memory_entry(mtbl, i);
         mtbl->mem[i].next = i + 1;
 
     }
     /* NIL Terminate the last entries next index */
-    rc = init_memory_entry(mtbl, MEM_TABLE_ENTRY_COUNT - 1);
+    init_memory_entry(mtbl, MEM_TABLE_ENTRY_COUNT - 1);
     mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL16;
 }
 
@@ -1483,9 +1480,16 @@ uint16_t insert_file(
             /* Evict a block from mtbl with most mem entries */
             struct file_ent_s *max_fent = 0;
             struct mem_table_s *max_mtbl;
-            locate_max_fent(&max_fent);
-            max_mtbl = get_mtbl(max_fent->mtbl_blk, max_fent->mtbl_ent);
-            evict_LRU(max_fent);
+            uint16_t ment_count = 0;
+            ment_count = locate_max_fent(&max_fent);
+            max_mtbl = ucache_get_mtbl(max_fent->mtbl_blk, max_fent->mtbl_ent);
+            if(ment_count == 0 || max_mtbl->lru_last == NIL16)
+            {
+            }
+            else
+            {
+                evict_LRU(max_fent);
+            }
         }
         /* TODO: other policy? */
         if(ucache->ftbl.free_blk == NIL16)
@@ -1547,7 +1551,7 @@ uint16_t insert_file(
     current->mtbl_ent = free_mtbl_ent;
     current->size = 0;
     /* Initialize Memory Table */
-    init_memory_table(get_mtbl(free_mtbl_blk, free_mtbl_ent));
+    init_memory_table(ucache_get_mtbl(free_mtbl_blk, free_mtbl_ent));
     return current->index;
 }
 
@@ -1559,7 +1563,7 @@ uint16_t insert_file(
 static int remove_file(struct file_ent_s *fent)
 {
     int rc = 0;
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk,
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk,
                                        fent->mtbl_ent);
 
     if(mtbl == (struct mem_table_s *)NILP)
@@ -1572,7 +1576,7 @@ static int remove_file(struct file_ent_s *fent)
 
     if(mtbl->ref_cnt > 0)
     {
-        return 0;
+        return (int) mtbl->ref_cnt;
     }
 
     /* Flush dirty blocks before file removal from cache */
@@ -1760,8 +1764,6 @@ static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
 static uint16_t locate_max_fent(struct file_ent_s **fent)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
-    uint16_t index_of_max_blk = NIL16;
-    uint16_t index_of_max_ent = NIL16;
     uint16_t value_of_max = 0;
     /* Iterate over file hash table indices */
     uint16_t i;
@@ -1785,14 +1787,13 @@ static uint16_t locate_max_fent(struct file_ent_s **fent)
             /* Examine the mtbl's value of num_blocks to see if it's the 
              * greatest. 
              */
-            struct mem_table_s *current_mtbl = get_mtbl(current_fent->mtbl_blk, 
-                                                       current_fent->mtbl_ent);
+            struct mem_table_s *current_mtbl = ucache_get_mtbl(
+                current_fent->mtbl_blk,
+                current_fent->mtbl_ent);
 
             if(current_mtbl->num_blocks >= value_of_max)
             {
                 *fent = current_fent; /* Set the parameter to this mtbl */
-                index_of_max_blk = current_fent->mtbl_blk;
-                index_of_max_ent = current_fent->mtbl_ent;
                 value_of_max = current_mtbl->num_blocks;
             }
         }
@@ -1809,24 +1810,20 @@ static uint16_t locate_max_fent(struct file_ent_s **fent)
  */
 static int evict_LRU(struct file_ent_s *fent)
 {
-    int rc = -1;
+    int rc = 0;
     
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
 
     if(mtbl->num_blocks != 0 && mtbl->lru_last != NIL16)
     {
         //printf("evicting: %hu\n", mtbl->lru_last);
         rc = remove_mem(fent, mtbl->mem[mtbl->lru_last].tag);
-        if(rc != 1)
+        if(rc == 1)
         {
-            return 0;
+            return 1;
         } 
-        return 1;
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 
@@ -1844,7 +1841,7 @@ static inline void *set_item(struct file_ent_s *fent,
 {
         uint16_t free_blk = get_free_blk();
 
-        struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+        struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
 
         /* No Free Blocks Available */
         if(free_blk == NIL16)
@@ -1860,9 +1857,9 @@ static inline void *set_item(struct file_ent_s *fent,
         {
             struct file_ent_s *max_fent = 0;
             struct mem_table_s *max_mtbl;
-            int ment_count = 0;
+            uint16_t ment_count = 0;
             ment_count = locate_max_fent(&max_fent);
-            max_mtbl = get_mtbl(max_fent->mtbl_blk, max_fent->mtbl_ent);
+            max_mtbl = ucache_get_mtbl(max_fent->mtbl_blk, max_fent->mtbl_ent);
             if(ment_count == 0 || max_mtbl->lru_last == NIL16)
             {
                 goto errout;
@@ -1900,7 +1897,7 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
                                               uint16_t *block_ndx)
 {
     void* rc = 0;
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
 
     /* Lookup first */
     void *returnValue = lookup_mem(mtbl, offset, block_ndx, NULL, NULL);
@@ -1919,7 +1916,10 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     if(mentIndex == NIL16)
     {   /* No free ment available, so attempt eviction, and try again */
         evict_rc = evict_LRU(fent);
-        mentIndex = get_free_ment(mtbl);
+        if(evict_rc == 1)
+        {
+            mentIndex = get_free_ment(mtbl);
+        }
     }
 
     /* Eviction Failed */
@@ -1960,7 +1960,7 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
  */
 static int remove_mem(struct file_ent_s *fent, uint64_t offset)
 {
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
 
     /* Some Indices */
     uint16_t item_index = NIL16; /* index of cached block */

@@ -25,8 +25,11 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "dist-dir-utils.h"
 
+/*
 static char *lost_and_found_string = "lost+found";
+*/
 
 /* V3 NEXT remove this struct and all references to it */
 
@@ -139,6 +142,7 @@ int pvfs2_mkspace(char *data_path,
     TROVE_op_id op_id;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
+    TROVE_keyval_s *key_a = NULL, *val_a = NULL;
     TROVE_ds_attributes_s attr;
 /* V3 */
 #if 0
@@ -148,9 +152,6 @@ int pvfs2_mkspace(char *data_path,
 #endif
     TROVE_context_id trove_context = -1;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
-    TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
-    TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
-    TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -431,362 +432,10 @@ int pvfs2_mkspace(char *data_path,
             return -1;
         }
 
-        /*
-         * create a dataspace to hold directory entries; if we have a
-         * meta handle range, use that one of those ranges (being
-         * careful to make sure the range has enough space for an
-         * allocation) to allocate a dataspace to hold directory
-         * entries.  if we don't have a meta handle range, use
-         * TROVE_HANDLE_NULL which tells the allocator to use any
-         * handle available
+        /* The creation of dirdata objects for the root directory is 
+         * moved to pvfs2_server.c to setup distributed directory struct.
+         * lost+found directory is also created there. 
          */
-#if 0
-        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
-        if (meta_handle_ranges)
-        {
-            get_handle_extent_from_ranges(meta_handle_ranges,
-                                          &cur_extent,
-                                          s_used_handles,
-                                          1);
-
-            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
-                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
-            {
-                gossip_err("No valid meta handle ranges available! "
-                           "Using a default\n");
-            }
-            else
-            {
-                mkspace_print(
-                    verbose, "info: using meta handle range %s-%s for "
-                    "root dirent dspace\n", PVFS_OID_str(&cur_extent.first),
-                    PVFS_OID_str(&cur_extent.last));
-            }
-        }
-
-        extent_array.extent_count = 1;
-        extent_array.extent_array = &cur_extent;
-#endif
-
-        tmp_handle = TROVE_HANDLE_NULL;
-
-        ret = trove_dspace_create(coll_id,
-                                  tmp_handle,
-                                  &root_dirdata_handle,
-                                  PVFS_TYPE_DIRDATA,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  trove_context,
-                                  &op_id,
-                                  NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                                    &state, TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if ((ret != 1) && (state != 0))
-        {
-            gossip_err("dspace create (for dirent storage) failed.\n");
-            return -1;
-        }
-
-        mkspace_print(verbose, "info: created dspace for dirents "
-                      "with handle %s\n", PVFS_OID_str(&root_dirdata_handle));
-        s_used_handles[1] = root_dirdata_handle;
-
-        key.buffer = DIRECTORY_ENTRY_KEYSTR;
-        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
-        val.buffer = &root_dirdata_handle;
-        val.buffer_sz = sizeof(TROVE_handle);
-
-        ret = trove_keyval_write(coll_id,
-                                 new_root_handle,
-                                 &key,
-                                 &val, 
-                                 TROVE_SYNC,
-                                 0,
-                                 NULL,
-                                 trove_context,
-                                 &op_id,
-                                 NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if (ret < 0)
-        {
-            gossip_err("error: keyval write for handle used to store "
-                       "dirents failed; aborting!\n");
-            return -1;
-        }
-
-        mkspace_print(
-            verbose, "info: wrote attributes for root directory.\n");
-
-        /****************************************************
-          at this point we need to create and initialize the
-          lost+found directory as well
-        *****************************************************/
-#if 0
-        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
-        if (meta_handle_ranges)
-        {
-            get_handle_extent_from_ranges(meta_handle_ranges,
-                                          &cur_extent,
-                                          s_used_handles,
-                                          2);
-
-            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
-                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
-            {
-                gossip_err("No valid meta handle ranges available! "
-                           "Using a default\n");
-            }
-            else
-            {
-                mkspace_print(verbose,
-                        "info: using meta handle range %s-%s for "
-                        "lost+found directory dspace\n",
-                        PVFS_OID_str(&cur_extent.first),
-                        PVFS_OID_str(&cur_extent.last));
-            }
-        }
-        extent_array.extent_count = 1;
-        extent_array.extent_array = &cur_extent;
-#endif
-
-        tmp_handle = TROVE_HANDLE_NULL;
-
-        ret = trove_dspace_create(coll_id,
-                                  tmp_handle,
-                                  &lost_and_found_handle,
-                                  PVFS_TYPE_DIRECTORY,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  trove_context,
-                                  &op_id,
-                                  NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if ((ret != 1) && (state != 0))
-        {
-            mkspace_print(verbose,
-                          "dspace create (for lost+found dir) failed.\n");
-            return -1;
-        }
-
-        mkspace_print(verbose,"info: created lost+found directory "
-                      "with handle %s.\n",
-                      PVFS_OID_str(&lost_and_found_handle));
-        s_used_handles[2] = lost_and_found_handle;
-
-        /* set lost+found directory dspace attributes */
-        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
-        attr.uid = getuid();
-        attr.gid = getgid();
-        attr.mode = 0777;
-        attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PINT_util_get_current_time();
-        attr.mtime = PINT_util_mktime_version(attr.ctime);
-
-        ret = trove_dspace_setattr(coll_id,
-                                   lost_and_found_handle,
-                                   &attr,
-                                   TROVE_SYNC,
-                                   NULL,
-                                   trove_context,
-                                   &op_id,
-                                   NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if (ret < 0)
-        {
-            gossip_err("error: dspace setattr for lost+found handle "
-                       "attributes failed; aborting!\n");
-            return -1;
-        }
-
-        /* create a dataspace to hold directory entries */
-#if 0
-        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
-        if (meta_handle_ranges)
-        {
-            get_handle_extent_from_ranges(meta_handle_ranges,
-                                          &cur_extent,
-                                          s_used_handles,
-                                          3);
-
-            if ((!PVFS_OID_cmp(&cur_extent.first, &TROVE_HANDLE_NULL)) &&
-                (!PVFS_OID_cmp(&cur_extent.last, &TROVE_HANDLE_NULL)))
-            {
-                gossip_err("No valid meta handle ranges available! "
-                           "Using a default\n");
-            }
-            else
-            {
-                mkspace_print(verbose,
-                        "info: using meta handle range %s-%s for "
-                        "lost+found dirent dspace\n",
-                        PVFS_OID_str(&cur_extent.first),
-                        PVFS_OID_str(&cur_extent.last));
-            }
-        }
-        extent_array.extent_count = 1;
-        extent_array.extent_array = &cur_extent;
-#endif
-
-        tmp_handle = TROVE_HANDLE_NULL;
-
-        ret = trove_dspace_create(coll_id,
-                                  tmp_handle,
-                                  &lost_and_found_dirdata_handle,
-                                  PVFS_TYPE_DIRDATA,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  trove_context,
-                                  &op_id,
-                                  NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if ((ret != 1) && (state != 0))
-        {
-            gossip_err("dspace create (for dirent storage) failed.\n");
-            return -1;
-        }
-
-        mkspace_print(verbose,
-                "info: created dspace for dirents with handle %s\n",
-                PVFS_OID_str(&lost_and_found_dirdata_handle));
-        s_used_handles[3] = lost_and_found_dirdata_handle;
-
-        key.buffer = DIRECTORY_ENTRY_KEYSTR;
-        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
-        val.buffer = &lost_and_found_dirdata_handle;
-        val.buffer_sz = sizeof(TROVE_handle);
-
-        ret = trove_keyval_write(coll_id,
-                                 lost_and_found_handle,
-                                 &key,
-                                 &val, 
-                                 TROVE_SYNC,
-                                 0,
-                                 NULL,
-                                 trove_context,
-                                 &op_id,
-                                 NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if (ret < 0)
-        {
-            gossip_err("error: keyval write for handle used to store "
-                       "dirents failed; aborting!\n");
-            return -1;
-        }
-
-        mkspace_print(verbose, "info: wrote attributes for "
-                      "lost+found directory.\n");
-
-        /*
-          finally, crdirent the lost+found directory into the root
-          directory by writing the appropriate keyval info into the
-          root dirdata handle space
-        */
-        key.buffer = lost_and_found_string;
-        key.buffer_sz = strlen(lost_and_found_string) + 1;
-        val.buffer = &lost_and_found_handle;
-        val.buffer_sz = sizeof(TROVE_handle);
-
-        ret = trove_keyval_write(coll_id,
-                                 root_dirdata_handle,
-                                 &key,
-                                 &val, 
-                                 TROVE_SYNC | TROVE_NOOVERWRITE |
-                                              TROVE_KEYVAL_HANDLE_COUNT, 
-	                         0,
-                                 NULL,
-                                 trove_context,
-                                 &op_id,
-                                 NULL);
-
-        while (ret == 0)
-        {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
-        }
-
-        if (ret < 0)
-        {
-            gossip_err("error: keyval write for handle used to store "
-                       "dirents failed; aborting!\n");
-            return -1;
-        }
-
-        mkspace_print(verbose, "info: adding lost+found directory to "
-                      "the root directory.\n");
     }
     	
     if (trove_context != -1)
@@ -801,6 +450,17 @@ int pvfs2_mkspace(char *data_path,
                   PVFS_OID_str(&root_handle),
                   coll_id,
                   ROOT_HANDLE_KEYSTR);
+
+    /* free space */
+    if (key_a)
+    {
+        free(key_a);
+    }
+    if (val_a)
+    {
+        free(val_a);
+    }
+
     return 0;
 }
 

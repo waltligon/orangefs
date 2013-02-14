@@ -17,8 +17,12 @@
 #endif
 #include "posix-ops.h"
 #include "openfile-util.h"
+#include "iocommon.h"
 #include "posix-pvfs.h"
+#include "pvfs-path.h"
+#ifdef PVFS_AIO_ENABLE
 #include "aiocommon.h"
+#endif
 
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
@@ -200,10 +204,13 @@ static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
     return syscall(SYS_readdir, fd, dirp, count);
 }
 
+/* moved the need for this to posix-pvfs.c */
+#if 0
 static int my_glibc_getcwd(char *buf, unsigned long size)
 {
     return syscall(SYS_getcwd, buf, size);
 }
+#endif
 
 void load_glibc(void)
 { 
@@ -429,7 +436,7 @@ int pvfs_sys_init(void)
         rc = gen_mutex_lock(&mutex_mutex);
         if(!pvfs_lib_lock_initialized)
         {
-            //init recursive mutex
+            /* Init recursive mutex */
             pthread_mutexattr_t rec_attr;
             rc = pthread_mutexattr_init(&rec_attr);
             rc = pthread_mutexattr_settype(&rec_attr, PTHREAD_MUTEX_RECURSIVE);
@@ -450,7 +457,7 @@ int pvfs_sys_init(void)
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
     pvfs_initializing_flag = 1;
 
-    //Perform Init
+    /* Perform Init */
     pvfs_sys_init_doit();
     pvfs_initializing_flag = 0;
     pvfs_lib_init_flag = 1;
@@ -464,7 +471,6 @@ int pvfs_sys_init(void)
 void pvfs_sys_init_doit(void) {
     struct rlimit rl; 
 	int rc;
-    char curdir[PVFS_PATH_MAX];
 
     /* this allows system calls to run */
     load_glibc();
@@ -474,14 +480,7 @@ void pvfs_sys_init_doit(void) {
     atexit(usrint_cleanup);
 
     /* set up current working dir */
-    memset(curdir, 0, sizeof(curdir));
-    rc = my_glibc_getcwd(curdir, PVFS_PATH_MAX);
-    if (rc < 0)
-    {
-        perror("failed to get CWD");
-        exit(-1);
-    }
-    pvfs_cwd_init(curdir, PVFS_PATH_MAX);
+    pvfs_cwd_init(0); /* do not expand */
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
@@ -530,11 +529,18 @@ void pvfs_sys_init_doit(void) {
         errno = 0;
     }
 
+    /* set up current working dir - need this one and previous one */
+    pvfs_cwd_init(1); /* expand sym links*/
+
     /* call other initialization routines */
 
+    /* lib calls should never print user error messages */
+    /* user can do that with return codes */
+    PVFS_perror_gossip_silent();
+
 #if PVFS_UCACHE_ENABLE
-    //gossip_enable_file(UCACHE_LOG_FILE, "a");
-    //gossip_enable_stderr();
+    /* gossip_enable_file(UCACHE_LOG_FILE, "a");*/
+    /* gossip_enable_stderr();*/
 
     /* ucache initialization - assumes shared memory previously 
      * acquired (using ucache daemon) 
@@ -546,24 +552,47 @@ void pvfs_sys_init_doit(void) {
         /* Write a warning message in the ucache.log letting programmer know */
         ucache_enabled = 0;
 
-        /* Enable the writing of the error message and write the message to file. */
-        //gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);
-        //gossip_debug(GOSSIP_UCACHE_DEBUG, 
-        //    "WARNING: client caching configured enabled but couldn't inizialize\n");
+        /* Enable the writing of the error message and */
+        /* write the message to file. */
+        /* gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);*/
+        /* gossip_debug(GOSSIP_UCACHE_DEBUG, */
+        /*    "WARNING: client caching configured enabled but couldn't "
+         *    "inizialize\n");*/
     }
 #endif
 
+#ifdef PVFS_AIO_ENABLE
    /* initialize aio interface */
    rc = aiocommon_init();
    if (rc < 0)
    {
-      gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS AIO interface failed to initialize\n");
+      gossip_debug(GOSSIP_CLIENT_DEBUG,
+                   "PVFS AIO interface failed to initialize\n");
    }
+#endif
 }
 
 int pvfs_descriptor_table_size(void)
 {
     return descriptor_table_size;
+}
+
+int pvfs_descriptor_table_next(int start)
+{
+    int flags;
+    int i;
+    for (i = start; i < descriptor_table_size; i++)
+    {   
+        if (!descriptor_table[i])
+        {
+            flags = glibc_ops.fcntl(i, F_GETFL);
+            if (flags < 0)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
 }
 
 /*
@@ -577,8 +606,12 @@ int pvfs_descriptor_table_size(void)
  {
     int newfd, flags = 0; 
     pvfs_descriptor *pd;
+    /* insure one thread at a time is in */
+    /* fd setup section */
+    static gen_mutex_t lock = GEN_MUTEX_INITIALIZER;
 
     pvfs_sys_init();
+    debug("pvfs_alloc_descriptor called with %d\n", fd);
     if (fsops == NULL)
     {
         errno = EINVAL;
@@ -598,26 +631,33 @@ int pvfs_descriptor_table_size(void)
         {
             return NULL;
         }
+    }
+
+    gen_mutex_lock(&lock);
+    {
         if (descriptor_table[newfd] != NULL)
         {
             errno = EINVAL;
+            gen_mutex_unlock(&lock);
             return NULL;
         }
+
+        /* allocate new descriptor */
+	    descriptor_table_count++;
+        pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    
+        if (!pd)
+        {
+            gen_mutex_unlock(&lock);
+            return NULL;
+        }
+        memset(pd, 0, sizeof(pvfs_descriptor));
+    
+        gen_mutex_init(&pd->lock);
+        gen_mutex_lock(&pd->lock);
+        descriptor_table[newfd] = pd;
     }
-
-    /* allocate new descriptor */
-	descriptor_table_count++;
-    pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
-
-    if (!pd)
-    {
-        return NULL;
-    }
-    memset(pd, 0, sizeof(pvfs_descriptor));
-
-    gen_mutex_init(&pd->lock);
-    gen_mutex_lock(&pd->lock);
-    descriptor_table[newfd] = pd;
+    gen_mutex_unlock(&lock);
 
     pd->s = (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
     if (!pd->s)
@@ -689,6 +729,7 @@ int pvfs_descriptor_table_size(void)
 #endif /* PVFS_UCACHE_ENABLE */
 
     /* NEW PD IS STILL LOCKED */
+    debug("\tpvfs_alloc_descriptor returns with %d\n", pd->fd);
     return pd;
 }
 
@@ -700,6 +741,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     int rc = 0;
     pvfs_descriptor *pd;
 
+    debug("pvfs_dup_descriptor: called with %d\n", oldfd);
     pvfs_sys_init();
     if (oldfd < 0 || oldfd >= descriptor_table_size)
     {
@@ -711,6 +753,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
         newfd = glibc_ops.dup(logfile);
         if (newfd < 0)
         {
+            debug("\npvfs_dup_descriptor: returns with %d\n", newfd);
             return newfd;
         }
     }
@@ -722,12 +765,14 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
             /* check for special case */
             if (newfd == oldfd)
             {
+                debug("\tpvfs_dup_descriptor: returns with %d\n", oldfd);
                 return oldfd;
             }
             /* close old file in new slot */
             rc = pvfs_free_descriptor(newfd);
             if (rc < 0)
             {
+                debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
                 return rc;
             }
         }
@@ -735,6 +780,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
         rc = glibc_ops.dup2(oldfd, newfd);
         if (rc < 0)
         {
+            debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
             return rc;
         }
     }
@@ -743,6 +789,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
     if (!pd)
     {
+        debug("\tpvfs_dup_descriptor: returns with %d\n", -1);
         return -1;
     }
     memset(pd, 0, sizeof(pvfs_descriptor));
@@ -760,7 +807,8 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     pd->s->dup_cnt++;
     gen_mutex_unlock(&pd->s->lock);
     gen_mutex_unlock(&pd->lock);
-    return 0;
+    debug("\tpvfs_dup_descriptor: returns with %d\n", newfd);
+    return newfd;
 }
 
 /*
@@ -771,6 +819,7 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
 pvfs_descriptor *pvfs_find_descriptor(int fd)
 {
     pvfs_descriptor *pd = NULL;
+    struct stat sbuf;
 
     pvfs_sys_init();
     if (fd < 0 || fd >= descriptor_table_size)
@@ -800,6 +849,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
         gen_mutex_init(&pd->lock);
         gen_mutex_lock(&pd->lock);
         descriptor_table[fd] = pd;
+        debug("pvfs_find_descriptor: implicit alloc of descriptor %d\n", fd);
 
         pd->s =
              (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
@@ -823,10 +873,35 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->pvfs_ref.sid_count = 0;
 	    pd->s->pvfs_ref.sid_array = NULL;
 	    pd->s->flags = flags;
+	    pd->s->dpath = NULL;
+        glibc_ops.fstat(fd, &sbuf);
+        pd->s->mode = sbuf.st_mode;
+        if (S_ISDIR(sbuf.st_mode))
+        {
+            /* need to get path for this fd from /proc */
+            /* we will use glibc to open /proc/self/# which */
+            /* is a symbolic link, and then read the link */
+            /* to get the path */
+            char procpath[50];
+            char dirpath[PVFS_PATH_MAX];
+            int len;
+
+            memset(procpath, 0, 50);
+            memset(dirpath, 0, PVFS_PATH_MAX);
+            sprintf(procpath, "/proc/self/%d", fd);
+            len = glibc_ops.readlink(procpath, dirpath, PVFS_PATH_MAX);
+            if (len < 0)
+            {
+                /* error reading link */
+            }
+            /* stash the path */
+            pd->s->dpath = (char *)malloc(len + 1);
+            memset(pd->s->dpath, 0, len + 1);
+            memcpy(pd->s->dpath, procpath, len);
+        }
 	    pd->s->mode = 0;
 	    pd->s->file_pointer = 0;
 	    pd->s->token = 0;
-	    pd->s->dpath = NULL;
         pd->s->fent = NULL; /* not caching if left NULL */
     }
     else
@@ -854,6 +929,7 @@ int pvfs_free_descriptor(int fd)
     pd = pvfs_find_descriptor(fd);
     if (pd == NULL)
     {
+        debug("\tpvfs_free_descriptor returns %d\n", -1);
         return -1;
     }
 
@@ -882,6 +958,7 @@ int pvfs_free_descriptor(int fd)
             rc = ucache_close_file(pd->s->fent);
             if(rc == -1)
             {
+                debug("\tpvfs_free_descriptor returns %d\n", rc);
                 return rc;
             }
         }
@@ -912,261 +989,8 @@ int pvfs_free_descriptor(int fd)
 	    free(pd);
     }
 
-    debug("pvfs_free_descriptor returns %d\n", 0);
+    debug("\tpvfs_free_descriptor returns %d\n", 0);
 	return 0;
-}
-
-/* 
- * takes a path that is relative to the working dir and
- * expands it all the way to the root
- */
-char *pvfs_qualify_path(const char *path)
-{
-    int cdsz, psz, msz;
-    char *rc;
-    char *newpath = NULL;
-    char curdir[PVFS_PATH_MAX];
-
-    if(path[0] != '/')
-    {
-        memset(curdir, 0, PVFS_PATH_MAX);
-        rc = getcwd(curdir, PVFS_PATH_MAX);
-        if (curdir == NULL)
-        {
-            /* ERANGE if need a larger buffer */
-            /* error, bail out */
-            return NULL;
-        }
-        cdsz = strlen(curdir);
-        psz = strlen(path);
-        msz = cdsz + psz + 2;
-        if (msz < 2)
-        {
-            errno = EINVAL;
-            return NULL;
-        }
-        /* allocate buffer for whole path and copy */
-        newpath = (char *)malloc(msz);
-        if (!newpath)
-        {
-            return NULL;
-        }
-        memset(newpath, 0, msz);
-        if (cdsz >= 0) /* zero size copy is bad */
-        {
-            strncpy(newpath, curdir, cdsz);
-        }
-        /* free(curdir); */
-        strncat(newpath, "/", 1);
-        if (psz >= 0) /* zero size copy is bad */
-        {
-            strncat(newpath, path, psz);
-        }
-    }
-    else
-    {
-        newpath = (char *)path;
-    }
-    return newpath;
-}
-
-/**
- * Determines if a path is part of a PVFS Filesystem 
- *
- * returns 1 if PVFS 0 otherwise
- */
-
-int is_pvfs_path(const char *path)
-{
-    int rc = 0;
-    char *newpath = NULL ;
-#if PVFS_USRINT_KMOUNT
-    int npsize;
-    struct stat sbuf;
-    struct statfs fsbuf;
-#else
-    PVFS_fs_id fs_id;
-    char pvfs_path[PVFS_PATH_MAX];
-#endif
-    
-    if(pvfs_sys_init())
-    {
-        return 0;
-    }
-
-    if (!path)
-    {
-        errno = EINVAL;
-        return 0; /* let glibc sort out the error */
-    }
-#if PVFS_USRINT_KMOUNT
-    memset(&sbuf, 0, sizeof(sbuf));
-    memset(&fsbuf, 0, sizeof(fsbuf));
-    npsize = strnlen(path, PVFS_PATH_MAX) + 1;
-    newpath = (char *)malloc(npsize);
-    if (!newpath)
-    {
-        return 0; /* let glibc sort out the error */
-    }
-    strncpy(newpath, path, npsize);
-    
-    /* first try to stat the path */
-    /* this must call standard glibc stat */
-    rc = glibc_ops.stat(newpath, &sbuf);
-    if (rc < 0)
-    {
-        int count;
-        /* path doesn't exist, try removing last segment */
-        for(count = strlen(newpath) - 2; count > 0; count--)
-        {
-            if(newpath[count] == '/')
-            {
-                newpath[count] = '\0';
-                break;
-            }
-        }
-        /* this must call standard glibc stat */
-        rc = glibc_ops.stat(newpath, &sbuf);
-        if (rc < 0)
-        {
-            /* can't find the path must be an error */
-            free(newpath);
-            return 0; /* let glibc sort out the error */
-        }
-    }
-    /* this must call standard glibc statfs */
-    rc = glibc_ops.statfs(newpath, &fsbuf);
-    free(newpath);
-    if(fsbuf.f_type == PVFS_FS)
-    {
-        return 1; /* PVFS */
-    }
-    else
-    {
-        return 0; /* not PVFS assume the kernel can handle it */
-    }
-/***************************************************************/
-#else /* PVFS_USRINT_KMOUNT */
-/***************************************************************/
-    /* we might not be able to stat the file direcly
-     * so we will use our resolver to look up the path
-     * prefix in the mount tab files
-     */
-    memset(pvfs_path, 0 , PVFS_PATH_MAX);
-    newpath = pvfs_qualify_path(path);
-    rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, PVFS_PATH_MAX);
-    if (newpath != path)
-    {
-        free(newpath);
-    }
-    if (rc < 0)
-    {
-        if (rc == -PVFS_ENOENT)
-        {
-            return 0; /* not a PVFS path */
-        }
-        errno = rc;
-        return 0; /* an error returned - let glibc deal with it */
-        // return -1; /* an error returned */
-    }
-    return 1; /* a PVFS path */
-#endif /* PVFS_USRINT_KMOUNT */
-}
-
-/**
- * Split a pathname into a directory and a filename.
- * If non-null is passed as the directory or filename,
- * the field will be allocated and filled with the correct value
- *
- * A slash at the end of the path is interpreted as no filename
- * and is an error.  To parse the last dir in a path, remove this
- * trailing slash.  No filename with no directory is OK.
- */
-int split_pathname( const char *path,
-                    int dirflag,
-                    char **directory,
-                    char **filename)
-{
-    int i, fnlen, slashes = 0;
-    int length = strlen("pvfs2");
-
-    if (!path || !directory || !filename)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-	/* chop off pvfs2 prefix */
-	if (strncmp(path, "pvfs2:", length) == 0)
-    {
-		path = &path[length];
-    }
-    /* Split path into a directory and filename */
-    length = strnlen(path, PVFS_PATH_MAX);
-    if (length == PVFS_PATH_MAX)
-    {
-        errno = ENAMETOOLONG;
-        return -1;
-    }
-    i = length - 1;
-    if (dirflag)
-    {
-        /* skip any trailing slashes */
-        for(; i >= 0 && path[i] == '/'; i--)
-        {
-            slashes++;
-        }
-    }
-    for (; i >= 0; i--)
-    {
-        if (path[i] == '/')
-        {
-            /* parse the directory */
-            *directory = malloc(i + 1);
-            if (!*directory)
-            {
-                return -1;
-            }
-            strncpy(*directory, path, i);
-            (*directory)[i] = '\0';
-            break;
-        }
-    }
-    if (i == -1)
-    {
-        /* found no '/' path is all filename */
-        *directory = NULL;
-    }
-    i++;
-    /* copy the filename */
-    fnlen = length - i - slashes;
-    if (fnlen == 0)
-    {
-        filename = NULL;
-        if (!directory)
-        {
-            errno = EISDIR;
-        }
-        else
-        {
-            errno = ENOENT;
-        }
-        return -1;
-    }
-    /* check flag to see if there are slashes to skip */
-    *filename = malloc(fnlen + 1);
-    if (!*filename)
-    {
-        if (*directory)
-        {
-            free(*directory);
-        }
-        *directory = NULL;
-        *filename = NULL;
-        return -1;
-    }
-    strncpy(*filename, path + i, length - i);
-    (*filename)[length - i] = '\0';
-    return 0;
 }
 
 void PINT_initrand(void)

@@ -438,9 +438,155 @@ static PINT_sm_action small_io_setup_msgpairs(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+#if 0
 
-static PINT_sm_action small_io_check_for_retries(struct PINT_smcb *smcb,
-                                                 job_status_s *js_p)
+/* DOn't know what this is */
+
+    int ret = 0;
+
+    assert(resp_p->op == PVFS_SERV_SMALL_IO);
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    if(resp_p->u.small_io.io_type == PVFS_IO_READ)
+    {
+        PVFS_size sizes[IO_MAX_REGIONS];
+        PVFS_offset offsets[IO_MAX_REGIONS];
+        PVFS_object_attr * attr = &sm_p->getattr.attr;
+        PINT_request_file_data fdata;
+        PINT_Request_result result;
+        PINT_Request_state * file_req_state;
+        PINT_Request_state * mem_req_state;
+        int i = 0;
+        int done = 0;
+        PVFS_size bytes_processed = 0;
+
+        memset(&fdata, 0, sizeof(fdata));
+
+        if(resp_p->u.small_io.result_size != 0)
+        {
+            memset(&fdata, 0, sizeof(PINT_request_file_data));
+            fdata.server_ct = attr->u.meta.dfile_count;
+
+            fdata.server_nr = server_nr;
+            fdata.dist = attr->u.meta.dist;
+            fdata.fsize = resp_p->u.small_io.bstream_size;
+
+            result.segmax = IO_MAX_REGIONS;
+            result.bytemax = resp_p->u.small_io.result_size;
+            result.size_array = sizes;
+            result.offset_array = offsets;
+
+            file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+            mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+            PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                          sm_p->u.io.file_req_offset);
+            PINT_REQUEST_STATE_SET_FINAL(
+                    file_req_state, sm_p->u.io.file_req_offset + 
+                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+
+            do
+            {
+                result.segs = 0;
+                result.bytes = 0;
+
+                ret = PINT_process_request(file_req_state,
+                                           mem_req_state,
+                                           &fdata,
+                                           &result,
+                                           PINT_CLIENT);
+                if(ret < 0)
+                {
+                    gossip_err("Failed processing request in small I/O read\n");
+                    return ret;
+                }
+
+                for(i = 0; i < result.segs && !done; ++i)
+                {
+                    int tmp_size;
+                    char * src_ptr;
+                    char * dest_ptr;
+
+                    dest_ptr = (char *)sm_p->u.io.buffer + offsets[i];
+                    src_ptr = (char *)resp_p->u.small_io.buffer + 
+                            bytes_processed;
+
+                    if((bytes_processed + sizes[i]) <= 
+                            resp_p->u.small_io.result_size)
+                    {
+                        tmp_size = sizes[i];
+                    }
+                    else
+                    {
+                        tmp_size = resp_p->u.small_io.result_size - 
+                                bytes_processed;
+                        done = 1;
+                    }
+
+                    memcpy(dest_ptr, src_ptr, sizes[i]);
+                    bytes_processed += tmp_size;
+                }
+            } while(!PINT_REQUEST_DONE(file_req_state) && !done);
+
+            if(resp_p->u.small_io.result_size != bytes_processed)
+            {
+                gossip_err("size of bytes copied to user buffer "
+                           "(%llu) do not match size of response (%llu)\n", 
+                           llu(bytes_processed),
+                           llu(resp_p->u.small_io.result_size));
+                return -PVFS_EINVAL;
+            }
+            PINT_free_request_state(file_req_state);
+            PINT_free_request_state(mem_req_state);
+        }
+    } /*if PVFS_IO_READ*/
+
+    sm_p->u.io.dfile_size_array[server_nr] = resp_p->u.small_io.bstream_size;
+    //sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;
+
+    sm_p->u.io.total_size += resp_p->u.small_io.result_size;
+
+    /* Let's SMALL-IO know that the msg completed. */
+    ctx->msg_completed = 1;
+
+    /* To test fail-over with small-io, uncomment the following code.  This
+     * will force each primary handle to have each of its mirrored handles
+     * tried on a READ io.  If you are testing a file with many primary
+     * handles and/or many copies and don't want to wade through such a large
+     * test, then don't set the retry-limit.  By default, it is normally set
+     * at 5.  You can tweak this value in the pvfs2-fs.conf file, if you
+     * want.
+    */
+
+    gossip_debug(GOSSIP_IO_DEBUG,"handle=%llu \toperation=%d \toffset=%ld "
+                             "\taggregate_size=%ld\n",
+                            llu(msg_p->req.u.small_io.handle),
+                            msg_p->req.u.small_io.io_type,
+                            ((long int)msg_p->req.u.small_io.file_req_offset),
+                            ((long int)msg_p->req.u.small_io.aggregate_size));
+
+/*
+    if (   (sm_p->u.io.io_type == PVFS_IO_READ) 
+        && (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) 
+                               == PVFS_ATTR_META_MIRROR_DFILES
+        && (sm_p->u.io.retry_count < mop->params.retry_limit))
+    {
+       mop->params.retry_limit = meta->mirror_copies_count;
+       ctx->msg_completed = 0;
+    } 
+*/
+
+    return 0;
+}
+#endif
+
+
+static int small_io_check_for_retries( struct PINT_smcb *smcb
+                                     , job_status_s *js_p)
 {
 #ifndef WIN32
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s..\n",__func__);
@@ -516,7 +662,7 @@ static PINT_sm_action small_io_check_for_retries(struct PINT_smcb *smcb,
         /* don't process completed messages */
         if (ctx->msg_completed)
         {
-            continue;
+           continue;
         }
 
         /* for incomplete messages, cleanup memory, if necessary */
@@ -655,7 +801,7 @@ static PINT_sm_action small_io_check_for_retries(struct PINT_smcb *smcb,
         /* don't populate with completed messages */
         if (ctx->msg_completed)
         {
-            continue;
+           continue;
         }
 
         new_msg = &new_mop.msgarray[j];

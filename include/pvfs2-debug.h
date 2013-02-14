@@ -79,7 +79,8 @@
 #define GOSSIP_WIN_CLIENT_DEBUG        ((uint64_t)1 << 57)
 #define GOSSIP_SECURITY_DEBUG          ((uint64_t)1 << 58)
 #define GOSSIP_USRINT_DEBUG            ((uint64_t)1 << 59)
-#define GOSSIP_SIDCACHE_DEBUG          ((uint64_t)1 << 60)
+#define GOSSIP_RCACHE_DEBUG            ((uint64_t)1 << 60)
+#define GOSSIP_SIDCACHE_DEBUG          ((uint64_t)1 << 61)
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
@@ -228,6 +229,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "security", GOSSIP_SECURITY_DEBUG },
     /* Client User Interface */
     { "usrint", GOSSIP_USRINT_DEBUG },
+    /* rcache */
+    { "rcache", GOSSIP_RCACHE_DEBUG },
     /* Sidcache debugging */
     { "sidcache", GOSSIP_SIDCACHE_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */

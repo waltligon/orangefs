@@ -122,13 +122,6 @@ PVFS_error PVFS_imgmt_setparam_list(PVFS_fs_id fs_id,
     sm_p->u.setparam_list.count = count;
     sm_p->u.setparam_list.details = details;
 
-    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, count);
-    if(ret != 0)
-    {
-        PINT_smcb_free(smcb);
-        return ret;
-    }
-
     if (sm_p->u.setparam_list.root_check_status_array)
     {
         free(sm_p->u.setparam_list.root_check_status_array);
@@ -305,10 +298,19 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
+    int ret = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setparam_list state: "
                  "mgmt_setparam_list_setup_msgpair\n");
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
+                                  sm_p->u.setparam_list.count);
+    if(ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
 
     /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)

@@ -15,8 +15,6 @@
 #ifdef WIN32
 #include "wincommon.h"
 
-#define snprintf(b, c, f, ...)    _snprintf(b, c, f, __VA_ARGS__)
-
 /* error codes not defined on Windows */
 #define EREMOTE    66
 #define EHOSTDOWN  112

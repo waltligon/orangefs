@@ -4,7 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include "pvfs2-config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,13 +22,14 @@
 #define HOST_NAME_MAX 64
 #endif
 
-#ifdef ENABLE_SECURITY
+#include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#endif
+#include <openssl/x509.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "src/proto/pvfs2-req-proto.h"
 #include "src/common/security/getugroups.h"
@@ -40,15 +40,27 @@ typedef struct {
     const char *group;
     int timeout;
     const char *keypath;
+#ifdef ENABLE_SECURITY_CERT
+    const char *certpath;
+#endif
 } options_t;
 
+char cert_keypath[PATH_MAX];
 
 static void usage(void)
 {
-    puts("usage: pvfs2-gencred [-u user] [-t timeout] [-k keyfile]"); 
+#ifdef ENABLE_SECURITY_CERT
+    puts("usage: pvfs2-gencred [-u uid] [-g gid] [-t timeout] "
+         "[-k keyfile] [-c certfile]");
+#else
+    puts("usage: pvfs2-gencred [-u uid] [-g gid] [-t timeout] "
+         "[-k keyfile]");
+#endif
 }
 
-static int safe_write(int fd, const void *buf, size_t nbyte)
+static int safe_write(int fd,
+                      const void *buf,
+                      size_t nbyte)
 {
     const char *cbuf = (const char *)buf;
     ssize_t total;
@@ -67,11 +79,18 @@ static int safe_write(int fd, const void *buf, size_t nbyte)
     return 0;
 }
 
-static int parse_options(int argc, char **argv, options_t *opts)
+static int parse_options(int argc,
+                         char **argv,
+                         options_t *opts)
 {
     int ch;
+#ifdef ENABLE_SECURITY_CERT
+    const char optstr[] = "u:g:t:k:c:";
+#else
+    const char optstr[] = "u:g:t:k:";
+#endif
     
-    while ((ch = getopt(argc, argv, "u:g:t:k:")) != -1)
+    while ((ch = getopt(argc, argv, optstr)) != -1)
     {
         switch(ch)
         {
@@ -94,6 +113,11 @@ static int parse_options(int argc, char **argv, options_t *opts)
             case 'k':
                 opts->keypath = optarg;
                 break;
+#ifdef ENABLE_SECURITY_CERT
+            case 'c':
+                opts->certpath = optarg;
+                break;
+#endif
             case '?':
             default:
                 usage();
@@ -104,12 +128,47 @@ static int parse_options(int argc, char **argv, options_t *opts)
     return EXIT_SUCCESS;
 }
 
-static int create_credential(const struct passwd *pwd, const gid_t *groups,
-    int ngroups, PVFS_credential *cred)
+#ifdef ENABLE_SECURITY_CERT
+static char *get_certificate_keypath(const struct passwd *pwd)
+{
+    const char def_keyfile[] = "/.pvfs2-cert-key.pem";
+
+    /* construct certificate private key file path */
+    strncpy(cert_keypath, pwd->pw_dir, PATH_MAX);
+    cert_keypath[PATH_MAX-1] = '\0';
+    if ((strlen(cert_keypath) + strlen(def_keyfile)) < (PATH_MAX - 1))
+    {
+        strcat(cert_keypath, def_keyfile);
+    }
+    else
+    {
+        return NULL;
+    }
+
+    return cert_keypath;
+}
+#endif
+
+static int create_credential(const struct passwd *pwd,
+                             const gid_t *groups,
+                             int ngroups,
+#ifdef ENABLE_SECURITY_CERT
+                             const char *certpath,
+#endif
+                             PVFS_credential *cred)
 {
     char hostname[HOST_NAME_MAX+1];
     char *issuer;
+#ifdef ENABLE_SECURITY_CERT
+    const char def_certfile[] = "/.pvfs2-cert.pem";
+    char def_certpath[PATH_MAX];
+    FILE *f;
+    X509 *cert;
+    BIO *bio_mem;
+    char *cert_buf;
+#else
     int i;
+#endif
 
     memset(cred, 0, sizeof(*cred));
 
@@ -125,6 +184,19 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     hostname[sizeof(hostname)-1] = '\0';
     strncpy(issuer+2, hostname, PVFS_REQ_LIMIT_ISSUER-2);
 
+#ifdef ENABLE_SECURITY_CERT
+    /* in cert mode, the uid/gids must be determined by
+       server mapping */
+    cred->userid = PVFS_UID_MAX;
+    cred->num_groups = 1;
+    cred->group_array = calloc(1, sizeof(PVFS_gid));
+    if (cred->group_array == NULL)
+    {
+        free(issuer);
+        return ENOMEM;
+    }
+    cred->group_array[0] = PVFS_GID_MAX;
+#else
     cred->userid = (PVFS_uid)pwd->pw_uid;
     cred->num_groups = (uint32_t)ngroups;
     cred->group_array = calloc(ngroups, sizeof(PVFS_gid));
@@ -137,15 +209,93 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     {
         cred->group_array[i] = (PVFS_gid)groups[i];
     }
+#endif /* ENABLE_SECURITY_CERT */
+
     cred->issuer = issuer;
+
+#ifdef ENABLE_SECURITY_CERT
+    /* use certpath or look for cert in home dir */
+    if (certpath == NULL)
+    {
+        strncpy(def_certpath, pwd->pw_dir, PATH_MAX);
+        def_certpath[PATH_MAX-1] = '\0';
+        if ((strlen(def_certpath) + strlen(def_certfile)) < (PATH_MAX - 1))
+        {
+            strncat(def_certpath, def_certfile, sizeof(def_certfile));
+        }
+        else
+        {            
+            fprintf(stderr, "Path to certificate too long\n");
+            return ERANGE;
+        }
+        certpath = def_certpath;
+    }
+
+    /* open certificate path */
+    f = fopen(certpath, "r");
+    if (f == NULL)
+    {
+        int err = errno;
+        perror(certpath);
+        return err;
+    }
+
+    /* read certificate */
+    cert = PEM_read_X509(f, NULL, NULL, NULL);
+
+    fclose(f);
+
+    /* check cert */
+    if (cert == NULL)
+    {
+        ERR_print_errors_fp(stderr);
+        return ENODATA;
+    }
+
+    /* write cert to memory */
+    bio_mem = BIO_new(BIO_s_mem());
+    if (bio_mem == NULL)
+    {
+        ERR_print_errors_fp(stderr);
+        X509_free(cert);
+        return ENOMEM;
+    }
+
+    /* write cert to mem BIO */
+    if (i2d_X509_bio(bio_mem, cert) <= 0)
+    {
+        ERR_print_errors_fp(stderr);
+        BIO_free(bio_mem);
+        X509_free(cert);
+        return EINVAL;
+    }
+
+    /* check size */
+    cred->certificate.buf_size = BIO_get_mem_data(bio_mem, &cert_buf);
+    if (cert_buf == NULL)
+    {
+        ERR_print_errors_fp(stderr);
+        BIO_free(bio_mem);
+        X509_free(cert);
+        return EINVAL;
+    }
+
+    cred->certificate.buf = (PVFS_cert_data) malloc(cred->certificate.buf_size);
+    memcpy(cred->certificate.buf, cert_buf, cred->certificate.buf_size);
+
+    BIO_free(bio_mem);
+    X509_free(cert);
+#else  /* !ENABLE_SECURITY_CERT */
+    cred->certificate.buf_size = 0;
+    cred->certificate.buf = NULL;
+#endif
 
     return EXIT_SUCCESS;
 }
 
-#ifdef ENABLE_SECURITY
-
-static int sign_credential(PVFS_credential *cred, time_t timeout,
-    const char *keypath)
+static int sign_credential(PVFS_credential *cred,
+                           time_t timeout,
+                           const char *keypath)
 {
     FILE *keyfile;
     struct stat stats;
@@ -177,14 +327,14 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     }
 
     privkey = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+
+    fclose(keyfile);
+
     if (privkey == NULL)
     {
         ERR_print_errors_fp(stderr);
-        fclose(keyfile);
         return ENODATA;
     }
-
-    fclose(keyfile);
 
     cred->timeout = (PVFS_time)(time(NULL) + timeout);
     cred->signature = malloc(EVP_PKEY_size(privkey));
@@ -236,22 +386,8 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     return EXIT_SUCCESS;
 }
 
-#else /* !ENABLE_SECURITY */
-
-static int sign_credential(PVFS_credential *cred, time_t timeout,
-    const char *keypath)
-{
-    cred->timeout = (PVFS_time)(time(NULL) + timeout);
-    cred->sig_size = 0;
-    cred->signature = NULL;
-
-    return 0;
-}
-
-#endif /* ENABLE_SECURITY */
-
 static int write_credential(const PVFS_credential *cred, 
-    const struct passwd *pwd)
+                            const struct passwd *pwd)
 {
     char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential] = { 0 };
     char *pptr = buf;
@@ -276,24 +412,24 @@ static int write_credential(const PVFS_credential *cred,
 
 int main(int argc, char **argv)
 {
-    options_t opts = { NULL, NULL, 0, NULL };
+    options_t opts;
     const struct passwd *pwd;
     const struct group *grp;
+    uid_t euid;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
     int ngroups;
     PVFS_credential credential;
     int ret = EXIT_SUCCESS;
-    
+
+    memset(&opts, 0, sizeof(opts));
     ret = parse_options(argc, argv, &opts);
     if (ret != EXIT_SUCCESS)
     {
         return ret;
     }
     
-#ifdef ENABLE_SECURITY
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
-#endif
     
     if (opts.user)
     {
@@ -365,14 +501,15 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
-    if (getuid() && pwd->pw_uid != getuid())
+    euid = getuid();
+    if (euid && pwd->pw_uid != euid)
     {
         fprintf(stderr, "error: only %s and root can generate a credential "
                 "for %s\n", pwd->pw_name, pwd->pw_name);
         return EPERM;
     }
 
-    if (getuid() && grp->gr_gid != getgid())
+    if (euid && grp->gr_gid != getgid())
     {
         fprintf(stderr, "error: cannot generate a credential for group %s: "
                 "Permission denied\n", grp->gr_name);
@@ -410,35 +547,41 @@ int main(int argc, char **argv)
 
 #endif /* HAVE_GETGROUPLIST */
     
-    ret = create_credential(pwd, groups, ngroups, &credential);
+    ret = create_credential(pwd, 
+                            groups, 
+                            ngroups, 
+#ifdef ENABLE_SECURITY_CERT
+                            opts.certpath,
+#endif
+                            &credential);
     if (ret != EXIT_SUCCESS)
+        goto main_exit;
+
+#ifdef ENABLE_SECURITY_CERT
+    if (opts.keypath == NULL)
     {
-        free(credential.issuer);
-        free(credential.group_array);
-        return ret;
+        opts.keypath = get_certificate_keypath(pwd);
     }
+#endif
 
     ret = sign_credential(&credential, (opts.timeout ? (time_t)opts.timeout :
                           PVFS2_DEFAULT_CREDENTIAL_TIMEOUT), (opts.keypath ?
                           opts.keypath : PVFS2_DEFAULT_CREDENTIAL_KEYPATH));
     if (ret != EXIT_SUCCESS)
-    {
-        free(credential.issuer);
-        free(credential.group_array);
-        return ret;
-    }
+        goto main_exit;
 
-    ret = write_credential(&credential,  pwd);
+    ret = write_credential(&credential, pwd);
     if (ret != EXIT_SUCCESS)
-    {
-        free(credential.issuer);
-        free(credential.group_array);
-        return ret;
-    }
-   
+        goto main_exit;
+
+main_exit:
+
     free(credential.issuer);
     free(credential.group_array);
+#ifdef ENABLE_SECURITY_CERT
+    free(credential.certificate.buf);
+#endif
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 

@@ -1,0 +1,340 @@
+/* 
+ * (C) 2011 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <ctype.h>
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-util.h"
+#include "pvfs2-internal.h"
+#include "pint-util.h"
+#include "dist-dir-utils.h"
+
+enum
+{
+    INVALID_OBJECT = 131,
+    INVALID_DIRDATA,
+    UPDATE_DIR_ATTR_REQUIRED
+};
+
+%%
+
+machine pvfs2_mgmt_split_dirent_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => write_directory_entries;
+        default => final_response;
+    }
+
+    state write_directory_entries
+    {
+        run mgmt_split_dirent_write_directory_entries;
+        success => update_directory_attr;
+        default => final_response;
+    }
+
+    state update_directory_attr
+    {
+        run mgmt_split_dirent_update_directory_attr;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => release;
+    }
+
+    state release
+    {
+        run mgmt_split_dirent_release;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_split_dirent_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * Function: mgmt_split_dirent_write_directory_entries
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *js_p
+ *
+ * Pre:      s_op->u.mgmt_split_dirent.dest_dirent_handle is the directory entry k/v space
+ *           s_op->u.mgmt_split_dirent.entry_names != NULL
+ *           s_op->u.mgmt_split_dirent.entry_handles != NULL
+ *
+ * Post:     key/val pair stored
+ *
+ * Returns:  int
+ *
+ * Synopsis: We are now ready to store the name/handle pairs in the k/v
+ *           space for directory handles.
+ */
+static PINT_sm_action mgmt_split_dirent_write_directory_entries(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    int j;
+    TROVE_ds_flags keyval_flags;
+
+    assert(s_op->req->u.mgmt_split_dirent.dest_dirent_handle);
+
+    js_p->error_code = 0;
+
+    if (s_op->req->u.mgmt_split_dirent.nentries < 1)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  no new directory entries to write.\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->key_a = calloc(s_op->req->u.mgmt_split_dirent.nentries,
+                         sizeof(PVFS_ds_keyval));
+    if(! s_op->key_a)
+    {
+        gossip_lerr("Cannot allocate memory for key.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->val_a = calloc(s_op->req->u.mgmt_split_dirent.nentries,
+                         sizeof(PVFS_ds_keyval));
+    if(! s_op->val_a)
+    {
+        gossip_lerr("Cannot allocate memory for val.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* We want to keep track of the keyval entries added or removed on
+     * this handle, which allows us to get the size of the directory later
+     */
+    keyval_flags = TROVE_SYNC | TROVE_NOOVERWRITE | TROVE_KEYVAL_HANDLE_COUNT |
+                   TROVE_KEYVAL_DIRECTORY_ENTRY;
+
+    for (j = 0; j < s_op->req->u.mgmt_split_dirent.nentries; j++)
+    {
+        if (! s_op->req->u.mgmt_split_dirent.undo)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
+                     "for %s (handle = %llu) to dirdata dspace %llu\n",
+                     s_op->req->u.mgmt_split_dirent.entry_names[j],
+                     llu(s_op->req->u.mgmt_split_dirent.entry_handles[j]),
+                     llu(s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "  deleting directory entry "
+                     "(handle = %llu) from dirdata dspace %llu\n",
+                     llu(s_op->req->u.mgmt_split_dirent.entry_handles[j]),
+                     llu(s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
+        }
+
+        s_op->key_a[j].buffer = s_op->req->u.mgmt_split_dirent.entry_names[j];
+        s_op->key_a[j].buffer_sz = strlen(s_op->req->u.mgmt_split_dirent.entry_names[j]) + 1;
+
+        s_op->val_a[j].buffer = &s_op->req->u.mgmt_split_dirent.entry_handles[j];
+        s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
+    }
+
+    if (! s_op->req->u.mgmt_split_dirent.undo)
+    {
+        ret = job_trove_keyval_write_list(
+            s_op->req->u.mgmt_split_dirent.fs_id,
+            s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
+            s_op->key_a,
+            s_op->val_a,
+            s_op->req->u.mgmt_split_dirent.nentries,
+            keyval_flags,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &j_id,
+            server_job_context, s_op->req->hints);
+    }
+    else
+    {
+        if (s_op->req->u.mgmt_split_dirent.undo)
+        {
+            s_op->error_a = calloc(s_op->req->u.mgmt_split_dirent.nentries,
+                                   sizeof(PVFS_error));
+            if (! s_op->error_a)
+            {
+                gossip_lerr("Cannot allocate memory for error.\n");
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+        }
+        ret = job_trove_keyval_remove_list(
+            s_op->req->u.mgmt_split_dirent.fs_id,
+            s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
+            s_op->key_a,
+            s_op->val_a,
+            s_op->error_a,
+            s_op->req->u.mgmt_split_dirent.nentries,
+            keyval_flags,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &j_id,
+            server_job_context,
+            s_op->req->hints);
+    }
+
+    return ret;
+}
+
+static PINT_sm_action mgmt_split_dirent_update_directory_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    /*
+     * creating entries will cause directory times to be updated.
+     */
+    if (js_p->error_code != 0)
+    {
+        PVFS_perror_gossip("previous keyval write failed",
+                           js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
+
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    dspace_attr = &s_op->attr;
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
+
+    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+    ds_attr = &(s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+
+    /* update timestamps for the dirdata handle. */
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.mgmt_split_dirent.fs_id,
+        s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
+        ds_attr, 
+        TROVE_SYNC,
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
+                     ds_attr->type);
+    return ret;
+}
+
+/*
+ * Function: mgmt_split_dirent_release()
+ *
+ * Params:   server_op *b,
+ *           job_status_s* js_p
+ *
+ * Pre:      we are done with all steps necessary to service
+ *           request
+ *
+ * Post:     operation has been released from the scheduler
+ *
+ * Returns:  int
+ *
+ * Synopsis: releases the operation from the scheduler
+ */
+static PINT_sm_action mgmt_split_dirent_release(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+//    job_id_t i;
+
+    if (s_op->val_a)
+        free(s_op->val_a);
+    if (s_op->key_a)
+        free(s_op->key_a);
+ 
+#if 0
+    /*
+      tell the scheduler that we are done with this operation (if it
+      was scheduled in the first place)
+    */
+    ret = job_req_sched_release(
+        s_op->scheduled_id, smcb, 0, js_p, &i, server_job_context);
+#endif
+    return ret;
+}
+
+/*
+ * Function: mgmt_split_dirent_cleanup()
+ *
+ * Params:   server_op *b,
+ *           job_status_s* js_p
+ *
+ * Pre:      all jobs done, simply need to clean up
+ *
+ * Post:     everything is free
+ *
+ * Returns:  int
+ *
+ * Synopsis: free up any buffers associated with the operation,
+ *           including any encoded or decoded protocol structures
+ */
+static PINT_sm_action mgmt_split_dirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+
+static inline int PINT_get_object_ref_mgmt_split_dirent(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.mgmt_split_dirent.fs_id;
+    *handle = req->u.mgmt_split_dirent.dest_dirent_handle;
+    return 0;
+};
+
+static int perm_mgmt_split_dirent(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
+struct PINT_server_req_params pvfs2_mgmt_split_dirent_params =
+{
+    .string_name = "mgmt_split_dirent",
+    .perm = perm_mgmt_split_dirent,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_split_dirent,
+    .state_machine = &pvfs2_mgmt_split_dirent_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

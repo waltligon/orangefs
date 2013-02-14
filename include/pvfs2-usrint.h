@@ -57,6 +57,16 @@
 					   effective IDs, not real IDs.  */
 #endif
 
+
+/* Set of valid atomic operations to be performed by a call to atomic_eattr */
+enum
+{
+    PVFS_TEST_AND_SET = 0x1,
+    PVFS_SWAP = 0x2,
+    PVFS_FETCH_AND_ADD = 0xADD
+};
+
+
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 

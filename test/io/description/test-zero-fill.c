@@ -502,12 +502,18 @@ int main(int argc, char * argv[])
 		before_len, dashes, after_len, dashes);
     }
 
-    PVFS_util_gen_credential_defaults(&creds);
+    res = PVFS_util_gen_credential_defaults(&creds);
+    if (res < 0)
+    {
+        PVFS_perror("error loading credential", res);
+        return -1;
+    }
 
     res = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(res < 0)
     {
 	PVFS_perror("lookup failed with errcode", res);
+    return -1;
     }
     
     dist = PVFS_sys_dist_lookup("simple_stripe");
@@ -517,6 +523,7 @@ int main(int argc, char * argv[])
     if(res < 0)
     {
 	PVFS_perror("dist setparam failed with errcode", res);
+    return -1;
     }
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;

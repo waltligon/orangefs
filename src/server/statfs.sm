@@ -170,6 +170,7 @@ struct PINT_server_req_params pvfs2_statfs_params =
 {
     .string_name = "statfs",
     .perm = perm_statfs,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_statfs,
     .state_machine = &pvfs2_statfs_sm
 };

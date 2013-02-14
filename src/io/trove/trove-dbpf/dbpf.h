@@ -30,7 +30,7 @@ extern "C" {
  * Major versions aren't either, but refer to architectural storage format changes.
  */
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.1.5"   
+#define TROVE_DBPF_VERSION_VALUE                                  "0.1.6"   
 
 #define LAST_HANDLE_STRING                                  "last_handle"
 
@@ -187,6 +187,7 @@ typedef int (* PINT_dbpf_keyval_iterate_callback)(
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
     TROVE_handle handle,
+    char type,
     PINT_dbpf_keyval_pcache *pcache,    
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
@@ -450,6 +451,13 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                 int opcode,
                                 struct dbpf_aio_ops * aio_ops,
                                 PVFS_hint  hints);
+
+enum dbpf_key_type
+{
+    DBPF_DIRECTORY_ENTRY_TYPE = 'd',
+    DBPF_ATTRIBUTE_TYPE = 'a',
+    DBPF_COUNT_TYPE = 'c'
+};
 
 struct dbpf_keyval_get_handle_info_op
 {

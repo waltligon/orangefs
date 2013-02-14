@@ -45,7 +45,7 @@ my $opt_default_num_dfiles = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
 
-my $opt_security = '0';
+my $opt_trusted = '0';
 my $opt_trusted_port = '';
 my $opt_trusted_network = '';
 my $opt_trusted_netmask = '';
@@ -63,8 +63,29 @@ my $bmi_module = undef;
 
 my $opt_gen_key = 0;
 
-my $opt_key_store = undef;
-my $opt_server_key = undef;
+# key-based security options 
+my $opt_security_key = undef;
+my $opt_keystore = undef;
+my $opt_server_key = undef;  # also used with cert-based security
+my $opt_security_timeout = undef;
+
+# cert-based security options
+my $opt_security_cert = undef;
+my $opt_ca_path = undef;
+
+# LDAP options for cert-based security
+my $opt_ldap_hosts = undef;
+my $opt_ldap_bind_dn = undef;
+my $opt_ldap_bind_password = undef;
+my $opt_ldap_search_mode = undef;
+my $opt_ldap_search_root = undef;
+my $opt_ldap_search_class = undef;
+my $opt_ldap_search_attr = undef;
+my $opt_ldap_search_scope = undef;
+my $opt_ldap_uid_attr = undef;
+my $opt_ldap_gid_attr = undef;
+my $opt_ldap_search_timeout = undef;
+
 
 my $META_ENDPOINT = 0x1;
 my $IO_ENDPOINT   = 0x2;
@@ -139,6 +160,25 @@ sub prompt_word
     return $val;
 }
 
+sub prompt_or_print
+{
+    my($opt,$defmsg,$msg,$prompt,$default) = @_;
+
+    if (defined($opt))
+    {
+        print $OUT "$defmsg: $opt\n";
+        return $opt;
+    }
+
+    print $OUT "$msg\n";
+
+    my $val = prompt_word($prompt, $default);
+    return undef
+        if ($val eq "");
+
+    return $val;
+}
+
 sub parse_hostlist
 {
     my $inputline = shift;
@@ -195,6 +235,120 @@ sub parse_hostlist
     return @hosts;
 }
 
+# emit trusted network info
+sub emit_trusted
+{
+    my ($target, $portlist, $network, $netmask) = @_;
+
+    print $target "\t\tTrustedPorts $portlist\n";
+    print $target "\t\tTrustedNetwork $network $netmask\n";
+}
+
+# emit security options
+sub emit_security
+{
+    my $target = shift;
+    my $alias = shift;
+    my $seckeyflag = 0;
+    my $seccertflag = 0;
+
+    # if securitykey or keystore used, use key-based options    
+    $seckeyflag = defined($opt_security_key) || defined($opt_keystore);
+    
+    # if securitycert or capath used, use cert-based options
+    $seccertflag = defined($opt_security_cert) || defined($opt_ca_path);
+
+    if ($seckeyflag || $seccertflag || $opt_trusted == 1)
+    {
+        print $target "\n\t<Security>\n";
+    }
+
+    if ($opt_trusted == 1)
+    {
+        emit_trusted($target, $opt_trusted_port, $opt_trusted_network,
+                     $opt_trusted_netmask);
+        print $target "\n"
+            if ($seckeyflag || $seccertflag);
+    }
+
+    if ($seckeyflag || $seccertflag)
+    {
+        my $serverkey = get_server_key($alias);
+        die "\n*** error: no server key specified\n*** use --serverkey option"
+            if (!defined($serverkey));
+
+        print $target "\t\tServerKey $serverkey\n";
+
+        if (defined($opt_security_timeout))
+        {
+            print $target "\t\tSecurityTimeout $opt_security_timeout\n";
+        }
+    }
+
+    if ($seckeyflag)
+    {
+        my $keystore = get_keystore($alias);
+        die "\n*** error: no keystore specified\n*** use --keystore option"
+            if (!defined($keystore));
+
+        print $target "\t\tKeystore $keystore\n";
+    }
+    elsif ($seccertflag)
+    {
+        my $capath = get_ca_path($alias);
+        die "\n*** error: no CA path specified\n*** use --capath option"
+            if (!defined($capath));
+
+        print $target "\t\tCAPath $capath\n";
+
+        if (defined($opt_ldap_hosts) ||
+            defined($opt_ldap_bind_dn) ||
+            defined($opt_ldap_bind_password) ||
+            defined($opt_ldap_search_mode) ||
+            defined($opt_ldap_search_root) ||
+            defined($opt_ldap_search_class) ||
+            defined($opt_ldap_search_attr) ||
+            defined($opt_ldap_search_scope) ||
+            defined($opt_ldap_uid_attr) ||
+            defined($opt_ldap_gid_attr) ||
+            defined($opt_ldap_search_timeout))
+        {
+            print $target "\n\t\t<LDAP>\n";
+
+            print $target "\t\t\tHosts $opt_ldap_hosts\n"
+                if (defined($opt_ldap_hosts));
+            print $target "\t\t\tBindDN $opt_ldap_bind_dn\n"
+                if (defined($opt_ldap_bind_dn));
+            print $target "\t\t\tBindPassword $opt_ldap_bind_password\n"
+                if (defined($opt_ldap_bind_password));
+            print $target "\t\t\tSearchMode $opt_ldap_search_mode\n"
+                if (defined($opt_ldap_search_mode));
+            print $target "\t\t\tSearchRoot $opt_ldap_search_root\n"
+                if (defined($opt_ldap_search_root));
+            print $target "\t\t\tSearchClass $opt_ldap_search_class\n"
+                if (defined($opt_ldap_search_class));
+            print $target "\t\t\tSearchAttr $opt_ldap_search_attr\n"
+                if (defined($opt_ldap_search_attr));
+            print $target "\t\t\tSearchScope $opt_ldap_search_scope\n"
+                if (defined($opt_ldap_search_scope));
+            print $target "\t\t\tUIDAttr $opt_ldap_uid_attr\n"
+                if (defined($opt_ldap_uid_attr));
+            print $target "\t\t\tGIDAttr $opt_ldap_gid_attr\n"
+                if (defined($opt_ldap_gid_attr));
+            print $target "\t\t\tSearchTimeout $opt_ldap_search_timeout\n"
+                if (defined($opt_ldap_search_timeout));
+
+            print $target "\t\t</LDAP>\n";
+       }
+    }
+
+    if ($seckeyflag || $seccertflag || $opt_trusted == 1)
+    {
+        print $target "\t</Security>\n";
+    }
+
+}
+
 sub emit_defaults
 {
     my ($target, $num_unexp, $bmi_module, $logfile,
@@ -237,18 +391,16 @@ sub emit_defaults
         print $target "\tTCPBindSpecific yes\n";
     }
 
+    # if --metaspec is used, security options are done per-server
+    # otherwise do them here
+    if (!defined($opt_metaspec))
+    {
+        emit_security($target);
+    }
+
     print $target "</Defaults>\n";
 }
 
-sub emit_security
-{
-    my ($target, $portlist, $network, $netmask) = @_;
-
-    print $target "<Security>\n";
-    print $target "\tTrustedPorts $portlist\n";
-    print $target "\tTrustedNetwork $network $netmask\n";
-    print $target "</Security>\n";
-}
 
 sub emit_aliases
 {
@@ -391,19 +543,8 @@ sub emit_serveropts
         print $target "\tDataStorageSpace $endpoint->{STORAGE}\n";
         print $target "\tMetadataStorageSpace $endpoint->{METASTORAGE}\n";
         print $target "\tLogFile $endpoint->{LOGFILE}\n";
-        
-        my $alias_key = get_server_key($alias);
-        my $alias_store = get_key_store($alias);
 
-        if( defined($alias_store) ) 
-        {
-            print $target "\tKeyStore $alias_store\n";
-        }
-
-        if( defined($alias_key) )
-        {
-            print $target "\tServerKey $alias_key\n";
-        }
+        emit_security($target, $alias);
 
         print $target "</ServerOptions>\n";
     }
@@ -564,28 +705,46 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --tracing                         Enable event tracing in the server
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
-     --storage <STRING>                path to pvfs storage directory.
-     --logfile <STRING>                file to place server logging.
+     --storage     <STRING>            path to pvfs storage directory.
+     --logfile     <STRING>            file to place server logging.
      --notrovesync                     sync metadata only upon request
      --server-job-timeout <NUM>        server job timeout value (seconds)
      --client-job-timeout <NUM>        server job timeout value (seconds)
      --trove-method <STRING>           specify a trove method
      --first-handle <NUM>              first handle value to reserve
-     --last-handle  <NUM>              last handle value to reserve
-     --root-handle  <NUM>              handle value to reserve for root object
-     --fsid         <NUM>              fs identifier value
-     --fsname <STRING>                 fs name
+     --last-handle <NUM>               last handle value to reserve
+     --root-handle <NUM>               handle value to reserve for root object
+     --fsid        <NUM>               fs identifier value
+     --fsname      <STRING>            fs name
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
      --flow-buffer-count <NUM>         set flow buffers per flow
-     --trusted      <0|1>              indicate whether trusted connection options need to be emitted
+     --trusted     <0|1>               indicate whether trusted connection options need to be emitted
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
-     --keystore                        keystore for each server. Magic value _ALIAS_ will be replaced 
-                                       with each defined alias' value.
-     --serverkey                       private key for each server. Magic value _ALIAS_ will be 
-                                       replaced in the path with each defined alias' value
+     --securitykey                     prompt for default key-based security values
+     --keystore    <STRING>            keystore for each server. With --metaspec, magic value _ALIAS_
+                                       will be replaced with each defined alias' value.
+     --serverkey   <STRING>            private key for each server. With --metaspec, magic value _ALIAS_ 
+                                       will be  replaced in the path with each defined alias' value.
+     --securitytimeout <NUM>           timeout for security operations in seconds
+     --securitycert                    prompt for default cert-based security values
+     --capath      <STRING>            path to certificate authority. With --metaspec, magic value
+                                       _ALIAS_ will be replaced with each defined alias' value.
+     --ldaphosts   <STRING>            comma-separated list of LDAP host URIs
+                                       Example: "ldap://myldap.mysite.com,ldaps://myldapssl.mysite.com"
+     --ldapbinddn  <STRING>            DN of user that will bind to LDAP for certificate mapping 
+                                       operations. Example: "cn=admin,dc=mysite,dc=com"
+     --ldapbindpassword <STRING>       Password of LDAP bind user. Literal password or "file:<path>"
+     --ldapsearchmode <CN|DN>          LDAP search mode; by common name (CN) or distinguished name (DN)
+     --ldapsearchroot <STRING>         DN of LDAP container to user for certificate mapping
+     --ldapsearchclass <STRING>        Class name of LDAP objects to search for certificate mapping
+     --ldapsearchattr <STRING>         LDAP attribute name to use for certificate mapping
+     --ldapsearchscope <STRING>        LDAP search scope; 'onelevel' or 'subtree'
+     --ldapuidattr <STRING>            LDAP attribute that contains UID values
+     --ldapgidattr <STRING>            LDAP attribute that contains GID values
+     --ldapsearchtimeout <NUM>         timeout for LDAP searches in seconds
      --help                            This message
      --spec-usage                      Show the usage info for --iospec 
                                        and --metaspec options
@@ -664,7 +823,7 @@ PROTOCOL
     foreach (split(',', $type)) {
         if ($_ eq "tcp") {
             $port{'tcp'} = tcp_get_port();
-            if ($opt_security == 1)
+            if ($opt_trusted == 1)
             {
                 $opt_trusted_port = get_portlist();
                 my $str = get_network();
@@ -1393,7 +1552,11 @@ sub get_server_key
     my $keypath = $opt_server_key;
     my $alias = shift;
 
-    if( defined($opt_server_key) )
+    # just return keypath if no alias
+    return $keypath
+        if (!defined($alias));
+
+    if(defined($keypath))
     {
         $keypath =~ s/_ALIAS_/$alias/g;
         return $keypath;
@@ -1401,15 +1564,36 @@ sub get_server_key
     return undef;
 }
 
-sub get_key_store
+sub get_keystore
 {
-    my $keystore = $opt_key_store;
+    my $keystore = $opt_keystore;
     my $alias = shift;
 
-    if( defined($opt_key_store) )
+    # just return keystore if no alias
+    return $keystore
+        if (!defined($alias));
+
+    if(defined($keystore))
     {
         $keystore =~ s/_ALIAS_/$alias/g;
         return $keystore;
+    }
+    return undef;
+}
+
+sub get_ca_path
+{
+    my $capath = $opt_ca_path;
+    my $alias = shift;
+
+    # just return capath if no alias
+    return $capath
+        if (!defined($alias));
+
+    if (defined($capath))
+    {
+        $capath =~ s/_ALIAS_/$alias/g;
+        return $capath;
     }
     return undef;
 }
@@ -1442,6 +1626,103 @@ sub set_default_value
     }
 }
 
+# prompt for security info
+sub get_security_info
+{
+    if (defined($opt_security_key) || defined($opt_keystore))
+    {
+        print $OUT "Using key-based security...\n\n";
+
+        $opt_server_key = prompt_or_print($opt_server_key,
+                                          "Using server key file",
+                                          "Specify the server key file.",
+                                          "Enter server key file location: ",
+                                          "");
+
+        $opt_keystore = prompt_or_print($opt_keystore,
+                                         "Using keystore file",
+                                         "Specify the keystore file.",
+                                         "Enter keystore file location: ",
+                                         "");
+    }
+    elsif (defined($opt_security_cert) || defined($opt_ca_path))
+    {
+        print $OUT "Using certificate-based security...\n\n";
+
+        $opt_ca_path = prompt_or_print($opt_ca_path,
+                                       "Using CA certificate file",
+                                       "Specify the CA certificate file.",
+                                       "Enter CA certificate file location: ",
+                                       "");
+
+        $opt_server_key = prompt_or_print($opt_server_key,
+                                          "Using CA private key file",
+                                          "Specify the CA private key file.",
+                                          "Enter CA private key file location: ",
+                                          "");
+
+        $opt_ldap_hosts = prompt_or_print($opt_ldap_hosts,
+                                          "Using LDAP host list",
+                                          "Specify the LDAP host list (ldap[s]://host[:port],...).",
+                                          "Enter LDAP host list [Default is ldap://localhost]: ",
+                                          "ldap://localhost");
+        
+        $opt_ldap_bind_dn = prompt_or_print($opt_ldap_bind_dn,
+                                            "Using LDAP bind DN",
+                                            "Specify the LDAP bind user DN (DN format).",
+                                            "Enter LDAP bind DN: ",
+                                            "");
+
+        $opt_ldap_bind_password = prompt_or_print($opt_ldap_bind_password,
+                                                  "Using LDAP bind password",
+                                                  "Specify the LDAP bind password (password or file:{path}).",
+                                                  "Enter LDAP bind password: ",
+                                                  "");
+
+        $opt_ldap_search_mode = prompt_or_print($opt_ldap_search_mode,
+                                                "Using LDAP search mode",
+                                                "Specify the LDAP search mode (CN or DN).",
+                                                "Enter LDAP search mode [Default is CN]: ",
+                                                "CN");
+
+        $opt_ldap_search_root = prompt_or_print($opt_ldap_search_root,
+                                                "Using LDAP search root",
+                                                "Specify the LDAP search root object (DN format).",
+                                                "Enter LDAP search root: ",
+                                                "");
+
+        $opt_ldap_search_class = prompt_or_print($opt_ldap_search_class,
+                                                 "Using LDAP search class",
+                                                 "Specify the LDAP search class.",
+                                                 "Enter LDAP search class [Default is inetOrgPerson]: ",
+                                                 "inetOrgPerson");
+
+        $opt_ldap_search_attr = prompt_or_print($opt_ldap_search_attr,
+                                                "Using LDAP search attribute",
+                                                "Specify the LDAP search attribute.",
+                                                "Enter LDAP search attribute [Default is cn]: ",
+                                                "cn");
+
+        $opt_ldap_search_scope = prompt_or_print($opt_ldap_search_scope,
+                                                 "Using LDAP search scope",
+                                                 "Specify the LDAP search scope (onelevel or subtree).",
+                                                 "Enter LDAP search scope [Default is subtree]: ",
+                                                 "subtree");
+
+        $opt_ldap_uid_attr = prompt_or_print($opt_ldap_uid_attr,
+                                             "Using LDAP UID attribute",
+                                             "Specify the LDAP UID attribute.",
+                                             "Enter LDAP UID attribute [Default is uidNumber]: ",
+                                             "uidNumber");
+
+        $opt_ldap_gid_attr = prompt_or_print($opt_ldap_gid_attr,
+                                             "Using LDAP GID attribute",
+                                             "Specify the LDAP GID attribute.",
+                                             "Enter LDAP GID attribute [Default is gidNumber]: ",
+                                             "gidNumber");
+    }
+}
+
 # ---------------------
 # entry point of script
 # ---------------------
@@ -1451,9 +1732,9 @@ my $show_help = '';
 my $show_specusage = '';
 
 $opt_quiet = 0;
-GetOptions('protocol=s'    => \$opt_protocol,
+GetOptions('protocol=s' => \$opt_protocol,
     'tcpport=i'     => \$opt_tcpport,
-    'tcpbindspecific'  => \$opt_tcpbindspecific,
+    'tcpbindspecific' => \$opt_tcpbindspecific,
     'gmport=i'      => \$opt_gmport,
     'mxboard=i'     => \$opt_mxboard,
     'mxendpoint=i'  => \$opt_mxendpoint,
@@ -1469,11 +1750,11 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'last-handle=i' => \$opt_last_handle,
     'default-num-dfiles=i' => \$opt_default_num_dfiles,
     'flow-buffer-size=i' => \$opt_default_flow_buffer_size,
-    'flow-buffer-count=i'=> \$opt_default_flow_buffer_count,
+    'flow-buffer-count=i' => \$opt_default_flow_buffer_count,
     'root-handle=i' => \$opt_root_handle,
     'fsid=i'        => \$opt_fsid,
     'fsname=s'      => \$opt_fsname,
-    'trusted=i'        => \$opt_security,
+    'trusted=i'     => \$opt_trusted,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
     'storage=s'     => \$opt_storage,
@@ -1481,13 +1762,28 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'quiet!'        => \$opt_quiet,
     'trovesync!'    => \$opt_trovesync,
     'trove-method=s' => \$opt_trovemethod,
-    'iospec=s'     => \$opt_iospec,
-    'metaspec=s'   => \$opt_metaspec, 
-    'spec-usage!'  => \$show_specusage,
+    'iospec=s'      => \$opt_iospec,
+    'metaspec=s'    => \$opt_metaspec, 
+    'spec-usage!'   => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
-    'keystore=s'    => \$opt_key_store,
-    'serverkey=s'    => \$opt_server_key,
-    '-'           => \$using_stdout)
+    'securitykey',  => \$opt_security_key,
+    'keystore=s'    => \$opt_keystore,
+    'serverkey=s'   => \$opt_server_key,
+    'securitytimeout=i' => \$opt_security_timeout,
+    'securitycert', => \$opt_security_cert,
+    'capath=s'      => \$opt_ca_path,
+    'ldaphosts=s'   => \$opt_ldap_hosts,
+    'ldapbinddn=s'  => \$opt_ldap_bind_dn,
+    'ldapbindpassword=s' => \$opt_ldap_bind_password,
+    'ldapsearchmode=s' => \$opt_ldap_search_mode,
+    'ldapsearchroot=s' => \$opt_ldap_search_root,
+    'ldapsearchclass=s' => \$opt_ldap_search_class,
+    'ldapsearchattr=s' => \$opt_ldap_search_attr,
+    'ldapsearchscope=s' => \$opt_ldap_search_scope,
+    'ldapuidattr=s' => \$opt_ldap_uid_attr,
+    'ldapgidattr=s' => \$opt_ldap_gid_attr,
+    'ldapsearchtimeout=i' => \$opt_ldap_search_timeout,
+    '-'             => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 
 if($opt_quiet)
@@ -1538,7 +1834,7 @@ if ($using_stdout) {
 }
 elsif (@ARGV != 1)
 {
-    die "Bad arguments.  See -h for help.\n";
+    die "Bad arguments.  Use -h for help.\n";
 }
 else
 {
@@ -1549,12 +1845,23 @@ else
     $output_target = \*FILEOUT;
 }
 
-die "-port not allowed with -iospec or -metaspec."
-if($opt_port ne '' && defined($opt_iospec) && defined($opt_metaspec));
-die "-iospec requires -metaspec." 
-if(defined($opt_iospec) && !defined($opt_metaspec));
-die "-metaspec requires -iospec." 
-if(defined($opt_metaspec) && !defined($opt_iospec));
+# options check
+die "--port not allowed with --iospec or --metaspec."
+    if ($opt_port ne '' && defined($opt_iospec) && defined($opt_metaspec));
+die "--iospec requires --metaspec." 
+    if (defined($opt_iospec) && !defined($opt_metaspec));
+die "--metaspec requires --iospec." 
+    if (defined($opt_metaspec) && !defined($opt_iospec));
+
+# security options check
+die "--keystore requires --serverkey"
+    if (defined($opt_keystore) && !defined($opt_server_key));
+die "--serverkey requires --keystore or --capath"
+    if (defined($opt_server_key) && !defined($opt_keystore) && !defined($opt_ca_path));
+die "--capath requires --serverkey"
+    if (defined($opt_ca_path) && !defined($opt_server_key));
+die "--securitykey and --securitycert are exclusive"
+    if (defined($opt_security_key) && defined($opt_security_cert));
 
 # only open the terminal for reading input if options specified
 # on the command line are not enough to gather necessary information
@@ -1619,6 +1926,18 @@ my $count = scalar(keys %all_endpoints);
 my $io_count = scalar(get_aliases($IO_ENDPOINT));
 my $meta_count = scalar(get_aliases($META_ENDPOINT));
 
+chomp(my $curdir = `dirname $0`);
+# may also be enabled on command-line
+$opt_security_key = 1 
+    if (-e "$curdir/.pvfs2-genconfig-key");
+$opt_security_cert = 1
+    if (-e "$curdir/.pvfs2-genconfig-cert");
+# prompt for security options
+if (!$opt_quiet && 
+    (defined($opt_security_key) || defined($opt_security_cert))) {
+    get_security_info
+}
+
 if (!$opt_quiet) {
     print $OUT <<"FINI"
 Configured a total of $count servers:
@@ -1627,7 +1946,7 @@ $meta_count of them are Metadata servers.
 FINI
     ;;
 
-    if ($opt_security == 1)
+    if ($opt_trusted == 1)
     {
         print $OUT "Configured trusted connection settings\n";
         print $OUT "Trusted port list : ", $opt_trusted_port, "\n";
@@ -1689,11 +2008,6 @@ if (!$opt_quiet) {
 emit_defaults($output_target, $num_unexp_reqs,
     $bmi_module, $default_logfile, $logging, $tracing,
     $logstamp, $server_job_timeout, $client_job_timeout);
-if ($opt_security == 1) 
-{
-    emit_security($output_target, $opt_trusted_port, 
-        $opt_trusted_network, $opt_trusted_netmask);
-}
 emit_aliases($output_target);
 emit_filesystem($output_target, $fsname , $fsid, $root_handle, 
     $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
@@ -1721,6 +2035,18 @@ if ($using_stdout == 0)
 
 if (!$opt_quiet) {
     print $OUT "done\n";
+}
+
+if (!$opt_quiet && defined($opt_security_key))
+{    
+    print $OUT "\nPlease see the documentation for information on configuring " .
+               "your client and server keys.\n";
+}
+
+if (!$opt_quiet && defined($opt_security_cert))
+{
+    print $OUT "\nPlease see the documentation for information on configuring " .
+               "your CA and user certificates.\n";
 }
 
 # Local variables:

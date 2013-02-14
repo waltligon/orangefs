@@ -90,6 +90,16 @@
  * These are used to define the table Trove_Special_keys in
  * the file src/server/get-attr.sm
  */
+/* new keys for distributed directory, '/' makes sure no conflict with dirent names */
+#define DIST_DIR_ATTR_KEYSTR   "/dda\0"
+#define DIST_DIR_ATTR_KEYLEN   5
+
+#define DIST_DIRDATA_HANDLES_KEYSTR   "/ddh\0"
+#define DIST_DIRDATA_HANDLES_KEYLEN   5
+
+#define DIST_DIRDATA_BITMAP_KEYSTR   "/ddb\0"
+#define DIST_DIRDATA_BITMAP_KEYLEN   5
+
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
 #define SPECIAL_DIST_NAME_KEYLEN         21
 #define SPECIAL_DIST_PARAMS_KEYSTR      "dist_params\0"

@@ -14,11 +14,17 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#include "pvfs-path.h"
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#include "string.h"
 #endif
 #include <errno.h>
+#include <pint-cached-config.h>
 
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
@@ -97,16 +103,19 @@ errorout:
  * assumes an absoluate path
  */
 int iocommon_lookup_absolute(const char *abs_path,
+                             int follow_links,
                              PVFS_object_ref *ref,
                              char *error_path,
                              int error_path_size)
 {
     int rc = 0;
     int orig_errno = errno;
-    char pvfs_path[PVFS_PATH_MAX];
-    PVFS_fs_id lookup_fs_id;
+    int local_path_alloc = 0;
     PVFS_credential *credential;
     PVFS_sysresp_lookup resp_lookup;
+    PVFS_path_t *Ppath;
+
+    debug("iocommon_lookup_absolute: called with %s\n", abs_path);
 
     /* Initialize any variables */
     memset(&resp_lookup, 0, sizeof(resp_lookup));
@@ -118,18 +127,79 @@ int iocommon_lookup_absolute(const char *abs_path,
         goto errorout;
     }
 
+    Ppath = PVFS_path_from_expanded((char *)abs_path);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        /* this allocates a PVFS_path which must be
+         * freed below since we do not pass it back */
+        Ppath = PVFS_new_path(abs_path);
+        abs_path = Ppath->expanded_path;
+        local_path_alloc = 1;
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        /* saves original path and returns qualified path */
+        /* this does not allocate a PVFS_path because the */
+        /* input already is one */
+        abs_path = PVFS_qualify_path(abs_path);
+    }
+
     /* Determine the fs_id and pvfs_path */
     errno = 0;
-    rc = PVFS_util_resolve(abs_path, &lookup_fs_id, pvfs_path, PVFS_PATH_MAX);
-    if (rc < 0)
+    /**
+     * All paths here should be fully resolved and processed
+     * to remove extra slashes, dots, and double dots.
+     * We could still have symbolic links that change things.
+     */
+    if (!PATH_RESOLVED(Ppath))
     {
-        if (rc == -PVFS_ENOENT)
+        rc = PVFS_util_resolve_absolute(abs_path);
+        if (rc < 0)
         {
-            errno = ESTALE; /* this signals open that resolve failed */
-            rc = -1;
-            goto errorout;
+            if (rc == -PVFS_ENOENT)
+            {
+                errno = ESTALE; /* this signals open that resolve failed */
+                rc = -1;
+                goto errorout;
+            }
+            if (!PATH_EXPANDED(Ppath))
+            {
+                char *ret;
+                /* try fully expanding the path looking up each segment */
+                /* this also should not allocate a PVFS_path */
+                ret = PVFS_expand_path(abs_path, !follow_links);
+                if (ret && PATH_LOOKEDUP(Ppath))
+                {
+                    /* the expanding process looks up the final path */
+                    /* as a side effect so there is nothing left to do */
+                    ref->fs_id = Ppath->fs_id;
+                    ref->handle = Ppath->handle;
+                }
+                else
+                {
+                    /* there was an error */
+                    /* either it failed and we're done */
+                    /* or we tried to look up a file we wish to create */
+                    /* either way this routine is done it will fall back */
+                    rc = -1;
+                }
+            }
+            IOCOMMON_CHECK_ERR(rc);
         }
-        IOCOMMON_CHECK_ERR(rc);
+    }
+
+    /* at this point we should have a resolved path */
+
+    if (PATH_MNTPOINT(Ppath))
+    {
+        /* looking up the mountpoint, the PVFS root dir */
+        /* which is known and stored in configuration */
+        ref->fs_id = Ppath->fs_id;
+        rc = PINT_cached_config_get_root_handle(Ppath->fs_id,
+                                                &ref->handle);
+        /* return rc; */
+        goto cleanup;
     }
 
     /* set up buffer to return partially looked up path */
@@ -148,17 +218,34 @@ int iocommon_lookup_absolute(const char *abs_path,
         resp_lookup.error_path_size = 0;
     }
 
+    /* let's try to do the lookup */
+
     errno = 0;
+/* what was this? it was in working ??? */
+#if 0
     rc = PVFS_sys_lookup(lookup_fs_id,
                          pvfs_path,
                          credential,
                          &resp_lookup,
                          PVFS2_LOOKUP_LINK_FOLLOW,
                          NULL);
+#endif
+    rc = PVFS_sys_lookup(Ppath->fs_id,
+                         Ppath->pvfs_path,
+                         credential,
+                         &resp_lookup,
+                         follow_links,
+                         NULL);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_lookup.ref;
 
 errorout:
+    /* no specific error handling */
+cleanup:
+    if (local_path_alloc)
+    {
+        PVFS_free_expanded((char *)abs_path);
+    }
     return rc;
 }
 
@@ -171,6 +258,10 @@ errorout:
  * include file you look at).  PVFS cannot deal with more
  * than 255 chars at a time so we must break long paths
  * into pieces and do multiple relative lookups
+ *
+ * rel_path is relative to PVFS object ref so this shoule
+ * all be in PVFS unless a symlink takes us back out of it.
+ * Therefore don't need to do anything to the path.
  */
 int iocommon_lookup_relative(const char *rel_path,
                              PVFS_object_ref parent_ref, /* by value */
@@ -187,6 +278,8 @@ int iocommon_lookup_relative(const char *rel_path,
     PVFS_credential *credential;
     PVFS_sysresp_lookup resp_lookup;
 
+    debug("iocommon_lookup_relative: called with %s\n", rel_path);
+
     /* Initialize any variables */
     pvfs_sys_init();
     memset(&resp_lookup, 0, sizeof(resp_lookup));
@@ -198,7 +291,11 @@ int iocommon_lookup_relative(const char *rel_path,
         goto errorout;
     }
 
-    /* Set up error path */
+    /* if the PVFS lookup hits a symlink out of PVFS space
+     * the remaining path will be returned in error_path
+     * and it will be handled upstream.
+     */
+
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -210,6 +307,11 @@ int iocommon_lookup_relative(const char *rel_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
+
+    /* a path can be up toPVFS_PATH_MAX long, but a single lookup
+     * will only accept up to PVFS_NAME_MAX so this loop takes
+     * chunks of the path and if needed uses multiple lookups
+     */
 
     current_seg_ref = parent_ref;
     cur = (char *)rel_path;
@@ -278,7 +380,78 @@ errorout:
 }
 
 /**
+ * Parses a simple string to find the number and select of servers
+ * for the LIST layout method
+ */
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid)
+{
+    PVFS_BMI_addr_t *server_array;
+    int count;
+    char *tok, *save_ptr;
+    int i;
+
+    /* expects slist->servers to be NULL */
+    if (!slist || slist->servers)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    tok = strtok_r(serverlist, ":", &save_ptr);
+    if (!tok)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->count = atoi(tok);
+    PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
+    if (slist->count < 1 || slist->count > count)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
+                                                slist->count);
+    if (!slist->servers)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
+    if (!server_array)
+    {
+        free(slist->servers);
+        slist->servers = NULL;
+        errno = ENOMEM;
+        return -1;
+    }
+    PINT_cached_config_get_server_array(fsid,
+                                        PINT_SERVER_TYPE_IO,
+                                        server_array,
+                                        &count);
+    for (i = 0; i < slist->count; i++)
+    {
+        tok = strtok_r(NULL, ":", &save_ptr);
+        if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
+        {
+            free(slist->servers);
+            slist->servers = NULL;
+            free(server_array);
+            errno = EINVAL;
+            return -1;
+        }
+        slist->servers[i] = server_array[atoi(tok)];
+    }
+    free(server_array);
+    return 0;
+}
+    
+
+/**
  * Create a file via the PVFS system interface
+ * parent_ref is a PVFS object so we should be all
+ * in PVFS space.
  */
 int iocommon_create_file(const char *filename,
                          mode_t mode,
@@ -295,25 +468,14 @@ int iocommon_create_file(const char *filename,
     PVFS_sysresp_create resp_create;
     PVFS_sys_dist *dist = NULL;
     PVFS_sys_layout *layout = NULL;
+    PVFS_hint hints = NULL;
+
+    debug("iocommon_create_file: called with %s\n", filename);
 
     /* Initialize */
     pvfs_sys_init();
     memset(&attr, 0, sizeof(attr));
     memset(&resp_create, 0, sizeof(resp_create));
-
-    /* this is not right - need to pull parameters out of hints */
-    /* investigate PVFS hint mechanism */
-#if 0
-    if (file_creation_param.striping_unit > 0)
-    {
-        dist = PVFS_sys_dist_lookup("simple_stripe");
-        if (PVFS_sys_dist_setparam(dist, "strip_size",
-                                  &(file_creation_param.striping_unit)) < 0)
-        {
-            fprintf(stderr, "Error: failed to set striping_factor\n");
-        }
-    }
-#endif
 
     attr.owner = geteuid();
     attr.group = getegid();
@@ -322,12 +484,78 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#if 0
-    if (file_creation_param.striping_factor > 0){
-        attributes.dfile_count = file_creation_param.striping_factor;
-        attributes.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    if (file_creation_param) /* these are hints */
+    {
+        int length;
+        void *value;
+        /* check for distribution */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DISTRIBUTION,
+                                            &length);
+        if (value)
+        {
+            dist = PVFS_sys_dist_lookup((char *)value);
+            if (!dist) /* distribution not found */
+            {
+                rc = EINVAL;
+                goto errorout;
+            }
+        }
+        /* check for dfile count */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DFILE_COUNT,
+                                            &length);
+        if (value)
+        {
+            attr.dfile_count = *(int *)value;
+            attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+        }
+        /* check for layout */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_LAYOUT,
+                                            &length);
+        if (value)
+        {
+            layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
+            layout->algorithm = *(int *)value;
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+        }
+        /* check for server list */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_SERVERLIST,
+                                            &length);
+        if (value)
+        {
+            if(!layout)
+            {
+                /* serverlist makes no sense without a layout */
+                rc = EINVAL;
+                goto errorout;
+            }
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+            rc = iocommon_parse_serverlist(value, &layout->server_list,
+                                           parent_ref.fs_id);
+            if (rc < 0)
+            {   
+                return rc;
+            }
+        }
+        /* check for nocache flag */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_NOCACHE,
+                                            &length);
+        if (value)
+        {   
+            /* this should probably move into the open routine */
+        }
+        /* look for hints handled on the server */
+        if (PVFS_hint_check_transfer(&file_creation_param))
+        {   
+            hints = file_creation_param;
+        }
     }
-#endif
 
     /* Extract the users umask (and restore it to the original value) */
     mode_mask = umask(0);
@@ -400,10 +628,233 @@ errorout:
     return rc;
 }
 
+/**
+ * OK we tried to open a file and may have run into a symbolic link that
+ * points to NON-PVFS space or something equally weird so we will call
+ * PVFS_expand_path which will look up each segment of the path one at a
+ * time using either glibc or PVFS as needed.  This is the long slow way
+ * but the only way to guarantee it is right.  Most opens should never
+ * get to this.
+ */
+int iocommon_expand_path (PVFS_path_t *Ppath,
+                          int follow_flag,
+                          int flags,
+                          mode_t mode,
+                          pvfs_descriptor **pdp)
+{
+    int rc = 0;
+    char *path = NULL;
+    pvfs_descriptor *pd = NULL;
+
+    debug("iocommon_expand_path: called with %s\n", Ppath->expanded_path);
+
+    path = PVFS_expand_path(Ppath->expanded_path, !follow_flag);
+    if (PATH_LOOKEDUP(Ppath))
+    {
+        /* we're done */
+        *pdp = NULL;
+        goto errorout;
+    }
+    if (!PATH_ERROR(Ppath))
+    {
+        /* glibc file */
+        struct stat sbuf;
+        /* try to open using glibc */
+        rc = (*glibc_ops.open)(path, flags & 01777777, mode);
+        IOCOMMON_RETURN_ERR(rc);
+
+        /* create a usrint file descriptor for it */
+        debug("iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
+        pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
+        pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
+        pd->true_fd = rc;
+        pd->s->flags = flags;           /* open flags */
+
+        gen_mutex_unlock(&pd->lock); /* must release before fstat */
+        fstat(rc, &sbuf);
+        pd->s->mode = sbuf.st_mode;
+        if (S_ISDIR(sbuf.st_mode))
+        {
+            /* we assume path was qualified by PVFS_expand_path() */
+            int len = strnlen(path, PVFS_PATH_MAX);
+            pd->s->dpath = (char *)malloc(len + 1);
+            strncpy(pd->s->dpath, path, len);
+        }
+        gen_mutex_unlock(&pd->s->lock); /* this is ok after fstat */
+
+        *pdp = pd;
+        goto errorout; /* not really an error, but bailing out */
+    }
+    rc = Ppath->rc;
+
+errorout:
+    /* an error */
+    return rc;
+}
+
+/**
+ * This is done in many of the iocommon calls so this is just a helper
+ * function to keep amount of redundant code down.  This routine is used
+ * with syscalls other than open and expect the path to be PVFS.
+ *
+ * pref and fref return object refs to parent and file if the pointer
+ * is not NULL.  Some calls only need one or the other.  If filename
+ * is not NULL the file name string is returned and must be freed by
+ * the caller.  If pdir is not NULL, it is used for a relative lookup
+ * otherwise path should be absolute.
+ */
+int iocommon_lookup(char *path,
+                    int followflag,
+                    PVFS_object_ref *pref,
+                    PVFS_object_ref *fref,
+                    char **filename,
+                    PVFS_object_ref *pdir)
+{
+    int rc = 0;
+    int internal_follow = PVFS2_LOOKUP_LINK_FOLLOW;
+    char *parentdir = NULL;
+    char *dir = NULL;
+    char *file = NULL;
+    pvfs_descriptor *pd = NULL;
+    PVFS_path_t *Ppath = NULL;
+    int flags = O_RDONLY;
+    int mode = 0644;
+    char error_path[PVFS_NAME_MAX];
+
+    debug("iocommon_lookup: called with %s\n", path);
+
+    memset(error_path, 0, sizeof(error_path));
+
+    rc = split_pathname(path, &parentdir, &file);
+    IOCOMMON_RETURN_ERR(rc);
+
+    if (fref && !pref)
+    {
+        /* this will use the parent code to do the file lookup */
+        /* in one request - unless it fails */
+        dir = path;
+        pref = fref;
+        fref = NULL;
+        internal_follow = followflag;
+    }
+    else
+    {
+        /* this is the normal lookup the dir first, file second */
+        dir = parentdir;
+    }
+    if (pref)
+    {
+        /* look up dir first */
+        if (!pdir)
+        {
+            errno = 0;
+            rc = iocommon_lookup_absolute(dir,
+                                          internal_follow,
+                                          pref,
+                                          error_path,
+                                          sizeof(error_path));
+        }
+        else
+        {
+            if (parentdir)
+             {
+                errno = 0;
+                rc = iocommon_lookup_relative(dir,
+                                              *pdir,
+                                              internal_follow,
+                                              pref,
+                                              error_path,
+                                              sizeof(error_path));
+            }
+            else
+            { 
+                pref = pdir;
+            }
+        }
+    }
+    if (rc == 0 && pref && fref)
+    {
+        /* now look up file */
+        errno = 0;
+        rc = iocommon_lookup_relative(file,
+                                      *pref,
+                                      followflag,
+                                      fref,
+                                      error_path,
+                                      sizeof(error_path));
+    }
+    /* check to see if we need to expand the path */
+    if (rc < 0 && errno == EIO &&
+            pvfs_errno == PVFS_ENOTPVFS &&
+            !PATH_EXPANDED(Ppath))
+    {
+        /* last chance to get it open */
+#if 0
+        if (pdir)
+        {
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(path);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, path);
+            Ppath = PVFS_new_path(tmp_path);
+        }
+        else
+#endif
+        {
+            Ppath = PVFS_path_from_expanded(path);
+        }
+        if (!VALID_PATH_MAGIC(Ppath))
+        {
+            /* must be a PVFS_path before we call expand */
+            rc = -1;
+            goto errorout;
+        }
+        rc = iocommon_expand_path(Ppath, internal_follow, flags, mode, &pd);
+        if (pd)
+        {
+            /* opened a glibc file - just close it */       
+            pvfs_free_descriptor(pd->fd);
+            /* need to reeturn some kind of code here */
+            return -1;
+        }
+        pref->fs_id = Ppath->fs_id;
+        pref->handle = Ppath->handle;
+#if 0
+        if (pdir)
+#endif
+        {
+            PVFS_free_path(Ppath);
+        }
+    }
+    IOCOMMON_RETURN_ERR(rc);
+errorout:
+    if (parentdir)
+    {
+        free(parentdir);
+    }
+    if (file)
+    {
+        if (filename)
+        {
+            *filename = file;
+        }
+        else
+        {
+            free(file);
+        }
+    }
+    return rc;
+}
 
 /** pvfs_open implementation, return file info in fd 
- *  assumes path is fully qualified 
  *  if pdir is not NULL, it is the parent directory 
+ *
+ *  By the time this is called path should be a PVFS_path_t
+ *  and the path should be at least qualified, and resolved.
+ *  We expect expanded calls to go directly to open_absolute.
+ *  
  */
 pvfs_descriptor *iocommon_open(const char *path,
                                int flags,
@@ -413,15 +864,19 @@ pvfs_descriptor *iocommon_open(const char *path,
 {
     int rc = 0;
     int orig_errno = errno;
-    int follow_link;
+    int follow_links = 0;
+    int open_dir = 0;
     char *directory = NULL;
     char *filename = NULL;
-    char error_path[256];
+    char error_path[PVFS_NAME_MAX];
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
     PVFS_sysresp_getattr attributes_resp;
     PVFS_credential *credential;
+    PVFS_path_t *Ppath;
+
+    debug("iocommon_open: called with %s\n", path);
 
     /* Initialize */
     memset(&file_ref, 0, sizeof(file_ref));
@@ -436,69 +891,273 @@ pvfs_descriptor *iocommon_open(const char *path,
         goto errorout;
     }
 
-    /* Split the path into a directory and file */
-    rc = split_pathname(path, 0, &directory, &filename);
-    IOCOMMON_RETURN_ERR(rc);
+    /* see if this is a PVFS path and if so check it out completely */
+    Ppath = PVFS_path_from_expanded(path);
+    if (VALID_PATH_MAGIC(Ppath))
+    {
+        if (PATH_LOOKEDUP(Ppath))
+        {
+            if (Ppath->filename && (*Ppath->filename == '\0'))
+            {
+                if (PATH_FOLLOWSYM(Ppath) && (flags & O_NOFOLLOW))
+                {
+                    /* oops this is an error */
+                    rc = -1;
+                    errno = ELOOP;
+                    goto errorout;
+                }
+                /* object was looked up completely */
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                goto found;
+            }
+            /* object was partly looked up */
+        }
+        if (PATH_RESOLVED(Ppath))
+        {
+            /* resolution can be skipped ahead */
+        }
+    }
+    /* else this was called with a plain path */
 
     /* Check the flags to determine if links are followed */
     if (flags & O_NOFOLLOW)
     {
-        follow_link = PVFS2_LOOKUP_LINK_NO_FOLLOW;
+        follow_links = PVFS2_LOOKUP_LINK_NO_FOLLOW;
     }
     else
     {
-        follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
+        follow_links = PVFS2_LOOKUP_LINK_FOLLOW;
     }
 
-    /* Get reference for the parent directory */
-    if (pdir == NULL)
+    /* now we are ready to try looking things up */
+    if (!pdir)
     {
-        errno = 0;
-        rc = iocommon_lookup_absolute(directory, &parent_ref, NULL, 0);
-        if (rc < 0)
+        /* if a simple open try the full path first */
+        rc = iocommon_lookup_absolute(path,
+                                      follow_links,
+                                      &file_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if (rc >= 0)
         {
-            if (errno == ESTALE)
+            goto found;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles links and everything
+             */
+            int need_to_free = 0;
+            if (!VALID_PATH_MAGIC(Ppath))
             {
-                /* special case we are opening the root dir of PVFS */
-                errno = 0;
-                rc = iocommon_lookup_absolute(path, &file_ref, NULL, 0);
-                /* in this case we don't need to look up anything else */
-                /* jump right to found the file code */
-                goto foundfile;
+                Ppath = PVFS_new_path(path);
+                need_to_free = 1;
             }
-            IOCOMMON_RETURN_ERR(rc);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                if (need_to_free)
+                {
+                    PVFS_free_path(Ppath);
+                }
+                goto found;
+            }
+            if (need_to_free)
+            {
+                PVFS_free_path(Ppath);
+            }
         }
     }
     else
     {
-        if (directory)
+        /* if an openat, try the full path relative to pdir */
+        rc = iocommon_lookup_relative(path,
+                                      pdir->s->pvfs_ref,
+                                      follow_links,
+                                      &file_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if (rc >= 0)
         {
-            errno = 0;
-            rc = iocommon_lookup_relative(directory,
-                                          pdir->s->pvfs_ref,
-                                          follow_link,
-                                          &parent_ref,
-                                          NULL,
-                                          0);
-            IOCOMMON_RETURN_ERR(rc);
+            goto found;
         }
-        else
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
         {
-            parent_ref = pdir->s->pvfs_ref;
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles link and everything
+             */
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(path);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, path);
+            Ppath = PVFS_new_path(tmp_path);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                free(tmp_path);
+                goto found;
+            }
+            PVFS_free_path(Ppath);
+            free(tmp_path);
         }
     }
 
-    /* An open procedure safe for multiprocessing */
+    /*
+     * if we got here opening the full path failed.  see if the O_CREAT
+     * flag was given and file not found, if so try to open the parent
+     * dir then create the file
+     */
+    if (errno != ENOENT || !(flags & O_CREAT))
+    {
+        /* either file not found and no create flag */
+        /* or some other error */
+        goto errorout;
+    }
 
-    /* Attempt to find file */
+    /* Split the path into a directory and file */
+    rc = split_pathname(path, &directory, &filename);
+    if (rc < 0)
+    {
+        if (errno != EISDIR)
+        {
+            goto errorout;
+        }
+        /* clear error */
+        rc = 0;
+        errno = 0;
+        open_dir = 1; /* we are opening a directory filename is null */
+    }
+
+    if (!pdir)
+    {
+        /* if a simple open try the directory path */
+        rc = iocommon_lookup_absolute(directory,
+                                      follow_links,
+                                      &parent_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if(rc >= 0)
+        {
+            goto createfile;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles links and everything
+             */
+            Ppath = PVFS_new_path(directory);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                file_ref.fs_id = Ppath->fs_id;
+                file_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                goto createfile;
+            }
+            PVFS_free_path(Ppath);
+        }
+    }
+    else
+    {
+        /* if an openat, try the directory path relative to pdir */
+        rc = iocommon_lookup_relative(directory,
+                                      pdir->s->pvfs_ref,
+                                      follow_links,
+                                      &parent_ref,
+                                      error_path,
+                                      sizeof(error_path));
+        if(rc >= 0)
+        {
+            goto createfile;
+        }
+        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS)
+        {
+            /* nope, so cat the path to pdir's path and go for a
+             * full expand that handles link and everything
+             */
+            char *tmp_path;
+            int pathsz = strlen(pdir->s->dpath) + strlen(directory);
+            tmp_path = (char *)malloc(pathsz + 2);
+            strcpy(tmp_path, pdir->s->dpath);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, directory);
+            Ppath = PVFS_new_path(tmp_path);
+
+            rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
+
+            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
+                (*Ppath->filename == '\0'))
+            {
+                parent_ref.fs_id = Ppath->fs_id;
+                parent_ref.handle = Ppath->handle;
+                PVFS_free_path(Ppath);
+                free(tmp_path);
+                goto createfile;
+            }
+            PVFS_free_path(Ppath);
+            free(tmp_path);
+        }
+    }
+    /* Still nothing, must be a file not found */
+    errno = ENOENT;
+    goto errorout;
+
+createfile:
+    /* Now create the file relative to the directory */
+    errno = orig_errno;
+    errno = 0;
+    rc = iocommon_create_file(filename,
+                              mode,
+                              file_creation_param,
+                              parent_ref,
+                              &file_ref);
+    if (rc >= 0)
+    {
+        goto finish;
+    }
+    /* error on the create */
+    if (errno != EEXIST)
+    {
+        goto errorout;
+    }
+    /* 
+     * The file exists so must have been
+     * created by a different process
+     * just open it - this should open
+     * because it returned the EEXIST above
+     */
     errno = 0;
     rc = iocommon_lookup_relative(filename,
                                   parent_ref,
-                                  follow_link,
+                                  follow_links,
                                   &file_ref,
                                   error_path,
                                   sizeof(error_path));
-foundfile:
+    if (rc >= 0)
+    {
+        goto finish;
+    }
+    goto errorout;
+
+found:
+    /* We found the file, make sure we were supposed to */
     if ((rc == 0) && (flags & O_EXCL) && (flags & O_CREAT))
     {
         /* File was found but EXCLUSIVE so fail */
@@ -506,67 +1165,15 @@ foundfile:
         errno = EEXIST;
         goto errorout;
     }
-    if (rc < 0)
-    {
-        /* if an error code was returned */
-        if (errno == EIO && pvfs_errno == PVFS_ENOTPVFS &&
-            flags & O_NOTPVFS)
-        {
-            struct stat sbuf;
-            /* try to open using glibc */
-            rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
-            IOCOMMON_RETURN_ERR(rc);
-            pd = pvfs_alloc_descriptor(&glibc_ops, -1, NULL, 0);
-            pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
-            pd->true_fd = rc;
-            pd->s->flags = flags;           /* open flags */
-            fstat(rc, &sbuf);
-            pd->s->mode = sbuf.st_mode;
-            gen_mutex_unlock(&pd->s->lock);
-            gen_mutex_unlock(&pd->lock);
-            goto errorout; /* not really an error, but bailing out */
-        }
-        if (errno != ENOENT || !(flags & O_CREAT))
-        {
-            /* either file not found and no create flag */
-            /* or some other error */
-            goto errorout;
-        }
-        /* file not found but create flag */
-        /* clear errno, it was not an error */
-        errno = orig_errno;
-        errno = 0;
-        rc = iocommon_create_file(filename,
-                                  mode,
-                                  file_creation_param,
-                                  parent_ref,
-                                  &file_ref);
-        if (rc < 0)
-        {
-            /* error on the create */
-            if (errno != EEXIST)
-            {
-                goto errorout;
-            }
-            /* the file exists so must have been
-             * created by a different process
-             * just open it
-             */
-            errno = 0;
-            rc = iocommon_lookup_relative(filename,
-                                          parent_ref,
-                                          follow_link,
-                                          &file_ref,
-                                          NULL,
-                                          0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-    }
+
+finish:
+    /* We successfully looked up the file so complete the open */
 
     /* If we get here the file was created and/or opened */
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
+    debug("iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
     pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, 0);
     if (!pd)
     {
@@ -595,7 +1202,8 @@ foundfile:
         pd->s->mode |= S_IFDIR;
         if (pdir)
         {
-            pd->s->dpath = (char *)malloc(strlen(pdir->s->dpath) + strlen(path) + 2);
+            pd->s->dpath = (char *)malloc(strlen(pdir->s->dpath) +
+                            strlen(path) + 2);
             strcpy(pd->s->dpath, pdir->s->dpath);
             strcat(pd->s->dpath, "/");
             strcat(pd->s->dpath, path);
@@ -777,11 +1385,12 @@ int iocommon_remove (const char *path,
 {
     int rc = 0;
     int orig_errno = errno;
-    char *parentdir = NULL;
     char *file = NULL;
     PVFS_object_ref parent_ref, file_ref;
     PVFS_credential *credential;
     PVFS_sys_attr attr;
+
+    debug("iocommon_remove: called with %s\n", path);
 
     /* Initialize */
     memset(&parent_ref, 0, sizeof(parent_ref));
@@ -796,36 +1405,16 @@ int iocommon_remove (const char *path,
         goto errorout;
     }
 
-    rc = split_pathname(path, dirflag, &parentdir, &file);
+    /* open path needs to be nofollow */
+    rc = iocommon_lookup((char *)path,
+                         PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                         &parent_ref,
+                         &file_ref,
+                         &file,
+                         pdir);
     IOCOMMON_RETURN_ERR(rc);
-
-    if (!pdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (parentdir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(parentdir, *pdir,
-                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        { 
-            parent_ref = *pdir;
-        }
-    }
 
     /* need to verify this is a file or symlink */
-    errno = 0;
-    rc = iocommon_lookup_relative(file, parent_ref,
-                PVFS2_LOOKUP_LINK_NO_FOLLOW, &file_ref, NULL, 0);
-    IOCOMMON_RETURN_ERR(rc);
-
     errno = 0;
     rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_TYPE);
     IOCOMMON_RETURN_ERR(rc);
@@ -848,10 +1437,6 @@ int iocommon_remove (const char *path,
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
-    if (parentdir)
-    {
-        free(parentdir);
-    }
     if (file)
     {
         free(file);
@@ -890,7 +1475,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
 {
     int rc = 0;
     int orig_errno = errno;
-    char *olddir = NULL, *newdir = NULL, *oldname = NULL, *newname = NULL;
+    char *oldname = NULL, *newname = NULL;
     PVFS_object_ref oldref, newref;
     PVFS_credential *creds;
     PVFS_hint hints = PVFS_HINT_NULL;
@@ -904,67 +1489,32 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     {
         goto errorout;
     }
-    rc = split_pathname(oldpath, 0, &olddir, &oldname);
+    /* open oldpath */
+    rc = iocommon_lookup((char *)oldpath,
+                         PVFS2_LOOKUP_LINK_FOLLOW,
+                         &oldref, /* parent */
+                         NULL,
+                         &oldname, /* filename */
+                         oldpdir);
     IOCOMMON_RETURN_ERR(rc);
 
-    if (!oldpdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(olddir, &oldref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (olddir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(olddir, *oldpdir, 
-                                PVFS2_LOOKUP_LINK_FOLLOW, &oldref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        {
-            oldref = *oldpdir;
-        }
-    }
-    rc = split_pathname(newpath, 0, &newdir, &newname);
+    /* open newpath */
+    rc = iocommon_lookup((char *)newpath,
+                         PVFS2_LOOKUP_LINK_FOLLOW,
+                         &newref, /* parent */
+                         NULL,
+                         &newname, /* filename */
+                         newpdir);
     IOCOMMON_RETURN_ERR(rc);
-    if (!newpdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(newdir, &newref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (newdir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(newdir, *newpdir,
-                            PVFS2_LOOKUP_LINK_FOLLOW, &newref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        {
-            newref = *newpdir;
-        }
-    }
+
     errno = 0;
     rc = PVFS_sys_rename(oldname, oldref, newname, newref, creds, hints);
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
-    if (olddir)
-    {
-        free(olddir);
-    }
     if (oldname)
     {
         free(oldname);
-    }
-    if (newdir)
-    {
-        free(newdir);
     }
     if (newname)
     {
@@ -974,14 +1524,14 @@ errorout:
 }
 
 #if PVFS_UCACHE_ENABLE
-/* Returns how many copy operations to/from the ucache will need to be 
+/* Returns how many copy operations to/from the ucache will need to be
  * completed.
  */
 static int calc_copy_op_cnt(
     off64_t offset,     /* offset into file where transfer should begin */
     size_t req_size,    /* total Request Size */
     int req_blk_cnt,    /* requested Block Count */
-    size_t iovec_count, /* number of iovecs in vector */ 
+    size_t iovec_count, /* number of iovecs in vector */
     const struct iovec *vector /* pointer to array of iovecs */
 )
 {
@@ -989,14 +1539,14 @@ static int calc_copy_op_cnt(
     size_t size_left = req_size; /* Bytes left to convert to copy ops */
     size_t iovec_left = vector[0].iov_len; /* bytes left in this iovec */
     int vec_ndx = 0; /* Index into iovec array */
-
+    
     /* Compute the size of the first block to be transfered */
     size_t block_size_to_transfer = CACHE_BLOCK_SIZE - (offset % CACHE_BLOCK_SIZE);
-
+    
     int i;
     /* For every block identify source and destination locations in memory and
-     * size of transfer between the ucache and memory buffer while maintaining: 
-     * the size left in the request, the size left in the current iovec 
+     * size of transfer between the ucache and memory buffer while maintaining:
+     * the size left in the request, the size left in the current iovec
      * segment, the size left in the current block, and which iovec segment is
      * currently being considered.
      */
@@ -1029,27 +1579,27 @@ static int calc_copy_op_cnt(
                 size_left -= iovec_left;
                 block_left = 0;
                 vec_ndx++; /* Done with this iovec and block */
-
+                
                 /* Only set the next iovec_left if one is available */
                 if(vec_ndx < iovec_count)
                 {
                     iovec_left = vector[vec_ndx].iov_len;
                 }
             }
-            /* Increment the number of the memcpy calls that will need to be 
-             * performed 
+            /* Increment the number of the memcpy calls that will need to be
+             * performed
              */
-            copy_count++; 
+            copy_count++;
         }
-
-        /* Break when there are no more bytes to be read/written so that the 
+        
+        /* Break when there are no more bytes to be read/written so that the
          * following if/else code block won't been run unless there is another
          * block of data to be transfered. */
         if(size_left == 0)
         {
             break;
         }
-      
+        
         if(size_left >= CACHE_BLOCK_SIZE)
         {
             /* Must transfer full block */
@@ -1058,28 +1608,28 @@ static int calc_copy_op_cnt(
         else
         {
             /* size_left is less than a full block's size, so size_left is all
-             * that needs to be transfered to/from this block 
+             * that needs to be transfered to/from this block
              */
             block_size_to_transfer = size_left;
         }
     }
-    /* Finally, return the number of memcpy operations that must be completed 
+    /* Finally, return the number of memcpy operations that must be completed
      * to satisfy this request.
      */
     return copy_count;
 }
 
 /**
- * Provided two ucache related structures ureq and ucop, determine the 
- * reads/writes to be completed between the ucache and user memory (vector). 
+ * Provided two ucache related structures ureq and ucop, determine the
+ * reads/writes to be completed between the ucache and user memory (vector).
  */
 void calc_copy_ops(
-                off64_t offset,
-                size_t req_size,
-                struct ucache_req_s *ureq,
-                struct ucache_copy_s *ucop,
-                int copy_count,
-                const struct iovec *vector
+    off64_t offset,
+    size_t req_size,
+    struct ucache_req_s *ureq,
+    struct ucache_copy_s *ucop,
+    int copy_count,
+    const struct iovec *vector
 )
 {
     int ureq_ndx = 0;
@@ -1094,21 +1644,25 @@ void calc_copy_ops(
         /* Record necessary info for the future memcpy operation */
         if(i == 0)
         {
-            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr + 
-                (offset % CACHE_BLOCK_SIZE);
+            ucop[i].cache_pos = (char *)ureq[ureq_ndx].ublk_ptr +
+            (offset % CACHE_BLOCK_SIZE);
         }
         else
         {
-            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr +
-                (blk_tfer_size - blk_left);
+            ucop[i].cache_pos = (char *)ureq[ureq_ndx].ublk_ptr +
+            (blk_tfer_size - blk_left);
         }
-        ucop[i].buff_pos = vector[vec_ndx].iov_base +
-                (vector[vec_ndx].iov_len - vec_left);
-        ucop[i].hit = ureq[ureq_ndx].ublk_hit;
+        ucop[i].buff_pos = (char *)vector[vec_ndx].iov_base +
+        (vector[vec_ndx].iov_len - vec_left);
         ucop[i].blk_index = ureq[ureq_ndx].ublk_index;
-
+        
         if(vec_left > blk_left) /* Finish block */
         {
+            if(size_left < blk_left)
+            {
+                ucop[i].size = size_left;
+                break;
+            }
             ucop[i].size = blk_left;
             vec_left -= blk_left;
             size_left -= blk_left;
@@ -1126,6 +1680,11 @@ void calc_copy_ops(
         }
         else if(vec_left < blk_left) /* Finish iovec */
         {
+            if(size_left < vec_left)
+            {
+                ucop[i].size = size_left;
+                break;
+            }
             ucop[i].size = vec_left;
             blk_left -= vec_left;
             size_left -= vec_left;
@@ -1134,11 +1693,16 @@ void calc_copy_ops(
         }
         else /* They must be equal - finish both */
         {
+            if(size_left < blk_left)
+            {
+                ucop[i].size = size_left;
+                break;
+            }
             ucop[i].size = blk_left;
             size_left -= blk_left;
             if(size_left >= CACHE_BLOCK_SIZE)
             {
-                blk_tfer_size = CACHE_BLOCK_SIZE;                
+                blk_tfer_size = CACHE_BLOCK_SIZE;
                 blk_left = blk_tfer_size;
             }
             else
@@ -1169,7 +1733,7 @@ static int cache_readorwrite(enum PVFS_io_type which,
         memcpy(ucop->cache_pos, ucop->buff_pos, ucop->size);
         rc = (int)ucop->size;
     }
-    return rc; 
+    return rc;
 }
 
 int calc_req_blk_cnt(uint64_t offset, size_t req_size)
@@ -1186,22 +1750,114 @@ int calc_req_blk_cnt(uint64_t offset, size_t req_size)
     }
     /* Count next blocks */
     size_t req_left = req_size - (CACHE_BLOCK_SIZE -
-        (offset % CACHE_BLOCK_SIZE));
+    (offset % CACHE_BLOCK_SIZE));
     int blk_cnt = req_left / CACHE_BLOCK_SIZE;
-
+    
     /* Account for last block if necessary */
     if((req_left - (blk_cnt * CACHE_BLOCK_SIZE)) != 0)
     {
         blk_cnt++;
     }
-
+    
     return (blk_cnt + 1); /* Add one to account for first block */
 }
 
+
+/* Return the sum of iov_len of iovecs in the iovec array pointed to by vector. */
+size_t sum_iovec_lengths(size_t iovec_count, const struct iovec *vector)
+{
+    size_t size = 0;
+    int i = 0;
+    for (i = 0; i < iovec_count; i++)
+    {
+        size += vector[i].iov_len;
+    }
+    return size;
+}
+
+/** Attempt to read a full CACHE_BLOCK_SIZE into the ucache block.
+ * 
+ * Also adjust req_size and req_blk_cnt used in
+ * iocommon_readorwrite to account for the scenarios where less
+ * data was read from the file system than was requested.
+ *
+ * Also, fent_size is updated to inform the ucache of the largest file size
+ * seen by the ucache related to this file.
+ * 
+ * Upon ucache block removal, we use the file entry size to determine if the
+ * last block held in ucache isn't a full CACHE_BLOCK_SIZE.
+ * This ensures that the correct number of bytes are written to the
+ * file system on block removal.
+ */
+unsigned char read_full_block_into_ucache(
+    pvfs_descriptor *pd, /** Ultimately let's us id the file */
+    PVFS_size offset, /** The original request offset */
+    struct ucache_req_s *req, /** The ucache_req_s describing this block */
+    int req_index, /** The index of this ucache_req_s in the overall array */
+    uint64_t * fent_size, /** Pointer to this file entry size seen by ucache */
+    size_t * req_size, /** Pointer to this iocommon_readorwrite request's size */
+    int * req_blk_cnt /** Pointer to the number of ucache blocks determined by req_size and offset */
+)
+{
+    /* Return Boolean indicating we read a full ucache block */
+    unsigned char rfb= 1;
+    
+    /* The byte count read by iocommon_vreadorwrite */
+    int vread_count = 0;
+    
+    /* Attempt Read of Full Block From file system into user cache */
+    struct iovec cache_vec = {req->ublk_ptr, CACHE_BLOCK_SIZE};
+    lock_lock(get_lock(req->ublk_index));
+    vread_count = iocommon_vreadorwrite(PVFS_IO_READ,
+                                        &pd->s->pvfs_ref,
+                                        req->ublk_tag,
+                                        1,
+                                        &cache_vec);
+    
+    /* After reading, attempt update of *fent_size */
+    if((req->ublk_tag + vread_count) > *fent_size)
+    {
+        *fent_size = req->ublk_tag + vread_count;
+    }
+    
+    /* Were we able to completely read this block? */
+    if(vread_count != CACHE_BLOCK_SIZE)
+    {
+        /* This is the index of the last valid cache block in the ureq array */
+        /* so add 1 to the index to get the correct block count. */
+        *req_blk_cnt = req_index + 1;
+        
+        /* We need to recompute the req_size if less data was
+         * read than was requested. */
+        size_t new_req_size = 0;
+        /* Did we fail to read a complete block on the first block of
+         * the request?
+         */
+        if(offset >= req->ublk_tag)
+        {
+            new_req_size = vread_count - (offset - req->ublk_tag);
+        }
+        else
+        {
+            new_req_size = (req->ublk_tag - offset) + vread_count;
+        }
+        if(new_req_size < *req_size)
+        {
+            /* printf("Request expected:%Zu\tbut only read:%Zu\n", *req_size, new_req_size); */
+            *req_size = new_req_size;
+        }
+        /* Unlock block */
+        lock_unlock(get_lock(req->ublk_index));
+        rfb = 0;
+    }
+    /* Unlock block */
+    lock_unlock(get_lock(req->ublk_index));
+    return rfb;
+}
 #endif /* PVFS_UCACHE_ENABLE */
 
 /** Do a blocking read or write, possibly utilizing the user cache.
- * Returns -1 on error, some positive value on success; 
+ * Returns -1 on error, some positive value on success;
  */
 int iocommon_readorwrite(enum PVFS_io_type which,
                          pvfs_descriptor *pd,
@@ -1221,110 +1877,98 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             lock_unlock(ucache_lock);
         }
     }
-
+    
     if(!ucache_enabled || !pd->s->fent)
-    {
+   {
 #endif /* PVFS_UCACHE_ENABLE */
-
         /* Bypass the ucache */
         errno = 0;
         rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                              iovec_count, vector);
+                                   iovec_count, vector);
         return rc;
 #if PVFS_UCACHE_ENABLE
     }
-
-
-    /* define all the values we'll need to fill the ucache_req_s struct */
-    int i; /* index used for 'for loops' */
-    int req_blk_cnt = 0; /* how many blocks to r/w */
-    size_t req_size = 0; /* size in bytes of r/w */
-
+    
     /* How many bytes is the request? */
-    /* These will be contiguous in file starting at offset. */
-    /* Also, they may be spread in out memory */
+    /* Request is contiguous in file starting at offset. */
+    /* Also, the iovec segments may be non-contiguous in memory */
     /* Sum the individal segment sizes */
-    for (i = 0; i < iovec_count; i++)
-    {
-        req_size += vector[i].iov_len;
-    }
-
+    /* size in bytes the R/W request might encompass */
+    size_t req_size = sum_iovec_lengths(iovec_count, vector);
+    /* Return zero here if we know there's nothing to be done. */
     if(req_size == 0)
     {
         return 0;
     }
-
-    struct file_ent_s *fent = pd->s->fent;
-    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
-    int mtbl_data_size = 0;
-    if(which == PVFS_IO_WRITE)
+    
+#if 0
+    printf("iocommon_readorwrite: offset = %lu\treq_size = %lu\n",
+           offset, req_size);
+    if(which == PVFS_IO_READ)
     {
-        mtbl_data_size = CACHE_BLOCK_SIZE * mtbl->num_blocks;
+        printf("attempting to read from ucache...\n");
     }
-   
-    /* If the ucache request threshold is exceeded, flush and evict file, then
-     * peform nocache version of readorwrite */
-    if((mtbl_data_size + req_size) > UCACHE_MAX_REQ)
+    else
     {
+        printf("attempting to write to ucache...\n");
+    }
+#endif
+    
+    /* Now, we know this isn't zero sized request */
+    struct file_ent_s *fent = pd->s->fent;
+    uint64_t new_file_size = fent->size;
+    struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    /* how many blocks the R/W request may encompass */
+    int req_blk_cnt = calc_req_blk_cnt(offset, req_size);
+    int transfered = 0; /* count of the bytes transfered */
+    
+    /* If the ucache per file blk request threshold is exceeded, flush and
+     * evict file, then peform nocache version of readorwrite. */
+    if((req_blk_cnt + mtbl->num_blocks) > UCACHE_MAX_BLK_REQ)
+    {
+        /*
+         *       printf("flushing file from ucache, since it's grown too large and "
+         *           "continuing to service request without involving the ucache\n");
+         */
         /* Flush dirty blocks */
         rc = ucache_flush_file(pd->s->fent);
         if(rc != 0)
         {
-            rc = -1;
+            /* TODO: alert user there was an error when flushing the ucache */
         }
-
-        /*TODO Possibly remove the file - bad idea? What if it's referenced? */
-
+        
         /* Bypass the ucache */
-        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset, 
-                                              iovec_count, vector);
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
+                                   iovec_count, vector);
         return rc;
     }
-
-    /* Keep a running count of the bytes transfered */
-    int transfered = 0;
-
-    /* How many tags? */
-    uint64_t start_tag = offset - (offset % CACHE_BLOCK_SIZE);
-    /* End_tag isn't really the last tag if the blk is alligned. 
-     * This value is used to determine the req_blk_cnt only.
-     */
-    uint64_t end_tag = 0;    
-    end_tag = (offset + req_size) - ((offset + req_size) % CACHE_BLOCK_SIZE);
-    req_blk_cnt = calc_req_blk_cnt(offset, req_size);
-
-    /* Now that we know the req_blk_cnt, allocate the required 
+    
+    /* Now that we know the req_blk_cnt, allocate the required
      * space for tags, hits boolean, and ptr to block in ucache shared memory.
      */
     struct ucache_req_s ureq[req_blk_cnt];
-    ureq[0].ublk_tag = start_tag;
+    memset(ureq, 0, sizeof(struct ucache_req_s) * req_blk_cnt);
+    ureq[0].ublk_tag = offset - (offset % CACHE_BLOCK_SIZE); /* first tag */
+    
+    int i; /* index used for 'for loops' */
     /* Loop over positions storing tags (ment identifiers) */
     for(i = 1; i < req_blk_cnt; i++)
     {
         ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + CACHE_BLOCK_SIZE;
     }
-
+    
     /* Now that tags are set fill in array of lookup responses */
     for(i = 0; i < req_blk_cnt; i++)
     {
-        /* if lookup returns nil set char to 0, otherwise 1 */
-        ureq[i].ublk_ptr = ucache_lookup(pd->s->fent, ureq[i].ublk_tag, 
-                                                  &(ureq[i].ublk_index));
-        if(ureq[i].ublk_ptr == (void *)NIL) 
+        struct ucache_req_s *this = &ureq[i];
+        this->ublk_ptr = ucache_lookup(pd->s->fent, this->ublk_tag,
+                                       &(this->ublk_index));
+        if(this->ublk_ptr == (void *)NIL)
         {
             lock_lock(ucache_lock);
             ucache_stats->misses++; /* could overflow */
             these_stats.misses++;
             lock_unlock(ucache_lock);
-            ureq[i].ublk_hit = 0; /* miss */
-            /* Find a place for the block */
-            ureq[i].ublk_ptr = ucache_insert(pd->s->fent, ureq[i].ublk_tag,
-                                                      &(ureq[i].ublk_index));
-            if((uint64_t)ureq[i].ublk_ptr == -1)
-            {
-                /* Cannot cache the rest of this file */
-            }
-            assert(ureq[i].ublk_ptr != (void *)NILP);            
         }
         else
         {
@@ -1332,76 +1976,203 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             ucache_stats->hits++;  /* could overflow */
             these_stats.hits++;
             lock_unlock(ucache_lock);
-            ureq[i].ublk_hit = 1; /* hit */
         }
     }
-
     if(which == PVFS_IO_READ)
     {
         /* Loop over ureq structure and perform reads on misses */
+        /* Keep track of how much has been read so we can know if the last
+         *          block successfully read is incomplete. */
+        /* Re-read last block if partial */
         for(i = 0; i < req_blk_cnt; i++)
         {
-            if(ureq[i].ublk_hit == 0)
+            struct ucache_req_s *this = &ureq[i];
+            if(this->ublk_ptr == (void *) NILP) /* ucache miss on block*/
             {
-                /* Perform read */
-                /* read single block from fs and write into ucache */
-                struct iovec cache_vec = {ureq[i].ublk_ptr, CACHE_BLOCK_SIZE};
-                lock_lock(get_lock(ureq[i].ublk_index));
-                rc = iocommon_vreadorwrite(PVFS_IO_READ,
-                                           &pd->s->pvfs_ref,
-                                           ureq[i].ublk_tag,
-                                           1,
-                                           &cache_vec);
-                lock_unlock(get_lock(ureq[i].ublk_index));
+                this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
+                                               &(this->ublk_index));
+                
+                /* ucache_insert fail */
+                if(this->ublk_ptr == (void *) NILP)
+                {
+                    /* Cannot cache the rest of this file */
+                    /* either try some other sort of eviction or perform no cache */
+                    
+                    /** Alert the user that we are no longer caching this file,
+                     * since we couldn't obtain a free cache block.
+                     */
+                    /*TODO make this a gossip statement */
+                    /* printf("Flushing file from cache. Couldn't obtain block.\n"); */
+                    
+                    /* Flush dirty blocks */
+                    rc = ucache_flush_file(pd->s->fent);
+                    if(rc != 0)
+                    {
+                        /* TODO: alert user there was an error when flushing
+                         * the ucache
+                         */
+                        printf("warning: error detected when flushing file"
+                        " from ucache.\n");
+                    }
+                    /* Bypass the ucache */
+                    rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
+                                               iovec_count, vector);
+                    return rc;
+                }
+                
+                /* Attempt read of full block from fs into ucache.
+                 * Remember this locks, reads into, then unlocks the specifed
+                 * block provided by this->ublk_ptr
+                 */
+                if(!read_full_block_into_ucache(
+                    pd, offset, this, i, &new_file_size, &req_size, &req_blk_cnt)
+                )
+                {
+                    /* Stop trying to read if we couldn't read a full bock
+                     * this time
+                     */
+                    break;
+                }
             }
         }
     }
-
-    /* Read beginning and end blks into cache before writing if 
+    
+    /* Read beginning and end blks into cache before writing if
      * either end of the request are unalligned.
      */
     if(which == PVFS_IO_WRITE) /* Write */
     {
-        /* Consult ureq to see if block was hit or missed */
-        /* Also see if block was alligned or not */
-        if((ureq[0].ublk_hit == 0) && (offset != ureq[0].ublk_tag))
+        unsigned char first_block_hit = 0;
+        unsigned char last_block_hit = 0;
+        
+        /* Attempt insertion of blocks reported missed during lookup */
+        for(i = 0; i < req_blk_cnt; i++)
         {
-            /* Read first block from fs into ucache */
-            struct iovec vector = {ureq[0].ublk_ptr, CACHE_BLOCK_SIZE};
-            lock_lock(get_lock(ureq[0].ublk_index));
-            rc = iocommon_vreadorwrite(PVFS_IO_READ,
-                            &pd->s->pvfs_ref,
-                            ureq[0].ublk_tag,
-                                           1,
-                                    &vector);
-            lock_unlock(get_lock(ureq[0].ublk_index));
+            struct ucache_req_s *this = &ureq[i];
+            if(this->ublk_ptr == (void *) NILP) /* ucache miss on block*/
+            {
+                /* Attempt to make room for missed blocks */
+                this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
+                                               &(this->ublk_index));
+                
+                /* ucache_insert fail */
+                if(this->ublk_ptr == (void *) NILP)
+                {
+                    /* Cannot cache the rest of this file */
+                    /* either try some other sort of eviction or perform no cache */
+                    
+                    /** Alert the user that we are no longer caching this file,
+                     * since we couldn't obtain a free cache block.
+                     */
+                    /*TODO make this a gossip statement */
+                    printf("Flushing file from cache. Couldn't obtain block.\n");
+                    
+                    /* Flush dirty blocks */
+                    rc = ucache_flush_file(pd->s->fent);
+                    if(rc != 0)
+                    {
+                        /* TODO: alert user there was an error when flushing
+                         * the ucache
+                         */
+                        printf("warning: error detected when flushing file"
+                        " from ucache.\n");
+                    }
+                    /* Bypass the ucache */
+                    rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
+                                               iovec_count, vector);
+                    return rc;
+                }
+            }
+            else /* Block was hit */
+            {
+                if(i == 0)
+                {
+                    first_block_hit = 1;
+                }
+                if(i == (req_blk_cnt - 1))
+                {
+                    last_block_hit = 1;
+                }
+            }
         }
-        if( req_blk_cnt > 1 &&
-            (ureq[req_blk_cnt - 1].ublk_hit == 0) &&
-            (((offset + req_size) % CACHE_BLOCK_SIZE) != 0)
-        )
+        
+        /* We aren't concerned about ucache block on the interior of this
+         * request, so we are only concerned about first and the last ucache
+         * blocks of this request. */
+        
+        /* Write would leave the first block incomplete if the offset starts
+         * after the first block's tag or the request is less than a full sized
+         * block */
+        if((ureq[0].ublk_tag != offset) || (req_size < CACHE_BLOCK_SIZE))
         {
-            /* Read last block from fs into ucache */
-            struct iovec vector = {ureq[req_blk_cnt - 1].ublk_ptr,
-                                            CACHE_BLOCK_SIZE};
-            lock_lock(get_lock(ureq[req_blk_cnt - 1].ublk_index));
-            rc = iocommon_vreadorwrite(PVFS_IO_READ,
-                            &pd->s->pvfs_ref,
-                            ureq[req_blk_cnt - 1].ublk_tag,
-                            1,
-                            &vector);
-            lock_unlock(get_lock(ureq[req_blk_cnt - 1].ublk_index));
+            /* If the first block was missed */
+            if(first_block_hit == 0)
+            {
+                /* We create copies of the following two variables so that
+                 * read_full_block_into_ucache won't adjust the originals
+                 * like we intend on PVFS_IO_READ.
+                 * Note that new_file_size may still be modified.
+                 */
+                size_t copy_of_req_size = req_size;
+                int copy_of_req_blk_cnt = req_blk_cnt;
+                read_full_block_into_ucache(pd,
+                                            offset,
+                                            &ureq[0],
+                                            0,
+                                            &new_file_size,
+                                            &copy_of_req_size,
+                                            &copy_of_req_blk_cnt);
+            }
         }
+        /* Last block if there is one and the write won't complete the block */
+        if((req_blk_cnt > 1) && ((offset + req_size) % CACHE_BLOCK_SIZE != 0))
+        {
+            /* If the last block was missed or if it was hit and the ucache
+             * block is currently incomplete from a ucache perspective. */
+            if(last_block_hit == 0)
+            {
+                /* We create copies of the following two variables so that
+                 * read_full_block_into_ucache won't adjust the originals
+                 * like we intend on PVFS_IO_READ.
+                 * Note that new_file_size may still be modified.
+                 */
+                
+                size_t copy_of_req_size = req_size;
+                int copy_of_req_blk_cnt = req_blk_cnt;
+                read_full_block_into_ucache(pd,
+                                            offset,
+                                            &ureq[req_blk_cnt -1],
+                                            req_blk_cnt - 1,
+                                            &new_file_size,
+                                            &copy_of_req_size,
+                                            &copy_of_req_blk_cnt);
+            }
+        }
+        
+        /* After reading, attempt update of new_file_size */
+        if(offset + req_size > new_file_size)
+        {
+            new_file_size = offset + req_size;
+        }
+        
+        /* Now that we're sure of what the new file size will be,
+         * lock the global ucache lock and adjust the file entry's size
+         * as perceived by the ucache, then unlock the ucache.
+         */
+        lock_lock(ucache_lock);
+        fent->size = new_file_size;
+        /* printf("fent->size = %lu KB\n", fent->size / 1024); */
+        lock_unlock(ucache_lock);
+        
     }
-
+    
     /* At this point we know how many blocks the request will cover, the tags
-     * (indexes into file) of the blocks, whether the corresponding block was
-     * hit, and the ptr to the corresponding blk in memory. The blocks are also
-     * locked at this point. They will be unlocked as reads/writes happen.
+     * (indexes into file) of the blocks, and the ptr to the corresponding
+     * blk in memory, and the new file size max seen by ucache.
      */
-
-    /* If only one iovec then we can assume there will be req_blk_cnt 
-     * memcpy operations, otherwise we need to determine how many 
+    
+    /* If only one iovec then we can assume there will be req_blk_cnt
+     * memcpy operations, otherwise we need to determine how many
      * memcpy operations will be required so we can create the ucache_copy_s
      * struct array of proper length.
      */
@@ -1412,37 +2183,35 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     }
     else
     {
-        copy_count = calc_copy_op_cnt(offset, req_size, req_blk_cnt, 
-            iovec_count, vector);
+        copy_count = calc_copy_op_cnt(offset, req_size, req_blk_cnt,
+                                      iovec_count, vector);
     }
-
+    
     /* Create copy structure and fill with appropriate values */
     struct ucache_copy_s ucop[copy_count];
     calc_copy_ops(offset, req_size, &ureq[0], &ucop[0], copy_count, vector);
-
-    /* The ucache copy structure should now be filled and we can procede with 
+    
+    /* The ucache copy structure should now be filled and we can procede with
      * the necessary memcpy operations.
      */
+    int ureq_index = 0;
     for(i = 0; i < copy_count; i++)
     {
         /* perform copy operation */
-        lock_lock(get_lock(ureq[i].ublk_index));
+        lock_lock(get_lock(ureq[ureq_index].ublk_index));
         transfered += cache_readorwrite(which, &ucop[i]);
         /* Unlock the block */
-        lock_unlock(get_lock(ureq[i].ublk_index));
+        lock_unlock(get_lock(ureq[ureq_index].ublk_index));
+        /* Check if this ucop completed this block, so we can adjust the
+         * ureq_index accordingly */
+        if((offset + transfered) >=
+            (ureq[ureq_index].ublk_tag + CACHE_BLOCK_SIZE))
+        {
+            ureq_index++;
+        }
     }
-
-    /** Update cache's perception of the file size, so that we flush the 
-     * correct amount on file close. 
-     */
-    if((which == PVFS_IO_WRITE) && (fent->size < (offset + transfered)))
-    {
-        fent->size = offset + transfered;
-    }     
-
-    rc = transfered;
+    return transfered;
 #endif /* PVFS_UCACHE_ENABLE */
-    return rc;
 }
 
 /** do a blocking read or write from an iovec
@@ -1490,16 +2259,18 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
  *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-                         PVFS_object_ref *por,
-                         PVFS_size offset,
-                         void *buf,
-                         PVFS_Request mem_req,
-                         PVFS_Request file_req)
+                                 PVFS_object_ref *por,
+                                 PVFS_size offset,
+                                 void *buf,
+                                 PVFS_Request mem_req,
+                                 PVFS_Request file_req)
 {
     int rc = 0;
     int orig_errno = errno;
     PVFS_credential *creds;
     PVFS_sysresp_io io_resp;
+
+    debug("iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
 
     if (!por)
     {
@@ -1551,11 +2322,11 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                           PVFS_sysresp_io *ret_resp,
                           PVFS_Request *ret_memory_req)
 {
-    #ifndef UCACHE_ENABLED
+#ifndef UCACHE_ENABLED
     // No cache 
     return iocommon_ireadorwrite_nocache(which, pd, extra_offset, buf, 
         etype_req, file_req, count, ret_op_id, ret_resp, ret_memory_req);
-    #endif // UCACHE_ENABLED 
+#endif // UCACHE_ENABLED 
 
     //if read then check cache..if not there..then read from i/o node and store into correct location
     //Possibly Data Transfer
@@ -1649,6 +2420,8 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     PVFS_credential *credential;
     PVFS_sysresp_getattr getattr_response;
 
+    debug("iocommon_getattr: called with %d\n", (int)obj.handle);
+
     /* Initialize */
     memset(&getattr_response, 0, sizeof(getattr_response));
 
@@ -1667,6 +2440,15 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
                           &getattr_response, NULL);
     IOCOMMON_CHECK_ERR(rc);
     *attr = getattr_response.attr;
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        attr->blksize = 1024; /* dir block sizes not maintained in PVFS */
+    }
+    if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        attr->blksize = 1024; /* dir block sizes not maintained in PVFS */
+        attr->size = strnlen(attr->link_target, PVFS_PATH_MAX);
+    }
 
 errorout:
     return rc;
@@ -1680,6 +2462,8 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     int rc = 0;
     int orig_errno = errno;
     PVFS_credential *credential;
+
+    debug("iocommon_setattr: called with %d\n", (int)obj.handle);
 
     /* check credential */
     rc = iocommon_cred(&credential);
@@ -1708,6 +2492,7 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -1721,25 +2506,25 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
     if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
+        buf->st_nlink = attr.dirent_count + 2;
     }
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
-    buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -1764,6 +2549,7 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
+    memset(buf, 0, sizeof(struct stat64));
 
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
@@ -1777,25 +2563,25 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
     if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
+        buf->st_nlink = attr.dirent_count + 2;
     }
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
+        buf->st_nlink = 1; /* PVFS does not allow hard links */
     }
-    buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    if (attr.blksize)
-    {
-        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
-    }
+    buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
+    /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -1860,13 +2646,12 @@ int iocommon_make_directory(const char *pvfs_path,
 {
     int rc = 0;
     int orig_errno = errno;
-    char *parentdir = NULL;
-    char *filename = NULL;
     PVFS_sys_attr       attr;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_object_ref     parent_ref;
     PVFS_sysresp_mkdir  resp_mkdir;
     PVFS_credential    *credential;
+    char *filename = NULL;
 
     /* Initialize any variables */
     memset(&attr,        0, sizeof(attr));
@@ -1881,37 +2666,20 @@ int iocommon_make_directory(const char *pvfs_path,
         goto errorout;
     }
 
-    rc = split_pathname(pvfs_path, 1, &parentdir, &filename);
-    IOCOMMON_RETURN_ERR(rc);
-
     /* Make sure we don't try and create the root or current directory */
 
     /* lookup parent */
-    if (!pdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (parentdir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(parentdir, *pdir,
-                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        {
-            parent_ref = *pdir;
-        }
-    }
-   
-    /* Set the attributes for the new directory */
+    rc = iocommon_lookup((char *)pvfs_path,
+                         PVFS2_LOOKUP_LINK_FOLLOW,
+                         &parent_ref,
+                         NULL,
+                         &filename,
+                         pdir);
+    IOCOMMON_RETURN_ERR(rc);
+
     attr.owner = geteuid();
     attr.group = getegid();
-    attr.perms = mode & 07777; /* mask off stray bits */
+    attr.perms = mode & 07777; /* mask of stray bits */
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
     errno = 0;
@@ -1923,14 +2691,10 @@ int iocommon_make_directory(const char *pvfs_path,
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
-    if (parentdir)
-    {
-        free(parentdir);
-    }
     if (filename)
     {
         free(filename);
-    }   
+    }
     return(rc);
 }
 
@@ -1949,18 +2713,20 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
  
     errno = 0;
     rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_TYPE | 
-                                               PVFS_ATTR_SYS_LNK_TARGET);
+                                                PVFS_ATTR_SYS_SIZE |
+                                                PVFS_ATTR_SYS_LNK_TARGET);
     IOCOMMON_RETURN_ERR(rc);
 
     /* copy attributes into standard stat struct */
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         strncpy(buf, attr.link_target, size);
+        rc = attr.size;
     }
     else
     {
         errno = EINVAL;
-        return -1;
+        rc = -1;
     }
 
 errorout:
@@ -1973,12 +2739,11 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
 {
     int rc = 0;
     int orig_errno = errno;
-    char *parentdir = NULL;
-    char *filename = NULL;
     PVFS_sys_attr       attr;
     PVFS_object_ref     parent_ref;
     PVFS_sysresp_symlink  resp_symlink;
     PVFS_credential    *credential;
+    char *filename = NULL;
 
     /* Initialize any variables */
     memset(&attr,        0, sizeof(attr));
@@ -1992,38 +2757,24 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
         goto errorout;
     }
 
-
-    rc = split_pathname(pvfs_path, 0, &parentdir, &filename);
-    IOCOMMON_RETURN_ERR(rc);
-
     /* Make sure we don't try and create the root or current directory */
 
     /* lookup parent */
-    if (!pdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (parentdir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(parentdir, *pdir,
-                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        {
-            parent_ref = *pdir;
-        }
-    }
-   
+    rc = iocommon_lookup((char *)pvfs_path,
+                         PVFS2_LOOKUP_LINK_FOLLOW,
+                         &parent_ref,
+                         NULL,
+                         &filename,
+                         pdir);
+    IOCOMMON_RETURN_ERR(rc);
+
     /* Set the attributes for the new directory */
     attr.owner = getuid();
     attr.group = getgid();
     attr.perms = 0777;
+    attr.atime = time(NULL);
+    attr.mtime = attr.atime;
+    attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
     errno = 0;
@@ -2037,14 +2788,10 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
-    if (parentdir)
-    {
-        free(parentdir);
-    }
     if (filename)
     {
         free(filename);
-    }   
+    }
     return(rc);
 }
 
@@ -2089,6 +2836,8 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
+    /* clear the output buffer */
+    memset(dirp, 0, size);
     /* posix deals in bytes in buffer and bytes read */
     /* PVFS deals in number of records to read or were read */
     count = size / sizeof(struct dirent);
@@ -2112,9 +2861,19 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         /* copy a PVFS_dirent to a struct dirent */
 /* NEXT */
         dirp->d_ino = PVFS_OID_hash32(&readdir_resp.dirent_array[i].handle);
+#ifdef _DIRENT_HAVE_D_OFF
         dirp->d_off = pd->s->file_pointer;
+#endif
+#ifdef _DIRENT_HAVE_D_RECLEN
         dirp->d_reclen = sizeof(PVFS_dirent);
-        memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+#endif
+#ifdef _DIRENT_HAVE_D_TYPE
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#endif
+        dirp->d_type = DT_UNKNOWN;
+#endif
+        strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
         pd->s->file_pointer += sizeof(struct dirent);
         bytes += sizeof(struct dirent);
@@ -2170,6 +2929,8 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
+    /* clear the output buffer */
+    memset(dirp, 0, size);
     count = size / sizeof(struct dirent64);
     if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
@@ -2191,9 +2952,19 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         /* copy a PVFS_dirent to a struct dirent64 */
 /* NEXT */
         dirp->d_ino = PVFS_OID_hash64(&readdir_resp.dirent_array[i].handle);
+#ifdef _DIRENT_HAVE_D_OFF
         dirp->d_off = (off64_t)pd->s->file_pointer;
+#endif
+#ifdef _DIRENT_HAVE_D_RECLEN
         dirp->d_reclen = sizeof(struct dirent64);
-        memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+#endif
+#ifdef _DIRENT_HAVE_D_TYPE
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#endif
+        dirp->d_type = DT_UNKNOWN;
+#endif
+        strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
         pd->s->file_pointer += sizeof(struct dirent64);
         bytes += sizeof(struct dirent64);
@@ -2248,17 +3019,13 @@ int iocommon_access(const char *pvfs_path,
                     PVFS_object_ref *pdir)
 {
     int rc = 0;
-    int orig_errno = errno;
-    char *parentdir = NULL;
-    char *file = NULL;
     int followflag = PVFS2_LOOKUP_LINK_FOLLOW;
     int uid = -1, gid = -1;
-    PVFS_object_ref parent_ref, file_ref;
+    PVFS_object_ref file_ref;
     PVFS_credential *credential;
     PVFS_sys_attr attr;
 
     /* Initialize */
-    memset(&parent_ref, 0, sizeof(parent_ref));
     memset(&file_ref, 0, sizeof(file_ref));
     memset(&attr, 0, sizeof(attr));
 
@@ -2270,42 +3037,21 @@ int iocommon_access(const char *pvfs_path,
         goto errorout;
     }
 
-    rc = split_pathname(pvfs_path, 0, &parentdir, &file);
-    IOCOMMON_RETURN_ERR(rc);
-
-    if (!pdir)
-    {
-        errno = 0;
-        rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
-    }
-    else
-    {
-        if (parentdir)
-        {
-            errno = 0;
-            rc = iocommon_lookup_relative(parentdir, *pdir,
-                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
-            IOCOMMON_RETURN_ERR(rc);
-        }
-        else
-        { 
-            parent_ref = *pdir;
-        }
-    }
     /* Attempt to find file */
     if (flags & AT_SYMLINK_NOFOLLOW)
     {
         followflag = PVFS2_LOOKUP_LINK_NO_FOLLOW;
     }
-    errno = 0;
-    rc = iocommon_lookup_relative(file,
-                                  parent_ref,
-                                  followflag,
-                                  &file_ref,
-                                  NULL,
-                                  0);
-    IOCOMMON_CHECK_ERR(rc);
+
+    /* lookup parent */
+    rc = iocommon_lookup((char *)pvfs_path,
+                         followflag,
+                         NULL,
+                         &file_ref,
+                         NULL,
+                         pdir);
+    IOCOMMON_RETURN_ERR(rc);
+
     /* Get file atributes */
     errno = 0;
     rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_COMMON_ALL);
@@ -2357,14 +3103,6 @@ int iocommon_access(const char *pvfs_path,
     /* Access is allowed, rc should be 0 */  
 
 errorout:
-    if (parentdir)
-    {
-        free(parentdir);
-    }
-    if (file)
-    {
-        free(file);
-    }
     return rc;
 }
 
@@ -2648,6 +3386,84 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     }
     IOCOMMON_CHECK_ERR(rc);
 
+errorout:
+    return rc;
+}
+
+/** Implelments atomic operations on an extended attribute
+ *
+ *  The flag parameter is currently not implemented.
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
+ */
+int iocommon_atomiceattr(pvfs_descriptor *pd,
+                         const char *key_p,
+                         void *val_p,
+                         int valsize,
+                         void *response,
+                         int respsize,
+                         int flag,
+                         int opcode)
+{
+    int rc = 0;
+    int pvfs_flag = 0;
+    int orig_errno = errno;
+    PVFS_credential *credential;
+    PVFS_ds_keyval key, val, resp;
+
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Initialize */
+    memset(&key, 0, sizeof(key));
+    memset(&val, 0, sizeof(val));
+    memset(&resp, 0, sizeof(resp));
+
+    /* check credential */
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
+
+    key.buffer = (char *)key_p;
+    key.buffer_sz = strlen(key_p) + 1;
+    val.buffer = (void *)val_p;
+    val.buffer_sz = valsize;
+    resp.buffer = (void *)response;
+    resp.buffer_sz = respsize;
+    
+
+    /* now perform atomic operation on attributes */
+    errno = 0;
+    rc = PVFS_sys_atomiceattr(pd->s->pvfs_ref,
+                              credential,
+                              &key,
+                              &val,
+                              &resp,
+                              pvfs_flag,
+                              opcode,
+                              NULL);
+    
+    /* NOTE: Are these really the only values we need to translate? */
+    switch (rc)
+    {
+        case -PVFS_ENOENT:
+            /* file exists if we have a pd */
+            /* either attr does not exist or */
+            /* we do not have access to it */
+            rc = -PVFS_ENODATA;
+            break;
+        case -PVFS_EMSGSIZE:
+        /* buffer was too small for the attribute value */
+        rc = -PVFS_ERANGE;
+    }
+    IOCOMMON_CHECK_ERR(rc);
+    rc = val.read_sz;
+    
 errorout:
     return rc;
 }

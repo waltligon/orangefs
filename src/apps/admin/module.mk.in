@@ -28,8 +28,13 @@ ADMINSRC := \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
 	$(DIR)/pvfs2-drop-caches.c \
-        $(DIR)/pvfs2-get-uid.c \
-	$(DIR)/pvfs2-gencred.c
+	$(DIR)/pvfs2-get-uid.c
+
+ifdef ENABLE_SECURITY_KEY
+	ADMINSRC += $(DIR)/pvfs2-gencred.c
+else ifdef ENABLE_SECURITY_CERT
+	ADMINSRC += $(DIR)/pvfs2-gencred.c
+endif
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

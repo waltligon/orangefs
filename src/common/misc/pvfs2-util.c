@@ -22,14 +22,6 @@
 #include <signal.h>
 #include <libgen.h>
 
-#ifndef ENABLE_SECURITY
-#include <pwd.h>
-#include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
-#endif
-
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -45,6 +37,19 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "pvfs-path.h"
+
+#if defined(ENABLE_SECURITY_CERT) || defined(ENABLE_SECURITY_KEY)
+#define ENABLE_SECURITY_MODE
+#endif
+
+#ifndef ENABLE_SECURITY_MODE
+#include <pwd.h>
+#include <grp.h>
+#ifndef HAVE_GETGROUPLIST
+#include "getugroups.h"
+#endif
+#endif
 
 #ifdef HAVE_MNTENT_H
 
@@ -63,6 +68,7 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
 
 #elif HAVE_FSTAB_H
+#include "openfile-util.h"
 
 #include <fstab.h>
 #define PINT_fstab_t FILE
@@ -108,11 +114,10 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-int PVFS_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max);
+#ifndef ENABLE_SECURITY_MODE
+static int PINT_gen_unsigned_credential(const char *user, const char *group,
+                                        unsigned int timeout, PVFS_credential *cred);
+#endif
 
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(char* config_server,
                                              char* fs_name)
@@ -179,7 +184,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
                                     NULL, cred);
 }
 
-#ifdef ENABLE_SECURITY
+#ifdef ENABLE_SECURITY_MODE
 /* PVFS_util_gen_credential
  * 
  * Generate signed credential object using external app pvfs2-gencred.
@@ -200,11 +205,18 @@ int PVFS_util_gen_credential(const char *user,
     pid_t pid;
     int filedes[2], errordes[2];
     int ret;
+#ifdef ENABLE_SECURITY_CERT
+    char *certpath;
+#endif
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
         keypath = getenv("PVFS2KEY_FILE");
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    certpath = getenv("PVFS2CERT_FILE");
+#endif
 
     memset(&newsa, 0, sizeof(newsa));
     newsa.sa_handler = SIG_DFL;
@@ -261,6 +273,13 @@ int PVFS_util_gen_credential(const char *user,
             *ptr++ = "-k";
             *ptr++ = (char*)keypath;
         }
+#ifdef ENABLE_SECURITY_CERT
+        if (certpath)
+        {
+            *ptr++ = "-c";
+            *ptr++ = certpath;
+        }
+#endif
         *ptr++ = NULL;
         execve(BINDIR"/pvfs2-gencred", args, envp);
 
@@ -309,6 +328,10 @@ int PVFS_util_gen_credential(const char *user,
 
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
+
+                /* on the stack */
+                tmp.issuer = NULL;
+                PINT_cleanup_credential(&tmp);
             }
             else if (WIFEXITED(rc))
             {                
@@ -337,9 +360,7 @@ int PVFS_util_gen_credential(const char *user,
             /* print errors */
             if (etotal > 0)
             {
-                char gbuf[600];
-                snprintf(gbuf, sizeof(gbuf), "pvfs2_gencred: %s", ebuf);
-                gossip_err(gbuf);
+                gossip_err("pvfs2_gencred: %s", ebuf);
             }
         }
     }
@@ -350,7 +371,7 @@ int PVFS_util_gen_credential(const char *user,
 
     return ret;
 }
-#else /* ENABLE_SECURITY */
+#else /* ENABLE_SECURITY_MODE */
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
@@ -559,6 +580,9 @@ int PINT_gen_unsigned_credential(const char *user,
     cred->sig_size = 0;
     cred->signature = NULL;
 
+    cred->certificate.buf_size = 0;
+    cred->certificate.buf = NULL;
+
     free(pwdbuf);
     free(grpbuf);
 
@@ -582,7 +606,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
-#endif /* ENABLE_SECURITY */
+#endif /* ENABLE_SECURITY_MODE */
 
 /*
  * This function checks to see if the credential is still valid
@@ -635,6 +659,7 @@ int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr,
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
+        dest_attr->dirdata_count = src_attr->dirdata_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -1262,6 +1287,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                     sizeof(struct PVFS_sys_mntent));
             if (!s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
             /* should this be PVFS_PATH_MAX? - WBL */
@@ -1276,6 +1302,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                 ((new_index + 1) * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
 
@@ -1369,6 +1396,7 @@ int PVFS_util_remove_internal_mntent(struct PVFS_sys_mntent *mntent)
       mntent_found:
         if (!found)
         {
+            gen_mutex_unlock(&s_stat_tab_mutex);
             return -PVFS_EINVAL;
         }
 
@@ -1390,6 +1418,7 @@ int PVFS_util_remove_internal_mntent(struct PVFS_sys_mntent *mntent)
                 (new_count * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
 
@@ -1494,6 +1523,11 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
 
 /* PVFS_util_resolve()
  *
+ * This function is quasi-obsolete.  It should still work and for now
+ * it is called by the pvfs2-xxx utils.  Most everything else calls
+ * PVFS_util_resolve_absolute directly and uses the new PVFS_path
+ * structure to keep up with paths and their modifications/expansions
+ *
  * given a local path of a file that resides on a pvfs2 volume,
  * determine what the fsid and fs relative path is.  
  *
@@ -1508,6 +1542,8 @@ int PVFS_util_resolve(const char* local_path,
     char* tmp_path = NULL;
     char* parent_path = NULL;
     int base_len = 0;
+    PVFS_path_t *Ppath;
+    int ppath_local = 0;
 
     if(strlen(local_path) > (PVFS_PATH_MAX-1))
     {
@@ -1515,14 +1551,36 @@ int PVFS_util_resolve(const char* local_path,
         return(-PVFS_ENAMETOOLONG);
     }
 
+    Ppath = PVFS_path_from_expanded((char *)local_path);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        /* this allocates a PVFS_path that must be freed before return */
+        Ppath = PVFS_new_path(local_path);
+        local_path = Ppath->expanded_path;
+        ppath_local = 1; /* this Ppath created locally */
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        /* this saves a copy of the original path and returns */
+        /* a pointer to the modified path */
+        /* this will not allocated PVFS_path) */
+        local_path = PVFS_qualify_path(local_path);
+    }
+
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-    ret = PVFS_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
-                                     out_fs_path_max);
+    ret = PVFS_util_resolve_absolute(local_path);
     if(ret == 0)
     {
         /* done */
+        strncpy(out_fs_path, Ppath->pvfs_path, out_fs_path_max);
+        *out_fs_id = Ppath->fs_id;
+        if (ppath_local)
+        {
+            PVFS_free_path(Ppath);
+        }
         return(0);
     }
     if(ret == -PVFS_ENOENT)
@@ -1550,7 +1608,7 @@ int PVFS_util_resolve(const char* local_path,
                 return(-PVFS_ENOMEM);
             }
             /* find size of basename so we can reserve space for it */
-            /* note: basename() and dirname() modifiy args, thus the strcpy */
+            /* note: basename() and dirname() modify args, thus the strcpy */
             strcpy(parent_path, local_path);
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
@@ -1576,8 +1634,17 @@ int PVFS_util_resolve(const char* local_path,
             return(-PVFS_ENOENT);
         }
 
-        ret = PVFS_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
-                                         out_fs_path_max);
+        ret = PVFS_util_resolve_absolute(tmp_path);
+        if (!ret)
+        {
+            /* done */
+            strncpy(out_fs_path, Ppath->pvfs_path, out_fs_path_max);
+            *out_fs_id = Ppath->fs_id;
+            if (ppath_local)
+            {
+                PVFS_free_path(Ppath);
+            }
+        }
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
@@ -2128,7 +2195,13 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     {
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
-    if(sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+
+    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
+    {
+        attrmask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
@@ -2219,7 +2292,7 @@ uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
     }
     if (obj_mask & PVFS_ATTR_DATA_SIZE)
     {
-        sys_mask |= PVFS_ATTR_DATA_SIZE;
+        sys_mask |= PVFS_ATTR_SYS_SIZE;
     }
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -2248,6 +2321,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
     if (obj_mask & PVFS_ATTR_CAPABILITY)
     {
         sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
+    }
+    if (obj_mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
@@ -2311,31 +2388,46 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
  * determine what the fsid and fs relative path is. Makes no attempt
  * to canonicalize the path.
  *
+ * result is returned through the PVFS_path type now
+ *
  * returns 0 on succees, -PVFS_error on failure
  */
-int PVFS_util_resolve_absolute(const char *local_path,
-                               PVFS_fs_id *out_fs_id,
-                               char *out_fs_path,
-                               int out_fs_path_max)
+int PVFS_util_resolve_absolute(const char* local_path)
 {
     int i = 0, j = 0;
     int ret = -PVFS_EINVAL;
+    PVFS_path_t *Ppath;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for(i = 0; i < s_stat_tab_count; i++)
+    Ppath = PVFS_path_from_expanded((char *)local_path);
+    if (!VALID_PATH_MAGIC(Ppath))
+    {
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return ret;
+    }
+
+    if (!(PATH_QUALIFIED(Ppath) || PATH_EXPANDED(Ppath)))
+    {
+        gossip_err("Error: PVFS_util_resolve_absolute only"
+                   " works on qualified or expanded paths\n");
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return ret;
+    }
+
+    CLEAR_RESOLVED(Ppath);
+
+    for(i=0; i < s_stat_tab_count; i++)
     {
         for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
-                           local_path, 
-                           s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                           out_fs_path,
-                           out_fs_path_max);
+                        local_path, 
+                        s_stat_tab_array[i].mntent_array[j].mnt_dir);
             if(ret == 0)
             {
-                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
-                if(*out_fs_id == PVFS_FS_ID_NULL)
+                Ppath->fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                if(Ppath->fs_id == PVFS_FS_ID_NULL)
                 {
                     gossip_err("Error: %s resides on a PVFS2 file system "
                     "that has not yet been initialized.\n", local_path);
@@ -2343,6 +2435,7 @@ int PVFS_util_resolve_absolute(const char *local_path,
                     gen_mutex_unlock(&s_stat_tab_mutex);
                     return(-PVFS_ENXIO);
                 }
+                SET_RESOLVED(Ppath);
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return(0);
             }
@@ -2353,15 +2446,13 @@ int PVFS_util_resolve_absolute(const char *local_path,
     for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
         ret = PINT_remove_dir_prefix(
-             local_path,
-             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-             out_fs_path,
-             out_fs_path_max);
+                    local_path, s_stat_tab_array[
+                    PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir);
         if (ret == 0)
         {
-            *out_fs_id =
-                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
-            if(*out_fs_id == PVFS_FS_ID_NULL)
+            Ppath->fs_id = s_stat_tab_array[
+                        PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            if(Ppath->fs_id == PVFS_FS_ID_NULL)
             {
                 gossip_err("Error: %s resides on a PVFS2 file system "
                            "that has not yet been initialized.\n",
@@ -2370,6 +2461,7 @@ int PVFS_util_resolve_absolute(const char *local_path,
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return(-PVFS_ENXIO);
             }
+            SET_RESOLVED(Ppath);
             gen_mutex_unlock(&s_stat_tab_mutex);
             return(0);
         }

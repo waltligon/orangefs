@@ -1,6 +1,6 @@
-#!/bin/sh 
+#!/bin/bash
 
-. functions
+source ./functions
 
 ##
 ## entry point for script

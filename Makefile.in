@@ -86,11 +86,13 @@ BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
+BUILD_JNI = @BUILD_JNI@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
-ENABLE_SECURITY = @ENABLE_SECURITY@
+ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
+ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -123,7 +125,7 @@ build_static = @build_static@
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
 
-# PHONEY targets are targets that do not result in the generation
+# PHONY targets are targets that do not result in the generation
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
@@ -196,16 +198,17 @@ CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @UUID_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 @LIBS@ 
+LIBS += -lpvfs2 -lm @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
 ULIBDEPLIBS := -lpvfs2
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
+RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 NPTL_WORKAROUND = @NPTL_WORKAROUND@
@@ -344,7 +347,10 @@ SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 # OpenSSL support
 SERVERCFLAGS += @OPENSSL_CPPFLAGS@
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@
+# LDAP support
+SERVERCFLAGS += @LDAP_CPPFLAGS@
+
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -445,6 +451,13 @@ ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
 endif
 
+# reset the file position pointer when a write call encounters errors (kernel only)
+# by default, this feature is disabled.  Default behavior is to increment the file
+# position pointer as bytes are written.
+ifdef RESET_FILE_POS
+CFLAGS += @RESET_FILE_POS@
+endif
+
 # enable trusted connections (unless disabled by configure)
 ifdef TRUSTED_CONNECTIONS
 CFLAGS += @TRUSTED_CONNECTIONS@
@@ -482,6 +495,8 @@ USERSRC :=
 LIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
+# JNI_ULIBSRC is source code wrapper of libofs for JNI use.
+#JNI_ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
@@ -528,10 +543,15 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-LIBRARIES_STATIC := lib/libpvfs2.a lib/liborange.a
-LIBRARIES_SHARED := lib/libpvfs2.so lib/liborange.so
+ifdef TARGET_OS_DARWIN
+LIBRARIES_STATIC := lib/libpvfs2.a
+LIBRARIES_LIBTOOL := lib/liborangefs.la
+else
+LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
+LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
+endif
 
 ifdef BUILD_BMI_ONLY
 LIBRARIES_STATIC += lib/libbmi.a
@@ -540,8 +560,8 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifdef BUILD_USRINT
-LIBRARIES_STATIC += lib/libofs.a lib/liborangepre.a
-LIBRARIES_SHARED += lib/libofs.so lib/liborangepre.so
+LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
 LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
 LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
@@ -584,14 +604,20 @@ include $(patsubst %, %/module.mk, $(MODULES))
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBOBJS is a list of objects to put in the jni ofs lib
+#JNI_ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBPICOBJS is a list of objects to put in the jni ofs lib
+#JNI_ULIBPICOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBDEPENDS is a list of dependency files for the client lib
+#JNI_ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -606,16 +632,25 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBTHREADEDOBJS is a list of objects to put in the 
+# multithreaded JNI ofs lib
+#JNI_ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared jni 
+# ofs library
+#JNI_ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
+# JNI_ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded
+# jni ofs lib
+#JNI_ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(JNI_ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -819,6 +854,11 @@ $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
+# special rules for devel tool objects which also require db components
+$(DEVELOBJS): %.o: %.c
+	$(Q) "  CC              $@"
+	$(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
+
 ifdef BUILD_BMI_ONLY
 # rule for building the bmi library
 lib/libbmi.a: $(LIBBMIOBJS)
@@ -870,33 +910,41 @@ lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
 	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
 
 # rule for building the shared ofs library
-lib/libofs.so: $(ULIBPICOBJS)
+lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the shared ofs _multithreaded_ library
-lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
+lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rules for building virtual libraries
-lib/liborange.a: lib/libpvfs2.a
+lib/liborangefs.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.a
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.a
 
-lib/liborange.so: lib/libpvfs2.so
+lib/liborangefs.la: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.so
+	$(E)glibtool --mode=link --tag=CC gcc -o lib/libpvfs2.la $^ -lcrypto -lssl -static
+	mv lib/libpvfs2.la $@
 
-lib/liborangepre.a: lib/libpvfs2.a
+lib/liborangefs.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.a
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.so
 
-lib/liborangepre.so: lib/libpvfs2.so
+lib/liborangefsposix.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.so
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.a
+
+lib/liborangefsposix.so: lib/libpvfs2.so
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
+
+# rule for building the JNI client shared library
+#lib/libPVFS2JNI.so: libPVFS2JNI.c PVFS2JNI.java javac javah  
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -1104,7 +1152,7 @@ clean::
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
-	$(E)rm -f $(STATECOMPGEN) 
+	$(E)rm -f $(STATECOMPGEN)
 	$(E)rm -f $(POLICYCOMPGEN) 
 endif
 
@@ -1290,6 +1338,7 @@ endif
 	install -m 755 $(ADMINTOOLS) $(bindir)
 	install -m 755 $(USERTOOLS) $(bindir)
 ifdef BUILD_UCACHE
+	install -d $(sbindir)
 	install -m 755 $(UCACHEDTOOLS) $(sbindir)
 endif
 	# for compatibility in case anyone really wants "lsplus"
@@ -1322,6 +1371,13 @@ ifdef BUILD_SERVER
     else
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
+    endif
+	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
+    ifdef ENABLE_SECURITY_KEY
+	touch $(bindir)/.pvfs2-genconfig-key    
+    endif
+    ifdef ENABLE_SECURITY_CERT
+	touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
 endif

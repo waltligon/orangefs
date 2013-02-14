@@ -35,9 +35,13 @@
 #define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
 
+#ifndef UCACHE_MAX_BLK_REQ 
+#define UCACHE_MAX_BLK_REQ MEM_TABLE_ENTRY_COUNT
+#endif
+
 #ifndef UCACHE_MAX_REQ 
-#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * MEM_TABLE_ENTRY_COUNT)
-#endif 
+#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * UCACHE_MAX_BLK_REQ)
+#endif
 
 /* Define multiple NILS to there's no need to cast for different types */
 #define NIL8  0XFF
@@ -52,7 +56,7 @@
 
 
 #ifndef DBG
-#define DBG 0   
+#define DBG 0 
 #endif
 
 #ifndef UCACHE_LOG_FILE
@@ -86,13 +90,13 @@
 #define UCACHE_STATS_64 3
 #define UCACHE_STATS_16 2
 /* This is the size of the ucache_aux auxilliary shared mem segment */
-#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 64) + \
-    (UCACHE_STATS_16 * 16))
+#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 8) + \
+    (UCACHE_STATS_16 * 2))
 
 /* Globals */
 extern FILE * out;
 extern int ucache_enabled;
-extern union user_cache_u *ucache;
+extern union ucache_u *ucache;
 extern struct ucache_aux_s *ucache_aux;
 extern ucache_lock_t *ucache_locks;
 extern ucache_lock_t *ucache_lock;
@@ -197,7 +201,7 @@ struct file_table_s
 /** The whole system wide cache
  *
  */
-union user_cache_u
+union ucache_u
 {
     struct file_table_s ftbl;
     union cache_block_u b[0]; /* actual size of this varies */
@@ -205,18 +209,18 @@ union user_cache_u
 
 struct ucache_ref_s
 {
-    union user_cache_u *ucache;     /* pointer to ucache shmem */
+    union ucache_u *ucache;     /* pointer to ucache shmem */
     ucache_lock_t *ucache_locks;    /* pointer to ucache locks */
 };
 
 /* externally visible API */
-union user_cache_u *get_ucache(void);
+union ucache_u *get_ucache(void);
 int ucache_initialize(void);
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct file_ent_s **fent);
 int ucache_close_file(struct file_ent_s *fent);
-inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
+inline struct mem_table_s *ucache_get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
 inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
 inline void *ucache_insert(struct file_ent_s *fent, 
                     uint64_t offset, 

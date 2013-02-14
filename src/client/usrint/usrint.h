@@ -154,6 +154,15 @@ extern ssize_t getxattr(const char *path, const char *name,
 extern ssize_t lgetxattr(const char *path, const char *name,
                      void *value, size_t size);
 extern ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
+extern ssize_t pvfs_atomicxattr(const char *path, const char *name,
+                                void *value, size_t valsize, void *response,
+                                size_t respsize, int flags, int opcode);
+extern ssize_t pvfs_latomicxattr(const char *path, const char *name,
+                                void *value, size_t valsize, void *response,
+                                size_t respsize, int flags, int opcode);
+extern ssize_t pvfs_fatomicxattr(int fd, const char *name,
+                                void *value, size_t valsize, void *response,
+                                size_t respsize, int flags, int opcode);
 extern ssize_t listxattr(const char *path, char *list, size_t size);
 extern ssize_t llistxattr(const char *path, char *list, size_t size);
 extern ssize_t flistxattr(int fd, char *list, size_t size);
@@ -176,6 +185,11 @@ extern int fremovexattr(int fd, const char *name);
 #include <pvfs2-types.h>
 #include <pvfs2-req-proto.h>
 #include <gen-locks.h>
+
+/* Just in case this is not defined - sizeof blocks reported in stat */
+#ifndef S_BLKSIZE
+#define S_BLKSIZE 512
+#endif
 
 /* magic numbers for PVFS filesystem */
 #define PVFS_FS 537068840
@@ -213,7 +227,7 @@ extern int fremovexattr(int fd, const char *name);
 #define true   1 
 #define false  0 
 #define O_HINTS     02000000  /* PVFS hints are present */
-#define O_NOTPVFS   04000000  /* Open non-PVFS files if possible */
+#define O_NOTPVFS   04000000  /* Turn off sym links from PVFS to non-PVFS */
 
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
@@ -243,7 +257,7 @@ extern int pvfs_convert_iovec(const struct iovec *vector,
 
 /* debugging */
 
-//#define USRINT_DEBUG
+//#define PVFS_USRINT_DEBUG
 #ifdef  PVFS_USRINT_DEBUG
 #define debug(s,v) fprintf(stderr,s,v)
 #else

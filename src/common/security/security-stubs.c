@@ -55,6 +55,38 @@ int PINT_sign_capability(PVFS_capability *cap)
     return 0;
 }
 
+int PINT_server_to_server_capability(PVFS_capability *capability,
+                                     PVFS_fs_id fs_id,
+                                     int num_handles,
+                                     PVFS_handle *handle_array)
+{   
+    int ret = -PVFS_EINVAL;
+    server_configuration_s *user_opts = PINT_get_server_config();
+        
+    ret = PINT_init_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_ENOMEM;
+    }
+    capability->issuer =
+        malloc(strlen(user_opts->server_alias) + 3);
+    capability->issuer[0] = 'S';
+    capability->issuer[1] = ':';
+    strcpy(capability->issuer+2, user_opts->server_alias);
+    capability->fsid = fs_id;
+    capability->timeout =
+        PINT_util_get_current_time() + user_opts->security_timeout;
+    capability->op_mask = ~((uint32_t)0);
+    capability->num_handles = num_handles;
+    capability->handle_array = handle_array;
+    ret = PINT_sign_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_EINVAL;
+    }
+    return 0;
+}
+
 int PINT_verify_capability(const PVFS_capability *cap)
 {
     if (!cap)

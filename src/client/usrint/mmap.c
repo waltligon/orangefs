@@ -93,10 +93,10 @@ int pvfs_munmap(void *start, size_t length)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if __SIZEOF_POINTER__ == __SIZEOF_LONG__
-    if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
+#if PVFS2_SIZEOF_VOIDP == 64
+    if (((uint64_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
-    if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)
+    if (((uint32_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #endif
     {
         errno = EINVAL;
@@ -137,10 +137,10 @@ int pvfs_msync(void *start, size_t length, int flags)
     struct pvfs_mmap_s *mapl, *temp;
     long long pagesize = getpagesize();
 
-#if __SIZEOF_POINTER__ == __SIZEOF_LONG__
-    if (((long)start % pagesize) != 0 || (length % pagesize) != 0)
+#if PVFS2_SIZEOF_VOIDP == 64
+    if (((uint64_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #else
-    if (((long long)start % pagesize) != 0 || (length % pagesize) != 0)
+    if (((uint32_t)start % pagesize) != 0 || (length % pagesize) != 0)
 #endif
     {
         errno = EINVAL;
@@ -148,7 +148,8 @@ int pvfs_msync(void *start, size_t length, int flags)
     }
     qlist_for_each_entry_safe(mapl, temp, &maplist, link)
     {
-        if (mapl->mst <= start && mapl->mst + mapl->mlen >= start + length)
+        if (mapl->mst <= start &&
+            ((u_char *)mapl->mst + mapl->mlen) >= ((u_char *)start + length))
         {
             break;
         }
@@ -162,8 +163,10 @@ int pvfs_msync(void *start, size_t length, int flags)
     {
         /* the diff between start and mst is distance from */
         /* start of buffer, and distnace from original offset */
-        rc = pvfs_pwrite(mapl->mfd, start, length,
-                          mapl->moff + (start - mapl->mst));
+        rc = pvfs_pwrite(mapl->mfd,
+                         start,
+                         length,
+                         mapl->moff + ((u_char *)start - (u_char *)mapl->mst));
     }
     return rc;
 }

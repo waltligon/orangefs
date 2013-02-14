@@ -303,7 +303,7 @@ int PINT_acache_get_cached_entry(
     uint64_t current_time_msecs = 0;
     /* Flags indicating if dynamic attrs or capabilities attr have expired. */
     /* unsigned char capabilities_expired = 0; */
-    unsigned char dynamic_attrs_expired = 0;
+    /* TODO unsigned char dynamic_attrs_expired = 0; */
   
     gossip_debug(GOSSIP_ACACHE_DEBUG,
                  "acache: get_cached_entry(): H=%s\n",
@@ -367,7 +367,7 @@ int PINT_acache_get_cached_entry(
     if((current_time_msecs - tmp_payload->msecs_dynamic) >
         DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
     {
-        dynamic_attrs_expired = 1;
+        /* TODO dynamic_attrs_expired = 1; */
         /* Mark the dynamic attrs invalid */
         tmp_payload->attr_status = -PVFS_ETIME;
         *attr_status = -PVFS_ETIME;

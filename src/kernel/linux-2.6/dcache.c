@@ -194,6 +194,10 @@ static int pvfs2_d_revalidate(
     struct dentry *dentry,
     struct nameidata *nd)
 {
+#ifdef LOOKUP_RCU
+    if (nd->flags & LOOKUP_RCU)
+        return -ECHILD;
+#endif
 
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         ((!nd->flags) & (LOOKUP_CREATE)) )

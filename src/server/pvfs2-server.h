@@ -82,6 +82,9 @@ typedef struct PINT_server_trove_keys
     int size;
 } PINT_server_trove_keys_s;
 
+/* This is defined in src/server/pvfs2-server.c
+ * These values index this table
+ */
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
@@ -92,9 +95,21 @@ enum
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
     METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6
+    NUM_DFILES_REQ_KEY   = 6,       
+    DIST_DIR_ATTR_KEY    = 7,
+    DIST_DIRDATA_BITMAP_KEY      = 8,
+    DIST_DIRDATA_HANDLES_KEY = 9
+
 };
 
+/* This is defined in src/server/get-attr.sm
+ * These values index this table
+ * The first NUM_SPECIAL_KEYS of these are automatically
+ * Read when getting metadata
+ *
+ * WBL V3 Uncomment this declaration if it doesn't cause problems
+ */
+/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
 /* optional; user-settable keys */
 enum 
 {
@@ -329,8 +344,10 @@ struct PINT_server_lookup_op
     char *segp;
     void *segstate;
 
-    PVFS_handle dirent_handle;
     PVFS_ds_attributes *ds_attr_array;
+    PVFS_object_attr attr;
+
+    int dirdata_server_index;
 };
 
 struct PINT_server_readdir_op
@@ -341,8 +358,16 @@ struct PINT_server_readdir_op
     PVFS_size dirdata_size;
 };
 
+typedef struct
+{
+    int start_entry;
+    int nentries;
+} split_msg_boundary;
+
 struct PINT_server_crdirent_op
 {
+    PVFS_credential credential;
+    PVFS_capability capability;
     char *name;
     PVFS_handle new_handle;
     PVFS_handle parent_handle;
@@ -350,7 +375,29 @@ struct PINT_server_crdirent_op
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
     PVFS_size dirent_count;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
     int dir_attr_update_required;
+    PVFS_object_attr dirdata_attr;
+    PVFS_ds_attributes dirdata_ds_attr;
+
+    /* index of node to receive directory entries when a split is necessary. */
+    int split_node;
+
+    /* Save the old directory attrs in case we have to back out due to an error. */
+    PVFS_object_attr saved_attr;
+
+    /* variables used for sending mgmt_split_dirent request */
+    PVFS_BMI_addr_t svr_addr; /*destination server address*/
+    PVFS_error *split_status; /*status from PVFS_SERV_MGMT_SPLIT_DIRENT*/
+    PINT_dist *dist; /*distribution structure for basic_dist*/
+    int read_all_directory_entries;
+    int nentries;
+    PVFS_handle *entry_handles;
+    char **entry_names;
+    int num_msgs_required;
+    split_msg_boundary *msg_boundaries;
+    PVFS_ds_keyval *entries_key_a;
+    PVFS_ds_keyval *entries_val_a;
 };
 
 struct PINT_server_rmdirent_op
@@ -360,6 +407,8 @@ struct PINT_server_rmdirent_op
                                * removed entry */
     PVFS_size dirent_count;
     int dir_attr_update_required;
+    PVFS_object_attr dirdata_attr;
+    PVFS_ds_attributes dirdata_ds_attr;
 };
 
 struct PINT_server_chdirent_op
@@ -368,6 +417,8 @@ struct PINT_server_chdirent_op
     PVFS_handle old_dirent_handle;
     PVFS_handle new_dirent_handle;
     int dir_attr_update_required;
+    PVFS_object_attr dirdata_attr;
+    PVFS_ds_attributes dirdata_ds_attr;
 };
 
 struct PINT_server_remove_op
@@ -383,7 +434,15 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
-    int saved_error_code; /* holds error_code from previous state. */
+
+    /* for dirdata rebuild */
+    int saved_error_code;
+    int need_rebuild_dirdata_local;
+    int local_dirdata_index;
+    int num_rebuild_dirdata_remote;
+    int *rebuild_dirdata_index_array_remote;
+    PVFS_handle handle_local;
+    PVFS_handle* handle_array_remote;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -457,18 +516,33 @@ struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
     PVFS_handle handle;        /* metadata handle passed by request */
-    PVFS_handle dirent_handle;
     PVFS_size init_dirdata_size;
+
+    /* dist-dir-struct
+     * not in resp, only return meta handle
+     * should be in attr up-level, PINT_server_op*/
+
+    /* inherit from create_op */
+    /* not using these right now
+    const char **dirdata_servers;
+    const char **remote_dirdata_servers;
+    */
+    int num_dirdata_servers;
+    PVFS_handle* handle_array_local;
+    PVFS_handle* handle_array_remote;
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    PVFS_error saved_error_code;
+    int handle_index;
 };
 
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
+    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
-    PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    PVFS_handle dirent_handle;
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
     PVFS_credential credential;
@@ -508,6 +582,26 @@ struct PINT_server_tree_communicate_op
     int handle_index;
     uint32_t sid_count; /* V3 FIXME */
     PVFS_SID *sid_array; /* V3 FIXME */
+};
+
+struct PINT_server_mgmt_get_dirent_op
+{
+    PVFS_handle handle;
+};
+
+
+struct PINT_server_mgmt_create_root_dir_op
+{
+    PVFS_handle lost_and_found_handle;
+    PVFS_capability capability;
+    PVFS_credential credential;
+    int num_dirdata_servers;
+    PVFS_handle* handle_array_local;
+    PVFS_handle* handle_array_remote;
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    PVFS_error saved_error_code;
+    int handle_index;
 };
 
 /* This structure is passed into the void *ptr 
@@ -586,6 +680,7 @@ typedef struct PINT_server_op
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
+//	struct PINT_server_setattr_op setattr;
 	struct PINT_server_readdir_op readdir;
 	struct PINT_server_remove_op remove;
 	struct PINT_server_chdirent_op chdirent;
@@ -597,12 +692,18 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+/*
+        struct PINT_server_precreate_pool_refiller_op
+                                               precreate_pool_refiller;
+*/
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
         struct PINT_server_tree_communicate_op tree_communicate;
+        struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
+        struct PINT_server_mgmt_create_root_dir_op mgmt_create_root_dir;
     } u;
 
 } PINT_server_op;
@@ -788,8 +889,11 @@ extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 
 /* nested state machines */
+extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
@@ -804,6 +908,7 @@ extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 
 /* Exported Prototypes */
@@ -824,6 +929,7 @@ int server_state_machine_alloc_noreq(
     enum PVFS_server_op op, struct PINT_smcb ** new_op);
 int server_state_machine_start_noreq(
     struct PINT_smcb *new_op);
+int server_state_machine_complete_noreq(PINT_smcb *smcb);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0

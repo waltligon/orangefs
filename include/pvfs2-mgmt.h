@@ -312,6 +312,22 @@ PVFS_error PVFS_mgmt_get_dfile_array(
     int dfile_count,
     PVFS_hint hints);
 
+PVFS_error PVFS_imgmt_get_dirdata_array(
+    PVFS_object_ref ref,
+    const PVFS_credential *credential,
+    PVFS_handle *dirdata_array,
+    int dirdata_count,
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_get_dirdata_array(
+    PVFS_object_ref ref,
+    const PVFS_credential *credential,
+    PVFS_handle *dirdata_array,
+    int dirdata_count,
+    PVFS_hint hints);
+
 PVFS_error PVFS_imgmt_remove_object(
     PVFS_object_ref object_ref,
     const PVFS_credential *credential,

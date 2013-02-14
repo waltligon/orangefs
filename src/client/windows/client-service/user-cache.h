@@ -20,19 +20,19 @@ struct user_entry
 {
     struct qhash_head hash_link;
     char user_name[256];
-    PVFS_credentials credentials;
+    PVFS_credential credential;
     ASN1_UTCTIME *expires;
 };
 
 int user_compare(void *key, 
                  struct qhash_head *link);
 
-int add_user(char *user_name, 
-             PVFS_credentials *credentials,
+int add_cache_user(char *user_name, 
+             PVFS_credential *credential,
              ASN1_UTCTIME *expires);
 
-int get_cached_user(char *user_name, 
-                    PVFS_credentials *credentials);
+int get_cache_user(char *user_name, 
+                    PVFS_credential *credential);
 
 int remove_user(char *user_name);
 

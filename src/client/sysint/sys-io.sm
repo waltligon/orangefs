@@ -1107,6 +1107,7 @@ sio_array_destroy:
 
 datafile_index_array_destroy:
     io_datafile_index_array_destroy(sm_p);
+
 error_exit:
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 exit:
@@ -1311,7 +1312,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
         /* posted the receive okay */
         ++sm_p->u.io.msgpair_completion_count;
 
-      recv_already_posted:
+    recv_already_posted:
 
         if (cur_ctx->msg_send_has_been_posted &&
             cur_ctx->msg_send_in_progress)
@@ -1645,9 +1646,8 @@ static PINT_sm_action io_datafile_no_mirror_retry(struct PINT_smcb *smcb,
   this case we post the flow operations as soon as we see them (the
   main motivation for not using the common msgpairarray code).
 */
-static PINT_sm_action io_datafile_complete_operations(
-                                           struct PINT_smcb *smcb,
-                                           job_status_s *js_p)
+static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, index = 0, i;
@@ -1657,9 +1657,8 @@ static PINT_sm_action io_datafile_complete_operations(
     int matched_send_or_recv = 0;
     struct server_configuration_s *server_config = NULL;
 
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
-        "(tag %lu)\n", sm_p, status_user_tag);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
+                 "(tag %lu)\n", sm_p, status_user_tag);
 
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
@@ -1681,8 +1680,8 @@ static PINT_sm_action io_datafile_complete_operations(
             if (ret < 0)
             {
                 /* problem */
-                PVFS_perror_gossip(
-                    "io_complete_context_send_or_recv failed", ret);
+                PVFS_perror_gossip("io_complete_context_send_or_recv failed",
+                                   ret);
                 js_p->error_code = ret;
                 return SM_ACTION_COMPLETE;
             }
@@ -1777,9 +1776,8 @@ static PINT_sm_action io_datafile_complete_operations(
         }
         else
         {
-            gossip_debug(
-                GOSSIP_IO_DEBUG, "*** %d msgpair completions "
-                "pending\n", sm_p->u.io.msgpair_completion_count);
+            gossip_debug(GOSSIP_IO_DEBUG, "*** %d msgpair completions "
+                         "pending\n", sm_p->u.io.msgpair_completion_count);
         }
     }
 
@@ -1834,17 +1832,15 @@ static PINT_sm_action io_datafile_complete_operations(
                  (js_p->error_code == -PVFS_EPROTO))
             {
                 /* if this is a an error that we can retry */
-                gossip_err(
-                       "%s: flow failed, retrying from msgpair\n", __func__);
+                gossip_err("%s: flow failed, retrying from msgpair\n",
+                           __func__);
                 cur_ctx->msg_send_has_been_posted = 0;
                 cur_ctx->msg_recv_has_been_posted = 0;
             }
             else
             {
                 /* do not retry on remaining error codes */
-                gossip_err(
-                       "%s: flow failed, not retrying\n", __func__);
-
+                gossip_err("%s: flow failed, not retrying\n", __func__); 
                 /* forcing the count high insures that the sm won't restart */
                 sm_p->u.io.retry_count = sm_p->msgarray_op.params.retry_limit;
             }
@@ -1854,12 +1850,13 @@ static PINT_sm_action io_datafile_complete_operations(
         /*To test fail-over uncomment the following. This will allow the code
          * to go through the retry state at least one time on a read operation.
         */
-        //if (!cur_ctx->write_ack_in_progress && sm_p->u.io.retry_count==0)
-        //{
-        //   cur_ctx->msg_send_has_been_posted = 0;
-        //   cur_ctx->msg_recv_has_been_posted = 0;
-        //}
-
+        /*
+        if (!cur_ctx->write_ack_in_progress && sm_p->u.io.retry_count==0)
+        {
+            cur_ctx->msg_send_has_been_posted = 0;
+            cur_ctx->msg_recv_has_been_posted = 0;
+        }
+        */
 
     }
     else if (STATUS_USER_TAG_TYPE(status_user_tag, IO_SM_PHASE_FINAL_ACK))
@@ -1887,7 +1884,8 @@ static PINT_sm_action io_datafile_complete_operations(
         if (js_p->error_code < 0)
         {
             gossip_debug(GOSSIP_IO_DEBUG,
-                    "%s: write-ack failed, retrying from msgpair\n", __func__);
+                         "%s: write-ack failed, retrying from msgpair\n",
+                         __func__);
             cur_ctx->msg_send_has_been_posted = 0;
             cur_ctx->msg_recv_has_been_posted = 0;
         }
@@ -2036,6 +2034,9 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                 }
                 break;
             }
+            gossip_debug(GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
+                         (i + 1), sm_p->u.io.datafile_count,
+                         lld(sm_p->u.io.total_size));
         }
 
         /*
@@ -2049,7 +2050,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
             char buf[64] = {0};
 
             ret = (PINT_smcb_cancelled(smcb) ? -PVFS_ECANCEL :
-                   sm_p->u.io.stored_error_code);
+                                               sm_p->u.io.stored_error_code);
 
             PVFS_strerror_r(ret, buf, 64);
             gossip_debug(GOSSIP_IO_DEBUG, "no context errors found; "
@@ -2204,8 +2205,8 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
              * In this case, we don't need to change the size of the
              * file stored in the attribute cache
              */
-            sm_p->u.io.io_resp_p->total_completed = PINT_REQUEST_TOTAL_BYTES(
-                                                           sm_p->u.io.mem_req);
+            sm_p->u.io.io_resp_p->total_completed = 
+                                 PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
 
             
             ret = io_zero_fill_holes(sm_p,
@@ -2251,7 +2252,8 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
 
                 sm_p->u.io.io_resp_p->total_completed = total_size;
 
-                ret = io_zero_fill_holes(sm_p, eor,
+                ret = io_zero_fill_holes(sm_p,
+                                         eor,
                                          sm_p->u.io.datafile_count,
                                          sm_p->u.io.dfile_size_array,
                                          NULL);
@@ -2342,7 +2344,8 @@ static PINT_sm_action io_analyze_size_results(struct PINT_smcb *smcb,
         sm_p->u.io.io_resp_p->total_completed = 
                                  PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
 
-        ret = io_zero_fill_holes(sm_p, eor,
+        ret = io_zero_fill_holes(sm_p,
+                                 eor,
                                  attr->u.meta.dfile_count,
                                  sm_p->getattr.size_array,
                                  NULL);
@@ -2365,7 +2368,8 @@ static PINT_sm_action io_analyze_size_results(struct PINT_smcb *smcb,
         
         sm_p->u.io.io_resp_p->total_completed = total_size;
 
-        ret = io_zero_fill_holes(sm_p, eof,
+        ret = io_zero_fill_holes(sm_p,
+                                 eof,
                                  attr->u.meta.dfile_count,
                                  sm_p->getattr.size_array,
                                  NULL);
@@ -2453,17 +2457,16 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 
     if (cur_ctx->msg.recv_status.error_code || cur_ctx->msg.op_status)
     {
-        gossip_debug(
-                GOSSIP_IO_DEBUG, "  error %d with status %d related "
-                "to response from context %p; not submitting flow.\n",
-                cur_ctx->msg.recv_status.error_code,
-                cur_ctx->msg.op_status, cur_ctx);
+        gossip_debug(GOSSIP_IO_DEBUG, "  error %d with status %d related "
+                     "to response from context %p; not submitting flow.\n",
+                     cur_ctx->msg.recv_status.error_code,
+                     cur_ctx->msg.op_status, cur_ctx);
 
         if (cur_ctx->msg.recv_status.error_code)
         {
             PVFS_perror_gossip(
-                "io_process_context_recv (recv_status.error_code)",
-                cur_ctx->msg.recv_status.error_code);
+                    "io_process_context_recv (recv_status.error_code)",
+                    cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
@@ -2728,8 +2731,7 @@ static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg = NULL;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_IO_DEBUG,
-                 "- complete_context_send_or_recv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "- complete_context_send_or_recv called\n");
 
     assert(smcb && js_p);
     assert(smcb->op == PVFS_SYS_IO);
@@ -2806,8 +2808,8 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
                  "- io_process_context_recv called\n");
 
     assert(sm_p && js_p);
-    assert(STATUS_USER_TAG_TYPE(
-               status_user_tag, IO_SM_PHASE_REQ_MSGPAIR_RECV));
+    assert(STATUS_USER_TAG_TYPE(status_user_tag,
+                                IO_SM_PHASE_REQ_MSGPAIR_RECV));
 
     status_user_tag = (unsigned long)js_p->status_user_tag;
 
@@ -2930,11 +2932,10 @@ static inline int io_check_message_status(PINT_sm_msgpair_state *msg_p,
                                      &resp);
             if (ret == 0)
             {
-                gossip_debug(
-                    GOSSIP_IO_DEBUG,
-                    "  %lld bytes written to context %p\n",
-                    lld(resp->u.write_completion.total_completed),
-                    cur_ctx);
+                gossip_debug(GOSSIP_IO_DEBUG,
+                             "  %lld bytes written to context %p\n",
+                             lld(resp->u.write_completion.total_completed),
+                             cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;
                 
@@ -3325,7 +3326,8 @@ static int io_find_total_size(PINT_client_sm *sm_p,
 
         res = PINT_process_request(filereq_state,
                                    memreq_state,
-                                   &rfdata, &result,
+                                   &rfdata,
+                                   &result,
                                    PINT_SERVER);
         if(res < 0)
         {
@@ -3528,8 +3530,7 @@ static int io_zero_fill_holes(PINT_client_sm *sm_p,
                }
            } while(!PINT_REQUEST_DONE(file_req_state) && result.segs);
                
-           PINT_REQUEST_STATE_SET_FINAL(file_req_state,
-                                        real_logical_offset);
+           PINT_REQUEST_STATE_SET_FINAL(file_req_state, real_logical_offset);
 
            fdata.extend_flag = 1;
 

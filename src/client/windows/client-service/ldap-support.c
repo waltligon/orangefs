@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
    
-/* LDAP functions - OrangeFS credentials (UID/GID) can be stored
+/* LDAP functions - OrangeFS credential (UID/GID) can be stored
  * in an LDAP directory. The system will search for the username
  * and locate attributes containing information. The details of the
  * search can be configured in the configuration file.
@@ -19,6 +19,7 @@
 #include <ldap.h>
 #include <ldap_ssl.h>
 
+#include "cred.h"
 #include "ldap-support.h"
 
 /* 15-second search timeout */
@@ -72,18 +73,20 @@ static int check_number(char *s)
     return 1;
 }
 
-int get_ldap_credentials(char *userid,
-                         PVFS_credentials *credentials)
+int get_ldap_credential(char *userid,
+                         PVFS_credential *credential)
 {
     LDAP *ld;
     int version, ret = -1, bind_ret = 0;
     char *bind_dn, *password, filter[384],
          *attrs[3], *attr_name, **values,
          error_msg[256];
+    PVFS_uid uid;
+    PVFS_gid gid;
     LDAPMessage *results, *entry;
     BerElement *ptr;
 
-    DbgPrint("   get_ldap_credentials: enter\n");
+    DbgPrint("   get_ldap_credential: enter\n");
 
     /* connect to LDAP - this will not be encrypted if
        secure is not set */    
@@ -94,7 +97,7 @@ int get_ldap_credentials(char *userid,
         _snprintf(error_msg, sizeof(error_msg), "User %s: could not initialize "
             "LDAP", userid);
         report_ldap_error(error_msg);
-        goto get_ldap_credentials_exit;
+        goto get_ldap_credential_exit;
     }
 
     /* set the version */
@@ -119,7 +122,7 @@ int get_ldap_credentials(char *userid,
         _snprintf(error_msg, sizeof(error_msg), "User %s: could not bind to "
             "LDAP server: %s (%d)", userid, ldap_err2string(bind_ret), bind_ret);
         report_ldap_error(error_msg);
-        goto get_ldap_credentials_exit;
+        goto get_ldap_credential_exit;
     }
     
     /* construct the filter in the form 
@@ -137,12 +140,12 @@ int get_ldap_credentials(char *userid,
     strncpy(attrs[1], goptions->ldap.gid_attr, 32);
     attrs[2] = NULL;
 
-    DbgPrint("   get_ldap_credentials: search root: %s\n",
+    DbgPrint("   get_ldap_credential: search root: %s\n",
         goptions->ldap.search_root);
-    DbgPrint("   get_ldap_credentials: search scope: %d\n", 
+    DbgPrint("   get_ldap_credential: search scope: %d\n", 
         goptions->ldap.search_scope);
-    DbgPrint("   get_ldap_credentials: filter: %s\n", filter);
-    DbgPrint("   get_ldap_credentials: attrs: %s/%s\n", 
+    DbgPrint("   get_ldap_credential: filter: %s\n", filter);
+    DbgPrint("   get_ldap_credential: attrs: %s/%s\n", 
         goptions->ldap.uid_attr, goptions->ldap.gid_attr);
     ret = ldap_search_st(ld, goptions->ldap.search_root, goptions->ldap.search_scope,
               filter, (char **) attrs, 0, &timeout, &results);
@@ -150,7 +153,7 @@ int get_ldap_credentials(char *userid,
     /* retrieve uid/gid values from results */
     if (ret == 0)
     {
-        credentials->uid = credentials->gid = -1;
+        uid = gid = -1;
 
         if (results != NULL)
         {
@@ -167,9 +170,9 @@ int get_ldap_credentials(char *userid,
                         if (check_number(values[0])) 
                         {
                             if (!stricmp(attr_name, goptions->ldap.uid_attr))
-                                credentials->uid = atoi(values[0]);
+                                uid = atoi(values[0]);
                             else if (!stricmp(attr_name, goptions->ldap.gid_attr))
-                                credentials->gid = atoi(values[0]);
+                                gid = atoi(values[0]);
                         }
                         else
                         {
@@ -225,15 +228,22 @@ int get_ldap_credentials(char *userid,
     free(attrs[0]);
     free(attrs[1]);
 
-    if (ret == 0 && (credentials->uid == -1 || credentials->gid == -1))
+    if (ret == 0 && uid != -1 && gid != -1)
     {
-        _snprintf(error_msg, sizeof(error_msg), "User %s: LDAP credentials "
+        init_credential(credential);
+        credential->userid = uid;
+        credential_add_group(credential, gid);
+        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+    }
+    else if (ret == 0)
+    {
+        _snprintf(error_msg, sizeof(error_msg), "User %s: LDAP credential "
             "not found", userid);
         report_ldap_error(error_msg);
         ret = -1;
     }
 
-get_ldap_credentials_exit:
+get_ldap_credential_exit:
 
     if (bind_ret != 0)
         ret = bind_ret;
@@ -241,7 +251,7 @@ get_ldap_credentials_exit:
     if (ld != NULL)
         ldap_unbind_s(ld);
 
-    DbgPrint("   get_ldap_credentials: exit\n");
+    DbgPrint("   get_ldap_credential: exit\n");
 
     return ret;
 }

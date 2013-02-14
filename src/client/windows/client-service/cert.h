@@ -20,9 +20,9 @@ void openssl_init();
 
 void openssl_cleanup();
 
-int get_cert_credentials(HANDLE huser,
+int get_cert_credential(HANDLE huser,
                          char *userid,
-                         PVFS_credentials *credentials,
+                         PVFS_credential *credential,
                          ASN1_UTCTIME **expires);
 
 #endif

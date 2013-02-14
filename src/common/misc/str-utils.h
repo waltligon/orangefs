@@ -10,6 +10,11 @@
 #include "pvfs2-types.h"
 #include "pvfs2-config.h"
 
+void PINT_string_rm_extra_slashes(
+    char *s);
+void PINT_string_rm_extra_slashes_rts(
+    char *s,
+    int rts);
 int PINT_get_path_element(
     char *pathname,
     int segment_num,
@@ -45,9 +50,7 @@ int PINT_remove_base_dir(
     int out_max_len);
 int PINT_remove_dir_prefix(
     const char *pathname,
-    const char *prefix,
-    char *out_path,
-    int out_max_len);
+    const char *prefix);
 char *PINT_merge_handle_range_strs(
     char *range1,
     char *range2);

@@ -40,6 +40,8 @@ extern struct PINT_server_req_params pvfs2_get_eattr_params;
 extern struct PINT_server_req_params pvfs2_get_eattr_list_params;
 extern struct PINT_server_req_params pvfs2_set_eattr_params;
 extern struct PINT_server_req_params pvfs2_set_eattr_list_params;
+extern struct PINT_server_req_params pvfs2_atomic_eattr_params;
+extern struct PINT_server_req_params pvfs2_atomic_eattr_lists_params;
 extern struct PINT_server_req_params pvfs2_del_eattr_params;
 extern struct PINT_server_req_params pvfs2_list_eattr_params;
 extern struct PINT_server_req_params pvfs2_batch_create_params;
@@ -51,6 +53,10 @@ extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
 extern struct PINT_server_req_params pvfs2_tree_remove_params;
 extern struct PINT_server_req_params pvfs2_tree_get_file_size_params;
 extern struct PINT_server_req_params pvfs2_uid_mgmt_params;
+extern struct PINT_server_req_params pvfs2_tree_setattr_params;
+extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
+extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
+extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -99,6 +105,11 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 41 */ {PVFS_SERV_TREE_REMOVE, &pvfs2_tree_remove_params},
     /* 42 */ {PVFS_SERV_TREE_GET_FILE_SIZE, &pvfs2_tree_get_file_size_params},
     /* 43 */ {PVFS_SERV_MGMT_GET_UID, &pvfs2_uid_mgmt_params},
+    /* 44 */ {PVFS_SERV_TREE_SETATTR, &pvfs2_tree_setattr_params},
+    /* 45 */ {PVFS_SERV_MGMT_GET_DIRENT, &pvfs2_mgmt_get_dirent_params},
+    /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
+    /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
+    /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

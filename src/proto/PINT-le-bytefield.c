@@ -266,6 +266,12 @@ static void lebf_initialize(void)
                 req.u.seteattr.nkey = 0;
                 reqsize = extra_size_PVFS_servreq_seteattr;
                 break;
+            case PVFS_SERV_ATOMICEATTR:
+                req.u.atomiceattr.nkey = 0;
+                resp.u.atomiceattr.nkey = 0;
+                reqsize = extra_size_PVFS_servreq_atomiceattr;
+                respsize = extra_size_PVFS_servresp_atomiceattr;
+                break;
             case PVFS_SERV_DELEATTR:
                 req.u.deleattr.key.buffer_sz = 0;
                 reqsize = extra_size_PVFS_servreq_deleattr;
@@ -296,6 +302,22 @@ static void lebf_initialize(void)
             case PVFS_SERV_MGMT_GET_UID:
                 resp.u.mgmt_get_uid.uid_info_array_count = 0;
                 respsize = extra_size_PVFS_servresp_mgmt_get_uid;
+                break;
+            case PVFS_SERV_TREE_SETATTR:
+                req.u.tree_setattr.num_servers = 0;
+                req.u.tree_setattr.handle_array = NULL;
+                reqsize = extra_size_PVFS_servreq_tree_setattr;
+                break;
+            case PVFS_SERV_MGMT_GET_DIRENT:
+                req.u.mgmt_get_dirent.entry = tmp_name;
+                reqsize = extra_size_PVFS_servreq_mgmt_get_dirent;
+                break;
+            case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+                /* nothing special */
+                break;
+            case PVFS_SERV_MGMT_SPLIT_DIRENT:
+                req.u.mgmt_split_dirent.dist = &tmp_dist;
+                reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
@@ -447,6 +469,7 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
@@ -467,10 +490,14 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_SETEATTR, seteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
+        CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+        CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+        CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
 
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -566,15 +593,18 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
+        CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_TREE_REMOVE:
+        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -587,6 +617,8 @@ static int lebf_encode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+        case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+        case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
 
@@ -662,6 +694,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_IO, io);
         /* CASE(PVFS_SERV_SMALL_IO, small_io); */
@@ -682,10 +715,14 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_SETEATTR, seteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
+        CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+        CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+        CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
 
         case PVFS_SERV_SMALL_IO:
         case PVFS_SERV_BATCH_CREATE:
@@ -773,10 +810,12 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_ATOMICEATTR, atomiceattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
+        CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_CREATE:
@@ -784,6 +823,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_TREE_REMOVE:
+        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -794,6 +834,8 @@ static int lebf_decode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+        case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+        case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
 
@@ -913,6 +955,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     decode_free(req->u.setattr.attr.u.meta.dist);
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
                     decode_free(req->u.setattr.attr.u.meta.dfile_array);
+                if (req->u.setattr.attr.mask
+                        & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                {
+                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
+                    {
+                        decode_free
+                            (req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
+                    }
+                    if(req->u.setattr.attr.u.dir.dirdata_handles)
+                    {
+                        decode_free
+                            (req->u.setattr.attr.u.dir.dirdata_handles);
+                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
+                    }
+                }
                 break;
 
             case PVFS_SERV_TREE_REMOVE:
@@ -923,6 +981,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.tree_get_file_size.handle_array);
                 decode_free(req->u.tree_get_file_size.credential.group_array);
                 decode_free(req->u.tree_get_file_size.credential.signature);
+                break;
+
+            case PVFS_SERV_TREE_SETATTR:
+                decode_free(req->u.tree_setattr.handle_array);
                 break;
 
             case PVFS_SERV_LISTATTR:
@@ -943,6 +1005,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_GETEATTR:
                 decode_free(req->u.geteattr.key);
                 decode_free(req->u.geteattr.valsz);
+                break;
+                
+            case PVFS_SERV_ATOMICEATTR:
+                decode_free(req->u.atomiceattr.key);
+                decode_free(req->u.atomiceattr.val);
+                decode_free(req->u.atomiceattr.valsz);
                 break;
 
             case PVFS_SERV_UNSTUFF:
@@ -969,11 +1037,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_MGMT_PERF_MON:
             case PVFS_SERV_MGMT_EVENT_MON:
             case PVFS_SERV_MGMT_GET_UID:
-
+            case PVFS_SERV_MGMT_GET_DIRENT:
+            case PVFS_SERV_MGMT_SPLIT_DIRENT:
             case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_IMM_COPIES:
+            case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
               /*nothing to free*/
                   break;
             case PVFS_SERV_INVALID:
@@ -1042,6 +1112,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.handle_array);
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
+                    if (resp->u.getattr.attr.mask
+                         & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                    {
+                       decode_free
+                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
+                       decode_free
+                        (resp->u.getattr.attr.u.dir.dirdata_handles);
+                    }
                     break;
 
                 case PVFS_SERV_UNSTUFF:
@@ -1063,6 +1141,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
                 case PVFS_SERV_GETEATTR:
                     /* need a loop here?  WBL */
+                    if (resp->u.geteattr.val)
+                        decode_free(resp->u.geteattr.val);
+                    break;
+                case PVFS_SERV_ATOMICEATTR:
+                    /* need a loop here? */
                     if (resp->u.geteattr.val)
                         decode_free(resp->u.geteattr.val);
                     break;
@@ -1147,6 +1230,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_REMOVE:
+                case PVFS_SERV_TREE_SETATTR:
+                case PVFS_SERV_MGMT_GET_DIRENT:
+                case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+                case PVFS_SERV_MGMT_SPLIT_DIRENT:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:

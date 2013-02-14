@@ -581,7 +581,7 @@ static size_t direct_aligned_read(int fd,
     /* if debug is enabled, check that fd was opened with O_DIRECT */
 #ifdef HAVE_OPEN_O_DIRECT
     if(!(fcntl(fd, F_GETFL) & O_DIRECT))
-#elif HAVE_FNCTL_F_NOCACHE
+#elif defined(HAVE_FNCTL_F_NOCACHE)
     if (!(fcntl(fd, F_GETFL) & F_NOCACHE)) 
 #else
     if (0) //TODO: error? fall back to madvise?

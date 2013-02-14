@@ -21,6 +21,9 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
+/* leave pvfs2-config.h first */
+#include "pvfs2-config.h"
+
 #include "pvfs2.h"
 #include "pvfs2-types.h"
 #include "pint-eattr.h"
@@ -36,14 +39,21 @@
 #include "security-hash.h"
 #include "security-util.h"
 
+#ifdef ENABLE_SECURITY_CERT
+#include "pint-cert.h"
+#include "cert-util.h"
+#include "pint-ldap-map.h"
+#endif
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t *openssl_mutexes = NULL;
 static int security_init_status = 0;
 
 /* private key used for signing */
-static EVP_PKEY *security_privkey = NULL;
+EVP_PKEY *security_privkey = NULL;
 
+/* TODO: global CA cert - should be looked up? */
+X509 *ca_cert;
 
 struct CRYPTO_dynlock_value
 {
@@ -73,9 +83,10 @@ static void dyn_lock_function(int, struct CRYPTO_dynlock_value*, const char*,
 static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
                                  int);
 
+#ifdef ENABLE_SECURITY_KEY
 static int load_private_key(const char*);
 static int load_public_keys(const char*);
-
+#endif
 
 /*  PINT_security_initialize    
  *
@@ -118,8 +129,25 @@ int PINT_security_initialize(void)
     }
 
     config = PINT_get_server_config();
-    assert(config->serverkey_path);
-    assert(config->keystore_path);
+
+    /* check for server private key */
+    if (config->serverkey_path == NULL)
+    {
+        gossip_err("ServerKey not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error);
+    }
+
+#ifdef ENABLE_SECURITY_KEY
+
+    if (config->keystore_path == NULL)
+    {
+        gossip_err("Keystore not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->keystore_path, init_error);
+    }
 
     security_privkey = EVP_PKEY_new();
     ret = load_private_key(config->serverkey_path);
@@ -144,6 +172,61 @@ int PINT_security_initialize(void)
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
+
+#elif ENABLE_SECURITY_CERT
+
+    /* load the CA cert */
+    ret = PINT_init_trust_store();
+    PINT_SECURITY_CHECK(ret, init_error);
+
+    if (config->ca_path == NULL)
+    {
+        gossip_err("CAPath not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->ca_path, init_error);
+    }
+
+    ret = PINT_load_cert_from_file(config->ca_path, &ca_cert);
+    PINT_SECURITY_CHECK(ret, init_error);
+
+    ret = PINT_add_trusted_certificate(ca_cert);
+    PINT_SECURITY_CHECK(ret, init_error);
+
+    /* load private key */
+    ret = PINT_load_key_from_file(config->serverkey_path, &security_privkey);
+    PINT_SECURITY_CHECK(ret, init_error);
+
+    /* initialize LDAP */
+    ret = PINT_ldap_initialize();
+    PINT_SECURITY_CHECK(ret, init_error);
+
+#endif
+
+    goto init_exit;
+
+init_error:
+
+#ifdef ENABLE_SECURITY_CERT
+    PINT_cleanup_trust_store();
+
+    PINT_ldap_finalize();
+#endif
+
+    if (security_privkey)
+    {
+        EVP_PKEY_free(security_privkey);
+    }
+
+    SECURITY_hash_finalize();
+    EVP_cleanup();
+    ERR_free_strings();
+    cleanup_threading();
+    gen_mutex_unlock(&security_init_mutex);
+
+    return -PVFS_ESECURITY;
+
+init_exit:
 
     security_init_status = 1;
     gen_mutex_unlock(&security_init_mutex);
@@ -172,6 +255,13 @@ int PINT_security_finalize(void)
     EVP_PKEY_free(security_privkey);
     EVP_cleanup();
     ERR_free_strings();
+
+
+#ifdef ENABLE_SECURITY_CERT
+    PINT_cleanup_trust_store();
+
+    PINT_ldap_finalize();
+#endif
 
     cleanup_threading();
 
@@ -353,6 +443,38 @@ int PINT_sign_capability(PVFS_capability *cap)
     return 0;
 }
 
+int PINT_server_to_server_capability(PVFS_capability *capability,
+                                     PVFS_fs_id fs_id,
+                                     int num_handles,
+                                     PVFS_handle *handle_array)
+{
+    int ret = -PVFS_EINVAL;
+    server_configuration_s *user_opts = PINT_get_server_config();
+
+    ret = PINT_init_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_ENOMEM;
+    }
+    capability->issuer =
+        malloc(strlen(user_opts->server_alias) + 3);
+    capability->issuer[0] = 'S';
+    capability->issuer[1] = ':';
+    strcpy(capability->issuer+2, user_opts->server_alias);
+    capability->fsid = fs_id;
+    capability->timeout =
+        PINT_util_get_current_time() + user_opts->security_timeout;
+    capability->op_mask = ~((uint32_t)0);
+    capability->num_handles = num_handles;
+    capability->handle_array = handle_array;
+    ret = PINT_sign_capability(capability);
+    if (ret < 0)
+    {
+        return -PVFS_EINVAL;
+    }
+    return 0;
+}
+
 /*  PINT_verify_capability
  *
  *  Takes in a PVFS_capability structure and checks to see if the
@@ -398,7 +520,16 @@ int PINT_verify_capability(const PVFS_capability *cap)
     hash_capability(cap, mdstr);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CAPVRFY: %s\n", mdstr);
 #endif
-    
+
+#ifdef ENABLE_SECURITY_CERT
+    /* get CA certificate public key */
+    pubkey = X509_get_pubkey(ca_cert);
+    if (pubkey == NULL)
+    {
+        PINT_security_error(__func__, -PVFS_ESECURITY);
+        return 0;
+    }
+#else
     pubkey = SECURITY_lookup_pubkey(cap->issuer);
     if (pubkey == NULL)
     {
@@ -407,7 +538,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
                      cap->issuer);
         return 0;
     }
-
+#endif
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
@@ -648,6 +779,9 @@ int PINT_verify_credential(const PVFS_credential *cred)
     EVP_PKEY *pubkey;
     char buf[256];
     int ret;
+#ifdef ENABLE_SECURITY_CERT
+    X509 *cert;
+#endif
 
     if (!cred)
     {
@@ -671,6 +805,34 @@ int PINT_verify_credential(const PVFS_credential *cred)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CREDVRFY: %s\n", mdstr);
 #endif
 
+#ifdef ENABLE_SECURITY_CERT
+    /* get X509 cert from certificate buffer */        
+    ret = PINT_cert_to_X509(&cred->certificate, &cert);
+    if (ret != 0)
+    {
+        PINT_security_error(__func__, ret);
+        return 0;
+    }
+
+    /* verify the certificate (using the trust store) */
+    ret = PINT_verify_certificate(cert);
+    if (ret != 0)
+    {
+        /* Note: errors already logged */
+        X509_free(cert);
+        return 0;
+    }
+
+    /* get certificate public key */
+    pubkey = X509_get_pubkey(cert);
+    if (pubkey == NULL)
+    {
+        PINT_security_error(__func__, -PVFS_ESECURITY);
+        X509_free(cert);
+        return 0;
+    }
+
+#else /* !ENABLE_SECURITY_CERT */
     pubkey = SECURITY_lookup_pubkey(cred->issuer);
     if (pubkey == NULL)
     {
@@ -679,6 +841,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
                      cred->issuer);
         return 0;
     }
+#endif /* ENABLE_SECURITY_CERT */
 
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
@@ -733,6 +896,11 @@ int PINT_verify_credential(const PVFS_credential *cred)
     }
 
     EVP_MD_CTX_cleanup(&mdctx);
+
+#ifdef ENABLE_SECURITY_CERT
+    EVP_PKEY_free(pubkey);
+    X509_free(cert);
+#endif
 
     return (ret == 1);
 }
@@ -896,6 +1064,7 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
     free(l);
 }
 
+#ifdef ENABLE_SECURITY_KEY
 /* load_private_key
  *
  * Reads the private key from a file in PEM format.
@@ -911,7 +1080,8 @@ static int load_private_key(const char *path)
     keyfile = fopen(path, "r");
     if (keyfile == NULL)
     {
-        gossip_err("%s: %s\n", path, strerror(errno));
+        gossip_err("Error loading private key: %s: %s\n", path, 
+                   strerror(errno));
         return -1;
     }
 
@@ -920,8 +1090,7 @@ static int load_private_key(const char *path)
     if (security_privkey == NULL)
     {
         ERR_error_string_n(ERR_get_error(), buf, 256);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading private key: "
-             "%s\n", buf);
+        gossip_err("Error loading private key: %s: %s\n", path, buf);
         fclose(keyfile);
         return -1;
     }
@@ -954,7 +1123,8 @@ static int load_public_keys(const char *path)
     keyfile = fopen(path, "r");
     if (keyfile == NULL)
     {
-        gossip_err("%s: %s\n", path, strerror(errno));
+        gossip_err("Error loading keystore: %s: %s\n", path, 
+                   strerror(errno));
         return -1;
     }
 
@@ -995,8 +1165,7 @@ static int load_public_keys(const char *path)
         if (key == NULL)
         {
             ERR_error_string_n(ERR_get_error(), buf, 4096);
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading public key: "
-                         "%s\n", buf);
+            gossip_err("Error loading public key: %s %s\n", path, buf);
             fclose(keyfile);
             return -1;
         }
@@ -1005,8 +1174,7 @@ static int load_public_keys(const char *path)
         if (ret < 0)
         {
             PVFS_strerror_r(ret, buf, 4096);
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "Error inserting public "
-                         "key: %s\n", buf);
+            gossip_err("Error inserting public key: %s\n", buf);
             fclose(keyfile);
             return -1;
         }
@@ -1021,7 +1189,41 @@ static int load_public_keys(const char *path)
 
     return 0;
 }
+#endif
 
+/* PINT_security_error 
+ * Log security errors to gossip, (usually OpenSSL errors)
+ */
+void PINT_security_error(const char *prefix, int err)
+{
+    unsigned long sslerr;
+    char errstr[256];
+
+    switch (err) {    
+    case 0:
+        break;
+    case -1:
+        /* usually a parameter error */
+        gossip_err("%s: parameter error\n", prefix);
+        break;
+    case -PVFS_ESECURITY:
+        /* debug OpenSSL error queue */
+        while ((sslerr = ERR_get_error()) != 0)
+        {
+            ERR_error_string_n(sslerr, errstr, 256);
+            errstr[255] = '\0';
+            gossip_err("%s: OpenSSL error: %s\n", 
+                         prefix, errstr);
+        }
+        break;
+    default:
+        /* debug PVFS error */
+        PVFS_strerror_r((int) err, errstr, 256);
+        errstr[255] = '\0';
+        gossip_err("%s: %s\n", prefix, errstr);
+    }
+
+}
 
 /*
  * Local variables:

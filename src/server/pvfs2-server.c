@@ -116,6 +116,8 @@ static char startup_cwd[PATH_MAX+1];
  * we're able to use sizeof here because sizeof an inlined string ("") gives
  * the length of the string with the null terminator
  */
+/* These are defined in src/common/pvfs2-internal.h
+ */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
     {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
@@ -124,7 +126,10 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
     {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
     {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
-    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN}
+    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN},
+    {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
+    {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
+    {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
 };
 
 /* These three are used continuously in our wait loop.  They could be
@@ -142,6 +147,7 @@ static int server_initialize(
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
+static int server_check_if_root_directory_created(void);
 static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
 static int server_shutdown(
@@ -332,6 +338,15 @@ int main(int argc, char **argv)
     {
         PVFS_perror_gossip("Error: failed to start job timer "
                            "state machine.\n", ret);
+        goto server_shutdown;
+    }
+
+    /* we have to take care of creating the distributed root
+     * directory and making the lost+found directory if needed */
+    ret = server_check_if_root_directory_created();
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Error: failed to create root handle! It needs to communicate with all servers. Please try again when all servers are up!!\n", ret);
         goto server_shutdown;
     }
 
@@ -1229,6 +1244,98 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGUSR1, &ign_action, NULL);
     sigaction (SIGUSR2, &ign_action, NULL);
 
+    return 0;
+}
+
+/* checks if the server is the owner of the root handles. if so, ensures that
+ * DIST_DIR_STRUCT exists. if it doesn't, puts the server in
+ * admin mode and submits a create_root_dir state machine to take care of it
+ */
+static int server_check_if_root_directory_created( void )
+{
+
+    PINT_llist *cur_f = server_config.file_systems;
+    struct filesystem_configuration_s *cur_fs;
+    char handle_server[BMI_MAX_ADDR_LEN];
+    job_status_s js;
+    job_id_t j_id;
+    PVFS_ds_keyval key, val;
+    struct PINT_smcb *tmp_op = NULL;
+    PINT_server_op *tmp_sop = NULL;
+    int ret = -1, outcount = 0;
+
+    PVFS_handle root_handle = 0;
+    PVFS_dist_dir_attr dist_dir_attr;
+
+    /* iterate through list of file systems */
+    while(cur_f)
+    {
+        cur_fs = PINT_llist_head(cur_f);
+        if (!cur_fs)
+        {
+            break;
+        }
+
+        /*
+           check if root handle is in our handle range for this fs.
+           if it is, we're responsible for creating it on disk when
+           creating the storage space
+         */
+        root_handle = cur_fs->root_handle;
+
+        ret = PINT_cached_config_get_server_name( handle_server,
+                BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+        if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
+        {
+            /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
+             * record, we want one. */
+            key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+            key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+            val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+            val.buffer = &dist_dir_attr;
+
+            ret = job_trove_keyval_read(cur_fs->coll_id, root_handle,
+                    &key, &val,
+                    0, NULL, NULL, 0,
+                    &js, &j_id, server_job_context,
+                    NULL);
+            while(ret == 0)
+            {
+                ret = job_test(j_id, &outcount, NULL, &js,
+                        PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+            }
+
+            if(js.error_code != 0)
+            {
+                /* launch root-dir-create noreq state machine */
+                   ret = server_state_machine_alloc_noreq(
+                   PVFS_SERV_MGMT_CREATE_ROOT_DIR, &(tmp_op));
+                if (ret < 0)
+                {
+                    return ret;
+                }
+
+                tmp_sop = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
+                tmp_sop->target_fs_id = cur_fs->coll_id;
+                tmp_sop->target_handle = root_handle;
+                ret = server_state_machine_start_noreq(tmp_op);
+
+                if (ret < 0)
+                {
+                    PVFS_perror_gossip("Error: failed to start root directory "
+                            "creation noreq state machine.\n",
+                            ret);
+                    PINT_smcb_free(tmp_op);
+                    return ret;
+                }
+            }
+            else // debug print
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "root dir already setup.\n");
+            }
+        }
+        cur_f = PINT_llist_next(cur_f);
+    }
     return 0;
 }
 
@@ -2218,6 +2325,27 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
         }
     }
     return ret;
+}
+
+/* server_state_machine_complete_noreq()
+ *
+ * stripped down version of the standard complete function. This removes
+ * items associated with handling/freeing requests structs and BMI connections
+ * when cause problems when there is no request or connection to cleanup.
+ *  
+ * returns 0
+ */ 
+int server_state_machine_complete_noreq(PINT_smcb *smcb)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_id_gen_t tmp_id;
+        
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: %p\n", __func__, smcb);
+    id_gen_fast_register(&tmp_id, s_op);
+                
+    qlist_del(&s_op->next);
+                
+    return SM_ACTION_TERMINATE;
 }
 
 /* server_state_machine_complete()
