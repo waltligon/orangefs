@@ -146,6 +146,14 @@ fi
 
 if [ $RUN_MPI_TEST ]
 then
+
+	if [ $LD_LIBRARY_PATH ]
+	then
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+	else
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib
+
+	fi
 	which qsub >/dev/null 2>&1
 	if [ $? -eq 0 ] ; then
 		echo ""
@@ -185,9 +193,11 @@ then
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
 	then
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
+		#export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
 	else
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
+		#export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
 	fi
 
 	if [ $LD_LIBRARY_PATH ]
@@ -215,7 +225,7 @@ then
 
 	# print out the current environment to a logfile
 	echo "Environment for userlib testing"
-	#env | tee userlib-env.log
+	env | tee userlib-env.log
 
 	# save file descriptors for later
 	exec 6<&1
