@@ -185,11 +185,19 @@ then
 	OLD_LD_PRELOAD=$LD_PRELOAD
 	if [ $LD_PRELOAD ]
 	then
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
 	else
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
 	fi
 
+	if [ $LD_LIBRARY_PATH ]
+	then
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+	else
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib
+
+	fi
+	
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	
 	for my_host in $VFS_HOSTS

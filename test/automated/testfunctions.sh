@@ -58,7 +58,7 @@ TESTNAME="${HOSTNAME}-nightly"
 
 # before starting any client apps, we need to deal with the possiblity that we
 # might have built with shared libraries
-export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+#export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
 if [ ! "$VFS_HOSTS" ]
