@@ -72,10 +72,11 @@ if [ $LD_LIBRARY_PATH ]
 then
 	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib:${LD_LIBRARY_PATH}
 else
-	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:opt/db4/lib
+	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib
 fi
 
 export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+echo "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
 
 echo "setup_pvfs2"
 teardown_pvfs2 && configure_pvfs2 
