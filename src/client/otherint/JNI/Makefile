@@ -48,15 +48,15 @@ IOSTREAM_CLASS=$(ORGDIR)/OrangeFileSystemInputStream.class \
 	$(ORGDIR)/OrangeFileSystemOutputStream.class
 
 #Package our OFS only Java .class files into a jar
-ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so \
+lib/ofs_jni.jar : lib/libPVFS2POSIXJNI.so lib/libPVFS2STDIOJNI.so \
         $(IOSTREAM_CLASS)
-	jar cf ofs_jni.jar \
+	jar cf $@ \
       $(ORGDIR)/*.class
 
 #Install all Jars and Generated Shared Libs to OFS lib dir
-install : ofs_jni.jar
-	cp *.so $(OFS_INSTALL)/lib
-	cp *.jar $(OFS_INSTALL)/lib
+install : lib/ofs_jni.jar
+	cp lib/*.so $(OFS_INSTALL)/lib
+	cp lib/*.jar $(OFS_INSTALL)/lib
 
 #Generate class files for I/O Streams
 $(IOSTREAM_CLASS) : $(IOSTREAM_JAVA)
@@ -73,8 +73,8 @@ OFS_CLASS=$(OFS_HADOOP)/OrangeFileSystem.class \
 $(OFS_CLASS) : $(OFS_JAVA)
 	javac -cp "$(HADOOP_CORE):$(OFS_JNI):$(COMMONS_LOGGING):." $(OFS_JAVA)
 
-ofs.jar : ofs_jni.jar $(OFS_CLASS)
-	jar cf ofs.jar $(OFS_CLASS)
+lib/ofs.jar : lib/ofs_jni.jar $(OFS_CLASS)
+	jar cf $@ $(OFS_CLASS)
 
 #PVFS2POSIXJNI
 #==============================================================================
@@ -104,7 +104,7 @@ POSIX_CLASS= $(ORGDIR)/PVFS2POSIXJNI.class \
 	$(ORGDIR)/Utimbuf.class
 
 #link
-libPVFS2POSIXJNI.so : $(POSIX_CLASS) $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2POSIXJNI.o
+lib/libPVFS2POSIXJNI.so : $(POSIX_CLASS) $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2POSIXJNI.o
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2POSIXJNI.o \
@@ -144,7 +144,7 @@ STDIO_CLASS=$(ORGDIR)/PVFS2STDIOJNI.class \
 	$(ORGDIR)/Dirent64.class
 
 #Link PVFS2STDIOJNI
-libPVFS2STDIOJNI.so : $(STDIO_CLASS) $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJNI.o
+lib/libPVFS2STDIOJNI.so : $(STDIO_CLASS) $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJNI.o
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2STDIOJNI.o \
@@ -173,8 +173,13 @@ libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 	  libPVFS2STDIOJNI.c
 
 #==============================================================================
+# Simplify make command to build jni and hadoop jars
+jni : lib/ofs_jni.jar
+hadoop : lib/ofs.jar
+all : jni hadoop
+
 clean :
-	rm -f *.o org_*.h *.so *.jar org/orangefs/usrint/*.class \
+	rm -f *.o org_*.h lib/*.so lib/ofs_jni.jar lib/ofs.jar org/orangefs/usrint/*.class \
 		org/apache/hadoop/fs/ofs/*.class \
 		$(OFS_INSTALL)/lib/libPVFS2POSIXJNI.so \
 		$(OFS_INSTALL)/lib/libPVFS2STDIOJNI.so 
