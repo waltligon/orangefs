@@ -132,7 +132,7 @@ export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 # Now start running tests
 
 # Make all of the test sections controlled by vars the same way
-do_sysint = 1
+do_sysint=1
 
 if [ $do_sysint -eq 1 ] ; then
 	# save file descriptors for later
