@@ -1368,6 +1368,7 @@ struct PVFS_servreq_io
 {
     PVFS_handle handle;        /* target datafile */
     PVFS_fs_id fs_id;          /* file system */
+
     /* type of I/O operation to perform */
     enum PVFS_io_type io_type; /* enum defined in pvfs2-types.h */
 
@@ -1387,9 +1388,17 @@ struct PVFS_servreq_io
     PVFS_offset file_req_offset;
     /* aggregate size of data to transfer */
     PVFS_size aggregate_size;
+
+    /* Replication Data: the datafiles where the replicated data should go for the
+     * target datafile listed above.
+     */
+    PVFS_handle *replication_handles;
+    uint64_t replication_number_of_copies;
+
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servreq_io(pptr,x) do { \
+    typeof( (x)->replication_number_of_copies ) i; \
     encode_PVFS_handle(pptr, &(x)->handle); \
     encode_PVFS_fs_id(pptr, &(x)->fs_id); \
     encode_skip4(pptr,); \
@@ -1401,8 +1410,12 @@ struct PVFS_servreq_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint64_t(pptr, &(x)->replication_number_of_copies); \
+    for (i=0; i < (x)->replication_number_of_copies; i++) \
+        encode_PVFS_handle(pptr, &(x)->replication_handles[i]); \
 } while (0)
 #define decode_PVFS_servreq_io(pptr,x) do { \
+    typeof( (x)->replication_number_of_copies ) i; \
     decode_PVFS_handle(pptr, &(x)->handle); \
     decode_PVFS_fs_id(pptr, &(x)->fs_id); \
     decode_skip4(pptr,); \
@@ -1415,10 +1428,15 @@ struct PVFS_servreq_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
+    decode_uint64_t(pptr, &(x)->replication_number_of_copies); \
+    (x)->replication_handles = decode_malloc((x)->replication_number_of_copies * sizeof(*((x)->replication_handles))); \
+    for (i=0; i < (x)->replication_number_of_copies; i++) \
+        decode_PVFS_handle(pptr, &(x)->replication_handles[i]); \
 } while (0)
 /* could be huge, limit to max ioreq size beyond struct itself */
 #define extra_size_PVFS_servreq_io roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES) \
-  + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request))
+  + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request)) \
+  + PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) 
 #endif
 
 #define PINT_SERVREQ_IO_FILL(__req,                   \
@@ -1433,22 +1451,45 @@ struct PVFS_servreq_io
                              __file_req,              \
                              __file_req_off,          \
                              __aggregate_size,        \
+                             __replication_copies,    \
+                             __replication_handles,   \
                              __hints)                 \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
-    (__req).op                 = PVFS_SERV_IO;        \
-    (__req).capability         = (__cap);             \
-    (__req).hints              = (__hints);           \
-    (__req).u.io.fs_id         = (__fsid);            \
-    (__req).u.io.handle        = (__handle);          \
-    (__req).u.io.io_type       = (__io_type);         \
-    (__req).u.io.flow_type     = (__flow_type);       \
-    (__req).u.io.server_nr       = (__datafile_nr);   \
-    (__req).u.io.server_ct     = (__datafile_ct);     \
-    (__req).u.io.io_dist       = (__io_dist);         \
-    (__req).u.io.file_req        = (__file_req);      \
-    (__req).u.io.file_req_offset = (__file_req_off);  \
-    (__req).u.io.aggregate_size  = (__aggregate_size);\
+    (__req).op                      = PVFS_SERV_IO;        \
+    (__req).capability              = (__cap);             \
+    (__req).hints                   = (__hints);           \
+    (__req).u.io.fs_id              = (__fsid);            \
+    (__req).u.io.handle             = (__handle);          \
+    (__req).u.io.io_type            = (__io_type);         \
+    (__req).u.io.flow_type          = (__flow_type);       \
+    (__req).u.io.server_nr          = (__datafile_nr);     \
+    (__req).u.io.server_ct          = (__datafile_ct);     \
+    (__req).u.io.io_dist            = (__io_dist);         \
+    (__req).u.io.file_req           = (__file_req);        \
+    (__req).u.io.file_req_offset    = (__file_req_off);    \
+    (__req).u.io.aggregate_size     = (__aggregate_size);  \
+    (__req).u.io.replication_number_of_copies = (__replication_copies); \
+    if ( (__replication_copies) != 0 )                                                \
+    {                                                                                 \
+        (__req).u.io.replication_handles = calloc( (__replication_copies)             \
+                                                  ,sizeof(*(__replication_handles))); \
+        if ( ((__req).u.io.replication_handles) )                                     \
+        {                                                                             \
+           memcpy( ((__req).u.io.replication_handles)                                 \
+                  ,(__replication_handles)                                            \
+                  ,(__replication_copies) * sizeof(*(__replication_handles)));        \
+        }                                                                             \
+        else                                                                          \
+        {                                                                             \
+           (__req).u.io.replication_number_of_copies = 0;                             \
+           (__req).u.io.replication_handles = NULL;                                   \
+        }                                                                             \
+    }                                                                                 \
+    else                                                                              \
+    {                                                                                 \
+       (__req).u.io.replication_handles = NULL;                                       \
+    }                                                                                 \
 } while (0)
 
 struct PVFS_servresp_io

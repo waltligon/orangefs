@@ -425,6 +425,25 @@ int PINT_acache_get_cached_entry(
             attr->u.meta.mirror_copies_count = 
                      tmp_payload->mirror_copies_count;
         }
+
+        if (tmp_payload->mask & PVFS_ATTR_META_REPLICATION)
+        {
+            if (attr->u.meta.replication_dfile_array)
+            {
+                free(attr->u.meta.replication_dfile_array);
+            }
+            attr->u.meta.replication_dfile_array = calloc(tmp_payload->replication_dfile_array_count
+                                                         ,sizeof(*tmp_payload->replication_dfile_array));
+            if (!attr->u.meta.replication_dfile_array)
+            {
+               gen_mutex_unlock(&acache_mutex);
+               return(-PVFS_ENOMEM);
+            }
+            memcpy(attr->u.meta.replication_dfile_array
+                  ,tmp_payload->replication_dfile_array
+                  ,tmp_payload->replication_dfile_array_count);
+            attr->u.meta.replication_dfile_array_count = tmp_payload->replication_dfile_array_count;
+        }
         
         if(tmp_payload->mask & PVFS_ATTR_META_DIST)
         {

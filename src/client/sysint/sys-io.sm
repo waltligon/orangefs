@@ -733,7 +733,11 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                              sm_p->u.io.file_req,
                              sm_p->u.io.file_req_offset,
                              PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+                             sm_p->u.io.contexts[i].replication_number_of_copies,
+                             sm_p->u.io.contexts[i].replication_handles,
                              sm_p->hints);
+       gossip_lerr("sm_p->u.io.contexts[%d].msg.req.u.io.replication_number_of_copies(%d)\n"
+                  ,i,(int)sm_p->u.io.contexts[i].msg.req.u.io.replication_number_of_copies);
     }
 
     js_p->error_code = 0;
@@ -3178,7 +3182,7 @@ static int io_contexts_init(PINT_client_sm *sm_p,
                             PVFS_object_attr *attr)
 {
     int ret;
-    int i = 0;
+    int i = 0,copy;
 
     sm_p->u.io.contexts = (PINT_client_io_ctx *)malloc(
                                  context_count * sizeof(PINT_client_io_ctx));
@@ -3220,6 +3224,31 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         cur_ctx->server_nr = sm_p->u.io.datafile_index_array[i];
         cur_ctx->data_handle = attr->u.meta.dfile_array[cur_ctx->server_nr];
 
+        if (attr->mask & PVFS_ATTR_META_REPLICATION)
+        {
+           cur_ctx->replication_number_of_copies = attr->u.meta.replication_number_of_copies;
+           cur_ctx->replication_handles = calloc(attr->u.meta.replication_number_of_copies
+                                                ,sizeof(*cur_ctx->replication_handles));
+           cur_ctx->replication_number_of_copies = attr->u.meta.replication_number_of_copies;
+           if ( !cur_ctx->replication_handles )
+           {
+              gossip_lerr("Error allocating memory for replication handles.\n");
+              return -PVFS_ENOMEM;
+           }
+           for (copy=0; copy<attr->u.meta.replication_number_of_copies; copy++)
+           {
+               cur_ctx->replication_handles[copy] = 
+                  attr->u.meta.replication_dfile_array[(copy*attr->u.meta.dfile_count) + cur_ctx->server_nr];
+               gossip_lerr("cur_ctx->replication_handles[%d]:(%llu):context(%d)\n"
+                          ,copy
+                          ,llu(cur_ctx->replication_handles[copy])
+                          ,i);         
+           }
+           gossip_lerr("cur_ctx->replication_number_of_copies(%d):context(%d)\n"
+                      ,(int)cur_ctx->replication_number_of_copies,i);
+        }
+
+
         PINT_flow_reset(&cur_ctx->flow_desc);
     }
 
@@ -3232,6 +3261,10 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
     for(; i < sm_p->u.io.context_count; ++i)
     {
         PINT_flow_clear(&(sm_p->u.io.contexts[i].flow_desc));
+        if ( sm_p->u.io.contexts[i].replication_handles )
+        {
+             free(sm_p->u.io.contexts[i].replication_handles);
+        }
     }
 
     free(sm_p->u.io.contexts);
@@ -3391,3 +3424,4 @@ static int unstuff_comp_fn(void *v_p,
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
+

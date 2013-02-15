@@ -333,6 +333,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
     PVFS_Request myFileReq = PVFS_BYTE;
     PVFS_offset  myFileReqOffset = 0;
     PVFS_capability capability;
+    PVFS_handle *tmp=NULL;
 
     js_p->error_code = 0;
 
@@ -396,6 +397,8 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
                              myFileReq,
                              myFileReqOffset,
                              reqmir_p->bsize,
+                             0,
+                             tmp, /*temporary variable needed to remove compiler warnings.*/
                              NULL );
     }/*end for*/
 
@@ -1049,3 +1052,15 @@ struct PINT_server_req_params pvfs2_mirror_params =
 	.get_object_ref = PINT_get_object_ref_mirror,
 	.state_machine = &pvfs2_mirror_sm
 };
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -279,6 +279,10 @@ typedef struct PINT_client_io_ctx
     /* the data handle we're responsible for doing I/O on */
     PVFS_handle data_handle;
 
+    /* replication data handles associated with this data_handle */
+    PVFS_handle *replication_handles;
+    uint64_t replication_number_of_copies;
+
     /* first level index into mirror_dfile_array. second level is         */
     /* the server_nr. mirror_dfile_array[current_copies_count][server_nr] */
     uint32_t current_copies_count;
