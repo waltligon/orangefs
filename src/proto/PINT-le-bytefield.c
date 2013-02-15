@@ -957,19 +957,19 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
                     decode_free(req->u.setattr.attr.u.meta.dfile_array);
                 if (req->u.setattr.attr.mask
-                        & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                        & PVFS_ATTR_DISTDIR_ATTR)
                 {
-                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
+                    if(req->u.setattr.attr.dist_dir_bitmap)
                     {
                         decode_free
-                            (req->u.setattr.attr.u.dir.dist_dir_bitmap);
-                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
+                            (req->u.setattr.attr.dist_dir_bitmap);
+                        req->u.setattr.attr.dist_dir_bitmap = NULL;
                     }
-                    if(req->u.setattr.attr.u.dir.dirdata_handles)
+                    if(req->u.setattr.attr.dirdata_handles)
                     {
                         decode_free
-                            (req->u.setattr.attr.u.dir.dirdata_handles);
-                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
+                            (req->u.setattr.attr.dirdata_handles);
+                        req->u.setattr.attr.dirdata_handles = NULL;
                     }
                 }
                 break;
@@ -1114,12 +1114,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
                     if (resp->u.getattr.attr.mask
-                         & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                         & PVFS_ATTR_DISTDIR_ATTR)
                     {
                        decode_free
-                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
+                        (resp->u.getattr.attr.dist_dir_bitmap);
                        decode_free
-                        (resp->u.getattr.attr.u.dir.dirdata_handles);
+                        (resp->u.getattr.attr.dirdata_handles);
                     }
                     break;
 

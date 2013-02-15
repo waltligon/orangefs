@@ -58,9 +58,11 @@
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
 #define PVFS_ATTR_DIR_HINT                  (1 << 20)
-#define PVFS_ATTR_DIR_DISTDIR_ATTR         (1 << 21)
 #define PVFS_ATTR_DIR_ALL \
-(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | PVFS_ATTR_DIR_DISTDIR_ATTR)
+(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
+
+/* internal attribute mask for distributed directory information */
+#define PVFS_ATTR_DISTDIR_ATTR         (1 << 21)
 
 /* internal attribute mask for capability objects */
 #define PVFS_ATTR_CAPABILITY               (1 << 22)
@@ -223,40 +225,17 @@ struct PVFS_directory_attr_s
 {
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
-
-    /* distributed directory parameters */
-    PVFS_dist_dir_attr dist_dir_attr;
-    PVFS_dist_dir_bitmap dist_dir_bitmap; 
-    PVFS_handle *dirdata_handles;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_directory_attr(pptr, x) do { \
-    int index_i;\
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
-    encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
-    for (index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
-        encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
-    encode_skip4(pptr,);\
-    for (index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
-        encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
 #define decode_PVFS_directory_attr(pptr, x) do { \
-    int index_i;\
     decode_PVFS_size(pptr, &(x)->dirent_count);\
     decode_PVFS_directory_hint(pptr, &(x)->hint);\
-    decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
-    (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size * \
-        sizeof(PVFS_dist_dir_bitmap_basetype));\
-    for(index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
-        decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
-    decode_skip4(pptr,);\
-    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
-        sizeof(*(x)->dirdata_handles));\
-    for(index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
-        decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
 #endif
 
@@ -285,6 +264,12 @@ struct PVFS_object_attr
     uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype; /* defined in pvfs2-types.h */
     PVFS_capability capability;
+
+    /* distributed directory parameters */
+    PVFS_dist_dir_attr dist_dir_attr;
+    PVFS_dist_dir_bitmap dist_dir_bitmap; 
+    PVFS_handle *dirdata_handles;
+
     union
     {
 	PVFS_metafile_attr meta;
@@ -326,8 +311,17 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DISTDIR_ATTR) \
+    { \
+        int index_i;\
+        encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
+        for (index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+            encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
+        encode_skip4(pptr,);\
+        for (index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+            encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
+    } \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -361,8 +355,21 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DISTDIR_ATTR) \
+    { \
+        int index_i;\
+        decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
+        (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size * \
+            sizeof(PVFS_dist_dir_bitmap_basetype));\
+        for(index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+            decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
+        decode_skip4(pptr,);\
+        (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
+            sizeof(*(x)->dirdata_handles));\
+        for(index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+            decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
+    } \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -372,8 +379,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
  * than a symlink or a metafile or a dir object 
 */
 #define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)) + \
-  PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
+
+#define extra_size_PVFS_distdir \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 /*TODO: PVFS_REQ_LIMIT_HANDLES_COUNT really needs to change to something
         indicating the max number of servers */
 
@@ -389,6 +398,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr \
         (extra_size_PVFS_object_attr_capability + \
+        extra_size_PVFS_distdir + \
         max(max(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink), extra_size_PVFS_object_attr_dir))
 
 #endif /* __PVFS2_ATTR_H */
