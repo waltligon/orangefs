@@ -219,6 +219,9 @@ static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = s_op->u.create.saved_error_code;
     }
 
+    gossip_lerr("Value of stuffed (%d) returned to the client.\n"
+               ,s_op->resp.u.create.stuffed);
+
     /* otherwise propagate the js_p->error code */
     return(SM_ACTION_COMPLETE);
 }

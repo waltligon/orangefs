@@ -492,6 +492,12 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
          /* Mirroring is optional, so remove mirror-dfiles */
          missing_attrs &= ~PVFS_ATTR_META_MIRROR_DFILES;   
     }
+
+    if ( missing_attrs & PVFS_ATTR_META_REPLICATION )
+    {
+         /* Replication is optional, so remove it. */
+         missing_attrs &= ~PVFS_ATTR_META_REPLICATION;
+    }
          
     gossip_debug(GOSSIP_GETATTR_DEBUG,"missing attrmask AFTER:\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,missing_attrs);
