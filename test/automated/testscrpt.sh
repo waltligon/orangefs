@@ -118,6 +118,24 @@ mount
 nr_passed=0
 nr_failed=0
 
+
+	if [ $LD_PRELOAD ]
+	then
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
+		#export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so:$LD_PRELOAD
+	else
+		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
+		#export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libpvfs2-threaded.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefs.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/liborangefsposix.so:${PVFS2_DEST}/INSTALL-pvfs2-testingjdb/lib/libofs-threaded.so
+	fi
+
+	if [ $LD_LIBRARY_PATH ]
+	then
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+	else
+		export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib
+
+	fi
+
 echo "Environment variables for sysint"
 env | tee sysint-env.log
 
@@ -134,6 +152,8 @@ echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	export LD_LIBRARY_PATH=/opt/db4/lib
+	export LD_PRELOAD=
 	echo ""
 	echo "running vfs scripts"
 	export VFS_SCRIPTS
