@@ -65,6 +65,18 @@ fi
 echo "pull_and_build_pvfs2"
 pull_and_build_pvfs2  $CVS_TAG_FULL || buildfail
 
+
+# These should be the same for ALL tests
+
+if [ $LD_LIBRARY_PATH ]
+then
+	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib:${LD_LIBRARY_PATH}
+else
+	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:opt/db4/lib
+fi
+
+export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+
 echo "setup_pvfs2"
 teardown_pvfs2 && configure_pvfs2 
 
@@ -118,16 +130,6 @@ mount
 nr_passed=0
 nr_failed=0
 
-# These should be the same for ALL tests
-
-if [ $LD_LIBRARY_PATH ]
-then
-	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib:${LD_LIBRARY_PATH}
-else
-	export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:opt/db4/lib
-fi
-
-export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 
 # Now start running tests
 
