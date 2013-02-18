@@ -58,7 +58,7 @@ TESTNAME="${HOSTNAME}-nightly"
 
 # before starting any client apps, we need to deal with the possiblity that we
 # might have built with shared libraries
-export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+#export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
 if [ ! "$VFS_HOSTS" ]
@@ -237,14 +237,15 @@ configure_pvfs2() {
 start_pvfs2() {
 
 	# clean up any artifacts from earlier runs
+	cd ${PVFS2_DEST}
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
 	for alias in `grep 'Alias ' fs.conf | grep ${HOSTNAME} | cut -d ' ' -f 2`; do
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid \
 			-f fs.conf -a $alias
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid  \
 			fs.conf $server_conf -a $alias
 	done
@@ -322,18 +323,19 @@ testfail() {
 # idea stolen from debian: for a given directory, run every executable file
 run_parts() {
 	cd $1
+	TESTS=$(basename `pwd`) 
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== `date` == running $f ..."
-			./$f > ${PVFS2_DEST}/${1}-${f}-${CVS_TAG}.log
+			./$f > ${PVFS2_DEST}/${TESTS}-${f}-${CVS_TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${1}-${f}-${CVS_TAG}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${TESTS}-${f}-${CVS_TAG}.log"
 				echo "FAILED"
 			fi
 		fi
