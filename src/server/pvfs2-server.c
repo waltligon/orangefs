@@ -49,6 +49,7 @@
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
+#include "capcache.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -576,6 +577,19 @@ static int server_initialize(
     }
 
     *server_status_flag |= SERVER_SECURITY_INIT;
+
+    #ifdef OFS_CAPCACHE_ENABLE
+    /* initialize the capability cache */
+    ret = PINT_capcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize capability cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CAPCACHE_INIT;
+    #endif /* OFS_CAPCACHE_ENABLE */
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1738,6 +1752,17 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+
+    #ifdef OFS_CAPCACHE_ENABLE    
+    if (status & SERVER_CAPCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
+                     "cache           [   ...   ]\n");
+        PINT_capcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
+                     "cache           [ stopped ]\n");
+    }
+    #endif /* OFS_CAPCACHE_ENABLE */
 
     if (status & SERVER_ENCODER_INIT)
     {
