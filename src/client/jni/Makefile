@@ -2,39 +2,36 @@
 # (C) 2012 Clemson University
 # See COPYING in top-level directory.
 
-# Purpose: create a shared library that can be loaded by a Java class exposing 
-# PVFS2 Library Calls to Java Developers.
+# Purpose: create shared libraries and jars that can be loaded by Java classes;
+# thereby exposing OrangeFS client library Calls to Java Developers.
 #------------------------------------------------------------------------------
 
-#    Setup - adjust these values accordingly...
+# Set your OFS_INSTALL path. Same as PREFIX during OrangeFS installation.
 #------------------------------------------------------------------------------
-#Path to OrangeFS libs, binaries, etc.
-OFS_INSTALL=/opt/orangefs
-#Folder containing OrangeFS src, etc.
-OFS_TOP=$(HOME)/trunk
-# Java found by running: 
-#`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
-JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
-COMMONS_LOGGING=lib/commons-logging-1.1.1.jar
+# Path to OrangeFS libs, binaries, etc.
+OFS_INSTALL="/opt/orangefs"
 
-#Hadoop Only Related Configuration Values
+# Hadoop Only Related Configuration Values
 #------------------------------------------------------------------------------
-#Location of OFS JNI Jar
-OFS_JNI =$(OFS_INSTALL)/lib/ofs_jni.jar
-#Path to OFS-Hadoop Code
-OFS_HADOOP=org/apache/hadoop/fs/ofs
 #HADOOP VERSION
 HADOOP_VERSION="1.1.1"
 #Dir containing Hadoop files
 HADOOP_DIR=$(HOME)/hadoop-$(HADOOP_VERSION)
+
+# Shouldn't Need to Modify the Following:
+#------------------------------------------------------------------------------
+#Folder containing OrangeFS src, etc.
+OFS_TOP="../../.."
+JAVA_HOME=`readlink -f /usr/bin/javac | sed "s:bin/javac::"`
+COMMONS_LOGGING=lib/commons-logging-1.1.1.jar
+#Path to OFS-Hadoop Code
+OFS_HADOOP=org/apache/hadoop/fs/ofs
+#Location of OFS JNI Jar
+OFS_JNI =$(OFS_INSTALL)/lib/ofs_jni.jar
 #Name of Hadoop Core Jar File
 CORE_NAME=hadoop-core-$(HADOOP_VERSION).jar
 #Path to Hadoop's core Jar
 HADOOP_CORE=$(HADOOP_DIR)/$(CORE_NAME)
-HADOOP_LIB_DIR=$(HADOOP_DIR)/lib
-
-#Don't Modify the following:
-#------------------------------------------------------------------------------
 ORGDIR=org/orangefs/usrint
 ORGDOT=org.orangefs.usrint
 ORGUNDER=org_orangefs_usrint
@@ -48,15 +45,15 @@ IOSTREAM_CLASS=$(ORGDIR)/OrangeFileSystemInputStream.class \
 	$(ORGDIR)/OrangeFileSystemOutputStream.class
 
 #Package our OFS only Java .class files into a jar
-ofs_jni.jar : libPVFS2POSIXJNI.so libPVFS2STDIOJNI.so \
+lib/ofs_jni.jar : lib/libPVFS2POSIXJNI.so lib/libPVFS2STDIOJNI.so \
         $(IOSTREAM_CLASS)
-	jar cf ofs_jni.jar \
+	jar cf $@ \
       $(ORGDIR)/*.class
 
 #Install all Jars and Generated Shared Libs to OFS lib dir
-install : ofs_jni.jar
-	cp *.so $(OFS_INSTALL)/lib
-	cp *.jar $(OFS_INSTALL)/lib
+install : lib/ofs_jni.jar
+	cp lib/*.so $(OFS_INSTALL)/lib
+	cp lib/*.jar $(OFS_INSTALL)/lib
 
 #Generate class files for I/O Streams
 $(IOSTREAM_CLASS) : $(IOSTREAM_JAVA)
@@ -73,8 +70,8 @@ OFS_CLASS=$(OFS_HADOOP)/OrangeFileSystem.class \
 $(OFS_CLASS) : $(OFS_JAVA)
 	javac -cp "$(HADOOP_CORE):$(OFS_JNI):$(COMMONS_LOGGING):." $(OFS_JAVA)
 
-ofs.jar : ofs_jni.jar $(OFS_CLASS)
-	jar cf ofs.jar $(OFS_CLASS)
+lib/ofs.jar : lib/ofs_jni.jar $(OFS_CLASS)
+	jar cf $@ $(OFS_CLASS)
 
 #PVFS2POSIXJNI
 #==============================================================================
@@ -104,7 +101,7 @@ POSIX_CLASS= $(ORGDIR)/PVFS2POSIXJNI.class \
 	$(ORGDIR)/Utimbuf.class
 
 #link
-libPVFS2POSIXJNI.so : $(POSIX_CLASS) $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2POSIXJNI.o
+lib/libPVFS2POSIXJNI.so : $(POSIX_CLASS) $(ORGUNDER)_PVFS2POSIXJNI.h libPVFS2POSIXJNI.o
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2POSIXJNI.o \
@@ -144,7 +141,7 @@ STDIO_CLASS=$(ORGDIR)/PVFS2STDIOJNI.class \
 	$(ORGDIR)/Dirent64.class
 
 #Link PVFS2STDIOJNI
-libPVFS2STDIOJNI.so : $(STDIO_CLASS) $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJNI.o
+lib/libPVFS2STDIOJNI.so : $(STDIO_CLASS) $(ORGUNDER)_PVFS2STDIOJNI.h libPVFS2STDIOJNI.o
 	gcc -shared -g \
 	  -o $@ \
 	  libPVFS2STDIOJNI.o \
@@ -173,8 +170,13 @@ libPVFS2STDIOJNI.o : libPVFS2STDIOJNI.c $(ORGUNDER)_PVFS2STDIOJNI.h
 	  libPVFS2STDIOJNI.c
 
 #==============================================================================
+# Simplify make command to build jni and hadoop jars
+jni : lib/ofs_jni.jar
+hadoop : lib/ofs.jar
+all : jni hadoop
+
 clean :
-	rm -f *.o org_*.h *.so *.jar org/orangefs/usrint/*.class \
+	rm -f *.o org_*.h lib/*.so lib/ofs_jni.jar lib/ofs.jar org/orangefs/usrint/*.class \
 		org/apache/hadoop/fs/ofs/*.class \
 		$(OFS_INSTALL)/lib/libPVFS2POSIXJNI.so \
 		$(OFS_INSTALL)/lib/libPVFS2STDIOJNI.so 
