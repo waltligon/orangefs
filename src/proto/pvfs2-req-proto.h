@@ -94,7 +94,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_CREATE_ROOT_DIR = 46,
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
-    PVFS_SERV_REPLICATE = 49,
+    PVFS_SERV_REPLICATE_PRIME = 49,
+    PVFS_SERV_REPLICATE_NEXT = 50,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -1457,40 +1458,41 @@ struct PVFS_servreq_io
                              __hints)                 \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
-    (__req).op                      = PVFS_SERV_IO;        \
-    (__req).capability              = (__cap);             \
-    (__req).hints                   = (__hints);           \
-    (__req).u.io.fs_id              = (__fsid);            \
-    (__req).u.io.handle             = (__handle);          \
-    (__req).u.io.io_type            = (__io_type);         \
-    (__req).u.io.flow_type          = (__flow_type);       \
-    (__req).u.io.server_nr          = (__datafile_nr);     \
-    (__req).u.io.server_ct          = (__datafile_ct);     \
-    (__req).u.io.io_dist            = (__io_dist);         \
-    (__req).u.io.file_req           = (__file_req);        \
-    (__req).u.io.file_req_offset    = (__file_req_off);    \
-    (__req).u.io.aggregate_size     = (__aggregate_size);  \
+    (__req).op                                = PVFS_SERV_IO;           \
+    (__req).capability                        = (__cap);                \
+    (__req).hints                             = (__hints);              \
+    (__req).u.io.fs_id                        = (__fsid);               \
+    (__req).u.io.handle                       = (__handle);             \
+    (__req).u.io.io_type                      = (__io_type);            \
+    (__req).u.io.flow_type                    = (__flow_type);          \
+    (__req).u.io.server_nr                    = (__datafile_nr);        \
+    (__req).u.io.server_ct                    = (__datafile_ct);        \
+    (__req).u.io.io_dist                      = (__io_dist);            \
+    (__req).u.io.file_req                     = (__file_req);           \
+    (__req).u.io.file_req_offset              = (__file_req_off);       \
+    (__req).u.io.aggregate_size               = (__aggregate_size);     \
     (__req).u.io.replication_number_of_copies = (__replication_copies); \
-    if ( (__replication_copies) != 0 )                                                \
-    {                                                                                 \
-        (__req).u.io.replication_handles = calloc( (__replication_copies)             \
-                                                  ,sizeof(*(__replication_handles))); \
-        if ( ((__req).u.io.replication_handles) )                                     \
-        {                                                                             \
-           memcpy( ((__req).u.io.replication_handles)                                 \
-                  ,(__replication_handles)                                            \
-                  ,(__replication_copies) * sizeof(*(__replication_handles)));        \
-        }                                                                             \
-        else                                                                          \
-        {                                                                             \
-           (__req).u.io.replication_number_of_copies = 0;                             \
-           (__req).u.io.replication_handles = NULL;                                   \
-        }                                                                             \
-    }                                                                                 \
-    else                                                                              \
-    {                                                                                 \
-       (__req).u.io.replication_handles = NULL;                                       \
-    }                                                                                 \
+    (__req).u.io.replication_handles          = (__replication_handles);\
+} while (0)
+
+#define PINT_SERVREQ_REPLICATE_NEXT_FILL(__src_req, __dest_req)                                     \
+do {                                                                                                \
+    memset(&(__dest_req), 0, sizeof(__dest_req));                                                   \
+    (__dest_req).op = PVFS_SERV_REPLICATE_NEXT;                                                     \
+    (__dest_req).capability                        = (__src_req).capability;                        \
+    (__dest_req).hints                             = (__src_req).hints;                             \
+    (__dest_req).u.io.fs_id                        = (__src_req).u.io.fs_id;                        \
+    (__dest_req).u.io.handle                       = (__src_req).u.io.handle;                       \
+    (__dest_req).u.io.io_type                      = (__src_req).u.io.io_type;                      \
+    (__dest_req).u.io.flow_type                    = (__src_req).u.io.flow_type;                    \
+    (__dest_req).u.io.server_nr                    = (__src_req).u.io.server_nr;                    \
+    (__dest_req).u.io.server_ct                    = (__src_req).u.io.server_ct;                    \
+    (__dest_req).u.io.io_dist                      = (__src_req).u.io.io_dist;                      \
+    (__dest_req).u.io.file_req                     = (__src_req).u.io.file_req;                     \
+    (__dest_req).u.io.file_req_offset              = (__src_req).u.io.file_req_offset;              \
+    (__dest_req).u.io.aggregate_size               = (__src_req).u.io.aggregate_size;               \
+    (__dest_req).u.io.replication_number_of_copies = (__src_req).u.io.replication_number_of_copies; \
+    (__dest_req).u.io.replication_handles          = (__src_req).u.io.replication_handles;          \
 } while (0)
 
 struct PVFS_servresp_io

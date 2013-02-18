@@ -58,21 +58,22 @@ extern struct PINT_server_req_params pvfs2_tree_setattr_params;
 extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
 extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
 extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
-extern struct PINT_server_req_params pvfs2_replicate_params;
+extern struct PINT_server_req_params pvfs2_replicate_prime_params;
+extern struct PINT_server_req_params pvfs2_replicate_next_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
 {
-    /* 0 */ {PVFS_SERV_INVALID, NULL},
-    /* 1 */ {PVFS_SERV_CREATE, &pvfs2_create_params},
-    /* 2 */ {PVFS_SERV_REMOVE, &pvfs2_remove_params},
-    /* 3 */ {PVFS_SERV_IO, &pvfs2_io_params},
-    /* 4 */ {PVFS_SERV_GETATTR, &pvfs2_get_attr_params},
-    /* 5 */ {PVFS_SERV_SETATTR, &pvfs2_set_attr_params},
-    /* 6 */ {PVFS_SERV_LOOKUP_PATH, &pvfs2_lookup_params},
-    /* 7 */ {PVFS_SERV_CRDIRENT, &pvfs2_crdirent_params},
-    /* 8 */ {PVFS_SERV_RMDIRENT, &pvfs2_rmdirent_params},
-    /* 9 */ {PVFS_SERV_CHDIRENT, &pvfs2_chdirent_params},
+    /* 0  */ {PVFS_SERV_INVALID, NULL},
+    /* 1  */ {PVFS_SERV_CREATE, &pvfs2_create_params},
+    /* 2  */ {PVFS_SERV_REMOVE, &pvfs2_remove_params},
+    /* 3  */ {PVFS_SERV_IO, &pvfs2_io_params},
+    /* 4  */ {PVFS_SERV_GETATTR, &pvfs2_get_attr_params},
+    /* 5  */ {PVFS_SERV_SETATTR, &pvfs2_set_attr_params},
+    /* 6  */ {PVFS_SERV_LOOKUP_PATH, &pvfs2_lookup_params},
+    /* 7  */ {PVFS_SERV_CRDIRENT, &pvfs2_crdirent_params},
+    /* 8  */ {PVFS_SERV_RMDIRENT, &pvfs2_rmdirent_params},
+    /* 9  */ {PVFS_SERV_CHDIRENT, &pvfs2_chdirent_params},
     /* 10 */ {PVFS_SERV_TRUNCATE, &pvfs2_truncate_params},
     /* 11 */ {PVFS_SERV_MKDIR, &pvfs2_mkdir_params},
     /* 12 */ {PVFS_SERV_READDIR, &pvfs2_readdir_params},
@@ -112,7 +113,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
     /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
     /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
-    /* 49 */ {PVFS_SERV_REPLICATE, &pvfs2_replicate_params}
+    /* 49 */ {PVFS_SERV_REPLICATE_PRIME, &pvfs2_replicate_prime_params},
+    /* 50 */ {PVFS_SERV_REPLICATE_NEXT, &pvfs2_replicate_next_params}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

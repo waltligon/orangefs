@@ -910,6 +910,7 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_seteattr_fast_sm;
+extern struct PINT_state_machine_s pvfs2_contact_replicate_servers_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

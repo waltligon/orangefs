@@ -166,7 +166,12 @@ static void lebf_initialize(void)
                 req.u.tree_remove.num_data_files = 0;
                 reqsize = extra_size_PVFS_servreq_tree_remove;
                 break;
-            case PVFS_SERV_REPLICATE:
+            case PVFS_SERV_REPLICATE_PRIME:
+                req.u.io.io_dist = &tmp_dist;
+                req.u.io.file_req = &tmp_req;
+                reqsize = extra_size_PVFS_servreq_io;
+                break;
+            case PVFS_SERV_REPLICATE_NEXT:
                 req.u.io.io_dist = &tmp_dist;
                 req.u.io.file_req = &tmp_req;
                 reqsize = extra_size_PVFS_servreq_io;
@@ -482,7 +487,8 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
-        CASE(PVFS_SERV_REPLICATE, io);
+        CASE(PVFS_SERV_REPLICATE_PRIME, io);
+        CASE(PVFS_SERV_REPLICATE_NEXT, io);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -590,7 +596,8 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
-        CASE(PVFS_SERV_REPLICATE, io);
+        CASE(PVFS_SERV_REPLICATE_PRIME, io);
+        CASE(PVFS_SERV_REPLICATE_NEXT, io);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -708,7 +715,8 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
-        CASE(PVFS_SERV_REPLICATE, io);
+        CASE(PVFS_SERV_REPLICATE_PRIME, io);
+        CASE(PVFS_SERV_REPLICATE_NEXT, io);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -806,7 +814,8 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
-        CASE(PVFS_SERV_REPLICATE, io);
+        CASE(PVFS_SERV_REPLICATE_PRIME, io);
+        CASE(PVFS_SERV_REPLICATE_NEXT, io);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -924,14 +933,25 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     req->u.batch_create.handle_extent_array.extent_array);
                 break;
 
-            case PVFS_SERV_REPLICATE:
+            case PVFS_SERV_REPLICATE_PRIME:
                 decode_free(req->u.io.io_dist);
                 decode_free(req->u.io.file_req);
+                if (req->u.io.replication_handles)
+                    decode_free(req->u.io.replication_handles);
+                break;
+
+            case PVFS_SERV_REPLICATE_NEXT:
+                decode_free(req->u.io.io_dist);
+                decode_free(req->u.io.file_req);
+                if (req->u.io.replication_handles)
+                    decode_free(req->u.io.replication_handles);
                 break;
 
             case PVFS_SERV_IO:
                 decode_free(req->u.io.io_dist);
                 decode_free(req->u.io.file_req);
+                if (req->u.io.replication_handles)
+                    decode_free(req->u.io.replication_handles);
                 break;
 
             case PVFS_SERV_SMALL_IO:
@@ -1226,7 +1246,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
                 case PVFS_SERV_MGMT_REMOVE_DIRENT:
                 case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-                case PVFS_SERV_REPLICATE:
+                case PVFS_SERV_REPLICATE_PRIME:
+                case PVFS_SERV_REPLICATE_NEXT:
                 case PVFS_SERV_IO:
                 case PVFS_SERV_SMALL_IO:
                 case PVFS_SERV_SETATTR:

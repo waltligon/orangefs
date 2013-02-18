@@ -53,7 +53,8 @@ ifdef BUILD_SERVER
                 $(DIR)/mgmt-get-dirent.c \
                 $(DIR)/mgmt-create-root-dir.c \
                 $(DIR)/mgmt-split-dirent.c \
-		$(DIR)/replicate.c
+		$(DIR)/replicate-prime.c \
+		$(DIR)/replicate-next.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

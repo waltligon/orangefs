@@ -333,7 +333,6 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
     PVFS_Request myFileReq = PVFS_BYTE;
     PVFS_offset  myFileReqOffset = 0;
     PVFS_capability capability;
-    PVFS_handle *tmp=NULL;
 
     js_p->error_code = 0;
 
@@ -398,7 +397,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
                              myFileReqOffset,
                              reqmir_p->bsize,
                              0,
-                             tmp, /*temporary variable needed to remove compiler warnings.*/
+                             NULL, 
                              NULL );
     }/*end for*/
 

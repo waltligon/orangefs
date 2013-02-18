@@ -615,6 +615,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_EBADF;
             goto exit;
     }
+
     /* cannot write to an immutable file */
     if (sm_p->u.io.io_type == PVFS_IO_WRITE
         && (attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL))
@@ -622,6 +623,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EPERM;
         goto exit;
     }
+
     ret = PINT_dist_lookup(attr->u.meta.dist);
     if (ret)
     {
@@ -692,7 +694,8 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
      * be changed in the future, for example, if sio_count is some
      * percentage of the target_datafile_count, then do small I/O to
      * the sio_array servers, etc.
-     * For now, if replication is turned on, then we MUST do flows.
+     *
+     * For now (OrangeFS 2.8.9), if replication is turned on, then we MUST do flows.
      * Changes for small-io will come later.     
      */
 
@@ -738,7 +741,13 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                              sm_p->hints);
        gossip_lerr("sm_p->u.io.contexts[%d].msg.req.u.io.replication_number_of_copies(%d)\n"
                   ,i,(int)sm_p->u.io.contexts[i].msg.req.u.io.replication_number_of_copies);
-    }
+       
+       /* if replication is turned on, then use PVFS_SERV_REPLICATE_PRIME instead of PVFS_SERV_IO */
+       if (attr->mask & PVFS_ATTR_META_REPLICATION)
+       {
+           sm_p->u.io.contexts[i].msg.req.op = PVFS_SERV_REPLICATE_PRIME;
+       }
+    }/*end for*/
 
     js_p->error_code = 0;
 
