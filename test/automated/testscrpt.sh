@@ -221,14 +221,15 @@ then
 
 	teardown_vfs
 
-	OLD_LD_PRELOAD=$LD_PRELOAD
-	if [ $LD_PRELOAD ]
-	then
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
-	else
-		export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
-	fi
+	#OLD_LD_PRELOAD=$LD_PRELOAD
+	#if [ $LD_PRELOAD ]
+	#then
+	#	export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so:$LD_PRELOAD
+	#else
+	#	export LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+	#fi
 
+	export PRELOAD=LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
 	
 	for my_host in $VFS_HOSTS
 	do
@@ -255,7 +256,7 @@ then
 
 	run_parts ${USERLIB_SCRIPTS}
 
-	LD_PRELOAD=$OLD_LD_PRELOAD
+	#LD_PRELOAD=$OLD_LD_PRELOAD
 
 	# restore file descriptors and close temporary fds
 	exec 1<&6 6<&-
