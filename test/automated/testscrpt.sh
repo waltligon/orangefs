@@ -213,7 +213,7 @@ then
 	exec 2<&7 7<&-
 fi
 
-
+echo "Current directory is `pwd`"
 echo "Run userlib test = $RUN_USERLIB_TEST"
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
