@@ -1,0 +1,3 @@
+#!/bin/sh
+
+${PRELOAD} sh shell-scripts/tail.sh
