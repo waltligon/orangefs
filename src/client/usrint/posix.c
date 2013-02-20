@@ -93,7 +93,7 @@ int open(const char *path, int flags, ...)
             /* we assume path was qualified by is_pvfs_path() */
             int len = strnlen(path, PVFS_PATH_MAX);
             pd->s->dpath = (char *)malloc(len + 1);
-            strncpy(pd->s->dpath, path, len);
+            strncpy(pd->s->dpath, path, len + 1);
         }
         gen_mutex_unlock(&pd->s->lock);
         gen_mutex_unlock(&pd->lock);
