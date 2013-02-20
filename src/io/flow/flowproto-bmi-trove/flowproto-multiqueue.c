@@ -629,6 +629,16 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         }
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
+    else if(flow_d->src.endpoint_id       == BMI_ENDPOINT   &&
+            flow_d->dest.endpoint_id      == TROVE_ENDPOINT &&
+            flow_d->next_dest.endpoint_id == BMI_ENDPOINT)
+    {
+         /* Create a flow that is written thru trove and forwarded to
+          * an additional bmi address simultaneously
+          */
+         gossip_lerr("Calling forwarding_flow_post_init...\n");
+         forwarding_flow_post_init(flow_d, flow_data);
+    }
     else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
         flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {

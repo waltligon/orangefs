@@ -103,7 +103,11 @@ struct flow_descriptor
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */
-    PVFS_msg_tag_t tag;		/* matching tag */
+    struct flow_endpoint next_dest; /* next destination endpoint */
+
+    PVFS_msg_tag_t tag;		/* matching session tag */
+    PVFS_msg_tag_t next_tag;    /* matching next session tag */
+
     void *user_ptr;		/* for use by caller */
     /* can be used to force use of specific flow protocol */
     enum PVFS_flowproto_type type;        

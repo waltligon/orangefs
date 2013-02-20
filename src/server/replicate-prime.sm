@@ -85,6 +85,12 @@ nested machine pvfs2_contact_replicate_servers_sm
     state setup_msgpairs
     {
         run setup_msgpairs;
+        default => xfer_msgpairs;
+    }
+
+    state xfer_msgpairs
+    {
+        jump pvfs2_msgpairarray_sm;
         default => return;
     }
 
@@ -216,6 +222,9 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->mem_req = NULL;
     s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
     s_op->u.io.flow_d->tag = s_op->tag;
+
+    s_op->u.io.flow_d->next_tag = s_op->msgarray_op.msgarray[0].session_tag;
+
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
@@ -246,6 +255,10 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->src.endpoint_id = BMI_ENDPOINT;
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
         s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
+
+        s_op->u.io.flow_d->next_dest.endpoint_id = BMI_ENDPOINT;
+        s_op->u.io.flow_d->next_dest.u.bmi.address = s_op->msgarray_op.msgarray[0].svr_addr;
+
         s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
         s_op->u.io.flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
     }
@@ -427,12 +440,14 @@ static PINT_sm_action io_send_completion_ack(
 
 static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op           = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_req *replicate_req = s_op->req;
-    struct PVFS_servreq_io *io            = &replicate_req->u.io;
-    PINT_sm_msgarray_op *msgarray_op      = &s_op->msgarray_op;
+    struct PINT_server_op *s_op                 = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_server_req *replicate_prime_req = s_op->req;
+    struct PVFS_servreq_io *io                  = &replicate_prime_req->u.io;
+    PINT_sm_msgarray_op *msgarray_op            = &s_op->msgarray_op;
     PINT_sm_msgpair_state *msg_p;
     int ret,i;
+ 
+//RAL TODO: What if one of the replicate servers is local?
 
     js_p->error_code = 0;
 
@@ -448,7 +463,7 @@ static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
        return SM_ACTION_COMPLETE;
     }
 
-    /* setup PVFS_SERV_REPLICATE_NEXT request */
+    /* setup PVFS_SERV_REPLICATE_NEXT requests, one for each copy */
     for (i=0; i<msgarray_op->count; i++)
     {
         msg_p = &msgarray_op->msgarray[i];
@@ -468,8 +483,8 @@ static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
            return SM_ACTION_COMPLETE;
         }
 
-        /* pass along the data from PVFS_SERV_REPLICATE request and then tweek it*/
-        PINT_SERVREQ_REPLICATE_NEXT_FILL( *replicate_req, msg_p->req );
+        /* pass along the data from PVFS_SERV_REPLICATE_PRIME request*/
+        PINT_SERVREQ_REPLICATE_NEXT_FILL( *replicate_prime_req, msg_p->req );
        
 
     }/*end for*/ 
@@ -487,6 +502,9 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
 {
     PINT_smcb *smcb = v_p;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgarray[i];
+
+
 
     /* Here, we will capture the response and session tag from the PVFS_SERV_REPLICATE_NEXT 
      * request.  The response pertains only to the inital ACK and start of the flow on
@@ -496,12 +514,12 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
 
     /* store bstream size, status, and session tag. */
 
+    gossip_lerr("Bstream size(%d) for handle(%llu)\n",(int)resp_p->u.io.bstream_size
+                                                     ,llu(msg_p->handle));
+    gossip_lerr("Response status (%d).\n",resp_p->status);
+    gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
     
-    
-
-
-
-
+    resp_p->status=0;
 
     return (0);
 }/*end contact_replicate_comp_fn*/

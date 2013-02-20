@@ -28,25 +28,18 @@ machine pvfs2_replicate_next_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => contact_replicate_servers;
-        default => send_negative_ack_to_client;
+        success => send_positive_ack_to_primary;
+        default => send_negative_ack_to_primary;
     }
 
-    state contact_replicate_servers
-    {
-        jump pvfs2_contact_replicate_servers_sm;
-        success => send_positive_ack_to_client;
-        default => send_negative_ack_to_client;
-    }
-
-    state send_positive_ack_to_client
+    state send_positive_ack_to_primary
     {
         run io_send_ack;
-        success => start_flow;
+        /*success => start_flow;*/
         default => release;
     }
 
-    state send_negative_ack_to_client
+    state send_negative_ack_to_primary
     {
         run io_send_ack;
         default => release;
@@ -76,7 +69,7 @@ machine pvfs2_replicate_next_sm
         run io_cleanup;
         default => terminate;
     }
-}/*end machine pvfs2_replicate_sm*/
+}/*end machine pvfs2_replicate_next_sm*/
 
 
 %%
@@ -108,9 +101,6 @@ static int io_send_ack(
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    gossip_lerr("Replication Number of Copies (%d)\n",(int)s_op->req->u.io.replication_number_of_copies);
-    for (i=0; i<s_op->req->u.io.replication_number_of_copies; i++)
-        gossip_lerr("replication handle[%d]:(%llu)\n",i,llu(s_op->req->u.io.replication_handles[i]));   
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons
