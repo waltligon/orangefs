@@ -1,3 +1,0 @@
-#!/bin/sh
-
-${PRELOAD} sh shell-scripts/append2.sh
