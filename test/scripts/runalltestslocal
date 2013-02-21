@@ -36,10 +36,10 @@ do
 		WITH_DB=$OPTARG
 		;;
 	h)
-	*)
 		echo "runalltestslocal [-v][-m][-u][-d path-to-db4][-s SVNBRANCH]"
 		echo ""
 		echo "To run on multiple servers, start OrangeFS on remote servers and set VFSHOSTS environment variable to list of hosts."
+		exit 1
 		;;
 	
 	esac
