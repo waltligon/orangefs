@@ -206,6 +206,7 @@ then
 		pull_and_build_mpich2 || buildfail
 		source $MPIIO_DRIVER
 		. $MPIIO_DRIVER
+		cd ..
 		
 	fi
 #	 restore file descriptors and close temporary fds

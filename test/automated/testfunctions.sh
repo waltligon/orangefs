@@ -322,8 +322,11 @@ testfail() {
 
 # idea stolen from debian: for a given directory, run every executable file
 run_parts() {
+	echo "Running $1 Starting from `pwd`"
 	cd $1
-	TESTS=$(basename `pwd`) 
+	echo "Currently at `pwd`"
+	TESTS=$(basename `pwd`)
+	
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
