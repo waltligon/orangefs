@@ -256,7 +256,7 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
         s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
 
-        s_op->u.io.flow_d->next_dest.endpoint_id = BMI_ENDPOINT;
+        s_op->u.io.flow_d->next_dest.endpoint_id   = BMI_ENDPOINT;
         s_op->u.io.flow_d->next_dest.u.bmi.address = s_op->msgarray_op.msgarray[0].svr_addr;
 
         s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
@@ -279,7 +279,7 @@ static PINT_sm_action io_start_flow(
 
     gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
-                   server_job_context, user_opts->server_job_flow_timeout
+                   server_job_context, JOB_TIMEOUT_INF /*user_opts->server_job_flow_timeout*/
                    , s_op->req->hints);
 
     gossip_debug(GOSSIP_IO_DEBUG,"\treturn code from job_flow "
