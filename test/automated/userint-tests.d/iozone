@@ -12,5 +12,5 @@ make linux  || exit 1
 # -q max record size
 # -n min file size
 # -g max file size
-${PRELOAD} ./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) \
+export ${PRELOAD} && ./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) \
         -f ${PVFS2_MOUNTPOINT}/test_iozone_file

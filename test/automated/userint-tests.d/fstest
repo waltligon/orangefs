@@ -3,4 +3,4 @@
 mkdir ${PVFS2_MOUNTPOINT}/fstest
 
 gcc ${VFS_SCRIPTS}/fstest.c -o ${PVFS2_DEST}/fstest && \
-	${PRELOAD} ${PVFS2_DEST}/fstest -p ${PVFS2_MOUNTPOINT}/fstest
+	export ${PRELOAD} && ${PVFS2_DEST}/fstest -p ${PVFS2_MOUNTPOINT}/fstest

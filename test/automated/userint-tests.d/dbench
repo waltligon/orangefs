@@ -50,7 +50,7 @@ then
    cd $cwd
    exit 1
 fi
-cd ${PVFS2_MOUNTPOINT} &&  ${PRELOAD} ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
+cd ${PVFS2_MOUNTPOINT} &&  export ${PRELOAD} && ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
 if [ $? != 0 ]
 then
    echo "dbench failed"

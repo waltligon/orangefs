@@ -237,7 +237,7 @@ configure_pvfs2() {
 start_pvfs2() {
 
 	# clean up any artifacts from earlier runs
-	export ${PRELOAD}
+	#export ${PRELOAD}
 	cd ${PVFS2_DEST}
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
@@ -327,7 +327,8 @@ run_parts() {
 	cd $1
 	echo "Currently at `pwd`"
 	TESTS=$(basename `pwd`)
-	
+
+	EXTRA_TESTS=$1	
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
@@ -408,7 +409,7 @@ start_all_pvfs2() {
 
 	echo  "Starting PVFS2 on $my_host"
 	echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
-	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ${PRELOAD} ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
+	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ &&  ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
 		
 	else
 		echo  "Starting PVFS2 on $my_host"

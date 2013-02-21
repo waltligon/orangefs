@@ -3,4 +3,4 @@
 PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin:${PATH}
 echo $PATH
 export PATH
-${PRELOAD} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/test/test-symlink-perms --directory ${PVFS2_MOUNTPOINT} 
+export ${PRELOAD} && ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/test/test-symlink-perms --directory ${PVFS2_MOUNTPOINT} 
