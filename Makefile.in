@@ -174,7 +174,9 @@ INCLUDES := \
     src/io/job \
     src/io/dev \
     src/proto \
-    src/common/mgmt
+    src/common/mgmt \
+	src/common/hash \
+	src/common/llist
 GENINCLUDES := \
 	include
 endif
