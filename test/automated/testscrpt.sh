@@ -136,6 +136,7 @@ nr_failed=0
 
 # Make all of the test sections controlled by vars the same way
 do_sysint=1
+echo "running SYSINT scripts------------------------------------"
 
 if [ $do_sysint -eq 1 ] ; then
 	# save file descriptors for later
@@ -156,8 +157,10 @@ if [ $do_sysint -eq 1 ] ; then
 	exec 1<&6 6<&-
 	exec 2<&7 7<&-
 fi
+	echo "running VFS scripts---------------------------------------"
 
-if [ $do_vfs -eq 1 ] ; then
+if [ $do_vfs -eq 1 ]  
+then
 	# save file descriptors for later
 	exec 6<&1
 	exec 7<&2
@@ -181,6 +184,7 @@ fi
 # down the road (as we get our hands on more clusters) we'll need a more
 # generic way of submitting jobs. for now assume all the world has pbs
 
+	echo "running MPI scripts----------------------------------------"
 if [ $RUN_MPI_TEST ]
 then
 	# save file descriptors for later
@@ -206,6 +210,7 @@ then
 		pull_and_build_mpich2 || buildfail
 		source $MPIIO_DRIVER
 		. $MPIIO_DRIVER
+		cd ..
 		
 	fi
 #	 restore file descriptors and close temporary fds
@@ -213,8 +218,10 @@ then
 	exec 2<&7 7<&-
 fi
 
-
+echo "Current directory is `pwd`"
 echo "Run userlib test = $RUN_USERLIB_TEST"
+
+	echo "running USRLIB scripts-------------------------------------"
 # run userlib tests first before starting client
 if [ $RUN_USERLIB_TEST ]
 then
