@@ -31,7 +31,7 @@ make clean
 ./configure -q
 
 #apply patches
-patch -p3 < ${VFS_SCRIPTS}/dbench.patch
+patch -p3 < ${USERLIB_SCRIPTS}/dbench.patch
 if [ "${?}" != 0 ]
 then
    echo "Error: failed to apply patches to DBENCH."
