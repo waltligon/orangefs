@@ -328,7 +328,6 @@ run_parts() {
 	echo "Currently at `pwd`"
 	TESTS=$(basename `pwd`)
 
-	EXTRA_TESTS=$1	
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
