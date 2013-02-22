@@ -170,6 +170,8 @@ static void handle_forwarding_io_error(PVFS_error error_code,
                                       struct fp_private_data* flow_data);
 static inline void server_write_flow_post_init(flow_descriptor *flow_d,
                                                struct fp_private_data *flow_data);
+static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
+					     struct fp_private_data* flow_data);
 
 
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -701,7 +703,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
           */
          gossip_lerr("Calling forwarding_flow_post_init...\n");
 
-         //forwarding_flow_post_init(flow_d, flow_data);
+         forwarding_flow_post_init(flow_d, flow_data);
     }
     else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
         flow_d->dest.endpoint_id == BMI_ENDPOINT)
@@ -732,7 +734,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     else if(flow_d->src.endpoint_id  == BMI_ENDPOINT &&
             flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
-        /* Initiate BMI-rcv,trove-write process for this server */
+        /* Initiate BMI-rcv,trove-write loop for this server */
         gossip_lerr("Calling server_wrtie_flow_post_init()...\n");
         server_write_flow_post_init(flow_d,flow_data);
     }
@@ -3152,6 +3154,82 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 
     return;
 }/*end handle_forwarding_io_error*/
+
+/**
+ * Perform initialization steps before this forwarding flow can be posted
+ */
+static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
+					     struct fp_private_data* flow_data)
+{
+    int i;
+
+    /* Generic flow initialization */
+    flow_data->parent->total_transferred = 0;
+    
+    /* Iniitialize the pending counts */
+    flow_data->recvs_pending = 0;
+    flow_data->sends_pending = 0;
+    flow_data->writes_pending = 0;
+    flow_data->primary_recvs_throttled = 0;
+
+    /* Initiailize progress counts */
+    flow_data->total_bytes_req = flow_data->parent->aggregate_size;
+    flow_data->total_bytes_forwarded = 0;
+    flow_data->total_bytes_recvd = 0;
+    flow_data->total_bytes_written = 0;
+    
+    gen_mutex_lock(&flow_data->parent->flow_mutex);
+
+    /* Initialize buffers */
+    for (i = 0; i < flow_data->parent->buffers_per_flow; i++)
+    {
+        /* Trove stuff I don't understand */
+        flow_data->prealloc_array[i].result_chain.q_item = 
+            &flow_data->prealloc_array[i];
+
+        /* Place available buffers on the empty list */
+        qlist_add_tail(&flow_data->prealloc_array[i].list_link,
+                       &flow_data->empty_list);
+
+    }
+
+    /* Post the initial receives */
+    for (i = 0; i < flow_data->parent->buffers_per_flow; i++)
+    {
+        /* If there is data to be received, perform the initial recv
+           otherwise mark the flow complete */
+        if (!PINT_REQUEST_DONE(flow_data->parent->file_req_state))
+        {
+            /* Remove the buffer from the available list */
+            qlist_del(&(flow_data->prealloc_array[i].list_link));
+
+            /* Post the recv operation */
+            flow_data->recvs_pending += 1;
+            flow_bmi_recv(&(flow_data->prealloc_array[i]),
+                          forwarding_bmi_recv_callback_wrapper,
+                          forwarding_bmi_recv_callback_fn);
+        }
+        else
+        {
+            gossip_lerr("Server flow posted all on initial post.\n");
+            break;
+        }
+    }
+
+    /* If the flow is complete, perform cleanup */
+    if(flow_data->parent->state == FLOW_COMPLETE)
+    {
+        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        FLOW_CLEANUP(flow_data);
+    }
+    else
+    {
+        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+    }
+
+}/*end forwarding_flow_post_init*/
+
+
 
 /*
  * Local variables:
