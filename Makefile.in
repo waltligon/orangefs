@@ -86,6 +86,7 @@ BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
+BUILD_JNI = @BUILD_JNI@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
@@ -123,7 +124,7 @@ build_static = @build_static@
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
 
-# PHONEY targets are targets that do not result in the generation
+# PHONY targets are targets that do not result in the generation
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
