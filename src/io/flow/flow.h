@@ -106,7 +106,7 @@ struct flow_descriptor
     struct flow_endpoint next_dest; /* next destination endpoint */
 
     PVFS_msg_tag_t tag;		/* matching session tag */
-    PVFS_msg_tag_t next_tag;    /* matching next session tag */
+    PVFS_msg_tag_t next_tag;      /* matching next session tag */
 
     void *user_ptr;		/* for use by caller */
     /* can be used to force use of specific flow protocol */

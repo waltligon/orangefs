@@ -56,11 +56,11 @@ machine pvfs2_replicate_prime_sm
     state start_flow
     {
         run io_start_flow;
-        success => send_completion_ack;
+        success => send_completion_ack_to_client;
         default => release;
     }
 
-    state send_completion_ack
+    state send_completion_ack_to_client
     {
         run io_send_completion_ack;
         default => release;
@@ -91,6 +91,12 @@ nested machine pvfs2_contact_replicate_servers_sm
     state xfer_msgpairs
     {
         jump pvfs2_msgpairarray_sm;
+        default => set_status;
+    }
+
+    state set_status
+    {
+        run set_status;
         default => return;
     }
 
@@ -222,14 +228,15 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->mem_req = NULL;
     s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
     s_op->u.io.flow_d->tag = s_op->tag;
-
-    s_op->u.io.flow_d->next_tag = s_op->msgarray_op.msgarray[0].session_tag;
+    
+    s_op->u.io.flow_d->next_tag = s_op->u.io.next_tag;
 
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
+    s_op->u.io.flow_d->total_transferred = 0;
 
     fs_conf = PINT_config_find_fs_id(user_opts, 
-        s_op->req->u.io.fs_id);
+                                     s_op->req->u.io.fs_id);
     if(fs_conf)
     {
         /* pick up any buffer settings overrides from fs conf */
@@ -278,9 +285,10 @@ static PINT_sm_action io_start_flow(
     }
 
     gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
-    err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
-                   server_job_context, JOB_TIMEOUT_INF /*user_opts->server_job_flow_timeout*/
-                   , s_op->req->hints);
+    err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id
+                  ,server_job_context
+                  ,user_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies
+                  ,s_op->req->hints);
 
     gossip_debug(GOSSIP_IO_DEBUG,"\treturn code from job_flow "
                                  "submission:%d\n"
@@ -484,8 +492,9 @@ static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
         }
 
         /* pass along the data from PVFS_SERV_REPLICATE_PRIME request*/
-        PINT_SERVREQ_REPLICATE_NEXT_FILL( *replicate_prime_req, msg_p->req );
-       
+        PINT_SERVREQ_REPLICATE_NEXT_FILL(*replicate_prime_req
+                                         ,msg_p->req
+                                         ,io->replication_handles[i]);
 
     }/*end for*/ 
 
@@ -504,8 +513,6 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgarray[i];
 
-
-
     /* Here, we will capture the response and session tag from the PVFS_SERV_REPLICATE_NEXT 
      * request.  The response pertains only to the inital ACK and start of the flow on
      * the replicate server.  We will retain the status from each response and then
@@ -514,17 +521,42 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
 
     /* store bstream size, status, and session tag. */
 
+    gossip_lerr("Response %d of %d.\n",i,s_op->msgarray_op.count);
     gossip_lerr("Bstream size(%d) for handle(%llu)\n",(int)resp_p->u.io.bstream_size
                                                      ,llu(msg_p->handle));
     gossip_lerr("Response status (%d).\n",resp_p->status);
     gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
     
+    s_op->u.io.next_resp_status = resp_p->status;
+    if (resp_p->status==0)
+    {
+        s_op->u.io.next_tag          = msg_p->session_tag;
+        s_op->u.io.next_bstream_size = resp_p->u.io.bstream_size;
+    }
+
     resp_p->status=0;
 
     return (0);
 }/*end contact_replicate_comp_fn*/
 
 
+static PINT_sm_action set_status(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* this will be more elaborate when multiple servers are contacted.
+     */ 
+    if (s_op->u.io.next_resp_status == 0)
+    {
+        js_p->error_code = 0;
+    }
+    else
+    {
+        js_p->error_code = s_op->u.io.next_resp_status;
+    }
+
+    return SM_ACTION_COMPLETE;
+}/*end set_status*/
 
 
 

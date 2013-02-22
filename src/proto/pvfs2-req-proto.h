@@ -1475,14 +1475,14 @@ do {                                                  \
     (__req).u.io.replication_handles          = (__replication_handles);\
 } while (0)
 
-#define PINT_SERVREQ_REPLICATE_NEXT_FILL(__src_req, __dest_req)                                     \
+#define PINT_SERVREQ_REPLICATE_NEXT_FILL(__src_req, __dest_req, __dest_handle)                      \
 do {                                                                                                \
     memset(&(__dest_req), 0, sizeof(__dest_req));                                                   \
     (__dest_req).op = PVFS_SERV_REPLICATE_NEXT;                                                     \
     (__dest_req).capability                        = (__src_req).capability;                        \
     (__dest_req).hints                             = (__src_req).hints;                             \
     (__dest_req).u.io.fs_id                        = (__src_req).u.io.fs_id;                        \
-    (__dest_req).u.io.handle                       = (__src_req).u.io.handle;                       \
+    (__dest_req).u.io.handle                       = (__dest_handle);                               \
     (__dest_req).u.io.io_type                      = (__src_req).u.io.io_type;                      \
     (__dest_req).u.io.flow_type                    = (__src_req).u.io.flow_type;                    \
     (__dest_req).u.io.server_nr                    = (__src_req).u.io.server_nr;                    \

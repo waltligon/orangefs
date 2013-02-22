@@ -516,6 +516,9 @@ struct PINT_server_getconfig_op
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
+    PVFS_size next_bstream_size;
+    PVFS_error next_resp_status;
+    PVFS_msg_tag_t next_tag;
 };
 
 struct PINT_server_small_io_op

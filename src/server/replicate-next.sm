@@ -35,7 +35,7 @@ machine pvfs2_replicate_next_sm
     state send_positive_ack_to_primary
     {
         run io_send_ack;
-        /*success => start_flow;*/
+        success => start_flow;
         default => release;
     }
 
@@ -48,11 +48,11 @@ machine pvfs2_replicate_next_sm
     state start_flow
     {
         run io_start_flow;
-        success => send_completion_ack;
+        success => send_completion_ack_to_primary;
         default => release;
     }
 
-    state send_completion_ack
+    state send_completion_ack_to_primary
     {
         run io_send_completion_ack;
         default => release;
@@ -97,7 +97,7 @@ static int io_send_ack(
 {
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_send_ack (io.sm)....\n");
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, err = -PVFS_EIO;
+    int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
@@ -193,12 +193,12 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->file_req_offset = s_op->req->u.io.file_req_offset;
     s_op->u.io.flow_d->mem_req = NULL;
     s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
-    s_op->u.io.flow_d->tag = s_op->tag;
+    s_op->u.io.flow_d->tag = s_op->tag; /*this is replicate-prime's session tag*/
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
     fs_conf = PINT_config_find_fs_id(user_opts, 
-        s_op->req->u.io.fs_id);
+                                     s_op->req->u.io.fs_id);
     if(fs_conf)
     {
         /* pick up any buffer settings overrides from fs conf */
@@ -244,8 +244,9 @@ static PINT_sm_action io_start_flow(
 
     gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
-                   server_job_context, user_opts->server_job_flow_timeout
-                   , s_op->req->hints);
+                   server_job_context, 
+                   user_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
+                   s_op->req->hints);
 
     gossip_debug(GOSSIP_IO_DEBUG,"\treturn code from job_flow "
                                  "submission:%d\n"
