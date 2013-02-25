@@ -2654,7 +2654,8 @@ int pvfs_fchdir(int fd)
     }
     debug("\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
     /* we will keep a copy and keep one in the environment */
-    strncpy(pvfs_cwd, pd->s->dpath, PVFS_PATH_MAX);
+    memset(pvfs_cwd, 0, sizeof(pvfs_cwd));
+    strncpy(pvfs_cwd, pd->s->dpath, plen + 1);
     setenv("PWD", pd->s->dpath, 1);
     return 0;
 }
@@ -2679,6 +2680,7 @@ char *pvfs_getcwd(char *buf, size_t size)
             errno = ENOMEM;
             return NULL;
         }
+        memset(buf, 0, bsize);
     }
     else
     {
@@ -2692,8 +2694,9 @@ char *pvfs_getcwd(char *buf, size_t size)
             errno = ERANGE;
             return NULL;
         }
+        memset(buf, 0, size);
     }
-    strcpy(buf, pvfs_cwd);
+    strncpy(buf, pvfs_cwd, plen + 1);
     return buf;
 }
 

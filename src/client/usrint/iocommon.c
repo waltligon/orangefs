@@ -631,8 +631,8 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         if (S_ISDIR(sbuf.st_mode))
         {
             /* we assume path was qualified by PVFS_expand_path() */
-            int len = strnlen(path, PVFS_PATH_MAX);
-            pd->s->dpath = (char *)malloc(len + 1);
+            int len = strnlen(path, PVFS_PATH_MAX) + 1;
+            pd->s->dpath = (char *)malloc(len);
             strncpy(pd->s->dpath, path, len);
         }
         gen_mutex_unlock(&pd->s->lock); /* this is ok after fstat */
@@ -947,11 +947,13 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int pathsz = strlen(pdir->s->dpath) + strlen(path);
-            tmp_path = (char *)malloc(pathsz + 2);
-            strcpy(tmp_path, pdir->s->dpath);
-            strcat(tmp_path, "/");
-            strcat(tmp_path, path);
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(directory);
+            int mlen = dlen + plen + 2;
+            tmp_path = (char *)malloc(mlen);
+            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
+            strncat(tmp_path, "/", 1);
+            strncat(tmp_path, directory, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1047,11 +1049,13 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int pathsz = strlen(pdir->s->dpath) + strlen(directory);
-            tmp_path = (char *)malloc(pathsz + 2);
-            strcpy(tmp_path, pdir->s->dpath);
-            strcat(tmp_path, "/");
-            strcat(tmp_path, directory);
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(directory);
+            int mlen = dlen + plen + 2;
+            tmp_path = (char *)malloc(mlen);
+            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
+            strncat(tmp_path, "/", 1);
+            strncat(tmp_path, directory, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1168,16 +1172,19 @@ finish:
         pd->s->mode |= S_IFDIR;
         if (pdir)
         {
-            pd->s->dpath = (char *)malloc(strlen(pdir->s->dpath) +
-                            strlen(path) + 2);
-            strcpy(pd->s->dpath, pdir->s->dpath);
-            strcat(pd->s->dpath, "/");
-            strcat(pd->s->dpath, path);
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(path);
+            int mlen = dlen + plen + 2;
+            pd->s->dpath = (char *)malloc(mlen);
+            strncpy(pd->s->dpath, pdir->s->dpath, dlen + 1);
+            strncat(pd->s->dpath, "/", 1);
+            strncat(pd->s->dpath, path, plen);
         }
         else
         {
-            pd->s->dpath = (char *)malloc(strlen(path) + 1);
-            strcpy(pd->s->dpath, path);
+            int len = strlen(path) + 1;
+            pd->s->dpath = (char *)malloc(len);
+            strncpy(pd->s->dpath, path, len);
         }
     }
     if (attributes_resp.attr.objtype == PVFS_TYPE_SYMLINK)

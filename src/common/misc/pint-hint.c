@@ -609,8 +609,9 @@ int PVFS_hint_import_env(PVFS_hint *out_hint)
     return 0;
 }
 
-void *PINT_hint_get_value_by_type(
-    struct PVFS_hint_s *hint, enum PINT_hint_type type, int *length)
+void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint,
+                                  enum PINT_hint_type type,
+                                  int *length)
 {
     PINT_hint *h;
 
@@ -632,8 +633,9 @@ void *PINT_hint_get_value_by_type(
     return NULL;
 }
 
-void *PINT_hint_get_value_by_name(
-    struct PVFS_hint_s *hint, const char *name, int *length)
+void *PINT_hint_get_value_by_name(struct PVFS_hint_s *hint,
+                                  const char *name,
+                                  int *length)
 {
     PINT_hint *h;
 
