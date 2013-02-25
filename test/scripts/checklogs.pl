@@ -156,6 +156,32 @@ while (<LOGFILE>)
 		$mpi_idx++;
 		next;
 		}
+	# did we run userlib tests? Same as VFS tests
+	if ($line =~ /running userlib scripts/)
+		{
+		#print "vfs found";
+		$vfs_idx = 0;
+		next;
+		}
+	#print "checking sysint test number $sysint_idx $sysint_tests[$sysint_idx]\n";
+	
+	# test all the vfs scripts in the table
+	if ( $vfs_idx >= 0 && $vfs_idx < @vfs_tests)
+		{
+		#print "checking vfs test number $vfs_idx $vfs_tests[$vfs_idx]\n";
+		if ($line =~ /${vfs_tests[$vfs_idx]}(.*)FAILED/)
+			{
+			print "Test ${vfs_tests[$vfs_idx]} (userlib) FAILED!\n";
+			$failed++;
+			
+			}
+		elsif ($line =~ /${vfs_tests[$vfs_idx]}(.*)OK/)
+			{
+			$passed++;
+			}
+		$vfs_idx++;
+		next;
+		}
 	}
 	
 print "\n";
