@@ -37,12 +37,12 @@ then
 	#apply patches
 	patch -p3 < ${USERLIB_SCRIPTS}/dbench.patch
 
-	if [ "${?}" != 0 ]
-	then
-   		echo "Error: failed to apply patches to DBENCH."
-   		cd $cwd
-   		exit 1;
-	fi
+#	if [ "${?}" != 0 ]
+#	then
+ #  		echo "Error: failed to apply patches to DBENCH."
+  # 		cd $cwd
+   #		exit 1;
+#	fi
 
 	#compile the system
 	make 2>&1
