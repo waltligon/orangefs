@@ -13,34 +13,40 @@ mkdir -p ${EXTRA_TESTS}/dbench-3.03
 #capture current working directory
 cwd=`pwd`
 
-#goto benchmark directory and cleanup
-cd ${EXTRA_TESTS}/dbench-3.03
-make clean
-#sudo /bin/rm -rf dbench-3.03
-
-#go back
-#cd ..
-
-#untar the dbench directory
-#tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
-
-#goto the dbench directory
-#cd benchmarks/dbench-3.03
-
-#configure the dbench software
-./configure -q
-
-#apply patches
-patch -p3 < ${VFS_SCRIPTS}/dbench.patch
-if [ "${?}" != 0 ]
+#do we need to build dbench?
+if [ ! -f ${EXTRA_TESTS}/dbench-3.03/dbench ] 
 then
-   echo "Error: failed to apply patches to DBENCH."
-   cd $cwd
-   exit 1;
-fi
+	#goto benchmark directory and cleanup
+	cd ${EXTRA_TESTS}/dbench-3.03
+	make clean
+	sudo /bin/rm -rf dbench-3.03
 
-#compile the system
-make 2>&1
+	#go back
+	cd ..
+
+
+	#untar the dbench directory
+	tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
+
+	#goto the dbench directory
+	cd benchmarks/dbench-3.03
+
+	#configure the dbench software
+	./configure -q
+
+	#apply patches
+	patch -p3 < ${USERLIB_SCRIPTS}/dbench.patch
+
+#	if [ "${?}" != 0 ]
+#	then
+ #  		echo "Error: failed to apply patches to DBENCH."
+  # 		cd $cwd
+   #		exit 1;
+#	fi
+
+	#compile the system
+	make 2>&1
+fi
 
 #setup dbench test and execute.
 cp client.txt ${PVFS2_MOUNTPOINT}
@@ -50,7 +56,7 @@ then
    cd $cwd
    exit 1
 fi
-cd ${PVFS2_MOUNTPOINT} &&  ${PRELOAD} ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
+cd ${PVFS2_MOUNTPOINT} &&  export ${PRELOAD} && ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
 if [ $? != 0 ]
 then
    echo "dbench failed"

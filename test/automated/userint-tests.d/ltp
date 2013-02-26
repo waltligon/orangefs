@@ -37,10 +37,10 @@ fi
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
 #for patch in \
-patch -p1 < ${VFS_SCRIPTS}/ltp-20120903-zoo-path.patch
-#        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
-#	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
-#      ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
+patch -p1 < ${USERLIB_SCRIPTS}/ltp-20120903-zoo-path.patch
+#        ${USERLIB_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
+#	${USERLIB_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
+#      ${USERLIB_SCRIPTS}/ltp-full-20081130-unzip.patch; do
 #		patch -p1 < $patch
 #done
 if [ "${?}" != 0 ]
@@ -78,17 +78,18 @@ fi
 #cd ../
 
 # copy pvfs friendly test cases; we should pass all of these
-cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
-sudo cp ${VFS_SCRIPTS}/ltp-pvfs-testcases /opt/ltp/runtest/
-${PRELOAD} mkdir -p ${PVFS2_MOUNTPOINT}/ltp-tmp 
-${PRELOAD} chmod 777 ${PVFS2_MOUNTPOINT}/ltp-tmp
+cp ${USERLIB_SCRIPTS}/ltp-pvfs-testcases runtest/
+sudo cp ${USERLIB_SCRIPTS}/ltp-pvfs-testcases /opt/ltp/runtest/
+export ${PRELOAD} && mkdir -p ${PVFS2_MOUNTPOINT}/ltp-tmp 
+export ${PRELOAD} && chmod 777 ${PVFS2_MOUNTPOINT}/ltp-tmp
 umask 0
 
 # run ltp
 echo Running LTP...
 CURRENTDIR=`pwd`
 cd /opt/ltp
-sudo ${PRELOAD} ./runltp -p -l ${CURRENTDIR}/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& ${CURRENTDIR}/../ltp-pvfs-testcases-$THISDATE.output
+export $PRELOAD
+sudo ./runltp -p -l ${CURRENTDIR}/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& ${CURRENTDIR}/../ltp-pvfs-testcases-$THISDATE.output
 LTPRET=${?}
 if [ "${LTPRET}" != 0 ]
 then
