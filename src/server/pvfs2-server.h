@@ -513,12 +513,25 @@ struct PINT_server_getconfig_op
                   * processing */
 };
 
+struct replicate_descriptor
+{
+   PVFS_size bstream_size;
+   PVFS_error resp_status;
+   PVFS_msg_tag_t session_tag;
+   PVFS_BMI_addr_t svr_addr;
+   void *encoded_resp_p;
+   job_id_t recv_id;
+   job_status_s recv_status;
+   PVFS_error op_status;
+};
+
+typedef struct replicate_descriptor replicate_descriptor;
+
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
-    PVFS_size next_bstream_size;
-    PVFS_error next_resp_status;
-    PVFS_msg_tag_t next_tag;
+    replicate_descriptor *replicate_d;
+    int replicate_d_count;
 };
 
 struct PINT_server_small_io_op

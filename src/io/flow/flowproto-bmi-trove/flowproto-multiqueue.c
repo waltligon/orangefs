@@ -574,6 +574,8 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     struct fp_private_data *flow_data = NULL;
     int i;
 
+    gossip_err("Executing %s...\n",__func__);
+
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto posting %p\n",
                  flow_d);
 
@@ -735,7 +737,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
         /* Initiate BMI-rcv,trove-write loop for this server */
-        gossip_lerr("Calling server_wrtie_flow_post_init()...\n");
+        gossip_lerr("Calling server_write_flow_post_init()...\n");
         server_write_flow_post_init(flow_d,flow_data);
     }
 #endif
@@ -2335,6 +2337,7 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
                           bmi_recv_callback recv_callback_wrapper,
                           bmi_recv_callback recv_callback)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
     PVFS_size tmp_actual_size;
@@ -2424,6 +2427,7 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
                                         PVFS_size actual_size,
                                         PVFS_error error_code)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct fp_queue_item *q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
@@ -2509,10 +2513,11 @@ static void flow_trove_write(struct fp_queue_item* q_item,
                              trove_write_callback write_callback_wrapper,
                              trove_write_callback write_callback)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
     struct result_chain_entry* result_iter = 0;
-    int data_sync_mode;
+    int data_sync_mode=0;
     int rc = 0;
 
     /* Add qitem to dest_list */
@@ -2523,10 +2528,15 @@ static void flow_trove_write(struct fp_queue_item* q_item,
     /* Retrieve the data sync mode */
     data_sync_mode = get_data_sync_mode(flow_d->dest.u.trove.coll_id);
 #endif
+
+    gossip_lerr("data sync mode (%d)\n",data_sync_mode);
+
+
     /* Perform a write to disk */
     q_item->result_chain_count = 0;
     result_iter = &q_item->result_chain;
     assert(result_iter);
+    q_item->out_size=0; /* just to be sure */
     
     while (0 != result_iter)
     {
@@ -2544,7 +2554,8 @@ static void flow_trove_write(struct fp_queue_item* q_item,
                                       result_iter->result.offset_array,
                                       result_iter->result.size_array,
                                       result_iter->result.segs,
-                                      &result_iter->result.bytes,
+                                      //&result_iter->result.bytes,
+                                      &q_item->out_size,
                                       data_sync_mode,
                                       NULL,
                                       &result_iter->trove_callback,
@@ -2599,12 +2610,12 @@ static void forwarding_trove_write_callback_wrapper(void *user_ptr,
 static void forwarding_trove_write_callback_fn(void *user_ptr,
 					       PVFS_error error_code)
 {
+    gossip_err("Executing %s...\n",__func__);
+
     struct result_chain_entry* result_entry = user_ptr;
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
-
-    gossip_lerr("Primary Write Finished\n");
 
     /* Handle trove errors */
     if(error_code != 0 || flow_d->error_code != 0)
@@ -2629,6 +2640,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
         while (0 != result_iter)
         {
             struct result_chain_entry* re = result_iter;
+            gossip_lerr("total-bytes-written(%d) \tq_item->out_size(%d)\n",(int)flow_data->total_bytes_written
+                                                                      ,(int)q_item->out_size);
             flow_data->total_bytes_written += result_iter->result.bytes;
             PINT_perf_count(PINT_server_pc, 
                             PINT_PERF_WRITE,
@@ -2643,7 +2656,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "SERVER WRITE FINISHED: Total: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
+            "FORWARDING-TROVE-WRITE-FINISHED: Total: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
             flow_data->writes_pending,
@@ -2705,6 +2718,10 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
             0 == flow_data->writes_pending)
         {
             gossip_lerr("Forwarding flow finished\n");
+            gossip_lerr("flow_data->total_bytes_recvd(%d) \ttotal_bytes_forwarded(%d)\n"
+                       ,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_forwarded);
+            gossip_lerr("flow_data->total_bytes_recv(%d) \ttotal_bytes_written(%d)\n"
+                       ,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_written);
             assert(flow_data->total_bytes_recvd ==
                    flow_data->total_bytes_forwarded);
             assert(flow_data->total_bytes_recvd ==
@@ -2745,6 +2762,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 					    PVFS_size actual_size,
 					    PVFS_error error_code)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct fp_queue_item *q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
@@ -2762,14 +2780,22 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     flow_data->total_bytes_recvd += actual_size;
     
     /* Debug output */
-    gossip_lerr("RECV FINISHED: Total: %lld AmtRecvd: %lld AmtFwd: %lld PendingRecvs: %d "
+    gossip_lerr("RECV FINISHED: Total: %lld TotalRecvd: %lld Recvd: %lld AmtFwd: %lld PendingRecvs: %d "
                 "PendingFwds: %d Throttled: %d\n",
                  (long long int)flow_data->total_bytes_req,
                  (long long int)flow_data->total_bytes_recvd,
+                 (long long int)actual_size,
                  (long long int)flow_data->total_bytes_forwarded,
                  flow_data->recvs_pending,
                  flow_data->sends_pending,
                  flow_data->primary_recvs_throttled);
+    if (q_item->buffer)
+    {
+           char *tmp;
+           tmp = calloc(51,sizeof(char)); 
+           gossip_err("First 50 bytes of received buffer:\n(%s)\n",strncpy(tmp,(char *)q_item->buffer,50));
+           free(tmp);
+    }
 
     /* Remove from current queue */
     qlist_del(&q_item->list_link);
@@ -2889,6 +2915,7 @@ static inline void server_trove_write_callback_wrapper(void *user_ptr,
 static void forwarding_bmi_send(struct fp_queue_item* q_item,
                                 PVFS_size actual_size)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
     int rc = 0;
@@ -2922,6 +2949,7 @@ static void forwarding_bmi_send(struct fp_queue_item* q_item,
     }
     else if (1 == rc)
     {
+        gossip_lerr("Calling forwarding_bmi_send_callback_fn from forwarding_bmi_send...\n");
         forwarding_bmi_send_callback_fn(q_item, actual_size, 0);
     }
 
@@ -2956,6 +2984,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                                             PVFS_size actual_size,
                                             PVFS_error error_code)
 {
+    gossip_err("Executing %s...\n",__func__);
     /* Convert data into flow descriptor */
     struct fp_queue_item* q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
@@ -2974,11 +3003,12 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     qlist_del(&q_item->list_link);
 
     /* Debug output */
-    gossip_lerr("FWD FINISHED: Total: %lld AmtRecvd: %lld AmtFwd: %lld PendingRecvs: %d "
+    gossip_lerr("FWD FINISHED: Total: %lld TotalRecvd: %lld TotalAmtFwd: %lld AmtFwd: %lld PendingRecvs: %d "
                 "PendingFwds: %d Throttled: %d\n",
                  (long long int)flow_data->total_bytes_req,
                  (long long int)flow_data->total_bytes_recvd,
                  (long long int)flow_data->total_bytes_forwarded,
+                 (long long int)actual_size,
                  flow_data->recvs_pending,
                  flow_data->sends_pending,
                  flow_data->primary_recvs_throttled);
@@ -3018,6 +3048,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 static void server_trove_write_callback_fn(void *user_ptr,
                                            PVFS_error error_code)
 {
+    gossip_err("Executing %s...\n",__func__);
     struct result_chain_entry* result_entry = user_ptr;
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
@@ -3062,7 +3093,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "SERVER WRITE FINISHED: Total: %lld AmtWritten: %lld PendingRecvs: %d Throttled: %d\n",
+            "SERVER WRITE FINISHED: Total: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
             flow_data->writes_pending,
@@ -3171,6 +3202,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
 					     struct fp_private_data* flow_data)
 {
+    gossip_err("Executing %s...\n",__func__);
     int i;
 
     /* Generic flow initialization */

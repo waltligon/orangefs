@@ -647,6 +647,14 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     attr =  &sm_p->getattr.attr;
 
+    if ( attr->mask & PVFS_ATTR_CAPABILITY )
+    {
+       gossip_lerr("attr mask (%08x)\n",attr->mask);
+       gossip_lerr("Print handles(%d) found in capability...\n",attr->capability.num_handles);
+       for (i=0; i<attr->capability.num_handles; i++)
+           gossip_err("Capability handle[%d]:(%llu)\n",i,llu(attr->capability.handle_array[i]));
+    }
+
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
      * attributes received are not one of the the types specified.

@@ -57,7 +57,8 @@ machine pvfs2_replicate_prime_sm
     {
         run io_start_flow;
         success => send_completion_ack_to_client;
-        default => release;
+        /*default => release;*/
+        default => send_completion_ack_to_client;
     }
 
     state send_completion_ack_to_client
@@ -84,7 +85,7 @@ nested machine pvfs2_contact_replicate_servers_sm
 {
     state setup_msgpairs
     {
-        run setup_msgpairs;
+        run contact_setup_msgpairs;
         default => xfer_msgpairs;
     }
 
@@ -96,7 +97,14 @@ nested machine pvfs2_contact_replicate_servers_sm
 
     state set_status
     {
-        run set_status;
+        run contact_set_status;
+        success => start_recvs_for_completion_ack;
+        default => return;
+    }
+
+    state start_recvs_for_completion_ack
+    {
+        run contact_start_recvs;
         default => return;
     }
 
@@ -223,13 +231,14 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->file_data.extend_flag = 0;
     }
 
+    gossip_lerr("file_req_offset:%lld\n",(long long int)s_op->req->u.io.file_req_offset);
     s_op->u.io.flow_d->file_req = s_op->req->u.io.file_req;
     s_op->u.io.flow_d->file_req_offset = s_op->req->u.io.file_req_offset;
     s_op->u.io.flow_d->mem_req = NULL;
     s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
     s_op->u.io.flow_d->tag = s_op->tag;
     
-    s_op->u.io.flow_d->next_tag = s_op->u.io.next_tag;
+    s_op->u.io.flow_d->next_tag = s_op->u.io.replicate_d[0].session_tag;
 
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
@@ -396,6 +405,10 @@ static PINT_sm_action io_send_completion_ack(
     
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
     
+
+    gossip_lerr("js_p->error_code:(%d)\n",js_p->error_code);
+
+
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */
@@ -446,7 +459,7 @@ static PINT_sm_action io_send_completion_ack(
     return err;
 }
 
-static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op                 = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_server_req *replicate_prime_req = s_op->req;
@@ -458,6 +471,17 @@ static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
 //RAL TODO: What if one of the replicate servers is local?
 
     js_p->error_code = 0;
+
+    /* create storage for the results of each msgpair */
+    s_op->u.io.replicate_d = calloc(io->replication_number_of_copies,
+                                    sizeof(*s_op->u.io.replicate_d));
+    if (!s_op->u.io.replicate_d)
+    {
+       gossip_lerr("Error allocating memory for replicate_d.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+    s_op->u.io.replicate_d_count = io->replication_number_of_copies;
 
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
@@ -504,7 +528,7 @@ static PINT_sm_action setup_msgpairs(struct PINT_smcb *smcb, job_status_s *js_p)
 
 
     return SM_ACTION_COMPLETE;
-}/*end setup_msgpairs*/
+}/*end contact_setup_msgpairs*/
 
 
 static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
@@ -527,11 +551,12 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     gossip_lerr("Response status (%d).\n",resp_p->status);
     gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
     
-    s_op->u.io.next_resp_status = resp_p->status;
+    s_op->u.io.replicate_d[i].resp_status = resp_p->status;
     if (resp_p->status==0)
     {
-        s_op->u.io.next_tag          = msg_p->session_tag;
-        s_op->u.io.next_bstream_size = resp_p->u.io.bstream_size;
+        s_op->u.io.replicate_d[i].session_tag  = msg_p->session_tag;
+        s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
+        s_op->u.io.replicate_d[i].svr_addr = msg_p->svr_addr;
     }
 
     resp_p->status=0;
@@ -540,23 +565,99 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
 }/*end contact_replicate_comp_fn*/
 
 
-static PINT_sm_action set_status(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
 
-    /* this will be more elaborate when multiple servers are contacted.
+    /* If one of the replicate servers is not answering, what should we do now?
+     * Use the servers that are alive?  Or, fail the entire write?
      */ 
-    if (s_op->u.io.next_resp_status == 0)
-    {
-        js_p->error_code = 0;
-    }
-    else
-    {
-        js_p->error_code = s_op->u.io.next_resp_status;
-    }
+    js_p->error_code = 0;
 
+    for (i=0; i<s_op->u.io.replicate_d_count; i++)
+    {
+        if (s_op->u.io.replicate_d[i].resp_status != 0)
+        {
+            js_p->error_code = s_op->u.io.replicate_d[i].resp_status;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+   
     return SM_ACTION_COMPLETE;
-}/*end set_status*/
+}/*end contact_set_status*/
+
+
+
+
+
+static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int max_resp_sz=0;
+    struct server_configuration_s *server_opts = get_server_config_struct();
+    struct filesystem_configuration_s *fs_config;
+    int i,ret=SM_ACTION_COMPLETE;
+
+
+    fs_config = PINT_config_find_fs_id(server_opts,s_op->target_fs_id);
+
+    max_resp_sz = PINT_encode_calc_max_size( PINT_ENCODE_RESP
+                                            ,PVFS_SERV_WRITE_COMPLETION
+                                            ,fs_config->encoding );
+
+
+    /* for each server that was contacted successfully, post a BMI RECV, which waits for an
+     * acknowledgement that the flow completed or failed.
+     */
+    for (i=0; i<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
+    {
+        s_op->u.io.replicate_d[i].encoded_resp_p = BMI_memalloc( s_op->u.io.replicate_d[i].svr_addr
+                                                                ,max_resp_sz
+                                                                ,BMI_RECV );
+        if (!s_op->u.io.replicate_d[i].encoded_resp_p)
+        {
+            gossip_lerr("Error allocating memory for encoded response.\n");
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        ret = job_bmi_recv(s_op->u.io.replicate_d[i].svr_addr,
+                           s_op->u.io.replicate_d[i].encoded_resp_p,
+                           max_resp_sz,
+                           s_op->u.io.replicate_d[i].session_tag,
+                           BMI_PRE_ALLOC,
+                           smcb,
+                           i,
+                           &s_op->u.io.replicate_d[i].recv_status,
+                           &s_op->u.io.replicate_d[i].recv_id,
+                           server_job_context,
+                           server_opts->server_job_flow_timeout,
+                           s_op->req->hints);
+        if (ret == 1 && s_op->u.io.replicate_d[i].recv_status.error_code)
+        {
+           /* error posting job */
+           js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code;
+           continue;
+        }
+        else if (ret == 1)
+        {
+           /* immediate completion in this context is an error */
+           js_p->error_code = -PVFS_EPERM; /* operation not permitted */
+           continue;
+        }
+        else if (ret != 0)
+        {
+           /* error adding job to job mgr */
+           js_p->error_code = ret;
+           continue;
+        }
+    }/*end for*/
+
+
+    return ret; 
+
+}/*end contact_start_recvs*/
+
 
 
 

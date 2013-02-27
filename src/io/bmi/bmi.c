@@ -689,6 +689,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  bmi_context_id context_id,
                   bmi_hint hints)
 {
+    gossip_err("Executing %s...\n",__func__);
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
