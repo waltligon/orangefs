@@ -2643,6 +2643,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
             gossip_lerr("total-bytes-written(%d) \tq_item->out_size(%d)\n",(int)flow_data->total_bytes_written
                                                                       ,(int)q_item->out_size);
             flow_data->total_bytes_written += result_iter->result.bytes;
+            flow_d->total_transferred += result_iter->result.bytes;
             PINT_perf_count(PINT_server_pc, 
                             PINT_PERF_WRITE,
                             result_iter->result.bytes, 
