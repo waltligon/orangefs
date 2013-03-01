@@ -515,14 +515,14 @@ struct PINT_server_getconfig_op
 
 struct replicate_descriptor
 {
+   PVFS_handle handle;
    PVFS_size bstream_size;
    PVFS_error resp_status;
    PVFS_msg_tag_t session_tag;
    PVFS_BMI_addr_t svr_addr;
    void *encoded_resp_p;
-   job_id_t recv_id;
    job_status_s recv_status;
-   PVFS_error op_status;
+   job_id_t recv_job_id;
 };
 
 typedef struct replicate_descriptor replicate_descriptor;

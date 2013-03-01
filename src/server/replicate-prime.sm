@@ -552,11 +552,12 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
     
     s_op->u.io.replicate_d[i].resp_status = resp_p->status;
+        s_op->u.io.replicate_d[i].session_tag  = msg_p->session_tag;
+        s_op->u.io.replicate_d[i].svr_addr = msg_p->svr_addr;
+    s_op->u.io.replicate_d[i].handle = msg_p->handle;
     if (resp_p->status==0)
     {
-        s_op->u.io.replicate_d[i].session_tag  = msg_p->session_tag;
         s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
-        s_op->u.io.replicate_d[i].svr_addr = msg_p->svr_addr;
     }
 
     resp_p->status=0;
@@ -570,8 +571,9 @@ static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *j
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
 
-    /* If one of the replicate servers is not answering, what should we do now?
-     * Use the servers that are alive?  Or, fail the entire write?
+    /* RAL TODO:  If one of the replicate servers is not answering, what should we do now?
+     * Use the servers that are alive?  Or, fail the entire write?  For now, we
+     * are failing the entire write.
      */ 
     js_p->error_code = 0;
 
@@ -609,6 +611,9 @@ static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *
 
     /* for each server that was contacted successfully, post a BMI RECV, which waits for an
      * acknowledgement that the flow completed or failed.
+     *
+     * RAL TODO:  if we decide to write to the servers that are available when others were not, 
+     * then we must check the resp_status; otherwise, the extra condition on the for loop is not necessary.
      */
     for (i=0; i<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
     {
@@ -627,28 +632,28 @@ static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *
                            s_op->u.io.replicate_d[i].session_tag,
                            BMI_PRE_ALLOC,
                            smcb,
-                           i,
+                           i, /*the status_user_tag will identify the replicate server in our list*/
                            &s_op->u.io.replicate_d[i].recv_status,
-                           &s_op->u.io.replicate_d[i].recv_id,
+                           &s_op->u.io.replicate_d[i].recv_job_id,
                            server_job_context,
-                           server_opts->server_job_flow_timeout,
+                           server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
                            s_op->req->hints);
         if (ret == 1 && s_op->u.io.replicate_d[i].recv_status.error_code)
         {
            /* error posting job */
            js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code;
-           continue;
+           continue;;
         }
         else if (ret == 1)
         {
-           /* immediate completion in this context is an error */
-           js_p->error_code = -PVFS_EPERM; /* operation not permitted */
+           /* immediate completion */
+           /* set something to indicate this receive has completed. */
            continue;
         }
         else if (ret != 0)
         {
            /* error adding job to job mgr */
-           js_p->error_code = ret;
+           js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code = ret;
            continue;
         }
     }/*end for*/
