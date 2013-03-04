@@ -28,13 +28,16 @@ enum flow_endpoint_type
 {
     BMI_ENDPOINT = 1,
     TROVE_ENDPOINT = 2,
-    MEM_ENDPOINT = 3
+    MEM_ENDPOINT = 3,
+    REPLICATION_ENDPOINT = 4 /*processes the same as trove-endpoint*/
 };
 
 /* describes BMI endpoints */
 struct BMI_endpoint_data
 {
     PVFS_BMI_addr_t address;
+    PVFS_msg_tag_t tag; /*used for replication operations*/    
+    int resp_status; /* used for replication operations */
 };
 
 /* describes trove interface endpoints */
@@ -103,10 +106,10 @@ struct flow_descriptor
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */
-    struct flow_endpoint next_dest; /* next destination endpoint */
+    struct flow_endpoint *next_dest; /* replication endpoint */
+    int next_dest_count; /*number of replication endpoints */
 
     PVFS_msg_tag_t tag;		/* matching session tag */
-    PVFS_msg_tag_t next_tag;      /* matching next session tag */
 
     void *user_ptr;		/* for use by caller */
     /* can be used to force use of specific flow protocol */

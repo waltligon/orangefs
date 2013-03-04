@@ -581,6 +581,8 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
 
     assert((flow_d->src.endpoint_id == BMI_ENDPOINT && 
             flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
+           (flow_d->src.endpoint_id == BMI_ENDPOINT &&
+            flow_d->dest.endpoint_id == REPLICATION_ENDPOINT) ||
            (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
             flow_d->dest.endpoint_id == BMI_ENDPOINT) ||
            (flow_d->src.endpoint_id == MEM_ENDPOINT &&
@@ -696,9 +698,8 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         }
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
-    else if(flow_d->src.endpoint_id       == BMI_ENDPOINT   &&
-            flow_d->dest.endpoint_id      == TROVE_ENDPOINT &&
-            flow_d->next_dest.endpoint_id == BMI_ENDPOINT)
+    else if(flow_d->src.endpoint_id  == BMI_ENDPOINT   &&
+            flow_d->dest.endpoint_id == REPLICATION_ENDPOINT) 
     {
          /* Create a flow that is simultaneously written thru trove and forwarded to
           * an additional bmi address.
@@ -1592,17 +1593,19 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
     int i;
     struct result_chain_entry *result_tmp;
     struct result_chain_entry *old_result_tmp;
+    flow_descriptor *flow_d = flow_data->parent;
 
-    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
+    if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
+        (flow_d->dest.endpoint_id == TROVE_ENDPOINT ||
+         flow_d->dest.endpoint_id == REPLICATION_ENDPOINT) )
     {
-        for(i=0; i<flow_data->parent->buffers_per_flow; i++)
+        for(i=0; i<flow_d->buffers_per_flow; i++)
         {
             if(flow_data->prealloc_array[i].buffer)
             {
-		    BMI_memfree(flow_data->parent->src.u.bmi.address,
+		    BMI_memfree(flow_d->src.u.bmi.address,
 				    flow_data->prealloc_array[i].buffer,
-				    flow_data->parent->buffer_size,
+				    flow_d->buffer_size,
 				    BMI_RECV);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
@@ -2709,6 +2712,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 int forwarding_is_flow_complete(struct fp_private_data* flow_data)
 {
     int is_flow_complete = 0;
+    flow_descriptor *flow_d = flow_data->parent;
     
     /* If there are no more recvs, check for completion
        else if there are recvs to go, start one if possible */
@@ -2720,12 +2724,16 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
             0 == flow_data->writes_pending)
         {
             gossip_lerr("Forwarding flow finished\n");
-            gossip_lerr("flow_data->total_bytes_recvd(%d) \ttotal_bytes_forwarded(%d)\n"
-                       ,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_forwarded);
+            gossip_lerr("flow_data->total_bytes_recvd(%d) \ttotal_bytes_forwarded(%d) \tNumber of Copies(%d) "
+                        "\tbytes_per_server(%d)\n"
+                       ,(int)flow_data->total_bytes_recvd
+                       ,(int)flow_data->total_bytes_forwarded
+                       ,(int)flow_d->next_dest_count
+                       ,(int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count);
             gossip_lerr("flow_data->total_bytes_recv(%d) \ttotal_bytes_written(%d)\n"
                        ,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_written);
             assert(flow_data->total_bytes_recvd ==
-                   flow_data->total_bytes_forwarded);
+                   ((int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count));
             assert(flow_data->total_bytes_recvd ==
                    flow_data->total_bytes_written);
             is_flow_complete = 1;
@@ -2767,7 +2775,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     gossip_err("Executing %s...\n",__func__);
     struct fp_queue_item *q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    flow_descriptor *flow_d = q_item->parent;
+    flow_descriptor *flow_d = flow_data->parent;
+    int i, ret;
 
     /* Handle errors from recv */
     if(error_code != 0 || flow_d->error_code != 0)
@@ -2777,12 +2786,14 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         return;
     }
 
-    /* Decrement recv pending count */
+    /* Decrement recv pending count; we just got one from the client */
     flow_data->recvs_pending -= 1;
+
+    /* bytes received from the client */
     flow_data->total_bytes_recvd += actual_size;
     
     /* Debug output */
-    gossip_lerr("RECV FINISHED: Total: %lld TotalRecvd: %lld Recvd: %lld AmtFwd: %lld PendingRecvs: %d "
+    gossip_lerr("RECV FINISHED: Total: %lld TotalRecvd: %lld RecvdNow: %lld AmtFwd: %lld PendingRecvs: %d "
                 "PendingFwds: %d Throttled: %d\n",
                  (long long int)flow_data->total_bytes_req,
                  (long long int)flow_data->total_bytes_recvd,
@@ -2801,10 +2812,38 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 
     /* Remove from current queue */
     qlist_del(&q_item->list_link);
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
-    /* Forward data to secondary endpoint */
-    flow_data->sends_pending += 1;
-    forwarding_bmi_send(q_item, actual_size);    
+    /* Forward data to each replicate server */
+    q_item->next_id = 0;
+    q_item->next_bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
+    q_item->next_bmi_callback.data = q_item;
+
+    for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].resp_status == 0; i++)
+    {
+        flow_data->sends_pending++;
+
+        ret = BMI_post_send( &flow_data->secondary_id
+                            ,flow_d->next_dest[i].u.bmi.address
+                            ,q_item->buffer
+                            ,actual_size
+                            ,BMI_PRE_ALLOC
+                            ,flow_d->next_dest[i].u.bmi.tag
+                            ,&q_item->secondary_bmi_callback
+                            ,global_bmi_context
+                            ,NULL );
+        if (ret < 0)
+        {
+           gossip_lerr("Error while sending to replcate servers..\n");
+           PVFS_perror("Error Code:",ret);
+           handle_forwarding_io_error(ret, q_item, flow_data);
+        }
+        else if (ret == 1)
+        {
+           forwarding_bmi_send_callback_fn(q_item, actual_size, 0);
+        }
+    }/*end for*/
+
 }/*end forwarding_bmi_recv_callback_fn*/
 
 
@@ -2905,6 +2944,8 @@ static inline void server_trove_write_callback_wrapper(void *user_ptr,
 
 
 
+/* MOVE THIS ENTIRE FUNCTION INTO forwarding_bmi_recv_callback_fn() */
+
 /**
  * Performs a bmi send on data for a forwarding flow
  *
@@ -2923,10 +2964,12 @@ static void forwarding_bmi_send(struct fp_queue_item* q_item,
     int rc = 0;
 
     /* Add qitem to dest_list */
+    /* move this to frowarding_bmi_recv_callback_fn*/
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
     /* Perform a write to secondary endpoint */
+    /* move all of this, too */
     q_item->next_id = 0;
     q_item->next_bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
     q_item->next_bmi_callback.data = q_item;
@@ -2999,13 +3042,18 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 
     /* Perform bookkeeping for data forward completion */
     flow_data->sends_pending -= 1;
+
+
+    /* after all sends have completed, this value will represent the amount of data sent
+     * times the number of copies.
+     */
     flow_data->total_bytes_forwarded += actual_size;
 
-    /* Remove this q_item from the busy list */
+    /* Remove this q_item from the dest list */
     qlist_del(&q_item->list_link);
 
     /* Debug output */
-    gossip_lerr("FWD FINISHED: Total: %lld TotalRecvd: %lld TotalAmtFwd: %lld AmtFwd: %lld PendingRecvs: %d "
+    gossip_lerr("FWD FINISHED: Total: %lld TotalRecvd: %lld TotalAmtFwd: %lld AmtFwdNow: %lld PendingRecvs: %d "
                 "PendingFwds: %d Throttled: %d\n",
                  (long long int)flow_data->total_bytes_req,
                  (long long int)flow_data->total_bytes_recvd,
@@ -3016,10 +3064,13 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                  flow_data->primary_recvs_throttled);
 
     /* Write the data to trove */
-    flow_data->writes_pending += 1;
-    flow_trove_write(q_item, actual_size,
-                     forwarding_trove_write_callback_wrapper,
-                     forwarding_trove_write_callback_fn);
+    if ( flow_data->sends_pending == 0 )
+    {
+       flow_data->writes_pending += 1;
+       flow_trove_write(q_item, actual_size,
+                        forwarding_trove_write_callback_wrapper,
+                        forwarding_trove_write_callback_fn);
+    }
     
     
     /* If there are no more recvs, check for completion

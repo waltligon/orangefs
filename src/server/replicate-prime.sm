@@ -231,6 +231,16 @@ static PINT_sm_action io_start_flow(
 
     s_op->u.io.flow_d->hints = s_op->req->hints;
 
+    s_op->u.io.flow_d.next_dest = calloc(s_op->req->u.io.replication_number_of_copies
+                                        ,sizeof(*s_op->u.io.flow_d.next_dest));
+    if (!s_op->u.io.flow_d.next_dest)
+    {
+        gossip_lerr("Error allocating memory for next_dest structures.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->u.io.flow_d.next_dest_count = s_op->req->u.io.replication_number_of_copies;
+
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
      * request
@@ -261,8 +271,6 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
     s_op->u.io.flow_d->tag = s_op->tag;
     
-    s_op->u.io.flow_d->next_tag = s_op->u.io.replicate_d[0].session_tag;
-
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
     s_op->u.io.flow_d->total_transferred = 0;
@@ -295,8 +303,13 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
         s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
 
-        s_op->u.io.flow_d->next_dest.endpoint_id   = BMI_ENDPOINT;
-        s_op->u.io.flow_d->next_dest.u.bmi.address = s_op->msgarray_op.msgarray[0].svr_addr;
+
+        for (i=0; i<s_op->u.io.flow_d->next_dest_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
+        {
+            s_op->u.io.flow_d->next_dest[i].endpoint_id   = BMI_ENDPOINT;
+            s_op->u.io.flow_d->next_dest[i].u.bmi.address = s_op->u.io.replicate_d[i].svr_addr;
+            s_op->u.io.flow_d->next_dest[i].u.bmi.tag     = s_op->u.io.replicate_d[i].tag;
+        }
 
         s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
         s_op->u.io.flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
