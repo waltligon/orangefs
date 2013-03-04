@@ -2657,9 +2657,10 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "FORWARDING-TROVE-WRITE-FINISHED: Total: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
+         "FORWARDING-TROVE-WRITE-FINISHED: Total: %lld TotalAmtWritten: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
+            (long long int)q_item->out_size,
             flow_data->writes_pending,
             flow_data->primary_recvs_throttled);
     
@@ -3081,6 +3082,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
         {
             struct result_chain_entry* re = result_iter;
             flow_data->total_bytes_written += result_iter->result.bytes;
+            flow_d->total_transferred += result_iter->result.bytes;
             PINT_perf_count(PINT_server_pc, 
                             PINT_PERF_WRITE,
                             result_iter->result.bytes, 

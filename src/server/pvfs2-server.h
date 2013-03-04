@@ -531,9 +531,11 @@ typedef struct replicate_descriptor replicate_descriptor;
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
+    int primary_flow_error_code;
+    int primary_flow_received;
+
     replicate_descriptor *replicate_d;
     int replicate_d_count;
-    int primary_flow_error_code;
 };
 
 struct PINT_server_small_io_op
