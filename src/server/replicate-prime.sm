@@ -217,7 +217,7 @@ static PINT_sm_action io_start_flow(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int err = -PVFS_EIO;
+    int i,err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
@@ -231,15 +231,15 @@ static PINT_sm_action io_start_flow(
 
     s_op->u.io.flow_d->hints = s_op->req->hints;
 
-    s_op->u.io.flow_d.next_dest = calloc(s_op->req->u.io.replication_number_of_copies
-                                        ,sizeof(*s_op->u.io.flow_d.next_dest));
-    if (!s_op->u.io.flow_d.next_dest)
+    s_op->u.io.flow_d->next_dest = calloc(s_op->req->u.io.replication_number_of_copies
+                                        ,sizeof(*s_op->u.io.flow_d->next_dest));
+    if (!s_op->u.io.flow_d->next_dest)
     {
         gossip_lerr("Error allocating memory for next_dest structures.\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    s_op->u.io.flow_d.next_dest_count = s_op->req->u.io.replication_number_of_copies;
+    s_op->u.io.flow_d->next_dest_count = s_op->req->u.io.replication_number_of_copies;
 
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
@@ -301,14 +301,15 @@ static PINT_sm_action io_start_flow(
     {
         s_op->u.io.flow_d->src.endpoint_id = BMI_ENDPOINT;
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
-        s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
+        s_op->u.io.flow_d->dest.endpoint_id = REPLICATION_ENDPOINT;
 
 
         for (i=0; i<s_op->u.io.flow_d->next_dest_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
         {
-            s_op->u.io.flow_d->next_dest[i].endpoint_id   = BMI_ENDPOINT;
-            s_op->u.io.flow_d->next_dest[i].u.bmi.address = s_op->u.io.replicate_d[i].svr_addr;
-            s_op->u.io.flow_d->next_dest[i].u.bmi.tag     = s_op->u.io.replicate_d[i].tag;
+            s_op->u.io.flow_d->next_dest[i].endpoint_id       = BMI_ENDPOINT;
+            s_op->u.io.flow_d->next_dest[i].u.bmi.address     = s_op->u.io.replicate_d[i].svr_addr;
+            s_op->u.io.flow_d->next_dest[i].u.bmi.tag         = s_op->u.io.replicate_d[i].session_tag;
+            s_op->u.io.flow_d->next_dest[i].u.bmi.resp_status = s_op->u.io.replicate_d[i].resp_status;
         }
 
         s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;

@@ -66,6 +66,7 @@ struct fp_queue_item
     int last;
     int seq;
     void *buffer;
+    int buffer_in_use; /*used by replication*/
     PVFS_size buffer_used;
     PVFS_size out_size;
     struct result_chain_entry result_chain;
@@ -157,8 +158,6 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data);
 static inline void forwarding_bmi_recv_callback_wrapper(void *user_ptr,
 							PVFS_size actual_size,
 							PVFS_error error_code);
-static void forwarding_bmi_send(struct fp_queue_item* q_item,
-                                PVFS_size actual_size);
 static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
 						 PVFS_size actual_size,
 						 PVFS_error error_code);
@@ -2618,7 +2617,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     struct result_chain_entry* result_entry = user_ptr;
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    flow_descriptor *flow_d = q_item->parent;
+    flow_descriptor *flow_d = flow_data->parent;
 
     /* Handle trove errors */
     if(error_code != 0 || flow_d->error_code != 0)
@@ -2672,7 +2671,18 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
         q_item->result_chain_count = 0;
 
         /* Remove q_item from in use list */
-        qlist_del(&q_item->list_link);
+
+        /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
+         *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
+         *       wrapper, which locks the flow-mutex and protects the use of this variable.
+         */
+
+        q_item->buffer_in_use--;
+        if (q_item->buffer_in_use == 0)
+        {
+           qlist_del(&q_item->list_link);
+           qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
+        }
 
         /* Determine if the flow is complete */
         if (forwarding_is_flow_complete(flow_data))
@@ -2686,19 +2696,16 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
         /* If there are recvs to go and stalling has occurred,
            start another recv */
-        if (!PINT_REQUEST_DONE(flow_d->file_req_state))
+        if (!PINT_REQUEST_DONE(flow_d->file_req_state) &&
+             q_item->buffer_in_use == 0)
         {
             /* Post another recv operation */
-            gossip_lerr("Starting recv from write callback.\n");
+            gossip_lerr("Starting recv from write callback. buffer_in_use(%d)\n",q_item->buffer_in_use);
             flow_data->primary_recvs_throttled -= 1;
             flow_data->recvs_pending += 1;
             flow_bmi_recv(q_item,
                           forwarding_bmi_recv_callback_wrapper,
                           forwarding_bmi_recv_callback_fn);
-        }
-        else
-        {
-            qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
         }
     }/*end if*/  
   
@@ -2810,7 +2817,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
            free(tmp);
     }
 
-    /* Remove from current queue */
+    /* Remove from current queue and add to dest_list queue*/
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
@@ -2819,17 +2826,23 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     q_item->next_bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
     q_item->next_bmi_callback.data = q_item;
 
-    for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].resp_status == 0; i++)
+    for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
     {
         flow_data->sends_pending++;
 
-        ret = BMI_post_send( &flow_data->secondary_id
+        /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
+         *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
+         *       wrapper, which locks the flow-mutex and protects the use of this variable.
+         */
+        q_item->buffer_in_use++;
+
+        ret = BMI_post_send( &q_item->next_id
                             ,flow_d->next_dest[i].u.bmi.address
                             ,q_item->buffer
                             ,actual_size
                             ,BMI_PRE_ALLOC
                             ,flow_d->next_dest[i].u.bmi.tag
-                            ,&q_item->secondary_bmi_callback
+                            ,&q_item->next_bmi_callback
                             ,global_bmi_context
                             ,NULL );
         if (ret < 0)
@@ -2844,6 +2857,18 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         }
     }/*end for*/
 
+    /* Issue write to trove */
+
+    /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
+     *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
+     *       wrapper, which locks the flow-mutex and protects the use of this variable.
+     */
+    flow_data->writes_pending += 1;
+    q_item->buffer_in_use++;
+    flow_trove_write(q_item, actual_size,
+                     forwarding_trove_write_callback_wrapper,
+                     forwarding_trove_write_callback_fn);
+ 
 }/*end forwarding_bmi_recv_callback_fn*/
 
 
@@ -2944,62 +2969,6 @@ static inline void server_trove_write_callback_wrapper(void *user_ptr,
 
 
 
-/* MOVE THIS ENTIRE FUNCTION INTO forwarding_bmi_recv_callback_fn() */
-
-/**
- * Performs a bmi send on data for a forwarding flow
- *
- * Remove q_item from current list
- * Adds q_item to dest_list
- * Sends data
- * Calls forwarding_bmi_send_callback on success
- *
- */
-static void forwarding_bmi_send(struct fp_queue_item* q_item,
-                                PVFS_size actual_size)
-{
-    gossip_err("Executing %s...\n",__func__);
-    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    flow_descriptor *flow_d = q_item->parent;
-    int rc = 0;
-
-    /* Add qitem to dest_list */
-    /* move this to frowarding_bmi_recv_callback_fn*/
-    qlist_del(&q_item->list_link);
-    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
-
-    /* Perform a write to secondary endpoint */
-    /* move all of this, too */
-    q_item->next_id = 0;
-    q_item->next_bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
-    q_item->next_bmi_callback.data = q_item;
-
-    rc = BMI_post_send(&q_item->next_id,
-                       flow_d->next_dest.u.bmi.address,
-                       q_item->buffer,
-                       actual_size,
-                       BMI_PRE_ALLOC,
-                       flow_d->next_tag,
-                       &q_item->next_bmi_callback,
-                       global_bmi_context,
-                       NULL);
-
-    /* if an error occurs, handle it
-       else if immediate completion, trigger callback */
-    if (rc < 0)
-    {
-        gossip_err("ERROR: CATASTROPHIC FAILURE while forwarding\n");
-        PVFS_perror("Error Code:", rc);
-        handle_forwarding_io_error(rc, q_item, flow_data);    
-    }
-    else if (1 == rc)
-    {
-        gossip_lerr("Calling forwarding_bmi_send_callback_fn from forwarding_bmi_send...\n");
-        forwarding_bmi_send_callback_fn(q_item, actual_size, 0);
-    }
-
-}/*end forwading_bmi_send*/
-
 static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
 						 PVFS_size actual_size,
 						 PVFS_error error_code)
@@ -3033,6 +3002,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     /* Convert data into flow descriptor */
     struct fp_queue_item* q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    flow_descriptor *flow_d = flow_data->parent;
 
     /* Error handling */
     if (0 != error_code)
@@ -3043,14 +3013,23 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     /* Perform bookkeeping for data forward completion */
     flow_data->sends_pending -= 1;
 
-
     /* after all sends have completed, this value will represent the amount of data sent
      * times the number of copies.
      */
     flow_data->total_bytes_forwarded += actual_size;
 
     /* Remove this q_item from the dest list */
-    qlist_del(&q_item->list_link);
+
+    /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
+     *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
+     *       wrapper, which locks the flow-mutex and protects the use of this variable.
+     */
+    q_item->buffer_in_use--;
+    if (q_item->buffer_in_use == 0)
+    {
+       qlist_del(&q_item->list_link);
+       qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
+    }
 
     /* Debug output */
     gossip_lerr("FWD FINISHED: Total: %lld TotalRecvd: %lld TotalAmtFwd: %lld AmtFwdNow: %lld PendingRecvs: %d "
@@ -3063,35 +3042,22 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                  flow_data->sends_pending,
                  flow_data->primary_recvs_throttled);
 
-    /* Write the data to trove */
-    if ( flow_data->sends_pending == 0 )
+
+
+    /* if there is more data to receive from the client and THIS q_item is no longer in use, then issue another 
+     * BMI recv using THIS q_item.
+     */
+    if (!PINT_REQUEST_DONE(flow_d->file_req_state) && q_item->buffer_in_use == 0)
     {
-       flow_data->writes_pending += 1;
-       flow_trove_write(q_item, actual_size,
-                        forwarding_trove_write_callback_wrapper,
-                        forwarding_trove_write_callback_fn);
+       /* Post another recv operation */
+       gossip_lerr("Starting recv from send callback. buffer_in_use(%d)\n",q_item->buffer_in_use);
+       flow_data->primary_recvs_throttled -= 1;
+       flow_data->recvs_pending += 1;
+       flow_bmi_recv(q_item,
+                     forwarding_bmi_recv_callback_wrapper,
+                      forwarding_bmi_recv_callback_fn);
     }
-    
-    
-    /* If there are no more recvs, check for completion
-       else if there are recvs to go, start one if possible */
-    /*
-    if (forwarding_is_flow_complete(flow_data))
-    {
-        assert(flow_data->parent->state != FLOW_COMPLETE);
-        flow_data->parent->state = FLOW_COMPLETE;
-    }
-    else if
-    if (!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
-        0 < flow_data->primary_recvs_throttled)
-    {
-        gossip_debug(GOSSIP_BWS_PRIMARY_DEBUG,
-                     "Starting recv from send callback.\n");
-        flow_data->primary_recvs_throttled -= 1;
-        flow_data->recvs_pending += 1;
-        forwarding_bmi_recv(q_item);
-    }
-    */
+
 }/*end forwarding_bmi_send_callback_fn*/
 
 
@@ -3106,6 +3072,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = q_item->parent;
+    int bytes_written=0;
 
     gossip_lerr("Server Write Finished\n");
 
@@ -3132,6 +3099,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
         while (0 != result_iter)
         {
             struct result_chain_entry* re = result_iter;
+            bytes_written += result_iter->result.bytes;
             flow_data->total_bytes_written += result_iter->result.bytes;
             flow_d->total_transferred += result_iter->result.bytes;
             PINT_perf_count(PINT_server_pc, 
@@ -3147,9 +3115,10 @@ static void server_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "SERVER WRITE FINISHED: Total: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
+            "SERVER WRITE FINISHED: Total: %lld TotalAmtWritten: %lld AmtWritten: %lld PendingWrites: %d Throttled: %d\n",
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
+            (long long int)bytes_written,
             flow_data->writes_pending,
             flow_data->primary_recvs_throttled);
     
