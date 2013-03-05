@@ -2112,7 +2112,7 @@ static void handle_io_error(
                 "flowproto-multiqueue canceled %d trove-bmi BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
-        else if (src == BMI_ENDPOINT && dest == TROVE_ENDPOINT)
+        else if (src == BMI_ENDPOINT && (dest == TROVE_ENDPOINT || dest == REPLICATION_ENDPOINT))
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
