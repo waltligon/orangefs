@@ -441,11 +441,18 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    int local_dirdata_index;    /* holds the index into the 
+                                   attr.dirdata_handles array for
+                                   the local dirdata handle */
+    int *remote_dirdata_index;  /* hold indices into the
+                                   attr.dirdata_handles array for
+                                   remote dirdata handles*/
+    int num_remote_dirdata_indices; /* number of remote dirdata handles */
 
     /* for dirdata rebuild */
     int saved_error_code;
     int need_rebuild_dirdata_local;
-    int local_dirdata_index;
+    int rebuild_local_dirdata_index;
     int num_rebuild_dirdata_remote;
     int *rebuild_dirdata_index_array_remote;
     PVFS_handle handle_local;
@@ -634,7 +641,7 @@ typedef struct PINT_server_op
 
     /* generic int for use by state machines that are accessing
      * PINT_server_op structs before pjumping to them. */
-    int local_index;
+    uint32_t local_index;
 
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
@@ -885,6 +892,7 @@ extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 

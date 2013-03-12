@@ -94,6 +94,7 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_CREATE_ROOT_DIR = 46,
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
+    PVFS_SERV_TREE_GETATTR = 49,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -495,14 +496,16 @@ struct PVFS_servreq_tree_remove
 {
     PVFS_fs_id  fs_id;
     PVFS_credential credential;
-    uint32_t num_data_files;
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
     PVFS_handle *handle_array;
 };
-endecode_fields_2a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_tree_remove,
     PVFS_fs_id, fs_id,
     PVFS_credential, credential,
-    uint32_t, num_data_files,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_remove \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
@@ -511,7 +514,8 @@ endecode_fields_2a_struct(
                                  __cap,                                  \
                                  __cred,                                 \
                                  __fsid,                                 \
-                                 __num_data_files,                       \
+                                 __caller_handle_index,                  \
+                                 __handle_count,                         \
                                  __handle_array,                         \
                                  __hints)                                \
 do {                                                                     \
@@ -521,9 +525,25 @@ do {                                                                     \
     (__req).capability = (__cap);                                        \
     (__req).u.tree_remove.credential = (__cred);                         \
     (__req).u.tree_remove.fs_id = (__fsid);                              \
-    (__req).u.tree_remove.num_data_files = (__num_data_files);           \
+    (__req).u.tree_remove.caller_handle_index = (__caller_handle_index); \
+    (__req).u.tree_remove.handle_count = (__handle_count);               \
     (__req).u.tree_remove.handle_array = (__handle_array);               \
 } while (0)
+
+struct PVFS_servresp_tree_remove
+{
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    int32_t *status;
+};
+endecode_fields_2a_struct(
+    PVFS_servresp_tree_remove,
+    skip4,,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    int32_t, status);
+#define extra_size_PVFS_servresp_tree_remove \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(int32_t))
 
 struct PVFS_servreq_tree_get_file_size
 {
@@ -586,6 +606,76 @@ endecode_fields_1aa_struct(
 #define extra_size_PVFS_servresp_tree_get_file_size \
   ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
+
+struct PVFS_servreq_tree_getattr
+{
+    PVFS_fs_id  fs_id;
+    uint32_t caller_handle_index;
+    uint32_t retry_msgpair_at_leaf;
+    PVFS_credential credential;
+    uint32_t attrmask;
+    uint32_t handle_count;
+    PVFS_handle *handle_array;
+};
+endecode_fields_5a_struct(
+    PVFS_servreq_tree_getattr,
+    PVFS_fs_id, fs_id,
+    uint32_t, caller_handle_index,
+    uint32_t, retry_msgpair_at_leaf,
+    PVFS_credential, credential,
+    uint32_t, attrmask,
+    uint32_t, handle_count,
+    PVFS_handle, handle_array);
+#define extra_size_PVFS_servreq_tree_getattr \
+    ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + extra_size_PVFS_credential)
+
+#define PINT_SERVREQ_TREE_GETATTR_FILL(__req,           \
+                                 __cap,                       \
+                                 __cred,                      \
+                                 __fsid,                      \
+                                 __caller_handle_index,       \
+                                 __handle_count,              \
+                                 __handle_array,              \
+                                 __amask,                     \
+                                 __retry_msgpair_at_leaf,     \
+                                 __hints)                     \
+do {                                                          \
+    memset(&(__req), 0, sizeof(__req));                       \
+    (__req).op = PVFS_SERV_TREE_GETATTR;                      \
+    (__req).hints = (__hints);                                \
+    (__req).capability = (__cap);                             \
+    (__req).u.tree_getattr.credential = (__cred);             \
+    (__req).u.tree_getattr.fs_id = (__fsid);                  \
+    (__req).u.tree_getattr.caller_handle_index =              \
+                                  (__caller_handle_index);    \
+    (__req).u.tree_getattr.handle_count =                     \
+                                  (__handle_count);           \
+    (__req).u.tree_getattr.handle_array = (__handle_array);   \
+    (__req).u.tree_getattr.attrmask = (__amask);              \
+    (__req).u.tree_getattr.retry_msgpair_at_leaf =            \
+                                  (__retry_msgpair_at_leaf);  \
+} while (0)
+
+struct PVFS_servresp_tree_getattr
+{
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    PVFS_object_attr *attr;
+    PVFS_error *error;
+};
+endecode_fields_1aa_struct(
+    PVFS_servresp_tree_getattr,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    PVFS_object_attr, attr,
+    PVFS_error, error);
+/* this is a big thing. Just use the max io req limit */
+#define extra_size_PVFS_servresp_tree_getattr \
+  (PVFS_REQ_LIMIT_IOREQ_BYTES)
+
+/*#define extra_size_PVFS_servresp_tree_getattr \
+  ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * (sizeof(PVFS_object_attr) + extra_size_PVFS_object_attr))) */
 
 /* mgmt_get_dirdata_handle */
 /* - used to retrieve the dirdata handle of the specified parent ref */
@@ -2357,6 +2447,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
+        struct PVFS_servreq_tree_getattr tree_getattr;
         struct PVFS_servreq_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servreq_tree_setattr tree_setattr;
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
@@ -2419,6 +2510,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
+        struct PVFS_servresp_tree_getattr tree_getattr;
+        struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
     } u;
