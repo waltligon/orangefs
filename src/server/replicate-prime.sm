@@ -27,7 +27,8 @@ enum
     NONE_CONTACTED_SUCCESSFULLY = 100,
     FLOWS_COMPLETED             = 200,
     PRIMARY_FLOW                = 300,
-    NEXT_FLOW                   = 400
+    NEXT_FLOW                   = 400,
+    NOT_IN_USE                  = 500
 };
 
 
@@ -221,6 +222,9 @@ static PINT_sm_action io_start_flow(
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
+
+    js_p->error_code = 0;
+    js_p->status_user_tag = NOT_IN_USE;
         
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
@@ -403,6 +407,7 @@ static PINT_sm_action io_cleanup(
         PINT_flow_free(s_op->u.io.flow_d);
     }
 
+
     /* let go of our encoded response buffer, if we appear to have
      * made one
      */
@@ -443,7 +448,8 @@ static PINT_sm_action io_send_completion_ack(
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
     
 
-    gossip_lerr("js_p->error_code:(%d)\n",js_p->error_code);
+    gossip_lerr("js_p->error_code:(%d):js_p->status_user_code(%d)\n",(int)js_p->error_code
+                                                                    ,(int)js_p->status_user_tag);
 
 
     /* we only send this trailing ack if we are working on a write
@@ -480,8 +486,7 @@ static PINT_sm_action io_send_completion_ack(
     }
 
     s_op->resp.status = s_op->u.io.primary_flow_error_code;
-    s_op->resp.u.write_completion.total_completed =
-        s_op->u.io.flow_d->total_transferred;
+    s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transferred;
 
     err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
@@ -739,7 +744,19 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
     int index, ret;
 
 
-    gossip_lerr("js_p->error_code(%d)\n",(int)js_p->error_code);
+    gossip_lerr("js_p->error_code(%d):js_p->status_user_tag(%d)\n",(int)js_p->error_code
+                                                                  ,(int)js_p->status_user_tag);
+
+    /* Did we encounter an error before flows could be started? */
+    if (js_p->status_user_tag == NOT_IN_USE)
+    {
+       if (js_p->error_code < 0)
+       {
+          s_op->u.io.primary_flow_error_code = js_p->error_code;
+          js_p->error_code = FLOWS_COMPLETED;
+          return SM_ACTION_COMPLETE;
+       }
+    }
 
     /* Which job just finished? */
     if (js_p->status_user_tag == PRIMARY_FLOW)

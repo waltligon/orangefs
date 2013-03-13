@@ -276,7 +276,7 @@ flow_descriptor *PINT_flow_alloc(void)
 {
     flow_descriptor *tmp_desc = NULL;
 
-    tmp_desc = (flow_descriptor *)malloc(sizeof(struct flow_descriptor));
+    tmp_desc = (flow_descriptor *)calloc(1,sizeof(struct flow_descriptor));
     if (tmp_desc)
     {
         gen_mutex_init(&tmp_desc->flow_mutex);

@@ -1579,13 +1579,14 @@ static int dbpf_dspace_cancel(
 
         if(bstream_method_table[method_id]->bstream_cancel)
         {
+            gossip_lerr("Calling bstream_method_table[%d]->bstream_cancel...\n",method_id);
             return bstream_method_table[method_id]->bstream_cancel(
                 coll_id, id, context_id);
         }
         else
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "Trove cancellation is not supported for this operation type; ignoring.\n");
-            return(0);
+            gossip_lerr("GOSSIP_TROVE_DEBUG, Trove cancellation is not supported for this operation type; ignoring.\n");
+            return(-TROVE_EOPNOTSUPP);
 
         }
     }
