@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <sys/epoll.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "socket-collection-epoll.h"
 #include "bmi-method-support.h"

@@ -7,6 +7,7 @@
 #ifndef __TCACHE_H
 #define __TCACHE_H
 
+#include "pvfs2-internal.h"
 #ifndef WIN32
 #include <sys/time.h>
 #else

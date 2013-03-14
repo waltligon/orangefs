@@ -4,8 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include "posix-ops.h"
-
 /** \file
  *  \ingroup usrint
  *
@@ -14,13 +12,19 @@
 #ifndef OPENFILE_UTIL_H
 #define OPENFILE_UTIL_H 1
 
+#include "pvfs2-internal.h"
+#include "posix-ops.h"
+
+/* used in stio.c and openfile-util.c */
+#define _P_IO_MAGIC 0xF0BD0000
+
 //Define success and error return values
 #define PVFS_FD_SUCCESS 0
 #define PVFS_FD_FAILURE -1
 
 int pvfs_ucache_enabled(void);
 
-extern int pvfs_sys_init(void); 
+extern int pvfs_sys_init(void) GCC_CONSTRUCTOR(1003); 
 
 extern void pvfs_debug(char *fmt, ...); 
 
@@ -43,7 +47,7 @@ extern pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops,
 
 extern pvfs_descriptor *pvfs_find_descriptor(int fd);
 
-extern int pvfs_dup_descriptor(int oldfd, int newfd);
+extern int pvfs_dup_descriptor(int oldfd, int newfd, int flags, int fcntl_dup);
 
 extern int pvfs_free_descriptor(int fd);
 

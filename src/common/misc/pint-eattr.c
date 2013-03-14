@@ -4,17 +4,18 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "endecode-funcs.h"
 #include "pvfs2.h"
 #include "pint-eattr.h"
 #include "pvfs2-req-proto.h"
-#include "pvfs2-internal.h"
 
 #define PVFS_EATTR_SYSTEM_NS "system.pvfs2."
 

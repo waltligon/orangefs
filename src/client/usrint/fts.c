@@ -40,6 +40,7 @@ static char sccsid[] = "@(#)fts.c	8.6 (Berkeley) 8/14/94";
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "pvfs2-internal.h"
 
 
 /* Largest alignment size needed, minus one.

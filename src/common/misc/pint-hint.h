@@ -14,6 +14,7 @@
 
 #define PINT_HINT_TRANSFER 0x01
 
+#include "pvfs2-internal.h"
 #include "pvfs2-hint.h"
 
 enum PINT_hint_type

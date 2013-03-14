@@ -9,7 +9,9 @@
  *
  *  PVFS2 user interface routines - routines to manage open files
  */
+/* This prevents headers from defining sys calls as macros */
 #define USRINT_SOURCE 1
+
 #include "usrint.h"
 #include <sys/syscall.h>
 #ifndef SYS_readdir
@@ -52,7 +54,7 @@ static char rstate[256];  /* used for random number generation */
 
 posix_ops glibc_ops;
 
-pvfs_descriptor_status pvfs_stdin_status =
+static pvfs_descriptor_status pvfs_stdin_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
@@ -66,7 +68,7 @@ pvfs_descriptor_status pvfs_stdin_status =
     .fent = NULL
 };
 
-pvfs_descriptor pvfs_stdin =
+static pvfs_descriptor pvfs_stdin =
 {
     .is_in_use = PVFS_FS,
     .fd = 0,
@@ -74,8 +76,42 @@ pvfs_descriptor pvfs_stdin =
     .fdflags = 0,
     .s = &pvfs_stdin_status
 };
+#if 0
+#if PVFS_STDIO_REDEFSTREAM
+static char pvfs_stdin_buffer[PVFS_BUFSIZE];
+static FILE pvfs_stdin_stream =
+{
+    ._flags = _P_IO_MAGIC | _IO_NO_WRITES | _IO_USER_BUF,
+    ._IO_read_ptr = pvfs_stdin_buffer,
+    ._IO_read_end = pvfs_stdin_buffer,
+    ._IO_read_base = pvfs_stdin_buffer,
+    ._IO_write_ptr = pvfs_stdin_buffer,
+    ._IO_write_end = pvfs_stdin_buffer + PVFS_BUFSIZE,
+    ._IO_write_base = pvfs_stdin_buffer,
+    ._IO_buf_base = pvfs_stdin_buffer,
+    ._IO_buf_end = pvfs_stdin_buffer + PVFS_BUFSIZE,
+    ._IO_save_base = NULL,
+    ._IO_backup_base = NULL,
+    ._IO_save_end = NULL,
+    ._markers = NULL,
+    ._chain = NULL,
+    ._fileno = STDIN_FILENO,
+    ._flags2 = 0,
+    ._old_offset = 0,
+#ifdef __HAVE_COLUMN
+    ._cur_column = 0,
+#endif
+    ._vtable_offset = 0,
+    ._shortbuf = {0} /* comma is on the next line */
+#ifdef _IO_MTSAFE_IO
+    , ._lock = NULL
+#endif
+};
+FILE *stdin = &pvfs_stdin_stream;
+#endif
+#endif
 
-pvfs_descriptor_status pvfs_stdout_status =
+static pvfs_descriptor_status pvfs_stdout_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
@@ -89,7 +125,7 @@ pvfs_descriptor_status pvfs_stdout_status =
     .fent = NULL
 };
 
-pvfs_descriptor pvfs_stdout =
+static pvfs_descriptor pvfs_stdout =
 {
     .is_in_use = PVFS_FS,
     .fd = 1,
@@ -98,7 +134,42 @@ pvfs_descriptor pvfs_stdout =
     .s = &pvfs_stdout_status
 };
 
-pvfs_descriptor_status pvfs_stderr_status =
+#if 0
+#if PVFS_STDIO_REDEFSTREAM
+static char pvfs_stdout_buffer[PVFS_BUFSIZE];
+static FILE pvfs_stdout_stream =
+{
+    ._flags = _P_IO_MAGIC | _IO_NO_READS | _IO_CURRENTLY_PUTTING | _IO_USER_BUF,
+    ._IO_read_ptr = pvfs_stdout_buffer,
+    ._IO_read_end = pvfs_stdout_buffer,
+    ._IO_read_base = pvfs_stdout_buffer,
+    ._IO_write_ptr = pvfs_stdout_buffer,
+    ._IO_write_end = pvfs_stdout_buffer + PVFS_BUFSIZE,
+    ._IO_write_base = pvfs_stdout_buffer,
+    ._IO_buf_base = pvfs_stdout_buffer,
+    ._IO_buf_end = pvfs_stdout_buffer + PVFS_BUFSIZE,
+    ._IO_save_base = NULL,
+    ._IO_backup_base = NULL,
+    ._IO_save_end = NULL,
+    ._markers = NULL,
+    ._chain = NULL,
+    ._fileno = STDOUT_FILENO,
+    ._flags2 = 0,
+    ._old_offset = 0,
+#ifdef __HAVE_COLUMN
+    ._cur_column = 0,
+#endif
+    ._vtable_offset = 0,
+    ._shortbuf = {0} /* comma is on the next line */
+#ifdef _IO_MTSAFE_IO
+    , ._lock = NULL
+#endif
+};
+FILE *stdout = &pvfs_stdout_stream;
+#endif
+#endif
+
+static pvfs_descriptor_status pvfs_stderr_status =
 {
     .dup_cnt = 1,
     .fsops = &glibc_ops,
@@ -112,7 +183,7 @@ pvfs_descriptor_status pvfs_stderr_status =
     .fent = NULL
 };
 
-pvfs_descriptor pvfs_stderr =
+static pvfs_descriptor pvfs_stderr =
 {
     .is_in_use = PVFS_FS,
     .fd = 2,
@@ -120,6 +191,41 @@ pvfs_descriptor pvfs_stderr =
     .fdflags = 0,
     .s = &pvfs_stderr_status
 };
+
+#if 0
+#if PVFS_STDIO_REDEFSTREAM
+static char pvfs_stderr_buffer[PVFS_BUFSIZE];
+static FILE pvfs_stderr_stream =
+{
+    ._flags = _P_IO_MAGIC | _IO_NO_READS | _IO_CURRENTLY_PUTTING | _IO_USER_BUF,
+    ._IO_read_ptr = pvfs_stderr_buffer,
+    ._IO_read_end = pvfs_stderr_buffer,
+    ._IO_read_base = pvfs_stderr_buffer,
+    ._IO_write_ptr = pvfs_stderr_buffer,
+    ._IO_write_end = pvfs_stderr_buffer + PVFS_BUFSIZE,
+    ._IO_write_base = pvfs_stderr_buffer,
+    ._IO_buf_base = pvfs_stderr_buffer,
+    ._IO_buf_end = pvfs_stderr_buffer + PVFS_BUFSIZE,
+    ._IO_save_base = NULL,
+    ._IO_backup_base = NULL,
+    ._IO_save_end = NULL,
+    ._markers = NULL,
+    ._chain = NULL,
+    ._fileno = STDERR_FILENO,
+    ._flags2 = 0,
+    ._old_offset = 0,
+#ifdef __HAVE_COLUMN
+    ._cur_column = 0,
+#endif
+    ._vtable_offset = 0,
+    ._shortbuf = {0} /* comma is on the next line */
+#ifdef _IO_MTSAFE_IO
+    , ._lock = NULL
+#endif
+};
+FILE *stderr = &pvfs_stderr_stream;
+#endif
+#endif
 
 static int my_glibc_stat(const char *path, struct stat *buf)
 {
@@ -236,6 +342,7 @@ void load_glibc(void)
     glibc_ops.pwrite64 = dlsym(libc_handle, "pwrite64");
     glibc_ops.lseek = dlsym(libc_handle, "lseek");
     glibc_ops.lseek64 = dlsym(libc_handle, "lseek64");
+    glibc_ops.perror = dlsym(libc_handle, "perror");
     glibc_ops.truncate = dlsym(libc_handle, "truncate");
     glibc_ops.truncate64 = dlsym(libc_handle, "truncate64");
     glibc_ops.ftruncate = dlsym(libc_handle, "ftruncate");
@@ -264,6 +371,7 @@ void load_glibc(void)
     glibc_ops.futimes = dlsym(libc_handle, "futimes");
     glibc_ops.dup = dlsym(libc_handle, "dup");
     glibc_ops.dup2 = dlsym(libc_handle, "dup2");
+    glibc_ops.dup3 = dlsym(libc_handle, "dup3");
     glibc_ops.chown = dlsym(libc_handle, "chown");
     glibc_ops.fchown = dlsym(libc_handle, "fchown");
     glibc_ops.fchownat = dlsym(libc_handle, "fchownat");
@@ -421,7 +529,7 @@ int pvfs_ucache_enabled(void)
 }
 #endif
 
-void pvfs_sys_init_doit(void);
+void static pvfs_sys_init_doit(void);
 
 int pvfs_sys_init(void)
 {
@@ -435,7 +543,9 @@ int pvfs_sys_init(void)
     static pthread_mutex_t rec_mutex;
 
     if(pvfs_lib_init_flag)
+    {
         return 0;
+    }
 
     if(!pvfs_lib_lock_initialized)
     {
@@ -465,8 +575,8 @@ int pvfs_sys_init(void)
 
     //Perform Init
     pvfs_sys_init_doit();
-    pvfs_initializing_flag = 0;
     pvfs_lib_init_flag = 1;
+    pvfs_initializing_flag = 0;
     pthread_mutex_unlock(&rec_mutex);
     return 0;
 }
@@ -474,11 +584,13 @@ int pvfs_sys_init(void)
 /* 
  * Perform PVFS initialization tasks
  */
-void pvfs_sys_init_doit(void) {
+void static pvfs_sys_init_doit(void) {
     struct rlimit rl; 
 	int rc __attribute__((unused));
 
+
     /* this allows system calls to run */
+    /* init_glibc_malloc(); */
     load_glibc();
     PINT_initrand();
 
@@ -488,28 +600,39 @@ void pvfs_sys_init_doit(void) {
     /* set up current working dir */
     pvfs_cwd_init(0); /* do not expand */
 
-	rc = getrlimit(RLIMIT_NOFILE, &rl); 
+	getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
-
+    if (rl.rlim_max == RLIM_INFINITY)
+    {
+	    descriptor_table_size = PVFS_NOFILE_MAX;
+    }
+    else
+    {
+	    descriptor_table_size = rl.rlim_max;
+    }
     /* set up descriptor table */
-	descriptor_table_size = rl.rlim_max;
 	descriptor_table =
 			(pvfs_descriptor **)malloc(sizeof(pvfs_descriptor *) *
 			descriptor_table_size);
     if (!descriptor_table)
     {
-        perror("failed to malloc descriptor table");
+        glibc_ops.perror("failed to malloc descriptor table");
         exit(-1);
     }
-	memset(descriptor_table, 0,
-			(sizeof(pvfs_descriptor *) * descriptor_table_size));
-    descriptor_table[0] = &pvfs_stdin;
+    /* handled by PINT_malloc */
+#if 0
+	memset(descriptor_table,
+           0,
+		   (sizeof(pvfs_descriptor *) * descriptor_table_size));
+#endif
+    /* init stdio descriptors */
+    descriptor_table[STDIN_FILENO] = &pvfs_stdin;
     gen_mutex_init(&pvfs_stdin.lock);
     gen_mutex_init(&pvfs_stdin.s->lock);
-    descriptor_table[1] = &pvfs_stdout;
+    descriptor_table[STDOUT_FILENO] = &pvfs_stdout;
     gen_mutex_init(&pvfs_stdout.lock);
     gen_mutex_init(&pvfs_stdin.s->lock);
-    descriptor_table[2] = &pvfs_stderr;
+    descriptor_table[STDERR_FILENO] = &pvfs_stderr;
     gen_mutex_init(&pvfs_stderr.lock);
     gen_mutex_init(&pvfs_stdin.s->lock);
     descriptor_table_count = PREALLOC;
@@ -521,7 +644,7 @@ void pvfs_sys_init_doit(void) {
     logfile = glibc_ops.open(logfilepath, O_RDWR|O_CREAT, 0600);
     if (logfile < 0)
     {
-        perror("failed in pvfs_sys_init");
+        glibc_ops.perror("failed in pvfs_sys_init");
         exit(-1);
     }
 
@@ -551,9 +674,8 @@ void pvfs_sys_init_doit(void) {
     /* ucache initialization - assumes shared memory previously 
      * aquired (using ucache daemon) 
      */
-    int rc1;
-    rc1 = ucache_initialize();
-    if (rc1 < 0)
+    rc = ucache_initialize();
+    if (rc < 0)
     {
         /* ucache failed to initialize, so continue without it */
         /* Write a warning message in the ucache.log letting programmer know */
@@ -570,6 +692,9 @@ void pvfs_sys_init_doit(void) {
    /* initialize aio interface */
    aiocommon_init();
 #endif
+
+    /* init must happen before trying to debug print */
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_sys_init running\n");
 }
 
 int pvfs_descriptor_table_size(void)
@@ -610,8 +735,9 @@ int pvfs_descriptor_table_next(int start)
     /* fd setup section */
     static gen_mutex_t lock = GEN_MUTEX_INITIALIZER;
 
-    pvfs_sys_init();
-    debug("pvfs_alloc_descriptor called with %d\n", fd);
+    PVFS_INIT(pvfs_sys_init);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_alloc_descriptor called with %d\n", fd);
     if (fsops == NULL)
     {
         errno = EINVAL;
@@ -721,23 +847,33 @@ int pvfs_descriptor_table_next(int start)
 #endif /* PVFS_UCACHE_ENABLE */
 
     /* NEW PD IS STILL LOCKED */
-    debug("\tpvfs_alloc_descriptor returns with %d\n", pd->fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "\tpvfs_alloc_descriptor returns with %d\n", pd->fd);
     return pd;
 }
 
 /*
- * Function for duplicating a descriptor - used in dup and dup2 calls
+ * Function for duplicating a descriptor
+ * used in dup, dup2, dup3, and fcntl calls
  */
-int pvfs_dup_descriptor(int oldfd, int newfd)
+int pvfs_dup_descriptor(int oldfd, int newfd, int flags, int fcntl_dup)
 {
     int rc = 0;
     pvfs_descriptor *pd;
 
-    debug("pvfs_dup_descriptor: called with %d\n", oldfd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_dup_descriptor: called with %d\n", oldfd);
     pvfs_sys_init();
-    if (oldfd < 0 || oldfd >= descriptor_table_size)
+    if (oldfd < 0 || oldfd >= descriptor_table_size ||
+        !descriptor_table[oldfd] ||
+        descriptor_table[oldfd]->is_in_use != PVFS_FS)
     {
         errno = EBADF;
+        return -1;
+    }
+    if (newfd < 0 || newfd >= descriptor_table_size)
+    {
+        errno = EINVAL;
         return -1;
     }
     if (newfd == -1) /* dup */
@@ -745,43 +881,68 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
         newfd = glibc_ops.dup(logfile);
         if (newfd < 0)
         {
-            debug("\npvfs_dup_descriptor: returns with %d\n", newfd);
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "\npvfs_dup_descriptor: returns with %d\n", newfd);
             return newfd;
         }
     }
-    else /* dup2 */
+    else /* dup2, dup3, or fcntl */
     {
         /* see if requested fd is in use */
-        if (descriptor_table[newfd] != NULL)
+        if (descriptor_table[newfd] != NULL ||
+            glibc_ops.fcntl(newfd, F_GETFL) < 0)
         {
             /* check for special case */
             if (newfd == oldfd)
             {
-                debug("\tpvfs_dup_descriptor: returns with %d\n", oldfd);
-                return oldfd;
+                gossip_debug(GOSSIP_USRINT_DEBUG,
+                             "\tpvfs_dup_descriptor: returns with %d\n", oldfd);
+                return newfd;
             }
-            /* close old file in new slot */
-            rc = pvfs_free_descriptor(newfd);
-            if (rc < 0)
+            if (fcntl_dup) /* this is fcntl */
             {
-                debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
-                return rc;
+                /* find smallest available fd >= newfd */
+                newfd++; /* we know original newfd is in use */
+                while (descriptor_table[newfd] ||
+                       glibc_ops.fcntl(newfd, F_GETFL) < 0)
+                {
+                    newfd++;
+                    if (newfd >= descriptor_table_size)
+                    {
+                        /* ran out of valid fds */
+                        errno = EMFILE;
+                        return -1;
+                    }
+                }
+            }
+            else /* this is dup2 or dup3 */
+            {
+                /* close old file in new slot */
+                rc = pvfs_free_descriptor(newfd);
+                if (rc < 0)
+                {
+                    gossip_debug(GOSSIP_USRINT_DEBUG,
+                                "\tpvfs_dup_descriptor: returns with %d\n", rc);
+                    return rc;
+                }
             }
         }
-        /* continuing with dup2 */
+        /* continuing with dup2, dup2, or fcntl */
         rc = glibc_ops.dup2(oldfd, newfd);
         if (rc < 0)
         {
-            debug("\tpvfs_dup_descriptor: returns with %d\n", rc);
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "\tpvfs_dup_descriptor: returns with %d\n", rc);
             return rc;
         }
     }
-    /* new set up new pvfs_descfriptor */
+    /* new set up new pvfs_descriptor */
 	descriptor_table_count++;
     pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
     if (!pd)
     {
-        debug("\tpvfs_dup_descriptor: returns with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_dup_descriptor: returns with %d\n", -1);
         return -1;
     }
     memset(pd, 0, sizeof(pvfs_descriptor));
@@ -792,14 +953,15 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
 	pd->is_in_use = PVFS_FS;
 	pd->fd = newfd;
 	pd->true_fd = newfd;
-	pd->fdflags = 0;
+	pd->fdflags = flags;
     /* share the pvfs_desdriptor_status info */
     pd->s = descriptor_table[oldfd]->s;
     gen_mutex_lock(&pd->s->lock);
     pd->s->dup_cnt++;
     gen_mutex_unlock(&pd->s->lock);
     gen_mutex_unlock(&pd->lock);
-    debug("\tpvfs_dup_descriptor: returns with %d\n", newfd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "\tpvfs_dup_descriptor: returns with %d\n", newfd);
     return newfd;
 }
 
@@ -841,7 +1003,8 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
         gen_mutex_init(&pd->lock);
         gen_mutex_lock(&pd->lock);
         descriptor_table[fd] = pd;
-        debug("pvfs_find_descriptor: implicit alloc of descriptor %d\n", fd);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+              "pvfs_find_descriptor: implicit alloc of descriptor %d\n", fd);
 
         pd->s =
              (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
@@ -918,12 +1081,14 @@ int pvfs_free_descriptor(int fd)
 {
     int dup_cnt;
     pvfs_descriptor *pd = NULL;
-    debug("pvfs_free_descriptor called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_free_descriptor called with %d\n", fd);
 
     pd = pvfs_find_descriptor(fd);
     if (pd == NULL)
     {
-        debug("\tpvfs_free_descriptor returns %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_free_descriptor returns %d\n", -1);
         return -1;
     }
 
@@ -952,7 +1117,8 @@ int pvfs_free_descriptor(int fd)
             rc = ucache_close_file(pd->s->fent);
             if(rc == -1)
             {
-                debug("\tpvfs_free_descriptor returns %d\n", rc);
+                gossip_debug(GOSSIP_USRINT_DEBUG,
+                             "\tpvfs_free_descriptor returns %d\n", rc);
                 return rc;
             }
         }
@@ -975,7 +1141,7 @@ int pvfs_free_descriptor(int fd)
 	    free(pd);
     }
 
-    debug("\tpvfs_free_descriptor returns %d\n", 0);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_free_descriptor returns %d\n", 0);
 	return 0;
 }
 

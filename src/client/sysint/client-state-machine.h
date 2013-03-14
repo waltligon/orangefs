@@ -15,6 +15,7 @@
   NOTE: state-machine.h is included at the bottom so we can define all
   the client-sm structures before it's included
 */
+#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"

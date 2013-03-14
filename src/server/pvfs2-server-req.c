@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 #include "assert.h"
 
 /* server operation state machines */

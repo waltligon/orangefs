@@ -22,6 +22,7 @@
 
 #include "bmi-method-support.h"
 #include "op-list.h"
+#include "pvfs2-internal.h"
 #include "gossip.h"
 
 

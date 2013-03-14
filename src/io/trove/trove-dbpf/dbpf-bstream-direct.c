@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "trove.h"
@@ -28,7 +29,7 @@
 #include "dbpf-attr-cache.h"
 #include "dbpf-bstream.h"
 #include "dbpf-sync.h"
-#include "pint-mem.h"
+/* #include "pint-mem.h" obsolete */
 #include "pint-mgmt.h"
 #include "pint-context.h"
 #include "pint-op.h"
@@ -459,7 +460,8 @@ static size_t direct_write(int fd,
                  llu(write_offset),
                  llu(stream_size));
 
-    aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE);
+    /* aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE); */
+    posix_memalign(&aligned_buf, BLOCK_SIZE, aligned_size);
     if(!aligned_buf)
     {
         return -ENOMEM;
@@ -482,7 +484,8 @@ static size_t direct_write(int fd,
                 gossip_err(
                     "direct_memcpy_write: RMW failed at "
                     "beginning of request\n");
-                PINT_mem_aligned_free(aligned_buf);
+                /* PINT_mem_aligned_free(aligned_buf); */
+                free(aligned_buf);
 
                 return -trove_errno_to_trove_error(pread_errno);
             }
@@ -512,7 +515,8 @@ static size_t direct_write(int fd,
                 int pread_errno = errno;
                 gossip_err(
                     "direct_memcpy_write: RMW failed at end of request\n");
-                PINT_mem_aligned_free(aligned_buf);
+                /* PINT_mem_aligned_free(aligned_buf); */
+                free(aligned_buf);
 
                 return -trove_errno_to_trove_error(pread_errno);
             }
@@ -533,7 +537,8 @@ static size_t direct_write(int fd,
     ret = direct_aligned_write(fd, aligned_buf, 0,
                                 aligned_size, aligned_offset, stream_size);
 
-    PINT_mem_aligned_free(aligned_buf);
+    /* PINT_mem_aligned_free(aligned_buf); */
+    free(aligned_buf);
 
     return (ret < 0) ? ret : size;
 }
@@ -675,7 +680,8 @@ static size_t direct_read(int fd,
                                    file_offset, stream_size);
     }
 
-    aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE);
+    /* aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE); */
+    posix_memalign(&aligned_buf, BLOCK_SIZE, aligned_size);
     if(!aligned_buf)
     {
         return -ENOMEM;
@@ -685,7 +691,8 @@ static size_t direct_read(int fd,
                                aligned_offset, stream_size);
     if(ret < 0)
     {
-        PINT_mem_aligned_free(aligned_buf);
+        /* PINT_mem_aligned_free(aligned_buf); */
+        free(aligned_buf);
 
         return ret;
     }
@@ -694,7 +701,8 @@ static size_t direct_read(int fd,
            ((char *)aligned_buf) + (file_offset - aligned_offset),
            read_size);
 
-    PINT_mem_aligned_free(aligned_buf);
+    /* PINT_mem_aligned_free(aligned_buf); */
+    free(aligned_buf);
 
     return ret;
 }

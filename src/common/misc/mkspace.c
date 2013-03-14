@@ -13,6 +13,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2-attr.h"
 #include "trove.h"
 #include "mkspace.h"
@@ -22,7 +23,6 @@
 #include "str-utils.h"
 #include "extent-utils.h"
 #include "pvfs2-util.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
 

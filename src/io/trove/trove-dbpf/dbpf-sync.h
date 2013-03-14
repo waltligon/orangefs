@@ -3,6 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
+#include "pvfs2-internal.h"
 
 #include "dbpf-op-queue.h"
 #include "gossip.h"

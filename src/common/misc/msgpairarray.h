@@ -7,6 +7,7 @@
 #ifndef __MSGPAIRARRAY_H
 #define __MSGPAIRARRAY_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
 #include "PINT-reqproto-encode.h"

@@ -4,7 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-#include <pvfs2-config.h>
+/* need this for #ifdefs below */
+#include "pvfs2-config.h"
+
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -21,6 +23,7 @@
 #include <openssl/sha.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
@@ -30,7 +33,6 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
 
 /* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX

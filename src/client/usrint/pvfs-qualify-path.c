@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs-path.h"
 
 

@@ -54,12 +54,12 @@ int pvfs_open(const char *path, int flags, ...)
     PVFS_hint hints;
     char *newpath;
     pvfs_descriptor *pd;
-    debug("pvfs_open: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_open: called with %s\n", path);
 
     if (!path)
     {
         errno = EINVAL;
-        debug("\tpvfs_open: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -77,7 +77,7 @@ int pvfs_open(const char *path, int flags, ...)
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
-        debug("\tpvfs_open: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     pd = iocommon_open(newpath, flags, hints, mode, NULL);
@@ -88,12 +88,13 @@ int pvfs_open(const char *path, int flags, ...)
     }
     if (!pd)
     {
-        debug("\tpvfs_open: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_open: return with %d\n", -1);
         return -1;
     }
     else
     {
-        debug("\tpvfs_open: return with %d\n", pd->fd);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_open: return with %d\n", pd->fd);
         return pd->fd;
     }
 }
@@ -107,11 +108,12 @@ int pvfs_open64(const char *path, int flags, ...)
     int mode;
     PVFS_hint hints __attribute__((unused));
 
-    debug("pvfs_open64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_open64: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
-        debug("\tpvfs_open64: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_open64: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -146,11 +148,12 @@ int pvfs_openat(int dirfd, const char *path, int flags, ...)
     PVFS_hint hints;
     pvfs_descriptor *dpd, *fpd;
 
-    debug("pvfs_openat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_openat: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
-        debug("\tpvfs_openat: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_openat: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -180,19 +183,22 @@ int pvfs_openat(int dirfd, const char *path, int flags, ...)
         if (dirfd < 0)
         {
             errno = EBADF;
-            debug("\tpvfs_openat: return with %d\n", -1);
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         dpd = pvfs_find_descriptor(dirfd);
         if (!dpd)
         {
-            debug("\tpvfs_openat: return with %d\n", -1);
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         fpd = iocommon_open(path, flags, hints, mode, dpd);
         if (!fpd)
         {
-            debug("\tpvfs_openat: return with %d\n", -1);
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "\tpvfs_openat: return with %d\n", -1);
             return -1;
         }
         return fpd->fd;
@@ -208,11 +214,12 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
     int mode;
     PVFS_hint hints __attribute__((unused));
 
-    debug("pvfs_openat64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_openat64: called with %s\n", path);
     if (dirfd < 0)
     {
         errno = EBADF;
-        debug("\tpvfs_openat64: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_openat64: return with %d\n", -1);
         return -1;
     }
     va_start(ap, flags);
@@ -242,7 +249,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
  */
 int pvfs_creat(const char *path, mode_t mode, ...)
 {
-    debug("pvfs_creat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_creat: called with %s\n", path);
     return pvfs_open(path, O_RDWR | O_CREAT | O_EXCL, mode);
 }
 
@@ -251,7 +258,7 @@ int pvfs_creat(const char *path, mode_t mode, ...)
  */
 int pvfs_creat64(const char *path, mode_t mode, ...)
 {
-    debug("pvfs_creat64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_creat64: called with %s\n", path);
     return pvfs_open64(path, O_RDWR | O_CREAT | O_EXCL, mode);
 }
 
@@ -263,11 +270,12 @@ int pvfs_unlink(const char *path)
     int rc = 0;
     char *newpath;
 
-    debug("pvfs_unlink: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_unlink: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
-        debug("\tpvfs_unlink: return with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tpvfs_unlink: return with %d\n", -1);
         return -1;
     }
     rc = iocommon_unlink(path, NULL);
@@ -276,7 +284,7 @@ int pvfs_unlink(const char *path)
         /* This should only happen if path was not a PVFS_path */
         PVFS_free_expanded(newpath);
     }
-    debug("\tpvfs_unlink: return with %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_unlink: return with %d\n", rc);
     return rc;
 }
 
@@ -288,7 +296,7 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
     int rc;
     pvfs_descriptor *pd;
 
-    debug("pvfs_unlinkat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_unlinkat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
         rc = iocommon_unlink(path, NULL);
@@ -315,7 +323,7 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
             rc = iocommon_unlink(path, &pd->s->pvfs_ref);
         }
     }
-    debug("\tpvfs_unlinkat: return with %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "\tpvfs_unlinkat: return with %d\n", rc);
     return rc;
 }
 
@@ -327,7 +335,7 @@ int pvfs_rename(const char *oldpath, const char *newpath)
     int rc;
     char *absoldpath, *absnewpath;
 
-    debug("pvfs_rename: called with %s\n", oldpath);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_rename: called with %s\n", oldpath);
     absoldpath = PVFS_qualify_path(oldpath);
     if (!absoldpath)
     {
@@ -365,7 +373,8 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     PVFS_object_ref *olddirref, *newdirref;
     char *absoldpath, *absnewpath;
 
-    debug("pvfs_renameat: called with %s\n", oldpath);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_renameat: called with %s\n", oldpath);
     if (!oldpath || !newpath)
     {
         errno = EINVAL;
@@ -442,7 +451,7 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
 {
     int rc;
 
-    debug("pvfs_read: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_read: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -469,7 +478,7 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
  */
 ssize_t pvfs_pread(int fd, void *buf, size_t count, off_t offset)
 {
-    debug("pvfs_pread: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_pread: called with %d\n", fd);
     return pvfs_prdwr64(fd, buf, count, (off64_t) offset, PVFS_IO_READ);
 }
 
@@ -478,7 +487,7 @@ ssize_t pvfs_pread(int fd, void *buf, size_t count, off_t offset)
  */
 ssize_t pvfs_readv(int fd, const struct iovec *vector, int count)
 {
-    debug("pvfs_readv: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_readv: called with %d\n", fd);
     return pvfs_rdwrv(fd, vector, count, PVFS_IO_READ);
 }
 
@@ -487,7 +496,7 @@ ssize_t pvfs_readv(int fd, const struct iovec *vector, int count)
  */
 ssize_t pvfs_pread64( int fd, void *buf, size_t count, off64_t offset )
 {
-    debug("pvfs_pread64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_pread64: called with %d\n", fd);
     return pvfs_prdwr64(fd, buf, count, offset, PVFS_IO_READ);
 }
 
@@ -499,7 +508,7 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
     int rc;
     off64_t offset;
 
-    debug("pvfs_write: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_write: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -537,7 +546,7 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
  */
 ssize_t pvfs_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
-    debug("pvfs_pwrite: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_pwrite: called with %d\n", fd);
     return pvfs_prdwr64(fd, (void *)buf, count, (off64_t)offset, PVFS_IO_WRITE);
 }
 
@@ -546,7 +555,7 @@ ssize_t pvfs_pwrite(int fd, const void *buf, size_t count, off_t offset)
  */
 ssize_t pvfs_writev(int fd, const struct iovec *vector, int count)
 {
-    debug("pvfs_writev: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_writev: called with %d\n", fd);
     return pvfs_rdwrv(fd, vector, count, PVFS_IO_WRITE);
 }
 
@@ -555,7 +564,7 @@ ssize_t pvfs_writev(int fd, const struct iovec *vector, int count)
  */
 ssize_t pvfs_pwrite64(int fd, const void *buf, size_t count, off64_t offset)
 {
-    debug("pvfs_pwrite64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_pwrite64: called with %d\n", fd);
     return pvfs_prdwr64(fd, (void *)buf, count, offset, PVFS_IO_WRITE);
 }
 
@@ -646,7 +655,7 @@ static ssize_t pvfs_rdwrv(int fd,
  */
 off_t pvfs_lseek(int fd, off_t offset, int whence)
 {
-    debug("pvfs_lseek: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lseek: called with %d\n", fd);
     return (off_t) pvfs_lseek64(fd, (off64_t)offset, whence);
 }
 
@@ -657,7 +666,7 @@ off64_t pvfs_lseek64(int fd, off64_t offset, int whence)
 {
     pvfs_descriptor* pd;
 
-    debug("pvfs_lseek64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lseek64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -681,7 +690,7 @@ off64_t pvfs_lseek64(int fd, off64_t offset, int whence)
  */
 int pvfs_truncate(const char *path, off_t length)
 {
-    debug("pvfs_truncate: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_truncate: called with %s\n", path);
     return pvfs_truncate64(path, (off64_t) length);
 }
 
@@ -694,7 +703,8 @@ int pvfs_truncate64(const char *path, off64_t length)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_truncate64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_truncate64: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -740,7 +750,7 @@ errorout:
  */
 int pvfs_fallocate(int fd, off_t offset, off_t length)
 {
-    debug("pvfs_fallocate: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fallocate: called with %d\n", fd);
     if (offset < 0 || length < 0)
     {
         errno = EINVAL;
@@ -757,7 +767,7 @@ int pvfs_fallocate(int fd, off_t offset, off_t length)
  */
 int pvfs_ftruncate(int fd, off_t length)
 {
-    debug("pvfs_ftruncate: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_ftruncate: called with %d\n", fd);
     return pvfs_ftruncate64(fd, (off64_t) length);
 }
 
@@ -766,7 +776,7 @@ int pvfs_ftruncate(int fd, off_t length)
  */
 int pvfs_ftruncate64(int fd, off64_t length)
 {
-    debug("pvfs_ftruncate64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_ftruncate64: called with %d\n", fd);
     pvfs_descriptor *pd;
     
     if (fd < 0)
@@ -793,7 +803,7 @@ int pvfs_close(int fd)
 {
     int rc = 0;
     pvfs_descriptor* pd;
-    debug("pvfs_close: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_close: called with %d\n", fd);
 
     if (fd < 0)
     {
@@ -830,7 +840,7 @@ int pvfs_close(int fd)
         return -1;
     }
 
-    debug("pvfs_close: returns %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_close: returns %d\n", rc);
     return rc;
 }
 
@@ -840,7 +850,7 @@ int pvfs_close(int fd)
  */
 int pvfs_stat(const char *path, struct stat *buf)
 {
-    debug("pvfs_stat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_stat: called with %s\n", path);
     return pvfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
@@ -850,7 +860,7 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_stat_mask: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_stat_mask: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -892,7 +902,7 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_stat64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_stat64: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -929,13 +939,13 @@ errorout:
  */
 int pvfs_fstat(int fd, struct stat *buf)
 {
-    debug("pvfs_fstat: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstat: called with %d\n", fd);
     return pvfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
 {
-    debug("pvfs_fstat_mask: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstat_mask: called with %d\n", fd);
     pvfs_descriptor *pd;
 
     if (fd < 0)
@@ -958,7 +968,7 @@ int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
  */
 int pvfs_fstat64(int fd, struct stat64 *buf)
 {
-    debug("pvfs_fstat64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstat64: called with %d\n", fd);
     pvfs_descriptor *pd;
 
     if (fd < 0)
@@ -983,7 +993,7 @@ int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
-    debug("pvfs_fstatat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstatat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -1031,7 +1041,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
-    debug("pvfs_fstatat64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstatat64: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -1077,7 +1087,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
  */
 int pvfs_lstat(const char *path, struct stat *buf)
 {
-    debug("pvfs_lstat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lstat: called with %s\n", path);
     return pvfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
@@ -1087,7 +1097,8 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_lstat_mask: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_lstat_mask: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1129,7 +1140,7 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_lstat64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lstat64: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1172,7 +1183,7 @@ int pvfs_futimesat(int dirfd,
     pvfs_descriptor *pd=NULL, *pd2=NULL;
     PVFS_sys_attr attr;
 
-    debug("pvfs_futimesat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_futimesat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
         pd = NULL;
@@ -1227,14 +1238,14 @@ int pvfs_futimesat(int dirfd,
 
 int pvfs_utimes(const char *path, const struct timeval times[2])
 {
-    debug("pvfs_utimes: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_utimes: called with %s\n", path);
     return pvfs_futimesat(AT_FDCWD, path, times);
 }
 
 int pvfs_utime(const char *path, const struct utimbuf *buf)
 {
     struct timeval times[2];
-    debug("pvfs_utime: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_utime: called with %s\n", path);
     times[0].tv_sec = buf->actime;
     times[0].tv_usec = 0;
     times[1].tv_sec = buf->modtime;
@@ -1248,7 +1259,7 @@ int pvfs_futimes(int fd, const struct timeval times[2])
     pvfs_descriptor *pd=NULL;
     PVFS_sys_attr attr;
 
-    debug("pvfs_futimes: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_futimes: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1283,8 +1294,8 @@ int pvfs_futimes(int fd, const struct timeval times[2])
  */
 int pvfs_dup(int oldfd)
 {
-    debug("pvfs_dup: called with %d\n", oldfd);
-    return pvfs_dup_descriptor(oldfd, -1);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_dup: called with %d\n", oldfd);
+    return pvfs_dup_descriptor(oldfd, -1, 0, 0);
 }
 
 /**
@@ -1292,8 +1303,17 @@ int pvfs_dup(int oldfd)
  */
 int pvfs_dup2(int oldfd, int newfd)
 {
-    debug("pvfs_dup2: called with %d\n", oldfd);
-    return pvfs_dup_descriptor(oldfd, newfd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_dup2: called with %d\n", oldfd);
+    return pvfs_dup_descriptor(oldfd, newfd, 0, 0);
+}
+
+/**
+ * pvfs_dup3
+ */
+int pvfs_dup3(int oldfd, int newfd, int flags)
+{
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_dup2: called with %d\n", oldfd);
+    return pvfs_dup_descriptor(oldfd, newfd, flags, 0);
 }
 
 /**
@@ -1305,7 +1325,7 @@ int pvfs_chown(const char *path, uid_t owner, gid_t group)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_chown: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_chown: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1344,7 +1364,7 @@ int pvfs_fchown(int fd, uid_t owner, gid_t group)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fchown: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fchown: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1367,7 +1387,7 @@ int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
-    debug("pvfs_chown: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_chown: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
@@ -1416,7 +1436,7 @@ int pvfs_lchown(const char *path, uid_t owner, gid_t group)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_lchown: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lchown: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1457,7 +1477,7 @@ int pvfs_chmod(const char *path, mode_t mode)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_chmod: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_chmod: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1496,7 +1516,7 @@ int pvfs_fchmod(int fd, mode_t mode)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fchmod: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fchmod: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1519,7 +1539,7 @@ int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
-    debug("pvfs_fchmodat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fchmodat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         rc = pvfs_chmod(path, mode);
@@ -1556,7 +1576,7 @@ int pvfs_mkdir(const char *path, mode_t mode)
     int rc;
     char *newpath;
 
-    debug("pvfs_mkdir: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_mkdir: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1579,7 +1599,7 @@ int pvfs_mkdirat(int dirfd, const char *path, mode_t mode)
     int rc;
     pvfs_descriptor *pd;
 
-    debug("pvfs_mkdirat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_mkdirat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
         rc = pvfs_mkdir(path, mode);
@@ -1612,7 +1632,7 @@ int pvfs_rmdir(const char *path)
     int rc;
     char *newpath;
 
-    debug("pvfs_rmdir: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_rmdir: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1637,7 +1657,7 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_readlink: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_readlink: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1657,7 +1677,8 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
-    debug("pvfs_readlink mode is %o\n", pd->s->mode);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_readlink mode is %o\n", pd->s->mode);
     /* this checks that it is a valid symlink and sets errno if not */
     rc = iocommon_readlink(pd, buf, bufsiz);
     /* need to close if readlink succeeds or not */
@@ -1677,7 +1698,8 @@ ssize_t pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
     int rc;
     pvfs_descriptor *pd, *pd2;
 
-    debug("pvfs_readlinkat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_readlinkat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         rc = pvfs_readlink(path, buf, bufsiz);
@@ -1711,7 +1733,8 @@ int pvfs_symlink(const char *oldpath, const char *newpath)
     int rc = 0;
     char *abspath;
 
-    debug("pvfs_symlink: called with %s\n", oldpath);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_symlink: called with %s\n", oldpath);
     abspath = PVFS_qualify_path(newpath);
     if (!abspath)
     {
@@ -1730,7 +1753,8 @@ int pvfs_symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_symlinkat: called with %s\n", oldpath);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_symlinkat: called with %s\n", oldpath);
     if (newpath[0] == '/' || newdirfd == AT_FDCWD)
     {
         return pvfs_symlink(oldpath, newpath);
@@ -1778,7 +1802,7 @@ int pvfs_linkat(int olddirfd, const char *oldpath,
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    debug("pvfs_readdir: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_readdir: called with %d\n", fd);
     return pvfs_getdents(fd, dirp, sizeof(struct dirent));
 }
 
@@ -1791,7 +1815,7 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_getdents: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1810,7 +1834,7 @@ int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_getdents64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -1830,7 +1854,7 @@ int pvfs_access(const char *path, int mode)
     int rc = 0;
     char *newpath;
 
-    debug("pvfs_access: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_access: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -1849,7 +1873,7 @@ int pvfs_faccessat(int fd, const char *path, int mode, int flags)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_faccessat: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_faccessat: called with %s\n", path);
     if (path[0] == '/' || fd == AT_FDCWD)
     {
         return pvfs_access(path, mode);
@@ -1886,9 +1910,8 @@ int pvfs_fcntl(int fd, int cmd, ...)
     struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
     long larg;
-    int tsz;
 
-    debug("pvfs_fcntl: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fcntl: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -1901,6 +1924,9 @@ int pvfs_fcntl(int fd, int cmd, ...)
     {
     case F_DUPFD :
         larg = va_arg(ap, long);
+        rc = pvfs_dup_descriptor(fd, larg, 0, 1);
+#if 0
+/* moved this functionality into pvfs_dup_descriptor */
         tsz = pvfs_descriptor_table_size();
         if (larg < 0 || larg > tsz)
         {
@@ -1923,6 +1949,7 @@ int pvfs_fcntl(int fd, int cmd, ...)
                 break;
             }
         }
+#endif
         break;
     case F_GETFD :
         rc = pd->fdflags;
@@ -1975,7 +2002,7 @@ int pvfs_fsync(int fd)
     int rc = 0;
     pvfs_descriptor* pd;
 
-    debug("pvfs_fsync: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fsync: called with %d\n", fd);
 
     if (fd < 0)
     {
@@ -2000,7 +2027,7 @@ int pvfs_fsync(int fd)
 
     /* tell the server to flush data to disk */
     rc = iocommon_fsync(pd);
-    debug("pvfs_fsync: returns %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fsync: returns %d\n", rc);
     return rc;
 }
 
@@ -2009,7 +2036,7 @@ int pvfs_fdatasync(int fd)
 {
     int rc = 0;
 
-    debug("pvfs_fdatasync: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fdatasync: called with %d\n", fd);
     rc = pvfs_fsync(fd); /* as close as we have for now */
     return rc;
 }
@@ -2025,7 +2052,7 @@ int pvfs_fadvise(int fd, off_t offset, off_t len, int advice)
  */
 int pvfs_fadvise64(int fd, off64_t offset, off64_t len, int advice)
 {
-    debug("pvfs_fadvise64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fadvise64: called with %d\n", fd);
     switch (advice)
     {
     case POSIX_FADV_NORMAL:
@@ -2048,7 +2075,7 @@ int pvfs_statfs(const char *path, struct statfs *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_statfs: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_statfs: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -2086,7 +2113,7 @@ int pvfs_statfs64(const char *path, struct statfs64 *buf)
     char *newpath;
     pvfs_descriptor *pd;
 
-    debug("pvfs_statfs64: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_statfs64: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -2122,7 +2149,7 @@ int pvfs_fstatfs(int fd, struct statfs *buf)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fstatfs: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstatfs: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -2141,7 +2168,7 @@ int pvfs_fstatfs64(int fd, struct statfs64 *buf)
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fstatfs64: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstatfs64: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -2163,7 +2190,7 @@ int pvfs_statvfs(const char *path, struct statvfs *buf)
     struct statfs buf2;
     char *newpath;
 
-    debug("pvfs_statvfs: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_statvfs: called with %s\n", path);
     newpath = PVFS_qualify_path(path);
     if (!newpath)
     {
@@ -2216,7 +2243,7 @@ int pvfs_fstatvfs(int fd, struct statvfs *buf)
     pvfs_descriptor *pd;
     struct statfs buf2;
 
-    debug("pvfs_fstatvfs: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstatvfs: called with %d\n", fd);
     if (fd < 0)
     {
         errno = EBADF;
@@ -2249,7 +2276,7 @@ int pvfs_fstatvfs(int fd, struct statvfs *buf)
 
 int pvfs_mknod(const char *path, mode_t mode, dev_t dev)
 {
-    debug("pvfs_mknod: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_mknod: called with %s\n", path);
     return pvfs_mknodat(AT_FDCWD, path, mode, dev);
 }
 
@@ -2258,7 +2285,7 @@ int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
     int fd;
     /* int s_type = mode & S_IFMT; */
     
-    debug("pvfs_mknod: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_mknod: called with %s\n", path);
     switch (dev)
     {
     case S_IFREG:
@@ -2282,7 +2309,7 @@ int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
 
 ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count)
 {
-    debug("pvfs_sendfile: called with %d\n", outfd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_sendfile: called with %d\n", outfd);
     return pvfs_sendfile64(outfd, infd, (off64_t *)offset, count);
 }
                  
@@ -2290,7 +2317,8 @@ ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count)
 {
     pvfs_descriptor *inpd, *outpd;
 
-    debug("pvfs_sendfile64: called with %d\n", outfd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_sendfile64: called with %d\n", outfd);
     inpd = pvfs_find_descriptor(infd);
     outpd = pvfs_find_descriptor(outfd);  /* this should be  a socket */
     if (!inpd || !outpd)
@@ -2309,7 +2337,7 @@ int pvfs_setxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_setxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_setxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2328,7 +2356,7 @@ int pvfs_lsetxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_lsetxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lsetxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2348,7 +2376,7 @@ int pvfs_fsetxattr(int fd,
     int rc = 0;
     pvfs_descriptor *pd;
 
-    debug("pvfs_fsetxattr: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fsetxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2366,7 +2394,7 @@ ssize_t pvfs_getxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_getxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2384,7 +2412,7 @@ ssize_t pvfs_lgetxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_lgetxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_lgetxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2402,7 +2430,7 @@ ssize_t pvfs_fgetxattr(int fd,
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fgetxattr: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fgetxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2418,7 +2446,7 @@ ssize_t pvfs_listxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_listxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_listxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2435,7 +2463,8 @@ ssize_t pvfs_llistxattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_llistxattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_llistxattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2453,7 +2482,7 @@ ssize_t pvfs_flistxattr(int fd,
     int retsize, rc = 0;
     pvfs_descriptor *pd;
 
-    debug("pvfs_flistxattr: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_flistxattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2473,7 +2502,8 @@ int pvfs_removexattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_removexattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_removexattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR);
     if (fd < 0)
     {
@@ -2489,7 +2519,8 @@ int pvfs_lremovexattr(const char *path,
 {
     int fd, rc = 0;
 
-    debug("pvfs_lremovexattr: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_lremovexattr: called with %s\n", path);
     fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
     if (fd < 0)
     {
@@ -2505,7 +2536,8 @@ int pvfs_fremovexattr(int fd,
 {
     pvfs_descriptor *pd;
 
-    debug("pvfs_fremovexattr: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "pvfs_fremovexattr: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -2536,7 +2568,7 @@ int pvfs_cwd_init(int expand)
         rc = my_glibc_getcwd(buf, PVFS_PATH_MAX);
         if (rc < 0)
         {
-            perror("failed to get CWD from kernel");
+            glibc_ops.perror("failed to get CWD from kernel");
             exit(-1);
         }
     }
@@ -2545,7 +2577,7 @@ int pvfs_cwd_init(int expand)
         rv = strncpy(buf, rv, PVFS_PATH_MAX);
         if (!rv)
         {
-            perror("string copy failed");
+            glibc_ops.perror("string copy failed");
             exit(-1);
         }
     }
@@ -2584,7 +2616,7 @@ int pvfs_chdir(const char *path)
     struct stat sbuf;
     char *newpath = NULL;
 
-    debug("pvfs_chdir: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_chdir: called with %s\n", path);
     if (!path)
     {
         errno = EINVAL;
@@ -2637,7 +2669,7 @@ int pvfs_fchdir(int fd)
     int plen;
     pvfs_descriptor *pd;
 
-    debug("pvfs_fchdir: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fchdir: called with %d\n", fd);
     /* path is already opened, make sure it is a dir */
     pd = pvfs_find_descriptor(fd);
     if (!pd || !S_ISDIR(pd->s->mode) || !pd->s->dpath)
@@ -2652,7 +2684,8 @@ int pvfs_fchdir(int fd)
         errno = ENAMETOOLONG;
         return -1;
     }
-    debug("\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
     /* we will keep a copy and keep one in the environment */
     memset(pvfs_cwd, 0, sizeof(pvfs_cwd));
     strncpy(pvfs_cwd, pd->s->dpath, plen + 1);

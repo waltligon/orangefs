@@ -908,6 +908,75 @@ else
       [Should we enable user interface CWD support.])
 fi])
 
+dnl Method to disable usrint redefining stdin stdout stderr as PVFS streams
+AC_ARG_ENABLE(stdio-redefstream,
+[  --disable-stdio-redefstream    Do not redefine stdin stdout stderr as PVFS streams],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 1,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+else
+   AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 0,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+fi],
+[AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 1,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+])
+
+dnl Method to disable redefining malloc
+AC_ARG_ENABLE(malloc-redef,
+[  --disable-malloc-redef    Do not redefine malloc],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_REDEF, 1,
+      [Should we redefine malloc.])
+   MALLOC_REDEF=1
+else
+   AC_DEFINE(PVFS_MALLOC_REDEF, 0,
+      [Should we redefine malloc.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_REDEF, 1,
+      [Should we redefine malloc.])
+MALLOC_REDEF=1
+])
+
+dnl Method to disable malloc checking a magic number
+AC_ARG_ENABLE(malloc-magic,
+[  --disable-malloc-magic    Do not have malloc check a magic number],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_MAGIC, 1,
+      [Should we have malloc check a magic number.])
+else AC_DEFINE(PVFS_MALLOC_MAGIC, 0,
+      [Should we have malloc check a magic number.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_MAGIC, 1,
+      [Should we have malloc check a magic number.])
+])
+
+dnl Method to disable malloc zeroing new memory
+AC_ARG_ENABLE(malloc-zero,
+[  --disable-malloc-zero    Do not have malloc zero new memory],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_ZERO, 1,
+      [Should we have malloc zero new memory.])
+else AC_DEFINE(PVFS_MALLOC_ZERO, 0,
+      [Should we have malloc zero new memory.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_ZERO, 1,
+      [Should we have malloc zero new memory.])
+])
+
+dnl Method to disable malloc zeroing freed memory
+AC_ARG_ENABLE(malloc-free-zero,
+[  --disable-malloc-free-zero    Do not have malloc zero freed memory],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 1,
+      [Should we have malloc zero freed memory.])
+else AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 0,
+      [Should we have malloc zero freed memory.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 1,
+      [Should we have malloc zero freed memory.])
+])
+
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
 AC_LINK_IFELSE([AC_LANG_SOURCE([
@@ -1552,21 +1621,24 @@ if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 server will be built                        : yes])
 else
    AC_MSG_RESULT([PVFS2 server will be built                        :  no])
-
 fi
 
 if test "x$BUILD_USRINT" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface libraries will be built      : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface libraries will be built      :  no])
-
 fi
 
 if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
+fi
 
+if test "x$MALLOC_REDEF" = "x1" ; then
+   AC_MSG_RESULT([Malloc will be redefined                          : yes])
+else
+   AC_MSG_RESULT([Malloc will be redefined                          :  no])
 fi
 
 if test "x$BUILD_JNI" = "x1" ; then

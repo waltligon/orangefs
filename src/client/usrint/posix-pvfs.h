@@ -120,6 +120,8 @@ extern int pvfs_dup(int oldfd);
 
 extern int pvfs_dup2(int oldfd, int newfd);
 
+extern int pvfs_dup3(int oldfd, int newfd, int flags);
+
 extern int pvfs_chown (const char *path, uid_t owner, gid_t group);
 
 extern int pvfs_fchown (int fd, uid_t owner, gid_t group);

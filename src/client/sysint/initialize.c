@@ -15,6 +15,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
 #include "pint-cached-config.h"

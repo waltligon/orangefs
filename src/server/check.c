@@ -18,6 +18,7 @@
 #include <grp.h>
 
 #include "pvfs2-debug.h"
+#include "pvfs2-internal.h"
 #include "gen-locks.h"
 #include "gossip.h"
 #include "bmi-byteswap.h"

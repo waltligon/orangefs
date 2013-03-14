@@ -1,6 +1,36 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
+
+* Added support for glob in usrint
+*
+* Fixed several bugs that involved using an uncleared buffer that becomes
+* corrupted.
+*
+* Added a malloc and associated functions wrapper that uses #defines to
+* replace malloc with PINT-malloc().  PINT-malloc() uses glibc malloc() (and not
+* a client program's replacement for malloc) to do memory management.  Inserts 
+* a magic number before each allocated buffer that is check on free to prevent
+* a number of common malloc related bugs.  Zeros newly allocarted buffer.
+* Zeros buffer being freed.  Can be adapted for other uses as well.  Includes
+* malloc debugging calls (currently controlled distinctly from gossip but
+* will be integrated into gossip).  Configure options can turn off some or
+* all of these features.  Also incAudes a set of functions clean-malloc() that
+* calls to the default version of malloc().  This makes pint-mem.c obsolete.
+*
+* Began migrating to a new initialization mechanism that uses a feature of
+* GCC __attrubute__((constructor)) that causes a routine to run before main.
+* This should enable us to remove the many calls to init routines currently in
+* the usrint code.  May not work on other compilers, but there may be an 
+* older alternative.  Worst case we replace the many calls with macros.  A
+* similar destructor attribute exists for shutdown
+*
+* Reworked implementation of stdin, stdout, stderr so that we can use them
+* effectively with freopen and OrangeFS files.  Reworked freopen to support
+* this.  Can still be disabled with configure.
+*
+* Made some changes to handling of locks in streams.
+
 orangefs-2.8.7 (Subversion Tag v2.8.7)
 
 Revs 9399 thru 9763

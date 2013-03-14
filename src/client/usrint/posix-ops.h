@@ -39,6 +39,7 @@ typedef struct posix_ops_s
     ssize_t (*pwrite64)( int fd, const void *buf, size_t count, off64_t offset);
     off_t (*lseek)(int fd, off_t offset, int whence);
     off64_t (*lseek64)(int fd, off64_t offset, int whence);
+    void (*perror)(const char *s);
     int (*truncate)(const char *path, off_t length);
     int (*truncate64)(const char *path, off64_t length);
     int (*ftruncate)(int fd, off_t length);
@@ -59,6 +60,7 @@ typedef struct posix_ops_s
     int (*futimes)(int fd, const struct timeval times[2]);
     int (*dup)(int oldfd);
     int (*dup2)(int oldfd, int newfd);
+    int (*dup3)(int oldfd, int newfd, int flags);
     int (*chown)(const char *path, uid_t owner, gid_t group);
     int (*fchown)(int fd, uid_t owner, gid_t group);
     int (*fchownat)(int fd, const char *path, uid_t owner, gid_t group, int flag);

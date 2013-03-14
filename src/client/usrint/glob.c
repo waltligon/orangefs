@@ -27,6 +27,8 @@
 #include <sys/stat.h>
 #include <stddef.h>
 
+#include "pvfs2-internal.h"
+
 /* Outcomment the following line for production quality code.  */
 /* #define NDEBUG 1 */
 #include <assert.h>
@@ -841,8 +843,8 @@ glob (pattern, flags, errfunc, pglob)
 
 	  /* Look up specific user's home directory.  */
 	  {
-	    struct passwd *p;
-	    char *pwtmpbuf;
+	    struct passwd *p = NULL;
+	    char *pwtmpbuf = NULL;
 	    int malloc_pwtmpbuf = 0;
 #  if defined HAVE_GETPWNAM_R || defined _LIBC
 	    long int buflen = GETPW_R_SIZE_MAX ();

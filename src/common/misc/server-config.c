@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -19,6 +20,8 @@
 #include <io.h>
 #endif
 
+#include "pvfs2-internal.h"
+
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
 #include "pvfs2.h"
@@ -28,9 +31,7 @@
 #include "extent-utils.h"
 #include "mkspace.h"
 #include "pint-distribution.h"
-#include "pvfs2-config.h"
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 
 #ifdef WITH_OPENSSL
 #include "openssl/evp.h"

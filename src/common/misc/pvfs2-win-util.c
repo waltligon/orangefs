@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
@@ -30,7 +30,6 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 
 #ifdef HAVE_MNTENT_H

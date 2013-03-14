@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-internal.h"
 #include "pint-op.h"
 #include <string.h>
 
