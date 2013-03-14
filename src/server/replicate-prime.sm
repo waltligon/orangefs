@@ -448,7 +448,7 @@ static PINT_sm_action io_send_completion_ack(
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
     
 
-    gossip_lerr("js_p->error_code:(%d):js_p->status_user_code(%d)\n",(int)js_p->error_code
+    gossip_lerr("js_p->error_code:(%d):js_p->status_user_tag(%d)\n",(int)js_p->error_code
                                                                     ,(int)js_p->status_user_tag);
 
 
