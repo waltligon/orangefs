@@ -513,14 +513,14 @@ struct PINT_server_small_io_op
 
 struct PINT_server_flush_op
 {
-    PVFS_handle handle;	    /* handle of data we want to flush to disk */
-    int flags;		    /* any special flags for flush */
+    PVFS_handle handle;        /* handle of data we want to flush to disk */
+    int flags;            /* any special flags for flush */
 };
 
 struct PINT_server_truncate_op
 {
-    PVFS_handle handle;	    /* handle of datafile we resize */
-    PVFS_offset size;	    /* new size of datafile */
+    PVFS_handle handle;        /* handle of datafile we resize */
+    PVFS_offset size;        /* new size of datafile */
 };
 
 struct PINT_server_mkdir_op
@@ -681,24 +681,24 @@ typedef struct PINT_server_op
 
     union
     {
-	/* request-specific scratch spaces for use during processing */
+        /* request-specific scratch spaces for use during processing */
         struct PINT_server_create_op create;
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
         struct PINT_server_listattr_op listattr;
-	struct PINT_server_getconfig_op getconfig;
-	struct PINT_server_lookup_op lookup;
-	struct PINT_server_crdirent_op crdirent;
-//	struct PINT_server_setattr_op setattr;
-	struct PINT_server_readdir_op readdir;
-	struct PINT_server_remove_op remove;
-	struct PINT_server_chdirent_op chdirent;
-	struct PINT_server_rmdirent_op rmdirent;
-	struct PINT_server_io_op io;
+        struct PINT_server_getconfig_op getconfig;
+        struct PINT_server_lookup_op lookup;
+        struct PINT_server_crdirent_op crdirent;
+        // struct PINT_server_setattr_op setattr;
+        struct PINT_server_readdir_op readdir;
+        struct PINT_server_remove_op remove;
+        struct PINT_server_chdirent_op chdirent;
+        struct PINT_server_rmdirent_op rmdirent;
+        struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
-	struct PINT_server_flush_op flush;
-	struct PINT_server_truncate_op truncate;
-	struct PINT_server_mkdir_op mkdir;
+        struct PINT_server_flush_op flush;
+        struct PINT_server_truncate_op truncate;
+        struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
         struct PINT_server_precreate_pool_refiller_op

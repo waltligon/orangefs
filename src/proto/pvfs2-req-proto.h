@@ -95,6 +95,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
+    PVFS_SERV_MGMT_GET_USER_CERT = 50,
+    PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -189,7 +191,12 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_ISSUER 128
 /* max size of a certificate buffer (in bytes) */
 #define PVFS_REQ_LIMIT_CERT 8192
-
+/* max size of a certificate private key (in bytes) */
+#define PVFS_REQ_LIMIT_SECURITY_KEY 8192
+/* max size of userid/password for cert request (in bytes) */
+#define PVFS_REQ_LIMIT_USERID_PWD 256
+/* max size of encrypted private key for cert request (in bytes) */
+#define PVFS_REQ_LIMIT_ENC_KEY 16384
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -2401,6 +2408,111 @@ do {                                                                 \
     (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);     \
 } while (0)
 
+/* get_user_cert ******************************************************/
+/* - retrieve user certificate/key from server given user id/password */
+
+
+struct PVFS_servreq_mgmt_get_user_cert
+{
+    PVFS_fs_id fs_id;
+    char *userid;
+    PVFS_size enc_pwd_size;
+    char *enc_pwd;
+    PVFS_size enc_key_size;
+    char *enc_key;
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mgmt_get_user_cert(pptr,x) do { \
+    encode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    encode_string(pptr, &(x)->userid); \
+    encode_PVFS_size(pptr, &(x)->enc_pwd_size); \
+    memcpy((*pptr), (char *) (x)->enc_pwd, (x)->enc_pwd_size); \
+    (*pptr) += (x)->enc_pwd_size; \
+    encode_PVFS_size(pptr, &(x)->enc_key_size); \
+    memcpy((*pptr), (char *) (x)->enc_key, (x)->enc_key_size); \
+    (*pptr) += (x)->enc_key_size; \
+} while (0)
+
+#define decode_PVFS_servreq_mgmt_get_user_cert(pptr,x) do { \
+    decode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    decode_string(pptr, &(x)->userid); \
+    decode_PVFS_size(pptr, &(x)->enc_pwd_size); \
+    (x)->enc_pwd = (*pptr); \
+    (*pptr) += (x)->enc_pwd_size; \
+    decode_PVFS_size(pptr, &(x)->enc_key_size); \
+    (x)->enc_key = (*pptr); \
+    (*pptr) += (x)->enc_key_size; \
+} while (0)
+#endif
+
+#define extra_size_PVFS_servreq_mgmt_get_user_cert \
+    (PVFS_REQ_LIMIT_USERID_PWD * 2) + \
+        PVFS_REQ_LIMIT_ENC_KEY
+
+#define PINT_SERVREQ_MGMT_GET_USER_CERT_FILL(__req,          \
+                                             __cap,          \
+                                             __fsid,         \
+                                             __userid,       \
+                                             __pwdsize,      \
+                                             __pwd,          \
+                                             __keysize,      \
+                                             __key)          \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_GET_USER_CERT;               \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_get_user_cert.fs_id   = (__fsid);         \
+    (__req).u.mgmt_get_user_cert.userid  = (__userid);       \
+    (__req).u.mgmt_get_user_cert.enc_pwd_size = (__pwdsize); \
+    (__req).u.mgmt_get_user_cert.enc_pwd =                   \
+        (char *) (__pwd);                                    \
+    (__req).u.mgmt_get_user_cert.enc_key_size = (__keysize); \
+    (__req).u.mgmt_get_user_cert.enc_key =                   \
+        (char *) (__key);                                    \
+} while (0)
+
+struct PVFS_servresp_mgmt_get_user_cert
+{
+    PVFS_certificate cert;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_get_user_cert,
+    PVFS_certificate, cert);
+#define extra_size_PVFS_servresp_mgmt_get_user_cert \
+    PVFS_REQ_LIMIT_CERT
+
+/* get_user_cert_keyreq *****************************************************/
+/* - request the CA public key in order to encrypt password and private key */
+
+struct PVFS_servreq_mgmt_get_user_cert_keyreq
+{
+    PVFS_fs_id fs_id;
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_get_user_cert_keyreq,
+    PVFS_fs_id, fs_id);
+
+#define PINT_SERVREQ_MGMT_GET_USER_CERT_KEYREQ_FILL(__req,   \
+                                                    __cap,   \
+                                                    __fsid)  \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ;        \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_get_user_cert_keyreq.fs_id = (__fsid);    \
+} while (0)
+
+struct PVFS_servresp_mgmt_get_user_cert_keyreq
+{
+    PVFS_security_key public_key;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_get_user_cert_keyreq,
+    PVFS_security_key, public_key);
+#define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
+    PVFS_REQ_LIMIT_SECURITY_KEY
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2453,6 +2565,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
+        struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
+        struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2514,6 +2628,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
+        struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
+        struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
     } u;
 };
 endecode_fields_2_struct(

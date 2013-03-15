@@ -11,6 +11,9 @@
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 #include <ldap.h>
 
@@ -46,8 +49,21 @@ static char *get_ldap_password(const char *path)
 {
     FILE *f;
     char *buf;
+    struct stat statbuf;
 
-    /* TODO: check permissions */
+    /* check permissions */
+    if (stat(path, &statbuf) != 0)
+    {
+        gossip_err("Could not stat LDAP password file %s: %s\n", path,
+                   strerror(errno));
+        return NULL;
+    }
+    /* check if group or other modes are set */
+    if (statbuf.st_mode & (S_IRWXG|S_IRWXO))
+    {
+        gossip_err("Warning: LDAP password file %s has Group or Other "
+                   "permissions enabled\n", path);
+    }
 
     f = fopen(path, "r");
     if (f == NULL)
@@ -538,6 +554,122 @@ PINT_ldap_map_user_exit:
                      "%s: error code %d: returning -PVFS_EACCES\n",
                      __func__, ret);
         ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
+int PINT_ldap_authenticate(const char *userid,
+                           const char *password)
+{
+    struct server_configuration_s *config = PINT_get_server_config();
+    char *base = NULL, filter[512], *dn = NULL;
+    int ldapret, ret = -PVFS_EINVAL, scope = LDAP_SCOPE_SUBTREE;
+    struct timeval timeout = { 15, 0 };
+    LDAPMessage *res, *entry;
+    BerValue *bvalue;
+
+    if (userid == NULL || password == NULL)
+    {
+        gossip_err("%s: userid and/or password is NULL\n", __func__);
+        return -PVFS_EINVAL;
+    }
+
+    /* set LDAP search parameters */
+    scope = config->ldap_search_scope;
+
+    /* root container of search -- may be null */
+    base = config->ldap_search_root;
+
+    /* construct the filter in the form 
+     (&(objectClass={search-class})({naming-attr}={userid})) */
+    snprintf(filter, sizeof(filter), "(&(objectClass=%s)(%s=%s))",
+             config->ldap_search_class,
+             config->ldap_search_attr,
+             userid);
+    filter[sizeof(filter) - 1] = '\0';
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
+                 "ldap_search_ext_s(ldap, \"%s\", %d, "
+                 "\"%s\", NULL, 0, NULL, NULL, "
+                 "%lu, 0, ...)\n",
+                 __func__,
+                 base,
+                 scope,
+                 filter,
+                 timeout.tv_sec);
+
+    /* search LDAP with the specified values */
+    ldapret = ldap_search_ext_s(ldap, base, scope, filter, NULL, 0,
+                            NULL, NULL, &timeout, 0, &res);
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: ldap_search_ext returned %d\n",
+                 __func__, ldapret);
+
+    if (ldapret == LDAP_SUCCESS)
+    {
+        if (res != NULL)
+        {
+            int count = ldap_count_entries(ldap, res);
+            if (count > 1)
+            {
+                gossip_err("%s: LDAP warning: multiple entries for user %s\n",
+                           __func__, userid);
+            }
+
+            /* note: we only check the first entry */
+            entry = ldap_first_entry(ldap, res);
+            if (entry != NULL)
+            {
+                dn = ldap_get_dn(ldap, entry);
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: found LDAP user %s\n",
+                             __func__, dn);
+
+                /* get ber value ... does not need to be freed */
+                bvalue = ber_bvstr(password);
+                if (bvalue != NULL)
+                {
+                    ldapret = ldap_compare_ext_s(ldap, dn, "userPassword", 
+                                             bvalue, NULL, NULL);
+
+                    if ((ldapret != LDAP_COMPARE_TRUE) && (ldapret != LDAP_COMPARE_FALSE))
+                    {
+                        PINT_ldap_error("password check failed", ldapret);
+                    }
+                    else
+                    {
+                        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                                     "%s: password check: %s\n", __func__,
+                                     (ldapret == LDAP_COMPARE_TRUE) ? "true" : "false");
+                    }
+                    ret = (ldapret == LDAP_COMPARE_TRUE) ? 0 : -PVFS_EACCES;                    
+                }
+                else
+                {
+                    ret = -PVFS_ENOMEM;
+                }
+
+                ldap_memfree(dn);
+            }
+            else
+            {
+                /* no entries... return -PVFS_ENOENT */
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: no users found for "
+                             "username %s\n", __func__, userid);
+                ret = -PVFS_ENOENT;
+            }
+            ldap_msgfree(res);
+        }
+        else
+        {
+            gossip_err("%s: LDAP result buffer is null\n", __func__);
+            ret = -PVFS_ESECURITY;
+        }
+    }
+    else
+    {
+        PINT_ldap_error("LDAP_authenticate failed", ldapret);
+        ret = -PVFS_ESECURITY;
     }
 
     return ret;
