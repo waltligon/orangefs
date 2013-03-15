@@ -140,6 +140,7 @@ machine pvfs2_get_user_cert_sm
  * Return one entry (segment) (type and value) from a subject dn.
  * entry_type is assumed to be 16 bytes, entry_value is 256.
  */
+#ifdef ENABLE_SECURITY_CERT
 static int get_subject_entry(
         const char *dn, int index, char *entry_field, char *entry_value)
 {
@@ -182,6 +183,7 @@ static int get_subject_entry(
 
     return 0;
 }
+#endif
 
 /* get_user_cert_keyreq_send_public_key()
  *
@@ -267,9 +269,9 @@ static PINT_sm_action get_user_cert_keyreq_cleanup(
 {
 #ifdef ENABLE_SECURITY_CERT
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-#endif
 
     PINT_cleanup_key(&s_op->resp.u.mgmt_get_user_cert_keyreq.public_key);
+#endif
 
     return server_state_machine_complete(smcb);
 }
