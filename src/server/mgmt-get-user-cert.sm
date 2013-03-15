@@ -347,8 +347,7 @@ static PINT_sm_action get_user_cert_ldap_lookup(
               pwd, rsa_privkey, RSA_PKCS1_PADDING);
     if (ret <= 0)
     {
-        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "password decryption error\n",
-                            __func__);
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "password decryption error\n");
         js_p->error_code = -PVFS_ESECURITY;
         free(pwd);
         return SM_ACTION_COMPLETE;
@@ -526,8 +525,7 @@ static PINT_sm_action get_user_cert_gen_cert(
     ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_basic_constraints, "CA:FALSE");
     if (ext == NULL)
     {
-        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "error adding extension",
-                            __func__);
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "error adding extension");
         js_p->error_code = -PVFS_ESECURITY;
         X509_free(xcert);
         EVP_PKEY_free(keypair);

@@ -58,12 +58,9 @@ extern struct PINT_server_req_params pvfs2_tree_setattr_params;
 extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
 extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
 extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
-<<<<<<< .mine
+extern struct PINT_server_req_params pvfs2_tree_getattr_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
-=======
-extern struct PINT_server_req_params pvfs2_tree_getattr_params;
->>>>>>> .r10076
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
