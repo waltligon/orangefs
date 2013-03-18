@@ -826,7 +826,6 @@ pvfs_descriptor *iocommon_open(const char *path,
     int rc = 0;
     int orig_errno = errno;
     int follow_links = 0;
-    int open_dir = 0;
     int cache_flag = 1;
     int length = 0;
     void *value = NULL;
@@ -1001,7 +1000,6 @@ pvfs_descriptor *iocommon_open(const char *path,
         /* clear error */
         rc = 0;
         errno = 0;
-        open_dir = 1; /* we are opening a directory filename is null */
     }
 
     if (!pdir)

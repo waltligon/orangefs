@@ -105,7 +105,7 @@
 #endif /* USRINT SOURCE */
 
 /* locking - should activate glibc pthreads locks - if not already on */
-#if 1
+#if 0
 
 # ifdef _IO_MTSAFE_IO
 #  undef _IO_MTSAFE_IO
@@ -297,7 +297,7 @@ extern int pvfs_convert_iovec(const struct iovec *vector,
                               PVFS_Request *req,
                               void **buf);
 
-#if !defined(__linux__) || !defined(__GLIBC___) || \
+#if !defined(__linux__) || !defined(__GLIBC__) || \
     !(__GLIBC__ >= 3 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 9))
 extern int dup3(int oldfd, int newfd, int flags);
 #endif

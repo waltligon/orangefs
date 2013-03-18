@@ -247,6 +247,7 @@ ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wundef -Wpointer-arith
     GCC_CFLAGS += -Wnested-externs
     GCC_CFLAGS += -Wredundant-decls
+    GCC_CFLAGS += -Wno-address -Wno-attributes
     # These are very noisy, and probably too strict.
     #GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
     #GCC_CFLAGS += -Wcast-qual
