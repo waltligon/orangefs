@@ -23,8 +23,13 @@
 
 /* some compiler portability macros - used by gcc maybe not others */
 #if __GNUC__ 
-#define GCC_CONSTRUCTOR(priority) __attribute__ ((constructor(priority)))
-#define GCC_DESTRUCTOR  __attribute__ ((destructor))
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
+#define GCC_CONSTRUCTOR(priority) __attribute__((constructor(priority)))
+#define GCC_DESTRUCTOR  __attribute__((destructor))
+#else
+#define GCC_CONSTRUCTOR(priority) __attribute__((constructor))
+#define GCC_DESTRUCTOR  __attribute__((destructor))
+#endif
 #else
 #define GCC_CONSTRUCTOR(priority) 
 #define GCC_DESTRUCTOR
