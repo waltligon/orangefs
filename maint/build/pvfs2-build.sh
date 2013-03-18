@@ -131,10 +131,10 @@ get_cvs $full_cvs_tag || exit 1
 mkdir $builddir
 mkdir $installdir
 cd $srcdir
-$srcdir/prepare
+$srcdir/prepare > prepare.out
 cd $builddir
 #ls $srcdir
-$srcdir/prepare
+$srcdir/prepare > prepare.out
 if [ $build_kernel = "true" ] ; then
 	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
