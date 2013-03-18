@@ -386,10 +386,6 @@ int PINT_sign_capability(PVFS_capability *cap)
     {
         md = EVP_sha1();
     }
-    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
-    }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
@@ -550,10 +546,6 @@ int PINT_verify_capability(const PVFS_capability *cap)
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
-    }
-    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
     }
     else
     {
@@ -716,10 +708,6 @@ int PINT_sign_credential(PVFS_credential *cred)
     {
         md = EVP_sha1();
     }
-    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
-    }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
@@ -854,10 +842,6 @@ int PINT_verify_credential(const PVFS_credential *cred)
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
-    }
-    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
     }
     else
     {
