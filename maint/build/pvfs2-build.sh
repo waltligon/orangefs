@@ -134,6 +134,7 @@ cd $srcdir
 $srcdir/prepare
 cd $builddir
 #ls $srcdir
+$srcdir/prepare
 if [ $build_kernel = "true" ] ; then
 	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
