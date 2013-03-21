@@ -20,6 +20,8 @@
 #ifndef __GEN_LOCKS_H
 #define __GEN_LOCKS_H
 
+#include "pvfs2-internal.h"
+
 #include <stdlib.h>
 #ifndef WIN32
 #include <unistd.h>

@@ -7,6 +7,8 @@
 #ifndef __DBPF_BSTREAM_H__
 #define __DBPF_BSTREAM_H__
 
+#include "pvfs2-internal.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

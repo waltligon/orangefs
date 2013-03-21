@@ -21,7 +21,7 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/fsck-utils.c \
 	  $(DIR)/pint-eattr.c \
 	  $(DIR)/pint-hint.c \
-	  $(DIR)/pint-mem.c \
+	  $(DIR)/pint-malloc.c \
 	  $(DIR)/pint-uid-mgmt.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
@@ -40,14 +40,14 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/realpath.c \
 	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-eattr.c \
-	     $(DIR)/pint-mem.c \
+	     $(DIR)/pint-malloc.c \
 	     $(DIR)/pint-hint.c \
 	     $(DIR)/pint-uid-mgmt.c
 
 LIBBMISRC += $(DIR)/str-utils.c \
 	  $(DIR)/pint-event.c \
 	  $(DIR)/errno-mapping.c \
-	  $(DIR)/pint-mem.c
+	  $(DIR)/pint-malloc.c
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

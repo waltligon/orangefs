@@ -25,7 +25,7 @@
 #include <sys/time.h>
 #endif
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif

@@ -11,6 +11,7 @@
 #ifndef __FLOW_QUEUE_H
 #define __FLOW_QUEUE_H
 
+#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "flow.h"
 

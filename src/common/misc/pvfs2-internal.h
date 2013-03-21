@@ -7,7 +7,37 @@
 #ifndef PVFS2_INTERNAL_H
 #define PVFS2_INTERNAL_H
 
+#ifndef __KERNEL__
 #include "pvfs2-config.h"
+
+/* in special cases like the statecomp we want to override the config
+ * and force the malloc redirect off
+ */
+
+#ifdef PVFS_MALLOC_REDEF_OVERRIDE
+#ifdef PVFS_MALLOC_REDEF
+#undef PVFS_MALLOC_REDEF
+#endif
+#define PVFS_MALLOC_REDEF 0
+#endif
+
+/* some compiler portability macros - used by gcc maybe not others */
+#if __GNUC__ 
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
+#define GCC_CONSTRUCTOR(priority) __attribute__((constructor(priority)))
+#define GCC_DESTRUCTOR  __attribute__((destructor))
+#else
+#define GCC_CONSTRUCTOR(priority) __attribute__((constructor))
+#define GCC_DESTRUCTOR  __attribute__((destructor))
+#endif
+#else
+#define GCC_CONSTRUCTOR(priority) 
+#define GCC_DESTRUCTOR
+#endif
+
+/* This should be included everywhere in the code */
+#include "pint-malloc.h" 
+#endif /* __KERNEL__ */
 
 /* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
  * to print out a PVFS_handle, which is typedefed to a uint64_t.  On

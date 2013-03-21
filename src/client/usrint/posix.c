@@ -44,7 +44,7 @@ int open(const char *path, int flags, ...)
     PVFS_hint hints;  /* need to figure out how to set default */
     pvfs_descriptor *pd;
     
-    debug("posix.c open: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c open: called with %s\n", path);
     va_start(ap, flags); 
     if (flags & O_CREAT)
         mode = va_arg(ap, mode_t); 
@@ -60,7 +60,8 @@ int open(const char *path, int flags, ...)
     if (!path)
     {
         errno = EFAULT;
-        debug("\tposix.c open: returns with %d\n", -1);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "\tposix.c open: returns with %d\n", -1);
         return -1;
     }
     if (is_pvfs_path(&path, 0))
@@ -78,7 +79,8 @@ int open(const char *path, int flags, ...)
             goto errorout;
         }
         /* set up the descriptor manually */
-        debug("posix.c open calls pvfs_alloc_descriptor %d\n", rc);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+                     "posix.c open calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         if (!pd)
         {
@@ -104,7 +106,7 @@ errorout:
     rc = -1;
 cleanup:
     PVFS_free_expanded(path);
-    debug("\tposix.c open: returns with %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "\tposix.c open: returns with %d\n", rc);
     return rc;
 }
 
@@ -625,10 +627,10 @@ int posix_fallocate(int fd, off_t offset, off_t length)
 int close(int fd)
 {
     int rc = 0;
-    debug("posix.c close: called with %d\n", fd);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c close: called with %d\n", fd);
     
     rc = pvfs_free_descriptor(fd);
-    debug("\tposix.c close: returns %d\n", rc);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "\tposix.c close: returns %d\n", rc);
     return rc;
 }
 
@@ -983,6 +985,24 @@ int dup2(int oldfd, int newfd)
     if (pd)
     {
         rc = pd->s->fsops->dup2(pd->true_fd, newfd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int dup3(int oldfd, int newfd, int flags)
+{
+    int rc = 0;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(oldfd);
+    if (pd)
+    {
+        rc = pd->s->fsops->dup3(pd->true_fd, newfd, flags);
     }
     else
     {

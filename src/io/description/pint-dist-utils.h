@@ -7,6 +7,7 @@
 #ifndef __PINT_DIST_UTILS_H
 #define __PINT_DIST_UTILS_H
 
+#include "pvfs2-internal.h"
 #include "pint-distribution.h"
 #include "server-config.h"
 

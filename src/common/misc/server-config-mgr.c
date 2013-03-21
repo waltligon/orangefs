@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2.h"
 #include "server-config-mgr.h"
 #include "quickhash.h"

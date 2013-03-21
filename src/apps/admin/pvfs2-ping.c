@@ -96,6 +96,12 @@ int main(int argc, char **argv)
 	printf("   %s: ", tab->mntent_array[i].mnt_dir);
 	if(ret < 0)
 	{
+            if (ret == -PVFS_EEXIST)
+            {
+                /* this mount point already mounted - skip on */
+	        printf("Ok\n");
+                continue;
+            }
 	    printf("FAILURE!\n");
             err = 1;
 	}

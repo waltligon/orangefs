@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 #include "trove-handle-mgmt.h"
 #include "pint-cached-config.h"
 

@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,7 @@
 #define strdup(s)    _strdup(s)
 #endif
 
+#include "pvfs2-internal.h"
 #include "str-utils.h"
 #include "pvfs-path.h"
 
@@ -440,7 +442,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     /* if we don't find any commas, just set the entire string to the first
      *  token and return
      */
-    if(0 == tokencount)
+    if(tokencount == 0)
     {
         tokencount = 1;
     }
@@ -453,12 +455,13 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
         return 0;
     }
 
-    if(1 == tokencount)
+    if(tokencount == 1)
     {
         (*tokens)[0] = strdup(comma_list);
         if(!(*tokens)[0])
         {
-            tokencount = 0;
+            /* failure needs tokencount to know what to free */
+            /* tokencount = 0; */
             goto failure;
         }
         return tokencount;
@@ -512,7 +515,7 @@ failure:
  * 
  * Free the string list allocated by PINT_split_string_list()
  */
-void PINT_free_string_list(char ** list, int len)
+void PINT_free_string_list(char** list, int len)
 {
     int i = 0;
 

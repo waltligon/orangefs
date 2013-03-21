@@ -96,7 +96,8 @@ int iocommon_lookup_absolute(const char *abs_path,
     PVFS_sysresp_lookup resp_lookup;
     PVFS_path_t *Ppath;
 
-    debug("iocommon_lookup_absolute: called with %s\n", abs_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup_absolute: called with %s\n", abs_path);
 
     /* Initialize any variables */
     memset(&resp_lookup, 0, sizeof(resp_lookup));
@@ -245,7 +246,8 @@ int iocommon_lookup_relative(const char *rel_path,
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
 
-    debug("iocommon_lookup_relative: called with %s\n", rel_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup_relative: called with %s\n", rel_path);
 
     /* Initialize any variables */
     pvfs_sys_init();
@@ -433,7 +435,8 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
-    debug("iocommon_create_file: called with %s\n", filename);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_create_file: called with %s\n", filename);
 
     /* Initialize */
     pvfs_sys_init();
@@ -601,7 +604,8 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
     char *path = NULL;
     pvfs_descriptor *pd = NULL;
 
-    debug("iocommon_expand_path: called with %s\n", Ppath->expanded_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_expand_path: called with %s\n", Ppath->expanded_path);
 
     path = PVFS_expand_path(Ppath->expanded_path, !follow_flag);
     if (PATH_LOOKEDUP(Ppath))
@@ -619,7 +623,8 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         IOCOMMON_RETURN_ERR(rc);
 
         /* create a usrint file descriptor for it */
-        debug("iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+               "iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -676,7 +681,8 @@ int iocommon_lookup(char *path,
     int mode = 0644;
     char error_path[PVFS_NAME_MAX];
 
-    debug("iocommon_lookup: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup: called with %s\n", path);
 
     memset(error_path, 0, sizeof(error_path));
 
@@ -820,7 +826,6 @@ pvfs_descriptor *iocommon_open(const char *path,
     int rc = 0;
     int orig_errno = errno;
     int follow_links = 0;
-    int open_dir = 0;
     int cache_flag = 1;
     int length = 0;
     void *value = NULL;
@@ -834,7 +839,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     PVFS_credentials *credentials;
     PVFS_path_t *Ppath;
 
-    debug("iocommon_open: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "iocommon_open: called with %s\n", path);
 
     /* Initialize */
     memset(&file_ref, 0, sizeof(file_ref));
@@ -995,7 +1000,6 @@ pvfs_descriptor *iocommon_open(const char *path,
         /* clear error */
         rc = 0;
         errno = 0;
-        open_dir = 1; /* we are opening a directory filename is null */
     }
 
     if (!pdir)
@@ -1131,7 +1135,8 @@ finish:
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
-    debug("iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
 
     /* check for cache flag */
     /* At the moment the default is to cache */
@@ -1351,7 +1356,8 @@ int iocommon_remove (const char *path,
     PVFS_credentials *credentials;
     PVFS_sys_attr attr;
 
-    debug("iocommon_remove: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_remove: called with %s\n", path);
 
     /* Initialize */
     memset(&parent_ref, 0, sizeof(parent_ref));
@@ -2220,7 +2226,8 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
-    debug("iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+           "iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
 
     if (!por)
     {
@@ -2361,7 +2368,8 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     PVFS_credentials *credentials;
     PVFS_sysresp_getattr getattr_response;
 
-    debug("iocommon_getattr: called with %d\n", (int)obj.handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_getattr: called with %d\n", (int)obj.handle);
 
     /* Initialize */
     memset(&getattr_response, 0, sizeof(getattr_response));
@@ -2400,7 +2408,8 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     int orig_errno = errno;
     PVFS_credentials *credentials;
 
-    debug("iocommon_setattr: called with %d\n", (int)obj.handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_setattr: called with %d\n", (int)obj.handle);
 
     /* check credentials */
     iocommon_cred(&credentials);

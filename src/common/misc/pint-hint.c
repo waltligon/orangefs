@@ -10,10 +10,12 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
+#include <stdio.h>
+
+#include "pvfs2-internal.h"
 #include "pint-hint.h"
 #include "gossip.h"
-#include <stdio.h>
-#include <pvfs2-debug.h>
+#include "pvfs2-debug.h"
 
 DEFINE_STATIC_ENDECODE_FUNCS(uint64_t, uint64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int64_t, int64_t);

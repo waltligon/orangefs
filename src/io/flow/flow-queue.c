@@ -9,6 +9,7 @@
  */
 
 #include "gossip.h"
+#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "flow-queue.h"
 #include <errno.h>

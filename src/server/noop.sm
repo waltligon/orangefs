@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 
 %%
 

@@ -7,6 +7,7 @@
 #ifndef __JOB_TIME_MGR_H
 #define __JOB_TIME_MGR_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "job-desc-queue.h"
 #include "job.h"

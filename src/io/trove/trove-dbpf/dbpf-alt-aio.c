@@ -1,4 +1,5 @@
 
+#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "dbpf-alt-aio.h"
 #include "pthread.h"

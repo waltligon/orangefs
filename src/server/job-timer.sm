@@ -12,6 +12,7 @@
 #include <sys/time.h>
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 #include "job-time-mgr.h"
 #include "server-config.h"
 

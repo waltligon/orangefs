@@ -21,7 +21,7 @@
 #include <libgen.h>
 #endif
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
@@ -32,7 +32,6 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pvfs-path.h"
 
@@ -1133,6 +1132,9 @@ int PVFS_util_init_defaults(void)
     int ret = -1, i = 0, j = 0, found_one = 0;
     int failed_indices[PVFS2_MAX_INVALID_MNTENTS] = {0};
 
+    /* first set up our malloc */
+    init_glibc_malloc();
+
     /* use standard system tab files */
     const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
     if (!tab)
@@ -1160,6 +1162,12 @@ int PVFS_util_init_defaults(void)
         }
         else
         {
+            if (ret == -PVFS_EEXIST)
+            {
+                /* this mount already exists so count it as found */
+                found_one = 1;
+                continue;
+            }
             failed_indices[j++] = i;
 
             if (j > (PVFS2_MAX_INVALID_MNTENTS - 1))
