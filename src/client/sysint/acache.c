@@ -361,7 +361,8 @@ int PINT_acache_get_cached_entry(
     /* copy out non-static attributes if valid */
     if(tmp_payload && tmp_payload->attr_status == 0)
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: copying out attr.\n");
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: copying out attr. tmp_payload->mask(0x%08x) "
+                                          "tmp_payload->attr.mask(0x%08x)\n",tmp_payload->mask,tmp_payload->attr.mask);
         ret = PINT_copy_object_attr(attr, &(tmp_payload->attr));
         if(ret < 0)
         {
@@ -441,8 +442,15 @@ int PINT_acache_get_cached_entry(
             }
             memcpy(attr->u.meta.replication_dfile_array
                   ,tmp_payload->replication_dfile_array
-                  ,tmp_payload->replication_dfile_array_count);
+                  ,tmp_payload->replication_dfile_array_count * sizeof(*tmp_payload->replication_dfile_array));
             attr->u.meta.replication_dfile_array_count = tmp_payload->replication_dfile_array_count;
+            attr->u.meta.replication_number_of_copies  = tmp_payload->replication_number_of_copies;
+            gossip_lerr("Replica handles from acache...\n");
+            int i;
+            for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
+            {
+               gossip_err("handle[%d]:(%llu)\n",i,llu(attr->u.meta.replication_dfile_array[i]));
+            }
         }
         
         if(tmp_payload->mask & PVFS_ATTR_META_DIST)
@@ -626,6 +634,12 @@ int PINT_acache_update(
         }
         if(attr->mask & PVFS_ATTR_META_REPLICATION)
         {
+           int i;
+           gossip_lerr("Dumping replication from attr...\n");
+           for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
+           {
+               gossip_err("handle[%d]:(%llu)\n",i,llu(attr->u.meta.replication_dfile_array[i]));
+           }
            tmp_payload->replication_dfile_array = 
               calloc(attr->u.meta.replication_dfile_array_count,
                      sizeof(*attr->u.meta.replication_dfile_array));

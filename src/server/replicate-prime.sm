@@ -758,6 +758,16 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
        }
     }
 
+    /* right now, we are shutting down everything if an error occurs, so don't wait for any more
+     * jobs to complete or cancel. We will change this later.
+     */
+    if (js_p->error_code != 0)
+    {
+       s_op->u.io.primary_flow_error_code = js_p->error_code;
+       js_p->error_code = FLOWS_COMPLETED;
+       return SM_ACTION_COMPLETE;
+    }
+
     /* Which job just finished? */
     if (js_p->status_user_tag == PRIMARY_FLOW)
     {
@@ -791,6 +801,19 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
       }/*end for*/
     }/*end if*/
     
+    /* if js_p->status_code != zero, then we probably did not receive a valid response from the
+     * replica server but cancelled the operation internally.  So, don't try to decode it.  Save
+     * the error code and keep going.
+     */
+
+    if (js_p->error_code != 0)
+    {
+       if (!s_op->u.io.primary_flow_error_code)
+       {
+          s_op->u.io.primary_flow_error_code = js_p->error_code;
+       }
+       goto completion_exit;
+    }
 
     /* decode repsonse from "next" server */
     ret = PINT_serv_decode_resp( s_op->target_fs_id

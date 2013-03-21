@@ -3200,6 +3200,13 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         return -PVFS_ENOMEM;
     }
 
+    gossip_lerr("Dumping replica handles(%d)...\n",attr->u.meta.replication_dfile_array_count);
+    for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
+    {
+        gossip_err("handle[%d]:(%llu)\n",i,llu(attr->u.meta.replication_dfile_array[i]));
+    }
+
+
     memset(sm_p->u.io.contexts,
            0,
            (context_count * sizeof(PINT_client_io_ctx)));
@@ -3248,10 +3255,11 @@ static int io_contexts_init(PINT_client_sm *sm_p,
            {
                cur_ctx->replication_handles[copy] = 
                   attr->u.meta.replication_dfile_array[(copy*attr->u.meta.dfile_count) + cur_ctx->server_nr];
-               gossip_lerr("cur_ctx->replication_handles[%d]:(%llu):context(%d)\n"
+               gossip_lerr("cur_ctx->replication_handles[%d]:(%llu):context(%d) \tdfile_count(%d)\n"
                           ,copy
                           ,llu(cur_ctx->replication_handles[copy])
-                          ,i);         
+                          ,i
+                          ,attr->u.meta.dfile_count);         
            }
            gossip_lerr("cur_ctx->replication_number_of_copies(%d):context(%d)\n"
                       ,(int)cur_ctx->replication_number_of_copies,i);

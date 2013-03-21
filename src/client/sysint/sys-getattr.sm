@@ -1570,6 +1570,8 @@ static PINT_sm_action getattr_acache_insert(
             }
         }
 
+        gossip_lerr("Executing PINT_acache_update from %s.\n",__func__);
+
         PINT_acache_update(sm_p->getattr.object_ref,
             &sm_p->getattr.attr,
             tmp_size);
