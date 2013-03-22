@@ -2936,7 +2936,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
            free(tmp);
     }
 
-    /* Remove from current queue and add to dest_list queue*/
+    /* Remove from src_list and add to dest_list */
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
@@ -2957,7 +2957,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 
         replica_q_item = &q_item->replicas[i];
         memset(replica_q_item,0,sizeof(*replica_q_item));
-        INIT_QUEUE_HEAD(replica_q_item->list_link);
+        INIT_QLIST_HEAD(&replica_q_item->list_link);
 
         replica_q_item->bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
         replica_q_item->bmi_callback.data = replica_q_item;
