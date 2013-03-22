@@ -2413,9 +2413,9 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
     PVFS_size bytes_processed = 0;
     int ret;
 
-    gossip_lerr("Executing %s...flow(%p):q_item(%p)\n",__func__,flow_d,q_item);
-
     q_item->buffer_in_use++;
+
+    gossip_lerr("Executing %s...flow(%p):q_item(%p):buffer_in_use(%d)\n",__func__,flow_d,q_item,q_item->buffer_in_use);
 
     /* Create rest of qitem so that we can recv into it */
     if (0 == q_item->buffer)
@@ -2890,7 +2890,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     int i, ret;
     struct fp_queue_item *replica_q_item = NULL;
 
-    gossip_err("flow(%p):q_tiem(%p):Executing %s...\n",flow_d,q_item,__func__);
+    gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
     /* Handle errors from recv */
     if(error_code != 0 || flow_d->error_code != 0)
@@ -2956,8 +2956,9 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
 
         replica_q_item = &q_item->replicas[i];
+        memset(replica_q_item,0,sizeof(*replica_q_item));
+        INIT_QUEUE_HEAD(replica_q_item->list_link);
 
-        replica_q_item->posted_id= 0;
         replica_q_item->bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
         replica_q_item->bmi_callback.data = replica_q_item;
         replica_q_item->buffer = q_item->buffer;
@@ -2965,7 +2966,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         /* NOTE: the replica q_item's are only included on the src-list, so that error handling
          *       will remove any pending SENDS when cancel_pending_bmi is called.
          */
-        qlist_del(&replica_q_item->list_link);
         qlist_add_tail(&replica_q_item->list_link, &flow_data->src_list);
 
         /* if this iteration is the last iteration to post a send to a replica for this flow buffer, then allow the
@@ -3002,6 +3002,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         }
         else if (ret == 1)
         {
+           gossip_lerr("flow(%p):q_item(%p):q_item parent(%p):BMI-send completed immediately. "
+                       "Calling forwarding_bmi_send_callback.\n",flow_d,replica_q_item,q_item);
            forwarding_bmi_send_callback_fn(replica_q_item, actual_size, 0);
         }
     }/*end for*/
