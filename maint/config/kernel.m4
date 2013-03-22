@@ -1405,26 +1405,30 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl need for the -Werror and -Wall.
 	tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror -Wall"
-	AC_MSG_CHECKING(for two param permission)
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/kernel.h>
-		#include <linux/slab.h>
-		#include <linux/fs.h>
-		#include <linux/namei.h>
-		int ctor(struct inode *i, int a)
-		{
-			return 0;
-		}
-		struct inode_operations iop = {
-			.permission = ctor,
-		};
-	], [
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
-	AC_MSG_RESULT(no)
-	)
+    AC_MSG_CHECKING(for two param permission)
+    AC_TRY_COMPILE(
+      [
+        #define __KERNEL__
+        #include <linux/kernel.h>
+        #include <linux/slab.h>
+        #include <linux/fs.h>
+        #include <linux/namei.h>
+        int ctor(struct inode *i, int a)
+        {
+            return 0;
+        }
+        struct inode_operations iop = {
+            .permission = ctor,
+        };
+      ],
+      [ ],
+      [
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1,                 [Define
+if kernel's inode_operations has two parameters permission function])
+      ],
+      [AC_MSG_RESULT(no)]
+    )
 	CFLAGS=$tmp_cflags
 
 
