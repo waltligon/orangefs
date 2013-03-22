@@ -37,9 +37,9 @@ export CVS_TAG=`echo $CVS_TAG_FULL | awk -F"/" '{print $NF}'`
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 #SYSINT_SCRIPTS=~+/sysint-tests.d
-export SYSINT_SCRIPTS=`pwd`/sysint-tests.d
-export VFS_SCRIPTS=`pwd`/vfs-tests.d
-export USERLIB_SCRIPTS=`pwd`/userint-tests.d
+SYSINT_SCRIPTS=`pwd`/sysint-tests.d
+VFS_SCRIPTS=`pwd`/vfs-tests.d
+USERLIB_SCRIPTS=`pwd`/userint-tests.d
 #VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
@@ -141,7 +141,7 @@ setup_vfs() {
 	if [ $ENABLE_SECURITY ] ; then
 		keypath="--keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/clientkey.pem"
 	fi
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
@@ -237,7 +237,6 @@ configure_pvfs2() {
 start_pvfs2() {
 
 	# clean up any artifacts from earlier runs
-	#export ${PRELOAD}
 	cd ${PVFS2_DEST}
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
@@ -327,7 +326,7 @@ run_parts() {
 	cd $1
 	echo "Currently at `pwd`"
 	TESTS=$(basename `pwd`)
-
+	
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
@@ -408,7 +407,7 @@ start_all_pvfs2() {
 
 	echo  "Starting PVFS2 on $my_host"
 	echo "ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh\""
-	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ &&  ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
+	ssh -i ${KEYFILE} ${VMUSER}@${my_host} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "cd ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/ && ./start_pvfs2.sh $PVFS2_DEST $CVS_TAG "	
 		
 	else
 		echo  "Starting PVFS2 on $my_host"
