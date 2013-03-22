@@ -23,7 +23,6 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
-#include "security-util.h"
 #include "pvfs-path.h"
 
 extern job_context_id pint_client_sm_context;
@@ -75,9 +74,9 @@ machine pvfs2_client_lookup_sm
     {
         run lookup_segment_query_ncache;
         success => lookup_segment_verify_attr_present;
-        default => lookup_segment_setup_parent_getattr;
+        default => lookup_segment_setup_msgpair;
     }
-
+/*
     state lookup_segment_setup_parent_getattr
     {
         run lookup_segment_setup_parent_getattr;
@@ -90,7 +89,7 @@ machine pvfs2_client_lookup_sm
         success => lookup_segment_setup_msgpair;
         default => lookup_segment_lookup_failure;
     }
-
+*/
     state lookup_segment_setup_msgpair
     {
         run lookup_segment_setup_msgpair;
@@ -526,7 +525,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credential *credential,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
@@ -556,7 +555,7 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credential(sm_p->cred_p, credential);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -584,7 +583,7 @@ PVFS_error PVFS_isys_ref_lookup(
             gossip_err("%s: failed to init context (path = %s)\n",
                     __func__, relative_pathname);
         }
-        PINT_cleanup_credential(sm_p->cred_p);
+        PVFS_util_release_credentials(sm_p->cred_p);
         PINT_smcb_free(smcb);
         return ret;
     }
@@ -601,7 +600,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credential *credential,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints)
@@ -614,7 +613,7 @@ PVFS_error PVFS_sys_ref_lookup(
     ret = PVFS_isys_ref_lookup(fs_id, 
                                relative_pathname, 
                                parent, 
-                               credential, 
+                               credentials, 
                                resp,
                                follow_link, 
                                &op_id, 
@@ -649,7 +648,7 @@ PVFS_error PVFS_sys_ref_lookup(
  */
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
-    const PVFS_credential *credential,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints)
@@ -689,7 +688,7 @@ PVFS_error PVFS_sys_lookup(
             ret = PVFS_sys_ref_lookup(fs_id, 
                                       path,
                                       parent,
-                                      credential,
+                                      credentials,
                                       resp,
                                       follow_link,
                                       hints);
@@ -768,7 +767,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     }
     return SM_ACTION_COMPLETE;
 }
-  
+/*
 static PINT_sm_action lookup_segment_setup_parent_getattr(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -783,14 +782,14 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         cur_seg->seg_starting_refn,
-        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY),
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT),
         PVFS_TYPE_DIRECTORY,
         0);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
-   
+*/
 /*
  * This is called if the ncache lookup failed.  It builds the msgpair
  * so that the next state can jump into xfer msgpair.
@@ -829,12 +828,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* ensure a capability exists for the parent directory */
-    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY); 
-
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         seg_to_lookup,
         cur_seg->seg_starting_refn.fs_id,
@@ -911,7 +906,6 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
-        /* nlmills: TODO: get capability too? */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         PINT_SM_GETATTR_STATE_FILL(
             sm_p->getattr,  

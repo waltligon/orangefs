@@ -91,8 +91,7 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
-ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
-ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
+ENABLE_SECURITY = @ENABLE_SECURITY@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -174,7 +173,9 @@ INCLUDES := \
     src/io/job \
     src/io/dev \
     src/proto \
-    src/common/mgmt
+    src/common/mgmt \
+	src/common/hash \
+	src/common/llist
 GENINCLUDES := \
 	include
 endif
@@ -195,11 +196,11 @@ CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 -lm @LIBS@ 
+LIBS += -lpvfs2 @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
@@ -238,9 +239,6 @@ CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
 CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
-
-  # OpenSLL support
-CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
@@ -341,30 +339,24 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-# OpenSSL support
-SERVERCFLAGS += @OPENSSL_CPPFLAGS@
-
-# LDAP support
-SERVERCFLAGS += @LDAP_CPPFLAGS@
-
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
 endif
 
 # must be after -lrt because -lrt may use -lpthread
-SERVERLIBS += -lpthread
+SERVERLIBS += -lpthread 
 
 # you can optionally disable thread safety support in the client
 # though it's not recommended unless *required*.
 #
 # run ./configure --help for information on how to do this cleanly.
-LIBCFLAGS=@LIBCFLAGS@ @OPENSSL_CPPFLAGS@ -D__PVFS2_CLIENT__
+LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
-LIBS += @THREAD_LIB@ @OPENSSL_LIB@
-DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
-LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
+LIBS += @THREAD_LIB@
+DEPLIBS += @THREAD_LIB@
+LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
 # build BMI TCP?
@@ -490,8 +482,6 @@ USERSRC :=
 LIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
-# JNI_ULIBSRC is source code wrapper of libofs for JNI use.
-#JNI_ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
@@ -541,10 +531,10 @@ LIBRARIES_STATIC := lib/libpvfs2.a
 LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
+endif
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
-endif
 
 ifdef BUILD_BMI_ONLY
 LIBRARIES_STATIC += lib/libbmi.a
@@ -597,20 +587,14 @@ include $(patsubst %, %/module.mk, $(MODULES))
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBPICOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBPICOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBDEPENDS is a list of dependency files for the client lib
-#JNI_ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -625,25 +609,16 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDOBJS is a list of objects to put in the 
-# multithreaded JNI ofs lib
-#JNI_ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared jni 
-# ofs library
-#JNI_ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded
-# jni ofs lib
-#JNI_ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(JNI_ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -838,11 +813,6 @@ $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
-# special rules for devel tool objects which also require db components
-$(DEVELOBJS): %.o: %.c
-	$(Q) "  CC              $@"
-	$(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
-
 ifdef BUILD_BMI_ONLY
 # rule for building the bmi library
 lib/libbmi.a: $(LIBBMIOBJS)
@@ -927,9 +897,6 @@ lib/liborangefsposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
 	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
 
-# rule for building the JNI client shared library
-#lib/libPVFS2JNI.so: libPVFS2JNI.c PVFS2JNI.java javac javah  
-
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
 	$(Q) "  RANLIB	$@"
@@ -953,9 +920,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
-	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+$(DEVELTOOLS): %: %.o
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -1170,7 +1137,7 @@ cleaner: clean
 # except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.me
+	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.m4
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
@@ -1220,9 +1187,9 @@ endif
 src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
- --quiet src/server/simple.conf
+ --ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+ --storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+ --logging "server,network,storage,flow" --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
@@ -1231,8 +1198,8 @@ all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space \
+ --ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+ --storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
  --quiet examples/fs.conf
 endif
 
@@ -1258,6 +1225,7 @@ else
 install:: all install_doc
 	install -d $(includedir)
 	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
+	install -m 644 $(srcdir)/include/orange.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
@@ -1275,10 +1243,18 @@ ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
-ifneq (,$(KERNAPPSTHR))
+ifdef TARGET_OS_DARWIN
+#       TOC needs to be regenerated in libs after they get moved
+	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES_STATIC))
+endif
+endif
+ifneq (,$(LIBRARIES_THREADED_STATIC))
 	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
+ifdef TARGET_OS_DARWIN
+#       TOC needs to be regenerated in libs after they get moved
+	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES_THREADED_STATIC))
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
@@ -1287,18 +1263,13 @@ ifneq (,$(LIBRARIES_SHARED))
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
-ifneq (,$(KERNAPPSTHR))
+endif
+ifneq (,$(LIBRARIES_THREADED_SHARED))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
 	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
-endif
-endif
-
-ifdef TARGET_OS_DARWIN
-#       TOC needs to be regenerated in libs after they get moved
-	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
 endif
 
 	install -d $(bindir)
@@ -1338,13 +1309,6 @@ ifdef BUILD_SERVER
     else
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
-    endif
-	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
-    ifdef ENABLE_SECURITY_KEY
-	touch $(bindir)/.pvfs2-genconfig-key    
-    endif
-    ifdef ENABLE_SECURITY_CERT
-	touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
 endif

@@ -193,7 +193,9 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
 
-                ret = PINT_cached_config_handle_load_mapping(cur_fs);
+                ret =
+                PINT_cached_config_handle_load_mapping(cur_fs,
+                             config->server_config);
                 if (ret)
                 {
                     PVFS_perror(

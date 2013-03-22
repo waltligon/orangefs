@@ -1,17 +1,63 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
-SVN changes can be seen at
-http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
+orangefs-2.8.7 (Subversion Tag v2.8.7)
 
-Trunk
+Revs 9399 thru 9763
 
-* New Feature: added human readable times to pvfs2-db-display.  Rev 9366.
+* WARNINGS:
+*	- The pvfs kernel module is NOT compatible with linux kernel versions
+*	  3.4 and higher.  Work is currently underway.
+*	- A known linux kernel bug causing kernel panics when a PVFS
+*	  filesystem is unmounted was found in RHEL releases 2.6.18-308.1.1 thru
+*	  2.6.18-308.20.1.  The OrangeFS team recommends using 2.6.18-308 (RHEL 5.8) or
+*	  2.6.32-71 (RHEL 6,0) and up.  This kernel bug affects other
+*	  filesystems as well.
+
+* Corrected issues with the readdirplus operations effecting the dokan
+interface for Windows.
+
+* Corrected memory overwrite that resulted from using both readdir and
+readdirplus members of a union whenever the readdir state machine was called
+from the readdirplus state machine.
+
+* Starting in linux kernels 3.4, d_make_root is used instead of d_alloc_root.
+Configure changes were added to account for this change in the kernel module.
+
+* Fixed a bug in pvfs_readdir associated with the usrint library.
+
+* Modified kernel module to accommodate the RCU walk initiated by the system
+in pvfs2_d_validate.  This fixes a deadlock occurring in kernel versions
+2.6.38 and later.
+
+* Fixed bug in usrint library where a dir is opened and the fd is passed to
+fchdir but the path is missing.
+
+* Added support for fts interface in usrint library.
+
+* Fixed errors with invalid objects in the kernel module.
+
+* Performance improvements for Windows Client.
+
+* Defects corrected for ucache system.
+
+* Changes to Makefile:
+*   - Using glibtool instead of glib on MAC-Darwin OS when making libpvfs2.a
+*   - Ensure that sbin dir is creatd before moving ucache system into it.
+*   - Added lib/libpvfs2.so as a dependency when making libofs.so to allow
+*     make with the -j option to operate correctly.
+*   - Renamed liborange to liborangefs.
+
+* New Feature: added human readable times to pvfs2-db-display.
 
 * New Feature:  when setting the mode (admin or normal) of a filesystem 
-* using pvfs2-set-mode, you can now do so for individual servers.  Prior
-* to this change, the mode was set for all the servers within a particular 
-* filesystem.
+using pvfs2-set-mode, you can now do so for individual servers.  Prior
+to this change, the mode was set for all the servers within a particular 
+filesystem.
+
+
+
+orangefs-2.8.6 (Rev v2.8.6)
 
 * New Feature: users can now specify at configure time how they want the
 * kernel module to handle the file pointer when an error occurs.  The
@@ -61,14 +107,145 @@ the heap; however, the code would be overwriting other global structures, like
 the known_method_table, etc. To correct this problem, I use a local
 job_status_s structure inside the server_post_unexpected_recv(). Please read
 the comments in that function to understand why this works.
-	SVN Changeset 9273
+	SVN:  Change #9272
 
-* Enhancement: Incremented display of handles from 16 to 20 bytes in pvfs2-ls.
+* New Feature: added usrint and ucache code allows programs to link
+* directly bypassing kernel
 
-* Bug fix: Fix invalid argument errors on chmod though pvfs2fuse
+* Bug Fix: rewrote layout algorithms for RANDOM and ROUND_ROBIN which
+* did not perform as advertized.  Still a question if metadata
+* selection works correctly or stuffed file allocation.
 
-* Bug fix: uninitialized variable could cause seg fault when file system 
+* Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
+to 20 characters.
+
+* Bug Fix: uninitialized variable could cause seg fault when file system 
 * cannot be initialized.
+
+orangefs-2.8.5
+
+SVN changes can be seen at
+http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/orangefs-2-8-5
+
+* Bug Fix:  Problem: server seg faulted when the unstuff state machine tried
+            to unstuff a file defined as needing more datafilesthan I/O servers currently
+            in the system.  A side affect was that this worked when there was more than
+            one server in the system.  The correct behavior is to NEVER define more datahandles than
+            there are I/O servers in the system.
+            Correction:  Modified function PINT_cached_config_get_num_dfiles to return no
+            more than the number of I/O servers, regardless of the number requested by the user 
+	    or needed by the distribution.  This function is called during the sys-create state machine 
+	    BEFORE the number of requested datafiles is sent to the server.  
+	SVN: Change #9082
+
+* Enhancement: Added optimization.  When a file is created and the requested number of dfiles is 1,
+               then we create the metadata without "stuffed" values,i.e., key="nd".  When data
+               is written to this file, there is no need to execute the "unstuff" server side
+               state machine.
+	SVN: Change #9083
+
+Text after "CVS: " can be prepended with "http://www.pvfs.org/fisheye/changelog/~br=Orange-Branch/PVFS/?cs=Orange-Branch:" to view related change sets in FishEye.
+
+* Enhancement: change to kernel source path to support SuSE style kernel sources
+        CVS: mtmoore:20110831005433
+
+* Enhancement: add prompt after X removals during a pvfs2-fsck when -y specified
+        CVS: mtmoore:20110824144127
+
+* Enhancement: Add sanity checks to extended attribute operations 
+        CVS: mtmoore:20110811180653
+
+* Enhancement addition of counters and application to feed SNMP counters
+        CVS: walt:20110628184842
+        CVS: walt:20110628161840
+        CVS: walt:20110617152339
+
+* Enhancement: addition of scripts used for OrangeFS CI Jenkins testing
+        CVS: mtmoore:20110623183144
+
+* Enhancement: add backtrace handler to SIGABRT
+        CVS: mtmoore:20110607235041
+
+* Enhancement: add sanity checks during trove cleanup/initialization
+        CVS: mtmoore:20110607232817
+
+* Enhancement: allow server log to be re-opened on SIGHUP to allow log rotation
+        CVS: mtmoore:20110607023901        
+        CVS: mtmoore:20110530143543
+
+* Enhancement: allow debug mask to be reset during SIGHUP
+        CVS: bligon:20110504200411
+
+* Enhancement: add Berkeley DB configure check for version 4.8.30
+        CVS: mtmoore:20110405050554
+	Additional Information: https://www.orangefs.org/trac/orangefs/wiki/DBVersionRequired
+
+* Enhancement add configure checks for binaries required during build
+        CVS: mtmoore:20110404165443
+
+* Enhancement: kernel changes to support newer kernels (up to 2.6.40 tested and 3.X compiles, not tested)
+        CVS: mtmoore:20110831005433
+        CVS: mtmoore:20110823184109
+        CVS: mtmoore:20110822232017
+        CVS: mtmoore:20110412175323
+        CVS: mtmoore:20110525205504
+        CVS: mtmoore:20110405142136
+        CVS: mtmoore:20110405141506
+
+* Bug Fix: man pages are now gzip'd during installation  
+        CVS: mtmoore:20110904010919
+
+* Bug Fix: berkeley db gives back unaligned pages (in custom compare/multi-key cases), use local variables to fix ARM failures
+        CVS: mtmoore:20110902173424
+
+* Bug Fix: pointer dereference size issue in dbpf-mgmt on non-x86 platforms, Neal Ferguson
+        CVS: mtmoore:20110823171834
+
+* Bug Fix: file corruption using direct backend when writes continuously appending to single file
+        CVS: elaine:20110819120934
+        CVS: mtmoore:20110629130442
+
+* Bug Fix: segfault in pvfs2-xattr due to mirror handle string comparison, Nick Mills
+        CVS: mtmoore:20110809180325
+
+* Bug Fix: add backtrace functionality back in for newer distributions
+        CVS: mtmoore:20110801124552
+        CVS: mtmoore:20110607215819
+
+* Bug Fix: server-side memory leak related to operation completion 
+        CVS: bligon:20110708194724
+
+* Bug Fix: slab cache fix, Bart Taylor
+        CVS: bligon:20110613200154
+
+* Bug Fix: duplicate handle fix in iterate-handles, Phil Carns
+        CVS: bligon:20110610202309
+
+* Bug Fix: correctly parse pvfs2-server alias argument
+        CVS: mtmoore:20110608010721
+
+* Bug Fix: mx_address lookup failure with multiple protocols
+        CVS: bligon:20110530173949
+
+* Bug Fix: admin apps segfault with IB
+        CVS: bligon:20110512215357
+
+* Bug Fix: allow pvfs2-server to re-read configuratio file regardless of absolute or relative path
+        CVS: mtmoore:20110506194814
+
+* Bug Fix: root squash functionality, Bart Taylor
+        CVS: bligon:20110506173620
+
+* Bug Fix: various kernel related stability and error-handling fixes
+        CVS: mtmoore:20110729151843
+        CVS: mtmoore:20110729143317
+        CVS: mtmoore:20110530154853
+        CVS: mtmoore:20110412175444
+
+* Bug Fix: pin memory passed in to the kernel to prevent swap pages and kernel panic
+        CVS: mtmoore:20110725160953
+
+-------------------------------------------------------------------------------
 
 orangefs-2.8.4
 * Change verisioning to no longer include dates, just increment the sub version for every release

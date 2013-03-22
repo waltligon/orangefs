@@ -344,8 +344,7 @@ static int sign_credential(PVFS_credential *cred,
         return ENOMEM;
     }
 
-    md = EVP_PKEY_type(privkey->type) == EVP_PKEY_DSA ? EVP_dss1() : 
-         EVP_sha1();
+    md = EVP_sha1();
     EVP_MD_CTX_init(&mdctx);
 
     ret = EVP_SignInit_ex(&mdctx, md, NULL);

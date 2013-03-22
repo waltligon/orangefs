@@ -58,7 +58,8 @@ extern int pvfs_errno;
 /* Perform PVFS initialization if not already finished */
 void iocommon_ensure_init(void);
 
-int iocommon_cred(PVFS_credential **credential);
+void iocommon_cred(PVFS_credentials **credentials);
+
 
 void calc_copy_ops( off64_t offset,
                     size_t req_size,
@@ -68,21 +69,19 @@ void calc_copy_ops( off64_t offset,
                     const struct iovec *vector
 );
 
-int calc_req_blk_cnt( uint64_t offset,
-                      size_t req_size
-);
+int calc_req_blk_cnt(uint64_t offset, size_t req_size);
 
-size_t sum_iovec_lengths( size_t iovec_count,
-                          const struct iovec *vector
-);
 
-unsigned char read_full_block_into_ucache( pvfs_descriptor *pd,
-                                           PVFS_size offset,
-                                           struct ucache_req_s *req,
-                                           int req_index,
-                                           uint64_t *fent_size,
-                                           size_t *req_size,
-                                           int *req_blk_cnt
+size_t sum_iovec_lengths(size_t iovec_count, const struct iovec *vector);
+
+
+unsigned char read_full_block_into_ucache( pvfs_descriptor *pd, 
+                                           PVFS_size offset, 
+                                           struct ucache_req_s *req, 
+                                           int req_index, 
+                                           uint64_t * fent_size, 
+                                           size_t * req_size, 
+                                           int * req_blk_cnt 
 );
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
@@ -236,8 +235,6 @@ extern int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf);
 extern int iocommon_seteattr(pvfs_descriptor *pd, const char *key, const void *val, int size, int flag);
 
 extern int iocommon_geteattr(pvfs_descriptor *pd, const char *key, void *val, int size);
-
-extern int iocommon_atomiceattr(pvfs_descriptor *pd, const char *key, void *val, int valsize, void *response, int respsize, int flag, int opcode);
 
 extern int iocommon_listeattr(pvfs_descriptor *pd, char *list, int size, int *numkeys);
 

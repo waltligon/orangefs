@@ -66,6 +66,9 @@ typedef uint64_t u_int64_t;
 #define encode_PVFS_cert_data(pptr,x) encode_char(pptr,x)
 #define decode_PVFS_cert_data(pptr,x) decode_char(pptr,x)
 
+#define encode_PVFS_key_data(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_key_data(pptr,x) decode_char(pptr,x)
+
 #define encode_char(pptr,x) do { \
     *(char *) *(pptr) = *(x); \
     *(pptr) += 1; \

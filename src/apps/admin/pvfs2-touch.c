@@ -86,7 +86,7 @@ int main(int argc, char **argv)
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
         PVFS_sysresp_create resp_create;
-        PVFS_credential credentials;
+        PVFS_credentials credentials;
         PVFS_object_ref parent_ref;
         PVFS_sys_attr attr;
 
@@ -114,13 +114,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        ret = PVFS_util_gen_credential_defaults(&credentials);
-        if (ret < 0)
-        {
-            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
-            ret = -1;
-            break;
-        }
+
+        PVFS_util_gen_credentials(&credentials);
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
@@ -134,8 +129,8 @@ int main(int argc, char **argv)
 
         /* Set attributes */
         memset(&attr, 0, sizeof(PVFS_sys_attr));
-        attr.owner = credentials.userid;
-        attr.group = credentials.group_array[0];
+        attr.owner = credentials.uid;
+        attr.group = credentials.gid;
         attr.perms = 0777;
         attr.atime = time(NULL);
         attr.mtime = attr.atime;

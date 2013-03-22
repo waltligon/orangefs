@@ -29,7 +29,6 @@
 /* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
 
-/* TODO: error printing etc. */
 #define PINT_SECURITY_CHECK(rc, label) \
     do { \
         if ((rc) != 0) \
@@ -52,7 +51,7 @@
     do { \
         if ((ptr) == NULL) \
         { \
-            PINT_security_error(__func__, PVFS_ESECURITY); \
+            PINT_security_error(__func__, -PVFS_ESECURITY); \
             goto label; \
         } \
     } while (0)
@@ -61,11 +60,17 @@
     do { \
         if ((ptr) == NULL) \
         { \
-            PINT_security_error(__func__, PVFS_ESECURITY); \
-            return PVFS_ESECURITY; \
+            PINT_security_error(__func__, -PVFS_ESECURITY); \
+            return -PVFS_ESECURITY; \
         } \
     } while (0)
-    
+
+#define PINT_SECURITY_ERROR(rc, format, f...) \
+    do { \
+        gossip_err("%s: " format, __func__, ##f); \
+        PINT_security_error(__func__, (rc)); \
+    } while (0)
+
 int PINT_security_initialize(void);
 int PINT_security_finalize(void);
 

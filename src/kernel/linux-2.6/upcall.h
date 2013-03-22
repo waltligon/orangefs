@@ -204,10 +204,6 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT = 14,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE = 15,
     PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG = 16,
-    PVFS2_PARAM_REQUEST_OP_CCACHE_TIMEOUT_SECS = 17,
-    PVFS2_PARAM_REQUEST_OP_CCACHE_HARD_LIMIT = 18,
-    PVFS2_PARAM_REQUEST_OP_CCACHE_SOFT_LIMIT = 19,
-    PVFS2_PARAM_REQUEST_OP_CCACHE_RECLAIM_PERCENTAGE = 20
 };  
     
 typedef struct
@@ -239,8 +235,9 @@ typedef struct
 typedef struct
 {
     int32_t type;
-    PVFS_uid uid;
-    PVFS_gid gid;
+    int32_t __pad1;
+
+    PVFS_credentials credentials;
     int pid;
     int tgid;
     /* currently trailer is used only by readx/writex (iox) */
@@ -249,18 +246,18 @@ typedef struct
 
     union
     {
-        pvfs2_io_request_t io;
+	pvfs2_io_request_t io;
         pvfs2_iox_request_t iox;
-        pvfs2_lookup_request_t lookup;
-        pvfs2_create_request_t create;
-        pvfs2_symlink_request_t sym;
-        pvfs2_getattr_request_t getattr;
-        pvfs2_setattr_request_t setattr;
-        pvfs2_remove_request_t remove;
-        pvfs2_mkdir_request_t mkdir;
-        pvfs2_readdir_request_t readdir;
-        pvfs2_readdirplus_request_t readdirplus;
-        pvfs2_rename_request_t rename;
+	pvfs2_lookup_request_t lookup;
+	pvfs2_create_request_t create;
+	pvfs2_symlink_request_t sym;
+	pvfs2_getattr_request_t getattr;
+	pvfs2_setattr_request_t setattr;
+	pvfs2_remove_request_t remove;
+	pvfs2_mkdir_request_t mkdir;
+	pvfs2_readdir_request_t readdir;
+	pvfs2_readdirplus_request_t readdirplus;
+	pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
         pvfs2_truncate_request_t truncate;
         pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;

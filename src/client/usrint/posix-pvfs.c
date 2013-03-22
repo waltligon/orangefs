@@ -105,7 +105,7 @@ int pvfs_open64(const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints;
+    PVFS_hint hints __attribute__((unused));
 
     debug("pvfs_open64: called with %s\n", path);
     if (!path)
@@ -206,7 +206,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints;
+    PVFS_hint hints __attribute__((unused));
 
     debug("pvfs_openat64: called with %s\n", path);
     if (dirfd < 0)
@@ -1883,7 +1883,7 @@ int pvfs_fcntl(int fd, int cmd, ...)
     int rc = 0;
     va_list ap;
     /* long arg; */
-    struct flock *lock;
+    struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
     long larg;
     int tsz;
@@ -2412,71 +2412,6 @@ ssize_t pvfs_fgetxattr(int fd,
     return iocommon_geteattr(pd, name, value, size);
 }
 
-ssize_t pvfs_atomicxattr(const char *path,
-                          const char *name,
-                          void *value,
-                          size_t valsize,
-                          void *response,
-                          size_t respsize,
-                          int flags,
-                          int opcode)
-{
-    int fd, rc = 0;
-
-    fd = pvfs_open(path, O_RDWR);
-    if (fd < 0)
-    {
-        return fd;
-    }
-    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
-                           respsize, flags, opcode);
-    pvfs_close(fd);
-    return rc;
-}
-
-ssize_t pvfs_latomicxattr(const char *path,
-                          const char *name,
-                          void *value,
-                          size_t valsize,
-                          void *response,
-                          size_t respsize,
-                          int flags,
-                          int opcode)
-{
-    int fd, rc = 0;
-
-    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
-    if (fd < 0)
-    {
-        return fd;
-    }
-    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
-                           respsize, flags, opcode);
-    pvfs_close(fd);
-    return rc;
-}
-
-ssize_t pvfs_fatomicxattr(int fd,
-                          const char *name,
-                          void *value,
-                          size_t valsize,
-                          void *response,
-                          size_t respsize,
-                          int flags,
-                          int opcode)
-{
-    pvfs_descriptor *pd;
-
-    pd = pvfs_find_descriptor(fd);
-    if (!pd)
-    {
-        errno = EBADF;
-        return -1;
-    }
-    return iocommon_atomiceattr(pd, name, value, valsize, response,
-                                respsize, flags, opcode);
-}
-
 ssize_t pvfs_listxattr(const char *path,
                        char *list,
                        size_t size)
@@ -2719,7 +2654,8 @@ int pvfs_fchdir(int fd)
     }
     debug("\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
     /* we will keep a copy and keep one in the environment */
-    strncpy(pvfs_cwd, pd->s->dpath, PVFS_PATH_MAX);
+    memset(pvfs_cwd, 0, sizeof(pvfs_cwd));
+    strncpy(pvfs_cwd, pd->s->dpath, plen + 1);
     setenv("PWD", pd->s->dpath, 1);
     return 0;
 }
@@ -2744,6 +2680,7 @@ char *pvfs_getcwd(char *buf, size_t size)
             errno = ENOMEM;
             return NULL;
         }
+        memset(buf, 0, bsize);
     }
     else
     {
@@ -2757,8 +2694,9 @@ char *pvfs_getcwd(char *buf, size_t size)
             errno = ERANGE;
             return NULL;
         }
+        memset(buf, 0, size);
     }
-    strcpy(buf, pvfs_cwd);
+    strncpy(buf, pvfs_cwd, plen + 1);
     return buf;
 }
 

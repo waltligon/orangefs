@@ -179,12 +179,12 @@ extern posix_ops pvfs_ops;
 
 typedef struct pvfs_mmap_s
 {
-    void *mst;
-    size_t mlen;
-    int mprot;
-    int mflags;
-    int mfd;
-    off_t moff;
+    void *mst;              /**< start of mmap region */
+    size_t mlen;            /**< length of mmap region */
+    int mprot;              /**< protection of mmap region */
+    int mflags;             /**< flags of mmap region */
+    int mfd;                /**< file descriptor of mmap region */
+    off_t moff;             /**< offset of mmap region */
     struct qlist_head link;
 } *pvfs_mmap_t;
 

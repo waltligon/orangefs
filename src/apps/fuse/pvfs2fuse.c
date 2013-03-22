@@ -20,8 +20,8 @@ char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
 
-#include <fuse/fuse.h>
-#include <fuse/fuse_opt.h>
+#include <fuse.h>
+#include <fuse_opt.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>

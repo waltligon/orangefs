@@ -93,7 +93,7 @@ int open(const char *path, int flags, ...)
             /* we assume path was qualified by is_pvfs_path() */
             int len = strnlen(path, PVFS_PATH_MAX);
             pd->s->dpath = (char *)malloc(len + 1);
-            strncpy(pd->s->dpath, path, len);
+            strncpy(pd->s->dpath, path, len + 1);
         }
         gen_mutex_unlock(&pd->s->lock);
         gen_mutex_unlock(&pd->lock);
@@ -758,11 +758,11 @@ int fstatat(int fd, const char *path, struct stat *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = pvfs_lstat(path, buf);
+            rc = lstat(path, buf);
         }
         else
         {
-            rc = pvfs_stat(path, buf);
+            rc = stat(path, buf);
         }
     }
     else
@@ -795,11 +795,11 @@ int fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = pvfs_lstat64(path, buf);
+            rc = lstat64(path, buf);
         }
         else
         {
-            rc = pvfs_stat64(path, buf);
+            rc = stat64(path, buf);
         }
     }
     else

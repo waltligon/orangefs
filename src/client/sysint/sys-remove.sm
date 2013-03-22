@@ -119,7 +119,7 @@ machine pvfs2_client_remove_sm
         run remove_check_error_code;
         success => cleanup;
         RETURN_STORED_ERROR_CODE => cleanup;
-        default => crdirent_setup_msgpair;
+        default => getattr_setup;
     }
 
     state crdirent_timer
@@ -399,10 +399,6 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
-
-    sm_p->u.remove.stored_error_code = js_p->error_code;
-
-    js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
     assert(attr);

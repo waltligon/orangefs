@@ -1061,6 +1061,22 @@ endecode_fields_1a_struct (
     PVFS_cert_data, buf);
 #define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
 
+/* Buffer and structure for certificate private key */
+typedef unsigned char *PVFS_key_data;
+
+typedef struct PVFS_security_key PVFS_security_key;
+struct PVFS_security_key
+{
+    uint32_t buf_size;
+    PVFS_key_data buf;
+};
+endecode_fields_1a_struct (
+    PVFS_security_key,
+    skip4,,
+    uint32_t, buf_size,
+    PVFS_key_data, buf);
+#define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
+
 typedef unsigned char *PVFS_signature;
 
 /* A capability defines permissions for a set of handles. */

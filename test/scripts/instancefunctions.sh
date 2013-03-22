@@ -4,12 +4,14 @@ check_instance() {
 
 	#$1 = ipaddress
 	
+	echo "ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null"
 	ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 
 	#is SSH responding?
 	until [ $? -eq 0 ]
 	do
 		sleep 10
+		echo "ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null"
 		ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 	done
 }

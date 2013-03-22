@@ -3,9 +3,9 @@ SERVERSRC += $(DIR)/security-util.c \
              $(DIR)/pint-uid-map.c \
              $(DIR)/capcache.c
 LIBSRC += $(DIR)/security-util.c \
-          $(DIR)/getugroups.c
+          $(DIR)/getugroups.c \
+	  $(DIR)/cert-util.c
 
-# TODO: change for certs
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c

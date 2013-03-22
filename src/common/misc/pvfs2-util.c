@@ -14,15 +14,13 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
-#include <unistd.h>
 #include <sys/types.h>
+#ifndef WIN32
+#include <unistd.h>
 #include <sys/time.h>
-#include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
 #include <libgen.h>
+#endif
 
-#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -36,20 +34,7 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
-#include "security-util.h"
 #include "pvfs-path.h"
-
-#if defined(ENABLE_SECURITY_CERT) || defined(ENABLE_SECURITY_KEY)
-#define ENABLE_SECURITY_MODE
-#endif
-
-#ifndef ENABLE_SECURITY_MODE
-#include <pwd.h>
-#include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
-#endif
 
 #ifdef HAVE_MNTENT_H
 
@@ -68,7 +53,6 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
 
 #elif HAVE_FSTAB_H
-#include "openfile-util.h"
 
 #include <fstab.h>
 #define PINT_fstab_t FILE
@@ -113,11 +97,6 @@ static int parse_encoding_string(
     enum PVFS_encoding_type *et);
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
-
-#ifndef ENABLE_SECURITY_MODE
-static int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                        unsigned int timeout, PVFS_credential *cred);
-#endif
 
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     char* config_server,
@@ -169,462 +148,8 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     free(mntent->pvfs_config_servers[0]);
     free(mntent->pvfs_config_servers);
     free(mntent->pvfs_fs_name);
-    mntent->pvfs_fs_name = NULL;
     free(mntent);
     return;
-}
-
-/* PVFS_util_gen_credential_defaults
- * 
- * Generate a signed credential for the current user, with a 
- * default timeout.
- */
-int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
-{
-    return PVFS_util_gen_credential(NULL, NULL, 
-                                    PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
-                                    NULL, cred);
-}
-
-#ifdef ENABLE_SECURITY_MODE
-/* PVFS_util_gen_credential
- * 
- * Generate signed credential object using external app pvfs2-gencred.
- *
- * user - string representation of numeric uid
- * group - string representation of numeric gid
- * timeout - in seconds; value of 0 will result in default (1 hour)
- * keypath - path to client private key file
- * cred - the credential object
- */
-int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
-{
-    struct sigaction newsa, oldsa;
-    pid_t pid;
-    int filedes[2], errordes[2];
-    int ret;
-#ifdef ENABLE_SECURITY_CERT
-    char *certpath;
-#endif
-
-    if (!keypath && getenv("PVFS2KEY_FILE"))
-    {
-        keypath = getenv("PVFS2KEY_FILE");
-    }
-
-#ifdef ENABLE_SECURITY_CERT
-    certpath = getenv("PVFS2CERT_FILE");
-#endif
-
-    memset(&newsa, 0, sizeof(newsa));
-    newsa.sa_handler = SIG_DFL;
-    sigaction(SIGCHLD, &newsa, &oldsa);
-
-    /* pipe to read credential from stdout of pvfs2-gencred */
-    ret = pipe(filedes);
-    if (ret == -1)
-    {
-        return -PVFS_errno_to_error(errno);
-    }
-    /* pipe to read any error messages from stderr of pvfs2-gencred */
-    ret = pipe(errordes);
-    if (ret == -1)
-    {
-        return -PVFS_errno_to_error(errno);
-    }
-
-    pid = fork();
-    if (pid == 0)
-    {
-        char *args[7];
-        char **ptr = args;
-        char timearg[16];
-        char *envp[] = { NULL };
-
-        close(STDERR_FILENO);
-        dup(errordes[1]);
-        close(STDOUT_FILENO);
-        dup(filedes[1]);
-        close(STDIN_FILENO);
-
-        *ptr++ = BINDIR"/pvfs2-gencred";
-
-        if (user)
-        {
-            *ptr++ = "-u";
-            *ptr++ = (char*)user;
-        }
-        if (group)
-        {
-            *ptr++ = "-g";
-            *ptr++ = (char*)group;
-        }
-        if (timeout != 0 && 
-            timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
-        {
-           snprintf(timearg, sizeof(timearg), "%u", timeout);
-           *ptr++ = "-t";
-           *ptr++ = timearg;
-        }
-        if (keypath)
-        {
-            *ptr++ = "-k";
-            *ptr++ = (char*)keypath;
-        }
-#ifdef ENABLE_SECURITY_CERT
-        if (certpath)
-        {
-            *ptr++ = "-c";
-            *ptr++ = certpath;
-        }
-#endif
-        *ptr++ = NULL;
-        execve(BINDIR"/pvfs2-gencred", args, envp);
-
-        _exit(100);
-    }
-    else if (pid == -1)
-    {
-        close(filedes[1]);
-        close(errordes[1]);
-        ret = -PVFS_errno_to_error(errno);
-    }
-    else
-    {
-        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential],
-             ebuf[512];
-        ssize_t total = 0, etotal = 0;
-        ssize_t cnt, ecnt;
-
-        /* close write end so we get EOF when child exits */
-        close(errordes[1]);
-        close(filedes[1]);
-
-        /* read credential */
-        do
-        {
-            do
-            {
-                cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
-            } while (cnt == -1 && errno == EINTR);
-            total += cnt;
-        } while (cnt > 0);
-        
-        if (cnt == -1)
-        {
-            ret = -PVFS_errno_to_error(errno);
-        }
-        else
-        {
-            int rc;
-
-            waitpid(pid, &rc, 0);
-            if (WIFEXITED(rc) && !WEXITSTATUS(rc))
-            {
-                char *ptr = buf;
-                PVFS_credential tmp;
-
-                decode_PVFS_credential(&ptr, &tmp);
-                ret = PINT_copy_credential(&tmp, cred);
-
-                /* on the stack */
-                tmp.issuer = NULL;
-                PINT_cleanup_credential(&tmp);
-            }
-            else if (WIFEXITED(rc))
-            {                
-                /* error code from pvfs2_gencred */
-                ret = -PVFS_errno_to_error(WEXITSTATUS(rc));
-            }
-            else
-            {
-                /* catch-all error */
-                ret = -PVFS_EINVAL;
-            }
-
-            /* read errors and warnings */
-            do
-            {
-                do
-                {
-                    ecnt = read(errordes[0], ebuf+etotal, 
-                                (sizeof(ebuf) - etotal));
-                } while (ecnt == -1 && errno == EINTR);
-                etotal += ecnt;
-            } while (ecnt > 0 && etotal < sizeof(ebuf));
-            /* null terminate */
-            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
-
-            /* print errors */
-            if (etotal > 0)
-            {
-                gossip_err("pvfs2_gencred: %s", ebuf);
-            }
-        }
-    }
-
-    close(filedes[0]);
-    close(errordes[0]);
-    sigaction(SIGCHLD, &oldsa, NULL);
-
-    return ret;
-}
-#else /* ENABLE_SECURITY_MODE */
-/* PINT_gen_unsigned_credential 
- *
- * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
- * For use when robust security is disabled.
- */
-static int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                        unsigned int timeout, PVFS_credential *cred)
-{
-    unsigned long uid, gid, bufsize;
-    char *endptr;
-    struct passwd pwd;
-    struct group grp;
-    struct passwd *presult = NULL;
-    struct group *gresult = NULL;
-    char *pwdbuf, *grpbuf;
-    gid_t groups[PVFS_REQ_LIMIT_GROUPS];
-    int ngroups, ret, i;
-
-    /* allocate buffer for pwd functions */
-    bufsize = -1;
-#ifdef _SC_GETPW_R_SIZE_MAX
-    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-#endif
-    if (bufsize == -1)
-        bufsize = 16384;  /* adequate amount */
-    
-    pwdbuf = (char *) malloc(bufsize);
-    if (pwdbuf == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    /* get info for specified user or calling user */
-    if (user)
-    {
-        uid = strtoul(user, &endptr, 10);
-        if (*endptr == '\0' && *user != '\0')
-        {
-            if (uid > PVFS_UID_MAX)
-            {
-                ret = -1;
-                presult = NULL;
-            }
-            else
-            {
-                ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
-                if (presult == NULL)
-                {
-                    gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
-                                uid, ret);
-                }
-            }
-        }
-        else
-        {
-            ret = getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
-            if (presult == NULL)
-            {
-                gossip_lerr("User %s lookup error: %d (0 = not found)\n", 
-                            user, ret);
-            }
-        }
-    }
-    else
-    {
-        uid = getuid();
-        ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
-        if (presult == NULL)
-        {
-            gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
-                        uid, ret);
-        }
-    }
-    if (presult == NULL)
-    {
-        free(pwdbuf);
-        return -PVFS_EINVAL;
-    }
-
-    /* allocate buffer for grp functions */
-    bufsize = -1;
-#ifdef _SC_GETGR_R_SIZE_MAX
-    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
-#endif
-    if (bufsize == -1)
-    {
-        bufsize = 16384;
-    }
-
-    grpbuf = (char *) malloc(bufsize);
-    if (grpbuf == NULL)
-    {
-        free(pwdbuf);
-        return -PVFS_ENOMEM;
-    }
-
-    /* get info for specified or calling user's group */
-    if (group)
-    {
-        gid = strtoul(group, &endptr, 10);
-        if (*endptr == '\0' && *group != '\0')
-        {
-            if (gid > PVFS_GID_MAX)
-            {
-                ret = -1;
-                gresult = NULL;
-            }
-            else
-            {
-                ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
-                if (gresult == NULL)
-                {
-                    gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
-                                gid, ret);
-                }
-            }
-        }
-        else
-        {
-            ret = getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
-            if (gresult == NULL)
-            {
-                gossip_lerr("Group %s lookup error: %d (0 = not found)\n",
-                            group, ret);
-            }
-        }
-    }
-    else
-    {
-        gid = getgid();
-        ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
-        if (gresult == NULL)
-        {
-            gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
-                        gid, ret);
-        }
-    }
-    if (gresult == NULL)
-    {
-        free(pwdbuf);
-        free(grpbuf);
-        return -PVFS_EINVAL;
-    }
-
-    /* Note: without security enabled any user can generate a 
-       credential for another user. */
-
-    /* get user group list */
-#ifdef HAVE_GETGROUPLIST
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ret = getgrouplist(pwd.pw_name, grp.gr_gid, groups, &ngroups);
-    if (ret == -1)
-    {
-        gossip_lerr("error: unable to get group list for user %s\n",
-                    pwd.pw_name);
-        return -PVFS_EINVAL;
-    }
-    if (groups[0] != grp.gr_gid)
-    {
-        assert(groups[ngroups-1] == grp.gr_gid);
-        groups[ngroups-1] = groups[0];
-        groups[0] = grp.gr_gid;
-    }
-
-#else /* !HAVE_GETGROUPLIST */
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd.pw_name, grp.gr_gid);
-    if (ngroups == -1)
-    {
-        gossip_lerr("error: unable to get group list for user %s: %s\n",
-                pwd.pw_name, strerror(errno));
-        free(pwdbuf);
-        free(grpbuf);
-        return -PVFS_EINVAL;
-    }
-
-#endif /* HAVE_GETGROUPLIST */
-
-    /* fill in credential struct */
-    cred->userid = (PVFS_uid)pwd.pw_uid;
-    cred->num_groups = (uint32_t)ngroups;
-    cred->group_array = calloc(ngroups, sizeof(PVFS_gid));
-    if (cred->group_array == NULL)
-    {        
-        free(pwdbuf);
-        free(grpbuf);
-        return -PVFS_ENOMEM;
-    }
-    for (i = 0; i < ngroups; i++)
-    {
-        cred->group_array[i] = (PVFS_gid)groups[i];
-    }
-
-    /* insert an issuer and a null signature */
-    cred->issuer = strdup("");
-
-    cred->timeout = PINT_util_get_current_time() + 
-        (timeout != 0 ? timeout : PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
-
-    cred->sig_size = 0;
-    cred->signature = NULL;
-
-    cred->certificate.buf_size = 0;
-    cred->certificate.buf = NULL;
-
-    free(pwdbuf);
-    free(grpbuf);
-
-    return 0;
-}
-
-/*
- * This function generates an unsigned credential for use when
- * robust security is disabled.
- */
-int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
-{
-    if (cred == NULL)
-    {
-        gossip_lerr("PVFS_util_gen_credential: credential is null\n");
-        return -PVFS_EINVAL;
-    }
-
-    memset(cred, 0, sizeof(cred));
-
-    return PINT_gen_unsigned_credential(user, group, timeout, cred);
-}
-#endif /* ENABLE_SECURITY_MODE */
-
-/*
- * This function checks to see if the credential is still valid
- * and is not about to time out - if so then it does nothing,
- * otherwise it calls PVFS_util_gen_credential_defaults to make a
- * fresh one. Call this before running any system call.
- */
-int PVFS_util_refresh_credential(PVFS_credential *cred)
-{
-    int ret;
-
-    /* if the credential is valid for at least an hour */
-    if (PINT_util_get_current_time() <= cred->timeout - 3600)
-    {
-        ret = 0;
-    }
-    else
-    {
-        PINT_cleanup_credential(cred);
-        ret = PVFS_util_gen_credential_defaults(cred);
-    }
-
-    return ret;
 }
 
 int PVFS_util_get_umask(void)
@@ -638,6 +163,31 @@ int PVFS_util_get_umask(void)
         set = 1;
     }
     return mask;
+}
+
+PVFS_credentials *PVFS_util_dup_credentials(
+    const PVFS_credentials *credentials)
+{
+    PVFS_credentials *ret = NULL;
+
+    if (credentials)
+    {
+        ret = malloc(sizeof(PVFS_credentials));
+        if (ret)
+        {
+            memcpy(ret, credentials, sizeof(PVFS_credentials));
+        }
+    }
+    return ret;
+}
+
+void PVFS_util_release_credentials(
+    PVFS_credentials *credentials)
+{
+    if (credentials)
+    {
+        free(credentials);
+    }
 }
 
 int PVFS_util_copy_sys_attr(
@@ -654,7 +204,6 @@ int PVFS_util_copy_sys_attr(
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
-        dest_attr->dirdata_count = src_attr->dirdata_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -832,6 +381,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     if(!(PINT_FSTAB_NAME(tmp_ent)) || 
                        !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
                     {
+                        /* this entry is a comment */
                         PINT_fstab_entry_destroy(tmp_ent);
                         continue;
                     }
@@ -865,10 +415,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
     /* allocate array of entries */
     current_tab = &s_stat_tab_array[s_stat_tab_count];
-
     current_tab->mntent_array = (struct PVFS_sys_mntent *)malloc(
         (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
-
     if (!current_tab->mntent_array)
     {
         gen_mutex_unlock(&s_stat_tab_mutex);
@@ -889,52 +437,27 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     i = 0;
     while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
     {
-       if(!(PINT_FSTAB_NAME(tmp_ent)) || !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
-       {
-           PINT_fstab_entry_destroy(tmp_ent);
-           continue;
-        }
-
-        if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) && (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
+        if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
         {
             struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
             char *cp;
             int cur_server;
-	    char *rewrite_pointer;
 
-	    /* Entries in mtab may be prefixed by a process name and '#' */
-	    /* If detected, remove prefix.  */
-	    for(rewrite_pointer=cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++,rewrite_pointer++) {
-		if (*cp == '#') {
-		    rewrite_pointer = PINT_FSTAB_NAME(tmp_ent) - 1;
-		    continue;
-		}
-		if (rewrite_pointer == cp) continue;
-		*rewrite_pointer = *cp;
-	    }
-	    *rewrite_pointer = '\0';
-	       
             /* Enable integrity checks by default */
             me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
             for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
-            {
                 if (*cp == ',')
-                {
                     ++me->num_pvfs_config_servers;
-                }
-            }
 
             /* allocate room for our copies of the strings */
             me->pvfs_config_servers = malloc(me->num_pvfs_config_servers
-                                      * sizeof(*me->pvfs_config_servers));
+              * sizeof(*me->pvfs_config_servers));
             if (!me->pvfs_config_servers)
-            {
                 goto error_exit;
-            }
-            memset(me->pvfs_config_servers, 0, me->num_pvfs_config_servers
-                                            * sizeof(*me->pvfs_config_servers));
+            memset(me->pvfs_config_servers, 0,
+              me->num_pvfs_config_servers * sizeof(*me->pvfs_config_servers));
             me->mnt_dir = malloc(strlen(PINT_FSTAB_PATH(tmp_ent)) + 1);
             me->mnt_opts = malloc(strlen(PINT_FSTAB_OPTS(tmp_ent)) + 1);
 
@@ -946,10 +469,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* parse server list and make sure fsname is same */
             cp = PINT_FSTAB_NAME(tmp_ent);
-
             cur_server = 0;
-            for (;;)
-            {
+            for (;;) {
                 char *tok;
                 int slashcount;
                 char *slash;
@@ -1001,24 +522,16 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                  */
                 me->pvfs_config_servers[cur_server] = strdup(tok);
                 if (!me->pvfs_config_servers[cur_server])
-                {
                     goto error_exit;
-                }
 
                 ++last_slash;
 
-                if (cur_server == 0)
-                {
+                if (cur_server == 0) {
                     me->pvfs_fs_name = strdup(last_slash);
                     if (!me->pvfs_fs_name)
-                    {
                         goto error_exit;
-                    }
-                }
-                else
-                {
-                    if (strcmp(last_slash, me->pvfs_fs_name) != 0)
-                    {
+                } else {
+                    if (strcmp(last_slash, me->pvfs_fs_name) != 0) {
                         gossip_lerr(
                           "Error: different fs names in server addresses: %s\n",
                           PINT_FSTAB_NAME(tmp_ent));
@@ -1031,17 +544,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
-                                    PINT_FSTAB_PATH(tmp_ent));
+                   PINT_FSTAB_PATH(tmp_ent));
             strcpy(current_tab->mntent_array[i].mnt_opts,
-                                    PINT_FSTAB_OPTS(tmp_ent));
+                   PINT_FSTAB_OPTS(tmp_ent));
 
             /* find out if a particular flow protocol was specified */
             if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
             {
                 ret = parse_flowproto_string(
-                                        PINT_FSTAB_OPTS(tmp_ent),
-                                        &(current_tab->
-                                        mntent_array[i].flowproto));
+                    PINT_FSTAB_OPTS(tmp_ent),
+                    &(current_tab->
+                      mntent_array[i].flowproto));
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -1050,17 +563,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             else
             {
                 current_tab->mntent_array[i].flowproto =
-                                        FLOWPROTO_DEFAULT;
+                    FLOWPROTO_DEFAULT;
             }
 
             /* pick an encoding to use with the server */
             current_tab->mntent_array[i].encoding =
-                                    PVFS2_ENCODING_DEFAULT;
+                PVFS2_ENCODING_DEFAULT;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
                 ret = parse_encoding_string(
-                                   cp, &current_tab->mntent_array[i].encoding);
+                    cp, &current_tab->mntent_array[i].encoding);
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -1094,7 +607,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
-error_exit:
+  error_exit:
     for (; i > -1; i--)
     {
         struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
@@ -1103,12 +616,8 @@ error_exit:
         {
             int j;
             for (j=0; j<me->num_pvfs_config_servers; j++)
-            {
                 if (me->pvfs_config_servers[j])
-                {
                     free(me->pvfs_config_servers[j]);
-                }
-            }
             free(me->pvfs_config_servers);
             me->pvfs_config_servers = NULL;
             me->num_pvfs_config_servers = 0;
@@ -1265,8 +774,6 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_ENOMEM;
             }
-            /* should this be PVFS_PATH_MAX? - WBL */
-            /* need to find def of this field (tabfile_name) first */
             strncpy(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].tabfile_name,
                     PVFS2_DYNAMIC_TAB_NAME, PVFS_NAME_MAX);
         }
@@ -1415,7 +922,7 @@ int PVFS_util_remove_internal_mntent(
                     continue;
                 }
                 PVFS_util_copy_mntent(
-                            &tmp_mnt_array[new_count++], current_mnt);
+                    &tmp_mnt_array[new_count++], current_mnt);
                 PVFS_util_free_mntent(current_mnt);
             }
 
@@ -1434,7 +941,7 @@ int PVFS_util_remove_internal_mntent(
               array since we know it's now empty.
             */
             PVFS_util_free_mntent(
-                        &s_stat_tab_array[found_index].mntent_array[0]);
+                &s_stat_tab_array[found_index].mntent_array[0]);
             free(s_stat_tab_array[found_index].mntent_array);
             s_stat_tab_array[found_index].mntent_array = NULL;
             s_stat_tab_array[found_index].mntent_count = 0;
@@ -1454,7 +961,7 @@ int PVFS_util_remove_internal_mntent(
  * returns 0 on success, -PVFS_error on failure
  */
 int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
-                              struct PVFS_sys_mntent *out_mntent)
+                              struct PVFS_sys_mntent* out_mntent)
 {
     int i = 0;
 
@@ -1476,23 +983,6 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
             }
         }
     }
-
-    /* check the dynamic region if we haven't found a match yet */
-    for (i = 0; i < s_stat_tab_array[
-             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
-    {
-        struct PVFS_sys_mntent *mnt_iter;
-        mnt_iter = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
-                     mntent_array[i]);
-
-        if (mnt_iter->fs_id == fs_id)
-        {
-            PVFS_util_copy_mntent(out_mntent, mnt_iter);
-            gen_mutex_unlock(&s_stat_tab_mutex);
-            return 0;
-        }
-    }
-
     gen_mutex_unlock(&s_stat_tab_mutex);
     return -PVFS_EINVAL;
 }
@@ -1522,7 +1012,7 @@ int PVFS_util_resolve(
     PVFS_path_t *Ppath;
     int ppath_local = 0;
 
-    if(strlen(local_path) > (PVFS_PATH_MAX-1))
+    if(strlen(local_path) > (PVFS_NAME_MAX-1))
     {
         gossip_err("Error: PVFS_util_resolve() input path too long.\n");
         return(-PVFS_ENAMETOOLONG);
@@ -1565,32 +1055,32 @@ int PVFS_util_resolve(
         /* if the path wasn't found, try canonicalizing the path in case it
          * refers to a relative path on a mounted volume or contains symlinks
          */
-        tmp_path = (char*)malloc(PVFS_PATH_MAX * sizeof(char));
+        tmp_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
         if(!tmp_path)
         {
             return(-PVFS_ENOMEM);
         }
-        memset(tmp_path, 0, PVFS_PATH_MAX * sizeof(char));
-        ret = PINT_realpath(local_path, tmp_path, (PVFS_PATH_MAX - 1));
+        memset(tmp_path, 0, PVFS_NAME_MAX*sizeof(char));
+        ret = PINT_realpath(local_path, tmp_path, (PVFS_NAME_MAX-1));
         if(ret == -PVFS_EINVAL)
         {
             /* one more try; canonicalize the parent in case this function
              * is called before object creation; the basename
              * doesn't yet exist but we still need to find the PVFS volume
              */
-            parent_path = (char *)malloc(PVFS_PATH_MAX * sizeof(char));
+            parent_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
             if(!parent_path)
             {
                 free(tmp_path);
                 return(-PVFS_ENOMEM);
             }
             /* find size of basename so we can reserve space for it */
-            /* note: basename() and dirname() modify args, thus the strcpy */
+            /* note: basename() and dirname() modifiy args, thus the strcpy */
             strcpy(parent_path, local_path);
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
             ret = PINT_realpath(dirname(parent_path), tmp_path,
-                               (PVFS_PATH_MAX - base_len - 2));
+                (PVFS_NAME_MAX-base_len-2));
             if(ret < 0)
             {
                 free(tmp_path);
@@ -1880,18 +1370,8 @@ void PVFS_util_free_mntent(
         {
             int j;
             for (j=0; j<mntent->num_pvfs_config_servers; j++)
-            {            
                 if (mntent->pvfs_config_servers[j])
-                {
-                    if (mntent->pvfs_config_servers[j] == 
-                        mntent->the_pvfs_config_server)
-                    {
-                        /* don't free further down */
-                        mntent->the_pvfs_config_server = NULL;
-                    }
                     free(mntent->pvfs_config_servers[j]);
-                }
-            }
             free(mntent->pvfs_config_servers);
             mntent->pvfs_config_servers = NULL;
             mntent->num_pvfs_config_servers = 0;
@@ -1910,11 +1390,6 @@ void PVFS_util_free_mntent(
         {
             free(mntent->mnt_opts);
             mntent->mnt_opts = NULL;
-        }
-        if (mntent->the_pvfs_config_server)           
-        {
-            free(mntent->the_pvfs_config_server);
-            mntent->the_pvfs_config_server = NULL;
         }
 
         mntent->flowproto = 0;
@@ -1957,14 +1432,6 @@ int PVFS_util_copy_mntent(
                 ret = -PVFS_ENOMEM;
                 goto error_exit;
             }
-        }
-
-        dest_mntent->the_pvfs_config_server = 
-            strdup(src_mntent->the_pvfs_config_server);
-        if (!dest_mntent->the_pvfs_config_server)
-        {
-            ret = -PVFS_ENOMEM;
-            goto error_exit;
         }
 
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
@@ -2109,7 +1576,7 @@ void PINT_release_pvfstab(void)
     int i, j;
 
     gen_mutex_lock(&s_stat_tab_mutex);
-    for(i = 0; i < s_stat_tab_count; i++)
+    for(i=0; i<s_stat_tab_count; i++)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
@@ -2182,11 +1649,6 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
 
-    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
-    {
-        attrmask |= PVFS_ATTR_DISTDIR_ATTR;
-    }
-
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -2196,11 +1658,6 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
     if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
     {
         attrmask |= PVFS_ATTR_META_DIST;
-    }
-
-    if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
-    {
-        attrmask |= PVFS_ATTR_CAPABILITY;
     }
 
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
@@ -2264,7 +1721,7 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     }
     if (obj_mask & PVFS_ATTR_DATA_SIZE)
     {
-        sys_mask |= PVFS_ATTR_SYS_SIZE;
+        sys_mask |= PVFS_ATTR_DATA_SIZE;
     }
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -2289,14 +1746,6 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
-    }
-    if (obj_mask & PVFS_ATTR_CAPABILITY)
-    {
-        sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
-    }
-    if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
-    {
-        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
@@ -2391,7 +1840,7 @@ int PVFS_util_resolve_absolute(const char* local_path)
 
     for(i=0; i < s_stat_tab_count; i++)
     {
-        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
                         local_path, 
@@ -2415,7 +1864,8 @@ int PVFS_util_resolve_absolute(const char* local_path)
     }
 
     /* check the dynamic tab area if we haven't resolved anything yet */
-    for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    for(j = 0; j < s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
         ret = PINT_remove_dir_prefix(
                     local_path, s_stat_tab_array[
@@ -2445,33 +1895,33 @@ int PVFS_util_resolve_absolute(const char* local_path)
 
 #ifdef DEFINE_MY_GET_NEXT_FSENT
 
-static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
+static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab)
 {
     char linestr[500];
     int linelen = 0;
-    char *strtok_ctx;
-    char *nexttok; 
-    PINT_fstab_entry_t *fsentry;
-    if (!fgets(linestr, 500, tab))
+    char * strtok_ctx;
+    char * nexttok; 
+    PINT_fstab_entry_t * fsentry;
+    if(!fgets(linestr, 500, tab))
     {
         return NULL;
     }
 
     fsentry = malloc(sizeof(PINT_fstab_entry_t));
-    if (!fsentry)
+    if(!fsentry)
     {
         return NULL;
     }
     memset(fsentry, 0, sizeof(PINT_fstab_entry_t));
 
     linelen = strlen(linestr);
-    if (linestr[linelen - 1] == '\n')
+    if(linestr[linelen - 1] == '\n')
     {
         linestr[linelen - 1] = 0;
     }
 
     /* get the path string */
-    nexttok = strtok_r(linestr, " \t", &strtok_ctx);
+    nexttok = strtok_r(linestr, " ", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2481,7 +1931,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     
     /* get the mount point */
 
-    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2489,7 +1939,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     fsentry->fs_file = strdup(nexttok);
 
     /* get the fs type */
-    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2497,7 +1947,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     fsentry->fs_vfstype = strdup(nexttok);
 
     /* get the mount opts */
-    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2576,9 +2026,14 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
 #undef NUM_MODES
 }
 
+void PVFS_util_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    return(PINT_util_gen_credentials(credentials));
+}
+
 /*
  * Local variables:
- *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

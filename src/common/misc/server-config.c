@@ -129,6 +129,8 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
 static DOTCONF_CB(get_ca_path);
+static DOTCONF_CB(get_user_cert_dn);
+static DOTCONF_CB(get_user_cert_exp);
 static DOTCONF_CB(enter_ldap_context);
 static DOTCONF_CB(exit_ldap_context);
 static DOTCONF_CB(get_ldap_hosts);
@@ -316,7 +318,7 @@ static const configoption_t options[] =
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
-    /* Security timeout in seconds (TODO)
+    /* Security timeout in seconds
      */
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
@@ -325,6 +327,17 @@ static const configoption_t options[] =
      */
     {"CAPath", ARG_STR, get_ca_path, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
+
+    /* DN used for root of generated user certificate subject DN
+     */
+    {"UserCertDN", ARG_STR, get_user_cert_dn, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, 
+        "\"C=US, O=OrangeFS\""},
+
+    /* Expiration of generated user certificate in days 
+     */
+    {"UserCertExp", ARG_INT, get_user_cert_exp, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "365"},
 
     /* Open tag for LDAP options, used in certificate mode. 
      */
@@ -336,7 +349,7 @@ static const configoption_t options[] =
         CTX_LDAP, NULL},
 
     /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999"
-       TODO: make a list 
+       TODO: make a list?
      */
     {"Hosts", ARG_STR, get_ldap_hosts, NULL,
         CTX_LDAP, "ldaps://localhost"},
@@ -1141,7 +1154,7 @@ static const configoption_t options[] =
      /* Initial number of dirdata handles when creating a new directory.
       * TODO: determine the default value, use 2 as a start
       */
-     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles,NULL,
+     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles, NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2"},
 
     /* Specifies the maximum size of data transmitted with a
@@ -3275,6 +3288,42 @@ DOTCONF_CB(get_ca_path)
     return NULL;
 }
 
+DOTCONF_CB(get_user_cert_dn)
+{ 
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->user_cert_dn)
+    {
+        free(config_s->user_cert_dn);
+    }
+    config_s->user_cert_dn = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    
+    return NULL;
+}
+
+DOTCONF_CB(get_user_cert_exp)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+
+    config_s->user_cert_exp = cmd->data.value;
+
+    return NULL;
+}
+
 DOTCONF_CB(enter_ldap_context)
 {
     struct server_configuration_s *config_s = 
@@ -3302,7 +3351,7 @@ DOTCONF_CB(get_ldap_hosts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    /* TODO: read as list for failover */
+    /* TODO: read as list for failover? */
     if (config_s->ldap_hosts)
     {
         free(config_s->ldap_hosts);

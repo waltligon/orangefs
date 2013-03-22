@@ -51,7 +51,7 @@ static PINT_encoding_table_values *PINT_encoding_table[
 int PINT_encode_initialize(void)
 {
     int ret = -PVFS_EINVAL;
-    void * header = NULL;
+    void *header = NULL;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_initialize\n");
     if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
@@ -62,11 +62,11 @@ int PINT_encode_initialize(void)
 
         /* header prepended to all messages of this type */
         header = &(le_bytefield_table.generic_header[0]);
-        *((int32_t *)header) = htobmi32(PVFS2_PROTO_VERSION);
-  
+       *((int32_t *)header) = htobmi32(PVFS2_PROTO_VERSION);
+
         header = &(le_bytefield_table.generic_header[4]);
-        *((int32_t *)header) = htobmi32(ENCODING_LE_BFIELD);
- 
+       *((int32_t *)header) = htobmi32(ENCODING_LE_BFIELD);
+
         //*((int32_t*)&(le_bytefield_table.generic_header[0])) = 
         //    htobmi32(PVFS2_PROTO_VERSION);
         //*((int32_t*)&(le_bytefield_table.generic_header[4])) = 
@@ -236,8 +236,8 @@ int PINT_decode(void* input_buffer,
 	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
             == enc_type_recved))
        	{
-	    struct PVFS_server_req* tmp_req;
-	    struct PVFS_server_req* tmp_resp;
+	    //struct PVFS_server_req* tmp_req;
+	    //struct PVFS_server_req* tmp_resp;
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {
@@ -245,7 +245,7 @@ int PINT_decode(void* input_buffer,
 		    size_index,
 		    target_msg,
 		    target_addr);
-		tmp_req = target_msg->buffer;
+		//tmp_req = target_msg->buffer;
 		return(ret);
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
@@ -254,7 +254,7 @@ int PINT_decode(void* input_buffer,
 		    size_index,
 		    target_msg,
 		    target_addr);
-		tmp_resp = target_msg->buffer;
+		//tmp_resp = target_msg->buffer;
 		return(ret);
 	    }
 	    else

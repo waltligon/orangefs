@@ -29,6 +29,10 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
                              uint32_t *num_groups,
                              PVFS_gid *group_array);
 
+/* check userid/password to allow user certificate retrieval */
+int PINT_ldap_authenticate(const char *userid,
+                           const char *password);
+
 /* close LDAP connection */
 void PINT_ldap_finalize(void);
 

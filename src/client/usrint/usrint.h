@@ -154,15 +154,6 @@ extern ssize_t getxattr(const char *path, const char *name,
 extern ssize_t lgetxattr(const char *path, const char *name,
                      void *value, size_t size);
 extern ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
-extern ssize_t pvfs_atomicxattr(const char *path, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
-extern ssize_t pvfs_latomicxattr(const char *path, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
-extern ssize_t pvfs_fatomicxattr(int fd, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
 extern ssize_t listxattr(const char *path, char *list, size_t size);
 extern ssize_t llistxattr(const char *path, char *list, size_t size);
 extern ssize_t flistxattr(int fd, char *list, size_t size);

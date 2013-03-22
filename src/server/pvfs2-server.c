@@ -875,7 +875,8 @@ static int server_initialize_subsystems(
             break;
         }
 
-        ret = PINT_cached_config_handle_load_mapping(cur_fs);
+        ret = PINT_cached_config_handle_load_mapping(cur_fs,
+                &server_config);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);

@@ -1,4 +1,5 @@
-
+# (C) 2012 Clemson University
+# See COPYING in top-level directory.
 ===============================================================================
 Documentation - OrangeFS JNI and Hadoop Extensions
 
@@ -33,7 +34,7 @@ Step 3:
 
   Change directory to src/client/jni/. 
  
-  Make sure the Makefile variable OFS_INSTALL is set appropriatly. You will
+  Make sure the Makefile variable OFS_INSTALL is set appropriately. You will
   have to edit the Makefile in the jni directory if you specified a prefix 
   during the configure step.
 
