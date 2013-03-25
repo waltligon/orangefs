@@ -1707,7 +1707,7 @@ sub get_security_info
                                           "Using server key file",
                                           "Specify the server key file.",
                                           "Enter server key file location " .
-                                          "Default is ${fs_path}/etc/serverkey.pem): ",
+                                          "(Default is ${fs_path}/etc/serverkey.pem): ",
                                           "${fs_path}/etc/serverkey.pem");
 
         $opt_keystore = prompt_or_print($opt_keystore,
