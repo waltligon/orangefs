@@ -707,13 +707,13 @@ sub usage
     print $OUT <<"THIS";    
 Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
 
-  The pvfs2-genconfig utility creates configuration files for the
+  The pvfs2-genconfig utility creates a configuration file for the
   OrangeFS (aka PVFS2) file system. The <fs.conf> argument is
   mandatory and specifies the name of the configuration file that will
   be written. This utility will create the fs.conf file.  
 
-  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf' will
-  generate a file called /tmp/fs.conf
+  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf' will generate a file 
+           called /tmp/fs.conf.
   NOTE: If pvfs2-genconfig is executed with a single argument of "-", 
   then all output is directed to stdout and no files are written.
 
@@ -810,9 +810,9 @@ sub print_welcome
 ****************************************************************************
     Welcome to the OrangeFS Configuration Generator:
 
-This interactive script will generate configuration files suitable
-for use with a new OrangeFS (aka PVFS2) file system.  Please see the 
-OrangeFS documentation at http://www.orangefs.org/documentation for details.
+This interactive script will generate a configuration file suitable for use
+with a new OrangeFS (aka PVFS2) file system.  Please see the OrangeFS 
+documentation at http://www.orangefs.org/documentation for details.
 
 ****************************************************************************
 WELCOMEMSG
@@ -1171,7 +1171,7 @@ sub ib_get_port
         $port = $opt_ibport;
     } elsif(!$opt_iospec) {
         if (!$opt_quiet) { 
-            print $OUT "Choose a socket port for the servers to listen on for IB communications. Note that this\n";
+            print $OUT "Choose a TCP/IP port for the servers to listen on for IB communications. Note that this\n";
             print $OUT "script assumes that all servers will use the same port number.\n";
             $port = prompt_num("Enter port number [Default is 3335]: ","3335");
         }
@@ -2023,12 +2023,11 @@ my $count = scalar(keys %all_endpoints);
 my $io_count = scalar(get_aliases($IO_ENDPOINT));
 my $meta_count = scalar(get_aliases($META_ENDPOINT));
 
-chomp(my $curdir = `dirname $0`);
 # may also be enabled on command-line
 $opt_security_key = 1 
-    if (-e "$curdir/.pvfs2-genconfig-key");
+    if (-e "$script_dir/.pvfs2-genconfig-key");
 $opt_security_cert = 1
-    if (-e "$curdir/.pvfs2-genconfig-cert");
+    if (-e "$script_dir/.pvfs2-genconfig-cert");
 # prompt for security options
 if (!$opt_quiet && 
     (defined($opt_security_key) || defined($opt_security_cert))) {

@@ -1126,7 +1126,8 @@ clean::
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) \
                 src/server/pvfs2-server-server.o \
-                src/apps/karma/karma src/apps/fuse/pvfs2fuse
+                src/apps/karma/karma src/apps/fuse/pvfs2fuse \
+                src/server/simple.conf examples/fs.conf
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 endif
@@ -1222,9 +1223,9 @@ endif
 src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
- --storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
- --logging "server,network,storage,flow" --quiet src/server/simple.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--logging "server,network,storage,flow" --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
@@ -1233,9 +1234,9 @@ all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
- --storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
- --quiet examples/fs.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--quiet examples/fs.conf
 endif
 
 install_doc:
