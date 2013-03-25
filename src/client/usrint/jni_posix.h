@@ -49,6 +49,7 @@
 #define futimes jni_futimes
 #define dup jni_dup
 #define dup2 jni_dup2
+#define dup3 jni_dup3
 #define chown jni_chown
 #define fchown jni_fchown
 #define fchownat jni_fchownat
