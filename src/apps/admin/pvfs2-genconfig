@@ -1707,14 +1707,14 @@ sub get_security_info
                                           "Using server key file",
                                           "Specify the server key file.",
                                           "Enter server key file location " .
-                                          "(Default is ${fs_path}/etc/serverkey.pem): ",
+                                          "[Default is ${fs_path}/etc/serverkey.pem]: ",
                                           "${fs_path}/etc/serverkey.pem");
 
         $opt_keystore = prompt_or_print($opt_keystore,
                                          "Using keystore file",
                                          "Specify the keystore file.",
                                          "Enter keystore file location " .
-                                         "(Default is ${fs_path}/etc/keystore): ",
+                                         "[Default is ${fs_path}/etc/keystore]: ",
                                          "${fs_path}/etc/keystore");
     }
     elsif (defined($opt_security_cert) || defined($opt_ca_path))
