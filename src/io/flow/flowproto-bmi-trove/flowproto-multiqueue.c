@@ -69,7 +69,6 @@ struct fp_queue_item
     int seq;
     void *buffer;
     int buffer_in_use; /*used by replication*/
-    int issue_recv;    /*used by replication*/
     PVFS_size buffer_used;
     PVFS_size out_size;
     struct result_chain_entry result_chain;
@@ -2413,7 +2412,17 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
     PVFS_size bytes_processed = 0;
     int ret;
 
+    /* protect variables shared by all flow buffers */
+    gen_mutex_lock(&flow_d->flow_mutex);
+
+    /* Increment the use count for this flow buffer */
     q_item->buffer_in_use++;
+
+    /* Add qitem to src_list */
+    qlist_del(&q_item->list_link);
+    qlist_add_tail(&q_item->list_link, &flow_data->src_list);
+
+    gen_mutex_unlock(&flow_d->flow_mutex);
 
     gossip_lerr("Executing %s...flow(%p):q_item(%p):buffer_in_use(%d)\n",__func__,flow_d,q_item,q_item->buffer_in_use);
 
@@ -2430,9 +2439,6 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
     q_item->bmi_callback.fn = recv_callback_wrapper;
     q_item->posted_id = 0;
     
-    /* Add qitem to src_list */
-    qlist_del(&q_item->list_link);
-    qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
     /* Process the request to determine mapping */
     bytes_processed = flow_process_request(q_item);
@@ -2456,8 +2462,10 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
            else if the recv completes immediately, trigger callback */
         if (ret < 0)
         {
+            gen_mutex_lock(&flow_d->flow_mutex);
             flow_data->recvs_pending--;
             q_item->buffer_in_use--;
+            gen_mutex_unlock(&flow_d->flow_mutex);
             gossip_lerr("flow(%p):q_item(%p):ERROR: BMI_post_recv returned: %d!\n", flow_d,q_item,ret);
             handle_io_error(ret, q_item, flow_data);
             return;
@@ -2581,9 +2589,6 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
-    /* Add qitem to dest_list */
-    qlist_del(&q_item->list_link);
-    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     /* Retrieve the data sync mode */
@@ -2592,6 +2597,11 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 
     gossip_lerr("data sync mode (%d)\n",data_sync_mode);
 
+    gen_mutex_lock(&flow_d->flow_mutex);
+    /* Add qitem to dest_list */
+    qlist_del(&q_item->list_link);
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
+    gen_mutex_unlock(&flow_d->flow_mutex);
 
     /* Perform a write to disk */
     q_item->result_chain_count = 0;
@@ -2628,8 +2638,10 @@ static void flow_trove_write(struct fp_queue_item* q_item,
         if (rc < 0)
         {
             /* if write error occurs, stop the flow */
+            gen_mutex_lock(&flow_d->flow_mutex);
             flow_data->writes_pending--;
             q_item->buffer_in_use--;
+            gen_mutex_unlock(&flow_d->flow_mutex);
             gossip_lerr("Flow(%p): q_item(%p): ERROR: Trove Write CATASTROPHIC FAILURE\n",flow_d,q_item);
             handle_io_error(rc, q_item, flow_data);    
             return;
@@ -2652,19 +2664,21 @@ static void forwarding_trove_write_callback_wrapper(void *user_ptr,
                                                     PVFS_error error_code)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct result_chain_entry*)user_ptr)->q_item->parent);
+    flow_descriptor *flow_d = flow_data->parent;
 
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    //gen_mutex_lock(&flow_data->parent->flow_mutex);
     
     forwarding_trove_write_callback_fn(user_ptr, error_code);
 
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    gen_mutex_lock(&flow_d->flow_mutex);
+    if(flow_d->state == FLOW_COMPLETE)
     {
-        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        gen_mutex_unlock(&flow_d->flow_mutex);
         FLOW_CLEANUP(flow_data);
     }
     else
     {
-        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        gen_mutex_unlock(&flow_d->flow_mutex);
     }
 }/*end forwarding_trove_write_callback_wrapper*/
 
@@ -2680,8 +2694,6 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
-    struct qlist_head *empty_list_link = NULL;
-    struct fp_queue_item *new_q_item = NULL;
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
@@ -2689,8 +2701,10 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     /* Handle trove errors */
     if (flow_d->error_code != 0 || error_code != 0)
     {
+       gen_mutex_lock(&flow_d->flow_mutex);
        qlist_del(&q_item->list_link);
        flow_data->writes_pending--;
+       gen_mutex_unlock(&flow_d->flow_mutex);
     }
 
     if (flow_d->error_code != 0)
@@ -2717,6 +2731,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     if (0 == q_item->result_chain_count)
     {
         struct result_chain_entry* result_iter = &q_item->result_chain;
+
+        gen_mutex_lock(&flow_d->flow_mutex);
 
         /* Aggregate results */
         while (0 != result_iter)
@@ -2769,30 +2785,10 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
         q_item->buffer_in_use--;
 
         /* if q_item has completed all of its operations, then add to the empty-list */
-        if (q_item->buffer_in_use == 0)
-        {
-           qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
-        }
 
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d
                                                              ,q_item
                                                              ,q_item->buffer_in_use);
-
-
-        /* If the request needs more flow buffers, then pull one from the empty_list (if possible) */
-        if (!PINT_REQUEST_DONE(flow_d->file_req_state) && (empty_list_link=qlist_pop(&flow_data->empty_list)))
-        {
-            /* Post another recv operation */
-            new_q_item = qlist_entry(empty_list_link,struct fp_queue_item,list_link);
-            gossip_lerr("flow(%p):new_q_item(%p)Starting recv from write callback. buffer_in_use(%d)\n"
-                       ,flow_d,new_q_item,new_q_item->buffer_in_use);
-            flow_data->primary_recvs_throttled -= 1;
-            flow_data->recvs_pending += 1;
-            flow_bmi_recv(new_q_item,
-                          forwarding_bmi_recv_callback_wrapper,
-                          forwarding_bmi_recv_callback_fn);
-        }
-
 
         /* Determine if the flow is complete */
         if (forwarding_is_flow_complete(flow_data))
@@ -2802,6 +2798,27 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
                    flow_data->total_bytes_written);
             assert(flow_d->state != FLOW_COMPLETE);
             flow_d->state = FLOW_COMPLETE;
+            gen_mutex_unlock(&flow_d->flow_mutex);
+            return;
+        }
+
+
+        /* If the request needs more flow buffers, then pull one from the empty_list (if possible) */
+        if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
+        {
+            /* Post another recv operation */
+            gossip_lerr("flow(%p):q_item(%p)Starting recv from write callback. buffer_in_use(%d)\n"
+                       ,flow_d,q_item,q_item->buffer_in_use);
+            flow_data->primary_recvs_throttled -= 1;
+            flow_data->recvs_pending += 1;
+            gen_mutex_unlock(&flow_d->flow_mutex);
+            flow_bmi_recv(q_item,
+                          forwarding_bmi_recv_callback_wrapper,
+                          forwarding_bmi_recv_callback_fn);
+        }
+        else
+        {
+            gen_mutex_unlock(&flow_d->flow_mutex);
         }
     }/*end if write has completed*/  
   
@@ -2861,11 +2878,15 @@ static inline void forwarding_bmi_recv_callback_wrapper(void *user_ptr,
 							PVFS_error error_code)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    flow_descriptor *flow_d = flow_data->parent;
+ 
+    //gen_mutex_lock(&flow_data->parent->flow_mutex);
     forwarding_bmi_recv_callback_fn(user_ptr, actual_size, error_code);
+
+    gen_mutex_lock(&flow_d->flow_mutex);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        gen_mutex_unlock(&flow_d->flow_mutex);
         FLOW_CLEANUP(flow_data);
     }
     else
@@ -2945,13 +2966,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
  
     for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
     {
-        flow_data->sends_pending++;
-
-        /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
-         *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
-         *       wrapper, which locks the flow-mutex and protects the use of this variable.
-         */
-        q_item->buffer_in_use++;
      
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
 
@@ -2963,24 +2977,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         replica_q_item->bmi_callback.data = replica_q_item;
         replica_q_item->buffer = q_item->buffer;
 
-        /* NOTE: the replica q_item's are only included on the src-list, so that error handling
-         *       will remove any pending SENDS when cancel_pending_bmi is called.
-         */
-        qlist_add_tail(&replica_q_item->list_link, &flow_data->src_list);
-
-        /* if this iteration is the last iteration to post a send to a replica for this flow buffer, then allow the
-         * send callback to issue a new recv, if needed.  Otherwise, lets post all replica sends before accepting a
-         * new recv.
-         */ 
-        if ( (i+1) == flow_d->next_dest_count )
-        {
-           replica_q_item->issue_recv = 1;
-        }
-        else
-        {
-           replica_q_item->issue_recv = 0;
-        }
-
         ret = BMI_post_send( &replica_q_item->posted_id    
                             ,flow_d->next_dest[i].u.bmi.address
                             ,replica_q_item->buffer
@@ -2990,17 +2986,29 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
                             ,&replica_q_item->bmi_callback
                             ,global_bmi_context
                             ,NULL );
+        if (ret==0)
+        {
+           gen_mutex_lock(&flow_d->flow_mutex);
+           flow_data->sends_pending++;
+           q_item->buffer_in_use++;
+           /* NOTE: the replica q_item's are only included on the src-list, so that error handling
+            *       will remove any pending SENDS when cancel_pending_bmi is called.
+            */
+           qlist_add_tail(&replica_q_item->list_link, &flow_data->src_list);
+           gen_mutex_unlock(&flow_d->flow_mutex);
+           continue;
+        }
+
         if (ret < 0)
         {
            gossip_lerr("Error while sending to replcate servers..\n");
            PVFS_perror("Error Code:",ret);
-           q_item->buffer_in_use--;
-           flow_data->sends_pending--;
            /* change this to handle_io_error ? For now, stop the entire flow*/
            handle_io_error(ret, replica_q_item, flow_data);
            return;
         }
-        else if (ret == 1)
+
+        if (ret == 1)
         {
            gossip_lerr("flow(%p):q_item(%p):q_item parent(%p):BMI-send completed immediately. "
                        "Calling forwarding_bmi_send_callback.\n",flow_d,replica_q_item,q_item);
@@ -3026,13 +3034,17 @@ static int flow_process_request( struct fp_queue_item* q_item )
 {
     struct result_chain_entry *result_tmp;
     struct result_chain_entry *old_result_tmp;
+    flow_descriptor *flow_d = q_item->parent;
     PVFS_size bytes_processed = 0;
     void* tmp_buffer;
-    
+
     result_tmp = &q_item->result_chain;
     old_result_tmp = result_tmp;
     tmp_buffer = q_item->buffer;
     
+    /* protect the variables shared by the flow buffers */
+    gen_mutex_lock(&flow_d->flow_mutex);
+
     do {
         int ret = 0;
         
@@ -3056,10 +3068,10 @@ static int flow_process_request( struct fp_queue_item* q_item )
         result_tmp->result.segmax = MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
-        
-        ret = PINT_process_request(q_item->parent->file_req_state,
-                                   q_item->parent->mem_req_state,
-                                   &q_item->parent->file_data,
+
+        ret = PINT_process_request(flow_d->file_req_state,
+                                   flow_d->mem_req_state,
+                                   &flow_d->file_data,
                                    &result_tmp->result,
                                    PINT_SERVER);
         
@@ -3086,8 +3098,9 @@ static int flow_process_request( struct fp_queue_item* q_item )
             bytes_processed += old_result_tmp->result.bytes;
         }
         
-    } while (bytes_processed < q_item->parent->buffer_size && 
-             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+    } while (bytes_processed < flow_d->buffer_size && !PINT_REQUEST_DONE(flow_d->file_req_state));
+
+    gen_mutex_unlock(&flow_d->flow_mutex);
 
     return bytes_processed;
 }/*end flow_process_request*/
@@ -3118,19 +3131,21 @@ static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
 						 PVFS_error error_code)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    flow_descriptor *flow_d = flow_data->parent;
 
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    //gen_mutex_lock(&flow_data->parent->flow_mutex);
     
     forwarding_bmi_send_callback_fn(user_ptr, actual_size, error_code);
 
-    if (flow_data->parent->state == FLOW_COMPLETE)
+    gen_mutex_lock(&flow_d->flow_mutex);
+    if (flow_d->state == FLOW_COMPLETE)
     {
-        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        gen_mutex_unlock(&flow_d->flow_mutex);
         FLOW_CLEANUP(flow_data);
     }
     else
     {
-        gen_mutex_unlock(&flow_data->parent->flow_mutex);
+        gen_mutex_unlock(&flow_d->flow_mutex);
     }
 }/*end forwarding_bmi_send_callback_wrapper*/
 
@@ -3147,17 +3162,17 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
     flow_descriptor *flow_d = flow_data->parent;
     struct fp_queue_item *q_item = replica_q_item->replica_parent;
-    struct qlist_head *empty_list_link = NULL;
-    struct fp_queue_item *new_q_item = NULL;
 
     gossip_lerr("flow(%p):Executing %s...\n",flow_d,__func__);
 
     /* Error handling */
     if (flow_d->error_code != 0 || error_code != 0)
     {
+        gen_mutex_lock(&flow_d->flow_mutex);
         q_item->buffer_in_use--;
         flow_data->sends_pending--;
-        qlist_del(&replica_q_item->list_link);       
+        qlist_del(&replica_q_item->list_link); /* remove from src list */ 
+        gen_mutex_unlock(&flow_d->flow_mutex);      
     }
 
     /* Is the entire flow being cancelled? */
@@ -3180,6 +3195,8 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     }/*end error handling*/
     
 
+    gen_mutex_lock(&flow_d->flow_mutex);
+
     /* Perform bookkeeping for data forward completion */
     flow_data->sends_pending -= 1;
 
@@ -3196,11 +3213,6 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 
     /* Remove SEND request from the src-list */
     qlist_del(&replica_q_item->list_link);
-
-    if (q_item->buffer_in_use == 0)
-    {
-       qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
-    }
 
     /* Debug output */
     gossip_lerr("FWD FINISHED: flow(%p): q_item(%p) parent q_item(%p): Total: %lld TotalRecvd: %lld TotalAmtFwd: %lld "
@@ -3225,32 +3237,30 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                flow_data->total_bytes_written);
         assert(flow_d->state != FLOW_COMPLETE);
         flow_d->state = FLOW_COMPLETE;
+        gen_mutex_unlock(&flow_d->flow_mutex);
+        return;
     }
 
     gossip_lerr("flow(%p): parent q_item(%p): buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
 
-    /* Lets not issue another recv until we have issued sends for each replica for this flow buffer. */
-    gossip_lerr("flow(%p):q_item(%p):parent q_item(%p):issue_recv(%d)\n"
-               ,flow_d,replica_q_item,q_item,replica_q_item->issue_recv);
-    if (replica_q_item->issue_recv == 0)
+    /* If this request needs to receive more data, then re-use the current flow buffer if its no longer in use. */
+    if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
     {
-       return;
-    } 
-
-    /* If this request needs to receive more data, then grab a flow buffer from the empty-list(if possible) */
-    if (!PINT_REQUEST_DONE(flow_d->file_req_state) && (empty_list_link=qlist_pop(&flow_data->empty_list))) 
+          /* Post another recv operation */
+          gossip_lerr("flow(%p): q_item(%p): Starting recv from send callback. buffer_in_use(%d)\n"
+                     ,flow_d
+                     ,q_item
+                     ,q_item->buffer_in_use);
+          flow_data->primary_recvs_throttled -= 1;
+          flow_data->recvs_pending += 1;
+          gen_mutex_unlock(&flow_d->flow_mutex);
+          flow_bmi_recv(q_item,
+                        forwarding_bmi_recv_callback_wrapper,
+                        forwarding_bmi_recv_callback_fn);
+    }
+    else
     {
-       /* Post another recv operation */
-       new_q_item = qlist_entry(empty_list_link,struct fp_queue_item,list_link);
-       gossip_lerr("flow(%p): new_q_item(%p): Starting recv from send callback. buffer_in_use(%d)\n"
-                  ,flow_d
-                  ,new_q_item
-                  ,new_q_item->buffer_in_use);
-       flow_data->primary_recvs_throttled -= 1;
-       flow_data->recvs_pending += 1;
-       flow_bmi_recv(new_q_item,
-                     forwarding_bmi_recv_callback_wrapper,
-                     forwarding_bmi_recv_callback_fn);
+       gen_mutex_unlock(&flow_d->flow_mutex);
     }
 
 }/*end forwarding_bmi_send_callback_fn*/
@@ -3441,21 +3451,15 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     flow_data->total_bytes_recvd = 0;
     flow_data->total_bytes_written = 0;
     
-    gen_mutex_lock(&flow_d->flow_mutex);
 
     /* Initialize buffers */
-    for (i = 0; i < flow_data->parent->buffers_per_flow; i++)
+    for (i = 0; i < flow_d->buffers_per_flow; i++)
     {
         /* Required by TROVE */
         flow_data->prealloc_array[i].result_chain.q_item = 
             &flow_data->prealloc_array[i];
 
-        /* Place available buffers on the empty list */
-        //qlist_add_tail(&flow_data->prealloc_array[i].list_link,
-        //               &flow_data->empty_list);
-        /* Initialize each buffers list_link variable */
         INIT_QLIST_HEAD(&flow_data->prealloc_array[i].list_link);
-        flow_data->prealloc_array[i].issue_recv = 1;
     }
 
     /* Post the initial receives */
@@ -3463,6 +3467,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     {
         /* If there is data to be received, perform the initial recv
            otherwise mark the flow complete */
+        gen_mutex_lock(&flow_d->flow_mutex);
         if (!PINT_REQUEST_DONE(flow_d->file_req_state))
         {
             /* Remove the buffer from the empty list */
@@ -3472,18 +3477,21 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
             flow_data->recvs_pending += 1;
             gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d):Calling flow_bmi_recv from forwading_flow_post_init.\n"
                        ,flow_d,&flow_data->prealloc_array[i],flow_data->prealloc_array[i].buffer_in_use);
+            gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(&(flow_data->prealloc_array[i]),
                           forwarding_bmi_recv_callback_wrapper,
                           forwarding_bmi_recv_callback_fn);
         }
         else
         {
+            gen_mutex_unlock(&flow_d->flow_mutex);
             gossip_lerr("Server flow posted all on initial post.\n");
             break;
         }
     }
 
     /* If the flow is complete, perform cleanup */
+    gen_mutex_lock(&flow_d->flow_mutex);
     if(flow_d->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(&flow_d->flow_mutex);
