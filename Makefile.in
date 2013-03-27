@@ -66,6 +66,7 @@ sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
 sysconfdir = $(DESTDIR)@sysconfdir@
+logdir = $(DESTDIR)${prefix}/log
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -1311,6 +1312,9 @@ ifdef BUILD_SERVER
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
 endif
+	# create log and etc dirs under install dir
+	install -d $(sysconfdir)
+	install -d $(logdir)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
