@@ -863,7 +863,7 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The only currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
+The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -1138,7 +1138,7 @@ sub mx_get_endpoint
         $board = $opt_mxboard;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
-            print $OUT "Choose a MX board (in the range of 0 to 4) for the servers to listen on. \n";
+            print $OUT "Choose an MX board (in the range of 0 to 4) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same board number.\n";
             $board = prompt_num("Enter board number [Default is 0]: ","0");
         }
@@ -1151,7 +1151,7 @@ sub mx_get_endpoint
         $port = $opt_mxendpoint;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
-            print $OUT "Choose a MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
+            print $OUT "Choose an MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same port number.\n";
             $port = prompt_num("Enter port number [Default is 3]: ","3");
         }
@@ -1707,15 +1707,15 @@ sub get_security_info
                                           "Using server key file",
                                           "Specify the server key file.",
                                           "Enter server key file location " .
-                                          "[Default is ${fs_path}/etc/serverkey.pem]: ",
-                                          "${fs_path}/etc/serverkey.pem");
+                                          "[Default is ${fs_path}/etc/orangefs-serverkey.pem]: ",
+                                          "${fs_path}/etc/orangefs-serverkey.pem");
 
         $opt_keystore = prompt_or_print($opt_keystore,
                                          "Using keystore file",
                                          "Specify the keystore file.",
                                          "Enter keystore file location " .
-                                         "[Default is ${fs_path}/etc/keystore]: ",
-                                         "${fs_path}/etc/keystore");
+                                         "[Default is ${fs_path}/etc/orangefs-keystore]: ",
+                                         "${fs_path}/etc/orangefs-keystore");
     }
     elsif (defined($opt_security_cert) || defined($opt_ca_path))
     {
@@ -1723,17 +1723,17 @@ sub get_security_info
 
         $opt_ca_path = prompt_or_print($opt_ca_path,
                                        "Using CA certificate file",
-                                       "Specify the CA certificate file.",
+                                       "Specify the Certificate Authority (CA) certificate file.",
                                        "Enter CA certificate file location " .
-                                       "[Default is ${fs_path}/etc/pvfs2-ca-cert.pem]: ",
-                                       "${fs_path}/etc/pvfs2-ca-cert.pem");
+                                       "[Default is ${fs_path}/etc/orangefs-ca-cert.pem]: ",
+                                       "${fs_path}/etc/orangefs-ca-cert.pem");
 
         $opt_server_key = prompt_or_print($opt_server_key,
                                           "Using CA private key file",
                                           "Specify the CA private key file.",
                                           "Enter CA private key file location: " .
-                                          "[Default is ${fs_path}/etc/pvfs2-ca-cert-key.pem]: ",
-                                          "${fs_path}/etc/pvfs2-ca-cert-key.pem");
+                                          "[Default is ${fs_path}/etc/orangefs-ca-cert-key.pem]: ",
+                                          "${fs_path}/etc/orangefs-ca-cert-key.pem");
 
         $opt_user_cert_dn = prompt_or_print($opt_user_cert_dn,
                                             "Using user certificate DN",

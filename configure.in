@@ -369,7 +369,7 @@ AC_SUBST(RESET_FILE_POS)
 dnl See if the --enable-trusted-connections  option was given to configure
 AC_ARG_ENABLE(trusted-connections,
 [  --enable-trusted-connections
-                          **EXPERIMENTAL** Enable connects only 
+                          **EXPERIMENTAL** Enables connects only 
                           from trusted hosts/ports ],
 [if test "x$enableval" = "xyes"; then
 TRUSTED_CONNECTIONS="-DUSE_TRUSTED"
@@ -435,7 +435,7 @@ dnl what was the configure option set to?
 use_redhat24=0
 
 AC_ARG_ENABLE([redhat24],
-[  --enable-redhat24       Enable workaround for RedHat 2.4 kernel], 
+[  --enable-redhat24       Enables workaround for RedHat 2.4 kernel], 
     set_redhat24=1
     if test "$enableval" = no ; then 
     	use_redhat24=0
@@ -455,7 +455,7 @@ use_nptl_workaround=0
 
 AC_ARG_ENABLE([nptl-workaround],
 [  --enable-nptl-workaround
-                          Enable workaround for buggy NPTL/Pthread libraries], 
+                          Enables workaround for buggy NPTL/Pthread libraries], 
     set_nptl_workaround=1
     if test "$enableval" = no ; then 
     	use_nptl_workaround=0
@@ -722,7 +722,7 @@ AC_ARG_ENABLE(kernel-aio,
 
 AC_ARG_ENABLE(kernel-sendfile,
   [  --enable-kernel-sendfile
-                          **EXPERIMENTAL** Forcibly enable kernel sendfile],
+                          **EXPERIMENTAL** Forcibly enables kernel sendfile],
   [ enable_kernel_sendfile=$enableval ],
   [ enable_kernel_sendfile=no ]
   )
@@ -763,12 +763,23 @@ AC_SUBST(SRC_ABSOLUTE_TOP)
 
 dnl Optimized code, but never override CFLAGS from command line or environment.
 AC_ARG_ENABLE(fast,
-[  --enable-fast           Disable optional debugging, enable optimizations.],
+[  --enable-fast           Disables optional debugging, enables optimization],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
     CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
 fi
 ])
+
+dnl Disable compiler optimization
+AC_ARG_ENABLE(opt,
+[  --disable-opt           Disables compiler optimization],
+[if test "x$enableval" = "xyes" ; then
+    CC_OPT=-O2
+else
+    CC_OPT=-O0
+fi],
+    CC_OPT=-O2)
+AC_SUBST(CC_OPT)
 
 dnl
 dnl a function to check for FUSE
@@ -797,7 +808,7 @@ test_for_fuse()
 
 dnl FUSE component
 AC_ARG_ENABLE(fuse,
-[  --enable-fuse           **EXPERIMENTAL** Enable FUSE component],
+[  --enable-fuse           **EXPERIMENTAL** Enables FUSE component],
 [
 if test "x$enableval" = "xyes" ; then
    test_for_fuse
@@ -808,18 +819,18 @@ fi
 
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
-    CFLAGS="$CFLAGS -g -O2"
+    CFLAGS="$CFLAGS -g $CC_OPT"
 fi
 
 dnl Options that are not yet working
 dnl --------------------------------
 dnl AC_ARG_ENABLE(profiling,
-dnl [  --enable-profiling      Enable profiling (using gprof).                     *** not yet working ***],
+dnl [  --enable-profiling      Enables profiling (using gprof).                     *** not yet working ***],
 dnl CFLAGS="$CFLAGS -pg -fprofile-arcs",
 dnl )
 dnl 
 dnl AC_ARG_ENABLE(coverage,
-dnl [  --enable-coverage       Enable coverage analysis (disables optimizations).  *** not yet working ***],
+dnl [  --enable-coverage       Enables coverage analysis (disables optimizations).  *** not yet working ***],
 dnl [ CFLAGS="$CFLAGS -g -pg -ftest-coverage -O0"
 dnl ENABLE_COVERAGE=1 ],
 dnl )
@@ -862,10 +873,10 @@ test_for_epoll()
 dnl optionally enable use of epoll() on Linux instead of poll()
 dnl optionally disable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
-[  --enable-epoll          Enable use of epoll for TCP/IP polling 
+[  --enable-epoll          Enables use of epoll for TCP/IP polling 
                           (epoll is enabled by default, this option
 			  ensures no checking is done for x-compiling)
-  --disable-epoll         Disable epoll, use poll instead],
+  --disable-epoll         Disables epoll, use poll instead],
 [
    if test "x$enableval" = "xyes"; then
         BUILD_EPOLL=1
@@ -980,7 +991,7 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
-[  --enable-ucache         Enable user interface data cache.],
+[  --enable-ucache         Enables user interface data cache],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
       [Should we enable user interface data cache.])
@@ -997,7 +1008,7 @@ AC_SUBST(BUILD_UCACHE)])
 dnl Method to enable JNI prefixed stdio and posix calls
 BUILD_JNI=
 AC_ARG_ENABLE(jni,
-[  --enable-jni         Enable PVFS Client JNI.],
+[  --enable-jni         Enables PVFS Client JNI],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_JNI_ENABLE, 1,
       [Should we enable PVFS Client JNI.])
@@ -1077,7 +1088,7 @@ AC_SUBST(INTELC)
 AC_SUBST(GNUC)
 
 AC_ARG_WITH(efence,
-[  --with-efence=<path>    Use electric fence for malloc debugging.],
+[  --with-efence=<path>    Use electric fence for malloc debugging],
        if test "x$withval" != "xyes" ; then
               LDFLAGS="${LDFLAGS} -L$withval"
        fi
@@ -1089,7 +1100,7 @@ dnl is not in the usual location.  It is common to install the header
 dnl in a subdirectory, so look for that too.  Leave the include path
 dnl in CPPFLAGS if it is not a standard header.
 AC_ARG_WITH(valgrind,
-[  --with-valgrind[=<path>]  Use valgrind annotations for debugging.], [
+[  --with-valgrind[=<path>]  Use valgrind annotations for debugging], [
     found=no
     save_cppflags="$CPPFLAGS"
     AC_MSG_CHECKING(for valgrind.h usability)
@@ -1179,7 +1190,7 @@ CFLAGS="$oldcflags"
 dnl allow disabling TCP BMI method
 BUILD_BMI_TCP=1
 AC_ARG_WITH(bmi-tcp,
-[  --without-bmi-tcp       Disable BMI TCP method],
+[  --without-bmi-tcp       Disables BMI TCP method],
     if test -z "$withval" -o "$withval" = yes ; then
 	:
     elif test "$withval" = no ; then
@@ -1433,7 +1444,7 @@ test_for_sdl()
 
 dnl optionally disable building visualisation tools
 AC_ARG_ENABLE(visual,
-[  --enable-visual         Enable visualisation tools. (Disabled by default, requires SDL)],
+[  --enable-visual         Enables visualisation tools. (Disabled by default, requires SDL)],
 [
 if test "x$enableval" = "xyes" ; then
    test_for_sdl
