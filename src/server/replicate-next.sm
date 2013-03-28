@@ -120,6 +120,9 @@ static int io_send_ack(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lerr("Sending positive response back to primary. resp.status:(%d).\n",s_op->resp.status);
+
+
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,

@@ -606,10 +606,10 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     gossip_lerr("Response status (%d).\n",resp_p->status);
     gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
     
-    s_op->u.io.replicate_d[i].resp_status = resp_p->status;
-        s_op->u.io.replicate_d[i].session_tag  = msg_p->session_tag;
-        s_op->u.io.replicate_d[i].svr_addr = msg_p->svr_addr;
-    s_op->u.io.replicate_d[i].handle = msg_p->handle;
+    s_op->u.io.replicate_d[i].resp_status  = resp_p->status;
+    s_op->u.io.replicate_d[i].session_tag  = msg_p->session_tag;
+    s_op->u.io.replicate_d[i].svr_addr     = msg_p->svr_addr;
+    s_op->u.io.replicate_d[i].handle       = msg_p->handle;
     if (resp_p->status==0)
     {
         s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
@@ -632,6 +632,7 @@ static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *j
      */
     for (i=0; i<s_op->u.io.replicate_d_count; i++)
     {
+        gossip_lerr("s_op->u.io.replicate_d[%d].resp_status:(%d)\n",i,s_op->u.io.replicate_d[i].resp_status);
         if (s_op->u.io.replicate_d[i].resp_status == 0)
         {
             js_p->error_code = 0;
