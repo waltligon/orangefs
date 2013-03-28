@@ -662,7 +662,6 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
            {
               INIT_QLIST_HEAD(&flow_data->prealloc_array[i].replicas[j].list_link);
               flow_data->prealloc_array[i].replicas[j].parent = flow_d;
-              flow_data->prealloc_array[i].replicas[j].bmi_callback.data = &(flow_data->prealloc_array[i].replicas[j]);
               flow_data->prealloc_array[i].replicas[j].replica_parent = &(flow_data->prealloc_array[i]);
            }
         }/*end if*/
@@ -2907,6 +2906,10 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     /* Handle errors from recv */
     if(error_code != 0 || flow_d->error_code != 0)
     {
+        gen_mutex_lock(&flow_d->flow_mutex);
+        flow_data->recvs_pending--;
+        q_item->buffer_in_use--;
+        gen_mutex_unlock(&flow_d->flow_mutex);
         gossip_lerr("ERROR occured on recv: error_code(%d), flow_d->error_code(%d)\n", error_code
                                                                                      , flow_d->error_code);
         /* if we can't receive data from the client, then we must cancel the
@@ -2916,6 +2919,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         return;
     }
 
+    gen_mutex_lock(&flow_d->flow_mutex);
     /* Decrement recv pending count; we just got one from the client */
     flow_data->recvs_pending -= 1;
 
@@ -2952,6 +2956,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
+    gen_mutex_unlock(&flow_d->flow_mutex);
+
     /* Reset the posted_id for the trove call. */
     q_item->posted_id= 0;
  
@@ -2963,6 +2969,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         replica_q_item = &q_item->replicas[i];
         memset(replica_q_item,0,sizeof(*replica_q_item));
         INIT_QLIST_HEAD(&replica_q_item->list_link);
+        replica_q_item->parent = flow_d;
+        replica_q_item->replica_parent = q_item;
 
         replica_q_item->bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
         replica_q_item->bmi_callback.data = replica_q_item;
@@ -2994,6 +3002,11 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         {
            gossip_lerr("Error while sending to replcate servers..\n");
            PVFS_perror("Error Code:",ret);
+           gen_mutex_lock(&flow_d->flow_mutex);
+              flow_data->sends_pending--;
+              q_item->buffer_in_use--;
+              qlist_del(&replica_q_item->list_link);
+           gen_mutex_unlock(&flow_d->flow_mutex);
            /* change this to handle_io_error ? For now, stop the entire flow*/
            handle_io_error(ret, replica_q_item, flow_data);
            return;
