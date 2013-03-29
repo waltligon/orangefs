@@ -1155,6 +1155,8 @@ static PINT_sm_action rename_check_for_remove(
 
     if (sm_p->u.rename.target_dirent_exists)
     {
+        PINT_copy_capability(&sm_p->u.rename.caps[1],
+                             &sm_p->parent_capability);
         js_p->error_code = RENAME_REMOVE_REQUIRED;
     }
 

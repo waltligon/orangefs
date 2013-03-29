@@ -673,6 +673,9 @@ typedef struct PINT_client_sm
     PVFS_object_ref parent_ref;
 
     PVFS_credential *cred_p;
+    /* Generic capability used with the rename state machine, which is
+       called by both the sys-remove and sys-rename state machines */
+    PVFS_capability parent_capability;
 
     union
     {

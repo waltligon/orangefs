@@ -193,7 +193,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
-        sm_p->u.remove.parent_capability,
+        sm_p->parent_capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         0,
@@ -236,7 +236,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        sm_p->u.remove.parent_capability,
+        sm_p->parent_capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,

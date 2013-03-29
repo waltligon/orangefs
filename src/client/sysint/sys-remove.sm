@@ -308,7 +308,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     /* keep a copy of the parent's capability */
     PINT_copy_capability(&sm_p->getattr.attr.capability,
-                         &sm_p->u.remove.parent_capability);
+                         &sm_p->parent_capability);
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
@@ -328,7 +328,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
-        sm_p->u.remove.parent_capability,
+        sm_p->parent_capability,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
         sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
@@ -424,7 +424,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        sm_p->u.remove.parent_capability,
+        sm_p->parent_capability,
         *sm_p->cred_p,
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
@@ -543,7 +543,7 @@ static PINT_sm_action remove_cleanup(
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
 
-    PINT_cleanup_capability(&sm_p->u.remove.parent_capability);
+    PINT_cleanup_capability(&sm_p->parent_capability);
 
     /* NOTE: acache is invalidated by remove_helper now */
     
