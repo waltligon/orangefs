@@ -333,8 +333,8 @@ sub emit_filesystem
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
     @meta_aliases = sort @meta_aliases;    
-#    foreach my $ma (@meta_aliases)
-    for ($i = 0; $i < $num_ranges; $i++)
+    my $ranges = $num_ranges > @meta_aliases ? $num_ranges : @meta_aliases;
+    for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
         $start->binc();
@@ -354,8 +354,8 @@ sub emit_filesystem
 
     my @io_aliases = get_aliases($IO_ENDPOINT);
     @io_aliases = sort @io_aliases;
-#    foreach my $ia (@io_aliases)
-    for ($i = 0; $i < $num_ranges; $i++)
+    $ranges = $num_ranges > @io_aliases ? $num_ranges : @io_aliases;
+    for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
         $start->binc();
