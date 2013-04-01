@@ -2098,8 +2098,6 @@ my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
 my $res_io_ranges = defined($opt_res_io_ranges) ? $opt_res_io_ranges : 0;
 my $res_meta_ranges = defined($opt_res_meta_ranges) ? $opt_res_meta_ranges : 0;
-# TODO: debugging
-print $OUT "RANGES: $res_io_ranges,$res_meta_ranges\n";
 my $fsid = get_fsid();
 my $fsname = get_fsname();
 my $server_job_timeout = get_server_job_timeout();
