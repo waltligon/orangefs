@@ -21,82 +21,54 @@ Step 1:
 ===============================================================================
 Step 2: 
 
-  Complete OrangeFS configure, etc. 
+  JNI Only Instructions:
 
-    ex:
+    ./configure --enable-jni --with-jdk=<path_to_jdk>
+    make
+    sudo make install
+    make jni
+    sudo make jni_install
 
-      ./configure --enable-jni
-      make
-      sudo make install
+  JNI and Hadoop Instructions:
+
+    ./configure --enable-jni --with-jdk=<path_to_jdk> --enable-hadoop \
+      --with-hadoop=<path_to_hadoop>
+    make
+    sudo make install
+    make hadoop
+    sudo make hadoop_install
 
 ===============================================================================
 Step 3:
 
-  Change directory to src/client/jni/. 
- 
-  Make sure the Makefile variable OFS_INSTALL is set appropriately. You will
-  have to edit the Makefile in the jni directory if you specified a prefix 
-  during the configure step.
+  *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
+    contain the path of your JNI libraries. 
 
-    ex:
-
-      OFS_INSTALL=/opt/orangefs
+  ex:     
+    export LD_LIBRARY_PATH="$OFS_INSTALL/lib"
+    export JNI_LIBRARY_PATH="$OFS_INSTALL/lib"
 
 ===============================================================================
 Step 4:
 
-  To generate JNI layer:
-
-      make jni
-
-  To Generate Hadoop related files: 
-
-    *NOTE: This step requires the HADOOP_VERSION and HADOOP_DIR variables in 
-             the Makefile to be set appropriately. They should match your 
-             preferred Hadoop installation. See Makefile for default setting.
-
-      make hadoop
-
-===============================================================================
-Step 5:  
-
-  Install the generated files:
-
-      sudo make install
-
-===============================================================================
-Step 6:
-
-  *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
-           contain the path of your JNI libraries. 
-
-        ex: 
-        
-            export LD_LIBRARY_PATH="$OFS_INSTALL/lib"
-            export JNI_LIBRARY_PATH="$OFS_INSTALL/lib"
-
-===============================================================================
-Step 7:
-
-    Use the .jar files in your Java applications. Be sure to include the full
+  Use the .jar files in your Java applications. Be sure to include the full
     path names of the .jar files needed by passing the -cp option to javac
     and java.
 
-      example file Main.java:
+  example file Main.java:
 
-        import org.orangefs.usrint.*;
+    import org.orangefs.usrint.*;
 
-        public class Main
+    public class Main
+    {
+        public static final void main(String args[])
         {
-            public static final void main(String args[])
-            {
-                Orange fs = Orange.getInstance();
-                fs.posix.mkdir("/mnt/orangefs/test", fs.posix.f.S_IRWXU);
-            }
+          Orange fs = Orange.getInstance();
+          fs.posix.mkdir("/mnt/orangefs/test", fs.posix.f.S_IRWXU);
         }
+    }
 
+  example of building Main.java:
 
-      example of building Main.java:
-
-        javac -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main.java
-        java -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main
+    javac -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main.java
+    java -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main

@@ -88,6 +88,7 @@ BUILD_KARMA = @BUILD_KARMA@
 BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
+BUILD_HADOOP = @BUILD_HADOOP@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
@@ -1059,6 +1060,20 @@ docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
 publish: docs
 	$(srcdir)/maint/pvfs2-publish-pages `pwd`/doc
 
+ifdef BUILD_JNI
+jni:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ make -e -C $(builddir)/src/client/jni jni
+jni_install:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@  make -e -C $(builddir)/src/client/jni install
+endif
+
+ifdef BUILD_HADOOP
+hadoop:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni hadoop
+hadoop_install:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni install
+endif
+
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
 # don't get rid of generated files in dist releases
@@ -1093,6 +1108,12 @@ clean::
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf
+
+ifdef BUILD_JNI
+clean::
+	$(E)prefix=@prefix@ make -e -C $(builddir)/src/client/jni clean > /dev/null
+endif
+
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 endif
