@@ -113,11 +113,6 @@ extern int pxfs_open(const char *path, int flags, int *fd,
 
     aiocommon_submit_op(open_acb);
 
-    if (newpath != path)
-    {
-        free(newpath);
-    }
-
     return 0;
 }
 
