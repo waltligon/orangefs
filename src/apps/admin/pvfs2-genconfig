@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 #
-#  (C) 2001 Clemson University and The University of Chicago
+#  (C) 2001-13 Clemson University, The University of Chicago
+#              and Omnibond Systems LLC
 #
 #  See COPYING in top-level directory.
 #
@@ -43,10 +44,13 @@ my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
 my $opt_fsname = '';
-my $opt_ranges = '';
 my $opt_default_num_dfiles = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
+
+# reserved handle ranges
+my $opt_res_io_ranges = undef;
+my $opt_res_meta_ranges = undef;
 
 my $opt_trusted = '0';
 my $opt_trusted_port = '';
@@ -284,21 +288,26 @@ sub emit_aliases
 
 sub emit_filesystem
 {
-    my ($target, $name, $fs_id, $root_handle, 
-        $last_handle, $first_handle, $max_ranges,
-        $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
+    my ($target, $name, $fs_id, 
+        $root_handle, $last_handle, $first_handle, 
+        $total_ranges, $res_io_ranges, $res_meta_ranges,
+        $default_num_dfiles, $default_flow_buffer_size,
+        $default_flow_buffer_count) = @_;
 
     # divide handle range space equally among servers ((2^63)-1 for now)
-    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
-    $num_ranges = $max_ranges;
+    my($total_num_handles_available, $start, $end, $i, $step, $stuffing);
     $total_num_handles_available = $last_handle->copy();
     $total_num_handles_available->bsub($first_handle);
     $total_num_handles_available->binc();
 
+    # override total range count if more reserved ranges
+    $total_ranges = $res_io_ranges + $res_meta_ranges
+        if (($res_io_ranges + $res_meta_ranges) > $total_ranges);
+
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
     $step = $total_num_handles_available->copy();
-    $step->bdiv($num_ranges);
+    $step->bdiv($total_ranges);
 
     print $target "\n<Filesystem>\n";
     print $target "\tName $name\n";
@@ -333,7 +342,7 @@ sub emit_filesystem
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
     @meta_aliases = sort @meta_aliases;    
-    my $ranges = $num_ranges > @meta_aliases ? $num_ranges : @meta_aliases;
+    my $ranges = $res_meta_ranges > @meta_aliases ? $res_meta_ranges : @meta_aliases;
     for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
@@ -354,7 +363,7 @@ sub emit_filesystem
 
     my @io_aliases = get_aliases($IO_ENDPOINT);
     @io_aliases = sort @io_aliases;
-    $ranges = $num_ranges > @io_aliases ? $num_ranges : @io_aliases;
+    $ranges = $res_io_ranges > @io_aliases ? $res_io_ranges : @io_aliases;
     for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
@@ -598,9 +607,10 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --root-handle <NUM>               handle value to reserve for root object
      --fsid        <NUM>               fs identifier value
      --fsname      <STRING>            fs name
-     --ranges      <NUM>               number of metadata/datafile handle ranges to use
-                                       (may be greater than the number of servers to reserve
-                                        ranges for future use)
+     --res-io-ranges <NUM>             number of I/O server handle ranges to reserve 
+                                       for future use
+     --res-meta-ranges <NUM>           number of metadata server handle ranges to reserve
+                                       for future use                                  
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
@@ -676,7 +686,7 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The only currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
+The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -951,7 +961,7 @@ sub mx_get_endpoint
         $board = $opt_mxboard;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
-            print $OUT "Choose a MX board (in the range of 0 to 4) for the servers to listen on. \n";
+            print $OUT "Choose an MX board (in the range of 0 to 4) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same board number.\n";
             $board = prompt_num("Enter board number [Default is 0]: ","0");
         }
@@ -964,7 +974,7 @@ sub mx_get_endpoint
         $port = $opt_mxendpoint;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
-            print $OUT "Choose a MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
+            print $OUT "Choose an MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same port number.\n";
             $port = prompt_num("Enter port number [Default is 3]: ","3");
         }
@@ -1472,7 +1482,8 @@ GetOptions('protocol=s' => \$opt_protocol,
     'root-handle=i' => \$opt_root_handle,
     'fsid=i'        => \$opt_fsid,
     'fsname=s'      => \$opt_fsname,
-    'ranges=i'      => \$opt_ranges,
+    'res-io-ranges=i' => \$opt_res_io_ranges,
+    'res-meta-ranges=i' => \$opt_res_meta_ranges,
     'trusted=i'     => \$opt_trusted,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
@@ -1671,7 +1682,8 @@ my $default_num_dfiles = get_default_num_dfiles();
 my $default_flow_buffer_size = get_default_flow_buffer_size();
 my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
-my $ranges = $opt_ranges ? $opt_ranges : 1;
+my $res_io_ranges = defined($opt_res_io_ranges) ? $opt_res_io_ranges : 0;
+my $res_meta_ranges = defined($opt_res_meta_ranges) ? $opt_res_meta_ranges : 0;
 my $fsid = get_fsid();
 my $fsname = get_fsname();
 my $server_job_timeout = get_server_job_timeout();
@@ -1699,10 +1711,11 @@ if ($opt_trusted == 1)
 }
 emit_aliases($output_target);
 
-emit_filesystem($output_target, $fsname, $fsid, $root_handle,
-                $last_handle, $first_handle, $ranges,
-                $default_num_dfiles, $default_flow_buffer_size,
-                $default_flow_buffer_count);
+emit_filesystem($output_target, $fsname, $fsid, 
+                $root_handle, $last_handle, $first_handle,
+                $io_count + $meta_count, $res_io_ranges, $res_meta_ranges, 
+                $default_num_dfiles, 
+                $default_flow_buffer_size, $default_flow_buffer_count);
 
 if ($opt_metaspec) {
     emit_serveropts($output_target);
