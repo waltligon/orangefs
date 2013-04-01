@@ -991,7 +991,7 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
-[  --enable-ucache         Enables user interface data cache],
+[  --enable-ucache         Enables user interface data cache.],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
       [Should we enable user interface data cache.])
@@ -1005,22 +1005,94 @@ AC_SUBST(BUILD_UCACHE)],
     [Should we enable user interface data cache.])
 AC_SUBST(BUILD_UCACHE)])
 
+dnl Method to set JAVA_HOME if it hasn't already been set using --with-jdk
+JAVA_HOME=
+AC_ARG_WITH(
+    jdk,
+    [  --with-jdk=<path>       Enable support for JAVA and JNI.],
+    [
+        dnl Check for jni.h
+        AC_CHECK_HEADER(
+            [$withval/include/jni.h],
+            [
+                AC_DEFINE(HAVE_JNI_H, 1, Define if jni.h exists at the path given with --with-jdk)
+                JAVA_HOME=$withval
+            ],
+            [
+                AC_MSG_ERROR(could not locate include/jni.h at the path given with --with-jdk.)
+            ]
+        )
+    ],
+    [   with_jdk=no]
+)
+AC_SUBST(JAVA_HOME)
+
 dnl Method to enable JNI prefixed stdio and posix calls
 BUILD_JNI=
-AC_ARG_ENABLE(jni,
-[  --enable-jni         Enables PVFS Client JNI],
-[if test "x$enableval" = "xyes" ; then
-   AC_DEFINE(PVFS_JNI_ENABLE, 1,
-      [Should we enable PVFS Client JNI.])
-   BUILD_JNI=1
-else
-   AC_DEFINE(PVFS_JNI_ENABLE, 0,
-      [Should we enable PVFS Client JNI.])
-fi
-AC_SUBST(BUILD_JNI)],
-[AC_DEFINE(PVFS_JNI_ENABLE, 0,
-    [Should we enable PVFS Client JNI.])
-AC_SUBST(BUILD_JNI)])
+AC_ARG_ENABLE(
+    jni,
+    [  --enable-jni            Enables PVFS Client JNI. Requires --with-jdk.],
+    [   if test "x$enableval" = "xyes" ; then
+            if test "x$JAVA_HOME" = "x"; then
+                AC_MSG_ERROR(--enable-jni must be used in conjunction with --with-jdk=jdk_path.)
+            fi
+            AC_DEFINE(PVFS_JNI_ENABLE, 1,
+                [Should we enable PVFS Client JNI.])
+            BUILD_JNI=1
+        else
+            AC_DEFINE(PVFS_JNI_ENABLE, 0,
+                [Should we enable PVFS Client JNI.])
+        fi
+    ],
+    [   AC_DEFINE(PVFS_JNI_ENABLE, 0,
+            [Should we enable PVFS Client JNI.])
+    ]
+)
+AC_SUBST(BUILD_JNI)
+
+HADOOP_DIR=
+AC_ARG_WITH(
+    hadoop,
+    [  --with-hadoop=<path>    Enables support for OrangeFS extensions of Hadoop classes.],
+    [
+        HADOOP_DIR=$withval;
+        corepath=`ls $withval/hadoop-core*`
+        AC_CHECK_FILE($corepath,
+            [],
+            [
+                AC_MSG_ERROR(could not locate $withval/hadoop-core-*.jar at the path given with --with-hadoop.)
+            ]
+        )
+    ],
+    [   with_hadoop=no]
+)
+AC_SUBST(HADOOP_DIR)
+
+dnl Method to enable OrangeFS extensions to Hadoop classes.
+BUILD_HADOOP=
+AC_ARG_ENABLE(
+    hadoop,
+    [  --enable-hadoop         Enables OrangeFS extenions of Hadoop classes. Requires --enable-jni --with-jdk and --with-hadoop.],
+    [   if test "x$enableval" = "xyes" ; then
+            if test "x$HADOOP_DIR" = "x"; then
+                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --with-hadoop=path.)
+            fi
+            if test "$BUILD_JNI" != "1"; then
+                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --enable-jni.)
+            fi
+            AC_DEFINE(PVFS_HADOOP_ENABLE, 1,
+                [Should we enable OrangeFS extensions of Hadoop classes.])
+            BUILD_HADOOP=1
+        else
+            AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
+                [Should we enable OrangeFS extensions of Hadoop classes.])
+        fi
+    ],
+    [   AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
+            [Should we enable OrangeFS extensions of Hadoop classes.])
+    ]
+)
+AC_SUBST(BUILD_HADOOP)
 
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
@@ -1660,7 +1732,12 @@ if test "x$BUILD_JNI" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
 else
    AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
+fi
 
+if test "x$BUILD_HADOOP" = "x1" ; then
+   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 : yes])
+else
+   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 :  no])
 fi
 
 else
