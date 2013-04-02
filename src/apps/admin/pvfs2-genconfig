@@ -453,7 +453,7 @@ sub emit_filesystem
 {
     my ($target, $name, $fs_id, 
         $root_handle, $last_handle, $first_handle, 
-        $total_ranges, $res_io_ranges, $res_meta_ranges,
+        $curr_ranges, $res_io_ranges, $res_meta_ranges,
         $default_num_dfiles, $default_flow_buffer_size,
         $default_flow_buffer_count) = @_;
 
@@ -463,9 +463,8 @@ sub emit_filesystem
     $total_num_handles_available->bsub($first_handle);
     $total_num_handles_available->binc();
 
-    # override total range count if more reserved ranges
-    $total_ranges = $res_io_ranges + $res_meta_ranges
-        if (($res_io_ranges + $res_meta_ranges) > $total_ranges);
+    # current assigned ranges + reserved ranges
+    my $total_ranges = $curr_ranges + $res_io_ranges + $res_meta_ranges;        
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
@@ -505,7 +504,7 @@ sub emit_filesystem
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
     @meta_aliases = sort @meta_aliases;    
-    my $ranges = $res_meta_ranges > @meta_aliases ? $res_meta_ranges : @meta_aliases;
+    my $ranges = @meta_aliases + $res_meta_ranges;
     for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
@@ -526,7 +525,7 @@ sub emit_filesystem
 
     my @io_aliases = get_aliases($IO_ENDPOINT);
     @io_aliases = sort @io_aliases;
-    $ranges = $res_io_ranges > @io_aliases ? $res_io_ranges : @io_aliases;
+    $ranges = @io_aliases + $res_io_ranges;
     for ($i = 0; $i < $ranges; $i++)
     {
         $start = $end->copy();
