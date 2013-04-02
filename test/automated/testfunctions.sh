@@ -146,8 +146,8 @@ setup_vfs() {
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
-	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/orangefs at mountpoint $PVFS2_MOUNTPOINT"
+	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/orangefs ${PVFS2_MOUNTPOINT}
 	
 		if [ $? -ne 0 ]
 	then
@@ -253,7 +253,7 @@ start_pvfs2() {
         # give the servers time to finish all their initialization tasks
         sleep 10
 
-		echo "tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+		echo "tcp://${HOSTNAME}:3396/orangefs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
