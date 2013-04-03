@@ -55,6 +55,10 @@ CLIENT_SMCGEN := \
         $(DIR)/mgmt-get-uid-list.c \
 	$(DIR)/mgmt-get-dirdata-array.c
 
+ifdef ENABLE_SECURITY_CERT
+	CLIENT_SMCGEN += $(DIR)/mgmt-get-user-cert.c
+endif
+
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)
 

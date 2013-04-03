@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -49,11 +50,16 @@ static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t *openssl_mutexes = NULL;
 static int security_init_status = 0;
 
+#ifdef ENABLE_SECURITY_CERT
+/* CA public key - used for encryption */
+EVP_PKEY *security_pubkey;
+
+/* CA cert */
+X509 *ca_cert;
+#endif
 /* private key used for signing */
 EVP_PKEY *security_privkey = NULL;
 
-/* TODO: global CA cert - should be looked up? */
-X509 *ca_cert;
 
 struct CRYPTO_dynlock_value
 {
@@ -98,7 +104,7 @@ static int load_public_keys(const char*);
  */
 int PINT_security_initialize(void)
 {
-    const struct server_configuration_s *config;
+    const struct server_configuration_s *config = PINT_get_server_config();
     int ret;
 
     gen_mutex_lock(&security_init_mutex);
@@ -126,9 +132,7 @@ int PINT_security_initialize(void)
         cleanup_threading();
         gen_mutex_unlock(&security_init_mutex);
         return ret;
-    }
-
-    config = PINT_get_server_config();
+    }    
 
     /* check for server private key */
     if (config->serverkey_path == NULL)
@@ -196,6 +200,10 @@ int PINT_security_initialize(void)
     /* load private key */
     ret = PINT_load_key_from_file(config->serverkey_path, &security_privkey);
     PINT_SECURITY_CHECK(ret, init_error);
+
+    /* get public key */
+    security_pubkey = X509_get_pubkey(ca_cert);
+    PINT_SECURITY_CHECK_NULL(security_pubkey, init_error);
 
     /* initialize LDAP */
     ret = PINT_ldap_initialize();
@@ -378,10 +386,6 @@ int PINT_sign_capability(PVFS_capability *cap)
     {
         md = EVP_sha1();
     }
-    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
-    }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
@@ -542,10 +546,6 @@ int PINT_verify_capability(const PVFS_capability *cap)
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
-    }
-    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
     }
     else
     {
@@ -708,10 +708,6 @@ int PINT_sign_credential(PVFS_credential *cred)
     {
         md = EVP_sha1();
     }
-    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
-    }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
@@ -846,10 +842,6 @@ int PINT_verify_credential(const PVFS_credential *cred)
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
-    }
-    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
-    {
-        md = EVP_dss1();
     }
     else
     {
@@ -1217,7 +1209,7 @@ void PINT_security_error(const char *prefix, int err)
         }
         break;
     default:
-        /* debug PVFS error */
+        /* debug PVFS/errno error */
         PVFS_strerror_r((int) err, errstr, 256);
         errstr[255] = '\0';
         gossip_err("%s: %s\n", prefix, errstr);

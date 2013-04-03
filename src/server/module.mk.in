@@ -54,7 +54,8 @@ ifdef BUILD_SERVER
                 $(DIR)/mgmt-create-root-dir.c \
                 $(DIR)/mgmt-split-dirent.c \
 		$(DIR)/replicate-prime.c \
-		$(DIR)/replicate-next.c
+		$(DIR)/replicate-next.c \
+		$(DIR)/mgmt-get-user-cert.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

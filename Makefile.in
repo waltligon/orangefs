@@ -66,6 +66,7 @@ sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
 sysconfdir = $(DESTDIR)@sysconfdir@
+logdir = $(DESTDIR)${prefix}/log
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -87,6 +88,7 @@ BUILD_KARMA = @BUILD_KARMA@
 BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
+BUILD_HADOOP = @BUILD_HADOOP@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
@@ -492,8 +494,6 @@ USERSRC :=
 LIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
-# JNI_ULIBSRC is source code wrapper of libofs for JNI use.
-#JNI_ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
@@ -599,20 +599,14 @@ include $(patsubst %, %/module.mk, $(MODULES))
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBPICOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBPICOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBDEPENDS is a list of dependency files for the client lib
-#JNI_ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -627,25 +621,16 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDOBJS is a list of objects to put in the 
-# multithreaded JNI ofs lib
-#JNI_ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared jni 
-# ofs library
-#JNI_ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded
-# jni ofs lib
-#JNI_ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(JNI_ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -929,9 +914,6 @@ lib/liborangefsposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
 	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
 
-# rule for building the JNI client shared library
-#lib/libPVFS2JNI.so: libPVFS2JNI.c PVFS2JNI.java javac javah  
-
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
 	$(Q) "  RANLIB	$@"
@@ -1094,6 +1076,20 @@ docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
 publish: docs
 	$(srcdir)/maint/pvfs2-publish-pages `pwd`/doc
 
+ifdef BUILD_JNI
+jni:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ make -e -C $(builddir)/src/client/jni jni
+jni_install:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@  make -e -C $(builddir)/src/client/jni install
+endif
+
+ifdef BUILD_HADOOP
+hadoop:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni hadoop
+hadoop_install:
+	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni install
+endif
+
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
 # don't get rid of generated files in dist releases
@@ -1126,7 +1122,14 @@ clean::
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) \
                 src/server/pvfs2-server-server.o \
-                src/apps/karma/karma src/apps/fuse/pvfs2fuse
+                src/apps/karma/karma src/apps/fuse/pvfs2fuse \
+                src/server/simple.conf examples/fs.conf
+
+ifdef BUILD_JNI
+clean::
+	$(E)prefix=@prefix@ make -e -C $(builddir)/src/client/jni clean > /dev/null
+endif
+
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 endif
@@ -1172,7 +1175,7 @@ cleaner: clean
 # except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.me
+	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.m4
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
@@ -1222,9 +1225,9 @@ endif
 src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
- --quiet src/server/simple.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--logging "server,network,storage,flow" --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
@@ -1233,9 +1236,9 @@ all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space \
- --quiet examples/fs.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--quiet examples/fs.conf
 endif
 
 install_doc:
@@ -1349,6 +1352,9 @@ ifdef BUILD_SERVER
 	touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
+	# create log and etc dirs under install dir
+	install -d $(sysconfdir)
+	install -d $(logdir)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))

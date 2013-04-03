@@ -93,11 +93,13 @@ public class OrangeFileSystemFSInputStream
     /* *** This method declared abstract in FSInputStream *** */
     public synchronized void seek(long pos) throws IOException {
         displayMethodInfo(true, false);
+        int rc = 0;
         if(filePtr == 0) {
             throw new IOException("Invalid filePtr");
         }
-        if(orange.stdio.fseek(filePtr, pos, sf.SEEK_SET) != 0) {
-            throw new IOException("seek failed on file: " + path);
+        if((rc = orange.stdio.fseek(filePtr, pos, sf.SEEK_SET)) != 0) {
+            throw new IOException("seek failed on file: " + path + 
+                "\nlong pos = " + pos + "\nrc = " + rc);
         }
     }
 

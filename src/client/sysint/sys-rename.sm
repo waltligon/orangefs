@@ -793,6 +793,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     js_p->error_code = 0;
 
     /* if parents are identical, we only retrieved capabilities
+       and distributed directory attributes
        for the source. Copy this capability. */
     if ((sm_p->u.rename.parent_refns[0].fs_id ==
            sm_p->u.rename.parent_refns[1].fs_id) &&
@@ -803,6 +804,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                      "capability\n");
         PINT_copy_capability(&sm_p->u.rename.caps[0],
                              &sm_p->u.rename.caps[1]);
+        sm_p->u.rename.dirent_handle[1] =
+                sm_p->u.rename.dirent_handle[0];
 
     }
 
@@ -915,7 +918,8 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
 
     if (ret)
     {
-        gossip_err("Failed to map meta server address\n");
+        gossip_err("Failed to map meta server address for handle %llu\n",
+                    llu(msg_p->handle));
         js_p->error_code = ret;
     }
 
@@ -1151,6 +1155,8 @@ static PINT_sm_action rename_check_for_remove(
 
     if (sm_p->u.rename.target_dirent_exists)
     {
+        PINT_copy_capability(&sm_p->u.rename.caps[1],
+                             &sm_p->parent_capability);
         js_p->error_code = RENAME_REMOVE_REQUIRED;
     }
 

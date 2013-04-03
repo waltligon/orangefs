@@ -1,0 +1,621 @@
+/* 
+ * (C) 2013 Clemson University / Omnibond Systems LLC
+ *
+ * See COPYING in top-level directory.
+ *
+ */
+
+/* pvfs2_get_user_cert_sm
+ *
+ * This state machine handles two requests.
+ * 
+ * The first requests the server CA public key, so that the client may
+ * use it to encrypt the password sent with the next request.
+ *
+ * The second request is sent with a user id and encrypted password.
+ * The state machine looks up the specified user id in LDAP and
+ * returns a signed certificate and private key if located.
+ *
+ */
+
+#include "pvfs2-config.h"
+
+#ifdef ENABLE_SECURITY_CERT
+
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+
+#include <ldap.h>
+
+#endif
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
+
+#include "server-config.h"
+#include "gossip.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-types-debug.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "pint-cached-config.h"
+#include "quickhash.h"
+#include "pint-security.h"
+#include "security-util.h"
+#include "cert-util.h"
+#include "pint-ldap-map.h"
+
+#ifdef ENABLE_SECURITY_CERT
+extern EVP_PKEY *security_pubkey,
+                *security_privkey;
+
+extern X509 *ca_cert;
+
+#endif
+
+%%
+
+machine pvfs2_get_user_cert_keyreq_sm
+{
+    state keyreq_prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => send_public_key;
+        default => keyreq_final_response;
+    }
+
+    state send_public_key
+    {
+        run get_user_cert_keyreq_send_public_key;
+        default => keyreq_final_response;
+    }
+
+    state keyreq_final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => keyreq_cleanup;
+    }
+
+    state keyreq_cleanup
+    {
+        run get_user_cert_keyreq_cleanup;
+        default => terminate;
+    }
+
+}
+
+machine pvfs2_get_user_cert_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup;
+        default => final_response;
+    }
+
+    state setup
+    {
+        run get_user_cert_setup;
+        default => ldap_lookup;
+    }
+
+    state ldap_lookup
+    {
+        run get_user_cert_ldap_lookup;
+        success => gen_cert;
+        default => final_response;
+    }
+
+    state gen_cert
+    {
+        run get_user_cert_gen_cert;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run get_user_cert_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/* get_subject_entry()
+ * 
+ * Return one entry (segment) (type and value) from a subject dn.
+ * entry_type is assumed to be 16 bytes, entry_value is 256.
+ */
+#ifdef ENABLE_SECURITY_CERT
+static int get_subject_entry(
+        const char *dn, int index, char *entry_field, char *entry_value)
+{
+    char *pdn, *pfield, *pvalue;
+    int commas = 0, i;
+
+    pdn = (char *) dn;
+
+    /* find start of entry */
+    while (commas < index)
+    {
+        /* look for comma */
+        while (*pdn && *pdn != ',')
+            pdn++;
+        /* skip comma */
+        if (*pdn) pdn++;
+        /* skip whitespace */
+        while (*pdn && *pdn == ' ')
+            pdn++;
+        commas++;
+    }
+
+    if (!*pdn)
+        return -1;
+
+    /* copy type */
+    pfield = entry_field;
+    i = 0;
+    while (*pdn && *pdn != '=' && i++ < 15)
+       *pfield++ = *pdn++;
+    *pfield = '\0';
+    /* skip = */
+    pdn++;
+    /* copy value */
+    pvalue = entry_value;
+    i = 0;
+    while (*pdn && *pdn != ',' && i++ < 255)
+        *pvalue++ = *pdn++;
+    *pvalue = '\0';
+
+    return 0;
+}
+#endif
+
+/* get_user_cert_keyreq_send_public_key()
+ *
+ * Send the CA public key to the client for use with encryption.
+ */
+static PINT_sm_action get_user_cert_keyreq_send_public_key(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifndef ENABLE_SECURITY_CERT
+    /* not implemented if not using cert-based security */
+    gossip_err("%s: received user certificate key request, but server not "
+               "compiled in cert-security mode. Returning 'not implemented.'\n",
+               __func__);
+    js_p->error_code = -PVFS_ENOSYS;
+#else
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *config = get_server_config_struct();
+    RSA *rsa;
+    int enc_size;
+
+    /* check fs_id */
+    js_p->error_code = -PVFS_EINVAL;
+
+    if (config == NULL)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (PINT_config_find_fs_id(config, 
+            s_op->req->u.mgmt_get_user_cert_keyreq.fs_id) != NULL)
+    {
+        js_p->error_code = 0;
+    }
+    else 
+    {
+        gossip_err("%s: received invalid fs_id: %llu\n", __func__, 
+                   llu(s_op->req->u.mgmt_get_user_cert_keyreq.fs_id));
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* get RSA object */
+    rsa = EVP_PKEY_get1_RSA(security_pubkey);
+
+    if (rsa == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY,
+            "could not load RSA object from CA public key\n");
+        js_p->error_code = -PVFS_ESECURITY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* write public key to buffer */
+    enc_size = 
+        i2d_RSAPublicKey(rsa, 
+            &s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf);
+
+    if (enc_size > 0)
+    {
+        s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf_size = enc_size;
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: encoded public key for "
+                     "user cert key request (%d bytes)\n", __func__, enc_size);
+    }
+    else
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "could not write "
+                            "CA public key to buffer\n");
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: enc_size = %d\n", 
+                     __func__, enc_size);
+        js_p->error_code = -PVFS_ESECURITY;
+    }
+
+#endif
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_keyreq_cleanup()
+ *
+ * free memory allocated by SM
+ */
+static PINT_sm_action get_user_cert_keyreq_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifdef ENABLE_SECURITY_CERT
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_cleanup_key(&s_op->resp.u.mgmt_get_user_cert_keyreq.public_key);
+#endif
+
+    return server_state_machine_complete(smcb);
+}
+
+/* get_user_cert_setup()
+ *
+ * Initialize data structures.
+ */
+static PINT_sm_action get_user_cert_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifndef ENABLE_SECURITY_CERT
+    /* not implemented if not using cert-based security */
+    gossip_err("%s: received user certificate request, but server not "
+               "compiled in cert-security mode. Returning 'not implemented'.",
+               __func__);
+    js_p->error_code = -PVFS_ENOSYS;
+#else
+    /*
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    */
+
+    js_p->error_code = 0;
+#endif
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_ldap_lookup()
+ *
+ * Lookup the user id in the LDAP directory.
+ */
+static PINT_sm_action get_user_cert_ldap_lookup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifdef ENABLE_SECURITY_CERT
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char *userid = s_op->req->u.mgmt_get_user_cert.userid;
+    unsigned char *pwd;        
+    RSA *rsa_privkey, *rsa_pubkey;
+    int ret, flen;
+
+    /*** decrypt password ***/
+
+    /* get private key RSA object */
+    rsa_privkey = EVP_PKEY_get1_RSA(security_privkey);
+    if (rsa_privkey != NULL)
+    {
+        rsa_pubkey = EVP_PKEY_get1_RSA(security_pubkey);
+    }
+
+    if (rsa_privkey == NULL || rsa_pubkey == NULL)
+    {        
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "could not load public"
+                            "/private key RSA object\n");
+        js_p->error_code = -PVFS_ESECURITY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* allocate decrypt buffer */
+    flen = RSA_size(rsa_pubkey);
+    pwd = (unsigned char *) malloc(flen);
+    if (pwd == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ENOMEM, "could not allocate decrypt "
+                            "buffer\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* decrypt encrypted password */
+    ret = RSA_private_decrypt(flen, 
+              (unsigned char *) s_op->req->u.mgmt_get_user_cert.enc_pwd, 
+              pwd, rsa_privkey, RSA_PKCS1_PADDING);
+    if (ret <= 0)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "password decryption error\n");
+        js_p->error_code = -PVFS_ESECURITY;
+        free(pwd);
+        return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = PINT_ldap_authenticate(userid, (char *) pwd);
+    if (js_p->error_code != 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "%s: PINT_ldap_authenticate failed: %d\n",
+                     __func__, js_p->error_code);
+    }
+
+    /* clear password */
+    memset(pwd, 0, flen);
+    free(pwd);
+#endif 
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_gen_cert()
+ *
+ * Generate user certificate and private key.
+ */
+static PINT_sm_action get_user_cert_gen_cert(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifdef ENABLE_SECURITY_CERT
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *config = get_server_config_struct();
+    X509 *xcert = NULL;
+    PVFS_certificate *pcert;
+    EVP_PKEY *keypair = NULL;
+    RSA *rsa_privkey, *rsa_uprivkey;
+    unsigned char *dec_key, *pdec_key, *penc_key;
+    int ret, index, flen, dlen, bufrem, maxflen, tlen;
+    X509_NAME *name = NULL;
+    X509_EXTENSION *ext;
+    X509V3_CTX ctx;
+    char entry_field[16], entry_value[256];
+
+    /* get private key RSA object */
+    rsa_privkey = EVP_PKEY_get1_RSA(security_privkey);
+    if (rsa_privkey == NULL)
+    {        
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "could not load CA private "
+                            "key RSA object\n");
+        js_p->error_code = -PVFS_ESECURITY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*** decrypt user cert private key ***/
+
+    /* alloc buffers */
+    flen = RSA_size(rsa_privkey); /* block size */
+    maxflen = flen - 12; /* max plaintext per block */
+    /* total enc. key size */
+    bufrem = s_op->req->u.mgmt_get_user_cert.enc_key_size; 
+    dec_key = (unsigned char *) malloc(bufrem);
+    if (dec_key == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ENOMEM, "could not allocate decrypt "
+                            "buffer\n");
+        js_p->error_code = -PVFS_ENOMEM;
+
+        return SM_ACTION_COMPLETE;
+    }
+    pdec_key = dec_key;
+    penc_key = (unsigned char *) s_op->req->u.mgmt_get_user_cert.enc_key;
+    tlen = 0; /* total decrypted key len */
+    while (bufrem > 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: decrypting key: bufrem = %d   "
+                     "flen = %d\n", __func__, bufrem, flen);
+        /* flen = bufrem < maxflen ? bufrem : maxflen; */
+        dlen = RSA_private_decrypt(flen, penc_key, pdec_key, rsa_privkey, 
+                                   RSA_PKCS1_PADDING);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: decrypting key: dlen = %d\n",
+                     __func__, dlen);
+        if (dlen < 0)
+        {
+            PINT_SECURITY_ERROR(-PVFS_ESECURITY, "error decrypting user "
+                                "private key\n");
+            js_p->error_code = -PVFS_ESECURITY;
+            free(dec_key);
+
+            return SM_ACTION_COMPLETE;
+        }
+        pdec_key += dlen;
+        penc_key += flen;
+        tlen += dlen;
+        bufrem -= flen;
+    }
+
+    keypair = EVP_PKEY_new();
+    if (keypair == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "could not allocate keypair object");
+        js_p->error_code = -PVFS_ESECURITY;
+        free(dec_key);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* convert buffer to RSA object and assign to EVP_PKEY */
+    pdec_key = dec_key;
+    rsa_uprivkey = d2i_RSAPrivateKey(NULL, 
+                                     (const unsigned char **) &pdec_key,
+                                     tlen);
+    if (rsa_uprivkey == NULL || !EVP_PKEY_assign_RSA(keypair, rsa_uprivkey))
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "could not convert decrypted "
+                            "buffer to RSA object\n");
+        js_p->error_code = -PVFS_ESECURITY;
+        if (rsa_uprivkey != NULL)
+        {
+            RSA_free(rsa_uprivkey);
+        }
+        free(dec_key);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    free(dec_key);
+
+    /*** generate cert ***/
+
+    xcert = X509_new();
+    if (xcert == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ENOMEM, "could not alloc cert\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        EVP_PKEY_free(keypair);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    X509_set_version(xcert, 2);
+
+    /* serial number set to time */
+    ASN1_INTEGER_set(X509_get_serialNumber(xcert), time(NULL));
+
+    /* set expiration */
+    X509_gmtime_adj(X509_get_notBefore(xcert), 0);
+    X509_gmtime_adj(X509_get_notAfter(xcert), 
+                    (long) config->user_cert_exp * 24 * 60 * 60);
+
+    /* set public key */
+    X509_set_pubkey(xcert, keypair);
+
+    /* build subject dn from user-specified dn */
+    name = X509_get_subject_name(xcert);
+    index = 0;
+    do {
+        ret = get_subject_entry(config->user_cert_dn, index++, entry_field,
+                                entry_value);
+        if (ret == 0)
+        {
+            X509_NAME_add_entry_by_txt(name, entry_field, MBSTRING_UTF8, 
+                (const unsigned char *) entry_value, -1, -1, 0);
+        }
+    } while (ret == 0);
+
+    /* append CN=userid to subject dn */
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_UTF8, 
+        (const unsigned char *) s_op->req->u.mgmt_get_user_cert.userid, -1, -1, 0);
+
+    /* set issuer to CA */
+    X509_set_issuer_name(xcert, X509_get_subject_name(ca_cert));
+
+    /* add CA:FALSE extension */
+    X509V3_set_ctx_nodb(&ctx);
+    X509V3_set_ctx(&ctx, ca_cert, xcert, NULL, NULL, 0);
+    ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_basic_constraints, "CA:FALSE");
+    if (ext == NULL)
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "error adding extension");
+        js_p->error_code = -PVFS_ESECURITY;
+        X509_free(xcert);
+        EVP_PKEY_free(keypair);
+
+        return SM_ACTION_COMPLETE;
+    }
+    X509_add_ext(xcert, ext, -1);
+    X509_EXTENSION_free(ext);
+
+    /* sign the cert w/private key from CA cert */
+    if (!X509_sign(xcert, security_privkey, EVP_sha1()))
+    {
+        PINT_SECURITY_ERROR(-PVFS_ESECURITY, "cert signing error");
+        js_p->error_code = -PVFS_ESECURITY;
+        EVP_PKEY_free(keypair);
+        X509_free(xcert);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* copy cert to response buffer */    
+    ret = PINT_X509_to_cert(xcert, &pcert);
+    if (ret == 0)
+    {
+        ret = PINT_copy_cert(pcert, &s_op->resp.u.mgmt_get_user_cert.cert);
+    }
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: pcert.buf_size = %u    pcert = %s\n",
+                 __func__, s_op->resp.u.mgmt_get_user_cert.cert.buf_size, 
+                 PINT_util_bytes2str(s_op->resp.u.mgmt_get_user_cert.cert.buf, entry_field, 4));
+    if (ret != 0)
+    {
+        PINT_SECURITY_ERROR(ret, "could not copy cert");
+        js_p->error_code = ret;
+    }
+
+    /* cleanup */
+    EVP_PKEY_free(keypair);
+    PINT_cleanup_cert(pcert);
+    X509_free(xcert);
+    
+#endif
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_cleanup()
+ *
+ * Clean up data structures etc.
+ */
+static PINT_sm_action get_user_cert_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifdef ENABLE_SECURITY_CERT
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_cleanup_cert(&s_op->resp.u.mgmt_get_user_cert.cert);
+#endif
+
+    return server_state_machine_complete(smcb);
+}
+
+static int perm_get_user_cert(PINT_server_op *s_op)
+{
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params = 
+{
+    .string_name = "get-user-cert-keyreq",
+    .perm = perm_get_user_cert,
+    .access_type = PINT_server_req_readonly,
+    .state_machine = &pvfs2_get_user_cert_keyreq_sm
+};
+
+struct PINT_server_req_params pvfs2_get_user_cert_params =
+{
+    .string_name = "get-user-cert",
+    .perm = perm_get_user_cert,
+    .access_type = PINT_server_req_readonly,
+    .state_machine = &pvfs2_get_user_cert_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
