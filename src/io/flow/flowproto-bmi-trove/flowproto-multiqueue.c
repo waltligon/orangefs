@@ -2535,13 +2535,15 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
     /* Write the data to trove. flow_trove_write puts q_item on the dest-list */
     flow_data->writes_pending += 1;
 
-    gen_mutex_unlock(&flow_d->flow_mutex);
-
     /* Debug output */
-    gossip_lerr("SERVER RECV Callback: Total: %lld AmtRecvd: %lld PendingRecvs: %d \n",
+    gossip_lerr("flow(%p):q_item(%p):%s: Total: %lld TotalAmtRecvd: %lld AmtRecvd: %lld PendingRecvs: %d PendingWrites: %d\n",
+                 flow_d,q_item,__func__,
                  (long long int)flow_data->total_bytes_req,
                  (long long int)flow_data->total_bytes_recvd,
-                 flow_data->recvs_pending);
+                 (long long int)actual_size,
+                 flow_data->recvs_pending,
+                 flow_data->writes_pending);
+    gen_mutex_unlock(&flow_d->flow_mutex);
 
     flow_trove_write(q_item,
                      actual_size,
@@ -2605,6 +2607,7 @@ static void flow_trove_write(struct fp_queue_item* q_item,
         result_iter->q_item = q_item;
         result_iter->trove_callback.data = result_iter;
         result_iter->trove_callback.fn = write_callback_wrapper;
+        q_item->result_chain_count++;
 
         rc = trove_bstream_write_list(flow_d->dest.u.trove.coll_id,
                                       flow_d->dest.u.trove.handle,
@@ -2639,7 +2642,6 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 
         /* Increment iterator */
         result_iter = result_iter->next;
-        q_item->result_chain_count++;
     };
 
 } /*end flow_trove_write*/
@@ -3288,6 +3290,8 @@ static void server_trove_write_callback_fn(void *user_ptr,
     /* Handle trove errors */
     if(error_code != 0 || flow_d->error_code != 0)
     {
+        gossip_lerr("flow(%p):q_item(%p):%s trove error_code(%d) flow_d->error_code(%d)\n"
+                   ,flow_d,q_item,__func__,error_code,flow_d->error_code);
         gen_mutex_lock(&flow_d->flow_mutex);
         flow_data->writes_pending--;
         gen_mutex_unlock(&flow_d->flow_mutex);
@@ -3300,6 +3304,8 @@ static void server_trove_write_callback_fn(void *user_ptr,
     result_entry->posted_id = 0;
 
     /* If all results for this qitem are available continue */
+    gossip_lerr("flow(%p):q_item(%p):%s:result_chain_count(%d).\n"
+               ,flow_d,q_item,__func__,q_item->result_chain_count);
     if (0 == q_item->result_chain_count)
     {
         struct result_chain_entry* result_iter = &q_item->result_chain;
@@ -3329,12 +3335,15 @@ static void server_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "SERVER WRITE FINISHED: flow(%p)  Total: %lld TotalAmtWritten: %lld AmtWritten: %lld PendingWrites: %d \n",
-            flow_d,
+            "SERVER WRITE FINISHED: flow(%p):q_item(%p):%s  Total: %lld TotalAmtWritten: %lld AmtWritten: %lld PendingWrites: %d "
+            "PendingRecvs: %d RequestDone: %s\n",
+            flow_d,q_item,__func__,
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
             (long long int)bytes_written,
-            flow_data->writes_pending);
+            flow_data->writes_pending,
+            flow_data->recvs_pending,
+            PINT_REQUEST_DONE(flow_d->file_req_state)?"YES":"NO");
     
         /* Cleanup q_item memory */
         q_item->result_chain.next = NULL;
