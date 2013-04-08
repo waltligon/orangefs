@@ -22,11 +22,11 @@ VMSYSTEM=
 NEWINSTANCE=1
 
 
-while getopts s:i:a:dvhumc:k:f:n:t: arguments
+while getopts s:i:a:dvhumc:k:f:n:t:e: arguments
 do
 	case $arguments in
 	h)
-		echo "runalltests [-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE]"
+		echo "runalltests [-v][-m][-u][-d][-a IPADDRESS][-s SVNBRANCH][-i IMAGE][-t FLAVOR][[-n NUMBER_INSTANCES]-c EC2CONFFILE][-k KEYNAME][-f KEYFILE][-e SERVER_DEBUG_PARAMS]"
 		echo ""
 		echo "Examples: "
 		echo ""
@@ -79,6 +79,9 @@ do
 	t)
 		VMTYPE=$OPTARG
 		;;
+	e)
+		SERVER_DEBUG_PARAMS=$OPTARG
+		;;
 	esac
 done
 	
@@ -98,6 +101,8 @@ echo "RUN_USERLIB_TEST is $RUN_USERLIB_TEST"
 echo "VMIPADDR is $VMIPADDR"
 echo "DELETE_INSTANCE is $DELETE_INSTANCE"
 
+echo "SERVER_DEBUG_PARAMS is $SERVER_DEBUG_PARAMS"
+
 
 export SVNBRANCH
 export NEWINSTANCE
@@ -110,6 +115,7 @@ export KEYFILE
 export KEYNAME
 export EC2CONFFILE
 export DELETE_INSTANCE
+export SERVER_DEBUG_PARAMS
 
 #Determine VM User from system
 case $VMSYSTEM in 
