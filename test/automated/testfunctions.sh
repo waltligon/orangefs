@@ -263,7 +263,7 @@ start_pvfs2() {
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	#turn on debugging on each server
 	#echo "....setting server-side debug mask"
-	#INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
+	#INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "getattr,lookup"	
 }
 
 setup_pvfs2() {
