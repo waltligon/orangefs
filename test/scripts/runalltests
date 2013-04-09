@@ -210,9 +210,9 @@ echo "Running tests..."
 # run scripted via bash -s to work around remote issues
 (echo "script run-test.txt" && cat ./run-test.sh) > run-test.scr
 
-echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr 
+echo ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_VFS_TEST=${RUN_VFS_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} SERVER_DEBUG_PARAMS=${SERVER_DEBUG_PARAMS} bash -s " < ./run-test.scr 
 
-ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} bash -s " < ./run-test.scr
+ssh -i ${KEYFILE} ${VMUSER}@${VMIPADDR} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VFS_HOSTS='${VFS_HOSTS}' RUN_VFS_TEST=${RUN_VFS_TEST} RUN_USERLIB_TEST=${RUN_USERLIB_TEST} RUN_MPI_TEST=${RUN_MPI_TEST} SVNBRANCH=${SVNBRANCH} SERVER_DEBUG_PARAMS=${SERVER_DEBUG_PARAMS} bash -s " < ./run-test.scr
 
 echo "Grabbing logs and scripts from server"
 rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${VMUSER}@${VMIPADDR}:/tmp/${VMUSER}/pvfs2-nightly/${DATE}/${SVNBRANCH}/*.log logs-$DATETIME/
