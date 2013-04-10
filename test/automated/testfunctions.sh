@@ -260,10 +260,12 @@ start_pvfs2() {
 	#if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 	#	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	#fi
-	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-	echo "....setting server-side debug mask"
-	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
+	#turn on debugging on each server
+	if [ $SERVER_DEBUG_PARAMS ] ; then
+		echo "....setting server-side debug mask to $SERVER_DEBUG_PARAMS"
+		INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} $SERVER_DEBUG_PARAMS
+	fi
 }
 
 setup_pvfs2() {
