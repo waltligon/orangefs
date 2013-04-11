@@ -2451,6 +2451,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         op_list_search(op_list_array[IND_RECV_EAGER_DONE_BUFFERING], &key);
     if (query_op)
     {
+        /* if (hint==always-queue), then remove op from current queue and put op on completion queue. 
+         * op_list_remove(query_op);
+         * op_list_add(completion_array[context_id],query_op);
+         * return(0);
+         */ 
+
         /* make sure it isn't too big */
         if (query_op->actual_size > expected_size)
         {
@@ -2595,6 +2601,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         assert(query_op->amt_complete <= query_op->actual_size);
         if (query_op->amt_complete == query_op->actual_size)
         {
+            /* if (hint==always-queue), remove op from current queue and put in completion array.
+             * op_list_remove(query_op);
+             * op_list_add(completion_array[context_id],query_op);
+             * return(0);
+             */
+
             /* we are done */
             op_list_remove(query_op);
             *id = 0;
@@ -3867,14 +3879,14 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
 
     tcp_addr_data = dest->method_data;
 
-#if 0
+#if 1
     /* TODO: this is a hack for testing! */
     /* disables immediate send completion... */
     ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-			    dest, buffer_list, size_list, list_count, 0, 0,
+			    dest, (void * const *)buffer_list, size_list, list_count, 0, 0,
 			    id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 			    my_header.size, 0,
-			    context_id);
+			    context_id, eid);
     return(ret);
 #endif
 

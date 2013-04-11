@@ -112,6 +112,13 @@ static const struct PINT_hint_info hint_types[] = {
      decode_func_uint32_t,
      sizeof(uint32_t)},
 
+    {PINT_HINT_BMI_QUEUE,
+     PINT_HINT_TRANSFER,
+     PVFS_HINT_BMI_QUEUE_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
     {0}
 };
 

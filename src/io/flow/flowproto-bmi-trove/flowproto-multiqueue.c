@@ -2347,7 +2347,6 @@ static inline void server_write_flow_post_init(flow_descriptor *flow_d,
     flow_data->total_bytes_recvd = 0;
     flow_data->total_bytes_written = 0;
     
-    //gen_mutex_lock(&flow_d->flow_mutex);
 
     /* Initialize buffers */
     for (i = 0; i < flow_d->buffers_per_flow; i++)
@@ -3015,7 +3014,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         }
         else if (ret < 0)
         {
-           gossip_lerr("flow(%p):replica(%p):q_item(%p):%s:Error while sending to replcate server:(%d)..\n"
+           gossip_lerr("flow(%p):replica(%p):q_item(%p):%s:Error while sending to replica server:(%d)..\n"
                       ,flow_d,replica_q_item,q_item,__func__,ret);
            PVFS_perror("Error Code:",ret);
            /* change this to handle_io_error ? For now, stop the entire flow*/
@@ -3180,7 +3179,6 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
         q_item->buffer_in_use--;
         flow_data->sends_pending--;
         qlist_del(&replica_q_item->list_link); /* remove from src list */ 
-        gen_mutex_unlock(&flow_d->flow_mutex);      
     }
 
     /* Is the entire flow being cancelled? */
@@ -3469,6 +3467,12 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     flow_data->total_bytes_recvd = 0;
     flow_data->total_bytes_written = 0;
     
+    /* Add hint to indicate that we want BMI_post_recv and BMI_post_send to NEVER complete
+     * immediately but ALWAYS be queued.  In this way, we can post many sends and recvs
+     * without executing the callback returns immediately.  The hope is that we will have more
+     * data available to process and thus keep the server as busy as possible.
+     */
+ 
 
     /* Initialize buffers */
     for (i = 0; i < flow_d->buffers_per_flow; i++)

@@ -160,10 +160,16 @@ static int io_send_ack(
     int i, err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    PVFS_handle *handle = NULL;
 
     gossip_lerr("Replication Number of Copies (%d)\n",(int)s_op->req->u.io.replication_number_of_copies);
     for (i=0; i<s_op->req->u.io.replication_number_of_copies; i++)
         gossip_lerr("replication handle[%d]:(%llu)\n",i,llu(s_op->req->u.io.replication_handles[i]));   
+
+    handle = (PVFS_handle *)PINT_hint_get_value_by_type(s_op->req->hints,PINT_HINT_HANDLE,NULL);
+
+    gossip_lerr("Metadata handle(%llu)found in hints.\n",handle?*handle:0);
+
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons
