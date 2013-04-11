@@ -21,10 +21,10 @@
 
 /* Macro that helps print function info */
 #define CAPCACHE_ENTER_FN() do { \
-                                gossip_debug(GOSSIP_CAPCACHE_DEBUG, "%s: enter\n", __func__); \
+                                gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: enter\n", __func__); \
                             } while (0)
 #define CAPCACHE_EXIT_FN()  do { \
-                                gossip_debug(GOSSIP_CAPCACHE_DEBUG, "%s: exit\n", __func__); \
+                                gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: exit\n", __func__); \
                             } while (0)
 
 /* Capcache Macros - Adjust accordingly */
@@ -42,20 +42,20 @@
 #define CAPCACHE_STATS_FREQ     1000
 
 /* Capability Cache Locking */
-#define LOCK_TYPE 3
-#if (LOCK_TYPE == 0) /* No Locking */
+#define CAPCACHE_LOCK_TYPE 3
+#if (CAPCACHE_LOCK_TYPE == 0) /* No Locking */
     #define capcache_lock_t uint64_t
-#elif (LOCK_TYPE == 1)
+#elif (CAPCACHE_LOCK_TYPE == 1)
     #include <pthread.h>
     #define capcache_lock_t pthread_mutex_t
-#elif (LOCK_TYPE == 2)
+#elif (CAPCACHE_LOCK_TYPE == 2)
     #include <pthread.h>
     #define capcache_lock_t pthread_spinlock_t
-#elif (LOCK_TYPE == 3)
+#elif (CAPCACHE_LOCK_TYPE == 3)
     #include "gen-locks.h"
     #define capcache_lock_t gen_mutex_t
 #endif
-#define LOCK_SIZE sizeof(capcache_lock_t)
+#define CAPCACHE_LOCK_SIZE sizeof(capcache_lock_t)
 /* END OF Capability Cache Locking */
 
 /* Capability Cache Structure */
@@ -95,8 +95,9 @@ extern struct capcache_s * capcache;
 int PINT_capcache_init(void); /**/
 int PINT_capcache_finalize(void); /**/
 struct capcache_entry_s * PINT_capcache_lookup_entry(PVFS_capability *cap);
-int PINT_capcache_insert_entry(const PVFS_capability * cap); /**/
+int PINT_capcache_insert_entry(const PVFS_capability *cap); /**/
 int PINT_capcache_remove_entry(struct capcache_entry_s *entry); /**/
+int PINT_capcache_quick_sign(PVFS_capability *cap);
 /* End of Externally Visible Capability Cache API */
 
 #endif /* _CAPCACHE_H */

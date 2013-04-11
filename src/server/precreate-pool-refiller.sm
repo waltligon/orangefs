@@ -233,6 +233,16 @@ static PINT_sm_action setup_fn(
     cap->num_handles = 0;
     cap->handle_array = NULL;
 
+    cap->issuer = 
+        (char *) malloc(strlen(user_opts->server_alias) + 3);
+    if (cap->issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(cap->issuer, "S:");
+    strcat(cap->issuer, user_opts->server_alias);
+
     ret = PINT_sign_capability(cap);
     if (ret < 0)
     {

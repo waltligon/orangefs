@@ -38,8 +38,11 @@ static int PINT_capcache_entry_expired(void *e1, void *e2);
 static void PINT_capcache_rm_expired_entries(PVFS_boolean all, uint16_t index );
 static uint16_t PINT_capcache_get_index(const PVFS_capability *cap);
 static int PINT_capcache_capability_cmp (
-    void * cap1,
-    void * cap2);
+    void * cap,
+    void * entry);
+static int PINT_capcache_capability_quick_cmp(
+    void *cap,
+    void *entry);
 static void PINT_capcache_reset_stats(struct capcache_stats_s const *stats);
 static int PINT_capcache_convert_capability(
     const PVFS_capability * cap,
@@ -65,27 +68,27 @@ static void PINT_capcache_debug_capability(
 
     if (strlen(cap->issuer) == 0)
     {
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "%s null capability\n", prefix);
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s null capability\n", prefix);
         return;
     }
 
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "%s capability:\n", prefix);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tissuer: %s\n", cap->issuer);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tfsid: %u\n", cap->fsid);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tsig_size: %u\n", cap->sig_size);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tsignature: %s\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s capability:\n", prefix);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tissuer: %s\n", cap->issuer);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tfsid: %u\n", cap->fsid);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsig_size: %u\n", cap->sig_size);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsignature: %s\n",
                  PINT_util_bytes2str(cap->signature, sig_buf, 4));
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\ttimeout: %d\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\ttimeout: %d\n",
                  (int) cap->timeout);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\top_mask: %s\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\top_mask: %s\n",
                  PINT_print_op_mask(cap->op_mask, mask_buf));
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tnum_handles: %u\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tnum_handles: %u\n",
                  cap->num_handles);
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tfirst handle: %llu\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tfirst handle: %llu\n",
                  cap->num_handles > 0 ? llu(cap->handle_array[0]) : 0LL);
     for (i = 1; i < cap->num_handles; i++)
     {
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\thandle %d: %llu\n",
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "\thandle %d: %llu\n",
                      i+1, llu(cap->handle_array[i]));
     }
 }
@@ -97,13 +100,13 @@ static void PINT_capcache_print_stats(void)
     count++;
     if (count % CAPCACHE_STATS_FREQ == 0)
     {
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "*** capability cache statistics "
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** capability cache statistics "
                      "***\n");
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "*** entries: %llu inserts: %llu "
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** entries: %llu inserts: %llu "
                      "removes: %llu\n", llu(capcache->stats->entry_cnt), 
                      llu(capcache->stats->inserts), 
                      llu(capcache->stats->removed));
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "*** lookups: %llu hits: %llu (%3.1f%%) misses: "
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** lookups: %llu hits: %llu (%3.1f%%) misses: "
                      "%llu (%3.1f%%) expired: %llu\n", llu(capcache->stats->lookups), 
                      llu(capcache->stats->hits),
                      ((float) capcache->stats->hits / capcache->stats->lookups * 100),
@@ -130,7 +133,7 @@ int PINT_capcache_init(void)
     lock_lock(&lock);
 
     /* Acquire memory */
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "malloc capcache_s_size = %llu\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "malloc capcache_s_size = %llu\n",
         (long long unsigned int) capcache_s_size);
     capcache = (capcache_t *) malloc(capcache_s_size);
     if ((void *) capcache == NULL)
@@ -145,7 +148,7 @@ int PINT_capcache_init(void)
     capcache->size_limit = CAPCACHE_SIZE_CAP;
     capcache->default_timeout_length = CAPCACHE_TIMEOUT;
     capcache->entry_limit = CAPCACHE_ENTRY_LIMIT;
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+    gossip_debug(GOSSIP_SECCACHE_DEBUG,
         "malloc capcache_stats_s_size = %llu\n",
         (long long unsigned int) capcache_stats_s_size);
     capcache->stats = (struct capcache_stats_s *) malloc(
@@ -157,7 +160,7 @@ int PINT_capcache_init(void)
     PINT_capcache_reset_stats(capcache->stats);
     capcache->stats->cache_size = capcache_s_size;
 
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+    gossip_debug(GOSSIP_SECCACHE_DEBUG,
         "initializing the heads of hash table chains\n");
     
     for (i = 0; i < CAPCACHE_HASH_MAX; i++)
@@ -228,7 +231,7 @@ int PINT_capcache_finalize(void)
         return -PVFS_ENOLCK;
     }
 
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "Finalizing capability cache...\n");
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "Finalizing capability cache...\n");
 
     if (capcache != NULL)
     {
@@ -239,7 +242,7 @@ int PINT_capcache_finalize(void)
         /* Loop over capcache entries, freeing entry payload and entry */        
         for (hash_index = 0; hash_index < CAPCACHE_HASH_MAX; hash_index++)
         {
-            gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+            gossip_debug(GOSSIP_SECCACHE_DEBUG,
                 "Freeing entries in hash table chain at index = %d\n",
                 hash_index);
             PINT_llist_free(capcache->entries[hash_index],
@@ -247,7 +250,7 @@ int PINT_capcache_finalize(void)
         }
         free (capcache);
         capcache = NULL;
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "capability cache freed...\n");
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "capability cache freed...\n");
     }
     ret = lock_unlock(&lock);
 
@@ -298,12 +301,12 @@ static void PINT_capcache_rm_expired_entries(PVFS_boolean all, uint16_t index)
     /* removes expired entries from all hash table chains */
     if (all)
     {
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+        gossip_debug(GOSSIP_SECCACHE_DEBUG,
             "Removing all entries with timeouts before %llu\n",
             (long long unsigned int) now.expiration);        
         for (hash_index = 0; hash_index < CAPCACHE_HASH_MAX; hash_index++)
         {
-            gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+            gossip_debug(GOSSIP_SECCACHE_DEBUG,
                 "searching chain at hash_index = %d\n",
                 hash_index);
             struct capcache_entry_s * entry_rm = NULL;
@@ -323,7 +326,7 @@ static void PINT_capcache_rm_expired_entries(PVFS_boolean all, uint16_t index)
     else
     {
         /* remove expired entries from the hash table chain at index */
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+        gossip_debug(GOSSIP_SECCACHE_DEBUG,
             "searching chain at hash_index = %d\n", index);
         struct capcache_entry_s * entry_rm = NULL;
         while((entry_rm = PINT_llist_rem(
@@ -374,7 +377,7 @@ struct capcache_entry_s * PINT_capcache_lookup_entry(PVFS_capability * cap)
         cap,
         &PINT_capcache_capability_cmp);
     
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "cap cache %s!\n",
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "cap cache %s!\n",
                  (current != NULL) ? "hit" : "miss");    
 
     /* unlock the capability cache lock */
@@ -387,7 +390,7 @@ struct capcache_entry_s * PINT_capcache_lookup_entry(PVFS_capability * cap)
         /* 0 returned if expired */
         if (PINT_capcache_entry_expired(&now, current) == 0)
         {            
-            gossip_debug(GOSSIP_CAPCACHE_DEBUG, "entry %p expired\n", current);
+            gossip_debug(GOSSIP_SECCACHE_DEBUG, "entry %p expired\n", current);
             PINT_capcache_remove_entry(current);
             current = NULL;
             capcache->stats->expired++;
@@ -457,7 +460,7 @@ int PINT_capcache_insert_entry(const PVFS_capability * cap)
     /* acquire the lock */
     lock_lock(&lock);
 
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "entry %p added to the head of the "
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "entry %p added to the head of the "
                  "linked list @ index = %d\n", entry, index);
     if (PINT_llist_add_to_head(capcache->entries[index], entry) < 0)
     {
@@ -507,7 +510,7 @@ int PINT_capcache_remove_entry(struct capcache_entry_s *entry)
     /* free memory */
     if (rem != NULL)
     {
-        gossip_debug(GOSSIP_CAPCACHE_DEBUG, "removed entry %p at "
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "removed entry %p at "
                      "index %hd\n", rem, index);
         if (rem->cap != NULL)
         {
@@ -522,10 +525,64 @@ int PINT_capcache_remove_entry(struct capcache_entry_s *entry)
     return ret;
 }
 
+/** PINT_capcache_quick_sign
+ * Copy signature from cached capability if fields match
+ */
+int PINT_capcache_quick_sign(PVFS_capability *cap)
+{
+    struct capcache_entry_s * current = NULL;
+    uint16_t index = 0;
+
+    CAPCACHE_ENTER_FN();
+
+    if (capcache == NULL || cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }    
+
+    /* acquire the lock */
+    lock_lock(&lock);
+
+    /* get index of the hash table chain to look in */
+    index = PINT_capcache_get_index(cap);
+    
+    /* iterate over the hash table chain at the calculated index until a match
+     * is found.
+     */
+    current = (struct capcache_entry_s *) PINT_llist_search(
+        capcache->entries[index],
+        cap,
+        &PINT_capcache_capability_quick_cmp);
+
+    /* release the lock */
+    lock_unlock(&lock);
+
+    if (current != NULL)
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry found!\n",
+                     __func__);
+    }
+    else
+    {
+        CAPCACHE_EXIT_FN();
+        return 1;
+    }
+
+    /* copy capability timeout & signature */
+    cap->timeout = current->cap->timeout;
+    cap->sig_size = current->cap->sig_size;
+    memcpy(cap->signature, current->cap->signature, current->cap->sig_size);
+
+    CAPCACHE_EXIT_FN();
+
+    return 0;
+}
+
 /*****************************************************************************/
+
 /** PINT_capcache_get_index
- * Determine the hash table index based on certian PVFS_capability fields.
- * Returns index of hash table.
+ * Determine the hash table index based on certain
+ * PVFS_capability fields. Returns index of hash table.
  */
 static uint16_t PINT_capcache_get_index(const PVFS_capability *cap)
 {    
@@ -562,7 +619,7 @@ static uint16_t PINT_capcache_get_index(const PVFS_capability *cap)
 
     index = (uint16_t) (hash1[0] % CAPCACHE_HASH_MAX);
 
-    gossip_debug(GOSSIP_CAPCACHE_DEBUG, "\tindex=%hu\n", index);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tindex=%hu\n", index);
 
     return index;
 }
@@ -576,7 +633,6 @@ static int PINT_capcache_capability_cmp(void *cap, void *entry)
     PVFS_capability *kcap, *ecap;
     struct capcache_entry_s *pentry;
 
-    kcap = (PVFS_capability *) cap;
     pentry = (struct capcache_entry_s *) entry;
 
     /* ignore chain end marker */
@@ -586,6 +642,7 @@ static int PINT_capcache_capability_cmp(void *cap, void *entry)
     }
 
     ecap = pentry->cap;
+    kcap = (PVFS_capability *) cap;
 
     /* if both sig_sizes are 0, they're null caps */
     if (kcap->sig_size == 0 && ecap->sig_size == 0)
@@ -602,6 +659,34 @@ static int PINT_capcache_capability_cmp(void *cap, void *entry)
 
     /* compare signatures */
     return memcmp(kcap->signature, ecap->signature, kcap->sig_size);
+}
+
+/** PINT_capcache_capability_cmp
+ * Compares two PVFS_capability structures. Returns 0 if the
+ * capability fields are equivalent. Returns nonzero otherwise.
+ */
+static int PINT_capcache_capability_quick_cmp(void *cap, void *entry)
+{
+    PVFS_capability *kcap, *ecap;
+    struct capcache_entry_s *pentry;
+
+    pentry = (struct capcache_entry_s *) entry;
+
+    /* ignore chain end marker */
+    if (pentry->cap == NULL)
+    {
+        return 1;
+    }
+
+    ecap = pentry->cap;
+    kcap = (PVFS_capability *) cap;
+
+    return (!(kcap->fsid == ecap->fsid &&
+              kcap->num_handles == ecap->num_handles &&
+              kcap->op_mask == ecap->op_mask &&
+              (strcmp(kcap->issuer, ecap->issuer) == 0) &&
+              (memcmp(kcap->handle_array, ecap->handle_array, 
+                      kcap->num_handles * sizeof(PVFS_handle)) == 0)));
 }
 
 /** PINT_capcache_reset_stats
@@ -654,7 +739,7 @@ static void PINT_capcache_cleanup_entry(void * entry)
     {
         if (((struct capcache_entry_s *) entry)->cap != NULL)
         {
-            gossip_debug(GOSSIP_CAPCACHE_DEBUG,
+            gossip_debug(GOSSIP_SECCACHE_DEBUG,
                 "\tCleaning up capability: %llu\n",
                 (long long unsigned int) entry);
             PINT_cleanup_capability(((struct capcache_entry_s *) entry)->cap);
@@ -665,7 +750,7 @@ static void PINT_capcache_cleanup_entry(void * entry)
 
 /* LOCKING */
 /** lock_init() 
- * Initializes the proper lock based on the LOCK_TYPE
+ * Initializes the proper lock based on the CAPCACHE_LOCK_TYPE
  * Returns 0 on success, -1 on error
  */
 static int lock_init(capcache_lock_t * lock)
@@ -673,9 +758,9 @@ static int lock_init(capcache_lock_t * lock)
     int ret = -1;
 
     /* TODO: ability to disable locking */
-#if LOCK_TYPE == 0
+#if CAPCACHE_LOCK_TYPE == 0
     return 0;
-#elif LOCK_TYPE == 1
+#elif CAPCACHE_LOCK_TYPE == 1
     pthread_mutexattr_t attr;
     ret = pthread_mutexattr_init(&attr);
     if (ret != 0) return -1;
@@ -683,10 +768,10 @@ static int lock_init(capcache_lock_t * lock)
     if (ret != 0) return -1;
     ret = pthread_mutex_init(lock, &attr);
     if (ret != 0) return -1;
-#elif LOCK_TYPE == 2
+#elif CAPCACHE_LOCK_TYPE == 2
     ret = pthread_spin_init(lock, 1);
     if (ret != 0) return -1;
-#elif LOCK_TYPE == 3
+#elif CAPCACHE_LOCK_TYPE == 3
     *lock = (capcache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP;
     ret = 0;
 #endif
@@ -701,14 +786,14 @@ static inline int lock_lock(capcache_lock_t * lock)
 {
     int ret = 0;
     
-#if LOCK_TYPE == 0
+#if CAPCACHE_LOCK_TYPE == 0
     return ret;
-#elif LOCK_TYPE == 1
+#elif CAPCACHE_LOCK_TYPE == 1
     ret = pthread_mutex_lock(lock);
     return ret;
-#elif LOCK_TYPE == 2
+#elif CAPCACHE_LOCK_TYPE == 2
     return pthread_spin_lock(lock);
-#elif LOCK_TYPE == 3
+#elif CAPCACHE_LOCK_TYPE == 3
     ret = gen_mutex_lock(lock);
     return ret;
 #endif
@@ -720,13 +805,13 @@ static inline int lock_lock(capcache_lock_t * lock)
  */
 static inline int lock_unlock(capcache_lock_t * lock)
 {
-#if LOCK_TYPE == 0
+#if CAPCACHE_LOCK_TYPE == 0
     return 0;
-#elif LOCK_TYPE == 1
+#elif CAPCACHE_LOCK_TYPE == 1
     return pthread_mutex_unlock(lock);
-#elif LOCK_TYPE == 2
+#elif CAPCACHE_LOCK_TYPE == 2
     return pthread_spin_unlock(lock);
-#elif LOCK_TYPE == 3
+#elif CAPCACHE_LOCK_TYPE == 3
     return gen_mutex_unlock(lock);
 #endif
 }
@@ -740,21 +825,21 @@ static inline int lock_trylock(capcache_lock_t * lock)
 {
     int ret = -1;
 
-#if (LOCK_TYPE == 0)
+#if (CAPCACHE_LOCK_TYPE == 0)
     return 0;
-#elif (LOCK_TYPE == 1)
+#elif (CAPCACHE_LOCK_TYPE == 1)
     ret = pthread_mutex_trylock(lock);
     if (ret != 0)
     {
         ret = -1;
     }
-#elif (LOCK_TYPE == 2)
+#elif (CAPCACHE_LOCK_TYPE == 2)
     ret = pthread_spin_trylock(lock);
     if (ret != 0)
     {
         ret = -1;
     }
-#elif LOCK_TYPE == 3
+#elif CAPCACHE_LOCK_TYPE == 3
     ret = gen_mutex_trylock(lock);
     if (ret != 0)
     {

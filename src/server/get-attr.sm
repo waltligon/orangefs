@@ -1384,12 +1384,16 @@ static PINT_sm_action getattr_create_capability(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    struct server_configuration_s *config;
     void *acl_buf;
     size_t acl_size;
     int ret;
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+#ifdef ENABLE_CAPCACHE
+    int insert_flag = 1;
+#endif
 
     if (js_p->error_code == -TROVE_ENOENT)
     {
@@ -1470,7 +1474,34 @@ static PINT_sm_action getattr_create_capability(
     
     resp_attr->capability.fsid = s_op->u.getattr.fs_id;
 
+    config = PINT_get_server_config();
+    resp_attr->capability.issuer = 
+        (char *) malloc(strlen(config->server_alias) + 3);
+    if (resp_attr->capability.issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(resp_attr->capability.issuer, "S:");
+    strcat(resp_attr->capability.issuer, config->server_alias);
+
+#ifdef ENABLE_CAPCACHE
+    /* if capability fields match cached capability, use
+       signature from that capability */
+    ret = PINT_capcache_quick_sign(&resp_attr->capability);
+    if (ret != 0)
+    {
+        ret = PINT_sign_capability(&resp_attr->capability);        
+    }
+    else
+    {
+        /* no need to insert capability into cache */
+        insert_flag = 0;
+    }
+#else
     ret = PINT_sign_capability(&resp_attr->capability);
+#endif
+
     if (ret < 0)
     {
         gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
@@ -1490,11 +1521,14 @@ static PINT_sm_action getattr_create_capability(
 
 #ifdef ENABLE_CAPCACHE
     /* Cache the new capability */
-    ret = PINT_capcache_insert_entry(&resp_attr->capability);
-    if(ret < 0)
+    if (insert_flag)
     {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+        ret = PINT_capcache_insert_entry(&resp_attr->capability);
+        if(ret < 0)
+        {
+            /* issue a warning */
+            gossip_err("Warning: could not cache capability\n");            
+        }
     }
 #endif /* ENABLE_CAPCACHE */
 
@@ -1693,7 +1727,7 @@ static PINT_sm_action getattr_cleanup(
 static PINT_sm_action getattr_with_prelude_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    js_p->error_code = 0;
+    js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;
 }
 

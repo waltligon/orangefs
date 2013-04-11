@@ -1013,12 +1013,12 @@ enum PVFS_io_type
  */
 struct profiler
 {
-    struct  timeval  start;
-    struct  timeval  finish;
-    uint64_t  save_timing;
+    struct timeval start;
+    struct timeval finish;
+    uint64_t save_timing;
 };
 
-#define INIT_PROFILER(prof_struct) prof_struct.cumulative_diff = 0;
+#define INIT_PROFILER(prof_struct) prof_struct.save_timing = 0;
 
 #define START_PROFILER(prof_struct) \
     gettimeofday(&prof_struct.start, NULL);
