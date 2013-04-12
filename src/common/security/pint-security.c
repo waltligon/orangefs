@@ -182,15 +182,15 @@ int PINT_security_initialize(void)
     ret = PINT_init_trust_store();
     PINT_SECURITY_CHECK(ret, init_error);
 
-    if (config->ca_path == NULL)
+    if (config->ca_file == NULL)
     {
         gossip_err("CAPath not defined in configuration file... "
                    "aborting\n");
 
-        PINT_SECURITY_CHECK_NULL(config->ca_path, init_error);
+        PINT_SECURITY_CHECK_NULL(config->ca_file, init_error);
     }
 
-    ret = PINT_load_cert_from_file(config->ca_path, &ca_cert);
+    ret = PINT_load_cert_from_file(config->ca_file, &ca_cert);
     PINT_SECURITY_CHECK(ret, init_error);
 
     ret = PINT_add_trusted_certificate(ca_cert);

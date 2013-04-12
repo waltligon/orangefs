@@ -106,8 +106,7 @@ int PINT_map_credential(PVFS_credential *cred,
         return -PVFS_EINVAL;
     }
 
-    /* TODO: caching!
-       Also, pre-cache CA cert as root */
+    /* TODO: pre-cache CA cert as root */
 
 #ifdef ENABLE_SECURITY_CERT
     /* if provided certificate is the CA certificate, map to root user 

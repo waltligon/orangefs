@@ -221,7 +221,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 
 #ifdef ENABLE_SECURITY_CERT
     /* use CA certificate as cert in credential */
-    ret = PINT_load_cert_from_file(user_opts->ca_path, &xcert);
+    ret = PINT_load_cert_from_file(user_opts->ca_file, &xcert);
     if (ret != 0)
     {
         gossip_err("mgmt_create_root_dir: could not load CA "

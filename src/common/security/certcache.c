@@ -17,6 +17,7 @@
 #include <openssl/asn1.h>
 
 #include "certcache.h"
+#include "server-config.h"
 #include "security-util.h"
 #include "cert-util.h"
 #include "pint-util.h"
@@ -156,8 +157,11 @@ static void PINT_certcache_print_stats(void)
 int PINT_certcache_init(void)
 {
     int i, hash_index;
+    struct server_configuration_s *config;
 
     CERTCACHE_ENTER_FN();
+
+    config = PINT_get_server_config();
 
     /* Initialize certificate cache lock */
     lock_init(&lock);
@@ -178,7 +182,7 @@ int PINT_certcache_init(void)
     memset(certcache, 0, certcache_s_size);
     /* Cache structure allocation successful */
     certcache->size_limit = CERTCACHE_SIZE_CAP;
-    certcache->default_timeout_length = CERTCACHE_TIMEOUT;
+    certcache->default_timeout_length = config->security_timeout;
     certcache->entry_limit = CERTCACHE_ENTRY_LIMIT;
     gossip_debug(GOSSIP_SECCACHE_DEBUG,
         "malloc certcache_stats_s_size = %llu\n",
@@ -347,8 +351,9 @@ static void PINT_certcache_rm_expired_entries(PVFS_boolean all, uint16_t index)
                 &now,
                 &PINT_certcache_entry_expired)) != NULL)
             {
-                gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** removing %s ***\n",
-                             entry_rm->subject);
+                gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** removing %s (timeout: "
+                             "%llu) ***\n", entry_rm->subject,
+                             llu(entry_rm->expiration));
                 PINT_certcache_cleanup_entry(entry_rm);
                 certcache->stats->removed++;
                 certcache->stats->entry_cnt--;
@@ -426,7 +431,9 @@ struct certcache_entry_s * PINT_certcache_lookup_entry(PVFS_certificate * cert)
         if (exp == 0 ||
             PINT_certcache_entry_expired(&now, current) == 0)
         {            
-            gossip_debug(GOSSIP_SECCACHE_DEBUG, "entry %p expired\n", current);
+            gossip_debug(GOSSIP_SECCACHE_DEBUG, "entry %p expired "
+                         "(entry: %llu  now: %llu)\n", current, 
+                         llu(current->expiration), llu(now.expiration));
             PINT_certcache_remove_entry(current);
             current = NULL;
             certcache->stats->expired++;

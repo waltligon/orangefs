@@ -208,7 +208,7 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
-    char *ca_path;                   /* location of CA certificate */
+    char *ca_file;                   /* location of CA certificate */
     char *user_cert_dn;              /* dn that forms the root of the 
                                       * user certificate dn
                                       */

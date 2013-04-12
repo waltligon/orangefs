@@ -30,8 +30,6 @@
 /* certcache Macros - Adjust accordingly */
 /* Key type, so it can be swapped easily */
 #define KEY_T                   uint64_t
-/* Default timeout of certificate-cache entry in seconds */
-#define CERTCACHE_TIMEOUT        10
 /* Number of certificate cache entries certificate cache can hold */
 #define CERTCACHE_ENTRY_LIMIT    256
 /* The total certificate cache size 64 MB */
