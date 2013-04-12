@@ -573,6 +573,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
 {
     struct fp_private_data *flow_data = NULL;
     int i,j,ret;
+    uint32_t *always_queue=NULL;
 
     gossip_lerr("Executing %s for flow(%p):handle(%llu)...\n",__func__,flow_d,llu(flow_d->dest.u.trove.handle));
 
@@ -727,6 +728,30 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     else if(flow_d->src.endpoint_id  == BMI_ENDPOINT   &&
             flow_d->dest.endpoint_id == REPLICATION_ENDPOINT) 
     {
+         /* Add hint to indicate that we want BMI_post_recv and BMI_post_send to NEVER complete
+          * immediately but ALWAYS be queued.  In this way, we can post many sends and recvs
+          * without executing the callback returns immediately.  The hope is that we will have more
+          * data available to process and thus keep the server as busy as possible.
+          */
+         always_queue=malloc(sizeof(*always_queue));
+         if (!always_queue)
+         {
+             gossip_lerr("%s:Error allocating memory for always_queue.\n",__func__);
+             ret = -PVFS_ENOMEM;
+             goto error_exit;
+         }
+         *always_queue = 1;
+         ret=PVFS_hint_add(&(flow_d->hints),
+                          PVFS_HINT_BMI_QUEUE_NAME,
+                           sizeof(*always_queue),
+                           always_queue);
+         if (ret)
+         {
+            gossip_lerr("%s:Error adding hint(%d).\n",__func__,ret);
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
+         }
+
          /* Initiate BMI-RCV->multiple BMI-SENDs,one trove-write loop.
           */
          gossip_lerr("flow(%p):Calling forwarding_flow_post_init...\n",flow_d);
@@ -761,6 +786,29 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     else if(flow_d->src.endpoint_id  == BMI_ENDPOINT &&
             flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
+         /* Add hint to indicate that we want BMI_post_recv and BMI_post_send to NEVER complete
+          * immediately but ALWAYS be queued.  In this way, we can post many sends and recvs
+          * without executing the callback returns immediately.  The hope is that we will have more
+          * data available to process and thus keep the server as busy as possible.
+          */
+         always_queue=malloc(sizeof(*always_queue));
+         if (!always_queue)
+         {
+             gossip_lerr("%s:Error allocating memory for always_queue.\n",__func__);
+             ret = -PVFS_ENOMEM;
+             goto error_exit;
+         }
+         *always_queue = 1;
+         ret=PVFS_hint_add(&(flow_d->hints),
+                          PVFS_HINT_BMI_QUEUE_NAME,
+                           sizeof(*always_queue),
+                           always_queue);
+         if (ret)
+         {
+            gossip_lerr("%s:Error adding hint(%d).\n",__func__,ret);
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
+         }
         /* Initiate BMI-rcv,trove-write loop for this server */
         gossip_lerr("flow(%p):Calling server_write_flow_post_init()...\n",flow_d);
         server_write_flow_post_init(flow_d,flow_data);
@@ -792,6 +840,10 @@ error_exit:
        free(flow_data);
     }
     flow_d->flow_protocol_data = NULL;
+    if (always_queue)
+    {
+        free(always_queue);
+    }
     return (ret);
 }/*end fp_multiqueue_post*/
 
@@ -1661,6 +1713,10 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
             }while(result_tmp);
             flow_data->prealloc_array[i].result_chain.next = NULL;
         }
+
+        /* NOTE: hints are freed by the state machine processor in server_state_machine_complete().
+         *       The new hint, PINT_HINT_BMI_QUEUE, introduced for replication will be deallocated then.
+         */
     }
     else if(flow_data->parent->src.endpoint_id  == TROVE_ENDPOINT &&
             flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
@@ -2446,7 +2502,7 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
                             flow_d->tag,
                             &q_item->bmi_callback,
                             global_bmi_context,
-                            NULL);
+                            flow_d->hints);
 
         gossip_lerr("flow(%p):q_item(%p):%s:return value from BMI_post_recv:(%d).\n"
                    ,flow_d,q_item,__func__,ret);
@@ -2998,7 +3054,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
                             ,flow_d->next_dest[i].u.bmi.tag
                             ,&replica_q_item->bmi_callback
                             ,global_bmi_context
-                            ,NULL );
+                            ,flow_d->hints );
         gossip_lerr("flow(%p):replica(%p):q_item(%p):%s:Value of BMI_post_send:(%d).\n"
                    ,flow_d,replica_q_item,q_item,__func__,ret);
         if (ret == 0)
@@ -3451,6 +3507,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
 {
     gossip_err("flow(%p):Executing %s...\n",flow_d,__func__);
     int i;
+    uint32_t *always_queue;
 
     /* Generic flow initialization */
     flow_data->parent->total_transferred = 0;
@@ -3467,12 +3524,11 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     flow_data->total_bytes_recvd = 0;
     flow_data->total_bytes_written = 0;
     
-    /* Add hint to indicate that we want BMI_post_recv and BMI_post_send to NEVER complete
-     * immediately but ALWAYS be queued.  In this way, we can post many sends and recvs
-     * without executing the callback returns immediately.  The hope is that we will have more
-     * data available to process and thus keep the server as busy as possible.
-     */
- 
+    always_queue=PINT_hint_get_value_by_type(flow_d->hints,
+                                             PINT_HINT_BMI_QUEUE,
+                                             NULL);
+    gossip_lerr("always_queue(%d)\n",always_queue?*always_queue:0);
+    
 
     /* Initialize buffers */
     for (i = 0; i < flow_d->buffers_per_flow; i++)

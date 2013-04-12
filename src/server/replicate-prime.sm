@@ -168,7 +168,7 @@ static int io_send_ack(
 
     handle = (PVFS_handle *)PINT_hint_get_value_by_type(s_op->req->hints,PINT_HINT_HANDLE,NULL);
 
-    gossip_lerr("Metadata handle(%llu)found in hints.\n",handle?*handle:0);
+    gossip_lerr("Metadata handle(%llu)found in hints.\n",handle?llu(*handle):0);
 
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we

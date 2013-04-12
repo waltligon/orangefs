@@ -2414,6 +2414,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     bmi_size_t total_copied = 0;
     int i;
     PINT_event_id eid = 0;
+    uint32_t always_queue = 0;
 
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
@@ -2425,6 +2426,16 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         expected_size);
 
     tcp_addr_data = src->method_data;
+
+    /* get BMI_QUEUE hint.  If found, then we want to always queue the op instead of
+     * returning with immediate completion.
+     */
+    if (PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL))
+    {
+      always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
+    }
+
+    gossip_lerr("%s:always_queue(%d).\n",__func__,always_queue);
 
     /* short out immediately if the address is bad and we have no way to
      * reconnect
@@ -2456,6 +2467,14 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
          * op_list_add(completion_array[context_id],query_op);
          * return(0);
          */ 
+        if (always_queue)
+        {
+           gossip_lerr("%s:Moving query_op from RECV_EAGER_DONE_BUFFERING to completion array.\n"
+                      ,__func__);
+           op_list_remove(query_op);
+           op_list_add(completion_array[context_id],query_op);
+           return(0);
+        }
 
         /* make sure it isn't too big */
         if (query_op->actual_size > expected_size)
@@ -2606,6 +2625,14 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
              * op_list_add(completion_array[context_id],query_op);
              * return(0);
              */
+            if (always_queue)
+            {
+               gossip_lerr("%s:Moving query_op from RECV INFLIGHT to completion array.\n"
+                          ,__func__);
+               op_list_remove(query_op);
+               op_list_add(completion_array[context_id],query_op);
+               return (0);
+            }
 
             /* we are done */
             op_list_remove(query_op);
@@ -2643,6 +2670,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         bogus_header.mode = TCP_MODE_REND;
     }
     bogus_header.tag = tag;
+    gossip_lerr("%s:Adding recv to IND_RECV array.\n",__func__);
     ret = enqueue_operation(op_list_array[IND_RECV],
                             BMI_RECV, src, buffer_list, size_list,
                             list_count, 0, 0, id, BMI_TCP_INPROGRESS,
