@@ -2670,7 +2670,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         bogus_header.mode = TCP_MODE_REND;
     }
     bogus_header.tag = tag;
-    gossip_lerr("%s:Adding recv to IND_RECV array.\n",__func__);
+    //gossip_lerr("%s:Adding recv to IND_RECV array.\n",__func__);
+    gossip_lerr("%s:Adding op to IND_RECV array.\n",__func__);
     ret = enqueue_operation(op_list_array[IND_RECV],
                             BMI_RECV, src, buffer_list, size_list,
                             list_count, 0, 0, id, BMI_TCP_INPROGRESS,

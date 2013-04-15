@@ -2708,20 +2708,19 @@ static void forwarding_trove_write_callback_wrapper(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct result_chain_entry*)user_ptr)->q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
 
-    //gen_mutex_lock(&flow_data->parent->flow_mutex);
     
     forwarding_trove_write_callback_fn(user_ptr, error_code);
 
-    gen_mutex_lock(&flow_d->flow_mutex);
-    if(flow_d->state == FLOW_COMPLETE)
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-        FLOW_CLEANUP(flow_data);
-    }
-    else
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-    }
+    //gen_mutex_lock(&flow_d->flow_mutex);
+    //if(flow_d->state == FLOW_COMPLETE)
+    //{
+    //    gen_mutex_unlock(&flow_d->flow_mutex);
+    //    FLOW_CLEANUP(flow_data);
+    //}
+    //else
+    //{
+    //    gen_mutex_unlock(&flow_d->flow_mutex);
+    //}
 }/*end forwarding_trove_write_callback_wrapper*/
 
 
@@ -2837,6 +2836,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
             assert(flow_data->total_bytes_recvd ==
                    flow_data->total_bytes_written);
             assert(flow_d->state != FLOW_COMPLETE);
+            FLOW_CLEANUP(flow_data);
             flow_d->state = FLOW_COMPLETE;
             gen_mutex_unlock(&flow_d->flow_mutex);
             return;
@@ -3196,20 +3196,19 @@ static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
     flow_descriptor *flow_d = flow_data->parent;
 
-    //gen_mutex_lock(&flow_data->parent->flow_mutex);
     
     forwarding_bmi_send_callback_fn(user_ptr, actual_size, error_code);
 
-    gen_mutex_lock(&flow_d->flow_mutex);
-    if (flow_d->state == FLOW_COMPLETE)
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-        FLOW_CLEANUP(flow_data);
-    }
-    else
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-    }
+    //gen_mutex_lock(&flow_d->flow_mutex);
+    //if (flow_d->state == FLOW_COMPLETE)
+    //{
+    //    gen_mutex_unlock(&flow_d->flow_mutex);
+    //    FLOW_CLEANUP(flow_data);
+    //}
+    //else
+    //{
+    //    gen_mutex_unlock(&flow_d->flow_mutex);
+    //}
 }/*end forwarding_bmi_send_callback_wrapper*/
 
 
@@ -3294,10 +3293,11 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 
     if (forwarding_is_flow_complete(flow_data))
     {
-        gossip_lerr("Finished sending a buffer of data(%p)\n",q_item);
+        gossip_lerr("flow(%p):q_item(%p):%s:Finished sending a buffer of data\n",flow_d,q_item,__func__);
         assert(flow_data->total_bytes_recvd ==
                flow_data->total_bytes_written);
         assert(flow_d->state != FLOW_COMPLETE);
+        FLOW_CLEANUP(flow_data);
         flow_d->state = FLOW_COMPLETE;
         gen_mutex_unlock(&flow_d->flow_mutex);
         return;
