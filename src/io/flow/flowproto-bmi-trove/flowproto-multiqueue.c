@@ -132,11 +132,7 @@ typedef void (*bmi_recv_callback)(void *, PVFS_size, PVFS_error);
 typedef void (*trove_write_callback)(void *, PVFS_error);
 
 static void flow_bmi_recv(struct fp_queue_item* q_item,
-                          bmi_recv_callback recv_callback_wrapper,
                           bmi_recv_callback recv_callback);
-static inline void server_bmi_recv_callback_wrapper(void *user_ptr,
-                                                    PVFS_size actual_size,
-                                                    PVFS_error error_code);
 static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 					    PVFS_size actual_size,
 					    PVFS_error error_code);
@@ -146,22 +142,13 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
 static int flow_process_request( struct fp_queue_item* q_item );
 static void flow_trove_write(struct fp_queue_item* q_item,
                              PVFS_size actual_size,
-                             trove_write_callback write_callback_wrapper,
                              trove_write_callback write_callback);
-static inline void server_trove_write_callback_wrapper(void *user_ptr,
-                                                       PVFS_error error_code);
 static void server_trove_write_callback_fn(void *user_ptr,
                                                PVFS_error error_code);
 static TROVE_context_id global_trove_context = -1;
 static void forwarding_trove_write_callback_fn(void *user_ptr,
                                                PVFS_error error_code);
 int forwarding_is_flow_complete(struct fp_private_data* flow_data);
-static inline void forwarding_bmi_recv_callback_wrapper(void *user_ptr,
-							PVFS_size actual_size,
-							PVFS_error error_code);
-static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
-						 PVFS_size actual_size,
-						 PVFS_error error_code);
 static void forwarding_bmi_send_callback_fn(void *user_ptr,
 					    PVFS_size actual_size,
 					    PVFS_error error_code);
@@ -730,7 +717,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     {
          /* Add hint to indicate that we want BMI_post_recv and BMI_post_send to NEVER complete
           * immediately but ALWAYS be queued.  In this way, we can post many sends and recvs
-          * without executing the callback returns immediately.  The hope is that we will have more
+          * without executing the callback functions immediately.  The hope is that we will have more
           * data available to process and thus keep the server as busy as possible.
           */
          always_queue=malloc(sizeof(*always_queue));
@@ -752,7 +739,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             goto error_exit;
          }
 
-         /* Initiate BMI-RCV->multiple BMI-SENDs,one trove-write loop.
+         /* Initiate BMI-RCV->multiple BMI-SENDs->trove-write loop.
           */
          gossip_lerr("flow(%p):Calling forwarding_flow_post_init...\n",flow_d);
          forwarding_flow_post_init(flow_d, flow_data);
@@ -809,7 +796,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             ret = -PVFS_ENOMEM;
             goto error_exit;
          }
-        /* Initiate BMI-rcv,trove-write loop for this server */
+        /* Initiate BMI-rcv->trove-write loop for this server */
         gossip_lerr("flow(%p):Calling server_write_flow_post_init()...\n",flow_d);
         server_write_flow_post_init(flow_d,flow_data);
     }
@@ -2426,29 +2413,23 @@ static inline void server_write_flow_post_init(flow_descriptor *flow_d,
             /* Post the recv operation */
             gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(&(flow_data->prealloc_array[i]),
-                          server_bmi_recv_callback_wrapper,
                           server_bmi_recv_callback_fn);
         }
         else
         {
+            gen_mutex_unlock(&flow_d->flow_mutex);
             gossip_lerr("Server flow posted all buffers on initial post.\n");
             break;
         }
     }
 
-    /* If the flow is complete, perform cleanup */
-    if(flow_d->state == FLOW_COMPLETE)
-    {
-        FLOW_CLEANUP(flow_data);
-    }
-    gen_mutex_unlock(&flow_d->flow_mutex);
+    return;
 }/*end server_write_flow_post_init*/
 
 
 
 
 static void flow_bmi_recv(struct fp_queue_item* q_item,
-                          bmi_recv_callback recv_callback_wrapper,
                           bmi_recv_callback recv_callback)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
@@ -2470,7 +2451,7 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
     assert(q_item->buffer);
     memset(q_item->buffer,0,flow_d->buffer_size);
 
-    q_item->bmi_callback.fn = recv_callback_wrapper;
+    q_item->bmi_callback.fn = recv_callback;
     q_item->posted_id = 0;
     
 
@@ -2527,24 +2508,6 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
 
 
 
-static inline void server_bmi_recv_callback_wrapper(void *user_ptr,
-                                                    PVFS_size actual_size,
-                                                    PVFS_error error_code)
-{
-    struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    server_bmi_recv_callback_fn(user_ptr, actual_size, error_code);
-
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
-    if(flow_data->parent->state == FLOW_COMPLETE)
-    {
-        FLOW_CLEANUP(flow_data);
-    }
-    gen_mutex_unlock(&flow_data->parent->flow_mutex);
-    return;
-}/*end server_bmi_recv_callback_wrapper*/
-
-
-
 /* server_bmi_recv_callback_fn()
  *
  * Callback invoked when a BMI recv operation completes
@@ -2594,7 +2557,6 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
 
     flow_trove_write(q_item,
                      actual_size,
-                     server_trove_write_callback_wrapper,
                      server_trove_write_callback_fn);
     
     /* At this point, either the trove write has been queued or it completed immediately. If 
@@ -2616,7 +2578,6 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
  */
 static void flow_trove_write(struct fp_queue_item* q_item,
                              PVFS_size actual_size,
-                             trove_write_callback write_callback_wrapper,
                              trove_write_callback write_callback)
 {
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
@@ -2653,7 +2614,7 @@ static void flow_trove_write(struct fp_queue_item* q_item,
         assert(0 != result_iter->result.bytes);
         result_iter->q_item = q_item;
         result_iter->trove_callback.data = result_iter;
-        result_iter->trove_callback.fn = write_callback_wrapper;
+        result_iter->trove_callback.fn = write_callback;
         q_item->result_chain_count++;
 
         rc = trove_bstream_write_list(flow_d->dest.u.trove.coll_id,
@@ -2692,18 +2653,6 @@ static void flow_trove_write(struct fp_queue_item* q_item,
     };
 
 } /*end flow_trove_write*/
-
-
-static void forwarding_trove_write_callback_wrapper(void *user_ptr,
-                                                    PVFS_error error_code)
-{
-    struct fp_private_data *flow_data = PRIVATE_FLOW(((struct result_chain_entry*)user_ptr)->q_item->parent);
-    flow_descriptor *flow_d = flow_data->parent;
-
-    
-    forwarding_trove_write_callback_fn(user_ptr, error_code);
-
-}/*end forwarding_trove_write_callback_wrapper*/
 
 
 /**
@@ -2834,7 +2783,6 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
             flow_data->primary_recvs_throttled -= 1;
             gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(q_item,
-                          forwarding_bmi_recv_callback_wrapper,
                           forwarding_bmi_recv_callback_fn);
         }
         else
@@ -2898,17 +2846,8 @@ static inline void forwarding_bmi_recv_callback_wrapper(void *user_ptr,
 							PVFS_size actual_size,
 							PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    flow_descriptor *flow_d = flow_data->parent;
- 
     forwarding_bmi_recv_callback_fn(user_ptr, actual_size, error_code);
 
-    gen_mutex_lock(&flow_d->flow_mutex);
-    if(flow_data->parent->state == FLOW_COMPLETE)
-    {
-        FLOW_CLEANUP(flow_data);
-    }
-    gen_mutex_unlock(&flow_data->parent->flow_mutex);
     return;
 }/*end forwarding_bmi_recv_callback_wrapper*/
 
@@ -2946,7 +2885,9 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         return;
     }
 
-    /* calculate how many replicas that we will attempt to send */
+    /* calculate how many replicas that we will attempt to send. We check the intersection of the replicas
+     * contacted with those returning a successful response. 
+     */
     for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
     {
         replica_count++;
@@ -2963,9 +2904,9 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     /* Decrement recv pending count; we just got one from the client */
     flow_data->recvs_pending -= 1;
 
-    /* Increment writes pending.  We MUST increment before sending to replica servers, because the send MAY
-     * result in an immediate completion, which needs to know that we have a write pending and thus
-     * the flow buffer is still in use and therefore the flow is not finished.  
+    /* Increment writes pending.  We MUST increment before sending to replica servers, because the BMI thread may execute before we
+     * return from the post, which may possibly execute the callback for this send.  We want the callback to know that we have a 
+     * write pending and thus the flow buffer is still in use and therefore the flow is not finished.  
      */
     flow_data->writes_pending += 1;
 
@@ -3013,7 +2954,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         replica_q_item->parent = flow_d;
         replica_q_item->replica_parent = q_item;
 
-        replica_q_item->bmi_callback.fn = forwarding_bmi_send_callback_wrapper;
+        replica_q_item->bmi_callback.fn = forwarding_bmi_send_callback_fn;
         replica_q_item->bmi_callback.data = replica_q_item;
         replica_q_item->buffer = q_item->buffer;
 
@@ -3024,6 +2965,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
            qlist_add_tail(&replica_q_item->list_link, &flow_data->src_list);
         gen_mutex_unlock(&flow_d->flow_mutex);
 
+        /* hints should contain BMI_QUEUE hint, so that sends are always queued. */
         ret = BMI_post_send( &replica_q_item->posted_id    
                             ,flow_d->next_dest[i].u.bmi.address
                             ,replica_q_item->buffer
@@ -3042,7 +2984,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         }
         else if (ret == 1)
         {
-           /* BMI-send completed immediately */
+           /* BMI-send completed immediately, just in case */
            forwarding_bmi_send_callback_fn(replica_q_item, actual_size, 0);
            continue;
         }
@@ -3059,7 +3001,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 
     /* Issue write to trove */
     flow_trove_write(q_item, actual_size,
-                     forwarding_trove_write_callback_wrapper,
                      forwarding_trove_write_callback_fn);
    return; 
 }/*end forwarding_bmi_recv_callback_fn*/
@@ -3147,41 +3088,6 @@ static int flow_process_request( struct fp_queue_item* q_item )
 }/*end flow_process_request*/
 
 
-static inline void server_trove_write_callback_wrapper(void *user_ptr,
-                                                       PVFS_error error_code)
-{
-    struct fp_private_data *flow_data = PRIVATE_FLOW(((struct result_chain_entry*)user_ptr)->q_item->parent);
-
-    server_trove_write_callback_fn(user_ptr, error_code);
-
-    return;
-}/*end server_trove_write_callback_wrapper*/
-
-
-
-static void forwarding_bmi_send_callback_wrapper(void *user_ptr,
-						 PVFS_size actual_size,
-						 PVFS_error error_code)
-{
-    struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    flow_descriptor *flow_d = flow_data->parent;
-
-    
-    forwarding_bmi_send_callback_fn(user_ptr, actual_size, error_code);
-
-    //gen_mutex_lock(&flow_d->flow_mutex);
-    //if (flow_d->state == FLOW_COMPLETE)
-    //{
-    //    gen_mutex_unlock(&flow_d->flow_mutex);
-    //    FLOW_CLEANUP(flow_data);
-    //}
-    //else
-    //{
-    //    gen_mutex_unlock(&flow_d->flow_mutex);
-    //}
-}/*end forwarding_bmi_send_callback_wrapper*/
-
-
 /**
  * Callback invoked upon completion of a BMI send operation
  */
@@ -3237,8 +3143,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     flow_data->total_bytes_forwarded += actual_size;
 
     /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
-     *       and forwarding_trove_write_callback_fn.  Each of these functions is called by a 
-     *       wrapper, which locks the flow-mutex and protects the use of this variable.
+     *       and forwarding_trove_write_callback_fn.
      */
     q_item->buffer_in_use--;
 
@@ -3286,7 +3191,6 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
           flow_data->primary_recvs_throttled -= 1;
           gen_mutex_unlock(&flow_d->flow_mutex);
           flow_bmi_recv(q_item,
-                        forwarding_bmi_recv_callback_wrapper,
                         forwarding_bmi_recv_callback_fn);
     }
     else
@@ -3294,6 +3198,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
        gen_mutex_unlock(&flow_d->flow_mutex);
     }
 
+    return;
 }/*end forwarding_bmi_send_callback_fn*/
 
 
@@ -3385,8 +3290,8 @@ static void server_trove_write_callback_fn(void *user_ptr,
             assert(flow_data->total_bytes_recvd ==
                    flow_data->total_bytes_written);
             assert(flow_d->state != FLOW_COMPLETE);
-            flow_d->state = FLOW_COMPLETE;
             FLOW_CLEANUP(flow_data);
+            flow_d->state = FLOW_COMPLETE;
             gen_mutex_unlock(&flow_d->flow_mutex);
             return;
         }
@@ -3398,7 +3303,6 @@ static void server_trove_write_callback_fn(void *user_ptr,
             gossip_lerr("flow(%p):q_item(%p):Starting recv from server write callback.\n",flow_d,q_item);
             gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(q_item,
-                          server_bmi_recv_callback_wrapper,
                           server_bmi_recv_callback_fn);
         }
         else
@@ -3481,7 +3385,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     uint32_t *always_queue;
 
     /* Generic flow initialization */
-    flow_data->parent->total_transferred = 0;
+    flow_d->total_transferred = 0;
     
     /* Iniitialize the pending counts */
     flow_data->recvs_pending = 0;
@@ -3523,7 +3427,6 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
                        ,flow_d,&flow_data->prealloc_array[i],flow_data->prealloc_array[i].buffer_in_use);
             gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(&(flow_data->prealloc_array[i]),
-                          forwarding_bmi_recv_callback_wrapper,
                           forwarding_bmi_recv_callback_fn);
         }
         else
@@ -3534,18 +3437,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
         }
     }
 
-    /* If the flow is complete, perform cleanup */
-    gen_mutex_lock(&flow_d->flow_mutex);
-    if(flow_d->state == FLOW_COMPLETE)
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-        FLOW_CLEANUP(flow_data);
-    }
-    else
-    {
-        gen_mutex_unlock(&flow_d->flow_mutex);
-    }
-
+    return;
 }/*end forwarding_flow_post_init*/
 
 

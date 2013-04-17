@@ -2492,6 +2492,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     bmi_size_t total_copied = 0;
     int i;
     PINT_event_id eid = 0;
+    uint32_t always_queue = 0;
 
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
@@ -2503,6 +2504,14 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         expected_size);
 
     tcp_addr_data = (struct tcp_addr *) src->method_data;
+
+    /* get BMI_QUEUE hint.  If found, then we want to always queue the op instead of
+     * returning with immediate completion.
+     */
+    if (PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL))
+    {
+      always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
+    }
 
     /* short out immediately if the address is bad and we have no way to
      * reconnect
@@ -2529,6 +2538,18 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         op_list_search(op_list_array[IND_RECV_EAGER_DONE_BUFFERING], &key);
     if (query_op)
     {
+        /* if (hint==always-queue), then remove op from current queue and put op on completion queue. 
+         * op_list_remove(query_op);
+         * op_list_add(completion_array[context_id],query_op);
+         * return(0);
+         */
+        if (always_queue)
+        {
+           op_list_remove(query_op);
+           op_list_add(completion_array[context_id],query_op);
+           return(0);
+        }
+
         /* make sure it isn't too big */
         if (query_op->actual_size > expected_size)
         {
@@ -2673,6 +2694,18 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         assert(query_op->amt_complete <= query_op->actual_size);
         if (query_op->amt_complete == query_op->actual_size)
         {
+            /* if (hint==always-queue), remove op from current queue and put in completion array.
+             * op_list_remove(query_op);
+             * op_list_add(completion_array[context_id],query_op);
+             * return(0);
+             */
+            if (always_queue)
+            {
+               op_list_remove(query_op);
+               op_list_add(completion_array[context_id],query_op);
+               return (0);
+            }
+
             /* we are done */
             op_list_remove(query_op);
             *id = 0;
@@ -3856,6 +3889,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     int list_index = 0;
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
+    uint32_t always_queue=0;
 
     if(PINT_EVENT_ENABLED)
     {
@@ -3874,6 +3908,14 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         total_size);
+
+    /* get BMI_QUEUE hint.  If found, then we want to always queue the op instead of
+     * returning with immediate completion.
+     */
+    if (PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL))
+    {
+      always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
+    }
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -3948,16 +3990,18 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
 
     tcp_addr_data = (struct tcp_addr *) dest->method_data;
 
-#if 0
-    /* TODO: this is a hack for testing! */
-    /* disables immediate send completion... */
-    ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-                            dest, buffer_list, size_list, list_count, 0, 0,
-                            id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-                            my_header.size, 0,
-                            context_id);
-    return(ret);
-#endif
+    /* if BMI_HINT_BMI_QUEUE is true, then the caller wants to ALWAYS enqueue this
+     * operation.  For replication, we always want to queue.
+     */
+    if (always_queue)
+    {
+       ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
+                               dest, (void * const *)buffer_list, size_list, list_count, 0, 0,
+                               id, BMI_TCP_INPROGRESS, my_header, user_ptr,
+                               my_header.size, 0,
+                               context_id, eid);
+       return(ret);
+    }
 
     if (tcp_addr_data->not_connected)
     {

@@ -2670,7 +2670,6 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         bogus_header.mode = TCP_MODE_REND;
     }
     bogus_header.tag = tag;
-    //gossip_lerr("%s:Adding recv to IND_RECV array.\n",__func__);
     gossip_lerr("%s:Adding op to IND_RECV array.\n",__func__);
     ret = enqueue_operation(op_list_array[IND_RECV],
                             BMI_RECV, src, buffer_list, size_list,
@@ -3816,6 +3815,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     int list_index = 0;
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
+    uint32_t always_queue=0;
 
     if(PINT_EVENT_ENABLED)
     {
@@ -3834,6 +3834,16 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         total_size);
+
+    /* get BMI_QUEUE hint.  If found, then we want to always queue the op instead of
+     * returning with immediate completion.
+     */
+    if (PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL))
+    {
+      always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
+    }
+
+    gossip_lerr("%s:always_queue(%d).\n",__func__,always_queue);
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -3908,16 +3918,18 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
 
     tcp_addr_data = dest->method_data;
 
-#if 1
-    /* TODO: this is a hack for testing! */
-    /* disables immediate send completion... */
-    ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-			    dest, (void * const *)buffer_list, size_list, list_count, 0, 0,
-			    id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-			    my_header.size, 0,
-			    context_id, eid);
-    return(ret);
-#endif
+    /* if BMI_HINT_BMI_QUEUE is true, then the caller wants to ALWAYS enqueue this
+     * operation.  For replication, we always want to queue.
+     */
+    if (always_queue)
+    {
+       ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
+           		       dest, (void * const *)buffer_list, size_list, list_count, 0, 0,
+			       id, BMI_TCP_INPROGRESS, my_header, user_ptr,
+			       my_header.size, 0,
+			       context_id, eid);
+       return(ret);
+    }
 
     if (tcp_addr_data->not_connected)
     {
