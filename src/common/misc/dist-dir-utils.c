@@ -73,7 +73,8 @@ int PINT_init_dist_dir_state(
 		PVFS_dist_dir_bitmap *bitmap_ptr,
 		const int num_servers, 
 		const int server_no, 
-		int pre_dsg_num_server)
+		int pre_dsg_num_server,
+                int split_size)
 {
 	int i;
 
@@ -132,7 +133,7 @@ int PINT_init_dist_dir_state(
 	}
 
 	/* set split size */
-	dist_dir_attr->split_size = PVFS_DIST_DIR_MAX_ENTRIES;
+	dist_dir_attr->split_size = split_size;
 	return 0;
 }
 

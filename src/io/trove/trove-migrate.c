@@ -1029,10 +1029,10 @@ static int write_distdir_keyvals_0_1_5 (
     /* write distdir keyvals to both dir_handle and dirdata_handle */
 
     /* init meta_dis_dir_attr and dirdata_dist_dir_attr 
-     * num_servers=1 (will ask for more dirdata handles when split)
+     * num_servers=1
      * both have server_no=0, where metadata is never used */
     ret = PINT_init_dist_dir_state(&meta_dist_dir_attr,
-	    &dist_dir_bitmap, 1, 0, 1);
+	    &dist_dir_bitmap, 1, 0, 1, 1);
     assert(ret == 0);
     PINT_dist_dir_attr_copyto(dirdata_dist_dir_attr, meta_dist_dir_attr);
 
