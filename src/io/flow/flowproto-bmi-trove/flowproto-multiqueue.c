@@ -2496,7 +2496,9 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
         else if (ret < 0)
         {
             gossip_lerr("flow(%p):q_item(%p):%s:ERROR: BMI_post_recv returned: %d!\n", flow_d,q_item,__func__,ret);
-            handle_io_error(ret, q_item, flow_data);
+            gen_mutex_lock(&flow_mutex);
+            handle_forwarding_io_error(ret, q_item, flow_data);
+            gen_mutex_unlock(&flow_mutex);
             return;
         }
     }
@@ -2669,6 +2671,11 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
+    /* unlock mutexes in handle_forwarding_io_error, so cancel threads are not holding those mutexes.
+     * when the callback is executed, THEN lock the mutex, if necessary.
+     * don't think handle_io_error is needed again if the parent error-code is already set. but will
+     * need to be called for individual write error, most likely.
+     */
 
     /* Handle trove errors */
     if (flow_d->error_code != 0 || error_code != 0)
@@ -3316,17 +3323,12 @@ static void server_trove_write_callback_fn(void *user_ptr,
 
 /* handle_forwarding_io_error()
  * 
- * called any time a BMI or Trove error code is detected, responsible for
- * safely cleaning up the associated flow
- *
- * NOTE: this function should always be called while holding the flow mutex!
- *
- * no return value
  */
 static void handle_forwarding_io_error(PVFS_error error_code,
                                       struct fp_queue_item* q_item,
                                       struct fp_private_data* flow_data)
 {
+    flow_descriptor *flow_d = flow_data->parent;
     int ret;
 
     PVFS_perror("Error: ", error_code);
@@ -3335,21 +3337,36 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	"flowproto-multiqueue error cleanup path.\n");
 
     /* is this the first error registered for this particular flow? */
-    if(flow_data->parent->error_code == 0)
+    if(flow_d->error_code == 0)
     {
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 	    "flowproto-multiqueue first failure.\n");
-	flow_data->parent->error_code = error_code;
-	if(q_item)
-	{
-	    qlist_del(&q_item->list_link);
-	}
+	flow_d->error_code = error_code;
 	flow_data->cleanup_pending_count = 0;
 
-	/* cleanup depending on what endpoints are in use */
-        ret = cancel_pending_bmi(&flow_data->dest_list);
-        gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                     "flowproto-multiqueue canceling 2ndary %d BMI ops.\n", ret);
+        /* if BMI-RECV, item is on the src-list */
+
+        if (BMI-RECV)
+        {
+           /* In this case, we were unable to receive a buffer of data from
+            * the client; thus, we need to stop EVERYTHING: posted recvs,
+            * posted sends, and posted writes.  Posted recvs and sends are
+            * located on the src-list; posted writes are on the dest-list.
+            */
+           ret = cancel_pending_bmi(&flow_data->src_list);
+
+           /* cancel_pending_bmi returns the number of q_items that were sent to the
+            * bmi_cancel thread.
+            */
+           flow_data->cleanup_pending_count += ret;
+
+           ret = cancel_pending_trove(&flow_data->dest_list,flow_d->dest.u.trove.coll_id); 
+
+           /* cancel_pending_trove returns the number of result chains that were sent to the
+            * trove_cancel thread.  NOTE: there could be many result chains per one q_item.
+            */
+           flow_data->cleanup_pending_count += ret;
+        }
     }
     else
     {
@@ -3421,7 +3438,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
         /* If there is data to be received, perform the initial recv
            otherwise mark the flow complete */
         gen_mutex_lock(&flow_d->flow_mutex);
-        if (!PINT_REQUEST_DONE(flow_d->file_req_state))
+        if ( (flow_d->error_code == 0) && (!PINT_REQUEST_DONE(flow_d->file_req_state)))
         {
             gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d):Calling flow_bmi_recv from forwading_flow_post_init.\n"
                        ,flow_d,&flow_data->prealloc_array[i],flow_data->prealloc_array[i].buffer_in_use);
@@ -3432,7 +3449,10 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
         else
         {
             gen_mutex_unlock(&flow_d->flow_mutex);
-            gossip_lerr("Server flow posted all on initial post.\n");
+            if (!flow_d->error_code)
+            {
+               gossip_lerr("Server flow posted all on initial post.\n");
+            }
             break;
         }
     }
