@@ -795,7 +795,7 @@ sub get_fsname
     if ($opt_fsname) {
         $fsname = $opt_fsname;
     } else {
-        $fsname = "orangefs";
+        $fsname = "pvfs2-fs";
     }
     return $fsname;
 }
