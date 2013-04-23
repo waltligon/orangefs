@@ -235,9 +235,6 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
         num_total_dirdata_servers = user_opts->distr_dir_servers_max;
     }
 
-    /* set num_dirdata_servers for pre-allocation of dirdata handles */
-    s_op->u.mkdir.num_dirdata_servers = num_total_dirdata_servers;
-
     /* if received >0, use; else use config_file value,*/
     if(s_op->req->u.mkdir.distr_dir_servers_initial > 0)
     {
@@ -281,6 +278,10 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     {
         num_total_dirdata_servers = num_meta;
     }
+
+    /* set num_dirdata_servers for pre-allocation of dirdata handles */
+    s_op->u.mkdir.num_dirdata_servers = num_total_dirdata_servers;
+
 
     /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->dist_dir_attr,
