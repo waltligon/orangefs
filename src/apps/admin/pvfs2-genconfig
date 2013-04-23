@@ -405,11 +405,6 @@ sub emit_defaults
     print $target "\tPrecreateBatchSize 0,32,512,32,32,32,0\n";
     print $target "\tPrecreateLowThreshold 0,16,256,16,16,16,0\n";
 
-    my $meta_count = scalar(get_aliases($META_ENDPOINT));
-    print $target "\tDistrDirServersInitial 1\n";
-    print $target "\tDistrDirServersMax $meta_count\n";
-    print $target "\tDistrDirSplitSize 100\n";
-
     if(defined($default_storage))
     {
         print $target "\n\tDataStorageSpace " . $default_storage . "\n";
@@ -501,6 +496,11 @@ sub emit_filesystem
         }
     }
     print $target "\tFileStuffing $stuffing\n";
+
+    my $meta_count = scalar(get_aliases($META_ENDPOINT));
+    print $target "\tDistrDirServersInitial 1\n";
+    print $target "\tDistrDirServersMax $meta_count\n";
+    print $target "\tDistrDirSplitSize 100\n";
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
