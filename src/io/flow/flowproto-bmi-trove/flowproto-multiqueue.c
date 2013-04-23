@@ -2495,10 +2495,12 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
         }
         else if (ret < 0)
         {
+            /* we want to stop the entire flow.
+             * set flow_d->error_code = ret;
+             * set flow_d->replica_state = FAILED_BMI_RECV_POST;
+             */
             gossip_lerr("flow(%p):q_item(%p):%s:ERROR: BMI_post_recv returned: %d!\n", flow_d,q_item,__func__,ret);
-            gen_mutex_lock(&flow_mutex);
             handle_forwarding_io_error(ret, q_item, flow_data);
-            gen_mutex_unlock(&flow_mutex);
             return;
         }
     }
@@ -2639,9 +2641,16 @@ static void flow_trove_write(struct fp_queue_item* q_item,
            else if immediate completion, trigger callback */
         if (rc < 0)
         {
-            /* if write error occurs, stop the flow */
+            /* remove q_item from dest-list             
+             * writes_pending--
+             * buffer_in_use--
+             * flow_d->trove_write_error_code = ret
+             * flow_data->attempted_write_amt = actual_size
+             *
+             * We want to continue receiving the flow and passing on data to the replicas, even though we can no longer
+             * write to the local server.
+             */
             gossip_lerr("Flow(%p): q_item(%p): %s: ERROR: Trove Write CATASTROPHIC FAILURE\n",flow_d,q_item,__func__);
-            handle_io_error(rc, q_item, flow_data);    
             return;
         }
         else if (1 == rc)
@@ -2678,24 +2687,37 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
      */
 
     /* Handle trove errors */
+    gen_mutex_lock(&flow_d->flow_mutex);
     if (flow_d->error_code != 0 || error_code != 0)
     {
-       gen_mutex_lock(&flow_d->flow_mutex);
        qlist_del(&q_item->list_link);
        flow_data->writes_pending--;
-       gen_mutex_unlock(&flow_d->flow_mutex);
+       q_item->buffer_in_use--;
     }
 
-    if (flow_d->error_code != 0)
+    /* if flow_d->error_code is not zero, then the entire flow is being cancelled.  So, we call 
+     * handle_forwarding_io_error() so that pending-cancels is decremented.  If pending-cancels
+     * becomes zero, then we are done and cleanup can occur (done in error routine).
+     */
+    if (flow_d->error_code)
     {
-       /*Entire flow is being cancelled*/
-       handle_io_error(flow_d->error_code, q_item, flow_data);
-       return;
-    }else if (error_code != 0)
+        gen_mutex_unlock(&flow_d->flow_mutex);
+        handle_forwarding_io_error(error_code, q_item, flow_data);
+        return;
+    }
+    gen_mutex_unlock(&flow_d->flow_mutex);
+
+    if (error_code != 0)
     {
         /*Write to primary failed but continue with replica writes.*/
         /*For now, we are cancelling the entire flow.              */
-        handle_io_error(error_code, q_item, flow_data);
+
+        /* mutex on
+         * set flow_d->dest.u.trove.replication_trove_state = FAILED;
+         * set flow_d->dest.u.trove.replication_trove_status = error_code;
+         * set attempted-amount-of-bytes-to-write?
+         * mutex off
+         */
         return;
     }
 
@@ -3329,7 +3351,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
                                       struct fp_private_data* flow_data)
 {
     flow_descriptor *flow_d = flow_data->parent;
-    int ret;
+    int ret,ret_bmi,ret_trove;
 
     PVFS_perror("Error: ", error_code);
     gossip_lerr("Forwarding Flow Error: CATASTROPHIC ERROR!\n");
@@ -3337,6 +3359,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	"flowproto-multiqueue error cleanup path.\n");
 
     /* is this the first error registered for this particular flow? */
+    gen_mutex_lock(&flow_data->flow_mutex);
     if(flow_d->error_code == 0)
     {
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
@@ -3346,26 +3369,36 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 
         /* if BMI-RECV, item is on the src-list */
 
-        if (BMI-RECV)
+        if (BMI-RECV || BMI-SEND)
         {
            /* In this case, we were unable to receive a buffer of data from
             * the client; thus, we need to stop EVERYTHING: posted recvs,
             * posted sends, and posted writes.  Posted recvs and sends are
             * located on the src-list; posted writes are on the dest-list.
             */
-           ret = cancel_pending_bmi(&flow_data->src_list);
+           gen_mutex_unlock(&flow_data->flow_mutex);
+           ret_bmi = cancel_pending_bmi(&flow_data->src_list);
 
            /* cancel_pending_bmi returns the number of q_items that were sent to the
             * bmi_cancel thread.
             */
-           flow_data->cleanup_pending_count += ret;
 
-           ret = cancel_pending_trove(&flow_data->dest_list,flow_d->dest.u.trove.coll_id); 
+           ret_trove = cancel_pending_trove(&flow_data->dest_list,flow_d->dest.u.trove.coll_id); 
 
            /* cancel_pending_trove returns the number of result chains that were sent to the
             * trove_cancel thread.  NOTE: there could be many result chains per one q_item.
             */
-           flow_data->cleanup_pending_count += ret;
+          
+           gen_mutex_lock(&flow_data->flow_mutex);
+           flow_data->cleanup_pending_count = ret_bmi + ret_trove;
+           if (flow_data->cleanup_pending_count != 0)
+           {
+              gen_mutex_unlock(&flow_data->flow_mutex);
+              return;
+           }
+        }
+        else if (TROVE-WRITE)
+        {
         }
     }
     else
@@ -3379,6 +3412,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 
     if(flow_data->cleanup_pending_count == 0)
     {
+        //At this point, all pending cancels have completed and we can now stop the flow and cleanup.
 	/* we are finished, make sure error is marked and state is set */
 	assert(flow_data->parent->error_code);
 	/* we are in trouble if more than one callback function thinks that
