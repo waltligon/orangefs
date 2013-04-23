@@ -23,6 +23,8 @@
 #include "security-util.h"
 #include "pint-uid-map.h"
 
+int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+
 enum
 {
     INVALID_OBJECT = 131,
