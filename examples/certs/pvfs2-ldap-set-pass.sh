@@ -39,7 +39,7 @@ fi
 
 # bind option
 if [ $admindn ]; then
-    bindopt="-D"
+    bindopt="-D $admindn"
 fi
 
 # password option (-W to prompt)
