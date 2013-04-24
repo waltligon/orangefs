@@ -44,12 +44,12 @@ fi
 for server in ${servers[*]}
 do
     # generate private key
-    openssl genrsa -out pvfs2-serverkey-${server}.pem 2048
-    chmod 600 pvfs2-serverkey-${server}.pem
+    openssl genrsa -out orangefs-serverkey-${server}.pem 2048
+    chmod 600 orangefs-serverkey-${server}.pem
     # append public key to keystore
     echo "S:${server}" >> keystore
-    openssl rsa -in pvfs2-serverkey-${server}.pem -pubout >> keystore
-    echo "Created pvfs2-serverkey-${server}.pem"
+    openssl rsa -in orangefs-serverkey-${server}.pem -pubout >> keystore
+    echo "Created orangefs-serverkey-${server}.pem"
 done
 
 for client in ${clients[*]}

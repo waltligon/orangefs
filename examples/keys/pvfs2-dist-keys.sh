@@ -11,10 +11,10 @@ fi
 install_dir=$1
 
 # copy server keys and keystore
-for file in pvfs2-serverkey*.pem
+for file in orangefs-serverkey*.pem
 do
-    server=`echo $file | sed 's/pvfs2-serverkey-//' | sed 's/\.pem//'`
-    scp $file ${server}:${install_dir}/etc/pvfs2-serverkey.pem
+    server=`echo $file | sed 's/orangefs-serverkey-//' | sed 's/\.pem//'`
+    scp $file ${server}:${install_dir}/etc/orangefs-serverkey.pem
     scp keystore ${server}:${install_dir}/etc/keystore
 done
 
