@@ -563,15 +563,16 @@ int PINT_ldap_authenticate(const char *userid,
                            const char *password)
 {
     struct server_configuration_s *config = PINT_get_server_config();
+    LDAP *ldap2 = NULL;
     char *base = NULL, filter[512], *dn = NULL;
-    int ldapret, ret = -PVFS_EINVAL, scope = LDAP_SCOPE_SUBTREE;
+    int ldapret, ret = -PVFS_EINVAL, scope = LDAP_SCOPE_SUBTREE, version;
     struct timeval timeout = { 15, 0 };
     LDAPMessage *res, *entry;
-    BerValue *bvalue;
 
-    if (userid == NULL || password == NULL)
+    if (userid == NULL || strlen(userid) == 0 ||
+        password == NULL || strlen(password) == 0)
     {
-        gossip_err("%s: userid and/or password is NULL\n", __func__);
+        gossip_err("%s: userid and/or password is NULL or blank\n", __func__);
         return -PVFS_EINVAL;
     }
 
@@ -626,6 +627,7 @@ int PINT_ldap_authenticate(const char *userid,
                              __func__, dn);
 
                 /* get ber value ... does not need to be freed */
+                /* TODO: remove
                 bvalue = ber_bvstr(password);
                 if (bvalue != NULL)
                 {
@@ -647,9 +649,9 @@ int PINT_ldap_authenticate(const char *userid,
                 else
                 {
                     ret = -PVFS_ENOMEM;
-                }
-
+                }                
                 ldap_memfree(dn);
+                */
             }
             else
             {
@@ -670,6 +672,47 @@ int PINT_ldap_authenticate(const char *userid,
     {
         PINT_ldap_error("LDAP_authenticate failed", ldapret);
         ret = -PVFS_ESECURITY;
+    }
+
+    /* login with dn / password */
+    if (dn != NULL)
+    {
+        ldapret = ldap_initialize(&ldap2, config->ldap_hosts);
+        if (ldapret == LDAP_SUCCESS)
+        {
+            /* set the version */
+            version = LDAP_VERSION3;
+            ldap_set_option(ldap2, LDAP_OPT_PROTOCOL_VERSION, &version);
+
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: authenticating to LDAP "
+                         "using server list \"%s\", user \"%s\"\n",
+                         __func__, config->ldap_hosts, dn);
+
+            ldapret = ldap_simple_bind_s(ldap2,
+                                     dn,
+                                     password);
+
+            if (ldapret == 0)
+            {
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: password ok\n",
+                             __func__);
+
+                ldap_unbind_ext_s(ldap2, NULL, NULL);
+                ret = 0;                
+            }
+            else
+            {
+                PINT_ldap_error("ldap_simple_bind_s", ldapret);
+                ret = -PVFS_EACCES;
+            }
+        }
+        else
+        {
+            PINT_ldap_error("ldap_initialize", ldapret);
+            ret = -PVFS_ESECURITY;
+        }
+
+        ldap_memfree(dn);
     }
 
     return ret;
