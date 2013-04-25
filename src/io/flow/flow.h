@@ -18,6 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-internal.h"
 
 /********************************************************************
  * endpoint structure 
@@ -104,10 +105,14 @@ struct flow_descriptor
     /* function to be triggered upon completion */
     void(*callback)(struct flow_descriptor* flow_d, int cancel_path);
 
-    struct flow_endpoint src;	/* src endpoint */
-    struct flow_endpoint dest;	/* dest endpoint */
+    struct flow_endpoint src;	     /* src endpoint */
+    struct flow_endpoint dest;	     /* dest endpoint */
     struct flow_endpoint *next_dest; /* replication endpoint */
-    int next_dest_count; /*number of replication endpoints */
+    int    next_dest_count;          /*number of replication endpoints */
+
+    /* replication status structure */
+    replication_endpoint_status *res;
+    int res_count;
 
     PVFS_msg_tag_t tag;		/* matching session tag */
 

@@ -69,6 +69,7 @@ struct fp_queue_item
     int seq;
     void *buffer;
     int buffer_in_use; /*used by replication*/
+    replication_endpoint_status *res; /* used by replication to store status info */
     PVFS_size buffer_used;
     PVFS_size out_size;
     struct result_chain_entry result_chain;
@@ -651,11 +652,13 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
               INIT_QLIST_HEAD(&flow_data->prealloc_array[i].replicas[j].list_link);
               flow_data->prealloc_array[i].replicas[j].parent = flow_d;
               flow_data->prealloc_array[i].replicas[j].replica_parent = &(flow_data->prealloc_array[i]);
+              flow_data->prealloc_array[i].replicas[j].res = &(flow_d->res[j]);
            }
         }/*end if*/
         flow_data->prealloc_array[i].parent = flow_d;
         flow_data->prealloc_array[i].bmi_callback.data = 
             &(flow_data->prealloc_array[i]);
+        flow_data->prealloc_array[i].res = &(flow_d->res[flow_d->res_count - 1]);
     }
 
     /* remaining setup depends on the endpoints we intend to use */
@@ -2641,11 +2644,17 @@ static void flow_trove_write(struct fp_queue_item* q_item,
            else if immediate completion, trigger callback */
         if (rc < 0)
         {
-            /* remove q_item from dest-list             
-             * writes_pending--
-             * buffer_in_use--
-             * flow_d->trove_write_error_code = ret
+            /* mutex lock 
+             * qlist_del(&q_item->list_link)             
+             * flow_data->writes_pending--
+             * q_item->buffer_in_use--
+             * flow_d->replication_status |= REPLICATION_TROVE_FAILURE;
+             * q_item->res.replica_state = FAILED_TROVE_POST_WRITE;
+             * q_item->res.replica_error_code = rc;
              * flow_data->attempted_write_amt = actual_size
+             * mutex unlock
+             * return;
+             * 
              *
              * We want to continue receiving the flow and passing on data to the replicas, even though we can no longer
              * write to the local server.
@@ -2680,47 +2689,44 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
-    /* unlock mutexes in handle_forwarding_io_error, so cancel threads are not holding those mutexes.
-     * when the callback is executed, THEN lock the mutex, if necessary.
-     * don't think handle_io_error is needed again if the parent error-code is already set. but will
-     * need to be called for individual write error, most likely.
-     */
-
     /* Handle trove errors */
     gen_mutex_lock(&flow_d->flow_mutex);
-    if (flow_d->error_code != 0 || error_code != 0)
+    /* if (flow_d->replication_status & REPLICATION_STOP ) 
+     */ 
+    if (flow_d->error_code != 0 )
     {
        qlist_del(&q_item->list_link);
-       flow_data->writes_pending--;
-       q_item->buffer_in_use--;
-    }
 
-    /* if flow_d->error_code is not zero, then the entire flow is being cancelled.  So, we call 
+    /* if REPLICATION_STOP, then the entire flow is being cancelled.  So, we call 
      * handle_forwarding_io_error() so that pending-cancels is decremented.  If pending-cancels
-     * becomes zero, then we are done and cleanup can occur (done in error routine).
+     * becomes zero, then we are done and cleanup can occur (which is done in the error routine).
      */
-    if (flow_d->error_code)
-    {
         gen_mutex_unlock(&flow_d->flow_mutex);
         handle_forwarding_io_error(error_code, q_item, flow_data);
         return;
     }
-    gen_mutex_unlock(&flow_d->flow_mutex);
 
     if (error_code != 0)
     {
-        /*Write to primary failed but continue with replica writes.*/
-        /*For now, we are cancelling the entire flow.              */
+        /*Write to primary failed but continue with replica writes.
 
-        /* mutex on
-         * set flow_d->dest.u.trove.replication_trove_state = FAILED;
-         * set flow_d->dest.u.trove.replication_trove_status = error_code;
-         * set attempted-amount-of-bytes-to-write?
-         * mutex off
+         * qlist_del(&q_item->list_link);
+         * flow_d->res[].replica_state = FAILED_TROVE_WRITE;
+         * flow_d->res[].replica_error_code = error_code;
+         * flow_d->replication_status |= REPLICATION_TROVE_FAILURE;
+         *
+         * flow_data->writes_pending--;
+         * q_item->buffer_in_use--;
+         *
+         * set attempted-amount-of-bytes-to-write? 
+         */
+
+        /* do we want to check if the flow is now completed? 
          */
         return;
     }
 
+    gen_mutex_unlock(&flow_d->flow_mutex);
     /* Decrement result chain count */
     q_item->result_chain_count--;
     result_entry->posted_id = 0;
@@ -2899,7 +2905,23 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
     /* Handle errors from recv */
-    if(error_code != 0 || flow_d->error_code != 0)
+    /* mutex lock
+     * if ( flow_d->replication_status & REPLICATION_STOP ) 
+     *      qlist_del(&q_item->list_link)
+     *      unlock mutex
+     *      handle_forwarding_io_error()
+     *      return; 
+     * if ( error_code != 0 )
+     *      qlist_del(&q_item->list_link)
+     *      q_item->res.replica_state = FAILED_BMI_RECV
+     *      q_item->res.replica_error_code = error_code;
+     *      flow_d->replication_status |= REPLICATION_STOP
+     *      flow_d->state = FLOW_COMPLETE;
+     *      unlock mutex
+     *      handle_forwarding_io_error()
+     *      return;
+     */ 
+    if (flow_d->error_code != 0)
     {
         gen_mutex_lock(&flow_d->flow_mutex);
         flow_data->recvs_pending--;
@@ -2910,7 +2932,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         /* if we can't receive data from the client, then we must cancel the
          * entire flow, allowing the client to restart the flow.
          */
-        handle_io_error(error_code, q_item, flow_data);
+        handle_forwarding_io_error(error_code, q_item, flow_data);
         return;
     }
 
@@ -2924,7 +2946,12 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 
     gen_mutex_lock(&flow_d->flow_mutex);
 
-    /* Increment the buffer_in_use count by the number of expected replicas */
+    /* for each flow_d->res[]
+     *    if (flow_d->res[].endpoint_type == BMI_ENDPOINT && flow_d->res[].state == RUNNING)
+     *        replica_count++;
+     */
+
+    /* Increment the buffer_in_use count by the number of replicas still RUNNING */
     q_item->buffer_in_use += replica_count;
 
     /* Increment the number of pending sends by the expected number of replicas. */
@@ -2937,7 +2964,10 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
      * return from the post, which may possibly execute the callback for this send.  We want the callback to know that we have a 
      * write pending and thus the flow buffer is still in use and therefore the flow is not finished.  
      */
-    flow_data->writes_pending += 1;
+    /* if (!(flow_d->replication_status && REPLICATION_TROVE_FAILURE)) 
+     *    THEN writes_pending++;
+     *
+ *  flow_data->writes_pending += 1;
 
     /* bytes received from the client */
     flow_data->total_bytes_recvd += actual_size;
@@ -2978,7 +3008,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
 
         replica_q_item = &q_item->replicas[i];
-        memset(replica_q_item,0,sizeof(*replica_q_item));
+        //memset(replica_q_item,0,sizeof(*replica_q_item));
         INIT_QLIST_HEAD(&replica_q_item->list_link);
         replica_q_item->parent = flow_d;
         replica_q_item->replica_parent = q_item;
@@ -3019,6 +3049,17 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         }
         else if (ret < 0)
         {
+           /* mutex lock
+            * qlist_del(&replica_q_item->list_link);
+            * flow_data->sends_pending--;
+            * q_item->buffer_in_use--;
+            * flow_d->replication_status |= REPLICATION_BMI_SEND_FAILURE;
+            * replica_q_item->res.replica_state = FAILED_BMI_POST_SEND;
+            * replica_q_item->res.replica_error_code = ret;
+            * unlock mutex
+            * handle_forwarding_io_error();
+            * continue;
+            */
            gossip_lerr("flow(%p):replica(%p):q_item(%p):%s:Error while sending to replica server:(%d)..\n"
                       ,flow_d,replica_q_item,q_item,__func__,ret);
            PVFS_perror("Error Code:",ret);
@@ -3029,6 +3070,9 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     }/*end for*/
 
     /* Issue write to trove */
+    /* if (!(flow_d->replication_status & REPLICATION_TROVE_FAILURE))
+     *    THEN post the write.
+     */
     flow_trove_write(q_item, actual_size,
                      forwarding_trove_write_callback_fn);
    return; 
@@ -3133,6 +3177,27 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     gossip_lerr("flow(%p):Executing %s...\n",flow_d,__func__);
 
     /* Error handling */
+    /* mutex lock
+     * if ( flow_d->replication_status && REPLICATION_STOP )
+     *      qlist_del(&replica_q_item->list_link); remove from src list
+     *      mutex unlock
+     *      handle_forwarding_io_error();
+     *      return;
+     *
+     * if (error_code != 0)
+     *    qlist_del(&replicat_q_item->list_link); remove from src list
+     *    flow_data->sends_pending--;
+     *    q_item->buffer_in_use--;
+     *    set the attempted amount of bytes?
+     *    if (!REPLICATION_BMI_SEND_FAILURE)
+     *         replica_q_item->res.replica_state = FAILED_BMI_SEND;
+     *         replica_q_item->res.replica_error_code = error_code;
+     *         flow_d->replication_status |= REPLICATION_BMI_ERROR;
+     *    check if flow has completed.
+     *    return;     
+     *
+     * mutex unlock
+     */
     if (flow_d->error_code != 0 || error_code != 0)
     {
         gen_mutex_lock(&flow_d->flow_mutex);
@@ -3360,6 +3425,9 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 
     /* is this the first error registered for this particular flow? */
     gen_mutex_lock(&flow_data->flow_mutex);
+    /* if (error_code == REPLICATION_STOP)
+     *     flow_data->cleanup_pending_count=0;
+     */
     if(flow_d->error_code == 0)
     {
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
@@ -3367,10 +3435,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	flow_d->error_code = error_code;
 	flow_data->cleanup_pending_count = 0;
 
-        /* if BMI-RECV, item is on the src-list */
 
-        if (BMI-RECV || BMI-SEND)
-        {
            /* In this case, we were unable to receive a buffer of data from
             * the client; thus, we need to stop EVERYTHING: posted recvs,
             * posted sends, and posted writes.  Posted recvs and sends are
@@ -3396,10 +3461,6 @@ static void handle_forwarding_io_error(PVFS_error error_code,
               gen_mutex_unlock(&flow_data->flow_mutex);
               return;
            }
-        }
-        else if (TROVE-WRITE)
-        {
-        }
     }
     else
     {
@@ -3420,8 +3481,10 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	 */
 	assert(flow_data->parent->state != FLOW_COMPLETE);
 	flow_data->parent->state = FLOW_COMPLETE;
+        FLOW_CLEANUP();
     }
 
+    gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 }/*end handle_forwarding_io_error*/
 

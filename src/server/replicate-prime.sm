@@ -251,6 +251,10 @@ static PINT_sm_action io_start_flow(
     }
     s_op->u.io.flow_d->next_dest_count = s_op->req->u.io.replication_number_of_copies;
 
+    /* pass along replication status information through the flow descriptor */
+    s_op->u.io.flow_d->res       = s_op->u.io.res;
+    s_op->u.io.flow_d->res_count = s_op->u.io.res_count;
+
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
      * request
@@ -544,6 +548,21 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     }
     s_op->u.io.replicate_d_count = io->replication_number_of_copies;
 
+    /* create storage for the status of each replica and the original */
+    s_op->u.io.res_count = io->replication_number_of_copies + 1;
+    s_op->u.io.res = malloc(s_op->u.io.res_count * sizeof(*s_op->u.io.res));
+    if (!s_op->u.io.res)
+    {
+       gossip_lerr("Error allocating memory for replication status structure.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+    }
+    for (i=0; i<s_op->u.io.res_count; i++)
+    {
+        s_op->u.io.res[i].replica_state = RUNNING;
+        s_op->u.io.res[i].replica_error_code = 0;
+    }
+
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
     
@@ -587,7 +606,19 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
 
     gossip_lerr("Replication Number of Copies(%d).\n",(int)io->replication_number_of_copies);
 
+    return SM_ACTION_COMPLETE;
 
+error_exit:
+
+    if (s_op->u.io.replicate_d)
+    {
+        free(s_op->u.io.replicate_d);
+    }
+    s_op->u.io.replicate_d = NULL;
+    s_op->u.io.replicate_d_count = 0;
+
+    s_op->u.io.res = NULL;
+    s_op->u.io.res_count = 0;
     return SM_ACTION_COMPLETE;
 }/*end contact_setup_msgpairs*/
 
@@ -620,6 +651,13 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     {
         s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
     }
+
+    s_op->u.io.res[i].replica_error_code   = resp_p->status;
+    if (s_op->u.io.res[i].replica_error_code)
+    {
+        s_op->u.io.res[i].replica_state = FAILED_INITIAL_CONTACT;
+    }
+
 
     resp_p->status=0;
 

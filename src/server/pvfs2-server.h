@@ -543,6 +543,9 @@ struct PINT_server_io_op
 
     replicate_descriptor *replicate_d;
     int replicate_d_count;
+
+    replication_endpoint_status *res;
+    int res_count;
 };
 
 struct PINT_server_small_io_op
