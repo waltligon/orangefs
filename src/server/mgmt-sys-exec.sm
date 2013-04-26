@@ -1,0 +1,124 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+
+#include "pvfs2-server.h"
+#include "pint-util.h"
+
+/* static array used to quickly pull uid stats from the server */
+//static PVFS_uid_info_s *static_array = NULL;
+
+%%
+
+machine pvfs2_mgmt_sys_exec_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+
+    state do_work
+    {
+        run mgmt_sys_exec_do_work;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_sys_exec_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** mgmt_sys_exec_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action mgmt_sys_exec_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+
+
+	// probably just clean this up later.
+	//
+//	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//
+//	if(s_op->resp.u.mgmt_get_uid.uid_info_array)
+//	{
+//		free(s_op->resp.u.mgmt_get_uid.uid_info_array);
+//	}
+
+    return(server_state_machine_complete(smcb));
+}
+
+/** mgmt_sys_exec_do_work()
+ *
+ * gathers uid statistics from server and builds response
+ */
+static PINT_sm_action mgmt_sys_exec_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	int i;
+	int32_t pid;
+	struct timeval oldest;
+
+    // Launch the process on separate thread
+    
+	pid = fork();
+	
+	if ( pid == 0 )
+	{
+		// Child process
+		printf("Launching child process on %s with %s\n",
+		s_op->req->u.mgmt_sys_exec.server,
+		s_op->req->u.mgmt_sys_exec.command);
+	}
+	else if (pid < 0 )
+	{
+		// failure
+		printf("failed to launch child process on %s with %s\n",
+		s_op->req->u.mgmt_sys_exec.server,
+		s_op->req->u.mgmt_sys_exec.command);
+		js_p->error_code = PVFS_SYS_EXEC_FAILED;
+		return SM_ACTION_COMPLETE;
+	}
+	
+	// get the PID and return it.
+	s_op->req->u.mgmt_sys_exec.pid = pid;
+    
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+}
+
+struct PINT_server_req_params pvfs2_mgmt_sys_exec_params =
+{
+    .string_name = "mgmt_sys_exec",
+/* TODO: orange-security */
+    .perm = (PINT_server_req_perm_fun) PINT_SERVER_CHECK_NONE,
+    .state_machine = &pvfs2_mgmt_sys_exec_sm
+};
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

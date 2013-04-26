@@ -216,7 +216,9 @@ struct PINT_client_mkdir_sm
     /* keep first */
     PINT_dist *dist;
     PVFS_sys_layout layout;
-    int num_dirent_files;
+    int distr_dir_servers_initial;
+    int distr_dir_servers_max;
+    int distr_dir_split_size;
 };
 
 struct PINT_client_symlink_sm

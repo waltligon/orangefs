@@ -9,7 +9,6 @@
 #include <assert.h>
 #include <math.h>
 
-/* TODO: temp */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -23,6 +22,8 @@
 #include "pvfs2-dist-basic.h"
 #include "security-util.h"
 #include "pint-uid-map.h"
+
+int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 enum
 {

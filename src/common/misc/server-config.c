@@ -128,7 +128,7 @@ static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
-static DOTCONF_CB(get_ca_path);
+static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
 static DOTCONF_CB(enter_ldap_context);
@@ -145,10 +145,11 @@ static DOTCONF_CB(get_ldap_uid_attr);
 static DOTCONF_CB(get_ldap_gid_attr);
 static DOTCONF_CB(get_ldap_search_timeout);
 
-static DOTCONF_CB(get_init_num_dirdata_handles);
-static DOTCONF_CB(split_mem_limit);
 static DOTCONF_CB(tree_width);
 static DOTCONF_CB(tree_threshold);
+static DOTCONF_CB(distr_dir_servers_initial);
+static DOTCONF_CB(distr_dir_servers_max);
+static DOTCONF_CB(distr_dir_split_size);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -325,7 +326,7 @@ static const configoption_t options[] =
 
     /* Path to CA certificate file in PEM format.
      */
-    {"CAPath", ARG_STR, get_ca_path, NULL,
+    {"CAFile", ARG_STR, get_ca_file, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
     /* DN used for root of generated user certificate subject DN
@@ -348,9 +349,7 @@ static const configoption_t options[] =
     {"</LDAP>", ARG_NONE, exit_ldap_context, NULL,
         CTX_LDAP, NULL},
 
-    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999"
-       TODO: make a list?
-     */
+    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999" */
     {"Hosts", ARG_STR, get_ldap_hosts, NULL,
         CTX_LDAP, "ldaps://localhost"},
 
@@ -1151,18 +1150,6 @@ static const configoption_t options[] =
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
 
-     /* Initial number of dirdata handles when creating a new directory.
-      * TODO: determine the default value, use 2 as a start
-      */
-     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles, NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2"},
-
-    /* Specifies the maximum size of data transmitted with a
-     *   directory split operation.
-     */
-    {"SplitMemLimit", ARG_INT, split_mem_limit, NULL,
-        CTX_FILESYSTEM, "0"},
-
     /* Specifies the number of partitions to use for tree communication. */
     {"TreeWidth", ARG_INT, tree_width, NULL,
         CTX_FILESYSTEM, "2"},
@@ -1170,6 +1157,18 @@ static const configoption_t options[] =
     /* Specifies the minimum number of servers to contact before tree communication kicks in. */
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
+
+    /* Specifies the default for initial number of servers to hold directory entries. */
+    {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
+        CTX_FILESYSTEM, "1"},
+
+    /* Specifies the default for maximum number of servers to hold directory entries. */
+    {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
+        CTX_FILESYSTEM, "4"},
+
+    /* Specifies the default for number of directory entries on a server before splitting. */
+    {"DistrDirSplitSize", ARG_INT, distr_dir_split_size, NULL,
+        CTX_FILESYSTEM, "10000"},
 
     LAST_OPTION
 };
@@ -1331,7 +1330,7 @@ int PINT_parse_config(
 #endif /* ENABLE_SECURITY */
 
 #ifdef ENABLE_SECURITY_CERT
-    if (server_flag && !config_s->ca_path)
+    if (server_flag && !config_s->ca_file)
     {
         gossip_err("Configuration file error. No CA certificate path "
                    "specified.\n");
@@ -3268,7 +3267,7 @@ DOTCONF_CB(get_security_timeout)
     return NULL;
 }
 
-DOTCONF_CB(get_ca_path)
+DOTCONF_CB(get_ca_file)
 { 
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -3278,11 +3277,11 @@ DOTCONF_CB(get_ca_path)
     {
         return NULL;
     }
-    if (config_s->ca_path)
+    if (config_s->ca_file)
     {
-        free(config_s->ca_path);
+        free(config_s->ca_file);
     }
-    config_s->ca_path = 
+    config_s->ca_file = 
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     
     return NULL;
@@ -3351,7 +3350,6 @@ DOTCONF_CB(get_ldap_hosts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    /* TODO: read as list for failover? */
     if (config_s->ldap_hosts)
     {
         free(config_s->ldap_hosts);
@@ -3532,37 +3530,6 @@ DOTCONF_CB(get_ldap_search_timeout)
     return NULL;
 }
 
-DOTCONF_CB(get_init_num_dirdata_handles)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-    if(cmd->data.value <= 0)
-    {
-        return "InitNumDirdataHandles has to be a positive integer!\n";
-    }
-    config_s->init_num_dirdata_handles = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(split_mem_limit)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
-
-    struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-
-    fs_conf->split_mem_limit = cmd->data.value;
-
-    return NULL;
-}
-
 DOTCONF_CB(tree_width)
 {
     struct server_configuration_s *config_s =
@@ -3582,6 +3549,37 @@ DOTCONF_CB(tree_threshold)
 
     return NULL;
 }
+
+DOTCONF_CB(distr_dir_servers_initial)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_servers_initial = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(distr_dir_servers_max)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_servers_max = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(distr_dir_split_size)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_split_size = cmd->data.value;
+
+    return NULL;
+}
+
 
 /*
  * Function: PINT_config_release

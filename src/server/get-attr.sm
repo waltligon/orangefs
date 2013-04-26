@@ -867,9 +867,12 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
             resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
             resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         }
+        free_keyval_buffers(s_op);
+/*
         memset(&(s_op->key),0,sizeof(s_op->key));
         memset(&(s_op->val),0,sizeof(s_op->val));
         s_op->free_val = 0;
+*/
 
         return SM_ACTION_COMPLETE;
     }
@@ -1063,7 +1066,9 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    /*initialize permanent data structures*/
    meta->mirror_dfile_array = s_op->val_a[0].buffer;
    s_op->u.getattr.mirror_dfile_status_array = s_op->val_a[1].buffer;
+/*
    s_op->val_a[0].buffer = s_op->val_a[1].buffer = NULL;
+*/
 
    /* Check the mirroring status for each handle.  If the status is non-zero,
     * the handle is not valid, so put a null in the mirrory array for that
@@ -1097,6 +1102,8 @@ error_exit:
    */
       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCleaning up mirror operation...\n");
       js_p->error_code = 0;
+      free_keyval_buffers(s_op);
+#if 0
       for (i=0; i<s_op->keyval_count; i++)
       {
           if (s_op->val_a[i].buffer)
@@ -1108,6 +1115,7 @@ error_exit:
       s_op->key_a = s_op->val_a = NULL;
       s_op->error_a = NULL;
       s_op->keyval_count = 0; 
+#endif
       
       /*We MUST set the number of copies to zero to prevent encoding errors
        *later.
@@ -1384,12 +1392,16 @@ static PINT_sm_action getattr_create_capability(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    struct server_configuration_s *config;
     void *acl_buf;
     size_t acl_size;
     int ret;
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+#ifdef ENABLE_CAPCACHE
+    int insert_flag = 1;
+#endif
 
     if (js_p->error_code == -TROVE_ENOENT)
     {
@@ -1470,7 +1482,34 @@ static PINT_sm_action getattr_create_capability(
     
     resp_attr->capability.fsid = s_op->u.getattr.fs_id;
 
+    config = PINT_get_server_config();
+    resp_attr->capability.issuer = 
+        (char *) malloc(strlen(config->server_alias) + 3);
+    if (resp_attr->capability.issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(resp_attr->capability.issuer, "S:");
+    strcat(resp_attr->capability.issuer, config->server_alias);
+
+#ifdef ENABLE_CAPCACHE
+    /* if capability fields match cached capability, use
+       signature from that capability */
+    ret = PINT_capcache_quick_sign(&resp_attr->capability);
+    if (ret != 0)
+    {
+        ret = PINT_sign_capability(&resp_attr->capability);        
+    }
+    else
+    {
+        /* no need to insert capability into cache */
+        insert_flag = 0;
+    }
+#else
     ret = PINT_sign_capability(&resp_attr->capability);
+#endif
+
     if (ret < 0)
     {
         gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
@@ -1490,11 +1529,14 @@ static PINT_sm_action getattr_create_capability(
 
 #ifdef ENABLE_CAPCACHE
     /* Cache the new capability */
-    ret = PINT_capcache_insert_entry(&resp_attr->capability);
-    if(ret < 0)
+    if (insert_flag)
     {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+        ret = PINT_capcache_insert_entry(&resp_attr->capability);
+        if(ret < 0)
+        {
+            /* issue a warning */
+            gossip_err("Warning: could not cache capability\n");            
+        }
     }
 #endif /* ENABLE_CAPCACHE */
 
@@ -1693,7 +1735,7 @@ static PINT_sm_action getattr_cleanup(
 static PINT_sm_action getattr_with_prelude_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    js_p->error_code = 0;
+    js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;
 }
 
@@ -2163,7 +2205,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
         }            
-        s_op->val_a[DIST_NAME_KEY].buffer = NULL;
+/*        s_op->val_a[DIST_NAME_KEY].buffer = NULL; */
 
         if (s_op->error_a[DIST_PARAMS_KEY] == 0)
         {
@@ -2181,7 +2223,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         }
         if (s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
-           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL;
+/*           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; */
         }
 
         if (s_op->error_a[NUM_DFILES_KEY] == 0)
@@ -2204,8 +2246,11 @@ static PINT_sm_action getattr_interpret_dir_hint(
             s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
             s_op->val_a[NUM_DFILES_KEY].buffer_sz = 0;
         }
+/*
         s_op->keyval_count = 0;
         s_op->free_val = 0;
+*/
+        free_keyval_buffers(s_op);
 
 
         s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
@@ -2260,8 +2305,6 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
             free(s_op->val.buffer);
             s_op->val.buffer = NULL;
         }
-        memset(&(s_op->val),0,sizeof(s_op->val));
-        memset(&(s_op->key),0,sizeof(s_op->key));
 
         if (s_op->val_a)
         {
@@ -2276,6 +2319,8 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
         }
         s_op->free_val = 0;
     }
+    memset(&(s_op->val),0,sizeof(s_op->val));
+    memset(&(s_op->key),0,sizeof(s_op->key));
 
     if(s_op->val_a)
     {

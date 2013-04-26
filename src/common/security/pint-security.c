@@ -14,7 +14,6 @@
 #include <grp.h>
 #include <regex.h>
 #include <errno.h>
-#include <assert.h>
 
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
@@ -183,15 +182,15 @@ int PINT_security_initialize(void)
     ret = PINT_init_trust_store();
     PINT_SECURITY_CHECK(ret, init_error);
 
-    if (config->ca_path == NULL)
+    if (config->ca_file == NULL)
     {
         gossip_err("CAPath not defined in configuration file... "
                    "aborting\n");
 
-        PINT_SECURITY_CHECK_NULL(config->ca_path, init_error);
+        PINT_SECURITY_CHECK_NULL(config->ca_file, init_error);
     }
 
-    ret = PINT_load_cert_from_file(config->ca_path, &ca_cert);
+    ret = PINT_load_cert_from_file(config->ca_file, &ca_cert);
     PINT_SECURITY_CHECK(ret, init_error);
 
     ret = PINT_add_trusted_certificate(ca_cert);
@@ -365,20 +364,17 @@ int PINT_sign_capability(PVFS_capability *cap)
 #endif
     int ret;
 
-    assert(security_privkey);
-
     config = PINT_get_server_config();
-    assert(config->security_timeout);
 
-    cap->issuer = malloc(strlen(config->server_alias) + 3);
+    /* Moved to get-attr.sm 
+    cap->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (cap->issuer == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    /* issuer field for servers is prefixed with "S:" */
-    cap->issuer[0] = 'S';
-    cap->issuer[1] = ':';
-    strcpy(cap->issuer+2, config->server_alias);
+    strcpy(cap->issuer, "S:");
+    strcat(cap->issuer, config->server_alias);
+    */
 
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
@@ -453,24 +449,29 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {
     int ret = -PVFS_EINVAL;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_s *config = PINT_get_server_config();
 
     ret = PINT_init_capability(capability);
     if (ret < 0)
     {
         return -PVFS_ENOMEM;
     }
-    capability->issuer =
-        malloc(strlen(user_opts->server_alias) + 3);
-    capability->issuer[0] = 'S';
-    capability->issuer[1] = ':';
-    strcpy(capability->issuer+2, user_opts->server_alias);
+
+    capability->issuer = (char *) malloc(strlen(config->server_alias) + 3);
+    if (capability->issuer == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    strcpy(capability->issuer, "S:");
+    strcat(capability->issuer, config->server_alias);
+
     capability->fsid = fs_id;
     capability->timeout =
-        PINT_util_get_current_time() + user_opts->security_timeout;
+        PINT_util_get_current_time() + config->security_timeout;
     capability->op_mask = ~((uint32_t)0);
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
+
     ret = PINT_sign_capability(capability);
     if (ret < 0)
     {
@@ -673,21 +674,16 @@ int PINT_sign_credential(PVFS_credential *cred)
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
     int ret;
-    
-    assert(security_privkey);
-    
+        
     config = PINT_get_server_config();
-    assert(config->server_alias);
     
-    cred->issuer = malloc(strlen(config->server_alias) + 3);
+    cred->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (cred->issuer == NULL)
     {
-        return -1;
+        return -PVFS_ENOMEM;
     }
-    /* issuer field for servers is prefixed with "S:" */
-    cred->issuer[0] = 'S';
-    cred->issuer[1] = ':';
-    strcpy(cred->issuer+2, config->server_alias);
+    strcpy(cred->issuer, "S:");
+    strcat(cred->issuer, config->server_alias);
     
     cred->timeout = PINT_util_get_current_time() + config->security_timeout;
 

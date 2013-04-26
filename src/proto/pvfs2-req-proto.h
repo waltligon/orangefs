@@ -97,6 +97,7 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GETATTR = 49,
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+    PVFS_SERV_MGMT_SYS_EXEC = 52,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -197,6 +198,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
+/* max size of a process id (PID) */
+#define PVFS_REQ_LIMIT_PID 32
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -965,27 +968,25 @@ struct PVFS_servreq_mkdir
     */
     PVFS_handle_extent_array handle_extent_array;
 
-    /* NOTE: not using these now, may add these fields upon discussion */
     /* distributed directory request parameters */
-    /*
-       uint32_t num_total_dirdata_servers;
-       uint32_t num_initial_dirdata_servers;
-       */
+    int32_t distr_dir_servers_initial;
+    int32_t distr_dir_servers_max;
+    int32_t distr_dir_split_size;
 
-    /* assume all num_dirent_files are active */
-    int32_t num_dirent_files_req;
     /* NOTE: leave layout as final field so that we can deal with encoding
      * errors */
     PVFS_sys_layout layout;
 };
-endecode_fields_7_struct(
+endecode_fields_9_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_credential, credential,
     PVFS_object_attr, attr,
     PVFS_handle_extent_array, handle_extent_array,
-    int32_t, num_dirent_files_req,
+    int32_t, distr_dir_servers_initial,
+    int32_t, distr_dir_servers_max,
+    int32_t, distr_dir_split_size,
     PVFS_sys_layout, layout);
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
@@ -997,7 +998,9 @@ endecode_fields_7_struct(
                                 __fs_id,               \
                                 __ext_array,           \
                                 __attr,                \
-                                __num_dirent_files_req,\
+                                __distr_dir_servers_initial,\
+                                __distr_dir_servers_max,\
+                                __distr_dir_split_size,\
                                 __layout,              \
                                 __hints)               \
 do {                                                   \
@@ -1011,7 +1014,9 @@ do {                                                   \
         (__ext_array).extent_count;                    \
     (__req).u.mkdir.handle_extent_array.extent_array = \
         (__ext_array).extent_array;                    \
-    (__req).u.mkdir.num_dirent_files_req = (__num_dirent_files_req); \
+    (__req).u.mkdir.distr_dir_servers_initial = (__distr_dir_servers_initial); \
+    (__req).u.mkdir.distr_dir_servers_max = (__distr_dir_servers_max); \
+    (__req).u.mkdir.distr_dir_split_size = (__distr_dir_split_size); \
     (__req).u.mkdir.layout = __layout;                \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
@@ -2512,6 +2517,50 @@ endecode_fields_1_struct(
     PVFS_security_key, public_key);
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
+    
+/* mgmt_sys_exec *****************************************************/
+/* - request server execute a program in the bin directory */
+
+struct PVFS_servreq_mgmt_sys_exec
+{
+    PVFS_fs_id fs_id;
+    char *server;
+    char *command;
+    
+};
+endecode_fields_3_struct(
+    PVFS_servreq_mgmt_sys_exec,
+    PVFS_fs_id, fs_id,
+    string, server,
+    string, command
+
+);
+
+
+// to do - the green stuff below!
+#define PINT_SERVREQ_MGMT_SYS_EXEC_FILL(__req,   \
+                                                    __cap,   \
+                                                    __fsid,   \
+                                                    __server, \
+						    __command)  \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERVREQ_MGMT_SYS_EXEC;        \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_sys_exec.fs_id = (__fsid);    \
+    (__req).u.mgmt_sys_exec.server = (__server);    \
+    (__req).u.mgmt_sys_exec.command = (__command);    \
+} while (0)
+
+struct PVFS_servresp_mgmt_sys_exec
+{
+     int32_t pid;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_sys_exec,
+    int32_t pid);
+#define extra_size_PVFS_servresp_mgmt_sys_exec \
+    PVFS_REQ_LIMIT_PID
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -2567,6 +2616,7 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+	struct PVFS_servreq_mgmt_sys_exec mgmt_sys_exec;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2595,7 +2645,7 @@ decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
 /* - generic response with union of all op specific structs */
 struct PVFS_server_resp
 {
-    enum PVFS_server_op op;
+    enum PVFS_server_op op;completed
     PVFS_error status;
     union
     {
@@ -2610,7 +2660,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_rmdirent rmdirent;
         struct PVFS_servresp_chdirent chdirent;
         struct PVFS_servresp_getconfig getconfig;
-        struct PVFS_servresp_io io;
+        struct PVFS_servresp_io io;completed
         struct PVFS_servresp_write_completion write_completion;
         struct PVFS_servresp_statfs statfs;
         struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
@@ -2629,7 +2679,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
-        struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+        struct PVFS_servresp_mgmt_sys_exec mgmt_sys_exec;
     } u;
 };
 endecode_fields_2_struct(

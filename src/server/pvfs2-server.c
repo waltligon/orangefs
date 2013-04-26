@@ -49,7 +49,12 @@
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
+#ifdef ENABLE_CAPCACHE
 #include "capcache.h"
+#endif
+#ifdef ENABLE_CERTCACHE
+#include "certcache.h"
+#endif
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -578,7 +583,7 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_SECURITY_INIT;
 
-    #ifdef ENABLE_CAPCACHE
+#ifdef ENABLE_CAPCACHE
     /* initialize the capability cache */
     ret = PINT_capcache_init();
     if(ret < 0)
@@ -589,7 +594,20 @@ static int server_initialize(
     }
 
     *server_status_flag |= SERVER_CAPCACHE_INIT;
-    #endif /* ENABLE_CAPCACHE */
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CERTCACHE
+    /* initialize the certificate cache */
+    ret = PINT_certcache_init();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize certificate cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CERTCACHE_INIT;
+#endif
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1753,7 +1771,7 @@ static int server_shutdown(
                      "module           [ stopped ]\n");
     }
 
-    #ifdef ENABLE_CAPCACHE    
+#ifdef ENABLE_CAPCACHE    
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
@@ -1762,7 +1780,18 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
                      "cache           [ stopped ]\n");
     }
-    #endif /* ENABLE_CAPCACHE */
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CERTCACHE    
+    if (status & SERVER_CERTCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
+                     "cache           [   ...   ]\n");
+        PINT_capcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CERTCACHE */
 
     if (status & SERVER_ENCODER_INIT)
     {

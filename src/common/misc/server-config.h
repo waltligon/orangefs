@@ -123,8 +123,6 @@ typedef struct filesystem_configuration_s
     int32_t directio_thread_num;
     int32_t directio_ops_per_queue;
     int32_t directio_timeout;
-
-    int32_t split_mem_limit;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -164,7 +162,6 @@ typedef struct server_configuration_s
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */
     uint32_t  *precreate_low_threshold; /* threshold for each ds type */
-    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles when creating a new directory */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -208,7 +205,7 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
-    char *ca_path;                   /* location of CA certificate */
+    char *ca_file;                   /* location of CA certificate */
     char *user_cert_dn;              /* dn that forms the root of the 
                                       * user certificate dn
                                       */
@@ -233,6 +230,10 @@ typedef struct server_configuration_s
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;
+
+    int32_t distr_dir_servers_initial;
+    int32_t distr_dir_servers_max;
+    int32_t distr_dir_split_size;
 } server_configuration_s;
 
 int PINT_parse_config(
