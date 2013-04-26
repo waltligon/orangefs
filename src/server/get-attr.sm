@@ -867,9 +867,12 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
             resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
             resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         }
+        free_keyval_buffers(s_op);
+/*
         memset(&(s_op->key),0,sizeof(s_op->key));
         memset(&(s_op->val),0,sizeof(s_op->val));
         s_op->free_val = 0;
+*/
 
         return SM_ACTION_COMPLETE;
     }
@@ -1063,7 +1066,9 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    /*initialize permanent data structures*/
    meta->mirror_dfile_array = s_op->val_a[0].buffer;
    s_op->u.getattr.mirror_dfile_status_array = s_op->val_a[1].buffer;
+/*
    s_op->val_a[0].buffer = s_op->val_a[1].buffer = NULL;
+*/
 
    /* Check the mirroring status for each handle.  If the status is non-zero,
     * the handle is not valid, so put a null in the mirrory array for that
@@ -1097,6 +1102,8 @@ error_exit:
    */
       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCleaning up mirror operation...\n");
       js_p->error_code = 0;
+      free_keyval_buffers(s_op);
+#if 0
       for (i=0; i<s_op->keyval_count; i++)
       {
           if (s_op->val_a[i].buffer)
@@ -1108,6 +1115,7 @@ error_exit:
       s_op->key_a = s_op->val_a = NULL;
       s_op->error_a = NULL;
       s_op->keyval_count = 0; 
+#endif
       
       /*We MUST set the number of copies to zero to prevent encoding errors
        *later.
@@ -2197,7 +2205,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
         }            
-        s_op->val_a[DIST_NAME_KEY].buffer = NULL;
+/*        s_op->val_a[DIST_NAME_KEY].buffer = NULL; */
 
         if (s_op->error_a[DIST_PARAMS_KEY] == 0)
         {
@@ -2215,7 +2223,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         }
         if (s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
-           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL;
+/*           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; */
         }
 
         if (s_op->error_a[NUM_DFILES_KEY] == 0)
@@ -2238,8 +2246,11 @@ static PINT_sm_action getattr_interpret_dir_hint(
             s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
             s_op->val_a[NUM_DFILES_KEY].buffer_sz = 0;
         }
+/*
         s_op->keyval_count = 0;
         s_op->free_val = 0;
+*/
+        free_keyval_buffers(s_op);
 
 
         s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
@@ -2294,8 +2305,6 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
             free(s_op->val.buffer);
             s_op->val.buffer = NULL;
         }
-        memset(&(s_op->val),0,sizeof(s_op->val));
-        memset(&(s_op->key),0,sizeof(s_op->key));
 
         if (s_op->val_a)
         {
@@ -2310,6 +2319,8 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
         }
         s_op->free_val = 0;
     }
+    memset(&(s_op->val),0,sizeof(s_op->val));
+    memset(&(s_op->key),0,sizeof(s_op->key));
 
     if(s_op->val_a)
     {
