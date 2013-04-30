@@ -2966,8 +2966,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
      */
     /* if (!(flow_d->replication_status && REPLICATION_TROVE_FAILURE)) 
      *    THEN writes_pending++;
-     *
- *  flow_data->writes_pending += 1;
+     */
+     flow_data->writes_pending += 1;
 
     /* bytes received from the client */
     flow_data->total_bytes_recvd += actual_size;
@@ -3416,7 +3416,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
                                       struct fp_private_data* flow_data)
 {
     flow_descriptor *flow_d = flow_data->parent;
-    int ret,ret_bmi,ret_trove;
+    int ret_bmi,ret_trove;
 
     PVFS_perror("Error: ", error_code);
     gossip_lerr("Forwarding Flow Error: CATASTROPHIC ERROR!\n");
@@ -3424,7 +3424,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	"flowproto-multiqueue error cleanup path.\n");
 
     /* is this the first error registered for this particular flow? */
-    gen_mutex_lock(&flow_data->flow_mutex);
+    gen_mutex_lock(&flow_d->flow_mutex);
     /* if (error_code == REPLICATION_STOP)
      *     flow_data->cleanup_pending_count=0;
      */
@@ -3441,7 +3441,7 @@ static void handle_forwarding_io_error(PVFS_error error_code,
             * posted sends, and posted writes.  Posted recvs and sends are
             * located on the src-list; posted writes are on the dest-list.
             */
-           gen_mutex_unlock(&flow_data->flow_mutex);
+           gen_mutex_unlock(&flow_d->flow_mutex);
            ret_bmi = cancel_pending_bmi(&flow_data->src_list);
 
            /* cancel_pending_bmi returns the number of q_items that were sent to the
@@ -3454,11 +3454,11 @@ static void handle_forwarding_io_error(PVFS_error error_code,
             * trove_cancel thread.  NOTE: there could be many result chains per one q_item.
             */
           
-           gen_mutex_lock(&flow_data->flow_mutex);
+           gen_mutex_lock(&flow_d->flow_mutex);
            flow_data->cleanup_pending_count = ret_bmi + ret_trove;
            if (flow_data->cleanup_pending_count != 0)
            {
-              gen_mutex_unlock(&flow_data->flow_mutex);
+              gen_mutex_unlock(&flow_d->flow_mutex);
               return;
            }
     }
@@ -3481,10 +3481,10 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 	 */
 	assert(flow_data->parent->state != FLOW_COMPLETE);
 	flow_data->parent->state = FLOW_COMPLETE;
-        FLOW_CLEANUP();
+        FLOW_CLEANUP(flow_data);
     }
 
-    gen_mutex_unlock(&flow_data->flow_mutex);
+    gen_mutex_unlock(&flow_d->flow_mutex);
     return;
 }/*end handle_forwarding_io_error*/
 
