@@ -15,27 +15,27 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\common\misc\errno-mapping.c">
+    <ClCompile Include="..\..\..\..\src\common\misc\errno-mapping.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\common\misc\pint-event.c">
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-event.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\common\misc\pint-mem.c">
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-mem.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\common\misc\str-utils.c">
+    <ClCompile Include="..\..\..\..\src\common\misc\str-utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\common\misc\pint-event.h">
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-event.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\common\misc\pint-mem.h">
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-mem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\common\misc\str-utils.h">
+    <ClInclude Include="..\..\..\..\src\common\misc\str-utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
