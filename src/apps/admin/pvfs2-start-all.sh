@@ -8,8 +8,8 @@ cd `dirname $0`/..
 
 help()
 {
-    SP=40
-    printf "%s\n" "Usage: pvfs2-start-all.sh -c <config_file_path> [OPTION]"
+    SP=44
+    printf "%s\n" "Usage: pvfs2-start-all.sh -c <config_file_path> -p <prefix_path> [OPTION]"
     printf "%-${SP}s%s\n" "  -c, --conf <config_file_path>" "PVFS configuration file path"
 
     printf "%-${SP}s%s\n" "  -e, --exclusions <exclusions_string>" "String of space separated expressions: "
@@ -21,20 +21,21 @@ help()
     printf "%-${SP}s%s\n" "  -m, --mnt <mnt_path>" "PVFS mount path"
     printf "%-${SP}s%s\n" "  -o, --options <options_string>" "String of options passed to ssh"
     printf "%-${SP}s%s\n" "" "    ex: -o \"-t headnode ssh\""
+    printf "%-${SP}s%s\n" "  -p, --prefix <prefix_path>" "prefix path set during configure step"
+    printf "%-${SP}s%s\n" "" "    (or /usr/local if you didn't specify)"
     printf "%-${SP}s%s\n" "  -s, --server_options <options_string>" "String of options to pass to pvfs2-server"
 }
-
-PVFS2_SERVER=`pwd`/sbin/pvfs2-server
 
 # optionally set by options
 PVFS_CONF_FILE=                         #Ex: '/opt/orangefs/orangefs.conf'
 EXCLUSIONS=                             #Ex: 'ib0 myri0'
 MNT=                                    #Ex: '/mnt/orangefs'
 SSH_OPTIONS=                            #Ex: '-t another_host ssh'
+PREFIX_PATH=                            #Ex: '/opt/orangefs'
 PVFS2_SERVER_OPTIONS=                   #Ex: '-f' or '-r'
 
 # Execute getopt
-ARGS=`getopt -o "c:e:hm:o:s:" -l "conf:,exclusions:,help,mnt:,options:,server_options:" -n "$0" -- "$@"`
+ARGS=`getopt -o "c:e:hm:o:p:s:" -l "conf:,exclusions:,help,mnt:,options:,prefix:,server_options:" -n "$0" -- "$@"`
 
 # Check if getopt returned an error b/c of bad arguments
 if [ $? -ne 0 ]; then
@@ -48,6 +49,7 @@ MNT_SET=0
 
 # Check for Required Options
 CONF_SET=0
+PREFIX_SET=0
 
 # Iterate over options
 while [ $# -ne 0 ]; do
@@ -81,6 +83,13 @@ while [ $# -ne 0 ]; do
         fi
         shift 2;;
 
+        -p|--prefix)
+        if [ -n "$2" ]; then
+            PREFIX_PATH=$2
+            PREFIX_SET=1
+        fi
+        shift 2;;
+
         -s|--server_options)
         if [ -n "$2" ]; then
             PVFS2_SERVER_OPTIONS=$2
@@ -92,7 +101,7 @@ while [ $# -ne 0 ]; do
     esac
 done
 
-if [ $CONF_SET -eq 0 ]; then
+if [[ $CONF_SET -eq 0 || $PREFIX_SET -eq 0 ]]; then
     help
     exit 1
 fi
@@ -110,6 +119,7 @@ fi
 
 SPACING=$[`echo "$SERVERS" | wc -L`+4]
 
+PVFS2_SERVER=$PREFIX_PATH/sbin/pvfs2-server
 # Start Servers
 for SERVER in $SERVERS; do
     OUTPUT=`ssh $SSH_OPTIONS $SERVER $PVFS2_SERVER $PVFS2_SERVER_OPTIONS $PVFS_CONF_FILE 2>&1`
