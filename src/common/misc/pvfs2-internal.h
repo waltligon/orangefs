@@ -117,27 +117,4 @@
 
 #define IO_MAX_REGIONS 64
 
-/* structures used by replication to determine status between server and client */
-enum replication_endpoint_states
-{
-   RUNNING = 0,
-   FAILED_INITIAL_CONTACT,
-   FAILED_BMI_POST_RECV,
-   FAILED_BMI_POST_SEND,
-   FAILED_TROVE_POST_WRITE,
-   FAILED_BMI_RECV,
-   FAILED_BMI_SEND,
-   FAILED_TROVE_WRITE
-};
-
-typedef enum replication_endpoint_states replication_endpoint_state;
-
-struct replication_endpoint_status
-{
-   replication_endpoint_state replica_state;
-   int replica_error_code;
-};
-
-typedef struct replication_endpoint_status replication_endpoint_status;
-
 #endif /* PVFS2_INTERNAL_H */

@@ -35,6 +35,8 @@
 #define FLOW_CLEANUP_CANCEL_PATH(__flow_data, __cancel_path)          \
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
+    gossip_lerr("function(FLOW_CLEANUP_CANCEL_PATH):flow(%p)\n"       \
+               ,__flow_d);                                            \
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",\
                  __flow_d);                                           \
     cleanup_buffers(__flow_data);                                     \
@@ -2502,8 +2504,13 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
              * set flow_d->error_code = ret;
              * set flow_d->replica_state = FAILED_BMI_RECV_POST;
              */
-            gossip_lerr("flow(%p):q_item(%p):%s:ERROR: BMI_post_recv returned: %d!\n", flow_d,q_item,__func__,ret);
-            handle_forwarding_io_error(ret, q_item, flow_data);
+            gen_mutex_lock(&flow_d->flow_mutex);
+              q_item->res->state = FAILED_BMI_POST_RECV;
+              q_item->res->error_code = ret;
+              qlist_del(&q_item->list_link);
+              gossip_lerr("flow(%p):q_item(%p):%s:ERROR: BMI_post_recv returned: %d!\n", flow_d,q_item,__func__,ret);
+              handle_forwarding_io_error(ret, q_item, flow_data);
+            gen_mutex_unlock(&flow_d->flow_mutex);
             return;
         }
     }
@@ -2687,48 +2694,31 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
 
-    gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
+    gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
     /* Handle trove errors */
     gen_mutex_lock(&flow_d->flow_mutex);
-    /* if (flow_d->replication_status & REPLICATION_STOP ) 
-     */ 
     if (flow_d->error_code != 0 )
     {
        qlist_del(&q_item->list_link);
+       q_item->res->state      = FLOW_CANCELLED;
+       q_item->res->error_code = flow_d->error_code;
 
-    /* if REPLICATION_STOP, then the entire flow is being cancelled.  So, we call 
+    /* the entire flow is being cancelled.  So, we call 
      * handle_forwarding_io_error() so that pending-cancels is decremented.  If pending-cancels
      * becomes zero, then we are done and cleanup can occur (which is done in the error routine).
      */
-        gen_mutex_unlock(&flow_d->flow_mutex);
-        handle_forwarding_io_error(error_code, q_item, flow_data);
-        return;
+       handle_forwarding_io_error(error_code, q_item, flow_data);
+       gen_mutex_unlock(&flow_d->flow_mutex);
+       return;
     }
 
     if (error_code != 0)
     {
-        /*Write to primary failed but continue with replica writes.
-
-         * qlist_del(&q_item->list_link);
-         * flow_d->res[].replica_state = FAILED_TROVE_WRITE;
-         * flow_d->res[].replica_error_code = error_code;
-         * flow_d->replication_status |= REPLICATION_TROVE_FAILURE;
-         *
-         * flow_data->writes_pending--;
-         * q_item->buffer_in_use--;
-         *
-         * set attempted-amount-of-bytes-to-write? 
-         */
-
-        /* do we want to check if the flow is now completed? 
-         */
-        return;
+       q_item->res->state      = FAILED_TROVE_WRITE;
+       q_item->res->error_code = error_code;
     }
 
-    gen_mutex_unlock(&flow_d->flow_mutex);
-    /* Decrement result chain count */
-    q_item->result_chain_count--;
     result_entry->posted_id = 0;
 
 
@@ -2739,10 +2729,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     {
         struct result_chain_entry* result_iter = &q_item->result_chain;
 
-        gen_mutex_lock(&flow_d->flow_mutex);
-
-        /* Aggregate results */
-        while (0 != result_iter)
+        /* Aggregate results. don't need to aggregate results if bad error code */
+        while (0 != result_iter && q_item->res->error_code == 0)
         {
             struct result_chain_entry* re = result_iter;
             gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tq_item->out_size(%d)\n"
@@ -3174,59 +3162,27 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     flow_descriptor *flow_d = flow_data->parent;
     struct fp_queue_item *q_item = replica_q_item->replica_parent;
 
-    gossip_lerr("flow(%p):Executing %s...\n",flow_d,__func__);
-
-    /* Error handling */
-    /* mutex lock
-     * if ( flow_d->replication_status && REPLICATION_STOP )
-     *      qlist_del(&replica_q_item->list_link); remove from src list
-     *      mutex unlock
-     *      handle_forwarding_io_error();
-     *      return;
-     *
-     * if (error_code != 0)
-     *    qlist_del(&replicat_q_item->list_link); remove from src list
-     *    flow_data->sends_pending--;
-     *    q_item->buffer_in_use--;
-     *    set the attempted amount of bytes?
-     *    if (!REPLICATION_BMI_SEND_FAILURE)
-     *         replica_q_item->res.replica_state = FAILED_BMI_SEND;
-     *         replica_q_item->res.replica_error_code = error_code;
-     *         flow_d->replication_status |= REPLICATION_BMI_ERROR;
-     *    check if flow has completed.
-     *    return;     
-     *
-     * mutex unlock
-     */
-    if (flow_d->error_code != 0 || error_code != 0)
-    {
-        gen_mutex_lock(&flow_d->flow_mutex);
-        q_item->buffer_in_use--;
-        flow_data->sends_pending--;
-        qlist_del(&replica_q_item->list_link); /* remove from src list */ 
-    }
-
-    /* Is the entire flow being cancelled? */
-    if (flow_d->error_code != 0)
-    {
-       gossip_lerr("Entire flow(%p) is being cancelled.\n",flow_d);
-       handle_io_error(flow_d->error_code,replica_q_item,flow_data);
-       return;
-    }else if (error_code != 0)
-    {
-       /* Did the transfer of data from this server to the replica fail?  If so, don't send any more data
-        * to the replica but continue with the flow and transfers to any other replicas.
-        */
-        gossip_lerr("Forwarding completion:CATASTROPHIC ERROR??? Stop sending data to THIS replica.\n");
-        /* set status codes, update buffer_in_use, cleanup, etc. */
-
-        /* for now, cancel the entire flow */
-        handle_io_error(error_code, replica_q_item, flow_data);
-        return;
-    }/*end error handling*/
-    
+    gossip_lerr("flow(%p):replica_q_item(%p):error_code(%d):Executing %s...\n",flow_d
+                                                                              ,replica_q_item
+                                                                              ,(int)error_code,__func__);
 
     gen_mutex_lock(&flow_d->flow_mutex);
+
+    if (flow_d->error_code != 0)
+    {
+       gossip_lerr("function(%s):flow(%p):replica_q_item(%p):error_code(%d):Flow is being cancelled.\n"
+                   ,__func__
+                   ,flow_d
+                   ,replica_q_item
+                   ,(int)error_code);
+       replica_q_item->res->state = FLOW_CANCELLED;
+       replica_q_item->res->error_code = flow_d->error_code;
+       qlist_del(&replica_q_item->list_link);
+       /* if this q-item was counted? */
+       handle_forwarding_io_error(flow_d->error_code, replica_q_item, flow_data);
+       gen_mutex_unlock(&flow_d->flow_mutex);
+       return;
+    }
 
     /* Perform bookkeeping for data forward completion */
     flow_data->sends_pending -= 1;
@@ -3259,6 +3215,16 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                  flow_data->sends_pending,
                  flow_data->primary_recvs_throttled);
 
+    if (error_code != 0)
+    {
+        gossip_lerr("function(%s):flow(%p):replica_q_item(%p):error_code(%d):Error sending data.\n"
+                   ,__func__
+                   ,flow_d
+                   ,replica_q_item
+                   ,(int)error_code);
+        replica_q_item->res->state = FAILED_BMI_SEND;
+        replica_q_item->res->error_code = error_code;
+    }
 
     if (forwarding_is_flow_complete(flow_data))
     {
@@ -3282,7 +3248,6 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
                      ,flow_d
                      ,q_item,__func__
                      ,q_item->buffer_in_use);
-          flow_data->primary_recvs_throttled -= 1;
           gen_mutex_unlock(&flow_d->flow_mutex);
           flow_bmi_recv(q_item,
                         forwarding_bmi_recv_callback_fn);
@@ -3419,54 +3384,59 @@ static void handle_forwarding_io_error(PVFS_error error_code,
     int ret_bmi,ret_trove;
 
     PVFS_perror("Error: ", error_code);
-    gossip_lerr("Forwarding Flow Error: CATASTROPHIC ERROR!\n");
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
 	"flowproto-multiqueue error cleanup path.\n");
 
-    /* is this the first error registered for this particular flow? */
-    gen_mutex_lock(&flow_d->flow_mutex);
-    /* if (error_code == REPLICATION_STOP)
-     *     flow_data->cleanup_pending_count=0;
-     */
+
+    /* THIS FUNCTION HAS TO BE CALLED WITH FLOW_D->FLOW_MUTEX HELD. */
+
     if(flow_d->error_code == 0)
     {
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 	    "flowproto-multiqueue first failure.\n");
 	flow_d->error_code = error_code;
-	flow_data->cleanup_pending_count = 0;
 
+        /* In this case, we were unable to receive a buffer of data from
+         * the client; thus, we need to stop EVERYTHING: posted recvs,
+         * posted sends, and posted writes.  Posted recvs and sends are
+         * located on the src-list; posted writes are on the dest-list.
+         */
+        ret_bmi = cancel_pending_bmi(&flow_data->src_list);
 
-           /* In this case, we were unable to receive a buffer of data from
-            * the client; thus, we need to stop EVERYTHING: posted recvs,
-            * posted sends, and posted writes.  Posted recvs and sends are
-            * located on the src-list; posted writes are on the dest-list.
-            */
-           gen_mutex_unlock(&flow_d->flow_mutex);
-           ret_bmi = cancel_pending_bmi(&flow_data->src_list);
+        /* cancel_pending_bmi returns the number of q_items that were sent to the
+         * bmi_cancel thread.
+         */
 
-           /* cancel_pending_bmi returns the number of q_items that were sent to the
-            * bmi_cancel thread.
-            */
+        ret_trove = cancel_pending_trove(&flow_data->dest_list,flow_d->dest.u.trove.coll_id); 
 
-           ret_trove = cancel_pending_trove(&flow_data->dest_list,flow_d->dest.u.trove.coll_id); 
-
-           /* cancel_pending_trove returns the number of result chains that were sent to the
-            * trove_cancel thread.  NOTE: there could be many result chains per one q_item.
-            */
+        /* cancel_pending_trove returns the number of result chains that were sent to the
+         * trove_cancel thread.  NOTE: there could be many result chains per one q_item.
+         */
           
-           gen_mutex_lock(&flow_d->flow_mutex);
-           flow_data->cleanup_pending_count = ret_bmi + ret_trove;
-           if (flow_data->cleanup_pending_count != 0)
-           {
-              gen_mutex_unlock(&flow_d->flow_mutex);
-              return;
-           }
+        flow_data->cleanup_pending_count = ret_bmi + ret_trove;
+        gossip_lerr("function(%s):flow(%p):q_item:(%p):error_code(%d):initial cleanup_pending_count(%d).\n"
+                   ,__func__
+                   ,flow_d
+                   ,q_item
+                   ,(int)error_code
+                   ,flow_data->cleanup_pending_count);
+        if (flow_data->cleanup_pending_count > 0)
+        {
+           return;
+        }
     }
     else
     {
 	/* one of the previous cancels came through */
 	flow_data->cleanup_pending_count--;
     }
+    
+    gossip_lerr("function(%s):flow(%p):q_item:(%p):error_code(%d):cleanup_pending_count(%d).\n"
+                ,__func__
+                ,flow_d
+                ,q_item
+                ,(int)error_code
+                ,flow_data->cleanup_pending_count);
     
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "cleanup_pending_count: %d\n",
 	flow_data->cleanup_pending_count);
@@ -3475,16 +3445,15 @@ static void handle_forwarding_io_error(PVFS_error error_code,
     {
         //At this point, all pending cancels have completed and we can now stop the flow and cleanup.
 	/* we are finished, make sure error is marked and state is set */
-	assert(flow_data->parent->error_code);
+        assert(flow_d->error_code);
 	/* we are in trouble if more than one callback function thinks that
 	 * it can trigger completion
 	 */
-	assert(flow_data->parent->state != FLOW_COMPLETE);
-	flow_data->parent->state = FLOW_COMPLETE;
+	assert(flow_d->state != FLOW_COMPLETE);
         FLOW_CLEANUP(flow_data);
+	flow_d->state = FLOW_COMPLETE;
     }
 
-    gen_mutex_unlock(&flow_d->flow_mutex);
     return;
 }/*end handle_forwarding_io_error*/
 
@@ -3498,26 +3467,26 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
     int i;
     uint32_t *always_queue;
 
-    /* Generic flow initialization */
+    /* Initialization */
     flow_d->total_transferred = 0;
     
-    /* Iniitialize the pending counts */
-    flow_data->recvs_pending = 0;
-    flow_data->sends_pending = 0;
+    flow_data->recvs_pending  = 0;
+    flow_data->sends_pending  = 0;
     flow_data->writes_pending = 0;
     flow_data->primary_recvs_throttled = 0;
 
-    /* Initiailize progress counts */
     flow_data->total_bytes_req = flow_data->parent->aggregate_size;
     flow_data->total_bytes_forwarded = 0;
-    flow_data->total_bytes_recvd = 0;
-    flow_data->total_bytes_written = 0;
+    flow_data->total_bytes_recvd     = 0;
+    flow_data->total_bytes_written   = 0;
     
     always_queue=PINT_hint_get_value_by_type(flow_d->hints,
                                              PINT_HINT_BMI_QUEUE,
                                              NULL);
     gossip_lerr("always_queue(%d)\n",always_queue?*always_queue:0);
     
+    flow_data->cleanup_pending_count = -1;
+
 
     /* Initialize buffers */
     for (i = 0; i < flow_d->buffers_per_flow; i++)

@@ -158,6 +158,36 @@ void print_sys_layout_structure ( PVFS_sys_layout *layout_p )
    return;
 } /* end print_sys_layout_structure */
 
+
+/* helper function to print the replication endpoint status structure */
+void replication_endpoint_status_print(void)
+{
+   const char *replication_endpoint_states_as_strings[]=
+   {
+      "RUNNING",
+      "PENDING",
+      "FAILED INITIAL CONTACT",
+      "FAILED_BMI_POST_RECV",
+      "FAILED_BMI_POST_SEND",
+      "FAILED_TROVE_POST_WRITE",
+      "FAILED_BMI_RECV",
+      "FAILED_BMI_SEND",
+      "FAILED_TROVE_WRITE",
+      "FLOW_CANCELLED"
+   };
+
+   replication_endpoint_state res_state;
+
+
+   for (res_state=0; res_state < NUMBER_OF_STATES; res_state++)
+   {
+       gossip_lerr("Replication Endpoint States: %s\n",replication_endpoint_states_as_strings[RUNNING]);
+   }
+
+   return;
+};
+
+
 /*
  * Local variables:
  *   c-indent-level: 4

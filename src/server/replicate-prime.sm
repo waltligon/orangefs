@@ -559,9 +559,15 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     }
     for (i=0; i<s_op->u.io.res_count; i++)
     {
-        s_op->u.io.res[i].replica_state = RUNNING;
-        s_op->u.io.res[i].replica_error_code = 0;
+        s_op->u.io.res[i].state = PENDING;
+        s_op->u.io.res[i].error_code = 0;
     }
+    /* the last member of the res array will hold the status for the writes/reads to the local machine; 
+     * the other res array members will hold the statuses for the replica servers.  The statuses for
+     * the replica servers will be changed depending on the results of the initial contacts.  For the
+     * local machine, we go ahead and set the state to RUNNING.
+     */
+    s_op->u.io.res[s_op->u.io.res_count-1].state = RUNNING;
 
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
@@ -652,12 +658,15 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
         s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
     }
 
-    s_op->u.io.res[i].replica_error_code   = resp_p->status;
-    if (s_op->u.io.res[i].replica_error_code)
+    s_op->u.io.res[i].error_code   = resp_p->status;
+    if (s_op->u.io.res[i].error_code)
     {
-        s_op->u.io.res[i].replica_state = FAILED_INITIAL_CONTACT;
+        s_op->u.io.res[i].state = FAILED_INITIAL_CONTACT;
     }
-
+    else
+    {
+        s_op->u.io.res[i].state = RUNNING;
+    }
 
     resp_p->status=0;
 

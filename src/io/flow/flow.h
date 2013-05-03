@@ -18,7 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-storage.h"
-#include "pvfs2-internal.h"
+#include "replication-common-utils.h"
 
 /********************************************************************
  * endpoint structure 

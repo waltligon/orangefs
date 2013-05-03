@@ -38,6 +38,37 @@ void print_replication_structure(replication_s *replication_p);
 /* helper function to print PVFS_sys_layout structure */
 void print_sys_layout_structure ( PVFS_sys_layout *layout_p );
 
+/* helper function to print the replication endpoint status information */
+void replication_endpoint_status_print(void);
+
+
+/* structures used by replication to determine status between server and client */
+enum replication_endpoint_states
+{
+   RUNNING = 0,
+   PENDING,
+   FAILED_INITIAL_CONTACT,
+   FAILED_BMI_POST_RECV,
+   FAILED_BMI_POST_SEND,
+   FAILED_TROVE_POST_WRITE,
+   FAILED_BMI_RECV,
+   FAILED_BMI_SEND,
+   FAILED_TROVE_WRITE,
+   FLOW_CANCELLED,
+   NUMBER_OF_STATES
+};
+
+typedef enum replication_endpoint_states replication_endpoint_state;
+
+struct replication_endpoint_status
+{
+   replication_endpoint_state state;
+   int error_code;
+};
+
+typedef struct replication_endpoint_status replication_endpoint_status;
+
+
 #endif /* __REPLICATION_COMMON_UTILS_H */
 /*
  * Local variables:
