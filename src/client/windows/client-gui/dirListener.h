@@ -5,6 +5,7 @@
 
 class DirHandler;
 
+/* this is the asynchronous structure windows uses for thread data */
 typedef struct
 {
 	OVERLAPPED overlapped;
@@ -23,6 +24,10 @@ typedef struct
 	DirHandler *handler;
 }DirInfo;
 
+/*
+ * I got a majority of the functionality and structure/implementation for this directory watcher 
+ * from online. It has been tested and every case (delete, create, update, rename, etc) reports back asynchronously just fine.
+ */
 class DirWatcher
 {
 public:

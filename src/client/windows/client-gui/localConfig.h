@@ -15,10 +15,7 @@ class LocalConfig
 {
 public:
 	LocalConfig() { 
-		fileSystemName = "";
 		syncConfigPath = NULL;
-		fsSelection = "";
-		localSyncPath = "";
 		configFile = NULL;
 	}
 	~LocalConfig(void);
@@ -30,14 +27,7 @@ public:
 
 	wxString getSyncPath() const { return this->localSyncPath; }
 	wxString getConfigPath() const { return syncConfigPath; }
-	bool syncExists() 
-	{
-		if ( localSyncPath.size() )
-			return true;
-		else
-			return false;
-		return false;
-	}
+	bool syncExists();
 
 private:
 	wxString fileSystemName;

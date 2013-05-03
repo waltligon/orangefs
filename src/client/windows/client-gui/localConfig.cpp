@@ -51,6 +51,14 @@ bool LocalConfig::load()
 	return true;
 }
 
+bool LocalConfig::syncExists() {
+	if ( localSyncPath )
+			return true;
+		else
+			return false;
+		return false;
+}
+
 void LocalConfig::save() 
 {
 	this->configFile = fopen(syncConfigPath, "w");
