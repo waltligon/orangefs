@@ -10,6 +10,7 @@ package org.orangefs.usrint;
  * interface to be instantiated. Follows the singleton pattern. */
 public class Orange {
     
+    @SuppressWarnings("unused")
     private static Orange orange = null;
     
     public PVFS2POSIXJNI posix;

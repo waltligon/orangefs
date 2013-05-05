@@ -9,8 +9,7 @@ package org.orangefs.usrint;
 import java.lang.reflect.Field;
 
 /* Class representing C struct: 'struct stat' */
-public class Stat
-{
+public class Stat {
     public long st_dev;
     public long st_ino;
     public int st_mode;
@@ -25,12 +24,15 @@ public class Stat
     public long st_mtime;
     public long st_ctime;
 
-    /* This probably won't get called much since we're depending upon a 
-     * native method to initialize this object.
+    /*
+     * This probably won't get called much since we're depending upon a native
+     * method to initialize this object.
      */
-    Stat(){}
+    Stat() {
+    }
 
     /* Generic Object Dump to String */
+    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -41,13 +43,14 @@ public class Stat
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for(Field field : fields ) {
+        for (Field field : fields) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            } catch(IllegalAccessException ex) {
+            }
+            catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

@@ -34,16 +34,23 @@ ORGDOT=org.orangefs.usrint
 ORGUNDER=org_orangefs_usrint
 
 #------------------------------------------------------------------------------
-#OFS Input and Output Stream Classes
+#OFS I/O Stream and I/O Channel Classes
 IOSTREAM_JAVA=$(ORGDIR)/OrangeFileSystemInputStream.java \
 	$(ORGDIR)/OrangeFileSystemOutputStream.java
 
 IOSTREAM_CLASS=$(ORGDIR)/OrangeFileSystemInputStream.class \
 	$(ORGDIR)/OrangeFileSystemOutputStream.class
 
+IOCHANNEL_JAVA=$(ORGDIR)/OrangeFileSystemInputChannel.java \
+	$(ORGDIR)/OrangeFileSystemOutputChannel.java
+
+IOCHANNEL_CLASS=$(ORGDIR)/OrangeFileSystemInputChannel.class \
+	$(ORGDIR)/OrangeFileSystemOutputChannel.class
+
 #Package our OFS only Java .class files into a jar
 lib/ofs_jni.jar : lib/libPVFS2POSIXJNI.so lib/libPVFS2STDIOJNI.so \
-        $(IOSTREAM_CLASS)
+		$(IOSTREAM_CLASS) \
+		$(IOCHANNEL_CLASS)
 	$(JAVA_HOME)/bin/jar cf $@ \
       $(ORGDIR)/*.class
 
@@ -52,9 +59,14 @@ install : lib/ofs_jni.jar
 	cp lib/*.so $(prefix)/lib
 	cp lib/*.jar $(prefix)/lib
 
-#Generate class files for I/O Streams
-$(IOSTREAM_CLASS) : $(IOSTREAM_JAVA)
-	$(JAVA_HOME)/bin/javac -cp "$(COMMONS_LOGGING):." $(IOSTREAM_JAVA)
+#Generate class files for I/O Streams and I/O Channels
+$(IOSTREAM_CLASS): $(IOSTREAM_JAVA)
+	$(JAVA_HOME)/bin/javac -cp "$(COMMONS_LOGGING):." \
+	  $(IOSTREAM_JAVA)
+
+$(IOCHANNEL_CLASS): $(IOCHANNEL_JAVA)
+	$(JAVA_HOME)/bin/javac -cp "$(COMMONS_LOGGING):." \
+      $(IOCHANNEL_JAVA)
 
 #Hadoop Only Related Classes
 #==============================================================================

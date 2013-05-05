@@ -445,7 +445,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDelete(
     rc = recursive_delete(cpath);
     if(rc == -1)
     {
-        jni_fprintf(stderr, "recursiveDelete error\n");
+        if(JNI_DBG)
+        {
+            jni_fprintf(stderr, "recursiveDelete error\n");
+        }
     }
 err:
     JNI_FLUSH

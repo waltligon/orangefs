@@ -10,13 +10,11 @@ import java.lang.reflect.Field;
 
 public class PVFS2POSIXJNIFlags {
 
-    /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
-    private PVFS2POSIXJNIFlags() {}
-
-    /* Fields set by JNI function fill_PVFS2POSIXJNIFlags.
-    * See posix_flags.c 
-    */
+    /*
+     * Fields set by JNI function fill_PVFS2POSIXJNIFlags. See posix_flags.c
+     */
     public long O_WRONLY;
+
     public long O_RDONLY;
     public long PVFS_IO_READ;
     public long PVFS_IO_WRITE;
@@ -59,14 +57,14 @@ public class PVFS2POSIXJNIFlags {
     public long S_IXOTH;
     public long S_IFMT;
     public long S_IFSOCK;
-    public long S_IFLNK;   
-    public long S_IFREG;    
-    public long S_IFBLK;    
-    public long S_IFDIR;    
-    public long S_IFCHR;    
-    public long S_IFIFO;    
-    public long S_ISUID;    
-    public long S_ISGID;    
+    public long S_IFLNK;
+    public long S_IFREG;
+    public long S_IFBLK;
+    public long S_IFDIR;
+    public long S_IFCHR;
+    public long S_IFIFO;
+    public long S_ISUID;
+    public long S_ISGID;
     public long S_ISVTX;
     public long SEEK_SET;
     public long SEEK_CUR;
@@ -89,14 +87,18 @@ public class PVFS2POSIXJNIFlags {
     public long F_OWNER_TID;
     public long F_OWNER_PID;
     public long F_OWNER_PGRP;
-    public long DN_ACCESS;   
-    public long DN_MODIFY;   
-    public long DN_CREATE;  
-    public long DN_DELETE;   
-    public long DN_RENAME;   
+    public long DN_ACCESS;
+    public long DN_MODIFY;
+    public long DN_CREATE;
+    public long DN_DELETE;
+    public long DN_RENAME;
     public long DN_ATTRIB;
     public long DN_MULTISHOT;
+    /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
+    private PVFS2POSIXJNIFlags() {
+    }
 
+    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -107,13 +109,14 @@ public class PVFS2POSIXJNIFlags {
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for(Field field : fields ) {
+        for (Field field : fields) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            } catch(IllegalAccessException ex) {
+            }
+            catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

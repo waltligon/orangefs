@@ -50,7 +50,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     jobject obj
 )
 {
-    int num_fields = 52;
+    int num_fields = 55;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
@@ -110,11 +110,15 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "S_ISUID",
         
         "S_ISGID", //50
-        "S_ISVTX"
+        "S_ISVTX",
+        "SEEK_SET",
+        "SEEK_CUR",
+        "SEEK_END"
     };
 
     char *field_types[] = 
     {
+        "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
@@ -224,6 +228,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     
     SET_LONG_FIELD(env, inst, fids[50],S_ISGID);
     SET_LONG_FIELD(env, inst, fids[51],S_ISVTX);
+    SET_LONG_FIELD(env, inst, fids[52],SEEK_SET);
+    SET_LONG_FIELD(env, inst, fids[53],SEEK_CUR);
+    SET_LONG_FIELD(env, inst, fids[54],SEEK_END);
         
     JNI_FLUSH
     return inst;
@@ -1269,41 +1276,53 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_umask  (JNIEnv *env, jobject obj, jlong m
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_orangefs_usrint_PVFS2POSIXJNI_read(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count)
+Java_org_orangefs_usrint_PVFS2POSIXJNI_read(JNIEnv *env, jobject obj, int fd, jobject buf, jlong count)
 {
     PFI
-    ssize_t rc = 0;
-    jboolean is_copy;
-    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    ssize_t ret = 0;
+    void * buf_addr = 0;
+
     if(JNI_DBG)
     {
         printf("\tfd = %d\n", fd);
         printf("\tcount = %lu\n", (uint64_t) count);
-        is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
     }
-    if(!buffer)
+
+    buf_addr = (*env)->GetDirectBufferAddress(env, buf);
+    if(!buf_addr)
     {
-        if(JNI_DBG) perror("GetByteArrayElements");
-        errno = EFAULT;
-        rc = -1;
+        if(JNI_DBG)
+        {
+            fprintf(stderr, "buf_addr returned by "
+                "GetDirectBufferAddress is NULL\n");
+        }
+        ret = -1;
         goto done;
     }
-    rc = jni_read(fd, (void *) buffer, (size_t) count);
-    if(rc < 0)
+    ret = jni_read(fd, buf_addr, (size_t) count);
+    if(ret < 0)
     {
         if(JNI_DBG) perror("jni jni_read");
-        rc = -1;
+        ret = -1;
         goto done;
     }
-    if(rc > 0)
+    if(ret > 0)
     {
-        if(JNI_DBG) printf("\tread %lld bytes\n", (long long int) rc);
+        if(JNI_DBG)
+        {
+            printf("\tread %lld bytes\n", (long long int) ret);
+            printf("Bytes:\n");
+            int counter = 0;
+            for(; counter < ret; counter++)
+            {
+                printf("%c", ((char *)buf_addr)[counter]);
+            }
+            printf("End of Bytes...\n");
+        }
     }
 done:
-    /* copy back and free the buffer using 0 */
-    (*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
     JNI_FLUSH
-    return (jlong) rc;
+    return (jlong) ret;
 }
 
 JNIEXPORT jlong JNICALL

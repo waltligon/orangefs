@@ -17,14 +17,16 @@ public class Dirent64 {
     String d_type;
     String d_name;
 
-    /* This probably won't get called much since we're depending upon a 
-     * native method to initialize this object.
+    /*
+     * This probably won't get called much since we're depending upon a native
+     * method to initialize this object.
      */
     private Dirent64() {
 
     }
 
     /* Generic Object Dump to String */
+    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -35,18 +37,19 @@ public class Dirent64 {
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for(Field field : fields ) {
+        for (Field field : fields) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            } catch(IllegalAccessException ex) {
+            }
+            catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);
         }
         result.append("}");
         return result.toString();
-    }  
+    }
 }
