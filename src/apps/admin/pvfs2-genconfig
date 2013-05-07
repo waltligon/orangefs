@@ -47,6 +47,8 @@ my $opt_fsname = '';
 my $opt_default_num_dfiles = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
+my $opt_dist_name = '';
+my $opt_dist_params = '';
 
 # reserved handle ranges
 my $opt_res_io_ranges = undef;
@@ -449,6 +451,40 @@ sub emit_aliases
     print $target "</Aliases>\n";
 }
 
+sub emit_distribution
+{
+    my ($target, $dist_name, $dist_params) = @_;
+
+    if ($dist_name)
+    {
+        # create distribution section with parameters
+        print $target "\t<Distribution>\n";
+        print $target "\t\tName $dist_name\n";
+
+        # parse parameters
+        if ($dist_params)
+        {
+            # each param name/value pair separated by comma
+            my @params = split /,/, $dist_params;
+
+            foreach (@params)
+            {
+                # name/value separated by colon
+                # (note: colons may appear in param value)
+                my $ind = index $_, ":";
+                my $pname = substr $_, 0, $ind;
+                my $pvalue = substr $_, $ind+1;
+
+                # output parameter
+                print $target "\t\tParam $pname\n";
+                print $target "\t\tValue $pvalue\n";
+            }
+        }
+
+        print $target "\t</Distribution>\n";
+    }
+}
+
 sub emit_filesystem
 {
     my ($target, $name, $fs_id, 
@@ -586,6 +622,8 @@ sub emit_filesystem
     {
         print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
     }
+
+    emit_distribution($target, $opt_dist_name, $opt_dist_params);
 
     print $target "</Filesystem>\n";
 }
@@ -785,6 +823,11 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
                                        (defaults to number of I/O servers)
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
      --flow-buffer-count <NUM>         set flow buffers per flow
+     --dist-name <STRING>              datafile distribution type: 'simple_stripe' (default), 'basic_dist',
+                                       'varstrip_dist' or 'twod_stripe'
+     --dist-params <STRING>            datafile distribution parameters in form:
+                                          <param_name>:<param_value>[,<param_name>:<param_value>...]
+                                       see documentation for distribution information
      --trusted     <0|1>               indicate whether trusted connection options need to be emitted
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
@@ -1873,7 +1916,9 @@ GetOptions('protocol=s' => \$opt_protocol,
     'trovesync!'    => \$opt_trovesync,
     'trove-method=s' => \$opt_trovemethod,
     'iospec=s'      => \$opt_iospec,
-    'metaspec=s'    => \$opt_metaspec, 
+    'metaspec=s'    => \$opt_metaspec,
+    'dist-name=s'   => \$opt_dist_name,
+    'dist-params=s' => \$opt_dist_params,
     'spec-usage!'   => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
     'securitykey',  => \$opt_security_key,
