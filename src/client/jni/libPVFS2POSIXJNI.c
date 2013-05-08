@@ -50,7 +50,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     jobject obj
 )
 {
-    int num_fields = 55;
+    int num_fields = 56;
     jfieldID fids[num_fields];
     char *field_names[] = 
     {
@@ -113,7 +113,8 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "S_ISVTX",
         "SEEK_SET",
         "SEEK_CUR",
-        "SEEK_END"
+        "SEEK_END",
+        "O_TRUNC"
     };
 
     char *field_types[] = 
@@ -136,7 +137,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
         "J", "J", "J",
         "J", "J", "J",
         "J", "J", "J",
-        "J"
+        "J", "J"
     };
 
     char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNIFlags";
@@ -231,6 +232,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(
     SET_LONG_FIELD(env, inst, fids[52],SEEK_SET);
     SET_LONG_FIELD(env, inst, fids[53],SEEK_CUR);
     SET_LONG_FIELD(env, inst, fids[54],SEEK_END);
+    SET_LONG_FIELD(env, inst, fids[55],O_TRUNC);
         
     JNI_FLUSH
     return inst;
@@ -256,7 +258,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(
 )
 {
     PFI
-    int rc = 0;
+    int ret = 0;
 
     int cpath_len = (*env)->GetStringLength(env, path);
     char cpath[cpath_len + 1];
@@ -265,20 +267,20 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(
     if(((int) flags & O_CREAT) == O_CREAT)
     {
         if(JNI_DBG) printf("\tO_CREAT detected!\n");
-        rc = jni_open(cpath, (int) flags, (mode_t) mode);
+        ret = jni_open(cpath, (int) flags, (mode_t) mode);
     }
     else
     {
         if(JNI_DBG) printf("\tNo O_CREAT detected\n");
-        rc = jni_open(cpath, (int) flags);
+        ret = jni_open(cpath, (int) flags);
     }
-    if(rc < 0)
+    if(ret < 0)
     {
         if(JNI_DBG) perror("jni_open error");
-        rc = -1;
+        ret = -1;
     }
     JNI_FLUSH
-    return rc;
+    return ret;
 }
 
 /* jni_open64 06/08/2012 */
@@ -1402,43 +1404,53 @@ done:
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_orangefs_usrint_PVFS2POSIXJNI_write(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count)
+Java_org_orangefs_usrint_PVFS2POSIXJNI_write(JNIEnv *env, jobject obj, int fd, jobject buf, jlong count)
 {
     PFI
-    ssize_t rc = 0;
-    jboolean is_copy;
-    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    ssize_t ret = 0;
+    void * buf_addr = 0;
+
     if(JNI_DBG)
     {
-        printf("Write\n");
         printf("\tfd = %d\n", fd);
         printf("\tcount = %lu\n", (uint64_t) count);
-        is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") :
-            printf("\tbuf !is_copy\n");
     }
-    if(!buffer)
+
+    buf_addr = (*env)->GetDirectBufferAddress(env, buf);
+    if(!buf_addr)
     {
-        if(JNI_DBG) perror("GetByteArrayElements");
-        errno = EFAULT;
-        rc = -1;
+        if(JNI_DBG)
+        {
+            fprintf(stderr, "buf_addr returned by "
+                "GetDirectBufferAddress is NULL\n");
+        }
+        ret = -1;
         goto done;
     }
-    rc = jni_write(fd, (void *) buffer, (size_t) count);
-    if(rc < 0)
+    ret = jni_write(fd, buf_addr, (size_t) count);
+    if(ret < 0)
     {
         if(JNI_DBG) perror("jni jni_write");
+        ret = -1;
+        goto done;
     }
-    if(rc > 0)
+    if(ret > 0)
     {
-        if(JNI_DBG) printf("\twrote %lld bytes\n", (long long int) rc);
+        if(JNI_DBG)
+        {
+            printf("\twrote %lld bytes\n", (long long int) ret);
+            printf("Bytes:\n");
+            int counter = 0;
+            for(; counter < ret; counter++)
+            {
+                //printf("%c", ((char *)buf_addr)[counter]);
+            }
+            printf("End of Bytes...\n");
+        }
     }
 done:
-    /* free the buffer without copying back the possible changes in buffer
-     * using JNI_ABORT
-     */
-    (*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
     JNI_FLUSH
-    return (jlong) rc;
+    return (jlong) ret;
 }
 
 JNIEXPORT jlong JNICALL

@@ -3,15 +3,12 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.orangefs.usrint;
 
 import java.lang.reflect.Field;
 
 public class PVFS2STDIOJNI {
-
     public PVFS2STDIOJNIFlags f;
-
     static {
         String ldlpath = System.getenv("JNI_LIBRARY_PATH");
         // System.out.println("ldlpath=" + ldlpath);
@@ -183,13 +180,10 @@ public class PVFS2STDIOJNI {
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
-
         result.append(this.getClass().getName());
         result.append(" Object {");
         result.append(newLine);
-
         Field[] fields = this.getClass().getDeclaredFields();
-
         for (Field field : fields) {
             result.append("  ");
             try {

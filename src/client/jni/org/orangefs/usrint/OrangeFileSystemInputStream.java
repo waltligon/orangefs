@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.orangefs.usrint;
 
 import java.io.Closeable;
@@ -16,29 +15,22 @@ import org.apache.commons.logging.LogFactory;
 
 public class OrangeFileSystemInputStream extends InputStream implements
         Closeable {
-
     /* Interface Related Fields */
     private Orange orange;
     private PVFS2POSIXJNIFlags pf;
-
     /* File Related Fields */
     private OrangeFileSystemInputChannel inChannel;
     private String path;
     private long fileSize;
-
-    public static final Log OFSLOG = LogFactory
+    private static final Log OFSLOG = LogFactory
             .getLog(OrangeFileSystemInputStream.class);
 
     public OrangeFileSystemInputStream(String path, int bufferSize)
             throws IOException {
-
         int fd = -1;
-
         this.orange = Orange.getInstance();
         pf = orange.posix.f;
-
         this.path = path;
-
         /* Perform open */
         fd = orange.posix.open(path, pf.O_RDONLY, 0);
         if (fd < 0) {

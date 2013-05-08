@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.orangefs.usrint;
 
 import java.io.IOException;
@@ -15,16 +14,13 @@ import org.apache.commons.logging.LogFactory;
 
 /* Seekable OrangeFS channel for reading bytes. */
 public class OrangeFileSystemInputChannel implements ReadableByteChannel {
-
     /* Interface Related Fields */
     private Orange orange;
     private PVFS2POSIXJNIFlags pf;
-
     /* Channel Related Fields */
     private int fd;
     private int bufferSize;
     private ByteBuffer channelBuffer;
-
     /* OFSLOG for logging */
     public static final Log OFSLOG = LogFactory
             .getLog(OrangeFileSystemInputChannel.class);
@@ -60,7 +56,6 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
-
         int initialDstRemaining = dst.remaining();
         int dstRemaining = 0;
         int channelBufferRemaining = 0;
@@ -68,60 +63,43 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         int channelBufferPosition = 0;
         int finalDstRemaining = 0;
         int bytesRead = 0;
-
-        // Read bytes from channelBuffer into dst
+        /* Put bytes from channelBuffer into dst */
         while (dst.hasRemaining()) {
             dstRemaining = dst.remaining();
-            OFSLOG.debug("dst has remaining = " + dstRemaining);
-            // Read from OrangeFS if channelBuffer is empty
+            /* Read from OrangeFS if channelBuffer is empty */
             if (!channelBuffer.hasRemaining()) {
-                OFSLOG.debug("!channelBuffer.hasRemaining()");
-                // clear buffer then readOFS
+                /* clear buffer then readOFS */
                 channelBuffer.clear();
                 readOFS();
                 if (channelBuffer.position() == 0) {
-                    OFSLOG.debug("channelBuffer reached EOF");
                     channelBuffer.limit(0);
                     break;
                 }
                 channelBuffer.flip();
-                OFSLOG.debug("channelBuffer after flip() = "
-                        + channelBuffer.toString());
             }
-
             channelBufferRemaining = channelBuffer.remaining();
             channelBufferLimit = channelBuffer.limit();
             channelBufferPosition = channelBuffer.position();
-
             /*
-             * Potentially limit what can be copied out of the channelBuffer
-             * into the dst buffer
+             * Potentially limit put from channelBuffer into the dst buffer, put
+             * the data, then restore limit if necessary.
              */
             if (channelBufferRemaining > dstRemaining) {
-                OFSLOG.debug("setting limit on channelBuffer since it has more"
-                        + "remaining than dst");
-                // set a limit on the channelBuffer
                 channelBuffer.limit(channelBufferPosition + dstRemaining);
-            }
-
-            // Copy data from channelBuffer to dst
-            OFSLOG.debug("putting data from channelBuffer into dst");
-            OFSLOG.debug("dst = " + dst.toString());
-            OFSLOG.debug("channelBuffer = " + channelBuffer.toString());
-
-            dst.put(channelBuffer);
-            if (channelBufferRemaining > dstRemaining) {
-                // Restore the channelBuffer limit
+                dst.put(channelBuffer);
                 channelBuffer.limit(channelBufferLimit);
             }
+            else {
+                dst.put(channelBuffer);
+            }
         }
-
-        // Return the number of bytes read.
-        // Return -1 for EOF
+        /*
+         * Return the number of bytes read. Return -1 for EOF
+         */
         finalDstRemaining = dst.remaining();
         bytesRead = initialDstRemaining - finalDstRemaining;
         if (initialDstRemaining == 0 || bytesRead > 0) {
-            OFSLOG.debug("Channel read some bytes, returning to InputStream");
+            OFSLOG.debug("read: " + bytesRead);
             return bytesRead;
         }
         else {
@@ -132,18 +110,18 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
 
     /*
      * When this method is called, the position should equal 0, and the limit
-     * should equal the capacity, via clear()
+     * should equal the capacity, via clear().
      */
     private void readOFS() throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
-        // Attempt read of bufferSize bytes from OrangeFS into channelBuffer
+        /* Attempt read of bufferSize bytes from OrangeFS into channelBuffer. */
         long ret = orange.posix.read(fd, channelBuffer, bufferSize);
         if (ret < 0) {
             throw new IOException("orange.posix.read failed.");
         }
-        // Set the position to the number of bytes read
+        /* Set the position to the number of bytes read. */
         channelBuffer.position((int) ret);
     }
 
@@ -151,7 +129,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
-        // Reset the channelBuffer since we are seeking
+        /* Reset the channelBuffer since we are seeking */
         channelBuffer.position(0).limit(0);
         long ret = orange.posix.lseek(fd, pos, pf.SEEK_SET);
         if (ret < 0 || ret != pos) {

@@ -3,18 +3,15 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.orangefs.usrint;
 
 import java.lang.reflect.Field;
 
 public class PVFS2POSIXJNIFlags {
-
     /*
      * Fields set by JNI function fill_PVFS2POSIXJNIFlags. See posix_flags.c
      */
     public long O_WRONLY;
-
     public long O_RDONLY;
     public long PVFS_IO_READ;
     public long PVFS_IO_WRITE;
@@ -94,6 +91,7 @@ public class PVFS2POSIXJNIFlags {
     public long DN_RENAME;
     public long DN_ATTRIB;
     public long DN_MULTISHOT;
+
     /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
     private PVFS2POSIXJNIFlags() {
     }
@@ -102,13 +100,10 @@ public class PVFS2POSIXJNIFlags {
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
-
         result.append(this.getClass().getName());
         result.append(" Object {");
         result.append(newLine);
-
         Field[] fields = this.getClass().getDeclaredFields();
-
         for (Field field : fields) {
             result.append("  ");
             try {

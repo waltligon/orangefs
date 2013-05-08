@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.apache.hadoop.fs.ofs;
 
 import java.io.Closeable;
@@ -18,9 +17,7 @@ import org.orangefs.usrint.OrangeFileSystemInputStream;
 
 public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
         implements Closeable, Seekable, PositionedReadable {
-
     private FileSystem.Statistics statistics;
-
     public static final Log OFSLOG = LogFactory
             .getLog(OrangeFileSystemFSInputStream.class);
 
