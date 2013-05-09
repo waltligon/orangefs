@@ -2,7 +2,7 @@
 OrangeFS Release ChangeLog
 -----------------------
 
-Rev 10176
+Rev 10182
 
 * Reworked usrint initialization to support fork/exec effectively,
 * particularly for shells (like bash).  File descriptors were moved to
