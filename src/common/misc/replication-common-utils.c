@@ -21,6 +21,23 @@ const char *PINT_layout_str_mapping[] = {     \
     "PVFS_SYS_LAYOUT_LIST",        /* 4 */    \
 };
 
+/* This array must stay in sync with the replication_endpoint_states enum definition located
+ * in replication-common-utils.h. 
+ */
+const char *replication_endpoint_states_as_strings[]=
+{
+   "RUNNING",
+   "PENDING",
+   "FAILED INITIAL CONTACT",
+   "FAILED BMI POST RECV",
+   "FAILED BMI POST SEND",
+   "FAILED TROVE POST WRITE",
+   "FAILED BMI RECV",
+   "FAILED BMI SEND",
+   "FAILED TROVE WRITE",
+   "FLOW CANCELLED"
+};
+
 /* helper function to calculate the TOTAL size of the layout, so we can allocate
  * all of the space as one contiguous chunk.
  *   
@@ -160,32 +177,29 @@ void print_sys_layout_structure ( PVFS_sys_layout *layout_p )
 
 
 /* helper function to print the replication endpoint status structure */
-void replication_endpoint_status_print(void)
+void replication_endpoint_status_print(replication_endpoint_status *res_status
+                                      ,int res_status_count)
 {
-   const char *replication_endpoint_states_as_strings[]=
+
+   int i;
+
+   gossip_err("Replication Endpoint Status:\n");
+   for (i=0; i < res_status_count; i++)
    {
-      "RUNNING",
-      "PENDING",
-      "FAILED INITIAL CONTACT",
-      "FAILED_BMI_POST_RECV",
-      "FAILED_BMI_POST_SEND",
-      "FAILED_TROVE_POST_WRITE",
-      "FAILED_BMI_RECV",
-      "FAILED_BMI_SEND",
-      "FAILED_TROVE_WRITE",
-      "FLOW_CANCELLED"
-   };
-
-   replication_endpoint_state res_state;
-
-
-   for (res_state=0; res_state < NUMBER_OF_STATES; res_state++)
-   {
-       gossip_lerr("Replication Endpoint States: %s\n",replication_endpoint_states_as_strings[RUNNING]);
+       gossip_err("\t\t(%i):state=%s \terror-code=%d\n",i
+                                                     ,replication_endpoint_states_as_strings[res_status->state]
+                                                     ,res_status->error_code);
    }
 
    return;
 };
+
+/* helper function to return the string value of a replication state */
+const char *get_replication_endpoint_state_as_string(replication_endpoint_state res)
+{
+    return (replication_endpoint_states_as_strings[res]);
+}
+
 
 
 /*

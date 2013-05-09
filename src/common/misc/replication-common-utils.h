@@ -38,8 +38,6 @@ void print_replication_structure(replication_s *replication_p);
 /* helper function to print PVFS_sys_layout structure */
 void print_sys_layout_structure ( PVFS_sys_layout *layout_p );
 
-/* helper function to print the replication endpoint status information */
-void replication_endpoint_status_print(void);
 
 
 /* structures used by replication to determine status between server and client */
@@ -67,6 +65,13 @@ struct replication_endpoint_status
 };
 
 typedef struct replication_endpoint_status replication_endpoint_status;
+
+
+/* helper function to print the replication endpoint status information */
+void replication_endpoint_status_print(replication_endpoint_status *, int);
+
+/* helper funtion to retrieve the string value of a replication state */
+const char *get_replication_endpoint_state_as_string(replication_endpoint_state);
 
 
 #endif /* __REPLICATION_COMMON_UTILS_H */

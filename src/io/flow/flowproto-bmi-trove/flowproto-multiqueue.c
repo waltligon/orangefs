@@ -32,18 +32,18 @@
 
 #define MAX_REGIONS 64
 
-#define FLOW_CLEANUP_CANCEL_PATH(__flow_data, __cancel_path)          \
-do {                                                                  \
-    struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
-    gossip_lerr("function(FLOW_CLEANUP_CANCEL_PATH):flow(%p)\n"       \
-               ,__flow_d);                                            \
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",\
-                 __flow_d);                                           \
-    cleanup_buffers(__flow_data);                                     \
-    __flow_d = (__flow_data)->parent;                                 \
-    free(__flow_data);                                                \
-    __flow_d->release(__flow_d);                                      \
-    __flow_d->callback(__flow_d, __cancel_path);                      \
+#define FLOW_CLEANUP_CANCEL_PATH(__flow_data, __cancel_path)               \
+do {                                                                       \
+    struct flow_descriptor *__flow_d = (__flow_data)->parent;              \
+    gossip_lerr("function(FLOW_CLEANUP_CANCEL_PATH):flow(%p):cancel(%d)\n" \
+               ,__flow_d,__cancel_path);                                   \
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",     \
+                 __flow_d);                                                \
+    cleanup_buffers(__flow_data);                                          \
+    __flow_d = (__flow_data)->parent;                                      \
+    free(__flow_data);                                                     \
+    __flow_d->release(__flow_d);                                           \
+    __flow_d->callback(__flow_d, __cancel_path);                           \
 } while(0)
 
 #define FLOW_CLEANUP(___flow_data) FLOW_CLEANUP_CANCEL_PATH(___flow_data, 0)
@@ -655,13 +655,24 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
               flow_data->prealloc_array[i].replicas[j].parent = flow_d;
               flow_data->prealloc_array[i].replicas[j].replica_parent = &(flow_data->prealloc_array[i]);
               flow_data->prealloc_array[i].replicas[j].res = &(flow_d->res[j]);
+              gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->res[%d]:(%p)\n"
+                        ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&flow_d->res[j]);
            }
+
+           flow_data->prealloc_array[i].res = &(flow_d->res[flow_d->res_count - 1]);
+           gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->res[%d]:(%p)\n"
+                     ,__func__,i,flow_data->prealloc_array[i].res,flow_d->res_count - 1,&(flow_d->res[flow_d->res_count - 1]));
+           gossip_err("%s:flow_data->prealloc_array[%d].res->state:(%s) error_code:(%d)\n"
+                     ,__func__
+                     ,i
+                     ,get_replication_endpoint_state_as_string(flow_data->prealloc_array[i].res->state)
+                     ,flow_data->prealloc_array[i].res->error_code);
         }/*end if*/
         flow_data->prealloc_array[i].parent = flow_d;
         flow_data->prealloc_array[i].bmi_callback.data = 
             &(flow_data->prealloc_array[i]);
-        flow_data->prealloc_array[i].res = &(flow_d->res[flow_d->res_count - 1]);
     }
+
 
     /* remaining setup depends on the endpoints we intend to use */
     if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
@@ -2720,6 +2731,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     }
 
     result_entry->posted_id = 0;
+    q_item->result_chain_count--;
 
 
     gossip_lerr("flow(%p):q_item(%p):%s:result_chain_count(%d)\n",flow_d,q_item,__func__,q_item->result_chain_count);
@@ -2783,6 +2795,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
                                                                 ,q_item,__func__
                                                                 ,q_item->buffer_in_use);
 
+        q_item->res->state=FAILED_TROVE_WRITE;
+
         /* Determine if the flow is complete */
         if (forwarding_is_flow_complete(flow_data))
         {
@@ -2830,7 +2844,7 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
     
     /* If there are no more recvs, check for completion
        else if there are recvs to go, start one if possible */
-    if (PINT_REQUEST_DONE(flow_data->parent->file_req_state))
+    if (PINT_REQUEST_DONE(flow_d->file_req_state))
     {
        gossip_lerr("flow(%p):PINT_REQUEST_DONE is true.\n",flow_d);
        gossip_lerr("flow(%p):sends_pending(%d):recvs_pending(%d):writes_pending(%d)\n"
@@ -2838,7 +2852,7 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
                   ,flow_data->sends_pending
                   ,flow_data->recvs_pending
                   ,flow_data->writes_pending);
-        /* If all data operations are complete */
+        /* If all replicate operations are complete */
         if (0 == flow_data->sends_pending &&
             0 == flow_data->recvs_pending &&
             0 == flow_data->writes_pending)
@@ -3323,8 +3337,8 @@ static void server_trove_write_callback_fn(void *user_ptr,
 
         /* Debug output */
         gossip_lerr(
-            "SERVER WRITE FINISHED: flow(%p):q_item(%p):%s  Total: %lld TotalAmtWritten: %lld AmtWritten: %lld PendingWrites: %d "
-            "PendingRecvs: %d RequestDone: %s\n",
+            "SERVER WRITE FINISHED: flow(%p):q_item(%p):%s  Total: %lld TotalAmtWritten: %lld "
+            "AmtWritten: %lld PendingWrites: %d PendingRecvs: %d RequestDone: %s\n",
             flow_d,q_item,__func__,
             (long long int)flow_data->total_bytes_req,
             (long long int)flow_data->total_bytes_written,
@@ -3345,7 +3359,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
             0 == flow_data->recvs_pending &&
             0 == flow_data->writes_pending)
         {
-            gossip_lerr("flow(%p):q_item(%p):%s:Next Write flow finished\n",flow_d,q_item,__func__);
+            gossip_lerr("flow(%p):q_item(%p):%s:Server Write flow finished\n",flow_d,q_item,__func__);
             assert(flow_data->total_bytes_recvd ==
                    flow_data->total_bytes_written);
             assert(flow_d->state != FLOW_COMPLETE);

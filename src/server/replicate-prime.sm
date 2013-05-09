@@ -255,6 +255,15 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->res       = s_op->u.io.res;
     s_op->u.io.flow_d->res_count = s_op->u.io.res_count;
 
+    gossip_lerr("%s:s_op->u.io.flow_d->res(%p) s_op->u.io.res(%p)\n"
+               ,__func__,s_op->u.io.flow_d->res,s_op->u.io.res);
+    for (i=0; i<s_op->u.io.flow_d->res_count; i++)
+    {
+        gossip_err("&s_op->u.io.flow_d->res[%d]:(%p) &s_op->u.io.res[%d]:(%p)\n"
+        ,i,&s_op->u.io.flow_d->res[i],i,&s_op->u.io.res[i]);
+    }
+
+
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
      * request
@@ -343,6 +352,11 @@ static PINT_sm_action io_start_flow(
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
+
+    gossip_err("%s\n",__func__);
+    //replication_endpoint_status_print(s_op->u.io.res,s_op->u.io.res_count);
+    replication_endpoint_status_print(s_op->u.io.flow_d->res,s_op->u.io.flow_d->res_count);
+
 
     gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, PRIMARY_FLOW, js_p, &tmp_id
@@ -800,6 +814,9 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
 
     gossip_lerr("js_p->error_code(%d):js_p->status_user_tag(%d)\n",(int)js_p->error_code
                                                                   ,(int)js_p->status_user_tag);
+
+    gossip_err("Replicate-Prime.sm:%s:\n",__func__);
+    replication_endpoint_status_print(s_op->u.io.res,s_op->u.io.res_count);
 
     /* Did we encounter an error before flows could be started? */
     if (js_p->status_user_tag == NOT_IN_USE)
