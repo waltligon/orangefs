@@ -20,6 +20,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/x509.h>
 
 /* leave pvfs2-config.h first */
 #include "pvfs2-config.h"
@@ -43,6 +44,9 @@
 #include "pint-cert.h"
 #include "cert-util.h"
 #include "pint-ldap-map.h"
+#ifdef ENABLE_CERTCACHE
+#include "certcache.h"
+#endif
 #endif
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
@@ -54,7 +58,7 @@ static int security_init_status = 0;
 EVP_PKEY *security_pubkey;
 
 /* CA cert */
-X509 *ca_cert;
+X509 *ca_cert = NULL;
 #endif
 /* private key used for signing */
 EVP_PKEY *security_privkey = NULL;
@@ -208,7 +212,7 @@ int PINT_security_initialize(void)
     ret = PINT_ldap_initialize();
     PINT_SECURITY_CHECK(ret, init_error);
 
-#endif
+#endif /* ENABLE_SECURITY_CERT */
 
     goto init_exit;
 
@@ -277,6 +281,38 @@ int PINT_security_finalize(void)
     
     return 0;
 }
+
+#ifdef ENABLE_CERTCACHE
+/* PINT_security_cache_ca_cert
+ * 
+ * Caches CA cert--corresponds to root user.
+ * Primarily used when creating a new file system. 
+ */
+int PINT_security_cache_ca_cert(void)
+{
+    PVFS_certificate *pcert;
+    PVFS_gid group_array[] = {0};
+    int ret;
+
+    if (ca_cert == NULL)
+    {
+        return -PVFS_ESECURITY;
+    }
+
+    /* convert X509 CA cert to internal format */
+    if (PINT_X509_to_cert(ca_cert, &pcert) != 0)
+    {        
+        return -PVFS_ESECURITY;
+    }
+
+    /* insert cert into cache as root user */
+    ret = PINT_certcache_insert_entry(pcert, 0, 1, group_array);
+
+    PINT_cleanup_cert(pcert);
+
+    return ret;
+}
+#endif /* ENABLE_CERTCACHE */
 
 /*  PINT_init_capability
  *

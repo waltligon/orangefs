@@ -32,7 +32,8 @@
 extern X509_STORE *trust_store;
 #endif
 
-#ifdef ENABLE_SECURITY_CERT
+#if defined(ENABLE_SECURITY_CERT) && !defined(ENABLE_CERTCACHE)
+
 /* return true if credential holds CA cert */
 static int check_ca_cert(PVFS_credential *cred)
 {
@@ -54,7 +55,7 @@ static int check_ca_cert(PVFS_credential *cred)
         return ret;
     }
 
-    /* create a X509_STORE_CTX from the trust store */
+    /* create a X509_STORE_CTX for the trust store */
     ctx = X509_STORE_CTX_new();
     if (ctx == NULL)
     {
@@ -106,32 +107,10 @@ int PINT_map_credential(PVFS_credential *cred,
         return -PVFS_EINVAL;
     }
 
-    /* TODO: pre-cache CA cert as root */
-
 #ifdef ENABLE_SECURITY_CERT
-    /* if provided certificate is the CA certificate, map to root user 
-     * this is used primarily when creating a new file system 
-     * note that the credential must have been signed by the CA private key
-     */
-    ret = check_ca_cert(cred);
-    if (ret > 0)
-    {
-        *uid = 0;
-        *num_groups = 1;
-        group_array[0] = 0;
-
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Mapped credential to root\n");
-
-        return 0;
-    }
-    else if (ret < 0)
-    {
-        /* report error and continue */
-        PINT_security_error(__func__, ret);
-    }
 
 #ifdef ENABLE_CERTCACHE
-    /* check certificate cache */
+    /* check certificate cache -- note: CA cert is cached as root */
     entry = PINT_certcache_lookup_entry(&cred->certificate);
     if (entry != NULL)
     {
@@ -159,18 +138,39 @@ int PINT_map_credential(PVFS_credential *cred,
             }
         }
     }
-#else
+#else /* ENABLE_CERTCACHE */
+    /* if provided certificate is the CA certificate, map to root user 
+     * this is used primarily when creating a new file system 
+     * note that the credential must have been signed by the CA private key
+     */
+    ret = check_ca_cert(cred);
+    if (ret > 0)
+    {
+        *uid = 0;
+        *num_groups = 1;
+        group_array[0] = 0;
+
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Mapped credential to root\n");
+
+        return 0;
+    }
+    else if (ret < 0)
+    {
+        /* report error and continue */
+        PINT_security_error(__func__, ret);
+    }
+
     /* backend for cert mapping is LDAP */
     ret = PINT_ldap_map_credential(cred, uid, num_groups, group_array);
-#endif  /* ENABLE_CERT_CACHE */
+#endif  /* ENABLE_CERTCACHE */
 
-#else
+#else /* ENABLE_SECURITY_CERT */
     /* return info in credential */
     *uid = cred->userid;
     *num_groups = cred->num_groups;
     memcpy(group_array, cred->group_array, 
            cred->num_groups * sizeof(PVFS_gid));
-#endif
+#endif /* ENABLE_SECURITY_CERT */
 
     /* return -PVFS_EINVAL if no groups */
     if (ret == 0 && num_groups == 0)

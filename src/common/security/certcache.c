@@ -460,7 +460,7 @@ struct certcache_entry_s * PINT_certcache_lookup_entry(PVFS_certificate * cert)
 
 /** PINT_certcache_insert_entry
  * Inserts 'cert' into the certificate cache.
- * Returns 0 on succes; otherwise returns -PVFS_error.
+ * Returns 0 on success; otherwise returns -PVFS_error.
  */
 int PINT_certcache_insert_entry(const PVFS_certificate * cert, 
                                 PVFS_uid uid,
