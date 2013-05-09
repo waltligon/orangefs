@@ -18,6 +18,9 @@
 /** struct of pointers to methods for posix system calls */
 typedef struct posix_ops_s
 {   
+    /* this is not posix but is useful for debugging */
+    int (*snprintf)(char *str, int size, const char *format, ...);
+    /* begin posix system calls */
     int (*open)(const char *path, int flags, ...);
     int (*open64)(const char *path, int flags, ...);
     int (*openat)(int dirfd, const char *path, int flags, ...);
@@ -215,6 +218,7 @@ typedef struct pvfs_descriptor_s
     int fd;                   /**< file number in PVFS descriptor_table */
     int true_fd;              /**< the true file number depending on FS */
     int fdflags;              /**< POSIX file descriptor flags */
+    int shared_status;        /**< descriptor status is shared with parent */
     pvfs_descriptor_status *s;
 } pvfs_descriptor;
 

@@ -2,6 +2,26 @@
 OrangeFS Release ChangeLog
 -----------------------
 
+Rev 10176
+
+* Reworked usrint initialization to support fork/exec effectively,
+* particularly for shells (like bash).  File descriptors were moved to
+* a Posix shared memory object so that they can be passed from parent
+* to child in a fork and from one program to the next in an exec.  Fork
+* creates a new shm object and copies the parent's into it.  Exec takes
+* over the previous program's object but must modify internal pointers.
+* program loading OFS usrint for the first time creates and initializes
+* a new object.  File descriptor status structs can be shared from
+* parent to child on a fork.  Shared synchronization is used to manage
+* access to these objects.  Management of free space in the shared
+* objects is done in unshared user space memory using fairly simple
+* free lists.
+*
+* Added features to gen_locks to initialize recursive and shared mutexes
+* and shared conds for use in the new usrint features.
+
+Rev 10075
+
 * Added support for glob in usrint
 *
 * Fixed several bugs that involved using an uncleared buffer that becomes

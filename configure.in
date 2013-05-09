@@ -880,6 +880,11 @@ AC_SUBST(BUILD_USRINT)],
     [Should we build user interface libraries.])
 BUILD_USRINT=1
 AC_SUBST(BUILDUSRINT)])
+
+if test "x$BUILD_USRINT" = "x1"; then
+	dnl check if -lrt is required by usrint
+	AX_CHECK_LIB_NEEDS_LIBRT
+fi
  
 USRINT_KMOUNT=
 dnl Method to enable user interface kmod support
@@ -987,6 +992,22 @@ fi],
 [AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 1,
       [Should we have malloc zero freed memory.])
 ])
+
+dnl Check for O_CLOEXEC flag in open()
+AC_MSG_CHECKING([for O_CLOEXEC flag in open()])
+AC_TRY_COMPILE(
+    [
+     	#include <fcntl.h>
+    ], 
+    [
+    	int flags;
+        flags = O_CLOEXEC;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_O_CLOEXEC, 1, Define if open() has O_CLOEXEC flag)
+    ,
+    AC_MSG_RESULT(no)
+)
 
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
@@ -1537,15 +1558,42 @@ fi
 ],
 )
 
+dnl Do we have strerror_r?
+AC_MSG_CHECKING([for strerror_r])
+AC_TRY_COMPILE(
+    [
+	  #include <string.h>
+    ],
+    [
+      int errnum, buflen;
+      char *buf;
+      strerror_r(errnum, buf, buflen);
+    ],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_STRERROR_R, 1, Define if have strerror_r)
+      AC_DEFINE(HAVE_DECL_STRERROR_R, 1, Define if have strerror_r)
+    ]
+    ,
+    AC_MSG_RESULT(no)
+)
+
 dnl Which form of strerror?
 AC_MSG_CHECKING([for GNU-style strerror_r])
 AC_TRY_COMPILE(
     [
-	#include <string.h>
-	extern char *strerror_r();
-    ], [],
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
+	  #include <string.h>
+    ],
+    [
+      int errnum, buflen;
+      char *buf, *ret;
+      ret = strerror_r(errnum, buf, buflen);
+    ],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
+      AC_DEFINE(STRERROR_R_CHAR_P, 1, Define if strerror_r return char ptr)
+    ]
     ,
     AC_MSG_RESULT(no)
 )

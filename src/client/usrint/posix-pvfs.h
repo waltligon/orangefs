@@ -108,6 +108,15 @@ extern int pvfs_lstat64(const char *path, struct stat64 *buf);
 
 extern int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask);
 
+#ifdef __USE_GLIBC__
+extern int pvfs_utimensat(int dirfd,
+                          const char *path,
+                          const struct timespec times[2],
+                          int flags);
+
+extern int pvfs_futimens(int fd, const struct timespec times[2]);
+#endif
+
 extern int pvfs_futimesat(int dirfd, const char *path, const struct timeval times[2]);
 
 extern int pvfs_utimes(const char *path, const struct timeval times[2]);

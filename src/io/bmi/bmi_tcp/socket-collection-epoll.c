@@ -149,6 +149,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     if(ret < 0)
     {
+        perror("error returned from epoll_wait ");
 	return(-old_errno);
     }
 

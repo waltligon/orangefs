@@ -24,3 +24,26 @@ AC_TRY_LINK(
 		LIBS=$oldlibs
 	])
 ])
+
+AC_DEFUN([AX_CHECK_LIB_NEEDS_LIBRT],
+[
+
+AC_MSG_CHECKING([if user library needs -lrt])
+AC_TRY_LINK(
+	[#include <sys/mman.h>],
+	[shm_open("foo", 0, 0);],
+	[AC_MSG_RESULT(no)],
+	[
+		oldlibs=$LIBS
+		LIBS="$LIBS -lrt"
+		AC_TRY_LINK(
+	        [#include <sys/mman.h>],
+	        [shm_open("foo", 0, 0);],
+			[LIB_NEEDS_LIBRT=1
+			 AC_SUBST(LIB_NEEDS_LIBRT)
+			 AC_MSG_RESULT(yes)],
+			[AC_MSG_ERROR(failed attempting to link shm_open)])
+		LIBS=$oldlibs
+	])
+])
+

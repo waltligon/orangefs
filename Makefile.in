@@ -95,6 +95,7 @@ BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
 ENABLE_SECURITY = @ENABLE_SECURITY@
 NEEDS_LIBRT = @NEEDS_LIBRT@
+LIB_NEEDS_LIBRT = @LIB_NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
@@ -200,11 +201,24 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 @LIBS@ 
-LIBS_THREADED += -lpvfs2-threaded @LIBS@
+# Libraries - rt libs tend to depend on other libs so they go first
+LIBS += -lpvfs2
+ifdef LIB_NEEDS_LIBRT 
+	LIBS += -lrt
+endif
+LIBS += @LIBS@ @THREAD_LIB@
+LIBS_THREADED += -lpvfs2-threaded
+ifdef LIB_NEEDS_LIBRT 
+	LIBS_THREADED += -lrt
+endif
+LIBS_THREADED += @LIBS@ @THREAD_LIB@ 
 # need to include external dependency libs when building shared libraries
-DEPLIBS := @LIBS@
+ifdef LIB_NEEDS_LIBRT 
+	DEPLIBS += -lrt
+endif
+DEPLIBS += @LIBS@ @THREAD_LIB@
 ULIBDEPLIBS := -lpvfs2
+# Misc defines
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -355,9 +369,11 @@ SERVERLIBS += -lpthread
 # run ./configure --help for information on how to do this cleanly.
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
-LIBS += @THREAD_LIB@
-DEPLIBS += @THREAD_LIB@
-LIBS_THREADED += @THREAD_LIB@
+
+# Moved up to where libs are set
+# LIBS += @THREAD_LIB@
+# DEPLIBS += @THREAD_LIB@
+# LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
 # build BMI TCP?

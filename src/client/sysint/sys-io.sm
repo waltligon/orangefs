@@ -475,6 +475,19 @@ static PINT_sm_action io_inspect_attr(
         return SM_ACTION_COMPLETE;
     }
 
+    /* first make sure this is an appropriate object */
+    if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
+    {
+        js_p->error_code = -PVFS_EISDIR;
+        return(SM_ACTION_COMPLETE);
+    }
+    if (sm_p->getattr.attr.objtype != PVFS_TYPE_METAFILE ||
+        sm_p->getattr.attr.u.meta.dist == NULL)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return(SM_ACTION_COMPLETE);
+    }
+
     /* determine if we need to unstuff or not to service this request */
     js_p->error_code = unstuff_needed(
         sm_p->u.io.mem_req,

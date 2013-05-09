@@ -26,9 +26,7 @@ struct glibc_malloc_ops_s
     void  (*free)(void *mem);
 };
 
-extern struct glibc_malloc_ops_s glibc_malloc_ops;
-
-extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(1001);
+extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
 extern void *PINT_malloc(size_t size);
 extern void *PINT_calloc(size_t nmemb, size_t size);
@@ -169,6 +167,18 @@ extern void  PINT_free(void *mem);
 #endif
 #define PINT_free free
 
+#endif
+
+#if !PVFS_MALLOC_ZERO || !PVFS_MALLOC_REDEF
+#define ZEROMEM(p,s) memset((p), 0, (s))
+#else
+#define ZEROMEM(p,s) 
+#endif
+
+#if !PVFS_MALLOC_FREE_ZERO || !PVFS_MALLOC_REDEF
+#define ZEROFREE(p,s) memset((p), 0, (s))
+#else
+#define ZEROFREE(p,s) 
 #endif
 
 #endif

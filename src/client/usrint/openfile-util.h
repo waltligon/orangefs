@@ -24,11 +24,15 @@
 
 int pvfs_ucache_enabled(void);
 
-extern int pvfs_sys_init(void) GCC_CONSTRUCTOR(1003); 
+extern int pvfs_sys_init(void);
 
 extern void pvfs_debug(char *fmt, ...); 
 
 extern void load_glibc(void); 
+
+extern char *pvfs_dpath_insert(const char *p);
+
+extern void pvfs_dpath_remove(char *p);
 
 extern int pvfs_lookup_dir(const char *directory,
                            PVFS_object_ref *ref,
@@ -54,6 +58,12 @@ extern int pvfs_free_descriptor(int fd);
 extern int pvfs_descriptor_table_size(void);
 
 extern int pvfs_descriptor_table_next(int start);
+
+extern int pvfs_put_cwd(char *buf, int size);
+
+extern int pvfs_len_cwd(void);
+
+extern int pvfs_get_cwd(char *buf, int size);
 
 extern int pvfs_create_file(const char *filename,
                             mode_t mode,

@@ -143,36 +143,72 @@ void clean_free(void *ptr)
 
 /* These routines call glibc version unless we don't have a pointer to
  * one in which case it calls the default version which we hope is
- * glibc.  We don't want our own macros define in pint-malloc.h here so
+ * glibc.  We don't want our own macros defined in pint-malloc.h here so
  * these are after the undefs.
  */
 
-struct glibc_malloc_ops_s glibc_malloc_ops = {
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL
+static struct glibc_malloc_ops_s glibc_malloc_ops = {
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
 static inline void *my_glibc_malloc(size_t size)
 {
     if (glibc_malloc_ops.malloc)
+    {
         return glibc_malloc_ops.malloc(size);
+    }
     else
-        return malloc(size);
+    {
+        init_glibc_malloc();
+        if (glibc_malloc_ops.malloc)
+        {
+            return glibc_malloc_ops.malloc(size);
+        }
+        else
+        {
+            return malloc(size);
+        }
+    }
 }
 
 static inline void *my_glibc_realloc(void *mem, size_t size)
 {
     if (glibc_malloc_ops.realloc)
+    {
         return glibc_malloc_ops.realloc(mem, size);
+    }
     else
-        return realloc(mem, size);
+    {
+        init_glibc_malloc();
+        if (glibc_malloc_ops.realloc)
+        {
+            return glibc_malloc_ops.realloc(mem, size);
+        }
+        else
+        {
+            return realloc(mem, size);
+        }
+    }
 }
 
 static inline void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
+    {
         return glibc_malloc_ops.free(mem);
+    }
     else
-        return free(mem);
+    {
+        init_glibc_malloc();
+        if (glibc_malloc_ops.free)
+        {
+            return glibc_malloc_ops.free(mem);
+        }
+        else
+        {
+            return free(mem);
+        }
+    }
 }
 
 static inline int my_glibc_posix_memalign(void **mem,
@@ -180,9 +216,21 @@ static inline int my_glibc_posix_memalign(void **mem,
                                           size_t size)
 {
     if (glibc_malloc_ops.posix_memalign)
+    {
         return glibc_malloc_ops.posix_memalign(mem, alignment, size);
+    }
     else
-        return posix_memalign(mem, alignment, size);
+    {
+        init_glibc_malloc();
+        if (glibc_malloc_ops.posix_memalign)
+        {
+            return glibc_malloc_ops.posix_memalign(mem, alignment, size);
+        }
+        else
+        {
+            return posix_memalign(mem, alignment, size);
+        }
+    }
 }
 
 typedef struct extra_s
@@ -496,7 +544,7 @@ void init_glibc_malloc(void)
     glibc_malloc_ops.strdup = dlsym(libc_handle, "strdup");
     glibc_malloc_ops.strndup = dlsym(libc_handle, "strndup");
     glibc_malloc_ops.free = dlsym(libc_handle, "free");
-    if (libc_handle != RTLD_NEXT)
+    if (libc_handle != RTLD_DEFAULT) /* was NEXT but I think that was wrong */
     {
         dlclose(libc_handle);
     }

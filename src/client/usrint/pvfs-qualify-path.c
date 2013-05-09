@@ -25,6 +25,9 @@
  * will fail lookup later and we will have to run
  * pvfs_expand_path to work out the symbolic links.
  *
+ * Sets PATH_QUALIFIED to indicate a successful run of this routine
+ * Clears all other flags.
+ *
  * code taken from realpath
  *
  * NOTE:  if you modify this function (after 08/08/2012), 

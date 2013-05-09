@@ -10,14 +10,10 @@
  *  PVFS2 user interface routines
  */
 
+#include "pvfs2-config.h"
+
 #ifndef USRINT_H
 #define USRINT_H 1
-
-#if __GNUC__
-# define PVFS_INIT(x) x()
-#else
-# define PVFS_INIT(x)
-#endif /* GNUC */
 
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE 1
@@ -104,8 +100,21 @@
 
 #endif /* USRINT SOURCE */
 
-/* locking - should activate glibc pthreads locks - if not already on */
 #if 0
+#ifdef _IO_MTSAFE_IO
+#pragma message "MTSAFE is defined"
+#else
+#pragma message "MTSAFE is NOT defined"
+#endif
+#endif
+
+/* locking - should activate glibc pthreads locks - if not already on */
+/* need a config option here to turn off thread safety - otherwise
+ * assume it should be on.  This only controls locking on stdio layer.
+ * Presumably much of it could be turned off for efficiency sake - maybe
+ * a runtime option rather than library build time option.
+ */
+#if 1
 
 # ifdef _IO_MTSAFE_IO
 #  undef _IO_MTSAFE_IO
@@ -113,16 +122,10 @@
 
 # define _IO_MTSAFE_IO 1
 
-# ifdef __GLIBC__
-#  undef __GLIBC__
-# endif
-
-# define __GLIBC__ 2   
-
 #endif /* 1 */
 
 #include "pvfs2-internal.h"
-#include <gossip.h>
+#include "gossip.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -282,6 +285,9 @@ extern int fremovexattr(int fd, const char *name);
 /* size of stdio default buffer - starting at 1Meg */
 #define PVFS_BUFSIZE (1024*1024)
 #define PVFS_NOFILE_MAX (1024)
+#define PATH_TABLE_SIZE (1024*1024)
+#define SHMFD 101
+#define PARENTFD 100
 
 /* extra function prototypes */
 
@@ -358,7 +364,7 @@ extern int dup3(int oldfd, int newfd, int flags);
 #endif
 
 #ifndef PVFS_STDIO_REDEFSTREAM
-# define PVFS_STDIO_REDEFSTREAM 0
+# define PVFS_STDIO_REDEFSTREAM 1
 #endif
 
 /* FD sets */

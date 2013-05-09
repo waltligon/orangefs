@@ -24,7 +24,8 @@
          PVFS_ATTR_SYS_DIRENT_COUNT)
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
-static char pvfs_cwd[PVFS_PATH_MAX];
+/* static char pvfs_cwd[PVFS_PATH_MAX];
+ */
 
 /* actual implementation of read and write are in these static funcs */
 
@@ -39,10 +40,12 @@ static ssize_t pvfs_rdwrv(int fd,
                           size_t count,
                           int which);
 
+#if 0
 static int my_glibc_getcwd(char *buf, unsigned long size)
 {
     return syscall(SYS_getcwd, buf, size);
 }
+#endif
 
 /**
  *  pvfs_open
@@ -299,7 +302,14 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_unlinkat: called with %s\n", path);
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
-        rc = iocommon_unlink(path, NULL);
+        if (flags & AT_REMOVEDIR)
+        {
+            rc = iocommon_rmdir(path, NULL);
+        }
+        else
+        {
+            rc = iocommon_unlink(path, NULL);
+        }
     }
     else
     {
@@ -721,7 +731,7 @@ int pvfs_truncate64(const char *path, off64_t length)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.truncate(newpath, length);
+        rc = glibc_ops.ftruncate(pd->true_fd, length);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -813,11 +823,12 @@ int pvfs_close(int fd)
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
-        errno = EBADF;
-        return PVFS_FD_FAILURE;
+        /* make sure this fd is really closed - errno set in here */
+        rc = pvfs_free_descriptor(fd);
+        return rc;
     }
     /* This was supposed to be a PVFS file
-     * but it isn't - we didn't write to it
+     * if it isn't - we didn't write to it
      * so don't try to sync it
      */
     if (!(pd->s->fsops == &glibc_ops))
@@ -876,7 +887,7 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.stat(newpath, buf);
+        rc = glibc_ops.fstat(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -918,7 +929,7 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.stat64(newpath, buf);
+        rc = glibc_ops.fstat64(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1023,9 +1034,17 @@ int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
-        if (!pd2)
+        if (!pd2 || (pd2->s->fsops == &glibc_ops))
         {
-            return -1;
+            if (!pd2)
+            {
+                /* this is an error on open */
+                return -1;
+            }
+            /* else this was symlink pointing from PVFS to non PVFS */
+            rc = glibc_ops.fstat(pd2->true_fd, buf);
+            pvfs_close(pd2->fd);
+            return rc;
         }
         rc = iocommon_stat(pd2, buf, PVFS_ATTR_DEFAULT_MASK);
         pvfs_close(pd2->fd);
@@ -1072,9 +1091,17 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
-        if (!pd2)
+        if (!pd2 || (pd2->s->fsops == &glibc_ops))
         {
-            return -1;
+            if (!pd2)
+            {
+                /* this is an error on open */
+                return -1;
+            }
+            /* else this was symlink pointing from PVFS to non PVFS */
+            rc = glibc_ops.fstat64(pd2->true_fd, buf);
+            pvfs_close(pd2->fd);
+            return rc;
         }
         rc = iocommon_stat64(pd2, buf, PVFS_ATTR_DEFAULT_MASK);
         pvfs_close(pd2->fd);
@@ -1114,7 +1141,7 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.lstat(newpath, buf);
+        rc = glibc_ops.fstat(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1156,7 +1183,7 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.lstat64(newpath, buf);
+        rc = glibc_ops.fstat64(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1171,6 +1198,49 @@ errorout:
     }
     return rc;
 }
+
+#ifdef __USE_GLIBC__
+/**
+ * pvfs_utimesat
+ *
+ * Currently PVFS does not use nanosecond times or even microseconds times
+ * so just drop the sub-seconds
+ *
+ * TODO - need to add support for nofollow flag and special time values.
+ */
+int pvfs_utimensat(int dirfd,
+                   const char *path,
+                   const struct timespec times[2],
+                   int flags)
+{
+    struct timeval times2[2];
+
+    times2[0].tv_sec = times[0].tv_sec;
+    times2[0].tv_usec = 0;
+    times2[1].tv_sec = times[1].tv_sec;
+    times2[1].tv_usec = 0;
+
+    return pvfs_futimesat(dirfd, path, times2);
+}
+
+/**
+ * pvfs_futimens
+ *
+ * Currently PVFS does not use nanosecond times so just convert to the
+ * old microsecond times
+ */
+int pvfs_futimens(int fd, const struct timespec times[2])
+{
+    struct timeval times2[2];
+
+    times2[0].tv_sec = times[0].tv_sec;
+    times2[0].tv_usec = 0;
+    times2[1].tv_sec = times[1].tv_sec;
+    times2[1].tv_usec = 0;
+
+    return pvfs_futimes(fd, times2);
+}
+#endif
 
 /**
  * pvfs_futimesat
@@ -1210,9 +1280,17 @@ int pvfs_futimesat(int dirfd,
         errno = EINVAL;
         pd2 = pd; /* allow null path to work */
     }
-    if (!pd2)
+    if (!pd2 || (pd2->s->fsops == &glibc_ops))
     {
-        return -1;
+        if (!pd2)
+        {
+            /* this is an error on open */
+            return -1;
+        }
+        /* else this was symlink pointing from PVFS to non PVFS */
+        rc = glibc_ops.futimes(pd->true_fd, times);
+        pvfs_close(pd->fd);
+        return rc;
     }
     memset(&attr, 0, sizeof(attr));
     if (!times)
@@ -1341,7 +1419,7 @@ int pvfs_chown(const char *path, uid_t owner, gid_t group)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.chown(newpath, owner, group);
+        rc = glibc_ops.fchown(pd->true_fd, owner, group);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1417,9 +1495,17 @@ int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
-        if (!pd)
+        if (!pd2 || (pd2->s->fsops == &glibc_ops))
         {
-            return -1;
+            if (!pd2)
+            {
+                /* this is an error on open */
+                return -1;
+            }
+            /* else this was symlink pointing from PVFS to non PVFS */
+            rc = glibc_ops.fchown(pd2->true_fd, owner, group);
+            pvfs_close(pd2->fd);
+            return rc;
         }
         rc = iocommon_chown(pd2, owner, group);
         pvfs_close(pd2->fd);
@@ -1452,7 +1538,7 @@ int pvfs_lchown(const char *path, uid_t owner, gid_t group)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.lchown(newpath, owner, group);
+        rc = glibc_ops.fchown(pd->true_fd, owner, group);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1493,7 +1579,7 @@ int pvfs_chmod(const char *path, mode_t mode)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.chmod(newpath, mode);
+        rc = glibc_ops.fchmod(pd->true_fd, mode);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -1558,6 +1644,18 @@ int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
+        if (!pd2 || (pd2->s->fsops == &glibc_ops))
+        {
+            if (!pd2)
+            {
+                /* this is an error on open */
+                return -1;
+            }
+            /* else this was symlink pointing from PVFS to non PVFS */
+            rc = glibc_ops.fchmod(pd2->true_fd, mode);
+            pvfs_close(pd2->fd);
+            return rc;
+        }
         if (!pd2)
         {
             return -1;
@@ -1906,7 +2004,6 @@ int pvfs_fcntl(int fd, int cmd, ...)
 {
     int rc = 0;
     va_list ap;
-    /* long arg; */
     struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
     long larg;
@@ -1925,31 +2022,6 @@ int pvfs_fcntl(int fd, int cmd, ...)
     case F_DUPFD :
         larg = va_arg(ap, long);
         rc = pvfs_dup_descriptor(fd, larg, 0, 1);
-#if 0
-/* moved this functionality into pvfs_dup_descriptor */
-        tsz = pvfs_descriptor_table_size();
-        if (larg < 0 || larg > tsz)
-        {
-            errno = EINVAL;
-            rc = -1;
-            break;
-        }
-        while (rc <= 0)
-        {
-            larg = pvfs_descriptor_table_next(larg);
-            if (larg > 0 && larg < tsz)
-            {
-                rc = pvfs_dup2(fd, larg);
-            }
-            else
-            {
-                /* apparently could not find a free descriptor */
-                errno = EMFILE;
-                rc = -1;
-                break;
-            }
-        }
-#endif
         break;
     case F_GETFD :
         rc = pd->fdflags;
@@ -2091,7 +2163,7 @@ int pvfs_statfs(const char *path, struct statfs *buf)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.statfs(newpath, buf);
+        rc = glibc_ops.fstatfs(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -2129,7 +2201,7 @@ int pvfs_statfs64(const char *path, struct statfs64 *buf)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.statfs64(newpath, buf);
+        rc = glibc_ops.fstatfs64(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -2206,7 +2278,7 @@ int pvfs_statvfs(const char *path, struct statvfs *buf)
             goto errorout;
         }
         /* else this was symlink pointing from PVFS to non PVFS */
-        rc = glibc_ops.statvfs(newpath, buf);
+        rc = glibc_ops.fstatvfs(pd->true_fd, buf);
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
@@ -2217,15 +2289,15 @@ int pvfs_statvfs(const char *path, struct statvfs *buf)
         goto errorout;
     }
     buf->f_bsize = buf2.f_bsize;
-    /* buf->f_rsize */
+    buf->f_frsize = 1024;
     buf->f_blocks = buf2.f_blocks;
     buf->f_bfree = buf2.f_bfree;
     buf->f_bavail = buf2.f_bavail;
     buf->f_files = buf2.f_files;
     buf->f_ffree = buf2.f_ffree;
-    /* buf->f_favail */
+    buf->f_favail = buf2.f_ffree;
     buf->f_fsid = (unsigned long)buf2.f_fsid.__val[0];
-    /* buf->f_flag */
+    buf->f_flag = 0;
     buf->f_namemax = buf2.f_namelen;
 
 errorout:
@@ -2551,6 +2623,7 @@ int pvfs_fremovexattr(int fd,
  * working directory given than the kernel may not
  * be aware of PVFS virtual mounts
  */
+#if 0
 int pvfs_cwd_init(int expand)
 {
     int rc = 0;
@@ -2585,7 +2658,7 @@ int pvfs_cwd_init(int expand)
     {
         /* shells might not resolve symlinks */
         /* but PVFS must be up for this to work */
-        rv = PVFS_expand_path(buf,0);
+        rv = PVFS_expand_path(buf, 0);
     }
     else
     {
@@ -2606,6 +2679,7 @@ int pvfs_cwd_init(int expand)
     PVFS_free_expanded(rv);
     return rc;
 }
+#endif
 
 /**
  * pvfs chdir
@@ -2652,8 +2726,10 @@ int pvfs_chdir(const char *path)
         goto errout;
     }
     /* we will keep a copy and keep one in the environment */
-    strncpy(pvfs_cwd, newpath, PVFS_PATH_MAX);
-    setenv("PWD", newpath, 1);
+    pvfs_put_cwd(newpath, PVFS_PATH_MAX);
+    /* strncpy(pvfs_cwd, newpath, PVFS_PATH_MAX);
+     * setenv("PWD", newpath, 1);
+     */
 
 errout:
     if (newpath != path)
@@ -2687,16 +2763,20 @@ int pvfs_fchdir(int fd)
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "\tpvfs_fchdir: changes CWD to %s\n", pd->s->dpath);
     /* we will keep a copy and keep one in the environment */
-    memset(pvfs_cwd, 0, sizeof(pvfs_cwd));
-    strncpy(pvfs_cwd, pd->s->dpath, plen + 1);
-    setenv("PWD", pd->s->dpath, 1);
+    /* memset(pvfs_cwd, 0, sizeof(pvfs_cwd)); */
+    pvfs_put_cwd(pd->s->dpath, plen + 1);
+    /* strncpy(pvfs_cwd, pd->s->dpath, plen + 1);
+     * setenv("PWD", pd->s->dpath, 1);
+     */
     return 0;
 }
 
 char *pvfs_getcwd(char *buf, size_t size)
 {
     int plen;
-    plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+    plen = pvfs_len_cwd();
+    /* plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+     */
     /* implement Linux variation */
     if (!buf)
     {
@@ -2706,8 +2786,8 @@ char *pvfs_getcwd(char *buf, size_t size)
             errno = ERANGE;
             return NULL;
         }
-        /* malloc space */
-        buf = (char *)malloc(bsize);
+        /* malloc space - this is freed by the user */
+        buf = (char *)clean_malloc(bsize);
         if (!buf)
         {
             errno = ENOMEM;
@@ -2729,7 +2809,9 @@ char *pvfs_getcwd(char *buf, size_t size)
         }
         memset(buf, 0, size);
     }
-    strncpy(buf, pvfs_cwd, plen + 1);
+    pvfs_get_cwd(buf, plen + 1);
+    /* strncpy(buf, pvfs_cwd, plen + 1);
+     */
     return buf;
 }
 
@@ -2737,14 +2819,19 @@ char *pvfs_get_current_dir_name(void)
 {
     int plen;
     char *buf;
-    plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
-    buf = (char *)malloc(plen + 1);
+    plen = pvfs_len_cwd();
+    /* plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+     */
+    /* user frees this memory */
+    buf = (char *)clean_malloc(plen + 1);
     if (!buf)
     {
         errno = ENOMEM;
         return NULL;
     }
-    strcpy(buf, pvfs_cwd);
+    pvfs_get_cwd(buf, plen + 1);
+    /* strcpy(buf, pvfs_cwd);
+     */
     return buf;
 }
 /*
@@ -2758,7 +2845,9 @@ char *pvfs_getwd(char *buf)
         errno = EINVAL;
         return NULL;
     }
-    strncpy(buf, pvfs_cwd, PVFS_PATH_MAX);
+    pvfs_get_cwd(buf, PVFS_PATH_MAX);
+    /* strncpy(buf, pvfs_cwd, PVFS_PATH_MAX);
+     */
     return buf;
 }
 
