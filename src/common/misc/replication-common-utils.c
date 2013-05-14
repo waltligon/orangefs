@@ -186,9 +186,10 @@ void replication_endpoint_status_print(replication_endpoint_status *res_status
    gossip_err("Replication Endpoint Status:\n");
    for (i=0; i < res_status_count; i++)
    {
-       gossip_err("\t\t(%i):state=%s \terror-code=%d\n",i
-                                                     ,replication_endpoint_states_as_strings[res_status->state]
-                                                     ,res_status->error_code);
+       gossip_err("\t\t(%i):state=%s \t\t\terror-code=%d\n"
+                 ,i
+                 ,get_replication_endpoint_state_as_string(res_status[i].state)
+                 ,res_status[i].error_code);
    }
 
    return;

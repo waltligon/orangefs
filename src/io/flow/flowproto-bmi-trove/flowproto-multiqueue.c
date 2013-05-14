@@ -2707,127 +2707,133 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
-    /* Handle trove errors */
+    error_code = -PVFS_ENOMEM;
+
     gen_mutex_lock(&flow_d->flow_mutex);
+
+    /* we are cancelling the entire flow */
     if (flow_d->error_code != 0 )
     {
-       qlist_del(&q_item->list_link);
-       q_item->res->state      = FLOW_CANCELLED;
-       q_item->res->error_code = flow_d->error_code;
-
-    /* the entire flow is being cancelled.  So, we call 
-     * handle_forwarding_io_error() so that pending-cancels is decremented.  If pending-cancels
-     * becomes zero, then we are done and cleanup can occur (which is done in the error routine).
-     */
        handle_forwarding_io_error(error_code, q_item, flow_data);
        gen_mutex_unlock(&flow_d->flow_mutex);
        return;
     }
 
-    if (error_code != 0)
-    {
-       q_item->res->state      = FAILED_TROVE_WRITE;
-       q_item->res->error_code = error_code;
-    }
-
     result_entry->posted_id = 0;
     q_item->result_chain_count--;
-
-
     gossip_lerr("flow(%p):q_item(%p):%s:result_chain_count(%d)\n",flow_d,q_item,__func__,q_item->result_chain_count);
 
-    /* If all results for this qitem are available continue */
-    if (0 == q_item->result_chain_count)
+    /* A zero chain count signifies the last time trove-write callback will execute for this flow buffer. */
+    if (q_item->result_chain_count == 0)
     {
-        struct result_chain_entry* result_iter = &q_item->result_chain;
-
-        /* Aggregate results. don't need to aggregate results if bad error code */
-        while (0 != result_iter && q_item->res->error_code == 0)
-        {
-            struct result_chain_entry* re = result_iter;
-            gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tq_item->out_size(%d)\n"
-                       ,flow_d
-                       ,q_item,__func__
-                       ,(int)flow_data->total_bytes_written
-                       ,(int)q_item->out_size);
-            flow_data->total_bytes_written += result_iter->result.bytes;
-            flow_d->total_transferred += result_iter->result.bytes;
-            PINT_perf_count(PINT_server_pc, 
-                            PINT_PERF_WRITE,
-                            result_iter->result.bytes, 
-                            PINT_PERF_ADD);
-            result_iter = result_iter->next;
-
-            /* Free memory if this is not the chain head */
-            if (re != &q_item->result_chain)
-                free(re);
-        }
-    
-        /* Cleanup q_item memory */
-        q_item->result_chain.next = NULL;
-        q_item->result_chain_count = 0;
-
-
-        /* Remove completed trove operation from the dest-list */
         qlist_del(&q_item->list_link);
-
-        /* Decrement writes-pending */
         flow_data->writes_pending--;
-
-        /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
-         *       and forwarding_trove_write_callback_fn.  Currently, this variable is protected by the flow_mutex.
-         */
         q_item->buffer_in_use--;
+    }
 
-        /* Debug output */
-        gossip_lerr(
-         "FORWARDING-TROVE-WRITE-FINISHED: flow(%p):q_item(%p):%s:Total: %lld TotalAmtWritten: %lld "
-         "AmtWritten: %lld PendingWrites: %d "
-         "Throttled: %d\n",
-            flow_d,q_item,__func__,
-            (long long int)flow_data->total_bytes_req,
-            (long long int)flow_data->total_bytes_written,
-            (long long int)q_item->out_size,
-            flow_data->writes_pending,
-            flow_data->primary_recvs_throttled);
-
-        gossip_lerr("flow(%p):q_item(%p):%s:buffer_in_use(%d)\n",flow_d
-                                                                ,q_item,__func__
-                                                                ,q_item->buffer_in_use);
-
-        q_item->res->state=FAILED_TROVE_WRITE;
-
-        /* Determine if the flow is complete */
-        if (forwarding_is_flow_complete(flow_data))
-        {
-            gossip_lerr("flow(%p):%s: Write flow finished\n",flow_d,__func__);
-            assert(flow_data->total_bytes_recvd ==
-                   flow_data->total_bytes_written);
-            assert(flow_d->state != FLOW_COMPLETE);
-            FLOW_CLEANUP(flow_data);
-            flow_d->state = FLOW_COMPLETE;
-            gen_mutex_unlock(&flow_d->flow_mutex);
-            return;
-        }
-
-
-        /* If the request needs more flow buffers, then re-use this q_item */
-        if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
-        {
-            /* Post another recv operation */
-            gossip_lerr("flow(%p):q_item(%p):%s:Starting recv. buffer_in_use(%d)\n"
-                       ,flow_d,q_item,__func__,q_item->buffer_in_use);
-            flow_data->primary_recvs_throttled -= 1;
-            gen_mutex_unlock(&flow_d->flow_mutex);
-            flow_bmi_recv(q_item,
-                          forwarding_bmi_recv_callback_fn);
-        }
-        else
-        {
-            gen_mutex_unlock(&flow_d->flow_mutex);
-        }
-    }/*end if write has completed*/  
+    /* this error is for this particular result chain; there could be multiples. */
+    if (error_code != 0)
+    {
+       if (q_item->res->error_code != 0 )
+       {
+          q_item->res->state      = FAILED_TROVE_WRITE;
+          q_item->res->error_code = error_code;
+       }
+    }/*end if error code is not zero*/
+    else
+    {
+       /* If all results for this qitem are available continue */
+       if (0 == q_item->result_chain_count )
+       {
+           struct result_chain_entry* result_iter = &q_item->result_chain;
   
+           /* Aggregate results. don't need to aggregate results if bad error code */
+           while (0 != result_iter && q_item->res->error_code == 0)
+           {
+               struct result_chain_entry* re = result_iter;
+               gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tq_item->out_size(%d)\n"
+                          ,flow_d
+                          ,q_item,__func__
+                          ,(int)flow_data->total_bytes_written
+                          ,(int)q_item->out_size);
+               flow_data->total_bytes_written += result_iter->result.bytes;
+               flow_d->total_transferred += result_iter->result.bytes;
+               PINT_perf_count(PINT_server_pc, 
+                               PINT_PERF_WRITE,
+                               result_iter->result.bytes, 
+                               PINT_PERF_ADD);
+               result_iter = result_iter->next;
+
+               /* Free memory if this is not the chain head */
+               if (re != &q_item->result_chain)
+                   free(re);
+           }
+    
+           /* Cleanup q_item memory */
+           q_item->result_chain.next = NULL;
+           q_item->result_chain_count = 0;
+
+       }/*end if write has completed*/  
+       else
+       {
+           gen_mutex_unlock(&flow_d->flow_mutex);
+           return;
+       } /* return if write has NOT completed */
+
+    }/*end if error code is zero */
+
+    /* Debug output */
+    gossip_lerr(
+     "FORWARDING-TROVE-WRITE-FINISHED: flow(%p):q_item(%p):%s:Total: %lld TotalAmtWritten: %lld "
+     "AmtWritten: %lld PendingWrites: %d "
+     "Throttled: %d\n",
+        flow_d,q_item,__func__,
+        (long long int)flow_data->total_bytes_req,
+        (long long int)flow_data->total_bytes_written,
+        (long long int)q_item->out_size,
+        flow_data->writes_pending,
+        flow_data->primary_recvs_throttled);
+
+    gossip_lerr("flow(%p):q_item(%p):%s:buffer_in_use(%d)\n",flow_d
+                                                            ,q_item,__func__
+                                                            ,q_item->buffer_in_use);
+
+
+    /* Determine if the flow is complete, regardless of error_code */
+    if (forwarding_is_flow_complete(flow_data))
+    {
+         gossip_lerr("flow(%p):%s: Write finished\n",flow_d,__func__);
+         assert(flow_data->total_bytes_recvd ==
+                flow_data->total_bytes_written);
+         assert(flow_d->state != FLOW_COMPLETE);
+         FLOW_CLEANUP(flow_data);
+         flow_d->state = FLOW_COMPLETE;
+         gen_mutex_unlock(&flow_d->flow_mutex);
+         return;
+     }
+
+
+     /* If the request needs more flow buffers, then re-use this q_item, 
+      * IFF error_code is zero, which means we want to contiue writing buffers
+      * for this flow. 
+      */
+     if (q_item->buffer_in_use == 0 && 
+                    error_code == 0 &&
+         !PINT_REQUEST_DONE(flow_d->file_req_state))
+     {
+         /* Post another recv operation */
+         gossip_lerr("flow(%p):q_item(%p):%s:Starting recv. buffer_in_use(%d)\n"
+                    ,flow_d,q_item,__func__,q_item->buffer_in_use);
+         gen_mutex_unlock(&flow_d->flow_mutex);
+         flow_bmi_recv(q_item,
+                       forwarding_bmi_recv_callback_fn);
+     }
+     else
+     {
+         gen_mutex_unlock(&flow_d->flow_mutex);
+     }
+  
+    return;
 }/*end forwarding_trove_write_callback_fn*/
 
 
@@ -2923,18 +2929,17 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
      *      handle_forwarding_io_error()
      *      return;
      */ 
+    gen_mutex_lock(&flow_d->flow_mutex);
+
     if (flow_d->error_code != 0)
     {
-        gen_mutex_lock(&flow_d->flow_mutex);
-        flow_data->recvs_pending--;
-        q_item->buffer_in_use--;
-        gen_mutex_unlock(&flow_d->flow_mutex);
         gossip_lerr("ERROR occured on recv: error_code(%d), flow_d->error_code(%d)\n", error_code
                                                                                      , flow_d->error_code);
         /* if we can't receive data from the client, then we must cancel the
          * entire flow, allowing the client to restart the flow.
          */
         handle_forwarding_io_error(error_code, q_item, flow_data);
+        gen_mutex_unlock(&flow_d->flow_mutex);
         return;
     }
 
@@ -2945,13 +2950,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     {
         replica_count++;
     }
-
-    gen_mutex_lock(&flow_d->flow_mutex);
-
-    /* for each flow_d->res[]
-     *    if (flow_d->res[].endpoint_type == BMI_ENDPOINT && flow_d->res[].state == RUNNING)
-     *        replica_count++;
-     */
 
     /* Increment the buffer_in_use count by the number of replicas still RUNNING */
     q_item->buffer_in_use += replica_count;
@@ -2966,10 +2964,22 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
      * return from the post, which may possibly execute the callback for this send.  We want the callback to know that we have a 
      * write pending and thus the flow buffer is still in use and therefore the flow is not finished.  
      */
-    /* if (!(flow_d->replication_status && REPLICATION_TROVE_FAILURE)) 
-     *    THEN writes_pending++;
-     */
-     flow_data->writes_pending += 1;
+     if ( q_item->res->state == RUNNING )
+     {
+        flow_data->writes_pending += 1;
+
+        /* Remove from src_list and add to dest_list */
+        qlist_del(&q_item->list_link);
+        qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
+
+        /* Reset the posted_id for the trove call */
+        q_item->posted_id = 0;
+     }
+     else
+     {
+        q_item->buffer_in_use--;
+        qlist_del(&q_item->list_link);
+     }
 
     /* bytes received from the client */
     flow_data->total_bytes_recvd += actual_size;
@@ -2986,22 +2996,8 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
                  flow_data->recvs_pending,
                  flow_data->sends_pending,
                  flow_data->primary_recvs_throttled);
-    if (q_item->buffer)
-    {
-           char *tmp;
-           tmp = calloc(51,sizeof(char)); 
-           gossip_err("First 50 bytes of received buffer:\n(%s)\n",strncpy(tmp,(char *)q_item->buffer,50));
-           free(tmp);
-    }
-
-    /* Remove from src_list and add to dest_list */
-    qlist_del(&q_item->list_link);
-    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
     gen_mutex_unlock(&flow_d->flow_mutex);
-
-    /* Reset the posted_id for the trove call. */
-    q_item->posted_id= 0;
 
     /* Send data to replica servers */
     for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
@@ -3010,7 +3006,6 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
 
         replica_q_item = &q_item->replicas[i];
-        //memset(replica_q_item,0,sizeof(*replica_q_item));
         INIT_QLIST_HEAD(&replica_q_item->list_link);
         replica_q_item->parent = flow_d;
         replica_q_item->replica_parent = q_item;
@@ -3065,18 +3060,20 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
            gossip_lerr("flow(%p):replica(%p):q_item(%p):%s:Error while sending to replica server:(%d)..\n"
                       ,flow_d,replica_q_item,q_item,__func__,ret);
            PVFS_perror("Error Code:",ret);
+
+           gen_mutex_lock(&flow_d->flow_mutex);
            /* change this to handle_io_error ? For now, stop the entire flow*/
-           handle_io_error(ret, replica_q_item, flow_data);
+           handle_forwarding_io_error(ret, replica_q_item, flow_data);
+           gen_mutex_unlock(&flow_d->flow_mutex);
            return;
         }
     }/*end for*/
 
-    /* Issue write to trove */
-    /* if (!(flow_d->replication_status & REPLICATION_TROVE_FAILURE))
-     *    THEN post the write.
-     */
-    flow_trove_write(q_item, actual_size,
-                     forwarding_trove_write_callback_fn);
+    if (q_item->res->state == RUNNING)
+    {
+       flow_trove_write(q_item, actual_size,
+                        forwarding_trove_write_callback_fn);
+    }
    return; 
 }/*end forwarding_bmi_recv_callback_fn*/
 
