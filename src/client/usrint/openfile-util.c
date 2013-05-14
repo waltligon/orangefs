@@ -796,6 +796,7 @@ static int init_usrint_internal(void)
     int errno_in = 0;
     struct stat sbuf;
     index_rec_t *ixseg = NULL;
+    int rc = 0;
 
     /* The recursive mutex */
     static gen_mutex_t rec_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP; 
@@ -904,7 +905,6 @@ static int init_usrint_internal(void)
     }
     else
     {
-        int rc;
         int flags;
         struct stat sbuf;
         int plen;
