@@ -94,7 +94,7 @@
 # endif
 
 # ifdef __USE_FORTIFY_LEVEL
-#  undef __FORTIFY_LEVEL
+#  undef __USE_FORTIFY_LEVEL
 #  define __USE_FORTIFY_LEVEL 0
 # endif
 

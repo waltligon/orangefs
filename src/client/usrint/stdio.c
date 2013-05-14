@@ -2991,8 +2991,7 @@ static void cleanup_stdio_internal(void)
 static void init_stdio_internal(void)
 {
     static int recurse_flag = 0;
-    static gen_mutex_t initlock =
-                       (gen_mutex_t) GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+    static gen_mutex_t initlock = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
     /* don't let more than one thread initialize */
     gen_mutex_lock(&initlock);
     if (init_flag || recurse_flag)
