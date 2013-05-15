@@ -56,6 +56,7 @@ int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
 int slot_timeout_secs = PVFS2_DEFAULT_SLOT_TIMEOUT_SECS;
 uint32_t DEBUG_LINE = 50;
 char debug_help_string[DEBUG_HELP_STRING_SIZE] = {0};
+int fake_mmap_shared = 0;
 
 
 MODULE_LICENSE("GPL");
@@ -65,6 +66,7 @@ MODULE_PARM_DESC(debug, "debugging level (see pvfs2-debug.h for values)");
 MODULE_PARM_DESC(op_timeout_secs, "Operation timeout in seconds");
 MODULE_PARM_DESC(slot_timeout_secs, "Slot timeout in seconds");
 MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
+MODULE_PARM_DESC(fake_mmap_shared, "perform mmap with MAP_SHARED flag as if called with MAP_PRIVATE");
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*
@@ -77,6 +79,7 @@ MODULE_PARM(hash_table_size, "i");
 MODULE_PARM(module_parm_debug_mask, "i");
 MODULE_PARM(op_timeout_secs, "i");
 MODULE_PARM(slot_timeout_secs, "i");
+MODULE_PARM(fake_mmap_shared, "i");
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
@@ -104,6 +107,7 @@ module_param(hash_table_size, int, 0);
 module_param(module_parm_debug_mask, uint, 0);
 module_param(op_timeout_secs, int, 0);
 module_param(slot_timeout_secs, int, 0);
+module_param(fake_mmap_shared, int, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 

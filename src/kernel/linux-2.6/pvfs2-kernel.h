@@ -996,6 +996,7 @@ extern struct semaphore request_semaphore;
 extern int debug;
 extern int op_timeout_secs;
 extern int slot_timeout_secs;
+extern int fake_mmap_shared; 
 extern struct list_head pvfs2_superblocks;
 extern spinlock_t pvfs2_superblocks_lock;
 extern struct list_head pvfs2_request_list;

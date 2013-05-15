@@ -3199,7 +3199,17 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     /* we don't support mmap writes, or SHARED mmaps at all */
     if ((vma->vm_flags & VM_SHARED) || (vma->vm_flags & VM_MAYSHARE))
     {
-        return -EINVAL;
+        /* see if the fake_mmap_shared kmod option was set */
+        if (fake_mmap_shared) 
+        {
+            /* force vm sharing flags to be OFF */
+            vma->vm_flags &= ~VM_SHARED;    
+            vma->vm_flags &= ~VM_MAYSHARE;    
+        }
+        else
+        {
+            return -EINVAL;
+        }
     }
 
     /*
