@@ -3034,7 +3034,9 @@ static void init_stdio_internal(void)
     stdio_ops.puts = dlsym(RTLD_NEXT, "puts" );
     stdio_ops.putw = dlsym(RTLD_NEXT, "putw" );
     stdio_ops.fgets = dlsym(RTLD_NEXT, "fgets" );
+    stdio_ops.fgets_unlocked = dlsym(RTLD_NEXT, "fgets_unlocked" );
     stdio_ops.fgetc = dlsym(RTLD_NEXT, "fgetc" );
+    stdio_ops.fgetc_unlocked = dlsym(RTLD_NEXT, "fgetc_unlocked" );
     stdio_ops.getc = dlsym(RTLD_NEXT, "getc" );
     stdio_ops.getc_unlocked = dlsym(RTLD_NEXT, "getc_unlocked" );
     stdio_ops.getchar = dlsym(RTLD_NEXT, "getchar" );
