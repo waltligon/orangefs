@@ -162,7 +162,7 @@ int pvfs_msync(void *start, size_t length, int flags)
     if (mapl->mflags & MAP_SHARED)
     {
         /* the diff between start and mst is distance from */
-        /* start of buffer, and distnace from original offset */
+        /* start of buffer, and distance from original offset */
         rc = pvfs_pwrite(mapl->mfd, start, length,
                           mapl->moff + ((u_char *)start - (u_char *)mapl->mst));
     }

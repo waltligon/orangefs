@@ -94,6 +94,9 @@ struct stdio_ops_s
                       struct dirent64 ***namelist,
                       int(*filter)(const struct dirent64 *),
                       int(*compar)(const void *, const void *));
+    void (*flockfile)(FILE *stream);
+    int (*ftrylockfile)(FILE *stream);
+    void (*funlockfile)(FILE *stream);
 };
 
 #endif

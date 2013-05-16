@@ -15,6 +15,7 @@
 #include "usrint.h"
 #include "openfile-util.h"
 #include "stdio-ops.h"
+#include "locks.h"
 
 /* fdopendir not present until glibc2.5 */
 #if __GLIBC_PREREQ (2,5)
@@ -72,9 +73,7 @@ struct __dirstream {
 #define MAXTRIES 16 /* arbitrary - how many tries to get a unique file name */
 
 #if PVFS_STDIO_REDEFSTREAM
-#ifdef _IO_MTSAFE_IO
-static _IO_lock_t pvfs_stdin_lock = _IO_lock_initializer;
-#endif
+static _PVFS_lock_t pvfs_stdin_lock = _PVFS_lock_initializer;
 static char pvfs_stdin_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stdin_stream =
 {
@@ -100,9 +99,7 @@ static FILE pvfs_stdin_stream =
 #endif
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
-#ifdef _IO_MTSAFE_IO
-    , ._lock = &pvfs_stdin_lock
-#endif
+    , ._lock = (void *)&pvfs_stdin_lock
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
     , ._offset = 0
     , ._mode = 0
@@ -110,9 +107,7 @@ static FILE pvfs_stdin_stream =
 };
 FILE *stdin = &pvfs_stdin_stream;
 
-#ifdef _IO_MTSAFE_IO
-static _IO_lock_t pvfs_stdout_lock = _IO_lock_initializer;
-#endif
+static _PVFS_lock_t pvfs_stdout_lock = _PVFS_lock_initializer;
 static char pvfs_stdout_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stdout_stream =
 {
@@ -139,9 +134,7 @@ static FILE pvfs_stdout_stream =
 #endif
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
-#ifdef _IO_MTSAFE_IO
-    , ._lock = &pvfs_stdout_lock
-#endif
+    , ._lock = (void *)&pvfs_stdout_lock
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
     , ._offset = 0
     , ._mode = 0
@@ -149,9 +142,7 @@ static FILE pvfs_stdout_stream =
 };
 FILE *stdout = &pvfs_stdout_stream;
 
-#ifdef _IO_MTSAFE_IO
-static _IO_lock_t pvfs_stderr_lock = _IO_lock_initializer;
-#endif
+static _PVFS_lock_t pvfs_stderr_lock = _PVFS_lock_initializer;
 static char pvfs_stderr_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stderr_stream =
 {
@@ -178,9 +169,7 @@ static FILE pvfs_stderr_stream =
 #endif
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
-#ifdef _IO_MTSAFE_IO
-    , ._lock = &pvfs_stderr_lock
-#endif
+    , ._lock = (void *)&pvfs_stderr_lock
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
     , ._offset = 0
     , ._mode = 0
@@ -212,65 +201,55 @@ static inline void init_stdio(void)
 
 static inline void lock_init_stream(FILE *stream)
 {
-#ifdef _IO_MTSAFE_IO
     if (!stream->_lock)
     {
-        stream->_lock = (_IO_lock_t *)malloc(sizeof(_IO_lock_t));
-        ZEROMEM(stream->_lock, sizeof(_IO_lock_t));
+        stream->_lock = (_PVFS_lock_t *)malloc(sizeof(_PVFS_lock_t));
+        ZEROMEM(stream->_lock, sizeof(_PVFS_lock_t));
     }
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
-        _IO_lock_init(*(stream->_lock));
+        _PVFS_lock_init(stream);
     }
-#endif
 }
 
 static inline void lock_stream(FILE *stream)
 {
-#ifdef _IO_MTSAFE_IO
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
-        _IO_lock_lock(*(stream->_lock));
+        _PVFS_lock_lock(stream);
     }
-#endif
 }
 
 static inline int trylock_stream(FILE *stream)
 {
-#ifdef _IO_MTSAFE_IO
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
-        return _IO_lock_trylock(*(stream->_lock));
+        return _PVFS_lock_trylock(stream);
     }
-#endif
     return 0;
 }
 
 static inline void unlock_stream(FILE *stream)
 {
-#ifdef _IO_MTSAFE_IO
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
-        _IO_lock_unlock(*(stream->_lock));
+        _PVFS_lock_unlock(stream);
     }
-#endif
 }
 
 static inline void lock_fini_stream(FILE *stream)
 {
-#ifdef _IO_MTSAFE_IO
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
-        _IO_lock_fini(*(stream->_lock));
+        _PVFS_lock_fini(stream);
         if (stream != &pvfs_stdin_stream &&
             stream != &pvfs_stdout_stream &&
             stream != &pvfs_stderr_stream)
         {
-            ZEROFREE(stream->_lock, sizeof(_IO_lock_t));
+            ZEROFREE(stream->_lock, sizeof(_PVFS_lock_t));
             free(stream->_lock);
         }
     }
-#endif
 }
 
 /** POSIX interface for user level locking of streams *.
@@ -3079,6 +3058,9 @@ static void init_stdio_internal(void)
     stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
     stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
     stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
+    stdio_ops.flockfile  = dlsym(RTLD_NEXT, "flockfile" );
+    stdio_ops.ftrylockfile  = dlsym(RTLD_NEXT, "ftrylockfile" );
+    stdio_ops.funlockfile  = dlsym(RTLD_NEXT, "funlockfile" );
     
     /* can't do this here - we need to run before the pvfs2 init so that
      * debug prints can be made there if needed, but this init is

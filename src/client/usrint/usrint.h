@@ -31,11 +31,24 @@
 # define _LARGEFILE64_SOURCE 1
 #endif
 
+#ifndef _REENTRANT
+# define _REENTRANT 1
+#endif
+
+#ifndef _THREAD_SAFE
+# define _THREAD_SAFE 1
+#endif
+
 /*
  * This seems to control redirect of 32-bit IO to 64-bit IO
  * We want to avoid this in our source
  */
 #ifdef USRINT_SOURCE
+
+#ifdef _FORTIFY_SOURCE
+# undef _FORTIFY_SOURCE
+# define _FORTIFY_SOURCE 0
+#endif
 
 # ifdef _FILE_OFFSET_BITS
 #  undef _FILE_OFFSET_BITS 
@@ -114,7 +127,7 @@
  * Presumably much of it could be turned off for efficiency sake - maybe
  * a runtime option rather than library build time option.
  */
-#if 1
+#if 0
 
 # ifdef _IO_MTSAFE_IO
 #  undef _IO_MTSAFE_IO
