@@ -1778,7 +1778,7 @@ int fgetc(FILE *stream)
     }
 #endif
     rc = fread(&ch, 1, 1, stream);
-    if (ferror(stream) || feof(stream))
+    if (ferror(stream) || feof(stream) || rc <= 0)
     {
         gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc returns %d\n", EOF);
         return EOF;
@@ -1804,7 +1804,7 @@ int fgetc_unlocked(FILE *stream)
     }
 #endif
     rc = fread_unlocked(&ch, 1, 1, stream);
-    if (ferror_unlocked(stream) || feof_unlocked(stream))
+    if (ferror_unlocked(stream) || feof_unlocked(stream) || rc <= 0)
     {
         gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked returns %d\n", EOF);
         return EOF;
