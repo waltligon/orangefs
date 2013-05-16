@@ -1530,6 +1530,14 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
                          newpdir);
     IOCOMMON_RETURN_ERR(rc);
 
+    /* check for the trivial case */
+    if (newref.fs_id == oldref.fs_id &&
+        newref.handle == oldref.handle &&
+        !strcmp(oldname, newname))
+    {
+        return 0;
+    }
+
     errno = 0;
     rc = PVFS_sys_rename(oldname, oldref, newname, newref, creds, hints);
     IOCOMMON_CHECK_ERR(rc);
