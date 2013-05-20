@@ -25,8 +25,12 @@ typedef struct posix_ops_s
     int (*open64)(const char *path, int flags, ...);
     int (*openat)(int dirfd, const char *path, int flags, ...);
     int (*openat64)(int dirfd, const char *path, int flags, ...);
+#if 0
     int (*creat)(const char *path, mode_t mode, ...);
     int (*creat64)(const char *path, mode_t mode, ...);
+#endif
+    int (*creat)(const char *path, mode_t mode);
+    int (*creat64)(const char *path, mode_t mode);
     int (*unlink)(const char *path);
     int (*unlinkat)(int dirfd, const char *path, int flags);
     int (*rename)(const char *oldpath, const char *newpath);

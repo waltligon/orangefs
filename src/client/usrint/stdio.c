@@ -1376,7 +1376,7 @@ off64_t ftello64(FILE *stream)
 
 off64_t ftell64(FILE* stream)
 {
-    int64_t filepos __attribute__((unused));
+    int64_t filepos GCC_UNUSED;
 
     PVFS_INIT(init_stdio);
     gossip_debug(GOSSIP_USRINT_DEBUG, "ftell64 %p\n", stream);
@@ -1533,7 +1533,7 @@ int fputc(int c, FILE *stream)
 
 int fputc_unlocked(int c, FILE *stream)
 {
-    int rc __attribute__((unused));
+    int rc GCC_UNUSED;
 
     PVFS_INIT(init_stdio);
     gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
@@ -1708,7 +1708,8 @@ char *fgets(char *s, int size, FILE *stream)
     }
     lock_stream(stream);
     rc = fgets_unlocked(s, size, stream);
-    unlock_stream(stream); gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
+    unlock_stream(stream);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
     return rc;
 }
 
@@ -1763,7 +1764,7 @@ char *fgets_unlocked(char *s, int size, FILE *stream)
  */
 int fgetc(FILE *stream)
 {
-    int rc;
+    int rc GCC_UNUSED;
     unsigned char ch;
 
     PVFS_INIT(init_stdio);
@@ -1778,7 +1779,7 @@ int fgetc(FILE *stream)
     }
 #endif
     rc = fread(&ch, 1, 1, stream);
-    if (ferror(stream) || feof(stream) || rc <= 0)
+    if (ferror(stream) || feof(stream))
     {
         gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc returns %d\n", EOF);
         return EOF;
@@ -1789,7 +1790,7 @@ int fgetc(FILE *stream)
 
 int fgetc_unlocked(FILE *stream)
 {
-    int rc;
+    int rc GCC_UNUSED;
     char ch;
 
     PVFS_INIT(init_stdio);
@@ -1804,7 +1805,7 @@ int fgetc_unlocked(FILE *stream)
     }
 #endif
     rc = fread_unlocked(&ch, 1, 1, stream);
-    if (ferror_unlocked(stream) || feof_unlocked(stream) || rc <= 0)
+    if (ferror_unlocked(stream) || feof_unlocked(stream))
     {
         gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked returns %d\n", EOF);
         return EOF;
@@ -1846,7 +1847,7 @@ int getchar_unlocked(void)
  */
 int getw(FILE *stream)
 {
-    int rc __attribute__((unused)), wd;
+    int rc GCC_UNUSED, wd;
 
     PVFS_INIT(init_stdio);
     gossip_debug(GOSSIP_USRINT_DEBUG, "getw %p\n", stream);
@@ -2384,7 +2385,7 @@ int fileno_unlocked (FILE *stream)
  */
 int remove (const char *path)
 {
-    int rc __attribute__((unused));
+    int rc GCC_UNUSED;
     struct stat buf;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "remove %s\n", path);
@@ -3077,6 +3078,87 @@ static void init_stdio_internal(void)
     gen_mutex_unlock(&initlock);
 };
 
+/* This struct is for external code to force a call to this library */
+struct stdio_ops_s ofs_std_ops =
+{
+    .fopen = fopen,
+    .fdopen = fdopen,
+    .freopen = freopen,
+    .fwrite = fwrite,
+    .fwrite_unlocked = fwrite_unlocked,
+    .fread  = fread,
+    .fread_unlocked = fread_unlocked,
+    .fclose = fclose,
+    .fseek = fseek,
+    .fseek64 = fseek64,
+    .fsetpos = fsetpos,
+    .rewind = rewind,
+    .ftell = ftell,
+    .ftell64 = ftell64,
+    .fgetpos = fgetpos,
+    .fflush  = fflush,
+    .fflush_unlocked = fflush_unlocked,
+    .fputc  = fputc,
+    .fputc_unlocked = fputc_unlocked,
+    .fputs  = fputs,
+    .fputs_unlocked = fputs_unlocked,
+    .putc  = putc,
+    .putc_unlocked = putc_unlocked,
+    .putchar  = putchar,
+    .putchar_unlocked = putchar_unlocked,
+    .puts = puts,
+    .putw = putw,
+    .fgets = fgets,
+    .fgets_unlocked = fgets_unlocked,
+    .fgetc = fgetc,
+    .fgetc_unlocked = fgetc_unlocked,
+    .getc = getc,
+    .getc_unlocked = getc_unlocked,
+    .getchar = getchar,
+    .getchar_unlocked = getchar_unlocked,
+    .getw = getw,
+    .gets = gets,
+    .getdelim = getdelim,
+    .ungetc = ungetc,
+    .vfprintf = vfprintf,
+    .vprintf = vprintf,
+    .fprintf = fprintf,
+    .printf = printf,
+    .perror = perror,
+    .fscanf = fscanf,
+    .scanf = scanf,
+    .clearerr  = clearerr,
+    .clearerr_unlocked  = clearerr_unlocked,
+    .feof  = feof,
+    .feof_unlocked  = feof_unlocked,
+    .ferror  = ferror,
+    .ferror_unlocked  = ferror_unlocked,
+    .fileno  = fileno,
+    .fileno_unlocked  = fileno_unlocked,
+    .remove  = remove,
+    .setbuf  = setbuf,
+    .setbuffer  = setbuffer,
+    .setlinebuf  = setlinebuf,
+    .setvbuf  = setvbuf,
+    .mkdtemp = mkdtemp,
+    .mkstemp = mkstemp,
+    .tmpfile = tmpfile,
+    .opendir  = opendir,
+    .fdopendir  = fdopendir,
+    .dirfd  = dirfd,
+    .readdir  = readdir,
+    .readdir64  = readdir64,
+    .rewinddir  = rewinddir,
+    .seekdir  = seekdir,
+    .telldir  = telldir,
+    .closedir  = closedir,
+    .scandir  = scandir,
+    .scandir64  = scandir64,
+    .flockfile  = flockfile,
+    .ftrylockfile  = ftrylockfile,
+    .funlockfile  = funlockfile
+};
+    
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -109,7 +109,7 @@ int pvfs_open64(const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints __attribute__((unused));
+    PVFS_hint hints GCC_UNUSED;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_open64: called with %s\n", path);
     if (!path)
@@ -215,7 +215,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
 {
     va_list ap;
     int mode;
-    PVFS_hint hints __attribute__((unused));
+    PVFS_hint hints GCC_UNUSED;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_openat64: called with %s\n", path);
     if (dirfd < 0)
@@ -250,7 +250,7 @@ int pvfs_openat64(int dirfd, const char *path, int flags, ...)
 /**
  * pvfs_creat wrapper
  */
-int pvfs_creat(const char *path, mode_t mode, ...)
+int pvfs_creat(const char *path, mode_t mode)
 {
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_creat: called with %s\n", path);
     return pvfs_open(path, O_RDWR | O_CREAT | O_EXCL, mode);
@@ -259,7 +259,7 @@ int pvfs_creat(const char *path, mode_t mode, ...)
 /**
  * pvfs_creat64 wrapper
  */
-int pvfs_creat64(const char *path, mode_t mode, ...)
+int pvfs_creat64(const char *path, mode_t mode)
 {
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_creat64: called with %s\n", path);
     return pvfs_open64(path, O_RDWR | O_CREAT | O_EXCL, mode);
@@ -2004,9 +2004,9 @@ int pvfs_fcntl(int fd, int cmd, ...)
 {
     int rc = 0;
     va_list ap;
-    struct flock *lock __attribute__((unused));
     pvfs_descriptor *pd;
-    long larg;
+    struct flock *lock GCC_UNUSED;
+    long larg GCC_UNUSED;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fcntl: called with %d\n", fd);
     pd = pvfs_find_descriptor(fd);
@@ -2026,26 +2026,50 @@ int pvfs_fcntl(int fd, int cmd, ...)
     case F_GETFD :
         rc = pd->fdflags;
         break;
+    /* only flag is FD_CLOEXEC */
+    /* silently accepts undefined flags */
     case F_SETFD :
         pd->fdflags = va_arg(ap, int);
         break;
     case F_GETFL :
         rc = pd->s->flags;
         break;
+    /* silently accepts unsupoprted flags */
     case F_SETFL :
         pd->s->flags = va_arg(ap, int);
         break;
+    /* locks not implemented yet */
     case F_GETLK :
+        lock = va_arg(ap, struct flock *);
+        break;
     case F_SETLK :
+        lock = va_arg(ap, struct flock *);
+        break;
     case F_SETLKW :
         lock = va_arg(ap, struct flock *);
+        break;
+    /* ASYNC only applies to sockets and terminals so no PVFS support 
+     * lease and notify apply to normal files/dirs but involve signaling
+     * which is not currently possible with PVFS
+     */
     case F_GETOWN :
+        break;
     case F_SETOWN :
+        larg = va_arg(ap, long);
+        break;
     case F_GETSIG :
+        break;
     case F_SETSIG :
+        larg = va_arg(ap, long);
+        break;
     case F_GETLEASE :
+        break;
     case F_SETLEASE :
+        larg = va_arg(ap, long);
+        break;
     case F_NOTIFY :
+        larg = va_arg(ap, long);
+        break;
     default :
         errno = ENOSYS;
         fprintf(stderr, "pvfs_fcntl command not implemented\n");

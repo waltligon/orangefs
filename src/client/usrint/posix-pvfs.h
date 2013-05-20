@@ -28,9 +28,9 @@ extern int pvfs_openat(int dirfd, const char *path, int flags, ...);
 /* pvfs_openat64 */
 extern int pvfs_openat64(int dirfd, const char *path, int flags, ...);
 
-extern int pvfs_creat(const char *path, mode_t mode, ...);
+extern int pvfs_creat(const char *path, mode_t mode);
 
-extern int pvfs_creat64(const char *path, mode_t mode, ...);
+extern int pvfs_creat64(const char *path, mode_t mode);
 
 /* pvfs_unlink */
 extern int pvfs_unlink (const char *path);
