@@ -86,6 +86,7 @@ BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_USRINT = @BUILD_USRINT@
+BUILD_SYMBOLIC = @BUILD_SYMBOLIC@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
 BUILD_HADOOP = @BUILD_HADOOP@
@@ -562,8 +563,9 @@ endif
 ifdef BUILD_USRINT
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
-LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
-LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
+ifdef BUILD_SYMBOLIC
+LIBRARIES_SHARED += lib/libofs-s.so
+endif
 endif
 
 ifneq ($(build_static),yes)
@@ -874,23 +876,19 @@ lib/libofs.a: $(ULIBOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(ULIBOBJS)
 
-# rule for building the _multithreaded_ ofs library
-lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
-	$(Q) "  RANLIBTHREADED	$@"
-	$(E)$(INSTALL) -d lib
-	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
-
 # rule for building the shared ofs library
 lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-# rule for building the shared ofs _multithreaded_ library
-lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS) lib/libpvfs2.so
+ifdef BUILD_SYMBOLIC
+# rule for building the shared ofs library
+lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+endif
 
 # rules for building virtual libraries
 lib/liborangefs.a: lib/libpvfs2.a
