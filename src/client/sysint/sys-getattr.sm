@@ -42,12 +42,6 @@
  * we grab these sizes.
  */
 
-#ifdef WIN32
-static struct profiler getattr_prof;
-#else
-static struct profiler getattr_prof __attribute__((unused));
-#endif
-
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -92,7 +86,7 @@ nested machine pvfs2_client_datafile_getattr_sizes_sm
 
     state datafile_getattr_cleanup
     {
-	run getattr_datafile_getattr_cleanup;
+        run getattr_datafile_getattr_cleanup;
         default => return;
     }
 }
@@ -159,8 +153,8 @@ nested machine pvfs2_client_getattr_sm
 
     state datafile_get_sizes
     {
-	jump pvfs2_client_datafile_getattr_sizes_sm;
-	success => acache_insert;
+        jump pvfs2_client_datafile_getattr_sizes_sm;
+        success => acache_insert;
         default => cleanup;
     }
 
@@ -363,7 +357,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      */
     if(sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
     {
-	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
+        sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
     }
 
     /* if need dir timestamp or dirent_count, need dist_dir_struct */
@@ -818,11 +812,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         case PVFS_TYPE_SYMLINK:
             return 0;
         case PVFS_TYPE_DATAFILE:
-	    return 0;
+            return 0;
         case PVFS_TYPE_DIRDATA:
-	    return 0;
+            return 0;
         case PVFS_TYPE_INTERNAL:
-	    return 0;
+            return 0;
         default:
             gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
@@ -957,7 +951,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         getattr->index_to_server[i] = (uint32_t)i;
     }
 
-//START_PROFILER(getattr_prof);
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(msg_p->req,
                                          capability,
                                          *sm_p->cred_p,
@@ -1291,8 +1284,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
 static PINT_sm_action getattr_datafile_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-//FINISH_PROFILER("getattr", getattr_prof, 1);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);    
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
 
     /* cleanup handle_array created for the one tree request */

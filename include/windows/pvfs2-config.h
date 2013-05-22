@@ -14,6 +14,9 @@
 /* Define if robust security is enabled */
 /* #undef ENABLE_SECURITY */
 
+/* Define if profiling enabled */
+/* #undef ENABLE_PROFILING */
+
 /* Define if kernel has aio support */
 /* #define HAVE_AIO 1*/
 
