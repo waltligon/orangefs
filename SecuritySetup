@@ -1,0 +1,530 @@
+                  OrangeFS Certificate-Based Security
+
+In certificate-based security mode, the servers use a common CA (certificate
+authority) certificate. Users have user certificates which are signed by the
+CA certificate. The subject of the user certificate is mapped to a UID/GID by
+the server using an LDAP (Lightweight Directory Access Protocol) directory.
+
+The following instructions require OpenSSL for certificate operations and an
+LDAP server for LDAP operations.
+
+
+I. Building OrangeFS for Certificate-Based Security
+
+Note: all OrangeFS clients and servers must be built for the same security
+mode (certificates in this case) in order for them to interoperate.
+If you have an existing installation, following the steps below will upgrade
+your clients and servers.
+
+    1. Install OpenSSL and OpenLDAP development and client libraries to the
+       build system if necessary. (Consult your OS distribution documentation
+       for more information.)
+
+    2. In the source package root directory, run ./configure with the
+       --enable-security-cert option:
+      ./configure --enable-security-cert [additional options...]
+
+    3. Use make to build and install OrangeFS:
+       make && make install && make kmod && make kmod_install
+
+II. Configuring OrangeFS for Certificate-Based Security
+
+    1. Install OpenSSL and OpenLDAP client libraries to all servers and clients
+       if necessary. Install OpenLDAP server software to all servers hosting
+       your LDAP directory. See your OS distribution documentation for more
+       information.
+
+    2. Create a CA certificate and private key and distribute the files to all
+       OrangeFS servers. You may also use an existing CA certificate and key.
+       See "Creating a CA Certificate" below.
+
+    3. Set up your LDAP directory. See "Configuring LDAP for Identity Mapping"
+       below.
+
+    4. If you wish to allow users to use the user certificate application, add
+       their identities to your LDAP directory. See "User Certificate
+       Application" below.
+
+    5. Run pvfs2-genconfig to generate a new OrangeFS configuration file with
+       security options. Distribute this configuration file to all servers. If
+       you have an existing OrangeFS installation, you may instead edit your
+       existing configuration file. See the "Configuration File Settings" topics
+       under "Configuring Certificates" and "Configuring LDAP for Identity
+       Mapping" below.
+
+    6. Configure all clients for OrangeFS. Note that existing clients typically
+       don't need additional configuration after they have been upgraded to use
+       certificate-based security.
+
+    7. Start all OrangeFS server software.
+
+    8. Create a user certificate for root, using the user certificate
+       application or doing so manually.
+
+    9. Create identities in LDAP for users as needed (ongoing). Users may then
+       use pvfs2-get-user-cert to obtain user certificates, or they can
+       generate requests manually.
+
+III. Configuring Certificates
+
+Your organization may have a CA certificate file available for use. You will
+need a copy of this certificate and its private key in PEM format. Otherwise,
+use the instructions below to create a CA certificate.
+
+A. Creating a CA Certificate
+
+OpenSSL uses a configuration file to determine how to create certificates,
+including CA certificates. The default location is /etc/ssl/openssl.cnf;
+however, an example configuration file, orangefs.cnf, is provided in the
+examples/certs directory included with the source package. This file contains
+"quick start" settings for creating OrangeFS certificates. For complete
+information on the configuration file format, see the config(5ssl) man page.
+
+Here is the procedure for creating a CA certificate using the example
+configuration file:
+
+    1. If necessary, customize the OpenSSL configuration (.cnf) file to reflect
+       the security settings and policies of your organization.
+
+    2. Enter the command:
+       openssl req -config orangefs.cnf -new -x509 -outform PEM -out orangefs-ca-cert.pem -keyout orangefs-ca-cert-key.pem -nodes -days 1825
+       Note: you may use different file names. The documentation for this
+       command is in the req(1) man page.
+
+    3. You will be prompted for configuration values. Enter the elements of the
+       CA certificate subject. The configuration file will prompt for country,
+       state, locality, organization, organizational unit and common name. You
+       may want to discuss with your security administrator what values any
+       existing certificates use, and follow a similar format.
+
+In examples/certs from the source package, there is a shell script that
+simplifies this process: pvfs2-cert-ca.sh. pvfs2-cert-ca.sh takes a name as an
+optional parameter which is used in the file names. The default name is
+"orangefs". The process above could be completed by using the command:
+
+    ./pvfs2-cert-ca.sh orangefs
+
+Note: OrangeFS and PVFS2 are interchangeable terms. The script above uses
+"orangefs" for compatibility with the pvfs2-genconfig script.
+
+B. User Certificate Application
+
+A client application, pvfs2-get-user-cert, is installed in order to allow users
+to request and receive a user certificate with no intervention from the
+administrator.
+
+The client system must be configured to connect to a running OrangeFS server;
+the file pvfs2tab, in /opt/orangefs/etc by default, contains the necessary
+configuration information.
+
+An identity (user account) for the requesting user must be present in the LDAP
+directory before the user can request a certificate. See "Configuring LDAP for
+Identity Mapping" for more information.
+
+The usage of pvfs2-get-user-cert is:
+
+    pvfs2-get-user-cert [user name]
+
+If the optional user name is not supplied, the user name of the logged-on
+account will be used. The user will be prompted for their LDAP directory
+password. Once this is entered correctly, the user certificate and private key
+are stored as ~/.pvfs2-cert.pem and ~/.pvfs2-cert-key.pem, respectively.
+
+C. Obtaining a User Certificate Manually
+
+If you do not wish to have users use the pvfs2-get-user-cert application
+described above, they may create a certificate request which an administrator
+can use to generate a certificate.
+
+1. Creating a User Certificate Request
+
+A certificate request is a file that indicates what values should be in the
+requested certificate. A user can generate the request and submit the file to
+the administrator for signing by the CA certificate. In a production
+environment, it is not secure for users to sign their own certificates.
+
+To generate a certificate request, execute this command:
+
+    openssl req -newkey rsa:1024 -config pvfs2-user.cnf -keyout pvfs2-cert-key-pass.pem -nodes -out pvfs2-cert-req.pem
+
+Note: pvfs2-user.cnf is in the examples/certs directory.
+
+You may use different file names. The user will be prompted to enter subject
+values, which should follow some organization-defined naming scheme. (Note: the
+common name of the certificate subject will be used for UID/GID-mapping later,
+so take note of it.)
+
+The user can then submit (e.g. via email) the certificate request (but not the
+private key) to the administrator for signing.
+
+A script named pvfs2-cert-req.sh is in examples/certs for this step. It takes a
+name as an optional parameter (default "pvfs2"):
+
+    ./pvfs2-cert-req.sh pvfs2
+
+2. Signing a User Certificate Request
+
+The administrator will sign the certificate request with the CA private key.
+Execute this command:
+
+    openssl x509 -req -in pvfs2-cert-req.pem -CA orangefs-ca-cert.pem -CAkey orangefs-ca-cert-key.pem -days 365 -out pvfs2-cert.pem
+
+The file names should correspond with file names used in prior steps. The
+resulting certificate file (pvfs2-cert.pem above) should be returned to the
+user.
+
+A script named pvfs2-sign-cert.sh is in examples/certs. It takes the cert name
+and the CA name as optional parameters (defaults "pvfs2" and "orangefs"
+respectively):
+
+    ./pvfs2-sign-cert.sh pvfs2 orangefs
+
+The files pvfs2-cert.pem and pvfs2-cert-key.pem can then be sent to the user
+(e.g. via email).
+
+3. Storing the User Certificate
+
+The user can now store the certificate and private key files. The default file
+names used by OrangeFS are ~/.pvfs2-cert.pem for the certificate file and
+~/.pvfs2-cert-key.pem for the key file. Note the "." preceding both names,
+which marks them hidden. The private key should have permissions revoked for
+other users:
+
+    chmod 600 .pvfs2-cert-key.pem
+
+(It's a good idea to do that for the certificate as well.)
+
+These locations can be overridden with the PVFS2CERT_FILE and PVFS2KEY_FILE
+environment variables. These variables are used when accessing OrangeFS through
+a client application (sysint--e.g. pvfs2-ls) or library (usrint); they are not
+used if OrangeFS is mounted through the kernel module.
+
+D. OrangeFS Server Configuration File Settings
+
+The CA certificate and key locations are configurable; a good place for them is
+in the etc directory under the root of the OrangeFS installation (e.g.
+/opt/orangefs/etc).
+
+The private key file must be accessible only by root:
+
+    chmod 600 /opt/orangefs/etc/orangefs-ca-cert-key.pem
+
+To indicate to the server the locations of the files, add a <Security> section
+to the <Defaults> section of the OrangeFS configuration file. The CAFile and
+ServerKey keywords give the locations of the files:
+
+    <Defaults>
+        . . .
+        <Security>
+            CAFile /opt/orangefs/etc/orangefs-ca-cert.pem
+            ServerKey /opt/orangefs/etc/orangefs-ca-cert-key.pem
+            [SecurityTimeout {seconds}]
+            . . .
+        </Security>
+        . . .
+
+The SecurityTimeout specifies the number of seconds for which a user is
+authorized to access OrangeFS resources, after the user makes an initial file
+system request. A lower value is more secure, but may have a negative effect on
+performance. The default is one hour.
+
+A <Security> section may be placed within a <ServerOptions> section in order to specify different values for different servers:
+
+    <ServerOptions>
+        Server orangefs01
+        <Security>
+            . . .
+        </Security>
+        . . .
+    </ServerOptions>
+    <ServerOptions>
+        Server orangefs02
+        <Security>
+            . . .
+        </Security>
+        . . .
+    </ServerOptions>
+
+IV. Configuring LDAP for Identity Mapping
+
+When an OrangeFS server receives a certificate from a client, it performs
+identity mapping with the certificate. The certificate contains a subject
+distinguished name (DN) to identify it, while the server needs a numerical user
+ID (UID) and primary group ID (GID). In order to do the mapping, an LDAP
+directory is used. The subject DN is transformed in a configurable way to locate
+a user object in the LDAP directory; the object contains the UID and GID.
+
+OrangeFS is designed to use OpenLDAP client libraries, which are available for
+most distributions. The OrangeFS server can communicate with an OpenLDAP server
+or a standard LDAP server from another organization.
+
+For more information on LDAP see http://openldap.org.
+
+A. Planning for LDAP Identity Mapping
+
+The first step is identifying which users should be allowed to use OrangeFS.
+These users will require user certificates, and must have a user object in the
+LDAP directory. Information on creating users in LDAP will be provided below.
+
+It may be that you have an existing LDAP directory to leverage for use. Use the
+information below to evaluate how existing LDAP user objects can be utilized.
+
+The next step is to identify a string that can be uniquely associated with each
+user. The most obvious is the login name, the first field of /etc/passwd, with
+which users log in. However, if you have existing LDAP users, use their naming
+attribute values (often the "CN" or "UID" attribute).  The description field of
+/etc/passwd could also be used. Ultimately any string will work, as long as it
+is unique to each user. We'll call this value the "user name".
+
+As mentioned, determine what the naming attribute for user objects is in your
+LDAP directory. If you are creating a new LDAP directory, Common Name (CN) is a
+good choice.
+
+Next, determine where in LDAP the users will be/are stored. LDAP directories are
+hierarchical trees, where objects are identified by distinguished names (DNs).
+A DN consists of segments in the form "attribute=value", separated by commas.
+The DN "ou=Users,dc=acme,dc=com" indicates an organizational unit (OU) named
+Users under the acme domain context (DC), which in turn is in the com DC.
+Objects that contain other objects are naturally called containers; some typical
+container classes are domain contexts (DC), organizations (O) and organizational
+units (OU). Often the DNS name of an organization is used to form the domain
+contexts at the root of the directory, e.g. acme.com becomes "dc=acme,dc=com".
+
+Determine the DN of the container that contains all the users you wish to enable
+for OrangeFS. In some cases the users are in multiple containers; if so, select
+the container at the "highest" point that contains all subcontainers with users.
+For example if users are in both "ou=Engineering,ou=Users..." and
+"ou=Sales,ou=Users...", make a note of "ou=Users" as the container. Also make a
+note whether the users are in one container or multiple containers.
+
+Finally we need to know where the UID and GID values are stored in LDAP. Objects
+in LDAP have named attributes, which in turn may have one or more values. The
+default attributes that store the UID and GID are uidNumber and gidNumber. If
+you are using the OpenLDAP server, make sure to use the schema file nis.schema
+to enable these attributes. (See the OpenLDAP documentation for more
+information.)
+
+The list below summarizes information needed to configure OrangeFS for LDAP
+identity mapping.
+
+    - Which users to enable for OrangeFS.
+
+    - A user name to uniquely identify each user. For existing LDAP
+      installations, this should correspond to the naming attribute of the
+      existing user objects (often "CN" or "UID").
+
+    - The naming attribute used for user objects in LDAP, often Common Name (CN)
+      or UID.
+
+    - The DN of the LDAP container where user objects are stored. Users may be
+      stored in one container or multiple containers.
+
+    - The names of the UID- and GID-storing attributes, usually uidNumber and
+      gidNumber.
+
+B. Planning for LDAP Binding
+
+Binding is the term for connecting and authenticating to an LDAP server. You
+will need the following information to bind to your LDAP server:
+
+    - URI(s) for the LDAP server(s). These URIs are in form
+      "ldap[s]://hostname[:port]". Using "ldap" specifies a plaintext
+      connection, and "ldaps" specifies a secure (usually SSL) connection. The
+      default port is 389 for plaintext, and 636 for secure. You may have
+      multiple LDAP servers for the same directory; you may specify any of
+      these, separated by commas, and OrangeFS will use them for failover.
+
+    - DN of a binding user. The user must have sufficient rights to search for
+      users in their specified container, and to read their uidNumber and
+      gidNumber attributes. This value is optional as anonymous binds are
+      possible. The administrator must make sure anonymous binds do not have
+      excess rights.
+
+    - Password of the binding user. This value can be stored in a protected file
+      for additional security. This value is optional, as users are not required
+      to have passwords.
+
+Because the password is not encrypted, it is recommended that a user be created
+for OrangeFS usage with only the rights described above.
+
+C. OrangeFS Server Configuration File Settings
+
+The LDAP settings are specified in the OrangeFS configuration file, which is
+identical for each server. The <LDAP> tag within the <Security> tag contains the
+settings:
+
+<Defaults>
+    . . .
+<Security>
+    . . .
+    <LDAP>
+        [Hosts {list of LDAP URIs}]
+        [BindDN {DN}]
+        [BindPassword {password} or {file:path}]
+        [SearchMode "CN" or "DN"]
+        [SearchRoot {DN}]
+        [SearchClass {Class name}]
+        [SearchAttr {Attrname}]
+        [SearchScope "onelevel" or "subtree"]
+        [UIDAttr {Attrname}]
+        [GIDAttr {Attrname}]
+        [SearchTimeout {timeout (secs)}]
+    </LDAP>
+</Security>
+. . .
+</Defaults>
+
+The settings are defined below. (Note: do not use quotes in the values.)
+
+    - Hosts: a list of LDAP URIs separated by spaces, e.g. "ldaps://myhost.org".
+      Default: "ldaps://localhost".
+
+    - BindDN: an LDAP DN specifying the user that will connect to LDAP.
+      Default: will bind anonymously.
+
+    - BindPassword: the password for the binding user, or the string "file:"
+      followed by a path to a file from which to read the password.
+      Default: no password.
+
+    - SearchMode: "CN" or "DN". See below for more information. Default: "CN".
+
+    - SearchRoot: the DN of the container with the user objects. Default: the
+      root of the directory. Note: you must specify this value if you are using
+      an OpenLDAP server.
+
+    - SearchClass: the object class of the user objects.
+      Default: "inetOrgPerson".
+
+    - SearchAttr: the naming attribute to match against the certificate CN.
+      Default: "CN".
+
+    - SearchScope: "onelevel" or "subtree". Whether to search only the
+      SearchRoot container ("onelevel") or that container and all child
+      containers ("subtree"). Default: "subtree".
+
+    - UIDAttr: the name of the UID-storing attribute. Default: "uidNumber".
+
+    - GIDAttr: the name of the GID-storing attribute: Default: "gidNumber".
+
+    - SearchTimeout: timeout in seconds for LDAP searches. Default "15".
+
+You should have noted these values during the "planning" stages described above.
+
+C. Searching LDAP for Identities
+
+The OrangeFS server searches LDAP for the user object based on the user
+certificate's subject DN.
+
+If the SearchMode is "CN", the CN (common name) of the certificate subject is
+ used. It must match an object that 1) is in or under the SearchRoot container
+(depending on SearchMode),  2) has an object class equal to the SearchClass and
+3) has its SearchAttr attribute matching the certificate CN. The search filter
+used is:
+
+    (&(objectClass={SearchClass})({SearchAttr}={Certificate CN}))
+
+The UID and GID will be retrieved from the UIDAttr and GIDAttr attributes of the
+object. This UID and GID will be used for subsequent file system operations. If
+this search fails, an error will be printed to the server log and "operation not
+permitted" returned to the client.
+
+If the SearchMode is "DN", the certificate subject DN must match the LDAP user
+object DN exactly (case-insensitive). In this mode, SearchRoot, SearchClass,
+SearchAttr and SearchScope are not used.
+
+OrangeFS will retry the connection if it can't contact the LDAP server. It will
+try different servers on the URI list.
+
+D. LDAP and System Identities
+
+You can specify that an LDAP user object have a different UID/GID from its
+corresponding system user. For example, the system user "jsmith" may have
+UID/GID 500/100, but the LDAP user corresponding to "jsmith" might have UID/GID
+550/500. However, OrangeFS utilities will still show the system login name
+associated with the OrangeFS UID/GID. In our example, OrangeFS utilities would
+display files as owned by system UID 550 rather than "jsmith". If you are using
+nsswitch (Name Service Switch) with LDAP you will not have this conflict.
+Otherwise, it is not recommended that the identities have mismatching UID/GIDs.
+
+E. Creating a New LDAP Directory
+
+The examples/certs directory included in the distribution contains scripts and
+files that can be used to create a new OpenLDAP directory.
+
+The script pvfs2-ldap-create-dir.sh will create a new OpenLDAP directory and add
+some basic objects. The usage of the script is:
+
+    ./pvfs2-ldap-create-dir.sh [-p {prefix}] [-a {admin dn}] [-s {suffix dn}] [-w {admin password}]
+
+    - prefix: base directory for OpenLDAP installation, default /usr/local
+
+    - admin dn: DN of LDAP administrator; should end with suffix DN, default
+      cn=admin,{suffix dn}
+
+    - suffix dn: base (topmost) DN of directory; default based on hostname,
+      e.g. hostname acme.com would give dc=acme,dc=com
+
+    - admin password: LDAP administrator password, default "ldappwd".
+
+The script will create the new LDAP directory and add two organizational units,
+named Users and Groups. A user object for the system root account will be
+created with a random password. See "Adding Users to LDAP" below for information
+on changing the password.
+
+The directory created is not secure. User passwords are stored in plaintext, and
+SSL/TLS security is not enabled. Therefore the directory should only be used for
+testing, or as a starting point for a secure directory. Consult the OpenLDAP
+documentation for information on securing the directory.
+
+Here are the statements in the OrangeFS configuration file needed to configure
+this directory.
+
+<Defaults>
+    . . .
+    <Security>
+        . . .
+            <LDAP>
+                Hosts ldap://{hostname}
+                BindDN {admin dn}
+                BindPassword {admin password}
+                SearchRoot cn=Users,{suffix dn}
+                SearchScope onelevel
+            </LDAP>
+    </Security>
+    . . .
+</Defaults>
+
+Substitute the values in braces for the values used when creating the LDAP
+directory. All unspecified values are equal to the defaults.
+
+F. Adding Users to LDAP
+
+The ldapadd utility is used to add objects, including users, to an LDAP
+directory. LDAP utilities use LDIF files to describe objects. Consult the LDIF
+RFC (http://www.ietf.org/rfc/rfc2849.txt) for more information on the LDIF file
+format.
+
+In examples/certs, the script pvfs2-ldap-add-user.sh will create a user based on
+the information for that user in /etc/passwd:
+
+    ./pvfs2-ldap-add-user.sh [-D {admin dn}] [-w {admin pw}] {logon name} {container dn}
+
+The script will create a user with the CN equal to the logon name, located in
+the specified container. The uidNumber, gidNumber, displayName, homeDirectory
+and login shell attributes will be set to correspond to the system account
+fields (displayName corresponds to description). A random password will be
+created.
+
+To change a user password, the ldapmodify utility is used. There is a wrapper
+script provided in examples/certs:
+
+    ./pvfs2-ldap-set-pass.sh [-D {admin dn}] [-w {admin pw}] {user dn} {password}
+
+For example:
+
+    ./pvfs2-ldap-set-pass.sh -D cn=admin,dc=acme,dc=com -w ldappwd cn=jsmith,ou=users,dc=acme,dc=com "sEcr3t!"
+
+The script will store the password in LDAP in an encrypted format, using the
+slappasswd utility.
+
+
