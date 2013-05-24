@@ -58,6 +58,7 @@ struct result_chain_entry
     struct result_chain_entry *next;
     struct fp_queue_item *q_item;
     struct PINT_thread_mgr_trove_callback trove_callback;
+    PVFS_size out_size; /* holds the number of bytes actually written for this entry.*/
 };
 
 /* fp_queue_item describes an individual buffer being used within the flow */
@@ -2471,8 +2472,16 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
     q_item->posted_id = 0;
     
 
-    /* Process the request to determine mapping */
+    /* Process the request to determine mapping.  bytes_processed represents the total amount of bytes
+     * that will be processed with this flow buffer. Could be equal to the flow buffer size or could be
+     * something smaller than that.
+     */
     bytes_processed = flow_process_request(q_item);
+
+    gossip_lerr("%s:flow(%p):q_item(%p):q_item->result_chain_count(%d).\n",__func__
+                                                                          ,flow_d
+                                                                          ,q_item
+                                                                          ,(int)q_item->result_chain_count);
 
     if (0 != bytes_processed)
     {
@@ -2610,6 +2619,7 @@ static void flow_trove_write(struct fp_queue_item* q_item,
     struct result_chain_entry* result_iter = 0;
     int data_sync_mode=0;
     int rc = 0;
+    int i;
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
 
@@ -2628,19 +2638,21 @@ static void flow_trove_write(struct fp_queue_item* q_item,
     gen_mutex_unlock(&flow_d->flow_mutex);
 
     /* Perform a write to disk */
-    q_item->result_chain_count = 0;
     result_iter = &q_item->result_chain;
-    assert(result_iter);
     q_item->out_size=0; /* just to be sure */
     
-    while (0 != result_iter)
+    for (i=0; i<q_item->result_chain_count; i++)
     {
         /* Construct trove data structure */
-        assert(0 != result_iter->result.bytes);
         result_iter->q_item = q_item;
         result_iter->trove_callback.data = result_iter;
         result_iter->trove_callback.fn = write_callback;
-        q_item->result_chain_count++;
+        result_iter->out_size = 0;
+
+        gossip_lerr("%s:flow(%p):q_item(%p):result_iter->result.bytes(%d).\n",__func__
+                                                                             ,flow_d
+                                                                             ,q_item
+                                                                             ,(int)result_iter->result.bytes);
 
         rc = trove_bstream_write_list(flow_d->dest.u.trove.coll_id,
                                       flow_d->dest.u.trove.handle,
@@ -2650,7 +2662,7 @@ static void flow_trove_write(struct fp_queue_item* q_item,
                                       result_iter->result.offset_array,
                                       result_iter->result.size_array,
                                       result_iter->result.segs,
-                                      &q_item->out_size,
+                                      &result_iter->out_size, /* need to have an out_size for each result_iter */
                                       data_sync_mode,
                                       NULL,
                                       &result_iter->trove_callback,
@@ -2688,7 +2700,8 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 
         /* Increment iterator */
         result_iter = result_iter->next;
-    };
+
+    }; /*end for*/
 
 } /*end flow_trove_write*/
 
@@ -2699,8 +2712,7 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 static void forwarding_trove_write_callback_fn(void *user_ptr,
 					       PVFS_error error_code)
 {
-
-    struct result_chain_entry* result_entry = user_ptr;
+    struct result_chain_entry *result_entry = user_ptr;
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
@@ -2731,33 +2743,43 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
         q_item->buffer_in_use--;
     }
 
-    /* this error is for this particular result chain; there could be multiples. */
+    /* this error is for this particular result chain entry; there could be multiples. So,
+     * we will keep the first error and let any others go.  Or, another q_item may have
+     * already set the res->error_code.  In either case, we keep the original error and
+     * throw away any others.
+     */
     if (error_code != 0)
     {
-       if (q_item->res->error_code != 0 )
+       if (q_item->res->error_code == 0 )
        {
           q_item->res->state      = FAILED_TROVE_WRITE;
           q_item->res->error_code = error_code;
        }
+       gossip_err("%s:flow(%p):q_item(%p):q_item->res->state(%s):q_item->res->error_code(%d).\n"
+                 ,__func__
+                 ,flow_d
+                 ,q_item
+                 ,get_replication_endpoint_state_as_string(q_item->res->state)
+                 ,(int)q_item->res->error_code);
     }/*end if error code is not zero*/
     else
     {
-       /* If all results for this qitem are available continue */
-       if (0 == q_item->result_chain_count )
+       /* If all results for this q-item are available continue and no errors with the local trove calls.*/
+       if (0 == q_item->result_chain_count && q_item->res->state == RUNNING)
        {
            struct result_chain_entry* result_iter = &q_item->result_chain;
   
-           /* Aggregate results. don't need to aggregate results if bad error code */
-           while (0 != result_iter && q_item->res->error_code == 0)
+           /* Aggregate results.*/
+           while (result_iter)
            {
                struct result_chain_entry* re = result_iter;
-               gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tq_item->out_size(%d)\n"
+               gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
                           ,flow_d
                           ,q_item,__func__
                           ,(int)flow_data->total_bytes_written
-                          ,(int)q_item->out_size);
-               flow_data->total_bytes_written += result_iter->result.bytes;
-               flow_d->total_transferred += result_iter->result.bytes;
+                          ,(int)result_iter->out_size);
+               flow_data->total_bytes_written += result_iter->out_size;
+               flow_d->total_transferred += result_iter->out_size;
                PINT_perf_count(PINT_server_pc, 
                                PINT_PERF_WRITE,
                                result_iter->result.bytes, 
@@ -2767,7 +2789,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
                /* Free memory if this is not the chain head */
                if (re != &q_item->result_chain)
                    free(re);
-           }
+           }/*end while*/
     
            /* Cleanup q_item memory */
            q_item->result_chain.next = NULL;
@@ -2814,12 +2836,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
 
      /* If the request needs more flow buffers, then re-use this q_item, 
-      * IFF error_code is zero, which means we want to contiue writing buffers
-      * for this flow. 
       */
-     if (q_item->buffer_in_use == 0 && 
-                    error_code == 0 &&
-         !PINT_REQUEST_DONE(flow_d->file_req_state))
+     if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
      {
          /* Post another recv operation */
          gossip_lerr("flow(%p):q_item(%p):%s:Starting recv. buffer_in_use(%d)\n"
@@ -2845,6 +2863,7 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
 {
     int is_flow_complete = 0;
     flow_descriptor *flow_d = flow_data->parent;
+    int trove_index = flow_d->res_count-1;
  
     gossip_lerr("flow(%p):Executing %s...\n",flow_d,__func__);
     
@@ -2870,29 +2889,31 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
                        ,(int)flow_data->total_bytes_recvd
                        ,(int)flow_data->total_bytes_forwarded
                        ,(int)flow_d->next_dest_count
+                                     /* NOTE: flow_d->next_dest_count is wrong. should use count of active destinations */
                        ,(int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count);
             gossip_lerr("flow(%p):flow_data->total_bytes_recv(%d) \ttotal_bytes_written(%d)\n"
                        ,flow_d,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_written);
+            replication_endpoint_status_print(flow_d->res,flow_d->res_count);
             assert(flow_data->total_bytes_recvd ==
                    ((int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count));
-            assert(flow_data->total_bytes_recvd ==
-                   flow_data->total_bytes_written);
+
+            /* if the local trove call ended in error, then we cannot assume that the total_bytes_written 
+             * will match the total_bytes_recvd.  Once a trove error is encountered with one flow buffer,
+             * then all trove calls and updates to total_bytes_written are stopped, even though we are 
+             * still receiving and forwarding data to other replicas.
+             */
+            if ( flow_d->res[trove_index].state == RUNNING )
+            {
+               assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
+            }
+
             is_flow_complete = 1;
-        }
-    }
+        }/*end if*/
+    }/*end if*/
+
     return is_flow_complete;
 }/*end forwarding_is_flow_complete*/
 
-
-
-static inline void forwarding_bmi_recv_callback_wrapper(void *user_ptr,
-							PVFS_size actual_size,
-							PVFS_error error_code)
-{
-    forwarding_bmi_recv_callback_fn(user_ptr, actual_size, error_code);
-
-    return;
-}/*end forwarding_bmi_recv_callback_wrapper*/
 
 
 /* forwarding_bmi_recv_callback_fn()
@@ -2981,7 +3002,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         qlist_del(&q_item->list_link);
      }
 
-    /* bytes received from the client */
+    /* bytes received from the client.  This amount could be the size of a flow buffer or smaller. */
     flow_data->total_bytes_recvd += actual_size;
     
     /* Debug output */
@@ -3517,7 +3538,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
         gen_mutex_lock(&flow_d->flow_mutex);
         if ( (flow_d->error_code == 0) && (!PINT_REQUEST_DONE(flow_d->file_req_state)))
         {
-            gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d):Calling flow_bmi_recv from forwading_flow_post_init.\n"
+            gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d):Calling flow_bmi_recv from forwarding_flow_post_init.\n"
                        ,flow_d,&flow_data->prealloc_array[i],flow_data->prealloc_array[i].buffer_in_use);
             gen_mutex_unlock(&flow_d->flow_mutex);
             flow_bmi_recv(&(flow_data->prealloc_array[i]),

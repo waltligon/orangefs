@@ -260,7 +260,7 @@ static PINT_sm_action io_start_flow(
     for (i=0; i<s_op->u.io.flow_d->res_count; i++)
     {
         gossip_err("&s_op->u.io.flow_d->res[%d]:(%p) &s_op->u.io.res[%d]:(%p)\n"
-        ,i,&s_op->u.io.flow_d->res[i],i,&s_op->u.io.res[i]);
+       ,i,&s_op->u.io.flow_d->res[i],i,&s_op->u.io.res[i]);
     }
 
 
