@@ -2716,6 +2716,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     struct fp_queue_item *q_item = result_entry->q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
+    int i;
+    int trove_index = flow_d->res_count-1;
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
@@ -2825,8 +2827,10 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     if (forwarding_is_flow_complete(flow_data))
     {
          gossip_lerr("flow(%p):%s: Write finished\n",flow_d,__func__);
-         assert(flow_data->total_bytes_recvd ==
-                flow_data->total_bytes_written);
+         if (flow_d->res[trove_index].state == RUNNING)
+         {
+            assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
+         }
          assert(flow_d->state != FLOW_COMPLETE);
          FLOW_CLEANUP(flow_data);
          flow_d->state = FLOW_COMPLETE;
@@ -2835,16 +2839,29 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
      }
 
 
-     /* If the request needs more flow buffers, then re-use this q_item, 
+     /* If this buffer is available, then use it, if there is more data to receive.
       */
      if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
      {
-         /* Post another recv operation */
          gossip_lerr("flow(%p):q_item(%p):%s:Starting recv. buffer_in_use(%d)\n"
                     ,flow_d,q_item,__func__,q_item->buffer_in_use);
+
+         /* Post another recv operation as long as trove writes are still running or 
+          * bmi sends are still running.
+          */
+         for (i=0; i<flow_d->res_count; i++)
+         {
+             if (flow_d->res[i].state == RUNNING)
+             {
+                break;
+             }
+         }
          gen_mutex_unlock(&flow_d->flow_mutex);
-         flow_bmi_recv(q_item,
-                       forwarding_bmi_recv_callback_fn);
+         if (i < flow_d->res_count)
+         {
+            flow_bmi_recv(q_item,
+                          forwarding_bmi_recv_callback_fn);
+         }
      }
      else
      {
@@ -3193,6 +3210,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
     flow_descriptor *flow_d = flow_data->parent;
     struct fp_queue_item *q_item = replica_q_item->replica_parent;
+    int trove_index = flow_d->res_count-1;
 
     gossip_lerr("flow(%p):replica_q_item(%p):error_code(%d):Executing %s...\n",flow_d
                                                                               ,replica_q_item
@@ -3261,8 +3279,10 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     if (forwarding_is_flow_complete(flow_data))
     {
         gossip_lerr("flow(%p):q_item(%p):%s:Finished sending a buffer of data\n",flow_d,q_item,__func__);
-        assert(flow_data->total_bytes_recvd ==
-               flow_data->total_bytes_written);
+        if (flow_d->res[trove_index].state == RUNNING)
+        {
+            assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
+        }
         assert(flow_d->state != FLOW_COMPLETE);
         FLOW_CLEANUP(flow_data);
         flow_d->state = FLOW_COMPLETE;
