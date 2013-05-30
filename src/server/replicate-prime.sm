@@ -505,8 +505,8 @@ static PINT_sm_action io_send_completion_ack(
     gossip_lerr("Total Transferred(%lld)\n",(long long int)s_op->u.io.flow_d->total_transferred);
     for (i=0; i<s_op->u.io.replicate_d_count; i++)
     {
-        gossip_err("Next flow(%llu) \tstatus(%d)\n",llu(s_op->u.io.replicate_d[i].handle)
-                                           ,s_op->u.io.replicate_d[i].recv_status.error_code);
+        gossip_lerr("Next flow(%llu) \tstatus(%d)\n",llu(s_op->u.io.replicate_d[i].handle)
+                                                    ,s_op->u.io.replicate_d[i].recv_status.error_code);
     }
 
     s_op->resp.status = s_op->u.io.primary_flow_error_code;
@@ -812,8 +812,9 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
     int index, ret;
 
 
-    gossip_lerr("js_p->error_code(%d):js_p->status_user_tag(%d)\n",(int)js_p->error_code
-                                                                  ,(int)js_p->status_user_tag);
+    gossip_lerr("js_p->error_code(%d):js_p->status_user_tag(%d):js_p->actual_size(%d)\n",(int)js_p->error_code
+                                                                                        ,(int)js_p->status_user_tag
+                                                                                        ,(int)js_p->actual_size);
 
     gossip_err("Replicate-Prime.sm:%s:\n",__func__);
     replication_endpoint_status_print(s_op->u.io.res,s_op->u.io.res_count);
@@ -829,22 +830,12 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
        }
     }
 
-    /* right now, we are shutting down everything if an error occurs, so don't wait for any more
-     * jobs to complete or cancel. We will change this later.
-     */
-    if (js_p->error_code != 0)
-    {
-       s_op->u.io.primary_flow_error_code = js_p->error_code;
-       js_p->error_code = FLOWS_COMPLETED;
-       return SM_ACTION_COMPLETE;
-    }
 
     /* Which job just finished? */
     if (js_p->status_user_tag == PRIMARY_FLOW)
     {
-       /* all "next" flows should be done and we are ready to ack back to the client */
-       gossip_lerr("Primary flow has completed....\n");
-       gossip_lerr("Actual amount written(%lld)\n",(long long int)js_p->actual_size);
+       gossip_lerr("Primary flow has completed..Actual amount written to local trove(%lld)\n"
+                  ,(long long int)js_p->actual_size);
        for (index=0; index<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[index].resp_status == 0; index++)
        {
            if ( !s_op->u.io.replicate_d[index].received )
@@ -853,7 +844,6 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
                          ,llu(s_op->u.io.replicate_d[index].handle));
            }
        }
-       s_op->u.io.primary_flow_error_code = js_p->error_code;
        s_op->u.io.primary_flow_received = 1;
        goto completion_exit;
     }
@@ -872,21 +862,17 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
       }/*end for*/
     }/*end if*/
     
-    /* if js_p->status_code != zero, then we probably did not receive a valid response from the
-     * replica server but cancelled the operation internally.  So, don't try to decode it.  Save
-     * the error code and keep going.
+    /* if js_p->status_code != zero, then we probably received some sort of networking or job timeout       
+     * error, so it is not necessary to decode the response.   Otherwise, we should decode the reponse
+     * and cross check the returned information with the flow's information.
      */
 
     if (js_p->error_code != 0)
     {
-       if (!s_op->u.io.primary_flow_error_code)
-       {
-          s_op->u.io.primary_flow_error_code = js_p->error_code;
-       }
        goto completion_exit;
     }
 
-    /* decode repsonse from "next" server */
+    /* decode repsonse from "replica" server */
     ret = PINT_serv_decode_resp( s_op->target_fs_id
                                 ,s_op->u.io.replicate_d[index].encoded_resp_p
                                 ,&decoded_resp
@@ -909,7 +895,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
 
     gossip_lerr("Completion ACK returned from NEXT server for handle(%llu).\n"
                ,llu(s_op->u.io.replicate_d[index].handle));
-    gossip_err("Amount of data transferred(%lld).\n",(long long int)resp->u.write_completion.total_completed);
+    gossip_lerr("Amount of data transferred(%lld).\n",(long long int)resp->u.write_completion.total_completed);
 
 
     /* not sure if this is necessary; check on it */
@@ -932,6 +918,16 @@ completion_exit:
        }
    }
 
+   /* yep, we're done! */
+   /* check the replication_endpoint_status structure to determine the status of the entire flow */
+   s_op->u.io.primary_flow_error_code = 0;
+   for (index=0; index<s_op->u.io.res_count; index++)
+   {
+       if (s_op->u.io.res[index].state != RUNNING)
+       {
+           s_op->u.io.primary_flow_error_code = s_op->u.io.res[index].error_code;
+       }
+   }
 
    js_p->error_code = FLOWS_COMPLETED;
    return SM_ACTION_COMPLETE;

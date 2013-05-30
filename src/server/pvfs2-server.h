@@ -520,28 +520,13 @@ struct PINT_server_getconfig_op
                   * processing */
 };
 
-struct replicate_descriptor
-{
-   PVFS_handle handle;
-   PVFS_size bstream_size;
-   PVFS_error resp_status;
-   PVFS_msg_tag_t session_tag;
-   PVFS_BMI_addr_t svr_addr;
-   void *encoded_resp_p;
-   job_status_s recv_status;
-   job_id_t recv_job_id;
-   int received;
-};
-
-typedef struct replicate_descriptor replicate_descriptor;
-
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
     int primary_flow_error_code;
     int primary_flow_received;
 
-    replicate_descriptor *replicate_d;
+    replicate_descriptor_s *replicate_d;
     int replicate_d_count;
 
     replication_endpoint_status *res;
