@@ -5,6 +5,8 @@ SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
 
 orangefs-2.9beta
+* Bug Fix: Updated the release string.
+
 * New Feature: OrangeFS 2.9 supports two new security modes in addition to
   standard security mode. The first mode, key-based security, utilizes
   cryptographic key pairs for servers and clients. The second mode,
