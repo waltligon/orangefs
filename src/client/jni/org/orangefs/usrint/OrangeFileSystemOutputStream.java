@@ -78,9 +78,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * system, for example a file, then flushing the stream guarantees only that
      * bytes previously written to the stream are passed to the operating system
      * for writing; it does not guarantee that they are actually written to a
-     * physical device such as a disk drive.
-     * 
-     * The flush method of OutputStream does nothing.
+     * physical device such as a disk drive. The flush method of OutputStream
+     * does nothing.
      */
     @Override
     public void flush() throws IOException {
@@ -110,12 +109,10 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * this output stream. The general contract for write(b, off, len) is that
      * some of the bytes in the array b are written to the output stream in
      * order; element b[off] is the first byte written and b[off+len-1] is the
-     * last byte written by this operation.
-     * 
-     * If b is null, a NullPointerException is thrown.
-     * 
-     * If off is negative, or len is negative, or off+len is greater than the
-     * length of the array b, then an IndexOutOfBoundsException is thrown.
+     * last byte written by this operation. If b is null, a NullPointerException
+     * is thrown. If off is negative, or len is negative, or off+len is greater
+     * than the length of the array b, then an IndexOutOfBoundsException is
+     * thrown.
      */
     @Override
     public void write(byte b[], int off, int len) throws IOException {

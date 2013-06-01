@@ -10,16 +10,25 @@ import java.lang.reflect.Field;
 public class PVFS2STDIOJNI {
     public PVFS2STDIOJNIFlags f;
     static {
-        String ldlpath = System.getenv("JNI_LIBRARY_PATH");
-        // System.out.println("ldlpath=" + ldlpath);
+        String ldlPath = System.getenv("JNI_LIBRARY_PATH");
+        String libFirst = "libpvfs2.so";
+        String libSecond = "libofs-s.so";
         try {
-            System.load(ldlpath + "/libPVFS2STDIOJNI.so");
+            System.load(ldlPath + "/" + libFirst);
         }
         catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
-            System.err.println("Couldn't load libPVFS2STDIOJNI.so.");
-            System.err.println("JNI_LIBRARY_PATH = "
-                    + System.getenv("JNI_LIBRARY_PATH"));
+            System.err.println("Couldn't load " + libFirst);
+            System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
+            System.exit(-1);
+        }
+        try {
+            System.load(ldlPath + "/" + libSecond);
+        }
+        catch (UnsatisfiedLinkError error) {
+            error.printStackTrace();
+            System.err.println("Couldn't load " + libSecond);
+            System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }
     }
@@ -27,8 +36,6 @@ public class PVFS2STDIOJNI {
     public PVFS2STDIOJNI() {
         this.f = this.fillPVFS2STDIOJNIFlags();
     }
-
-    public native long calloc(long nmemb, long size);
 
     public native void clearerr(long stream);
 
@@ -44,7 +51,7 @@ public class PVFS2STDIOJNI {
 
     public native long fdopen(int fd, String mode);
 
-    public native long fdopendir(int fd);
+    public native Dirent fdopendir(int fd);
 
     public native int feof(long stream);
 
@@ -62,22 +69,19 @@ public class PVFS2STDIOJNI {
 
     public native int fgetcUnlocked(long stream);
 
-    public native String fgets(String s, int size, long stream);
+    public native String fgets(int size, long stream);
 
-    public native String fgetsUnlocked(String s, int size, long stream);
+    public native String fgetsUnlocked(int size, long stream);
 
     public native int fileno(long stream);
 
     public native int filenoUnlocked(long stream);
 
-    /* ========== PVFS2STDIOJNI Native Methods START ========== */
     public native PVFS2STDIOJNIFlags fillPVFS2STDIOJNIFlags();
 
     public native void flockfile(long stream);
 
     public native long fopen(String path, String mode);
-
-    public native long fopen64(String path, String mode);
 
     public native int fputc(int c, long stream);
 
@@ -92,19 +96,11 @@ public class PVFS2STDIOJNI {
     public native long freadUnlocked(byte[] ptr, long size, long nmemb,
             long stream);
 
-    public native void free(long ptr);
-
     public native long freopen(String path, String mode, long stream);
-
-    public native long freopen64(String path, String mode, long stream);
 
     public native int fseek(long stream, long offset, long whence);
 
-    public native int fseek64(long stream, long offset, long whence);
-
     public native long fseeko(long stream, long offset, long whence);
-
-    public native long fseeko64(long stream, long offset, long whence);
 
     public native long ftell(long stream);
 
@@ -127,21 +123,15 @@ public class PVFS2STDIOJNI {
 
     public native String[] getFilesInDir(String path);
 
-    public native String gets(String s);
-
     public native String[] getUsernameGroupname(int uid, int gid);
 
     public native int getw(long stream);
-
-    public native long malloc(long size);
 
     public native String mkdtemp(String tmplate);
 
     public native int mkstemp(String tmplate);
 
     public native Dirent opendir(String name);
-
-    public native void perror(String s);
 
     public native int putc(int c, long stream);
 
@@ -155,6 +145,8 @@ public class PVFS2STDIOJNI {
 
     public native int putw(int wd, long stream);
 
+    public native long readdir(long dirp);
+
     public native int recursiveDelete(String path);
 
     public native int remove(String path);
@@ -163,14 +155,11 @@ public class PVFS2STDIOJNI {
 
     public native void seekdir(long dir, long offset);
 
-    public native void setbuf(long stream, String buf);
-
-    public native void setbuffer(long stream, String buf, long size);
-
-    public native void setlinebuf(long stream);
-
-    public native int setvbuf(long stream, long buf, long mode, long size);
-
+    /* TODO - use NIO ByteBuffer */
+    /* public native void setbuf(long stream, String buf); */
+    /* public native void setbuffer(long stream, String buf, long size); */
+    /* public native void setlinebuf(long stream); */
+    /* public native int setvbuf(long stream, long buf, long mode, long size); */
     public native long telldir(long dir);
 
     public native long tmpfile();

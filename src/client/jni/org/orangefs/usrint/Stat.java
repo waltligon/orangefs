@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.orangefs.usrint;
 
 import java.lang.reflect.Field;
@@ -36,13 +35,10 @@ public class Stat {
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
-
         result.append(this.getClass().getName());
         result.append(" Object {");
         result.append(newLine);
-
         Field[] fields = this.getClass().getDeclaredFields();
-
         for (Field field : fields) {
             result.append("  ");
             try {

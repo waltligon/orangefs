@@ -12,12 +12,13 @@ public class PVFS2STDIOJNIFlags {
      * Fields set by JNI function fill_PVFS2STDIOJNIFlags. See
      * libPVFS2STDIOJNI.c
      */
+    
+    /* seek whence */
     public long SEEK_SET;
     public long SEEK_CUR;
     public long SEEK_END;
-    public long O_EXCL;
-    public long O_APPEND;
-    public long O_SYNC;
+    
+    /* readdir d_type */
     public long DT_BLK;
     public long DT_CHR;
     public long DT_DIR;
@@ -26,6 +27,8 @@ public class PVFS2STDIOJNIFlags {
     public long DT_REG;
     public long DT_SOCK;
     public long DT_UNKNOWN;
+    
+    /* setvbuf modes */
     public long _IONBF;
     public long _IOLBF;
     public long _IOFBF;

@@ -45,8 +45,8 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         }
         channelBuffer.flip();
         if (channelBuffer.hasRemaining()) {
-            long ret = orange.posix.write(fd, channelBuffer,
-                    channelBuffer.remaining());
+            long ret = orange.posix.write(fd, channelBuffer, channelBuffer
+                    .remaining());
             if (ret < 0) {
                 throw new IOException("write error");
             }
