@@ -10,7 +10,6 @@
 
 #include "pvfs2-types.h"
 #include "server-config.h"
-#include "job.h"
 
 /* helper function to calculate the TOTAL size of the layout, so we can allocate
  * all of the space as one contiguous chunk.
@@ -59,33 +58,21 @@ enum replication_endpoint_states
 
 typedef enum replication_endpoint_states replication_endpoint_state;
 
-struct replication_endpoint_status
+struct replication_endpoint_status_s
 {
    replication_endpoint_state state;
    int error_code;
    PVFS_size bytes_handled;
 };
 
-typedef struct replication_endpoint_status replication_endpoint_status;
+typedef struct replication_endpoint_status_s replication_endpoint_status_t;
 
 
 /* helper function to print the replication endpoint status information */
-void replication_endpoint_status_print(replication_endpoint_status *, int);
+void replication_endpoint_status_print(replication_endpoint_status_t *, int);
 
 /* helper funtion to retrieve the string value of a replication state */
 const char *get_replication_endpoint_state_as_string(replication_endpoint_state);
-
-struct replicate_descriptor
-{
-   PVFS_handle handle;
-   PVFS_size bstream_size;
-   PVFS_error resp_status;
-   PVFS_msg_tag_t session_tag;
-   PVFS_BMI_addr_t svr_addr;
-   job_status_s recv_status;
-};
-
-typedef struct replicate_descriptor replicate_descriptor_s;
 
 #endif /* __REPLICATION_COMMON_UTILS_H */
 /*

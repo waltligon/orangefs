@@ -72,7 +72,7 @@ struct fp_queue_item
     int seq;
     void *buffer;
     int buffer_in_use; /*used by replication*/
-    replication_endpoint_status *res; /* used by replication to store status info */
+    replication_endpoint_status_t *res; /* used by replication to store status info */
     PVFS_size buffer_used;
     PVFS_size out_size;
     struct result_chain_entry result_chain;

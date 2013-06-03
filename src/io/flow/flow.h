@@ -18,6 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-storage.h"
+#include "replication-common-utils.h"
 
 /********************************************************************
  * endpoint structure 
@@ -110,7 +111,7 @@ struct flow_descriptor
     int    next_dest_count;          /*number of replication endpoints */
 
     /* replication status structure */
-    replication_endpoint_status *res;
+    replication_endpoint_status_t *res;
     int res_count;
 
     PVFS_msg_tag_t tag;		/* matching session tag */

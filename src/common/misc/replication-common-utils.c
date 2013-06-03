@@ -177,7 +177,7 @@ void print_sys_layout_structure ( PVFS_sys_layout *layout_p )
 
 
 /* helper function to print the replication endpoint status structure */
-void replication_endpoint_status_print(replication_endpoint_status *res_status
+void replication_endpoint_status_print(replication_endpoint_status_t *res_status
                                       ,int res_status_count)
 {
 

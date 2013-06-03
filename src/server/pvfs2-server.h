@@ -25,6 +25,7 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
+#include "replication-server-utils.h"
 #include "job.h"
 #include "bmi.h"
 #include "trove.h"
@@ -526,10 +527,10 @@ struct PINT_server_io_op
     int primary_flow_error_code;
     int primary_flow_received;
 
-    replicate_descriptor_s *replicate_d;
+    replicate_descriptor_t *replicate_d;
     int replicate_d_count;
 
-    replication_endpoint_status *res;
+    replication_endpoint_status_t *res;
     int res_count;
 };
 

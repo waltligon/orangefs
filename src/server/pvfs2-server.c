@@ -27,7 +27,6 @@
 
 #include "bmi.h"
 #include "gossip.h"
-#include "replication-common-utils.h"
 #include "job.h"
 #include "trove.h"
 #include "pvfs2-server.h"
