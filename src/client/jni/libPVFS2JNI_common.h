@@ -11,7 +11,7 @@
 /* Uncomment the following line to enable debugging information for the C side 
  * of the OrangeFS JNI Layer 
  */
-#define JNI_DEBUG
+//#define JNI_DEBUG
 
 /* Helpful Debugging Macros for JNI Layer */
 #if defined(JNI_DEBUG) /* Enable debugging information for JNI Layer. */
