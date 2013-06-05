@@ -16,6 +16,9 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb);
 static void aiocommon_finish_op(struct pvfs_aiocb *p_cb);
 static void *aiocommon_progress(void *ptr);
 
+/* aio initialization flag */
+static int aiocommon_init_flag = 0;
+
 /* linked list variables used to implement aio structures */
 static struct qlist_head *aio_waiting_list = NULL;
 static struct qlist_head *aio_running_list = NULL;
@@ -26,6 +29,7 @@ static pthread_t aio_progress_thread;
 static int aio_progress_status = PVFS_AIO_PROGRESS_IDLE;
 static int aio_num_ops_running = 0;
 static PVFS_sys_op_id aio_running_ops[PVFS_AIO_MAX_RUNNING] = {0};
+static gen_cond_t aio_ops_to_run = GEN_COND_INITIALIZER; 
 
 /* prototypes for aio initializers */
 static int aio_io_init(struct pvfs_aiocb *p_cb);
@@ -121,6 +125,10 @@ int aiocommon_init(void)
     }
     INIT_QLIST_HEAD(aio_running_list);
 
+    pthread_create(&aio_progress_thread, NULL, aiocommon_progress, NULL);
+
+    aiocommon_init_flag = 1;
+
     gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
 
     return 0;
@@ -130,12 +138,18 @@ int aiocommon_init(void)
 void aiocommon_submit_op(struct pvfs_aiocb *p_cb)
 {
     p_cb->error_code = EINPROGRESS;
+
     gen_mutex_lock(&aio_wait_list_mutex);
+    if (!aiocommon_init_flag)
+    {
+        aiocommon_init();
+    }    
+
     qlist_add_tail(&(p_cb->link), aio_waiting_list);
     if (aio_progress_status == PVFS_AIO_PROGRESS_IDLE)
     {
-        pthread_create(&aio_progress_thread, NULL, aiocommon_progress, NULL);
         aio_progress_status = PVFS_AIO_PROGRESS_RUNNING;
+        pthread_cond_signal(&aio_ops_to_run);
     }
     gen_mutex_unlock(&aio_wait_list_mutex);
 
@@ -250,7 +264,6 @@ static void *aiocommon_progress(void *ptr)
     int err_code_array[PVFS_AIO_MAX_RUNNING] = {0};
     struct pvfs_aiocb *pcb_array[PVFS_AIO_MAX_RUNNING] = {NULL};
 
-    pvfs_sys_init();
     gossip_debug(GOSSIP_USRINT_DEBUG, "AIO progress thread starting up\n");
 
     /* progress thread */
@@ -266,10 +279,14 @@ static void *aiocommon_progress(void *ptr)
         if (!aio_num_ops_running && qlist_empty(aio_waiting_list))
         {
             gossip_debug(GOSSIP_USRINT_DEBUG,
-                         "No AIO requests waiting, progress thread exiting\n");
+                         "No AIO requests waiting, progress thread suspending\n");
             aio_progress_status = PVFS_AIO_PROGRESS_IDLE;
+            while (qlist_empty(aio_waiting_list))
+            {
+                pthread_cond_wait(&aio_ops_to_run, &aio_wait_list_mutex);
+            }
             gen_mutex_unlock(&aio_wait_list_mutex);
-            pthread_exit(NULL);
+            continue;
         }
         gen_mutex_unlock(&aio_wait_list_mutex);
 
