@@ -13,11 +13,7 @@
 #ifndef POSIX_PXFS_H
 #define POSIX_PXFS_H 1
 
-#include "usrint.h"
-#include "posix-ops.h"
-#include "openfile-util.h"
-#include "iocommon.h"
-#include "aiocommon.h"
+#include "pvfs2-usrint.h"
 
 typedef int (*pxfs_cb)(void *cdat, int status);
 
@@ -387,4 +383,3 @@ extern int pxfs_acl_set_file(const char *path_p, acl_type_t type, acl_t acl,
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
