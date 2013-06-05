@@ -16,9 +16,6 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb);
 static void aiocommon_finish_op(struct pvfs_aiocb *p_cb);
 static void *aiocommon_progress(void *ptr);
 
-/* aio initialization flag */
-static int aiocommon_init_flag = 0;
-
 /* linked list variables used to implement aio structures */
 static struct qlist_head *aio_waiting_list = NULL;
 static struct qlist_head *aio_running_list = NULL;
@@ -107,7 +104,11 @@ void (*aio_op_finalizers[])(struct pvfs_aiocb *) =
  ************************************************************
  */
 
-/* Initialization of PVFS AIO system */
+/* Initialization of PVFS AIO system 
+ * Note: constructor attribute allows this initialization to be executed before
+ * applications can call into the aio interface
+ */
+__attribute__ ((__constructor__))
 int aiocommon_init(void)
 {
     /* initialize waiting, running, and finished lists for aio implementation */
@@ -127,8 +128,6 @@ int aiocommon_init(void)
 
     pthread_create(&aio_progress_thread, NULL, aiocommon_progress, NULL);
 
-    aiocommon_init_flag = 1;
-
     gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
 
     return 0;
@@ -140,11 +139,6 @@ void aiocommon_submit_op(struct pvfs_aiocb *p_cb)
     p_cb->error_code = EINPROGRESS;
 
     gen_mutex_lock(&aio_wait_list_mutex);
-    if (!aiocommon_init_flag)
-    {
-        aiocommon_init();
-    }    
-
     qlist_add_tail(&(p_cb->link), aio_waiting_list);
     if (aio_progress_status == PVFS_AIO_PROGRESS_IDLE)
     {
