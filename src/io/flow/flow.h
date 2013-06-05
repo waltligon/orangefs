@@ -18,7 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-storage.h"
-#include "replication-common-utils.h"
+#include "replication-server-utils.h"
 
 /********************************************************************
  * endpoint structure 
@@ -38,7 +38,6 @@ struct BMI_endpoint_data
 {
     PVFS_BMI_addr_t address;
     PVFS_msg_tag_t tag; /*used for replication operations*/    
-    int resp_status; /* used for replication operations */
 };
 
 /* describes trove interface endpoints */
@@ -110,9 +109,10 @@ struct flow_descriptor
     struct flow_endpoint *next_dest; /* replication endpoint */
     int    next_dest_count;          /*number of replication endpoints */
 
-    /* replication status structure */
-    replication_endpoint_status_t *res;
-    int res_count;
+    /* replication status structure. will be tied to io.sm status structure */
+    replicate_descriptor_t *repl_d;
+    int repl_d_count;
+    int repl_local_flow_index;
 
     PVFS_msg_tag_t tag;		/* matching session tag */
 

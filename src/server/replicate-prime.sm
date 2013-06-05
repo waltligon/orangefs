@@ -109,23 +109,16 @@ nested machine pvfs2_contact_replicate_servers_sm
     state xfer_msgpairs
     {
         jump pvfs2_msgpairarray_sm;
-        default => set_status;
+        default => start_recvs_for_completion_ack;
     }
 
-    state set_status
-    {
-        run contact_set_status;
-        success => start_recvs_for_completion_ack;
-        default => return;
-    }
-
-    state start_recvs_for_completion_ack
+    state contact_post_bmi_recv_for_final_ack
     {
         /* a non-zero error_code from this state signifies that NONE of the BMI recv posts
          * were successful.  a ZERO error_code indicates that AT LEAST ONE  BMI recv post
          * was successful.
          */
-        run contact_start_recvs;
+        run contact_post_bmi_recv_for_final_ack;
         default => return;
     }
 
@@ -252,15 +245,16 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->next_dest_count = s_op->req->u.io.replication_number_of_copies;
 
     /* pass along replication status information through the flow descriptor */
-    s_op->u.io.flow_d->res       = s_op->u.io.res;
-    s_op->u.io.flow_d->res_count = s_op->u.io.res_count;
+    s_op->u.io.flow_d->repl_d                = s_op->u.io.replicate_d;
+    s_op->u.io.flow_d->repl_d_count          = s_op->u.io.replicate_d_count;
+    s_op->u.io.flow_d->repl_local_flow_index = s_op->u.io.replicate_local_flow_index;
 
-    gossip_lerr("%s:s_op->u.io.flow_d->res(%p) s_op->u.io.res(%p)\n"
-               ,__func__,s_op->u.io.flow_d->res,s_op->u.io.res);
-    for (i=0; i<s_op->u.io.flow_d->res_count; i++)
+    gossip_lerr("%s:s_op->u.io.flow_d->repl_d.(%p) s_op->u.io.replicate_d(%p)\n"
+               ,__func__,s_op->u.io.flow_d->repl_d,s_op->u.io.replicate_d);
+    for (i=0; i<s_op->u.io.flow_d->repl_d_count; i++)
     {
-        gossip_err("&s_op->u.io.flow_d->res[%d]:(%p) &s_op->u.io.res[%d]:(%p)\n"
-       ,i,&s_op->u.io.flow_d->res[i],i,&s_op->u.io.res[i]);
+        gossip_err("&s_op->u.io.flow_d->repl_d[%d]:(%p) &s_op->u.io.replicate_d[%d]:(%p)\n"
+       ,i,&s_op->u.io.flow_d->repl_d[i],i,&s_op->u.io.replicate_d[i]);
     }
 
 
@@ -326,13 +320,14 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
         s_op->u.io.flow_d->dest.endpoint_id = REPLICATION_ENDPOINT;
 
-
-        for (i=0; i<s_op->u.io.flow_d->next_dest_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
-        {
+        /* it is possible that NONE of the replicate servers are RUNNING, depending on the results of the
+         * initial contact.
+         */
+        for (i=0; i<s_op->u.io.flow_d->next_dest_count && s_op->u.io.replicate_d[i].endpt_status.state == RUNNING; i++)
+        
             s_op->u.io.flow_d->next_dest[i].endpoint_id       = BMI_ENDPOINT;
             s_op->u.io.flow_d->next_dest[i].u.bmi.address     = s_op->u.io.replicate_d[i].svr_addr;
             s_op->u.io.flow_d->next_dest[i].u.bmi.tag         = s_op->u.io.replicate_d[i].session_tag;
-            s_op->u.io.flow_d->next_dest[i].u.bmi.resp_status = s_op->u.io.replicate_d[i].resp_status;
         }
 
         s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
@@ -354,9 +349,10 @@ static PINT_sm_action io_start_flow(
     }
 
     gossip_err("%s\n",__func__);
-    //replication_endpoint_status_print(s_op->u.io.res,s_op->u.io.res_count);
-    replication_endpoint_status_print(s_op->u.io.flow_d->res,s_op->u.io.flow_d->res_count);
-
+    for (i=0; i<s_op->u.io.flow_d->repl_local_flow_index; i++)
+    {
+       replication_endpoint_status_print(&(s_op->u.io.flow_d->repl_d[i].endpt_status),1);
+    }
 
     gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, PRIMARY_FLOW, js_p, &tmp_id
@@ -551,37 +547,50 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
 
     js_p->error_code = 0;
 
-    /* create storage for the results of each msgpair */
-    s_op->u.io.replicate_d = calloc(io->replication_number_of_copies,
+    /* create storage for job-status and job-id for each replica */
+    s_op->u.io.replicate_recv_status = calloc(io->replication_number_of_copies,
+                                              sizeof(*s_op->u.io.replicate_recv_status));
+    if (!s_op->u.io.replicate_recv_status)
+    {
+       gossip_lerr("Error allocating memory for replicate_recv_status.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+    }
+
+    s_op->u.io.replicate_recv_job_id = calloc(io->replication_number_of_copies,
+                                              sizeof(*s_op->u.io.replicate_recv_job_id));
+    if (!s_op->u.io.replicate_recv_job_id)
+    {
+       gossip_lerr("Error allocating memory for replicate_recv_job_id.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+    }
+
+    /* create storage for the status of each replica flow plus the local flow. */
+    s_op->u.io.replicate_d = calloc(io->replication_number_of_copies + 1,
                                     sizeof(*s_op->u.io.replicate_d));
     if (!s_op->u.io.replicate_d)
     {
        gossip_lerr("Error allocating memory for replicate_d.\n");
        js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
-    }
-    s_op->u.io.replicate_d_count = io->replication_number_of_copies;
-
-    /* create storage for the status of each replica and the original */
-    s_op->u.io.res_count = io->replication_number_of_copies + 1;
-    s_op->u.io.res = malloc(s_op->u.io.res_count * sizeof(*s_op->u.io.res));
-    if (!s_op->u.io.res)
-    {
-       gossip_lerr("Error allocating memory for replication status structure.\n");
-       js_p->error_code = -PVFS_ENOMEM;
        goto error_exit;
     }
-    for (i=0; i<s_op->u.io.res_count; i++)
+    /* replicate_d_count identifies the replicate flows in the array */
+    s_op->u.io.replicate_d_count = io->replication_number_of_copies;
+
+    /* replicate_local_flow_index identifies the local flow in the array */
+    s_op->u.io.replicate_local_flow_index = s_op->u.io.replicate_d_count;
+
+    for (i=0; i<s_op->u.io.replicate_d_count; i++)
     {
-        s_op->u.io.res[i].state = PENDING;
-        s_op->u.io.res[i].error_code = 0;
+        s_op->u.io.replicate_d[i].endpt_status.state = PENDING;
     }
-    /* the last member of the res array will hold the status for the writes/reads to the local machine; 
-     * the other res array members will hold the statuses for the replica servers.  The statuses for
-     * the replica servers will be changed depending on the results of the initial contacts.  For the
-     * local machine, we go ahead and set the state to RUNNING.
+    /* the last member of the replicate_d array will hold the status for the writes/reads to the local flow; 
+     * the other replicate_d array members will hold the statuses for the replica flows.  The statuses for
+     * the replica flows will be changed depending on the results of the initial contacts.  For the
+     * local flow, we go ahead and set the state to RUNNING.
      */
-    s_op->u.io.res[s_op->u.io.res_count-1].state = RUNNING;
+    s_op->u.io.replicate_d[s_op->u.io.replicate_local_flow_index].endpt_status.state = RUNNING;
 
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
@@ -592,7 +601,7 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     {
        gossip_lerr("Error initializing msgpairarray.\n");
        js_p->error_code = ret;
-       return SM_ACTION_COMPLETE;
+       goto error_exit;
     }
 
     /* setup PVFS_SERV_REPLICATE_NEXT requests, one for each copy */
@@ -612,7 +621,7 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
         {
            gossip_lerr("Error mapping handle(%llu) to BMI server address.\n",llu(msg_p->handle));
            js_p->error_code = ret;
-           return SM_ACTION_COMPLETE;
+           goto error_exit;
         }
 
         /* pass along the data from PVFS_SERV_REPLICATE_PRIME request*/
@@ -636,9 +645,8 @@ error_exit:
     }
     s_op->u.io.replicate_d = NULL;
     s_op->u.io.replicate_d_count = 0;
+    s_op->u.io.replicate_local_flow_index = 0;
 
-    s_op->u.io.res = NULL;
-    s_op->u.io.res_count = 0;
     return SM_ACTION_COMPLETE;
 }/*end contact_setup_msgpairs*/
 
@@ -672,14 +680,14 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
         s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
     }
 
-    s_op->u.io.res[i].error_code   = resp_p->status;
-    if (s_op->u.io.res[i].error_code)
+    s_op->u.io.replicate_d[i].endpt_status.error_code   = resp_p->status;
+    if (s_op->u.io.replicate_d[i].endpt_status.error_code)
     {
-        s_op->u.io.res[i].state = FAILED_INITIAL_CONTACT;
+        s_op->u.io.replicate_d[i].endpt_status.state = FAILED_INITIAL_CONTACT;
     }
     else
     {
-        s_op->u.io.res[i].state = RUNNING;
+        s_op->u.io.replicate_d[i].endpt_status.state = RUNNING;
     }
 
     resp_p->status=0;
@@ -687,7 +695,9 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     return (0);
 }/*end contact_replicate_comp_fn*/
 
-
+/* I am removing this step.  If none of the replicate servers respond, we will continue
+ * with the flow to the local data server.
+ */
 static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -699,8 +709,10 @@ static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *j
      */
     for (i=0; i<s_op->u.io.replicate_d_count; i++)
     {
-        gossip_lerr("s_op->u.io.replicate_d[%d].resp_status:(%d)\n",i,s_op->u.io.replicate_d[i].resp_status);
-        if (s_op->u.io.replicate_d[i].resp_status == 0)
+        gossip_lerr("s_op->u.io.replicate_d[%d].endpt_status.error_code:(%d)\n"
+                    ,i
+                    ,s_op->u.io.replicate_d[i].endpt_status.error_code);
+        if (s_op->u.io.replicate_d[i].endpt_status.error_code == 0)
         {
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
@@ -716,7 +728,7 @@ static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *j
 
 
 
-static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int max_resp_sz=0;
@@ -730,12 +742,11 @@ static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *
     max_resp_sz = PINT_encode_calc_max_size( PINT_ENCODE_RESP
                                             ,PVFS_SERV_WRITE_COMPLETION
                                             ,fs_config->encoding );
-    js_p->error_code = 0;
 
-    /* for each server that was contacted successfully, post a BMI RECV, which waits for an
-     * acknowledgement that the flow completed or failed.
+    /* for each server that was contacted successfully, post a BMI RECV, which waits for the final
+     * acknowledgement (for writes only) that the flow completed or failed.
      */
-    for (i=0; i<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
+    for (i=0; i<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[i].endpt_status.state  == RUNNING; i++)
     {
         s_op->u.io.replicate_d[i].encoded_resp_p = BMI_memalloc( s_op->u.io.replicate_d[i].svr_addr
                                                                 ,max_resp_sz
@@ -752,7 +763,7 @@ static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *
                            s_op->u.io.replicate_d[i].session_tag,
                            BMI_PRE_ALLOC,
                            smcb,
-                           NEXT_FLOW + i, /*the status_user_tag will identify the replicate server in our list*/
+                           NEXT_FLOW + i, /*the status_user_tag contains the index into the replicate_d array */
                            &s_op->u.io.replicate_d[i].recv_status,
                            &s_op->u.io.replicate_d[i].recv_job_id,
                            server_job_context,
@@ -761,45 +772,32 @@ static PINT_sm_action contact_start_recvs(struct PINT_smcb *smcb, job_status_s *
         if (ret == 1 && s_op->u.io.replicate_d[i].recv_status.error_code)
         {
            /* error posting job */
-           js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code;
-           continue;;
+
+           /* Cancel the request? */
+           s_op->u.io.replicate_d[i].endpt_status.error_code = s_op->u.io.replicate_d[i].recv_status.error_code;
+           s_op->u.io.replicate_d[i].endpt_status.state = FAILED_INITIAL_BMI_RECV_POST;
+           continue;
         }
         else if (ret == 1)
         {
            /* immediate completion.  since we haven't started the flows yet, something is */
            /* wrong with this picture!                                                    */
-           js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code = -PVFS_EINVAL;
+           s_op->u.io.replicate_d[i].endpt_status.error_code = -PVFS_EINVAL;
+           s_op->u.io.replicate_d[i].endpt_status.state = FAILED_INITIAL_BMI_RECV_POST;
            continue;
         }
         else if (ret != 0)
         {
            /* error adding job to job mgr */
-           js_p->error_code = s_op->u.io.replicate_d[i].recv_status.error_code = ret;
+           s_op->u.io.replicate_d[i].endpt_status.error_code = ret;
+           s_op->u.io.replicate_d[i].endpt_status.state = FAILED_INITIAL_BMI_RECV_POST;
            continue;
         }
     }/*end for*/
 
-    if (js_p->error_code == 0)
-    {
-       /* ALL bmi recvs posted successfully */
-       return SM_ACTION_COMPLETE;
-    } 
-    else 
-    {
-       /* At least ONE bmi recv posted unsuccessfully.  Were there others that DID complete successfully? */
-       /* If so, then continue on with its processing.                                                    */
-       for (i=0; i<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[i].resp_status == 0; i++)
-       {
-           if ( s_op->u.io.replicate_d[i].recv_status.error_code == 0 )
-           {
-              js_p->error_code = 0;
-              return SM_ACTION_COMPLETE;
-           }
-       }/*end for*/
-    }/*end if*/
-
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
-}/*end contact_start_recvs*/
+}/*end contact_post_bmi_recv_for_final_ack*/
 
 
 

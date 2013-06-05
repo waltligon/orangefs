@@ -8,20 +8,17 @@
 #ifndef __REPLICATION_SERVER_UTILS_H
 #define __REPLICATION_SERVER_UTILS_H
 
-#include "job.h"
 #include "replication-common-utils.h"
 
 struct replicate_descriptor_s
 {
    PVFS_handle handle;
    PVFS_size bstream_size;
-   PVFS_error resp_status;
    PVFS_msg_tag_t session_tag;
    PVFS_BMI_addr_t svr_addr;
    void *encoded_resp_p;
-   job_status_s recv_status;
-   job_id_t recv_job_id;
    int received;
+   replication_endpoint_status_t *endpt_status; 
 };
 
 typedef struct replicate_descriptor_s replicate_descriptor_t;

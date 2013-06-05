@@ -529,9 +529,10 @@ struct PINT_server_io_op
 
     replicate_descriptor_t *replicate_d;
     int replicate_d_count;
+    int replicate_local_flow_index;
 
-    replication_endpoint_status_t *res;
-    int res_count;
+    job_status_s *replicate_recv_status;
+    job_id_t     *replicate_recv_job_id;
 };
 
 struct PINT_server_small_io_op
