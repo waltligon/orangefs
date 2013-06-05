@@ -258,6 +258,7 @@ static void *aiocommon_progress(void *ptr)
     int err_code_array[PVFS_AIO_MAX_RUNNING] = {0};
     struct pvfs_aiocb *pcb_array[PVFS_AIO_MAX_RUNNING] = {NULL};
 
+    pvfs_sys_init();
     gossip_debug(GOSSIP_USRINT_DEBUG, "AIO progress thread starting up\n");
 
     /* progress thread */
