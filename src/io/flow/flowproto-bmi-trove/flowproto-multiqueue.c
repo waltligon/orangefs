@@ -641,7 +641,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
          */
         if (flow_d->next_dest_count > 0)
         {
-           flow_data->prealloc_array[i].replicas = calloc(flow_d->next_dest_count
+           flow_data->prealloc_array[i].replicas = calloc(flow_d->repl_d_total_count
                                                          ,sizeof(*flow_data->prealloc_array[i].replicas));
            if (!flow_data->prealloc_array[i].replicas)
            {
@@ -649,20 +649,21 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
                ret = -PVFS_ENOMEM;
                goto error_exit;
            }
-           flow_data->prealloc_array[i].replica_count = flow_d->next_dest_count;
-           for (j=0; j<flow_d->next_dest_count; j++)
+           flow_data->prealloc_array[i].replica_count = flow_d->repl_d_total_count;
+           for (j=0; j<flow_d->flow_d->repl_d_total_count; j++)
            {
               INIT_QLIST_HEAD(&flow_data->prealloc_array[i].replicas[j].list_link);
               flow_data->prealloc_array[i].replicas[j].parent = flow_d;
               flow_data->prealloc_array[i].replicas[j].replica_parent = &(flow_data->prealloc_array[i]);
-              flow_data->prealloc_array[i].replicas[j].res = &(flow_d->res[j]);
-              gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->res[%d]:(%p)\n"
-                        ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&flow_d->res[j]);
+              flow_data->prealloc_array[i].replicas[j].res = &(flow_d->repl_d[j].endpt_status);
+              gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
+                        ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&(flow_d->repl_d[j].endpt_status));
            }
 
-           flow_data->prealloc_array[i].res = &(flow_d->res[flow_d->res_count - 1]);
-           gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->res[%d]:(%p)\n"
-                     ,__func__,i,flow_data->prealloc_array[i].res,flow_d->res_count - 1,&(flow_d->res[flow_d->res_count - 1]));
+           flow_data->prealloc_array[i].res = &(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status);
+           gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
+                     ,__func__,i,flow_data->prealloc_array[i].res,flow_d->repl_d_local_flow_index
+                     ,&(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status));
            gossip_err("%s:flow_data->prealloc_array[%d].res->state:(%s) error_code:(%d)\n"
                      ,__func__
                      ,i

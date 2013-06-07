@@ -43,10 +43,10 @@ void print_sys_layout_structure ( PVFS_sys_layout *layout_p );
 /* structures used by replication to determine status between server and client */
 enum replication_endpoint_states
 {
-   RUNNING = 0,
-   PENDING,
+   PENDING = 0,
    FAILED_INITIAL_CONTACT,
    FAILED_INITIAL_BMI_RECV_POST,
+   RUNNING,
    FAILED_BMI_POST_RECV,
    FAILED_BMI_POST_SEND,
    FAILED_TROVE_POST_WRITE,

@@ -26,16 +26,18 @@ const char *PINT_layout_str_mapping[] = {     \
  */
 const char *replication_endpoint_states_as_strings[]=
 {
-   "RUNNING",
    "PENDING",
    "FAILED INITIAL CONTACT",
+   "FAILED INITIAL BMI RECV POST",
+   "RUNNING",
    "FAILED BMI POST RECV",
    "FAILED BMI POST SEND",
    "FAILED TROVE POST WRITE",
    "FAILED BMI RECV",
    "FAILED BMI SEND",
    "FAILED TROVE WRITE",
-   "FLOW CANCELLED"
+   "FLOW CANCELLED",
+   "NUMBER OF STATES"
 };
 
 /* helper function to calculate the TOTAL size of the layout, so we can allocate
@@ -186,7 +188,7 @@ void replication_endpoint_status_print(replication_endpoint_status_t *res_status
    gossip_err("Replication Endpoint Status:\n");
    for (i=0; i < res_status_count; i++)
    {
-       gossip_err("\t\t(%i):state=%s \t\t\terror-code=%d\n"
+       gossip_err("\t\t(%i):state=%s \t\t\t\terror-code=%d\n"
                  ,i
                  ,get_replication_endpoint_state_as_string(res_status[i].state)
                  ,res_status[i].error_code);

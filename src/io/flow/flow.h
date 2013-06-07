@@ -111,8 +111,9 @@ struct flow_descriptor
 
     /* replication status structure. will be tied to io.sm status structure */
     replicate_descriptor_t *repl_d;
-    int repl_d_count;
-    int repl_local_flow_index;
+    int repl_d_repl_count;
+    int repl_d_total_count;
+    int repl_d_local_flow_index;
 
     PVFS_msg_tag_t tag;		/* matching session tag */
 

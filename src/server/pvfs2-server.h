@@ -528,8 +528,9 @@ struct PINT_server_io_op
     int primary_flow_received;
 
     replicate_descriptor_t *replicate_d;
-    int replicate_d_count;
-    int replicate_local_flow_index;
+    int replicate_d_repl_count;
+    int replicate_d_total_count;
+    int replicate_d_local_flow_index;
 
     job_status_s *replicate_recv_status;
     job_id_t     *replicate_recv_job_id;
