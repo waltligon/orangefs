@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "libPVFS2JNI_common.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -25,7 +26,6 @@
 #include <unistd.h>
 #include <utime.h>
 #include "org_orangefs_usrint_PVFS2POSIXJNI.h"
-#include "libPVFS2JNI_common.h"
 
 /* Forward Declarations */
 static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst);

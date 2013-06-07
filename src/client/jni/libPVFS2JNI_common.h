@@ -5,18 +5,20 @@
 #define _GNU_SOURCE
 #endif
 
+#ifdef _FORTIFY_SOURCE
+# undef _FORTIFY_SOURCE
+# define _FORTIFY_SOURCE 0
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 
-/* Uncomment the following line to enable debugging information for the C side 
- * of the OrangeFS JNI Layer 
- */
 //#define JNI_DEBUG
 
 /* Helpful Debugging Macros for JNI Layer */
-#if defined(JNI_DEBUG) /* Enable debugging information for JNI Layer. */
+#ifdef JNI_DEBUG
 #undef JNI_DEBUG
-#define JNI_DEBUG 1
+#define JNI_DEBUG 1 /* Enable debugging information for JNI Layer. */
 
 #define JNI_PRINT(...)                                                         \
     do                                                                         \

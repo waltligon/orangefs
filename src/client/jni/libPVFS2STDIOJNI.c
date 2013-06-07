@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "libPVFS2JNI_common.h"
 #include <dirent.h>
 #include <errno.h>
 #include <grp.h>
@@ -14,7 +15,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include "org_orangefs_usrint_PVFS2STDIOJNI.h"
-#include "libPVFS2JNI_common.h"
 
 /* TODO: relocate these maybe to pvfs2-types.h? */
 /* From 'man useradd': "Usernames may only be up to 32 characters long." */
