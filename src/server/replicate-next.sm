@@ -201,6 +201,9 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
+    gossip_lerr("%s:s_op->req->u.io.flow_type(%d) \ts_op->u.io.flow_d->type(%d)\n"
+               ,__func__,(int)s_op->req->u.io.flow_type,(int)s_op->u.io.flow_d->type);
+
     fs_conf = PINT_config_find_fs_id(user_opts, 
                                      s_op->req->u.io.fs_id);
     if(fs_conf)

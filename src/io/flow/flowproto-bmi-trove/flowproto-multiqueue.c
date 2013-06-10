@@ -2724,7 +2724,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
-    error_code = -PVFS_ENOMEM;
+    //error_code = -PVFS_ENOMEM;
 
     gen_mutex_lock(&flow_d->flow_mutex);
 
@@ -2778,17 +2778,21 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
            while (result_iter)
            {
                struct result_chain_entry* re = result_iter;
+
+               flow_data->total_bytes_written += result_iter->out_size;
+               flow_d->total_transferred += result_iter->out_size;
+
                gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
                           ,flow_d
                           ,q_item,__func__
                           ,(int)flow_data->total_bytes_written
                           ,(int)result_iter->out_size);
-               flow_data->total_bytes_written += result_iter->out_size;
-               flow_d->total_transferred += result_iter->out_size;
+
                PINT_perf_count(PINT_server_pc, 
                                PINT_PERF_WRITE,
                                result_iter->result.bytes, 
                                PINT_PERF_ADD);
+
                result_iter = result_iter->next;
 
                /* Free memory if this is not the chain head */
@@ -3064,6 +3068,9 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
         gen_mutex_unlock(&flow_d->flow_mutex);
 
         /* hints should contain BMI_QUEUE hint, so that sends are always queued. */
+        gossip_lerr("%s:flow(%p):flow_d->next_dest[%d].u.bmi.address(%d) tag(%d)\n"
+                   ,__func__,flow_d,i,(int)flow_d->next_dest[i].u.bmi.address
+                                     ,(int)flow_d->next_dest[i].u.bmi.tag);
         ret = BMI_post_send( &replica_q_item->posted_id    
                             ,flow_d->next_dest[i].u.bmi.address
                             ,replica_q_item->buffer

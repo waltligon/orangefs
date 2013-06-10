@@ -48,8 +48,8 @@ machine pvfs2_replicate_prime_sm
     state contact_replicate_servers
     {
         jump pvfs2_contact_replicate_servers_sm;
-        success => send_positive_ack_to_client;
-        default => send_negative_ack_to_client;
+        /*success => send_positive_ack_to_client;*/
+        default => send_positive_ack_to_client;
     }
 
     state send_positive_ack_to_client
@@ -634,6 +634,7 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
         PINT_SERVREQ_REPLICATE_NEXT_FILL(*replicate_prime_req
                                          ,msg_p->req
                                          ,io->replication_handles[i]);
+        gossip_lerr("%s(%d):msg_p->req.u.io.flow_type(%d).\n",__func__,i,(int)msg_p->req.u.io.flow_type);
 
     }/*end for*/ 
 
@@ -752,6 +753,8 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                            server_job_context,
                            server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
                            s_op->req->hints);
+        gossip_lerr("%s:job_bmi_recv:ret(%d) \trecv_status[%d].error_code:(%d).\n"
+                   ,__func__,ret,i,s_op->u.io.replicate_recv_status[i].error_code);
         if (ret == 1 && s_op->u.io.replicate_recv_status[i].error_code)
         {
            /* error posting job */
@@ -855,7 +858,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
     }
 
     /* replicate flow? */
-    index = js_p->status_user_tag = NEXT_FLOW;
+    index = js_p->status_user_tag - NEXT_FLOW;
     s_op->u.io.replicate_recv_status[index] = *js_p;
     s_op->u.io.replicate_d[index].received = 1;
     
