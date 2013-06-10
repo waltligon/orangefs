@@ -18,7 +18,7 @@ struct replicate_descriptor_s
    PVFS_BMI_addr_t svr_addr;
    void *encoded_resp_p;
    int received;
-   replication_endpoint_status_t *endpt_status; 
+   replication_endpoint_status_t endpt_status; 
 };
 
 typedef struct replicate_descriptor_s replicate_descriptor_t;

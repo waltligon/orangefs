@@ -219,7 +219,7 @@ static PINT_sm_action io_start_flow(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i,err = -PVFS_EIO;
+    int i, err;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
@@ -327,7 +327,7 @@ static PINT_sm_action io_start_flow(
          * initial contact.
          */
         for (i=0; i<s_op->u.io.flow_d->next_dest_count && s_op->u.io.replicate_d[i].endpt_status.state == RUNNING; i++)
-        
+        { 
             s_op->u.io.flow_d->next_dest[i].endpoint_id       = BMI_ENDPOINT;
             s_op->u.io.flow_d->next_dest[i].u.bmi.address     = s_op->u.io.replicate_d[i].svr_addr;
             s_op->u.io.flow_d->next_dest[i].u.bmi.tag         = s_op->u.io.replicate_d[i].session_tag;
@@ -502,10 +502,10 @@ static PINT_sm_action io_send_completion_ack(
 
     gossip_lerr("Primary flow status:(%d)\n",s_op->u.io.primary_flow_error_code);
     gossip_lerr("Total Transferred(%lld)\n",(long long int)s_op->u.io.flow_d->total_transferred);
-    for (i=0; i<s_op->u.io.replicate_d_count; i++)
+    for (i=0; i<s_op->u.io.replicate_d_repl_count; i++)
     {
         gossip_lerr("Next flow(%llu) \tstatus(%d)\n",llu(s_op->u.io.replicate_d[i].handle)
-                                                    ,s_op->u.io.replicate_d[i].recv_status.error_code);
+                                                    ,s_op->u.io.replicate_recv_status[i].error_code);
     }
 
     s_op->resp.status = s_op->u.io.primary_flow_error_code;
@@ -570,7 +570,7 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     }
     
     /* set state to PENDING for all replicas */
-    for (i=0; i<s_op->u.io.replicate_d_count; i++)
+    for (i=0; i<s_op->u.io.replicate_d_repl_count; i++)
     {
         s_op->u.io.replicate_d[i].endpt_status.state = PENDING;
     }
@@ -711,39 +711,6 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     return (0);
 }/*end contact_replicate_comp_fn*/
 
-/* I am removing this step.  If none of the replicate servers respond, we will continue
- * with the flow to the local data server.
- */
-static PINT_sm_action contact_set_status(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i;
-
-    /* If we have at least ONE replicate server respond successfully, then 
-     * we will continue normal processing.  If NONE of the replicate servers
-     * respond successfully, then we have a CATASTROPHIC situation.
-     */
-    for (i=0; i<s_op->u.io.replicate_d_count; i++)
-    {
-        gossip_lerr("s_op->u.io.replicate_d[%d].endpt_status.error_code:(%d)\n"
-                    ,i
-                    ,s_op->u.io.replicate_d[i].endpt_status.error_code);
-        if (s_op->u.io.replicate_d[i].endpt_status.error_code == 0)
-        {
-            js_p->error_code = 0;
-            return SM_ACTION_COMPLETE;
-        }
-    }
-
-    js_p->error_code = NONE_CONTACTED_SUCCESSFULLY;
-   
-    return SM_ACTION_COMPLETE;
-}/*end contact_set_status*/
-
-
-
-
-
 static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -780,7 +747,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                            BMI_PRE_ALLOC,
                            smcb,
                            NEXT_FLOW + i, /*the status_user_tag contains the index into the replicate_d array */
-                           &s_op->u.io.replicate_recv_status[i].recv_status,
+                           &s_op->u.io.replicate_recv_status[i],
                            &s_op->u.io.replicate_recv_job_id[i],
                            server_job_context,
                            server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
@@ -796,7 +763,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
            continue;
         }
         else if (ret == 1)
@@ -810,7 +777,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
            continue;
         }
         else if (ret != 0)
@@ -822,7 +789,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
            continue;
         }
     }/*end for*/
@@ -847,9 +814,9 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
                                                                                         ,(int)js_p->actual_size);
 
     gossip_err("Replicate-Prime.sm:%s:\n",__func__);
-    for (i=0; i<s_op->u.io.replicate_local_flow_index; i++)
+    for (i=0; i<s_op->u.io.replicate_d_local_flow_index; i++)
     {
-       replication_endpoint_status_print(s_op->u.io.replicate_d[i].endpt_status,1);
+       replication_endpoint_status_print(&(s_op->u.io.replicate_d[i].endpt_status),1);
     }
 
 
@@ -859,6 +826,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
        if (js_p->error_code < 0)
        {
           gossip_lerr("Error occurred before flows could be started(%d).\n",js_p->error_code);
+          index = s_op->u.io.replicate_d_local_flow_index;
           s_op->u.io.replicate_d[index].endpt_status.error_code = js_p->error_code;
           s_op->u.io.replicate_d[index].endpt_status.state = FAILED_INITIAL_CONTACT;
           js_p->error_code = FLOWS_COMPLETED;
@@ -873,7 +841,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
     {
        gossip_lerr("Primary flow has completed..Actual amount written to local server's storage(%lld)\n"
                   ,(long long int)js_p->actual_size);
-       for (index=0; index<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[index].endpt_status.state >= RUNNING; index++)
+       for (index=0; index<s_op->u.io.replicate_d_repl_count && s_op->u.io.replicate_d[index].endpt_status.state >= RUNNING; index++)
        {
            if ( !s_op->u.io.replicate_d[index].received )
            {
@@ -918,7 +886,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
 
     if (resp->status != 0)
     {
-       s_op->u.io.replicate_d[index].recv_status.error_code = resp->status;
+       s_op->u.io.replicate_recv_status[index].error_code = resp->status;
        PVFS_perror_gossip("Replicate-prime received an error from replicate-next.\n",resp->status);
     }
 
@@ -942,7 +910,7 @@ completion_exit:
    }
 
    /* check the replicate flows */
-   for (index=0; index<s_op->u.io.replicate_d_count && s_op->u.io.replicate_d[index].endpt_status.state >= RUNNING; index++)
+   for (index=0; index<s_op->u.io.replicate_d_repl_count && s_op->u.io.replicate_d[index].endpt_status.state >= RUNNING; index++)
    {
        if (!s_op->u.io.replicate_d[index].received)
        {

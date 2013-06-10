@@ -641,7 +641,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
          */
         if (flow_d->next_dest_count > 0)
         {
-           flow_data->prealloc_array[i].replicas = calloc(flow_d->repl_d_total_count
+           flow_data->prealloc_array[i].replicas = calloc(flow_d->repl_d_repl_count
                                                          ,sizeof(*flow_data->prealloc_array[i].replicas));
            if (!flow_data->prealloc_array[i].replicas)
            {
@@ -649,17 +649,20 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
                ret = -PVFS_ENOMEM;
                goto error_exit;
            }
-           flow_data->prealloc_array[i].replica_count = flow_d->repl_d_total_count;
-           for (j=0; j<flow_d->flow_d->repl_d_total_count; j++)
+           flow_data->prealloc_array[i].replica_count = flow_d->repl_d_repl_count;
+           for (j=0; j<flow_d->repl_d_repl_count; j++)
            {
               INIT_QLIST_HEAD(&flow_data->prealloc_array[i].replicas[j].list_link);
               flow_data->prealloc_array[i].replicas[j].parent = flow_d;
               flow_data->prealloc_array[i].replicas[j].replica_parent = &(flow_data->prealloc_array[i]);
+
+              /* flow status for each replica is kept in the replica q-item, subordinate to the primary q-item */
               flow_data->prealloc_array[i].replicas[j].res = &(flow_d->repl_d[j].endpt_status);
               gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
                         ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&(flow_d->repl_d[j].endpt_status));
            }
 
+           /* The local flow status is kept in the primary q_item */
            flow_data->prealloc_array[i].res = &(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status);
            gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
                      ,__func__,i,flow_data->prealloc_array[i].res,flow_d->repl_d_local_flow_index
@@ -2718,7 +2721,6 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
     int i;
-    int trove_index = flow_d->res_count-1;
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
@@ -2828,7 +2830,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     if (forwarding_is_flow_complete(flow_data))
     {
          gossip_lerr("flow(%p):%s: Write finished\n",flow_d,__func__);
-         if (flow_d->res[trove_index].state == RUNNING)
+         if (flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status.state == RUNNING)
          {
             assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
          }
@@ -2850,15 +2852,15 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
          /* Post another recv operation as long as trove writes are still running or 
           * bmi sends are still running.
           */
-         for (i=0; i<flow_d->res_count; i++)
+         for (i=0; i<flow_d->repl_d_total_count; i++)
          {
-             if (flow_d->res[i].state == RUNNING)
+             if (flow_d->repl_d[i].endpt_status.state == RUNNING)
              {
                 break;
              }
          }
          gen_mutex_unlock(&flow_d->flow_mutex);
-         if (i < flow_d->res_count)
+         if (i < flow_d->repl_d_total_count)
          {
             flow_bmi_recv(q_item,
                           forwarding_bmi_recv_callback_fn);
@@ -2880,8 +2882,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 int forwarding_is_flow_complete(struct fp_private_data* flow_data)
 {
     int is_flow_complete = 0;
+    int i;
     flow_descriptor *flow_d = flow_data->parent;
-    int trove_index = flow_d->res_count-1;
  
     gossip_lerr("flow(%p):Executing %s...\n",flow_d,__func__);
     
@@ -2911,7 +2913,10 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
                        ,(int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count);
             gossip_lerr("flow(%p):flow_data->total_bytes_recv(%d) \ttotal_bytes_written(%d)\n"
                        ,flow_d,(int)flow_data->total_bytes_recvd,(int)flow_data->total_bytes_written);
-            replication_endpoint_status_print(flow_d->res,flow_d->res_count);
+            for (i=0; i<flow_d->repl_d_total_count; i++)
+            {
+                replication_endpoint_status_print(&flow_d->repl_d[i].endpt_status,1);
+            }
             assert(flow_data->total_bytes_recvd ==
                    ((int)flow_data->total_bytes_forwarded/(int)flow_d->next_dest_count));
 
@@ -2920,7 +2925,7 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
              * then all trove calls and updates to total_bytes_written are stopped, even though we are 
              * still receiving and forwarding data to other replicas.
              */
-            if ( flow_d->res[trove_index].state == RUNNING )
+            if ( flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status.state == RUNNING )
             {
                assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
             }
@@ -2946,7 +2951,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     struct fp_queue_item *q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     flow_descriptor *flow_d = flow_data->parent;
-    int i, ret, replica_count=0;
+    int i, ret, running_replica_count=0;
     struct fp_queue_item *replica_q_item = NULL;
 
     gossip_err("flow(%p):q_item(%p):Executing %s...\n",flow_d,q_item,__func__);
@@ -2985,16 +2990,14 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     /* calculate how many replicas that we will attempt to send. We check the intersection of the replicas
      * contacted with those returning a successful response. 
      */
-    for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
+    for (i=0; i<flow_d->repl_d_repl_count && flow_d->repl_d[i].endpt_status.state == RUNNING; i++)
     {
-        replica_count++;
+        running_replica_count++;
     }
 
-    /* Increment the buffer_in_use count by the number of replicas still RUNNING */
-    q_item->buffer_in_use += replica_count;
-
-    /* Increment the number of pending sends by the expected number of replicas. */
-    flow_data->sends_pending += replica_count;
+    /* Increment buffer_in_use and sends_pending by the number of replicas still RUNNING */
+    q_item->buffer_in_use    += running_replica_count;
+    flow_data->sends_pending += running_replica_count;
 
     /* Decrement recv pending count; we just got one from the client */
     flow_data->recvs_pending -= 1;
@@ -3039,7 +3042,7 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     gen_mutex_unlock(&flow_d->flow_mutex);
 
     /* Send data to replica servers */
-    for (i=0; i<flow_d->next_dest_count && flow_d->next_dest[i].u.bmi.resp_status == 0; i++)
+    for (i=0; i<flow_d->repl_d_repl_count && flow_d->repl_d[i].endpt_status.state == RUNNING; i++)
     {
      
         gossip_lerr("flow(%p):q_item(%p):buffer_in_use(%d)\n",flow_d,q_item,q_item->buffer_in_use);
@@ -3211,7 +3214,6 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     struct fp_private_data *flow_data = PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
     flow_descriptor *flow_d = flow_data->parent;
     struct fp_queue_item *q_item = replica_q_item->replica_parent;
-    int trove_index = flow_d->res_count-1;
 
     gossip_lerr("flow(%p):replica_q_item(%p):error_code(%d):Executing %s...\n",flow_d
                                                                               ,replica_q_item
@@ -3280,7 +3282,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     if (forwarding_is_flow_complete(flow_data))
     {
         gossip_lerr("flow(%p):q_item(%p):%s:Finished sending a buffer of data\n",flow_d,q_item,__func__);
-        if (flow_d->res[trove_index].state == RUNNING)
+        if (flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status.state == RUNNING)
         {
             assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
         }
