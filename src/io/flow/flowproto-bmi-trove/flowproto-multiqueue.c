@@ -2724,7 +2724,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
-    //error_code = -PVFS_ENOMEM;
+    error_code = -PVFS_ENOMEM;
 
     gen_mutex_lock(&flow_d->flow_mutex);
 
