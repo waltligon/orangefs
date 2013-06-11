@@ -514,7 +514,7 @@ endif
 #            layer.
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
-CFLAGS += -I$(JAVA_HOME)/include
+CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 JAVAC := $(JAVA_HOME)/bin/javac
 JAVAH := $(JAVA_HOME)/bin/javah
 JAR := $(JAVA_HOME)/bin/jar
