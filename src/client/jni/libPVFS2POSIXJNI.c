@@ -29,7 +29,7 @@
 
 /* Forward Declarations */
 static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst);
-static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst);
+//static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst);
 static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst);
 static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst);
 
@@ -85,6 +85,7 @@ static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
 }
 
 /* Convert allocated structure to an instance of our Statfs Class */
+#if 0
 static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
 {
     int num_fields = 12;
@@ -165,6 +166,7 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
     free(ptr);
     return 0;
 }
+#endif
 
 /* fill_timeval */
 static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
@@ -787,6 +789,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatat(JNIEnv *env, jobject obj, int fd,
 }
 
 /* fstatfs */
+#if 0
 JNIEXPORT jobject JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, int fd)
 {
@@ -813,6 +816,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, int fd)
     }
     return (jobject) 0;
 }
+#endif
 
 /* TODO */
 #if 0
@@ -1439,6 +1443,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat(JNIEnv *env, jobject obj,
 }
 
 /* statfs */
+#if 0
 JNIEXPORT jobject JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_statfs(JNIEnv *env, jobject obj,
         jstring path)
@@ -1471,6 +1476,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_statfs(JNIEnv *env, jobject obj,
     }
     return (jobject) 0;
 }
+#endif
 
 /* TODO */
 #if 0
