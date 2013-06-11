@@ -1072,8 +1072,7 @@ AC_ARG_WITH(
     [  --with-jdk=<path>       Enable support for JAVA and JNI.],
     [
         dnl Check for jni.h
-        AC_CHECK_HEADER(
-            [$withval/include/jni.h],
+        AC_CHECK_FILE($withval/include/jni.h,
             [
                 AC_DEFINE(HAVE_JNI_H, 1, Define if jni.h exists at the path given with --with-jdk)
                 JAVA_HOME=$withval
