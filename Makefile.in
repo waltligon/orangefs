@@ -1053,7 +1053,7 @@ $(JNIPOSIXCLS): $(JNIPOSIXJAVA)
 # Force the JNI posix .class files to be a dependency of the header file. 
 $(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -cp $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
 
 # Force the required javah generated header file to be a dependency of the 
 # dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
@@ -1067,7 +1067,7 @@ $(JNISTDIOCLS): $(JNISTDIOJAVA)
 # Force the JNI stdio .class files to be a dependency of the header file.
 $(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -cp $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
 
 # Force the required javah generated header file to be a dependency of the 
 # dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
