@@ -54,6 +54,7 @@ enum replication_endpoint_states
    FAILED_BMI_SEND,
    FAILED_TROVE_WRITE,
    FLOW_CANCELLED,
+   FAILED_FINAL_CONTACT,
    NUMBER_OF_STATES
 };
 
