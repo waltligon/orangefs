@@ -42,17 +42,16 @@ machine pvfs2_replicate_prime_sm
     {
         jump pvfs2_prelude_sm;
         success => contact_replicate_servers;
-        default => send_negative_ack_to_client;
+        default => send_initial_ack_to_client;
     }
 
     state contact_replicate_servers
     {
         jump pvfs2_contact_replicate_servers_sm;
-        /*success => send_positive_ack_to_client;*/
-        default => send_positive_ack_to_client;
+        default => send_initial_ack_to_client;
     }
 
-    state send_positive_ack_to_client
+    state send_initial_ack_to_client
     {
         /* right now, we will always send a positive ack back to the client,
          * because we will always attempt to write to the local server, which
@@ -65,23 +64,17 @@ machine pvfs2_replicate_prime_sm
         default => release;
     }
 
-    state send_negative_ack_to_client
-    {
-        run io_send_ack;
-        default => release;
-    }
-
     state start_flow
     {
         run io_start_flow;
-        default => check_for_completion;
+        default => check_flow_completion;
     }
 
-    state check_for_completion
+    state check_flow_completion
     {
-        run replicate_check_completion;
+        run replicate_check_flow_completion;
         FLOWS_COMPLETED => send_completion_ack_to_client;
-        default => check_for_completion;
+        default => check_flow_completion;
     }
 
     state send_completion_ack_to_client
@@ -500,15 +493,19 @@ static PINT_sm_action io_send_completion_ack(
      * from the "next" flows.
      */
 
-    gossip_lerr("Primary flow status:(%d)\n",s_op->u.io.primary_flow_error_code);
+    gossip_lerr("Primary Error Code:(%d)\n",s_op->u.io.primary_error_code);
     gossip_lerr("Total Transferred(%lld)\n",(long long int)s_op->u.io.flow_d->total_transferred);
-    for (i=0; i<s_op->u.io.replicate_d_repl_count; i++)
+
+    for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
     {
-        gossip_lerr("Next flow(%llu) \tstatus(%d)\n",llu(s_op->u.io.replicate_d[i].handle)
-                                                    ,s_op->u.io.replicate_recv_status[i].error_code);
+        replication_endpoint_status_print(&(s_op->u.io.replicate_d[i].endpt_status),1);
     }
 
-    s_op->resp.status = s_op->u.io.primary_flow_error_code;
+    /* primary_error_code will be zero, unless there is an error within the state machine.  When the 
+     * primary_error_code is zero, then the client is expected to process the data in the response
+     * to determine the next course of action.
+     */
+    s_op->resp.status = s_op->u.io.primary_error_code;
     s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transferred;
 
     err = PINT_encode(
@@ -719,6 +716,8 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
     struct server_configuration_s *server_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_config;
     int i, ret;
+    job_status_s replicate_recv_status = {0};
+    job_id_t replicate_recv_job_id = 0;
 
 
     fs_config = PINT_config_find_fs_id(server_opts,s_op->target_fs_id);
@@ -748,25 +747,25 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                            BMI_PRE_ALLOC,
                            smcb,
                            NEXT_FLOW + i, /*the status_user_tag contains the index into the replicate_d array */
-                           &s_op->u.io.replicate_recv_status[i],
-                           &s_op->u.io.replicate_recv_job_id[i],
+                           &replicate_recv_status,
+                           &replicate_recv_job_id,
                            server_job_context,
                            server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
                            s_op->req->hints);
         gossip_lerr("%s:job_bmi_recv:ret(%d) \trecv_status[%d].error_code:(%d).\n"
-                   ,__func__,ret,i,s_op->u.io.replicate_recv_status[i].error_code);
-        if (ret == 1 && s_op->u.io.replicate_recv_status[i].error_code)
+                   ,__func__,ret,i,replicate_recv_status.error_code);
+        if (ret == 1 && replicate_recv_status.error_code)
         {
            /* error posting job */
 
            /* Cancel the replicate-next request? */
-           s_op->u.io.replicate_d[i].endpt_status.error_code = s_op->u.io.replicate_recv_status[i].error_code;
+           s_op->u.io.replicate_d[i].endpt_status.error_code = replicate_recv_status.error_code;
            s_op->u.io.replicate_d[i].endpt_status.state      = FAILED_INITIAL_BMI_RECV_POST;
            ret=BMI_memfree(s_op->u.io.replicate_d[i].svr_addr
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
            continue;
         }
         else if (ret == 1)
@@ -780,7 +779,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
            continue;
         }
         else if (ret != 0)
@@ -792,7 +791,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(s_op->u.io.replicate_recv_job_id[i],server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
            continue;
         }
     }/*end for*/
@@ -804,7 +803,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
 
 
 
-static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_decoded_msg decoded_resp;
@@ -817,7 +816,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
                                                                                         ,(int)js_p->actual_size);
 
     gossip_err("Replicate-Prime.sm:%s:\n",__func__);
-    for (i=0; i<s_op->u.io.replicate_d_local_flow_index; i++)
+    for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
     {
        replication_endpoint_status_print(&(s_op->u.io.replicate_d[i].endpt_status),1);
     }
@@ -829,17 +828,14 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
        if (js_p->error_code < 0)
        {
           gossip_lerr("Error occurred before flows could be started(%d).\n",js_p->error_code);
-          index = s_op->u.io.replicate_d_local_flow_index;
-          s_op->u.io.replicate_d[index].endpt_status.error_code = js_p->error_code;
-          s_op->u.io.replicate_d[index].endpt_status.state = FAILED_INITIAL_CONTACT;
+          s_op->u.io.primary_error_code = js_p->error_code;
           js_p->error_code = FLOWS_COMPLETED;
           return SM_ACTION_COMPLETE;
        }
     }
 
 
-    /* Which job just finished? */
-    /* local flow? */
+    /* Which job just finished? Local? */
     if (js_p->status_user_tag == PRIMARY_FLOW)
     {
        gossip_lerr("Primary flow has completed..Actual amount written to local server's storage(%lld)\n"
@@ -859,7 +855,6 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
 
     /* replicate flow? */
     index = js_p->status_user_tag - NEXT_FLOW;
-    s_op->u.io.replicate_recv_status[index] = *js_p;
     s_op->u.io.replicate_d[index].received = 1;
     
     /* if js_p->status_code != zero, then we probably received some sort of networking or job timeout       
@@ -869,6 +864,11 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
 
     if (js_p->error_code != 0)
     {
+       if ( s_op->u.io.replicate_d[index].endpt_status.error_code == 0)
+       {
+            s_op->u.io.replicate_d[index].endpt_status.error_code = js_p->error_code;
+            s_op->u.io.replicate_d[index].endpt_status.state = 
+       }
        goto completion_exit;
     }
 
@@ -877,7 +877,7 @@ static PINT_sm_action replicate_check_completion(struct PINT_smcb *smcb, job_sta
                                 ,s_op->u.io.replicate_d[index].encoded_resp_p
                                 ,&decoded_resp
                                 ,&s_op->u.io.replicate_d[index].svr_addr
-                                ,s_op->u.io.replicate_recv_status[index].actual_size
+                                ,s_op->u.io.replicate_recv_status[index].actual_size //same as js_p->actual_size
                                 ,&resp );
     if (ret != 0)
     {
@@ -926,7 +926,7 @@ completion_exit:
    /* we will always send back a zero error code in the response to the client.  the client MUST look at the 
     * data in the repsonse to determine what should happen next on the client side.
     */
-   s_op->u.io.primary_flow_error_code = 0;
+   s_op->u.io.primary_error_code = 0;
 
    js_p->error_code = FLOWS_COMPLETED;
    return SM_ACTION_COMPLETE;
