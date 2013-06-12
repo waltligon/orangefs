@@ -85,8 +85,6 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
-BUILD_USRINT = @BUILD_USRINT@
-BUILD_SYMBOLIC = @BUILD_SYMBOLIC@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
 BUILD_HADOOP = @BUILD_HADOOP@
@@ -124,6 +122,9 @@ endif
 # build which client libs
 build_shared = @build_shared@
 build_static = @build_static@
+build_threaded = @build_threaded@
+build_usrint = @build_usrint@
+build_symbolic = @build_symbolic@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -628,6 +629,7 @@ LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
 endif
+
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
@@ -638,12 +640,12 @@ LIBRARIES_SHARED += lib/libbmi.so
 BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
-ifdef BUILD_USRINT
+ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
-ifdef BUILD_SYMBOLIC
-LIBRARIES_SHARED += lib/libofs-s.so
-endif
+# ifeq ($(build_symbolic),yes)
+# LIBRARIES_SHARED += lib/libofs-s.so
+# endif
 endif
 
 ifneq ($(build_static),yes)
@@ -655,6 +657,12 @@ ifneq ($(build_shared),yes)
 LIBRARIES_SHARED :=
 LIBRARIES_THREADED_SHARED := 
 endif
+
+ifneq ($(build_threaded),yes)
+LIBRARIES_THREADED_SHARED := 
+LIBRARIES_THREADED_STATIC :=
+endif
+
 
 LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
 LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
@@ -968,15 +976,15 @@ lib/libofs.a: $(ULIBOBJS)
 lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-ifdef BUILD_SYMBOLIC
+# ifeq ($(build_symbolic),yes)
 # rule for building the shared ofs library
-lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
-	$(Q) "  LDSO		$@"
-	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
-endif
+# lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
+# 	$(Q) "  LDSO		$@"
+# 	$(E)$(INSTALL) -d lib
+# 	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+# endif
 
 # rules for building virtual libraries
 lib/liborangefs.a: lib/libpvfs2.a

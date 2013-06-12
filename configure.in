@@ -863,57 +863,64 @@ if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
     AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
 fi
 
+dnl shared or static client library
+AC_ARG_ENABLE(threaded,
+[  --enable-threaded         Build threaded client library],
+[build_threaded=$enableval], [build_threaded=no])
+AC_SUBST(build_threaded)
+
 dnl Method to disable build of user interface libraries
 BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
    [  --disable-usrint        Do not build posix and stdio user libraries],
    [if test "x$enableval" = "xyes" ; then
        AC_DEFINE(PVFS_USRINT_BUILD, 1,
-          [Should we build user interface libraries.])
+                 [Should we build user interface libraries.])
        BUILD_USRINT=1
     else
        AC_DEFINE(PVFS_USRINT_BUILD, 0,
-          [Should we build user interface libraries.])
+                 [Should we build user interface libraries.])
     fi
-    AC_SUBST(BUILD_USRINT)
+    build_usrint=$enableval
    ],
    [AC_DEFINE(PVFS_USRINT_BUILD, 1,
-             [Should we build user interface libraries.])
+              [Should we build user interface libraries.])
+    build_usrint=yes
     BUILD_USRINT=1
-    AC_SUBST(BUILD_USRINT)
    ])
+AC_SUBST(build_usrint)
 
-if test "x$BUILD_USRINT" = "x1"; then
+if test "x$build_usrint" = "xyes"; then
 	dnl check if -lrt is required by usrint
 	AX_CHECK_LIB_NEEDS_LIBRT
 fi
  
-BUILD_SYMBOLIC=
 dnl Method to enable symbolic user interface libraries
+BUILD_SYMBOLIC=
 AC_ARG_ENABLE(symbolic,
    [  --enable-symbolic  Build library to force programs to use libofs.so],
    [if test "x$enableval" = "xyes" ; then
-      if test "x$BUILD_USRINT" = "x1" ; then
+      if test "x$build_usrint" = "xyes" -a "x$build_shared" = "xyes" ; then
          AC_DEFINE(PVFS_USRINT_SYMBOLIC, 1,
                [Build library to force programs to use libofs.so.])
          BUILD_SYMBOLIC=1
       else
-         AC_MSG_ERROR([Must build usrint to build symbolic library.])
+         AC_MSG_ERROR([Must build usrint and shared to build symbolic library.])
       fi
    else
       AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
-            [Build library to force programs to use libofs.so.])
+                [Build library to force programs to use libofs.so.])
    fi
-   AC_SUBST(BUILD_SYMBOLIC)
+   build_symbolic=$enableval
    ],
    [AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
-            [Build library to force programs to use libofs.so.])
-    BUILD_SYMBOLIC=0
-    AC_SUBST(BUILD_SYMBOLIC)
+              [Build library to force programs to use libofs.so.])
+    build_symbolic=no
    ])
+AC_SUBST(build_symbolic)
  
-USRINT_KMOUNT=
 dnl Method to enable user interface kmod support
+USRINT_KMOUNT=
 AC_ARG_ENABLE(usrint-kmount,
 [  --enable-usrint-kmount  Assume FS is mounted via kernel],
 [if test "x$enableval" = "xyes" ; then

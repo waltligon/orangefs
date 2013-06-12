@@ -2486,7 +2486,14 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     /* check credentials */
     iocommon_cred(&credentials);
 
-    /* now get attributes */
+    /* Should we automatically set CTIME here?
+     * Seems like a good place to do so, all updates of the "inode" must
+     * go through here, for all potential user level interfaces, so this
+     * might be a good idea.  Should only update if we change owner,
+     * group, permissions, more something else like that.
+     */
+
+    /* now set attributes */
     rc = PVFS_sys_setattr(obj, *attr, credentials, NULL);
     IOCOMMON_CHECK_ERR(rc);
 

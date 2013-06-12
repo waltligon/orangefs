@@ -156,14 +156,6 @@ typedef struct posix_ops_s
     int (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                     struct sockaddr *addr, socklen_t *alen);
     int (*recvmsg)(int sockfd, struct msghdr *msg, int flags);
-    /* int (*select)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
-                  struct timeval *timeout); */
-    /* void (*FD_CLR)(int fd, fd_set *set); */
-    /* void (*FD_ISSET)(int fd, fd_set *set); */
-    /* void (*FD_SET)(int fd, fd_set *set); */
-    /* void (*FD_ZERO)(fd_set *set); */
-    /* int (*pselect)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
-                   const struct timeval *timeout, const sigset_t *sigmask); */
     int (*send)(int sockfd, const void *buf, size_t len, int flags);
     int (*sendto)(int sockfd, const void *buf, size_t len, int flags,
                   const struct sockaddr *addr, socklen_t alen);
@@ -171,6 +163,16 @@ typedef struct posix_ops_s
     int (*shutdown)(int sockfd, int how);
     int (*socketpair)(int d, int type, int prtocol, int sv[2]);
     int (*pipe)(int filedes[2]);
+
+    /* selinux operations */
+    int (*getfscreatecon)(security_context_t *con);
+    int (*getfilecon)(const char *path, security_context_t *con);
+    int (*lgetfilecon)(const char *path, security_context_t *con);
+    int (*fgetfilecon)(int fd, security_context_t *con);
+    int (*setfscreatecon)(security_context_t con);
+    int (*setfilecon)(const char *path, security_context_t con);
+    int (*lsetfilecon)(const char *path, security_context_t con);
+    int (*fsetfilecon)(int fd, security_context_t con);
 } posix_ops;
 
 #ifdef BITDEFS
@@ -202,7 +204,7 @@ typedef struct pvfs_mmap_s
 typedef struct pvfs_descriptor_status_s
 {
     gen_mutex_t lock;         /**< protect struct from mult threads */
-    int dup_cnt;              /**< number of table slots with this des */
+    int dup_cnt;              /**< number of desc using this stat */
     posix_ops *fsops;         /**< syscalls to use for this file */
     PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
     int flags;                /**< the open flags used for this file */
@@ -222,7 +224,7 @@ typedef struct pvfs_descriptor_s
     int fd;                   /**< file number in PVFS descriptor_table */
     int true_fd;              /**< the true file number depending on FS */
     int fdflags;              /**< POSIX file descriptor flags */
-    int shared_status;        /**< descriptor status is shared with parent */
+    int shared_status;        /**< status shared with another desc or process */
     pvfs_descriptor_status *s;
 } pvfs_descriptor;
 

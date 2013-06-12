@@ -2305,6 +2305,10 @@ int getdtablesize(void)
     return pvfs_getdtablesize();
 }
 
+#endif /* PVFS_USRINT_CWD */
+
+/* add a configure option to enable this */
+#if 0
 struct posix_ops_s ofs_sys_ops =
 { 
     .snprintf = NULL,
@@ -2434,9 +2438,16 @@ struct posix_ops_s ofs_sys_ops =
     , .acl_set_fd = acl_set_fd
     , .acl_set_file = acl_set_file
 #endif
+    , .getfscreatecon =  getfscreatecon
+    , .getfilecon = getfilecon
+    , .lgetfilecon = lgetfilecon
+    , .fgetfilecon = fgetfilecon
+    , .setfscreatecon = setfscreatecon
+    , .setfilecon = setfilecon
+    , .lsetfilecon = lsetfilecon
+    , .fsetfilecon = fsetfilecon
 };
-
-#endif /* PVFS_USRINT_CWD */
+#endif
 
 /*
  * Local variables:

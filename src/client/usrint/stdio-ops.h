@@ -88,26 +88,26 @@ struct stdio_ops_s
     int (*closedir)(DIR *dir);
 #ifdef PVFS_SCANDIR_VOID
     int (*scandir)(const char *dir,
-                    struct dirent ***namelist,
-                    int(*filter)(const struct dirent *),
-                    int(*compar)(const void *,
-                                 const void *));
-    int (*scandir64 )(const char *dir,
-                      struct dirent64 ***namelist,
-                      int(*filter)(const struct dirent64 *),
-                      int(*compar)(const void *,
-                                   const void *));
+                   struct dirent ***namelist,
+                   int(*filter)(const struct dirent *),
+                   int(*compar)(const void *,
+                                const void *));
+    int (*scandir64)(const char *dir,
+                     struct dirent64 ***namelist,
+                     int(*filter)(const struct dirent64 *),
+                     int(*compar)(const void *,
+                                  const void *));
 #else
     int (*scandir)(const char *dir,
-                    struct dirent ***namelist,
-                    int(*filter)(const struct dirent *),
-                    int(*compar)(const struct dirent **,
-                                 const struct dirent **));
-    int (*scandir64 )(const char *dir,
-                      struct dirent64 ***namelist,
-                      int(*filter)(const struct dirent64 *),
-                      int(*compar)(const struct dirent64 **,
-                                   const struct dirent64 **));
+                   struct dirent ***namelist,
+                   int(*filter)(const struct dirent *),
+                   int(*compar)(const struct dirent **,
+                                const struct dirent **));
+    int (*scandir64)(const char *dir,
+                     struct dirent64 ***namelist,
+                     int(*filter)(const struct dirent64 *),
+                     int(*compar)(const struct dirent64 **,
+                                  const struct dirent64 **));
 #endif
     void (*flockfile)(FILE *stream);
     int (*ftrylockfile)(FILE *stream);

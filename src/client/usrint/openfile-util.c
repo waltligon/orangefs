@@ -93,18 +93,16 @@ static struct glibc_redirect_s
  * allocated enough of everything we can use a trivial algorithm but we
  * may choose to go to a more sophisticated version later
  */
-static char shmobjpath[50];
-static int shmobj = -1;
-static int shmsize = 0; /* size of shm control area pointed to by shmctrl */
 
-typedef struct pvfs_shmcontrol_c
+typedef struct pvfs_shmcontrol_s
 {
-    void *shmctrl; /* pointer to this struct for reference */
+    int64_t shm_magic;
+    void *shmctrl;            /* pointer to this struct for reference */
     gen_mutex_t shmctrl_lock; /* these control the shm copy during a fork */
     gen_cond_t shmctrl_cond;
-    uint32_t shmctrl_copy;   /* indicates a copy is going on during a fork */
-    uint32_t shmctrl_shared; /* indicates number of stats shared with parent */
-    char shmctrl_cwd[PVFS_PATH_MAX]; /* the current working dir */
+    uint32_t shmctrl_copy;    /* indicates a copy is going on during a fork */
+    uint32_t shmctrl_shared;  /* number of descendent processes sharing this */
+    char shmctrl_cwd[PVFS_PATH_MAX];  /* the current working dir */
     pvfs_descriptor **descriptor_table;
     uint32_t descriptor_table_count;  /* number of active descriptors */
     uint32_t descriptor_table_size;   /* total number of descriptors */
@@ -115,21 +113,51 @@ typedef struct pvfs_shmcontrol_c
     uint32_t status_pool_size;
     char *path_table;
     uint32_t path_table_size;
+    int *fd_table;
+    uint32_t fd_table_size;
+    uint32_t fd_table_count;
 } pvfs_shmcontrol_t;
 
 static pvfs_shmcontrol_t *shmctrl = NULL;
+static char shmobjpath[50];
+static int shmobj = -1;
+static int shmsize = 0; /* size of shm control area pointed to by shmctrl */
 
-/* these are used during initialization */
-static pvfs_shmcontrol_t *parentctl = NULL;
-static char parentobjpath[50];
-static int parentobj = -1;
-static int parentsize = 0;
+/* This is for managing a list of the above structs.  This struct is
+ * referred to as a PDL for brevity, and the term may also refer to the
+ * pvfs_shmcontrol_t it points to when convenient.  THe items on this
+ * list represent the shm areas of ancestor processes that we are
+ * currently sharing an open file descriptor with (really a status
+ * struct) and we keep a count of how many of these are still active.
+ * When that count becomes zero we can disconntect from the shm area and
+ * remove it from the list.  Before doing so we should check if ANY
+ * other process is still shareing with it and unlink it as well if they
+ * are not.
+ */
 
+typedef struct pvfs_desc_list_s
+{
+    char *name;             /* global name of the PDL shm object */
+    pvfs_shmcontrol_t *ptr; /* pointer to the PDL object */
+    int64_t offset;         /* difference between currant and prev mapping */
+    int fd;                 /* fd PDL object is opened on */
+    int size;               /* size of PDL object */
+    int shares;             /* number of shares this process uses from PDL */
+    struct qlist_head link;
+} pvfs_desc_list_t;
+
+static QLIST_HEAD(desc_list); /* list of ancestor descriptor tables */
+
+/* convenience macro for adjusting pointers */
 #define P2L(p,t) (t *)(((char *)(p)) + parent_offset)
+#define PDLOFF(p,d) (((char *)(p)) + (d)->offset)
 
 #define PREALLOC 3
 static pvfs_descriptor **descriptor_table = NULL; /* convenience pointer */
 
+/* THese are used to index descriptors, statuses and dpaths we have
+ * allocated in the shm area.
+ */
 typedef struct index_rec_s
 {
     struct qlist_head link;
@@ -154,11 +182,21 @@ static void path_index_return(char *path);
 static char *path_index_find(int size);
 
 /* initialization stuff */
-static void rebuild_descriptor_table(void);
+static void rebuild_descriptor_table(pvfs_desc_list_t *pdl);
 static void parent_fork_begin(void);    /* fork parent handler */
 static void parent_fork_end(void);      /* fork parent handler */
+static void add_descriptor_area_list(char *name,
+                                     int fd,
+                                     int size,
+                                     int64_t offset,
+                                     pvfs_shmcontrol_t *new);
+static void close_descriptor_area_list(pvfs_desc_list_t *pdl);
+static pvfs_desc_list_t *find_descriptor_area_list(
+                                 pvfs_descriptor_status *stat);
+static pvfs_desc_list_t *first_descriptor_area_list(void);
 static void init_descriptor_area(void); /* fork child handler */
-static void init_descriptor_area_internal(void);
+static void init_descriptor_area_internal(void); /* create new PDL */
+/* actual initialization functions */
 static int init_usrint_internal(void)
                     GCC_CONSTRUCTOR(INIT_PRIORITY_PVFSLIB);
 static void cleanup_usrint_internal(void)
@@ -170,7 +208,6 @@ posix_ops glibc_ops;
 
 /* wrapper so we can call getpwd for initialization
  */
-
 static int my_glibc_getcwd(char *buf, unsigned long size)
 {
     return syscall(SYS_getcwd, buf, size);
@@ -203,12 +240,18 @@ static int my_glibc_fstat64(int fd, struct stat64 *buf)
     return glibc_redirect.fstat64(_STAT_VER, fd, buf);
 }
 
-static int my_glibc_fstatat(int fd, const char *path, struct stat *buf, int flag)
+static int my_glibc_fstatat(int fd,
+                            const char *path,
+                            struct stat *buf,
+                            int flag)
 {
     return glibc_redirect.fstatat(_STAT_VER, fd, path, buf, flag);
 }
 
-static int my_glibc_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
+static int my_glibc_fstatat64(int fd,
+                              const char *path,
+                              struct stat64 *buf,
+                              int flag)
 {
     return glibc_redirect.fstatat64(_STAT_VER, fd, path, buf, flag);
 }
@@ -268,7 +311,7 @@ void load_glibc(void)
     if (!libc_handle)
     {
         /* stderr should be set up before this */
-        fprintf(stderr, "Failed to open libc.so\n");
+        //init_debug("Failed to open libc.so\n");
         libc_handle = RTLD_NEXT;
     }
     memset((void *)&glibc_ops, 0, sizeof(glibc_ops));
@@ -403,12 +446,21 @@ void load_glibc(void)
     glibc_ops.munmap = dlsym(libc_handle, "munmap");
     glibc_ops.msync = dlsym(libc_handle, "msync");
 #if 0
+    /* might need these some day */
     glibc_ops.acl_delete_def_file = dlsym(libc_handle, "acl_delete_def_file");
     glibc_ops.acl_get_fd = dlsym(libc_handle, "acl_get_fd");
     glibc_ops.acl_get_file = dlsym(libc_handle, "acl_get_file");
     glibc_ops.acl_set_fd = dlsym(libc_handle, "acl_set_fd");
     glibc_ops.acl_set_file = dlsym(libc_handle, "acl_set_file");
 #endif
+    glibc_ops.getfscreatecon = dlsym(libc_handle, "getfscreatecon");
+    glibc_ops.getfilecon = dlsym(libc_handle, "getfilecon");
+    glibc_ops.lgetfilecon = dlsym(libc_handle, "lgetfilecon");
+    glibc_ops.fgetfilecon = dlsym(libc_handle, "fgetfilecon");
+    glibc_ops.setfscreatecon = dlsym(libc_handle, "setfscreatecon");
+    glibc_ops.setfilecon = dlsym(libc_handle, "setfilecon");
+    glibc_ops.lsetfilecon = dlsym(libc_handle, "lsetfilecon");
+    glibc_ops.fsetfilecon = dlsym(libc_handle, "fsetfilecon");
 
     /* PVFS does not implement socket ops */
     pvfs_ops.socket = dlsym(libc_handle, "socket");
@@ -424,14 +476,6 @@ void load_glibc(void)
     pvfs_ops.recv = dlsym(libc_handle, "recv");
     pvfs_ops.recvfrom = dlsym(libc_handle, "recvfrom");
     pvfs_ops.recvmsg = dlsym(libc_handle, "recvmsg");
-#if 0
-    glibc_ops.select = dlsym(libc_handle, "select");
-    glibc_ops.FD_CLR = dlsym(libc_handle, "FD_CLR");
-    glibc_ops.FD_ISSET = dlsym(libc_handle, "FD_ISSET");
-    glibc_ops.FD_SET = dlsym(libc_handle, "FD_SET");
-    glibc_ops.FD_ZERO = dlsym(libc_handle, "FD_ZERO");
-    glibc_ops.pselect = dlsym(libc_handle, "pselect");
-#endif
     pvfs_ops.send = dlsym(libc_handle, "send");
     pvfs_ops.sendto = dlsym(libc_handle, "sendto");
     pvfs_ops.sendmsg = dlsym(libc_handle, "sendmsg");
@@ -697,23 +741,26 @@ void pvfs_dpath_remove(char *path)
  */
 static void cleanup_usrint_internal(void)
 {
+    struct qlist_head *qh, *qh_next;
+
     init_debug("Running cleanup\n");
     /* cache cleanup */
-#if 0
-    if (ucache_enabled)
-    {
-        ucache_finalize();
-    }
+#if PVFS_UCACHE_ENABLE
+    /* put code here to flush and/or close files */
 #endif
     /* shut down PVFS */
     PVFS_sys_finalize();
-    /* close up shared memory region */
-    glibc_ops.close(shmobj);
+    /* run down the list and close all shm areas */
+    qlist_for_each_safe(qh, qh_next, &desc_list)
+    {
+        close_descriptor_area_list(qlist_entry(qh, pvfs_desc_list_t, link));
+    }
+    /* unlink our area - remains until all others have unmapped */
+    glibc_ops.unlink(shmobjpath);
+    /* clear globals */
     shmobj = -1;
-    glibc_ops.munmap(shmctrl, shmsize);
     shmctrl = NULL;
     descriptor_table = NULL;
-    glibc_ops.unlink(shmobjpath);
     memset(shmobjpath, 0, sizeof(shmobjpath));
 }
 
@@ -774,15 +821,11 @@ static int pvfs_sys_init_elf(void)
  */
 int pvfs_sys_init(void)
 {
-#if 0 && __GNUC__
-    return pvfs_lib_init_flag == 0; /* global flag */
-#else
     if (!pvfs_lib_init_flag)
     {
         return init_usrint_internal();
     }
     return 0;
-#endif
 }
 
 /* 
@@ -794,9 +837,9 @@ static int init_usrint_internal(void)
     /* global var pvfs_lib_init_flag: initialization done */
     static int pvfs_initializing_flag = 0;    /* initialization in progress */
     int errno_in = 0;
-    struct stat sbuf;
     index_rec_t *ixseg = NULL;
     int rc = 0;
+    int i;
 
     /* The recursive mutex */
     static gen_mutex_t rec_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP; 
@@ -838,70 +881,115 @@ static int init_usrint_internal(void)
     /* if this fails not much we can do about it */
     /* atexit(usrint_cleanup); */
 
-    /* set up current working dir */
-    // pvfs_cwd_init(0); /* do not expand */
-
     /* we assume if we are running this code this program was
      * just exec'd and the parent may or may not have been PVFS enabled
      *
-     * first check for existing shm are - look for an object
-     * tagged with this PID, if we did an exec we want that, else
-     * look for one tagged with the parent process PID
+     * first check for existing shm area - it should be on the magic fd
+     * PVFS_SHMOBJ, otherwise we assume the paretn was not PVFS enabled
+     * and we will have to create a new one from scratch.
      */
-    memset(shmobjpath, 0, sizeof(shmobjpath));
-    snprintf(shmobjpath,
-             50,
-             _PATH_DEV "shm/pvfs-%06d-%06d",
-             (int)getuid(),
-             (int)getpid());
-#if HAVE_O_CLOEXEC
-    shmobj = glibc_ops.open(shmobjpath, O_RDWR | O_CLOEXEC);
-#else
-    shmobj = glibc_ops.open(shmobjpath, O_RDWR);
-#endif
-    if (shmobj >= 0)
+
+    if (glibc_ops.fcntl(PVFS_SHMOBJ, F_GETFL) >= 0)
     {
-#if !HAVE_O_CLOEXEC
-        /* if O_CLOEXEC is not supported */
-        int flags;
-        flags = glibc_ops.fcntl(shmobj, GETFD);
-        glibc_ops.fcntl(shmobj, SETFD, flags | FD_CLOEXEC);
-#endif
-        /* found the previous shm area so map it */
-        /* find size of shm area */
-        glibc_ops.fstat(shmobj, &sbuf);
+        struct stat sbuf;
+        /* we found something on the magic fd */
+        glibc_ops.fstat(PVFS_SHMOBJ, &sbuf);
         shmsize = sbuf.st_size;
+
         /* map shm area */
         shmctrl = (pvfs_shmcontrol_t *)glibc_ops.mmap(NULL,
                                                      shmsize,
                                                      PROT_READ | PROT_WRITE,
                                                      MAP_SHARED,
-                                                     shmobj,
+                                                     PVFS_SHMOBJ,
                                                      0);
         if (shmctrl == ((void *)-1))
         {
             glibc_ops.perror("failed to map parent descriptor table");
             exit(-1);
         }
-        /* set up address displacement from the previous instance */
-        /* if we didn't find the old shm we will leave this NULL to
-         * be picked up below
-         */
-        parentctl = shmctrl->shmctrl;
-        /* update shmctrl to the new location - these might be exactly the
-         * same depending on what mmap does but we can't be sure of that
-         * We shold be fine as long as the old address wasn't zero!
-         */
-        shmctrl->shmctrl = shmctrl;
-        /* now rebuild the table and the indices
-         */
-        init_debug1("shmctrl = %p\n", shmctrl);
-        init_debug1("parentctl = %p\n", parentctl);
+        /* managed to map the object now look for a magic number */
+        if (shmctrl->shm_magic == PVFS_SHM_MAGIC)
+        {
+            /* we found it! */
+            shmobj = PVFS_SHMOBJ;
+            /* reconstruct the object name */
+            memset(shmobjpath, 0, sizeof(shmobjpath));
+            snprintf(shmobjpath,
+                     50,
+                     _PATH_DEV "shm/pvfs-%06d-%06d",
+                     (int)getuid(),
+                     (int)getpid());
+        }
+        else
+        {
+            /* something else is on the magic fd, will is bad news */
+            glibc_ops.munmap(shmctrl, shmsize);
+            glibc_ops.perror("something occupies the PVFS fd");
+            exit(-1);
+        }
 
-        rebuild_descriptor_table();
+        /* now load any shared PDLs that might be open */
+        for (i = 0; i < shmctrl->fd_table_count; i++)
+        {
+            int psize;
+            int fd;
+            pvfs_shmcontrol_t *objptr;
+            fd = shmctrl->fd_table[i];
+            if (glibc_ops.fcntl(fd, F_GETFL) >= 0)
+            {
+                struct stat sbuf;
+                glibc_ops.fstat(fd, &sbuf);
+                psize = sbuf.st_size;
 
-        /* should be ready to go 
-         */
+                /* map shm area */
+                objptr = (pvfs_shmcontrol_t *)glibc_ops.mmap(NULL,
+                                                             psize,
+                                                             PROT_READ |
+                                                                   PROT_WRITE,
+                                                             MAP_SHARED,
+                                                             fd,
+                                                             0);
+                if (objptr == ((void *)-1))
+                {
+                    glibc_ops.perror("failed to map ancestor descriptor table");
+                    continue;
+                }
+                /* managed to map the object now look for a magic number */
+                if (objptr->shm_magic == PVFS_SHM_MAGIC)
+                {
+                    add_descriptor_area_list(NULL,
+                                             fd,
+                                             psize,
+                                             (char *)objptr -
+                                                     (char *)objptr->shmctrl,
+                                             objptr);
+                }
+                else
+                {
+                    glibc_ops.perror("found non descriptor table");
+                    glibc_ops.munmap(objptr, psize);
+                    continue;
+                }
+            }
+            else
+            {
+                glibc_ops.perror("non-open object found");
+                continue;
+            }
+        }
+        
+        /* add our new PDL to the list */
+        add_descriptor_area_list(shmobjpath,
+                                 shmobj,
+                                 shmsize,
+                                 (char *)shmctrl - (char *)shmctrl->shmctrl,
+                                 shmctrl);
+
+        /* and adjust pointers */
+        rebuild_descriptor_table(first_descriptor_area_list());
+
+        /* should be ready to go */
     }
     else
     {
@@ -911,8 +999,12 @@ static int init_usrint_internal(void)
         char buf[PVFS_PATH_MAX];
 
         /* shmobj < 0 so we did not find the existing object */
+        /* We assume this process is the first to run PVFS */
         /* so set up a new shared memory descriptor area and initialize */
         init_descriptor_area_internal();
+
+        /* add new PDL to the list */
+        add_descriptor_area_list(shmobjpath, shmobj, shmsize, 0L, shmctrl);
 
         /* set up the CWD */
         memset(buf, 0, PVFS_PATH_MAX);
@@ -1023,8 +1115,10 @@ static int init_usrint_internal(void)
     PVFS_perror_gossip_silent();
 
 #if PVFS_UCACHE_ENABLE
-    //gossip_enable_file(UCACHE_LOG_FILE, "a");
-    //gossip_enable_stderr();
+#if 0
+    gossip_enable_file(UCACHE_LOG_FILE, "a");
+    gossip_enable_stderr();
+#endif
 
     /* ucache initialization - assumes shared memory previously 
      * aquired (using ucache daemon) 
@@ -1079,6 +1173,95 @@ static void parent_fork_end(void)
     init_debug("Parent completes fork\n");
 }
 
+/* These functions manage a list of ancestor shared memory areas (PDLs)
+ * so we can share descriptor status with ancestor processes.
+ */
+
+/* add a PDL to the list */
+static void add_descriptor_area_list(char *newname,
+                                     int newfd,
+                                     int newsize,
+                                     int64_t offset,
+                                     pvfs_shmcontrol_t *new)
+{
+    pvfs_desc_list_t *pdl;
+    int name_size;
+
+    pdl = (pvfs_desc_list_t *)malloc(sizeof(pvfs_desc_list_t));
+    if (!pdl)
+    {
+        glibc_ops.perror("Ran out of memory allocating a PDL");
+    }
+    if (newname)
+    {
+        name_size = strlen(newname);
+        if (name_size > 0)
+        {
+            pdl->name = (char *)malloc(name_size + 1);
+            memcpy(pdl->name, newname, name_size);
+        }
+    }
+    pdl->ptr = new;
+    pdl->offset = offset;
+    pdl->size = newsize;
+    pdl->fd = newfd;
+    pdl->shares = 0; /* indicates how many items in the desc are shared */
+    pdl->ptr->shmctrl_shared++; /* indicates we are sharing this desc */
+    qlist_add(&pdl->link, &desc_list);
+}
+
+
+/* close and possbily delete a PDL on the list */
+static void close_descriptor_area_list(pvfs_desc_list_t *pdl)
+{
+    int rc = 0;
+
+    rc = glibc_ops.close(pdl->fd);
+    if (rc < 0)
+    {
+        glibc_ops.perror("error closing a PDL\n");
+    }
+    pdl->fd = -1;
+    rc = glibc_ops.munmap(pdl->ptr, pdl->size);
+    if (rc < 0)
+    {
+        glibc_ops.perror("error unmapping a PDL\n");
+    }
+    pdl->size = 0;
+    pdl->ptr = NULL;
+    if (pdl->name)
+    {
+        free(pdl->name);
+        pdl->name = NULL;
+    }
+    pdl->name = NULL;
+    qlist_del(&pdl->link);
+    free(pdl);
+}
+
+/* find a PDL on the list */
+static pvfs_desc_list_t *find_descriptor_area_list(
+                                  pvfs_descriptor_status *stat)
+{
+    pvfs_desc_list_t *pdl;
+    qlist_for_each_entry(pdl, &desc_list, link)
+    {
+        int64_t diff = PDLOFF(stat, pdl) - PDLOFF(pdl->ptr->status_pool, pdl);
+        if (diff >= 0 && diff < pdl->ptr->status_pool_size)
+        {
+            return pdl;
+        }
+    }
+    init_debug("Desc list item to find not found\n");
+    return NULL;
+}
+
+/* return self PDL */
+static pvfs_desc_list_t *first_descriptor_area_list(void)
+{
+    return qlist_entry(desc_list.next, pvfs_desc_list_t, link);
+}
+
 /* This function is called when a process has just been fork()'d .
  * It's job is to copy the parent's descriptor area and set it up.  The
  * actual kernel descriptor table is handled by the kernel of course.
@@ -1088,10 +1271,14 @@ static void parent_fork_end(void)
  */
 static void init_descriptor_area(void)
 {
-    int64_t parent_offset = 0; /* memory offset between parent and new shmctrl */
+    int64_t parent_offset = 0; /* memory offset between parent and new desc */
     int d = 0;
     int dtable_size = 0;   /* number of slots in descriptor table */
     int dtable_count = 0;  /* number of used slots in descriptor table */
+    int parentobj;
+    pvfs_shmcontrol_t *parentctl;
+    int parentsize;
+    pvfs_desc_list_t *pdl;
 
     init_debug("Forked, running init descriptor area\n");
 
@@ -1108,20 +1295,30 @@ static void init_descriptor_area(void)
         return;
     }
 
-    parentobj = shmobj;
-    parentctl = shmctrl;
-    parentsize = shmsize;
-    strncpy(parentobjpath, shmobjpath, sizeof(parentobjpath));
+    /* This pdl was our parent's - save pointers to it before we create
+     * our new one.
+     */
+    pdl = first_descriptor_area_list();
 
+    parentctl = pdl->ptr;
+    parentsize = pdl->size;
+
+    /* move parent pdl off of the magic fd */
+    parentobj = glibc_ops.dup(pdl->fd);
+    glibc_ops.close(pdl->fd);
+    pdl->fd = parentobj;
+
+    /* get ready to create new shm area */
     shmobj = -1;
     shmctrl = NULL;
     shmsize = 0;
     memset(shmobjpath, 0, sizeof(shmobjpath));
 
-    /* Next we need to create the new shared memory space and initialize it
-     */
-
+    /* Next we need to initialize the new shared memory space */
     init_descriptor_area_internal();
+
+    /* add new descriptor table to list of known desc tables */
+    add_descriptor_area_list(shmobjpath, shmobj, shmsize, 0L,shmctrl);
 
     /* The indexes for dpath, desc, and status should already exist and
      * all linux fds should aready be open so we should simply be able
@@ -1143,6 +1340,7 @@ static void init_descriptor_area(void)
     /* copy the CWD */
     memcpy(shmctrl->shmctrl_cwd, parentctl->shmctrl_cwd, PVFS_PATH_MAX);
 
+    /* set loop bounds */
     dtable_size = shmctrl->descriptor_table_size;
     if (parentctl->descriptor_table_size < dtable_size)
     {
@@ -1150,6 +1348,19 @@ static void init_descriptor_area(void)
     }
     dtable_count = parentctl->descriptor_table_count;
 
+    /* copy fd_table */
+    memcpy(shmctrl->fd_table,
+           parentctl->fd_table,
+           parentctl->fd_table_count * sizeof(int));
+    shmctrl->fd_table_count = parentctl->fd_table_count;
+    /* add parent to the fd_table */
+    shmctrl->fd_table[shmctrl->fd_table_count++] = parentobj;
+
+    /* Note that as this is a fork(), all of the pointers held by the
+     * parent should be valid.  Only when we copy an object from the
+     * parent's table into our own will we have to adjust addresses 
+     */
+    /* now convert descriptors */
     for (d = 0; d < dtable_size && dtable_count; d++)
     {
         if (parentctl->descriptor_table[d])
@@ -1167,15 +1378,31 @@ static void init_descriptor_area(void)
                    sizeof(pvfs_descriptor));
             if (parentctl->descriptor_table[d]->s->fsops == &pvfs_ops)
             {
+                /* we are going to share the status on this fd this fd
+                 * may already be shared with and older process so we
+                 * will have to find it in our list and indicate we are
+                 * sharing one more fd with that processess.  Any shares
+                 * our parent was already sharing will count as well.
+                 * We mark the fd as shared, we increment the number of
+                 * shares on the status, and we increment the number of
+                 * shares we have with this specific process
+                 */
                 init_debug1("sharing descriptor status %d\n", d);
                 /* set up a shared descriptor */
-                parentctl->descriptor_table[d]->s->dup_cnt++;
                 shmctrl->descriptor_table[d]->shared_status = 1;
-                shmctrl->shmctrl_shared++;
+                pdl = find_descriptor_area_list(
+                                parentctl->descriptor_table[d]->s);
+                pdl->ptr->descriptor_table[d]->s->dup_cnt++;
+                /* If this was local to the parent and not an older
+                 * process then we should free the space used by the
+                 * status and potentially the dpath in our indices
+                 */
             }
             else
             {
-                /* adjust descriptor status address */
+                /* a glibc file so we can just copy the descriptor
+                 * status because the actual sharing happens throught
+                 * the kernel - adjust descriptor status address */
                 shmctrl->descriptor_table[d]->s =
                         P2L(shmctrl->descriptor_table[d]->s,
                             pvfs_descriptor_status);
@@ -1205,17 +1432,6 @@ static void init_descriptor_area(void)
     gen_cond_signal(&parentctl->shmctrl_cond);
     gen_mutex_unlock(&parentctl->shmctrl_lock);
 
-    /* now see if we can close down the parent's descriptor area */
-    if (shmctrl->shmctrl_shared == 0)
-    {
-        glibc_ops.munmap(parentctl, parentsize);
-        parentctl = NULL;
-        parentsize = 0;
-    }
-    glibc_ops.close(parentobj);
-    parentobj = -1;
-    memset(parentobjpath, 0, sizeof(parentobjpath));
-
     /* and the new shm area should be good to go */
     init_debug("init descriptor area done\n");
 }
@@ -1233,20 +1449,12 @@ static void init_descriptor_area_internal(void)
     /* open the new program's shared memory object */
     /* we dup this FD to get FD's for pvfs files */
     flags = O_RDWR | O_CREAT | O_TRUNC;
-#if HAVE_O_CLOEXEC
-    flags |= O_CLOEXEC,
-#endif
     snprintf(shmobjpath,
              50,
              _PATH_DEV "shm/pvfs-%06d-%06d",
              (int)getuid(),
              (int)getpid());
     shmobj = glibc_ops.open(shmobjpath, flags, S_IRUSR | S_IWUSR);
-#if !HAVE_O_CLOEXEC
-    /* if O_CLOEXEC is not supported - flags is int */
-    flags = glibc_ops.fcntl(shmobj, GETFD);
-    glibc_ops.fcntl(shmobj, SETFD, flags | FD_CLOEXEC);
-#endif
     if (shmobj < 0)
     {
         glibc_ops.perror("failed to open shared object in pvfs_sys_init");
@@ -1272,7 +1480,8 @@ static void init_descriptor_area_internal(void)
                   (sizeof(pvfs_descriptor *) +
                    sizeof(pvfs_descriptor) +
                    sizeof(pvfs_descriptor_status))) +
-               PATH_TABLE_SIZE;
+               PATH_TABLE_SIZE +
+               (FD_TABLE_SIZE * sizeof(int));
 
     /* set the size of the shared object */
     glibc_ops.ftruncate(shmobj, (off_t)shmsize);
@@ -1289,6 +1498,14 @@ static void init_descriptor_area_internal(void)
         glibc_ops.perror("failed to malloc descriptor table");
         exit(-1);
     }
+    /* move to magic fd */
+    if (glibc_ops.dup2(shmobj, PVFS_SHMOBJ) == -1)
+    {
+        glibc_ops.perror("failed to move descriptor table to magic fd");
+        exit(-1);
+    }
+    glibc_ops.close(shmobj);
+    shmobj = PVFS_SHMOBJ;
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
@@ -1296,6 +1513,7 @@ static void init_descriptor_area_internal(void)
     /* set up descriptor table */
     descriptor_table = (pvfs_descriptor **)&shmctrl[1];
 
+    shmctrl->shm_magic = PVFS_SHM_MAGIC;
     shmctrl->shmctrl = shmctrl; /* this is needed for reference mapping */
 
     /* need to share this sync prm across processes */
@@ -1335,6 +1553,10 @@ static void init_descriptor_area_internal(void)
 
     shmctrl->path_table = (char *)&shmctrl->status_pool[table_size];
     shmctrl->path_table_size = PATH_TABLE_SIZE;
+
+    shmctrl->fd_table = (int *)&shmctrl->path_table[PATH_TABLE_SIZE];
+    shmctrl->fd_table_size = FD_TABLE_SIZE;
+    shmctrl->fd_table_count = 0;
 }
 
 /*
@@ -1350,14 +1572,16 @@ static void init_descriptor_area_internal(void)
  * wiped we rebuild them by adding records for all unused space in the
  * corresponding pools.  Part of usrlib initialization.
  */
-static void rebuild_descriptor_table(void)
+static void rebuild_descriptor_table(pvfs_desc_list_t *shmpdl)
 {
-    int64_t parent_offset;
     int d = 0;
     int dtable_size = 0;
     int dtable_count = 0;
     int flags = 0;
     int last = 0;
+    pvfs_shmcontrol_t *scp;
+
+    scp = shmpdl->ptr;
 
     init_debug("Rebuilding descriptor table\n");
 
@@ -1368,28 +1592,34 @@ static void rebuild_descriptor_table(void)
      * which should be just fine.  There probably aren't that many.  We
      * could bypass that inside the loop if we wanted to.
      */
-    parent_offset = ((char *)shmctrl) - ((char *)parentctl);
-    init_debug1("parent_offset = %lld\n", parent_offset);
+    init_debug1("rebuild_offset = %lld\n", shmpdl->offset);
 
     /* FIXME: stdout probably isn't set up yet - should be gossip anyway */
     /* printf("Called copy_parent_to_descriptor_table\n"); */
 
     /* first get the control record adjusted */
-    init_debug1("P descriptor_table = %p\n", shmctrl->descriptor_table);
-    shmctrl->descriptor_table = P2L(shmctrl->descriptor_table, pvfs_descriptor *);
-    init_debug1("S descriptor_table = %p\n", shmctrl->descriptor_table);
+    init_debug1("P descriptor_table = %p\n", scp->descriptor_table);
+    scp->descriptor_table = (pvfs_descriptor **)PDLOFF(scp->descriptor_table,
+                                                       shmpdl);
+    init_debug1("S descriptor_table = %p\n", scp->descriptor_table);
 
-    init_debug1("P descriptor_pool = %p\n", shmctrl->descriptor_pool);
-    shmctrl->descriptor_pool = P2L(shmctrl->descriptor_pool, pvfs_descriptor);
-    init_debug1("S descriptor_pool = %p\n", shmctrl->descriptor_pool);
+    init_debug1("P descriptor_pool = %p\n", scp->descriptor_pool);
+    scp->descriptor_pool = (pvfs_descriptor *)PDLOFF(scp->descriptor_pool,
+                                                     shmpdl);
+    init_debug1("S descriptor_pool = %p\n", scp->descriptor_pool);
 
-    init_debug1("P status_pool = %p\n", shmctrl->status_pool);
-    shmctrl->status_pool = P2L(shmctrl->status_pool, pvfs_descriptor_status);
-    init_debug1("S status_pool = %p\n", shmctrl->status_pool);
+    init_debug1("P status_pool = %p\n", scp->status_pool);
+    scp->status_pool = (pvfs_descriptor_status *)PDLOFF(scp->status_pool,
+                                                        shmpdl);
+    init_debug1("S status_pool = %p\n", scp->status_pool);
 
-    init_debug1("P path_table = %p\n", shmctrl->path_table);
-    shmctrl->path_table = P2L(shmctrl->path_table, char);
-    init_debug1("S path_table = %p\n", shmctrl->path_table);
+    init_debug1("P path_table = %p\n", scp->path_table);
+    scp->path_table = (char *)PDLOFF(shmctrl->path_table, shmpdl);
+    init_debug1("S path_table = %p\n", scp->path_table);
+
+    init_debug1("P fd_table = %p\n", scp->fd_table);
+    scp->fd_table = (int *)PDLOFF(scp->fd_table, shmpdl);
+    init_debug1("S fd_table = %p\n", scp->fd_table);
 
     /* There is an inherent assumption that all useful items in the
      * tables can be reached via the main descriptor table.  We do not
@@ -1397,76 +1627,96 @@ static void rebuild_descriptor_table(void)
      * twice if they have been duped.  Should not be a problem.
      */
 
-    dtable_size = shmctrl->descriptor_table_size;
-    dtable_count = shmctrl->descriptor_table_count;
+    dtable_size = scp->descriptor_table_size;
+    dtable_count = scp->descriptor_table_count;
 
     for (d = 0; d < dtable_size && dtable_count; d++)
     {
-        if (shmctrl->descriptor_table[d])
+        if (scp->descriptor_table[d])
         {
+            pvfs_descriptor_status *st;
+
             init_debug1("adjusting descriptor %d\n", d);
             dtable_count--;
             /* adjust descriptor address */
-            shmctrl->descriptor_table[d] =
-                    P2L(shmctrl->descriptor_table[d], pvfs_descriptor);
+            scp->descriptor_table[d] =
+                    (pvfs_descriptor *)PDLOFF(scp->descriptor_table[d], shmpdl);
             /* adjust descriptor status address */
-            shmctrl->descriptor_table[d]->s =
-                    P2L(shmctrl->descriptor_table[d]->s, pvfs_descriptor_status);
-            /* recreate fsops pointer */
-            if (shmctrl->descriptor_table[d]->s->pvfs_ref.fs_id)
+            st = scp->descriptor_table[d]->s;
+            if (scp->descriptor_table[d]->shared_status)
             {
-                shmctrl->descriptor_table[d]->s->fsops = &pvfs_ops;
+                pvfs_desc_list_t *pdl;
+                pdl = find_descriptor_area_list(st);
+                scp->descriptor_table[d]->s = 
+                        (pvfs_descriptor_status *)PDLOFF(st, pdl);
+                /* we were already sharing this so don't increament the
+                 * counters in the other table, but do increment in the
+                 * pdl so we know how many references to this table we
+                 * have
+                 */
+                pdl->shares++;
             }
             else
             {
-                shmctrl->descriptor_table[d]->s->fsops = &glibc_ops;
+                /* not shared, adjust as normal */
+                scp->descriptor_table[d]->s =
+                        (pvfs_descriptor_status *)PDLOFF(st, shmpdl);
             }
-            if (shmctrl->descriptor_table[d]->s->dpath)
+            /* recreate fsops pointer */
+            if (scp->descriptor_table[d]->s->pvfs_ref.fs_id)
+            {
+                scp->descriptor_table[d]->s->fsops = &pvfs_ops;
+            }
+            else
+            {
+                scp->descriptor_table[d]->s->fsops = &glibc_ops;
+            }
+            if (scp->descriptor_table[d]->s->dpath)
             {
                 /* adjust directory path address */
-                shmctrl->descriptor_table[d]->s->dpath =
-                        P2L(shmctrl->descriptor_table[d]->s->dpath, char);
+                scp->descriptor_table[d]->s->dpath =
+                     (char *)PDLOFF(scp->descriptor_table[d]->s->dpath, shmpdl);
             }
-            if ((shmctrl->descriptor_table[d]->fdflags & FD_CLOEXEC))
+            if ((scp->descriptor_table[d]->fdflags & FD_CLOEXEC))
             {
                 /* remove the entry */
-                glibc_ops.close(shmctrl->descriptor_table[d]->true_fd);
-                if (shmctrl->descriptor_table[d]->s->dpath)
+                glibc_ops.close(scp->descriptor_table[d]->true_fd);
+                if (scp->descriptor_table[d]->s->dpath)
                 {
                     int len;
-                    len = strlen(shmctrl->descriptor_table[d]->s->dpath);
-                    memset(shmctrl->descriptor_table[d]->s->dpath, 0, len);
+                    len = strlen(scp->descriptor_table[d]->s->dpath);
+                    memset(scp->descriptor_table[d]->s->dpath, 0, len);
                 }
-                memset(shmctrl->descriptor_table[d]->s,
+                memset(scp->descriptor_table[d]->s,
                        0,
                        sizeof(pvfs_descriptor_status));
-                memset(shmctrl->descriptor_table[d],
+                memset(scp->descriptor_table[d],
                        0,
                        sizeof(pvfs_descriptor));
-                shmctrl->descriptor_table[d] = NULL;
-                shmctrl->descriptor_table_count--;
+                scp->descriptor_table[d] = NULL;
+                scp->descriptor_table_count--;
             }
             else
             {
-                if (shmctrl->descriptor_table[d]->s->fsops == &pvfs_ops)
+                if (scp->descriptor_table[d]->s->fsops == &pvfs_ops)
                 {
                     /* dup the shmobj for PVFS files */
-                    glibc_ops.dup2(shmobj,
-                                   shmctrl->descriptor_table[d]->true_fd);
+                    glibc_ops.dup2(shmpdl->fd,
+                                   scp->descriptor_table[d]->true_fd);
                     /* PVFS true_fd's are all CLOEXEC */
                     flags = glibc_ops.fcntl(
-                                    shmctrl->descriptor_table[d]->true_fd,
+                                    scp->descriptor_table[d]->true_fd,
                                     F_GETFD);
-                    glibc_ops.fcntl(shmctrl->descriptor_table[d]->true_fd,
+                    glibc_ops.fcntl(scp->descriptor_table[d]->true_fd,
                                     F_SETFD,
                                     flags | FD_CLOEXEC);
                 }
                 /* we assume glibc files are still open */
             }
-            if (shmctrl->descriptor_table[d]->s->fent)
+            if (scp->descriptor_table[d]->s->fent)
             {
                 /* need to decide how to update this correctly */
-                shmctrl->descriptor_table[d]->s->fent = NULL;
+                scp->descriptor_table[d]->s->fent = NULL;
             }
         }
     }
@@ -1549,8 +1799,8 @@ static void rebuild_descriptor_table(void)
 #   undef MISS
 #   undef HIT
 
-    parentctl = NULL;
     descriptor_table = shmctrl->descriptor_table;
+    shmpdl->offset = 0L;
     /* descriptor table should be ready to go */
     init_debug("Rebuilding done\n");
 }
@@ -2121,30 +2371,26 @@ int pvfs_free_descriptor(int fd)
     glibc_ops.close(pd->true_fd);
 
 	/* keep up with used descriptors */
-	shmctrl->descriptor_table_count--;
-    if (pd->shared_status)
-    {
-        shmctrl->shmctrl_shared--;
-        if (shmctrl->shmctrl_shared == 0)
-        {
-            glibc_ops.munmap(parentctl, parentsize);
-            parentctl = NULL;
-            parentsize = 0;
-        }
-    }
-    gen_mutex_unlock(&shmctrl->descriptor_table_lock);
+	--(shmctrl->descriptor_table_count);
 
-    /* check if last copy */
+    gen_mutex_unlock(&shmctrl->descriptor_table_lock);
     gen_mutex_lock(&pd->s->lock);
+    
+    /* descrement dup count */
     dup_cnt = --(pd->s->dup_cnt);
+
+    /* if not sharing, see if last dup */
     if (dup_cnt <= 0 && !pd->shared_status)
     {
+        /* not shared and last dup */
         if (pd->s->dpath)
         {
             pvfs_dpath_remove(pd->s->dpath);
         }
 
 #if PVFS_UCACHE_ENABLE
+        /* What about caching of shared files? */
+        /* Should we not clear the cache in the shared case too? */
         if (pd->s->fent)
         {
             int rc = 0;
@@ -2159,12 +2405,33 @@ int pvfs_free_descriptor(int fd)
 #endif /* PVFS_UCACHE_ENABLE */
 
         gen_mutex_unlock(&pd->s->lock);
+        /* status gets returned to pool here */
 	    put_status(pd->s);
         pd->s = NULL;
     }
     else
     {
-        gen_mutex_unlock(&pd->s->lock);
+        int closed = 0;
+        /* check for shared status */
+        if (pd->shared_status)
+        {
+            /* this descriptor is shared with another process */
+            pvfs_desc_list_t *pdl;
+            pdl = find_descriptor_area_list(pd->s);
+            if (--(pdl->shares))
+            {
+                closed = 1;
+                gen_mutex_unlock(&pd->s->lock);
+                close_descriptor_area_list(pdl);
+            }
+            /* cannot release the status because another process owns the
+            * indices for it
+            */
+        }
+        if (!closed)
+        {
+            gen_mutex_unlock(&pd->s->lock);
+        }
     }
     gen_mutex_unlock(&pd->lock);
     put_descriptor(pd);

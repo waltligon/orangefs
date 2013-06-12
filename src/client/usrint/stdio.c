@@ -17,6 +17,14 @@
 #include "stdio-ops.h"
 #include "locks.h"
 
+#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
+# define USE_OFFSET 1
+#else
+# define USE_OFFSET 0
+#endif
+#define _IO_pos_BAD -1
+#define _IO_wide_NOT -1
+
 /* fdopendir not present until glibc2.5 */
 #if __GLIBC_PREREQ (2,5)
 #else
@@ -30,7 +38,7 @@ static inline void init_stdio(void); /* wrapper to check if init is done before
 static void cleanup_stdio_internal(void) GCC_DESTRUCTOR(CLEANUP_PRIORITY_STDIO);
 static void init_stdio_internal(void) GCC_CONSTRUCTOR(INIT_PRIORITY_STDIO);
 static int init_flag = 0;
-static struct stdio_ops_s stdio_ops;
+struct stdio_ops_s stdio_ops;
 static FILE open_files = {._chain = NULL};
 
 /* this is defined in openfile-util.g because it is used openfile-util.c
@@ -72,8 +80,19 @@ struct __dirstream {
 #define ASIZE 256
 #define MAXTRIES 16 /* arbitrary - how many tries to get a unique file name */
 
+/* turning off REDEFSTREAM forces stdin, stdout, stderr to use glibc */
 #if PVFS_STDIO_REDEFSTREAM
+#define PVFS_STDIO_ON_LIBC_STREAMS 0
+/* forces all stdio to use ofs routines */
+#if PVFS_STDIO_ON_LIBC_STREAMS
+/* use libc defined stdin stdout and stderr but ofs calls */
+# define pvfs_stdin_stream  (*stdin)
+# define pvfs_stdout_stream (*stdout)
+# define pvfs_stderr_stream (*stderr)
+#else
+/* use ofs defined stdin stdout and stderr and ofs calls */
 static _PVFS_lock_t pvfs_stdin_lock = _PVFS_lock_initializer;
+//static struct _IO_wide_data pvfs_stdin_wide;
 static char pvfs_stdin_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stdin_stream =
 {
@@ -100,14 +119,16 @@ static FILE pvfs_stdin_stream =
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
     , ._lock = (void *)&pvfs_stdin_lock
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    , ._offset = 0
-    , ._mode = 0
+#if USE_OFFSET
+    , .__pad2 = NULL //(void *)&pvfs_stdin_wide
+    , ._offset = _IO_pos_BAD
+    , ._mode = _IO_wide_NOT
 #endif
 };
 FILE *stdin = &pvfs_stdin_stream;
 
 static _PVFS_lock_t pvfs_stdout_lock = _PVFS_lock_initializer;
+//static struct _IO_wide_data pvfs_stdout_wide;
 static char pvfs_stdout_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stdout_stream =
 {
@@ -135,14 +156,16 @@ static FILE pvfs_stdout_stream =
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
     , ._lock = (void *)&pvfs_stdout_lock
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    , ._offset = 0
-    , ._mode = 0
+#if USE_OFFSET
+    , .__pad2 = NULL //(void *)&pvfs_stdout_wide
+    , ._offset = _IO_pos_BAD
+    , ._mode = _IO_wide_NOT
 #endif
 };
 FILE *stdout = &pvfs_stdout_stream;
 
 static _PVFS_lock_t pvfs_stderr_lock = _PVFS_lock_initializer;
+//static struct _IO_wide_data pvfs_stderr_wide;
 static char pvfs_stderr_buffer[PVFS_BUFSIZE];
 static FILE pvfs_stderr_stream =
 {
@@ -170,12 +193,14 @@ static FILE pvfs_stderr_stream =
     ._vtable_offset = 0,
     ._shortbuf = {0} /* comma is on the next line */
     , ._lock = (void *)&pvfs_stderr_lock
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    , ._offset = 0
-    , ._mode = 0
+#if USE_OFFSET
+    , .__pad2 = NULL //(void *)&pvfs_stderr_wide
+    , ._offset = _IO_pos_BAD
+    , ._mode = _IO_wide_NOT
 #endif
 };
 FILE *stderr = &pvfs_stderr_stream;
+#endif
 #endif
 
 /* this is gets called all over the place to make sure initialization is
@@ -421,14 +446,17 @@ static int init_stream (FILE *stream, int flags, int bufsize)
     /* make sure stdio is initialized so we can insert on chain */
     PVFS_INIT(init_stdio);
     /* set up stream here */
-    SETMAGIC(stream, _P_IO_MAGIC);
-    if (!(flags & O_WRONLY))
+    //if (flags)
     {
-        SETFLAG(stream, _IO_NO_READS);
-    }
-    if (!(flags & O_RDONLY))
-    {
-        SETFLAG(stream, _IO_NO_WRITES);
+        SETMAGIC(stream, _P_IO_MAGIC);
+        if (!(flags & O_WRONLY))
+        {
+            SETFLAG(stream, _IO_NO_READS);
+        }
+        if (!(flags & O_RDONLY))
+        {
+            SETFLAG(stream, _IO_NO_WRITES);
+        }
     }
     /* set up default buffering here */
     if (!stream->_IO_buf_base)
@@ -459,9 +487,9 @@ static int init_stream (FILE *stream, int flags, int bufsize)
     stream->_vtable_offset   = 0;
     stream->_shortbuf[0]     = 0;
 #endif
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    stream->_offset          = 0;
-    stream->_mode            = 0;
+#if USE_OFFSET
+    stream->_offset          = _IO_pos_BAD;
+    stream->_mode            = _IO_wide_NOT;
 #endif
     lock_stream(&open_files);
     stream->_chain = open_files._chain;
@@ -524,6 +552,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 #endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
 #if 0
@@ -561,7 +590,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
             {
                 /* call libc freopen */
             }
-#endif
+#endif /* removed code */
             /* this is a libc allocated stream so assume libc will
              * reopen it using the standard call.  This could be a
              * problem if it is reopened as a PVFS file - giving rise
@@ -569,6 +598,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
              */
             return stdio_ops.freopen(path, mode, stream);
         }
+#endif /* if not PVFS_STDIO_ON_LIBC_STREAMS */
         errno = EINVAL;
         return NULL;
     }
@@ -657,10 +687,12 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 #endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             return stdio_ops.fwrite(ptr, size, nmemb, stream);
         }
+#endif
         errno = EINVAL;
         return 0;
     }
@@ -688,10 +720,12 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 #endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             return stdio_ops.fwrite_unlocked(ptr, size, nmemb, stream);
         }
+#endif
         errno = EINVAL;
         return 0;
     }
@@ -706,8 +740,15 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         rc = write(stream->_fileno, ptr, nmemb * size);
         if (rc >= 0)
         {
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-            stream->_offset += rc;
+#if USE_OFFSET
+            if (stream->_offset != _IO_pos_BAD)
+            {
+                stream->_offset += rc;
+            }
+            else
+            {
+                stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            }
 #endif
             return rc / size;
         }
@@ -723,7 +764,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         int c;
         for (c = 0; c < nmemb * size; c++)
         {
-            if ((*(char *)ptr) == '\n')
+            if (((char *)ptr)[c] == '\n')
             {
                 /* we will flush after buffering */
                 eol_seen = 1;
@@ -731,6 +772,14 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             }
         }
     }
+
+#if !PVFS_STDIO_ON_LIBC_STREAMS
+    if (stream->_IO_buf_base == NULL)
+    {
+        /* this is a glibc stream never used so just convert it to ofs */
+        init_stream(stream, 0, PVFS_BUFSIZE);
+    }
+#endif
 
     /* Check to see if switching from read to write */
     if (!ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
@@ -773,6 +822,16 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             SETFLAG(stream, _IO_ERR_SEEN);
             return 0;
         }
+#if USE_OFFSET
+        if (stream->_offset != _IO_pos_BAD)
+        {
+            stream->_offset += rc;
+        }
+        else
+        {
+            stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+        }
+#endif
         /* TODO: check for a short write */
         /* reset buffer */
         stream->_IO_write_ptr = stream->_IO_write_base;
@@ -804,9 +863,6 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     {
         fflush(stream);
     }
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    stream->_offset += rsz;
-#endif
     return rsz / size; /* num items written */
 }
 
@@ -880,7 +936,8 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
 #endif
-        rc = write(stream->_fileno, stream->_IO_write_base,
+        rc = write(stream->_fileno,
+                   stream->_IO_write_base,
                    stream->_IO_write_ptr - stream->_IO_write_base); 
         if (rc == -1)
         {
@@ -892,6 +949,16 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             /* short write but no error ??? */
             SETFLAG(stream, _IO_ERR_SEEN);
         }
+#if USE_OFFSET
+        if (stream->_offset != _IO_pos_BAD)
+        {
+             stream->_offset += rc;
+        }
+        else
+        {
+             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+        }
+#endif
         /* reset write pointer */
         stream->_IO_write_ptr = stream->_IO_write_base;
         /* clear flag */
@@ -917,6 +984,16 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         {
             SETFLAG(stream, _IO_EOF_SEEN);
         }
+#if USE_OFFSET
+        if (stream->_offset != _IO_pos_BAD)
+        {
+             stream->_offset += bytes_read;
+        }
+        else
+        {
+             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+        }
+#endif
         /* indicate end of read area */
         stream->_IO_read_end = stream->_IO_read_base + bytes_read;
         /* reset read pointer */
@@ -950,7 +1027,9 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             if (rsz_extra > (stream->_IO_buf_end - stream->_IO_buf_base))
             {
                 /* read directly from file for remainder of request */
-                bytes_read = read(stream->_fileno, (char *)ptr+rsz_buf, rsz_extra);
+                bytes_read = read(stream->_fileno,
+                                  (char *)ptr+rsz_buf,
+                                  rsz_extra);
                 if (bytes_read == -1)
                 {
                     SETFLAG(stream, _IO_ERR_SEEN);
@@ -960,11 +1039,22 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 {
                     SETFLAG(stream, _IO_EOF_SEEN);
                 }
+#if USE_OFFSET
+                    if (stream->_offset != _IO_pos_BAD)
+                    {
+                        stream->_offset += bytes_read;
+                    }
+                    else
+                    {
+                        stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                    }
+#endif
                 if (bytes_read == rsz_extra)
                 {
                     /* then read next buffer */
-                    bytes_read = read(stream->_fileno, stream->_IO_buf_base,
-                            stream->_IO_buf_end - stream->_IO_buf_base);
+                    bytes_read = read(stream->_fileno,
+                                 stream->_IO_buf_base,
+                                 stream->_IO_buf_end - stream->_IO_buf_base);
                     if (bytes_read == -1)
                     {
                         SETFLAG(stream, _IO_ERR_SEEN);
@@ -974,23 +1064,28 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     {
                         SETFLAG(stream, _IO_EOF_SEEN);
                     }
+#if USE_OFFSET
+                    if (stream->_offset != _IO_pos_BAD)
+                    {
+                        stream->_offset += bytes_read;
+                    }
+                    else
+                    {
+                        stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
+                    }
+#endif
                     stream->_IO_read_end = stream->_IO_read_base + bytes_read;
                     stream->_IO_read_ptr = stream->_IO_read_base;
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-                    stream->_offset += rsz;
-#endif
                     return rsz / size; /* num items read */
                 }
                 /* MIGHT have read to EOF - check for pipe, tty */
                 SETFLAG(stream, _IO_EOF_SEEN);
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-                stream->_offset += (rsz_buf + bytes_read);
-#endif
                 return (rsz_buf + bytes_read) / size; /* num items read */
             }
             /* rest of request fits in a buffer - read next buffer */
-            bytes_read = read(stream->_fileno, stream->_IO_buf_base,
-                    stream->_IO_buf_end - stream->_IO_buf_base);
+            bytes_read = read(stream->_fileno,
+                              stream->_IO_buf_base,
+                              stream->_IO_buf_end - stream->_IO_buf_base);
             if (bytes_read == -1)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
@@ -1000,6 +1095,16 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             {
                 SETFLAG(stream, _IO_EOF_SEEN);
             }
+#if USE_OFFSET
+            if (stream->_offset != _IO_pos_BAD)
+            {
+                 stream->_offset += bytes_read;
+            }
+            else
+            {
+                 stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
+            }
+#endif
             stream->_IO_read_end = stream->_IO_read_base + bytes_read;
             stream->_IO_read_ptr = stream->_IO_read_base;
             /* transfer remainder */
@@ -1015,25 +1120,16 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             {
                 SETFLAG(stream, _IO_EOF_SEEN);
             }
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-            stream->_offset += (rsz_buf + rsz_extra);
-#endif
             return (rsz_buf + rsz_extra) / size; /* num items read */
         }
         else
         {
             /* at EOF so return bytes read */
             SETFLAG(stream, _IO_EOF_SEEN);
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-            stream->_offset += rsz_buf;
-#endif
             return rsz_buf / size; /* num items read */
         }
     }
     /* request totally within current buffer */
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    stream->_offset += rsz;
-#endif
     return rsz / size; /* num items read */
 }
 
@@ -1287,7 +1383,8 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
 #endif
-            rc = write(stream->_fileno, stream->_IO_write_base,
+            rc = write(stream->_fileno,
+                       stream->_IO_write_base,
                        stream->_IO_write_ptr - stream->_IO_write_base); 
             if (rc < 0)
             {
@@ -1314,19 +1411,18 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
             rc = -1;
+#if USE_OFFSET
+            stream->_offset = _IO_pos_BAD;
+#endif
             goto exitout;
         }
+#if USE_OFFSET
+        stream->_offset = filepos;
+#endif
         /* fseek returns 0 on success */
         rc = 0;
     }
 exitout:
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    if (rc == 0)
-    {
-        /* successful call */
-        stream->_offset = offset;
-    }
-#endif
     unlock_stream(stream);
     CLEARFLAG(stream, _IO_EOF_SEEN);
     return rc;
@@ -1395,10 +1491,16 @@ off64_t ftell64(FILE* stream)
         errno = EINVAL;
         return -1;
     }
-#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
-    return stream->_offset;
-#else
-    filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+#if USE_OFFSET
+    if (stream->_offset != _IO_pos_BAD)
+    {
+        filepos = stream->_offset;
+    }
+    else
+#endif
+    {
+        filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+    }
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
         return filepos + (stream->_IO_write_ptr - stream->_IO_write_base);
@@ -1407,7 +1509,6 @@ off64_t ftell64(FILE* stream)
     {
         return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
     }
-#endif
 }
 
 /**
@@ -1444,10 +1545,12 @@ int fflush(FILE *stream)
 #endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             return stdio_ops.fflush(stream);
         }
+#endif
         errno = EINVAL;
         return -1;
     }
@@ -1471,10 +1574,12 @@ int fflush_unlocked(FILE *stream)
 #endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             return stdio_ops.fflush_unlocked(stream);
         }
+#endif
         errno = EINVAL;
         return -1;
     }
@@ -1488,13 +1593,24 @@ int fflush_unlocked(FILE *stream)
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
 #endif
-        rc = write(stream->_fileno, stream->_IO_write_base,
-                stream->_IO_write_ptr - stream->_IO_write_base); 
+        rc = write(stream->_fileno,
+                   stream->_IO_write_base,
+                   stream->_IO_write_ptr - stream->_IO_write_base); 
         if (rc < 0)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
             return rc;
         }
+#if USE_OFFSET
+        if (stream->_offset != _IO_pos_BAD)
+        {
+            stream->_offset += rc;
+        }
+        else
+        {
+            stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+        }
+#endif
         /* reset write pointer */
         stream->_IO_write_ptr = stream->_IO_write_base;
     }
@@ -2776,6 +2892,7 @@ void seekdir (DIR *dir, off_t offset)
         dir->buf_act = dir->buf_base;
         dir->buf_ptr = dir->buf_base;
         lseek64(dir->fileno, offset, SEEK_SET);
+        /* should we add an offset here */
     }
 }
 
@@ -3078,6 +3195,8 @@ static void init_stdio_internal(void)
     gen_mutex_unlock(&initlock);
 };
 
+/* add a configure option to enable this */
+#if 0
 /* This struct is for external code to force a call to this library */
 struct stdio_ops_s ofs_std_ops =
 {
@@ -3158,6 +3277,7 @@ struct stdio_ops_s ofs_std_ops =
     .ftrylockfile  = ftrylockfile,
     .funlockfile  = funlockfile
 };
+#endif
     
 /*
  * Local variables:

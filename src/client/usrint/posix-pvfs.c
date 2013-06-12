@@ -827,6 +827,15 @@ int pvfs_close(int fd)
         rc = pvfs_free_descriptor(fd);
         return rc;
     }
+/* it is not clear why this was added.  closing does not imply sync'ing
+ * in any semantics I am aware of.  at best this should only happen if
+ * O_SYNC is set - but one would suspect it would be redundant even in
+ * that case.
+ * currently this is kicking an unexpected error in some circumstances
+ * that must be fixed, or at least handled more cleanly but for the
+ * immediate moment I'm removing it pending a final deletion.  WBL
+ */
+#if 0
     /* This was supposed to be a PVFS file
      * if it isn't - we didn't write to it
      * so don't try to sync it
@@ -843,6 +852,7 @@ int pvfs_close(int fd)
             }
         }
     }
+#endif
 
     /* free descriptor */
     rc = pvfs_free_descriptor(pd->fd);
@@ -2900,6 +2910,59 @@ int pvfs_getdtablesize(void)
     return pvfs_descriptor_table_size();
 }
 
+/**
+ * THese are stubs for libselinux that return the proper error to
+ * indicate it is not implemented
+ */
+
+int pvfs_getfscreatecon(security_context_t *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_getfilecon(const char *path, security_context_t *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_lgetfilecon(const char *path, security_context_t *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_fgetfilecon(int fd, security_context_t *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_setfscreatecon(security_context_t con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_setfilecon(const char *path, security_context_t con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_lsetfilecon(const char *path, security_context_t con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int pvfs_fsetfilecon(int fd, security_context_t con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
 /*
  * Table of PVFS system call versions for use by posix.c
  */
@@ -3000,16 +3063,24 @@ posix_ops pvfs_ops =
     .getumask = pvfs_getumask,
     .mmap = pvfs_mmap,
     .munmap = pvfs_munmap,
-    .msync = pvfs_msync,
+    .msync = pvfs_msync
 /* these are defined in acl.c and do not really need */
 /* a PVFS specific implementation */
 #if 0
-    .acl_delete_def_file = pvfs_acl_delete_def_file,
-    .acl_get_fd = pvfs_acl_get_fd,
-    .acl_get_file = pvfs_acl_get_file,
-    .acl_set_fd = pvfs_acl_set_fd,
-    .acl_set_file = pvfs_acl_set_file,
+    , .acl_delete_def_file = pvfs_acl_delete_def_file
+    , .acl_get_fd = pvfs_acl_get_fd
+    , .acl_get_file = pvfs_acl_get_file
+    , .acl_set_fd = pvfs_acl_set_fd
+    , .acl_set_file = pvfs_acl_set_file
 #endif
+    , .getfscreatecon = pvfs_getfscreatecon
+    , .getfilecon = pvfs_getfilecon
+    , .lgetfilecon = pvfs_lgetfilecon
+    , .fgetfilecon = pvfs_fgetfilecon
+    , .setfscreatecon = pvfs_setfscreatecon
+    , .setfilecon = pvfs_setfilecon
+    , .lsetfilecon = pvfs_lsetfilecon
+    , .fsetfilecon = pvfs_fsetfilecon
 };
 
 /*

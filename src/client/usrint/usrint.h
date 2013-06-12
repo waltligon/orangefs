@@ -142,6 +142,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+//#define _GLIBCPP_USE_WCHAR_T 1
+//#include <libio.h>
+//#undef _GLIBCPP_USE_WCHAR_T
 #include <stdio.h>
 #include <utime.h>
 
@@ -203,6 +206,11 @@
 
 #ifdef HAVE_LINUX_TYPES_H
 # include <linux/types.h>
+#endif
+
+#if 1
+//#ifdef HAVE_SELINUX_H
+# include <selinux/selinux.h>
 #endif
 
 #ifdef HAVE_ATTR_XATTR_H
@@ -297,10 +305,11 @@ extern int fremovexattr(int fd, const char *name);
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
 #define PVFS_BUFSIZE (1024*1024)
+#define PVFS_SHM_MAGIC (0xfffefdfcfbfa9081)
 #define PVFS_NOFILE_MAX (1024)
 #define PATH_TABLE_SIZE (1024*1024)
-#define SHMFD 101
-#define PARENTFD 100
+#define FD_TABLE_SIZE (64)
+#define PVFS_SHMOBJ (PVFS_NOFILE_MAX -1)
 
 /* extra function prototypes */
 
