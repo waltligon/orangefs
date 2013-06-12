@@ -524,7 +524,7 @@ struct PINT_server_getconfig_op
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
-    int primary_flow_error_code;
+    int primary_error_code;
     int primary_flow_received;
 
     replicate_descriptor_t *replicate_d;
