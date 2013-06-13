@@ -37,6 +37,8 @@ const char *replication_endpoint_states_as_strings[]=
    "FAILED BMI SEND",
    "FAILED TROVE WRITE",
    "FLOW CANCELLED",
+   "FAILED TO REPLICATE",
+   "FAILED FINAL DECODE",
    "NUMBER OF STATES"
 };
 

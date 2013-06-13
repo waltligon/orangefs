@@ -464,9 +464,7 @@ static PINT_sm_action io_send_completion_ack(
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
     
 
-    gossip_lerr("js_p->error_code:(%d):js_p->status_user_tag(%d)\n",(int)js_p->error_code
-                                                                    ,(int)js_p->status_user_tag);
-
+    gossip_lerr("js_p->error_code:(%d)\n",(int)js_p->error_code);
 
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
@@ -505,8 +503,18 @@ static PINT_sm_action io_send_completion_ack(
      * primary_error_code is zero, then the client is expected to process the data in the response
      * to determine the next course of action.
      */
-    s_op->resp.status = s_op->u.io.primary_error_code;
-    s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transferred;
+
+    if (s_op->u.io.primary_error_code)
+    {
+       s_op->resp.status = s_op->u.io.primary_error_code;
+       s_op->resp.u.write_completion.total_completed = 0;
+    }
+    else
+    {
+      int index = s_op->u.io.replicate_d_local_flow_index;
+      s_op->resp.status = s_op->u.io.replicate_d[index].endpt_status.error_code;
+      s_op->resp.u.write_completion.total_completed = 0;
+    }
 
     err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
@@ -677,7 +685,7 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
      * check it when we return from msgpairarray.
      */
 
-    /* store bstream size, status, and session tag. */
+    /* store status and session tag. */
 
     gossip_lerr("Response %d of %d.\n",i,s_op->msgarray_op.count);
     gossip_lerr("Bstream size(%d) for handle(%llu)\n",(int)resp_p->u.io.bstream_size
@@ -689,11 +697,6 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     s_op->u.io.replicate_d[i].session_tag              = msg_p->session_tag;
     s_op->u.io.replicate_d[i].svr_addr                 = msg_p->svr_addr;
     s_op->u.io.replicate_d[i].handle                   = msg_p->handle;
-
-    if (resp_p->status==0)
-    {
-        s_op->u.io.replicate_d[i].bstream_size = resp_p->u.io.bstream_size;
-    }
 
     if (s_op->u.io.replicate_d[i].endpt_status.error_code)
     {
@@ -825,7 +828,7 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     /* Did we encounter an error before flows could be started? */
     if (js_p->status_user_tag == NOT_IN_USE)
     {
-       if (js_p->error_code < 0)
+       if (js_p->error_code)
        {
           gossip_lerr("Error occurred before flows could be started(%d).\n",js_p->error_code);
           s_op->u.io.primary_error_code = js_p->error_code;
@@ -856,46 +859,44 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     /* replicate flow? */
     index = js_p->status_user_tag - NEXT_FLOW;
     s_op->u.io.replicate_d[index].received = 1;
-    
-    /* if js_p->status_code != zero, then we probably received some sort of networking or job timeout       
-     * error, so it is not necessary to decode the response.   Otherwise, we should decode the reponse
-     * and cross check the returned information with the flow's information.
-     */
 
-    if (js_p->error_code != 0)
+    /* If replicate-next sm sent back a non-zero error code, then let that error override any
+     * error that may have been discovered during the flow from replicate-prime.
+     */
+    if (js_p->error_code)
     {
-       if ( s_op->u.io.replicate_d[index].endpt_status.error_code == 0)
-       {
-            s_op->u.io.replicate_d[index].endpt_status.error_code = js_p->error_code;
-            s_op->u.io.replicate_d[index].endpt_status.state = 
-       }
+       s_op->u.io.replicate_d[index].endpt_status.error_code = js_p->error_code;
+       s_op->u.io.replicate_d[index].endpt_status.state = FAILED_TO_REPLICATE;
+       goto completion_exit;
+    }
+    else if (s_op->u.io.replicate_d[index].endpt_status.state != RUNNING)
+    {
        goto completion_exit;
     }
 
-    /* decode repsonse from "replica" server */
+    /* if no errors from the internal flow(for this replica) nor replicate-next, then decode repsonse from "replica" server */
     ret = PINT_serv_decode_resp( s_op->target_fs_id
                                 ,s_op->u.io.replicate_d[index].encoded_resp_p
                                 ,&decoded_resp
                                 ,&s_op->u.io.replicate_d[index].svr_addr
-                                ,s_op->u.io.replicate_recv_status[index].actual_size //same as js_p->actual_size
+                                ,js_p->actual_size
                                 ,&resp );
     if (ret != 0)
     {
        gossip_lerr("Error decoding resp from NEXT server for handle (%llu).\n"
                   ,llu(s_op->u.io.replicate_d[index].handle));
        PVFS_perror_gossip("replicate-prime decoding error",ret);
-       s_op->u.io.replicate_recv_status[index].error_code = ret;       
+       s_op->u.io.replicate_d[index].endpt_status.error_code = ret;       
+       s_op->u.io.replicate_d[index].endpt_status.state = FAILED_FINAL_DECODE;
+       goto completion_exit;
     }
 
-    if (resp->status != 0)
-    {
-       s_op->u.io.replicate_recv_status[index].error_code = resp->status;
-       PVFS_perror_gossip("Replicate-prime received an error from replicate-next.\n",resp->status);
-    }
+    /* set the number of bytes handled by this replica server */
+    s_op->u.io.replicate_d[index].endpt_status.writes_completed_bytes = resp->u.write_completion.total_completed;
 
     gossip_lerr("Completion ACK returned from NEXT server for handle(%llu).\n"
                ,llu(s_op->u.io.replicate_d[index].handle));
-    gossip_lerr("Amount of data transferred(%lld).\n",(long long int)resp->u.write_completion.total_completed);
+    gossip_lerr("Amount of data written(%lld).\n",(long long int)resp->u.write_completion.total_completed);
 
 
     /* not sure if this is necessary; check on it */

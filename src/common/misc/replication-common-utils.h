@@ -54,7 +54,8 @@ enum replication_endpoint_states
    FAILED_BMI_SEND,
    FAILED_TROVE_WRITE,
    FLOW_CANCELLED,
-   FAILED_FINAL_CONTACT,
+   FAILED_TO_REPLICATE,
+   FAILED_FINAL_DECODE,
    NUMBER_OF_STATES
 };
 
@@ -64,7 +65,7 @@ struct replication_endpoint_status_s
 {
    replication_endpoint_state state;
    int error_code;
-   PVFS_size bytes_handled;
+   PVFS_size writes_completed_bytes;
 };
 
 typedef struct replication_endpoint_status_s replication_endpoint_status_t;

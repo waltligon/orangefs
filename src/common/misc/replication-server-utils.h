@@ -13,7 +13,6 @@
 struct replicate_descriptor_s
 {
    PVFS_handle handle;
-   PVFS_size bstream_size;
    PVFS_msg_tag_t session_tag;
    PVFS_BMI_addr_t svr_addr;
    void *encoded_resp_p;
