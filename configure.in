@@ -68,15 +68,34 @@ AC_CHECK_HEADER([stdint.h],
         [AC_DEFINE(HAVE_STDINT_H, 1, Define if stdint.h exists)])
 AC_CHECK_HEADER([stdlib.h],
         [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+AC_CHECK_HEADER([stdio.h],
+        [AC_DEFINE(HAVE_STDIO_H, 1, Define if stdio.h exists)])
+AC_CHECK_HEADER([fcntl.h],
+        [AC_DEFINE(HAVE_FCNTL_H, 1, Define if fcntl.h exists)])
+AC_CHECK_HEADER([utime.h],
+        [AC_DEFINE(HAVE_UTIME_H, 1, Define if utime.h exists)])
+AC_CHECK_HEADER([string.h],
+        [AC_DEFINE(HAVE_STRING_H, 1, Define if string.h exists)])
 AC_CHECK_HEADER([strings.h],
         [AC_DEFINE(HAVE_STRINGS_H, 1, Define if strings.h exists)])
-AC_CHECK_HEADER([stdlib.h],
-        [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+AC_CHECK_HEADER([assert.h],
+        [AC_DEFINE(HAVE_ASSERT_H, 1, Define if assert.h exists)])
+AC_CHECK_HEADER([libgen.h],
+        [AC_DEFINE(HAVE_LIBGEN_H, 1, Define if libgen.h exists)])
+AC_CHECK_HEADER([dirent.h],
+        [AC_DEFINE(HAVE_DIRENT_H, 1, Define if dirent.h exists)])
+AC_CHECK_HEADER([time.h],
+        [AC_DEFINE(HAVE_TIME_H, 1, Define if time.h exists)])
+AC_CHECK_HEADER([dlfcn.h],
+        [AC_DEFINE(HAVE_DLFCN_H, 1, Define if dlfcn.h exists)])
 
 AC_CHECK_HEADER([linux/types.h],
         [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
 AC_CHECK_HEADER([linux/malloc.h],
         [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
+
+AC_CHECK_HEADER([selinux/selinux.h],
+        [AC_DEFINE(HAVE_SELINUX_H, 1, Define if selinux/selinux.h exists)])
 
 dnl These are kernel headers checked in maint/config/kernel.m4
 dnl AC_CHECK_HEADERS([linux/compat.h])
@@ -102,6 +121,14 @@ AC_CHECK_HEADER([sys/sendfile.h],
         [AC_DEFINE(HAVE_SYS_SENDFILE_H, 1, Define if sys/sendfile.h exists)])
 AC_CHECK_HEADER([sys/xattr.h],
         [AC_DEFINE(HAVE_SYS_XATTR_H, 1, Define if sys/xattr.h exists)])
+AC_CHECK_HEADER([sys/statvfs.h],
+        [AC_DEFINE(HAVE_SYS_STATVFS_H, 1, Define if sys/statvfs.h exists)])
+AC_CHECK_HEADER([sys/uio.h],
+        [AC_DEFINE(HAVE_SYS_UIO_H, 1, Define if sys/uio.h exists)])
+AC_CHECK_HEADER([sys/mman.h],
+        [AC_DEFINE(HAVE_SYS_MMAN_H, 1, Define if sys/mman.h exists)])
+AC_CHECK_HEADER([sys/time.h],
+        [AC_DEFINE(HAVE_SYS_TIME_H, 1, Define if sys/time.h exists)])
 
 AC_CHECK_HEADER([arpa/inet.h],
         [AC_DEFINE(HAVE_ARPA_INET_H, 1, Define if arpa/inet.h exists)])

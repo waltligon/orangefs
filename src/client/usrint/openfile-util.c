@@ -892,6 +892,8 @@ static int init_usrint_internal(void)
     if (glibc_ops.fcntl(PVFS_SHMOBJ, F_GETFL) >= 0)
     {
         struct stat sbuf;
+        int *fd_table;
+
         /* we found something on the magic fd */
         glibc_ops.fstat(PVFS_SHMOBJ, &sbuf);
         shmsize = sbuf.st_size;
@@ -929,13 +931,17 @@ static int init_usrint_internal(void)
             exit(-1);
         }
 
+        /* pointers in the parent not relocated yet */
+        fd_table = (int *)((char *)shmctrl->fd_table +
+                        ((char *)shmctrl - (char *)shmctrl->shmctrl));
+
         /* now load any shared PDLs that might be open */
         for (i = 0; i < shmctrl->fd_table_count; i++)
         {
             int psize;
             int fd;
             pvfs_shmcontrol_t *objptr;
-            fd = shmctrl->fd_table[i];
+            fd = fd_table[i];
             if (glibc_ops.fcntl(fd, F_GETFL) >= 0)
             {
                 struct stat sbuf;

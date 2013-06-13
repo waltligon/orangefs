@@ -14,6 +14,9 @@
 #define USRINT_SOURCE 1
 #include "usrint.h"
 
+/* if no header file we assume no selinux */
+#ifdef HAVE_SELINUX_H
+
 #ifdef getfscreatecon
 #undef getfscreatecon
 #endif
@@ -98,6 +101,8 @@ int fsetfilecon(int fd, security_context_t con)
     errno = ENOTSUP;
     return -1;
 }
+
+#endif /* HAVE_SELINUX_H */
 
 /*
  * Local variables:

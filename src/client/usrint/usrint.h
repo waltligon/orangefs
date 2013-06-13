@@ -156,16 +156,30 @@
 # include <stdlib.h>
 #endif
 
-#include <assert.h>
-#include <libgen.h>
-#include <dirent.h>
-#include <string.h>
+#ifdef HAVE_STDARG_H
+# include <assert.h>
+#endif
+
+#ifdef HAVE_STDARG_H
+# include <libgen.h>
+#endif
+
+#ifdef HAVE_STDARG_H
+# include <dirent.h>
+#endif
+
+#ifdef HAVE_STDARG_H
+# include <string.h>
+#endif
 
 #ifdef HAVE_STDARG_H
 # include <stdarg.h>
 #endif
 
-#include <memory.h>
+#ifdef HAVE_MEMORY_H
+# include <memory.h>
+#endif
+
 #include <limits.h>
 
 #ifdef HAVE_SYS_TYPES_H
@@ -193,23 +207,32 @@
 # include <sys/stat.h>
 #endif
 
-#include <sys/statvfs.h>
-#include <sys/uio.h>
+#ifdef HAVE_SYS_STATVFS_H
+# include <sys/statvfs.h>
+#endif
+
+#ifdef HAVE_SYS_UIO_H
+# include <sys/uio.h>
+#endif
 
 #ifdef PVFS_HAVE_ACL_INCLUDES
 # include <sys/acl.h>
 # include <acl/libacl.h>
 #endif
 
-#include <sys/mman.h>
-#include <sys/time.h>
+#ifdef HAVE_SYS_MMAN_H
+# include <sys/mman.h>
+#endif
+
+#ifdef HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
 
 #ifdef HAVE_LINUX_TYPES_H
 # include <linux/types.h>
 #endif
 
-#if 1
-//#ifdef HAVE_SELINUX_H
+#ifdef HAVE_SELINUX_H
 # include <selinux/selinux.h>
 #endif
 
