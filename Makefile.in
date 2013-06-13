@@ -509,9 +509,9 @@ endif
 #            shared libraries will be built
 #
 #    --enable-symbolic must be specified during the configure step so that
-#            -Bsymbolic is passed to ld during the creation of libofs-s.so so 
+#            -Bsymbolic is passed to ld during the creation of libofs.so so 
 #            that our JNI layer's function calls are correctly bound when 
-#            libofs-s.so is dynamically loaded by the Java side of the JNI 
+#            libofs.so is dynamically loaded by the Java side of the JNI 
 #            layer.
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@

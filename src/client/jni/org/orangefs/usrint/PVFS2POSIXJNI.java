@@ -13,7 +13,7 @@ public class PVFS2POSIXJNI {
     static {
         String ldlPath = System.getenv("JNI_LIBRARY_PATH");
         String libFirst = "libpvfs2.so";
-        String libSecond = "libofs-s.so";
+        String libSecond = "libofs.so";
         try {
             System.load(ldlPath + "/" + libFirst);
         }
