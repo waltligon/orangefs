@@ -2740,15 +2740,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
     q_item->result_chain_count--;
     gossip_lerr("flow(%p):q_item(%p):%s:result_chain_count(%d)\n",flow_d,q_item,__func__,q_item->result_chain_count);
 
-    /* A zero chain count signifies the last time trove-write callback will execute for this flow buffer. */
-    if (q_item->result_chain_count == 0)
-    {
-        qlist_del(&q_item->list_link);
-        flow_data->writes_pending--;
-        q_item->buffer_in_use--;
-    }
-
-    /* this error is for this particular result chain entry; there could be multiples. So,
+    /* this error is for this particular result chain entry; there could be multiple entries. So,
      * we will keep the first error and let any others go.  Or, another q_item may have
      * already set the res->error_code.  In either case, we keep the original error and
      * throw away any others.
@@ -2767,51 +2759,46 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
                  ,get_replication_endpoint_state_as_string(q_item->res->state)
                  ,(int)q_item->res->error_code);
     }/*end if error code is not zero*/
-    else
+
+    /* A zero chain count signifies the last time trove-write-callback will execute for this flow buffer. 
+     * NOTE: we will have multiple chains when the given buffer contains data that is not to be written
+     * sequentially; used primarily in user-defined data types in MPI.
+     */
+    if (q_item->result_chain_count == 0)
     {
-       /* If all results for this q-item are available continue and no errors with the local trove calls.*/
-       if (0 == q_item->result_chain_count && q_item->res->state == RUNNING)
-       {
-           struct result_chain_entry* result_iter = &q_item->result_chain;
-  
-           /* Aggregate results.*/
-           while (result_iter)
-           {
-               struct result_chain_entry* re = result_iter;
+        struct result_chain_entry* result_iter = &q_item->result_chain;
 
-               flow_data->total_bytes_written += result_iter->out_size;
-               flow_d->total_transferred += result_iter->out_size;
+        qlist_del(&q_item->list_link); /* delete from the dest list */
+        flow_data->writes_pending--;
+        q_item->buffer_in_use--;
+          
+        while (result_iter)
+        {
+             struct result_chain_entry* re = result_iter;
+             flow_data->total_bytes_written += result_iter->out_size;
+             flow_d->total_transferred      += result_iter->out_size;
+             gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
+                       ,flow_d
+                       ,q_item,__func__
+                       ,(int)flow_data->total_bytes_written
+                       ,(int)result_iter->out_size);
+             PINT_perf_count(PINT_server_pc, 
+                             PINT_PERF_WRITE,
+                             result_iter->result.bytes, 
+                             PINT_PERF_ADD);
 
-               gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
-                          ,flow_d
-                          ,q_item,__func__
-                          ,(int)flow_data->total_bytes_written
-                          ,(int)result_iter->out_size);
+             result_iter = result_iter->next;
 
-               PINT_perf_count(PINT_server_pc, 
-                               PINT_PERF_WRITE,
-                               result_iter->result.bytes, 
-                               PINT_PERF_ADD);
-
-               result_iter = result_iter->next;
-
-               /* Free memory if this is not the chain head */
-               if (re != &q_item->result_chain)
-                   free(re);
-           }/*end while*/
+             /* Free memory if this is not the chain head */
+             if (re != &q_item->result_chain)
+                 free(re);
+        }/*end while*/
     
-           /* Cleanup q_item memory */
-           q_item->result_chain.next = NULL;
-           q_item->result_chain_count = 0;
+        /* Cleanup q_item memory */
+        q_item->result_chain.next = NULL;
+        q_item->result_chain_count = 0;
 
-       }/*end if write has completed*/  
-       else
-       {
-           gen_mutex_unlock(&flow_d->flow_mutex);
-           return;
-       } /* return if write has NOT completed */
-
-    }/*end if error code is zero */
+    }/*end if result-chain-count is zero*/
 
     /* Debug output */
     gossip_lerr(
@@ -2846,7 +2833,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
      }
 
 
-     /* If this buffer is available, then use it, if there is more data to receive.
+     /* If this buffer is available, there is more data to receive, and at least one flow is still runnning,
+      * then post another BMI-RECV.
       */
      if (q_item->buffer_in_use == 0 && !PINT_REQUEST_DONE(flow_d->file_req_state))
      {
@@ -3371,7 +3359,7 @@ static void server_trove_write_callback_fn(void *user_ptr,
             struct result_chain_entry* re = result_iter;
             bytes_written += result_iter->result.bytes;
             flow_data->total_bytes_written += result_iter->result.bytes;
-            flow_d->total_transferred += result_iter->result.bytes;
+            flow_d->total_transferred      += result_iter->result.bytes;
             PINT_perf_count(PINT_server_pc, 
                             PINT_PERF_WRITE,
                             result_iter->result.bytes, 

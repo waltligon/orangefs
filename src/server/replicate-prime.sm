@@ -511,9 +511,16 @@ static PINT_sm_action io_send_completion_ack(
     }
     else
     {
+      /* RAL TODO: the client does not need to retrieve bstream sizes, I will be returning
+       * the original bstream size and the actual bytes written.
+       */
       int index = s_op->u.io.replicate_d_local_flow_index;
-      s_op->resp.status = s_op->u.io.replicate_d[index].endpt_status.error_code;
-      s_op->resp.u.write_completion.total_completed = 0;
+      //s_op->ds_attr.u.datafile.b_size; contains the bstream size just prior to this write.
+      /* if we send a non-zero response status, then the decoding mechanism does not
+       * decode the rest of the response.
+       */ 
+      s_op->resp.status = s_op->u.io.replicate_d[index].endpt_status.error_code = 0;
+      s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transferred;
     }
 
     err = PINT_encode(
@@ -583,26 +590,6 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     /* set state to RUNNING for the local flow */
     s_op->u.io.replicate_d[s_op->u.io.replicate_d_local_flow_index].endpt_status.state = RUNNING;
 
-    /* create job-status array for replicas */
-    s_op->u.io.replicate_recv_status = calloc(s_op->u.io.replicate_d_repl_count,
-                                              sizeof(*s_op->u.io.replicate_recv_status));
-    if (!s_op->u.io.replicate_recv_status)
-    {
-       gossip_lerr("Error allocating memory for replicate_recv_status.\n");
-       js_p->error_code = -PVFS_ENOMEM;
-       goto error_exit;
-    }
-
-    /* create job-id array for replicas */
-    s_op->u.io.replicate_recv_job_id = calloc(io->replication_number_of_copies,
-                                              sizeof(*s_op->u.io.replicate_recv_job_id));
-    if (!s_op->u.io.replicate_recv_job_id)
-    {
-       gossip_lerr("Error allocating memory for replicate_recv_job_id.\n");
-       js_p->error_code = -PVFS_ENOMEM;
-       goto error_exit;
-    }
-
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
     
@@ -648,16 +635,6 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     return SM_ACTION_COMPLETE;
 
 error_exit:
-    if (s_op->u.io.replicate_recv_status)
-    {
-       free(s_op->u.io.replicate_recv_status);
-    }
-
-    if (s_op->u.io.replicate_recv_job_id)
-    {
-       free(s_op->u.io.replicate_recv_job_id);
-    }
-
     if (s_op->u.io.replicate_d)
     {
         free(s_op->u.io.replicate_d);
