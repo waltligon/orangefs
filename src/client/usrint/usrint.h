@@ -234,6 +234,8 @@
 
 #ifdef HAVE_SELINUX_H
 # include <selinux/selinux.h>
+#else
+  typedef void *security_context_t;
 #endif
 
 #ifdef HAVE_ATTR_XATTR_H
