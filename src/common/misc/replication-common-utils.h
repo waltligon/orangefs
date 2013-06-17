@@ -9,7 +9,15 @@
 #define __REPLICATION_COMMON_UTILS_H
 
 #include "pvfs2-types.h"
-#include "server-config.h"
+//#include "server-config.h"
+
+
+typedef struct replication_s
+{
+   uint32_t replication_switch;
+   PVFS_sys_layout replication_layout;
+   uint32_t replication_number_of_copies;
+} replication_s;
 
 /* helper function to calculate the TOTAL size of the layout, so we can allocate
  * all of the space as one contiguous chunk.
@@ -64,7 +72,7 @@ typedef enum replication_endpoint_states replication_endpoint_state;
 struct replication_endpoint_status_s
 {
    replication_endpoint_state state;
-   int error_code;
+   PVFS_error error_code;
    PVFS_size writes_completed_bytes;
 };
 

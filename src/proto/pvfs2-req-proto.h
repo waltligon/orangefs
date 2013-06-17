@@ -20,6 +20,7 @@
 #include "pint-hint.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
+#include "replication-server-utils.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -1604,10 +1605,12 @@ endecode_fields_1_struct(
 struct PVFS_servresp_write_completion
 {
     PVFS_size total_completed; /* amount of data transferred */
+    replication_endpoint_status_t *endpt_status;
+    PVFS_size endpt_status_count;
 };
-endecode_fields_1_struct(
-    PVFS_servresp_write_completion,
-    PVFS_size, total_completed);
+//endecode_fields_1_struct(
+ //   PVFS_servresp_write_completion,
+ //   PVFS_size, total_completed);
 
 #define SMALL_IO_MAX_SEGMENTS 64
 

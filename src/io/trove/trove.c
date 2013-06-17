@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #include "gossip.h"
+#include "replication-server-utils.h"
 #include "trove.h"
 #include "trove-internal.h"
 

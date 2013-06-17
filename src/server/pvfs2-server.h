@@ -25,7 +25,6 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
-#include "replication-server-utils.h"
 #include "job.h"
 #include "bmi.h"
 #include "trove.h"
