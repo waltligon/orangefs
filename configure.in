@@ -880,8 +880,9 @@ AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
-[  --enable-shared         Build shared client library],
-[build_shared=$enableval], [build_shared=no])
+    [  --enable-shared         Build shared client library],
+    [build_shared=$enableval],
+    [build_shared=no])
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static
@@ -892,8 +893,9 @@ fi
 
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
-[  --enable-threaded         Build threaded client library],
-[build_threaded=$enableval], [build_threaded=no])
+    [  --disable-threaded      Do not build threaded client library],
+    [build_threaded=$enableval],
+    [build_threaded=yes])
 AC_SUBST(build_threaded)
 
 dnl Method to disable build of user interface libraries
@@ -922,29 +924,31 @@ if test "x$build_usrint" = "xyes"; then
 	AX_CHECK_LIB_NEEDS_LIBRT
 fi
  
+dnl libofs is ALWAYS symbolic, others should never be
+dnl
 dnl Method to enable symbolic user interface libraries
-BUILD_SYMBOLIC=
-AC_ARG_ENABLE(symbolic,
-   [  --enable-symbolic  Build library to force programs to use libofs.so],
-   [if test "x$enableval" = "xyes" ; then
-      if test "x$build_usrint" = "xyes" -a "x$build_shared" = "xyes" ; then
-         AC_DEFINE(PVFS_USRINT_SYMBOLIC, 1,
-               [Build library to force programs to use libofs.so.])
-         BUILD_SYMBOLIC=1
-      else
-         AC_MSG_ERROR([Must build usrint and shared to build symbolic library.])
-      fi
-   else
-      AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
-                [Build library to force programs to use libofs.so.])
-   fi
-   build_symbolic=$enableval
-   ],
-   [AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
-              [Build library to force programs to use libofs.so.])
-    build_symbolic=no
-   ])
-AC_SUBST(build_symbolic)
+dnl BUILD_SYMBOLIC=
+dnl AC_ARG_ENABLE(symbolic,
+dnl    [  --enable-symbolic  Build library to force programs to use libofs.so],
+dnl    [if test "x$enableval" = "xyes" ; then
+dnl       if test "x$build_usrint" = "xyes" -a "x$build_shared" = "xyes" ; then
+dnl          AC_DEFINE(PVFS_USRINT_SYMBOLIC, 1,
+dnl                [Build library to force programs to use libofs.so.])
+dnl          BUILD_SYMBOLIC=1
+dnl       else
+dnl          AC_MSG_ERROR([Must build usrint and shared to build symbolic library.])
+dnl       fi
+dnl    else
+dnl       AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
+dnl                 [Build library to force programs to use libofs.so.])
+dnl    fi
+dnl    build_symbolic=$enableval
+dnl    ],
+dnl    [AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
+dnl               [Build library to force programs to use libofs.so.])
+dnl     build_symbolic=no
+dnl    ])
+dnl AC_SUBST(build_symbolic)
  
 dnl Method to enable user interface kmod support
 USRINT_KMOUNT=
@@ -1000,7 +1004,7 @@ fi],
 
 dnl Method to disable redefining malloc
 AC_ARG_ENABLE(malloc-redef,
-[  --disable-malloc-redef    Do not redefine malloc],
+[  --disable-malloc-redef  Do not redefine malloc],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_MALLOC_REDEF, 1,
       [Should we redefine malloc.])
@@ -1016,7 +1020,7 @@ MALLOC_REDEF=1
 
 dnl Method to disable malloc checking a magic number
 AC_ARG_ENABLE(malloc-magic,
-[  --disable-malloc-magic    Do not have malloc check a magic number],
+[  --disable-malloc-magic  Do not have malloc check a magic number],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_MALLOC_MAGIC, 1,
       [Should we have malloc check a magic number.])
@@ -1029,7 +1033,7 @@ fi],
 
 dnl Method to disable malloc zeroing new memory
 AC_ARG_ENABLE(malloc-zero,
-[  --disable-malloc-zero    Do not have malloc zero new memory],
+[  --disable-malloc-zero   Do not have malloc zero new memory],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_MALLOC_ZERO, 1,
       [Should we have malloc zero new memory.])
