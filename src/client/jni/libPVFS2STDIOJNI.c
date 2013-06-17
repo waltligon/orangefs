@@ -29,6 +29,7 @@ static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
 static inline int is_dot_dir(char * dirent_name);
+static inline int is_lostfound_dir(char * dirent_name);
 /* TODO: relocate recursive delete related functions so other utilities can
  * make use of them. */
 static int recursive_delete(char *dir);
@@ -136,6 +137,13 @@ static inline int is_dot_dir(char * dirent_name)
             || (strcmp(dirent_name, "..") == 0));
 }
 
+/* Returns non-zero(true) if the supplied directory entry name corresponds to
+ * the OrangeFS specific directory called "lost+found". */
+static inline int is_lostfound_dir(char * dirent_name)
+{
+    return (int) (strcmp(dirent_name, "lost+found") == 0);
+}
+
 /* Recursively delete the path specified by dir. */
 static int recursive_delete(char *dir)
 {
@@ -166,7 +174,8 @@ static int recursive_delete(char *dir)
         direntp = readdir(dirp);
         if (direntp && (direntp->d_type == DT_DIR))
         {
-            if (is_dot_dir(direntp->d_name))
+            if (is_dot_dir(direntp->d_name) ||
+                    is_lostfound_dir(direntp->d_name))
             {
                 continue;
             }
@@ -1039,7 +1048,8 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
         direntp = readdir(dirp);
         if (direntp)
         {
-            if (is_dot_dir(direntp->d_name))
+            if (is_dot_dir(direntp->d_name) ||
+                    is_lostfound_dir(direntp->d_name))
             {
                 continue;
             }
@@ -1062,7 +1072,8 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
             direntp = readdir(dirp);
             if (direntp)
             {
-                if (is_dot_dir(direntp->d_name))
+                if (is_dot_dir(direntp->d_name) ||
+                        is_lostfound_dir(direntp->d_name))
                 {
                     continue;
                 }

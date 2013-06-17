@@ -516,9 +516,9 @@ endif
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
-JAVAC := $(JAVA_HOME)/bin/javac
-JAVAH := $(JAVA_HOME)/bin/javah
-JAR := $(JAVA_HOME)/bin/jar
+JAVAC := $(JAVA_HOME)/bin/javac -J-Xmx256m
+JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
+JAR := $(JAVA_HOME)/bin/jar -J-Xmx256m
 JNI_DIR := $(srcdir)/src/client/jni
 ORGDIR := $(JNI_DIR)/org/orangefs/usrint
 ORGDOT := org.orangefs.usrint
