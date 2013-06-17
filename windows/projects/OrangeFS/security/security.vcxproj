@@ -94,6 +94,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -107,6 +108,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -122,6 +124,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -139,6 +142,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -150,6 +154,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">
     <ClCompile>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -159,6 +164,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>

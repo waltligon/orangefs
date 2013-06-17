@@ -1235,6 +1235,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
+	{ PVFS_MGMT_SYS_EXEC, "PVFS_MGMT_SYS_EXEC" },
         { 0, "UNKNOWN" }
     };
 

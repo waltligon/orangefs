@@ -7,6 +7,7 @@
 #ifndef _PINT_SECURITY_H_
 #define _PINT_SECURITY_H_
 
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 
 
@@ -65,14 +66,26 @@
         } \
     } while (0)
 
+#ifdef WIN32
+#define PINT_SECURITY_ERROR(rc, format, ...) \
+    do { \
+        gossip_err("%s: " format, __func__, __VA_ARGS__); \
+        PINT_security_error(__func__, (rc)); \
+    } while (0)
+#else
 #define PINT_SECURITY_ERROR(rc, format, f...) \
     do { \
         gossip_err("%s: " format, __func__, ##f); \
         PINT_security_error(__func__, (rc)); \
     } while (0)
+#endif
 
 int PINT_security_initialize(void);
 int PINT_security_finalize(void);
+
+#ifdef ENABLE_CERTCACHE
+int PINT_security_cache_ca_cert(void);
+#endif
 
 int PINT_init_capability(PVFS_capability *cap);
 int PINT_sign_capability(PVFS_capability *cap);

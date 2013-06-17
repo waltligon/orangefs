@@ -625,33 +625,6 @@ int PINT_ldap_authenticate(const char *userid,
                 dn = ldap_get_dn(ldap, entry);
                 gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: found LDAP user %s\n",
                              __func__, dn);
-
-                /* get ber value ... does not need to be freed */
-                /* TODO: remove
-                bvalue = ber_bvstr(password);
-                if (bvalue != NULL)
-                {
-                    ldapret = ldap_compare_ext_s(ldap, dn, "userPassword", 
-                                             bvalue, NULL, NULL);
-
-                    if ((ldapret != LDAP_COMPARE_TRUE) && (ldapret != LDAP_COMPARE_FALSE))
-                    {
-                        PINT_ldap_error("password check failed", ldapret);
-                    }
-                    else
-                    {
-                        gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                                     "%s: password check: %s\n", __func__,
-                                     (ldapret == LDAP_COMPARE_TRUE) ? "true" : "false");
-                    }
-                    ret = (ldapret == LDAP_COMPARE_TRUE) ? 0 : -PVFS_EACCES;                    
-                }
-                else
-                {
-                    ret = -PVFS_ENOMEM;
-                }                
-                ldap_memfree(dn);
-                */
             }
             else
             {

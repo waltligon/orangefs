@@ -1066,6 +1066,8 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    /*initialize permanent data structures*/
    meta->mirror_dfile_array = s_op->val_a[0].buffer;
    s_op->u.getattr.mirror_dfile_status_array = s_op->val_a[1].buffer;
+   /* Take over responsibility for freeing the buffers. */
+   s_op->free_val = 0;
 /*
    s_op->val_a[0].buffer = s_op->val_a[1].buffer = NULL;
 */

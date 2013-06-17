@@ -292,12 +292,12 @@ static PINT_sm_action readdir_init(
 static PINT_sm_action readdir_finish_partial_read(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: "
-                 "readdir_finish_partial_read\n");
-
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret = -PVFS_EINVAL;
+
+    gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: "
+                 "readdir_finish_partial_read\n");
 
     if(sm_p->readdir_state.pos_token == PVFS_READDIR_START)
     {
@@ -577,6 +577,8 @@ n",
 
     if (resp_p->u.readdir.dirent_count > 0)
     {
+        int dirent_array_offset, dirent_array_len;
+
         if(*(sm_p->readdir_state.dirent_outcount) == 0)
         {
             int dirent_array_len_total =
@@ -588,9 +590,9 @@ n",
             assert(*(sm_p->readdir_state.dirent_array));
         }
 
-        int dirent_array_offset =
+        dirent_array_offset =
             (*(sm_p->readdir_state.dirent_outcount));
-        int dirent_array_len =
+        dirent_array_len =
             (sizeof(PVFS_dirent) * resp_p->u.readdir.dirent_count);
 
         memcpy(*(sm_p->readdir_state.dirent_array) + dirent_array_offset,

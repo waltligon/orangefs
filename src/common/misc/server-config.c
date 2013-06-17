@@ -18,6 +18,8 @@
 #include <ctype.h>
 #ifdef WIN32
 #include <io.h>
+
+#include "wincommon.h"
 #endif
 
 #include "src/common/dotconf/dotconf.h"
@@ -1748,9 +1750,6 @@ DOTCONF_CB(get_tcp_buffer_send)
     return NULL;
 }
 
-#ifdef WIN32
-#define strcasecmp   stricmp
-#endif
 DOTCONF_CB(get_tcp_bind_specific)
 {
     struct server_configuration_s *config_s =

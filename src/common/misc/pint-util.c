@@ -156,9 +156,11 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
+            PVFS_size dist_dir_bitmap_size, dirent_handles_array_size;
+
             PINT_dist_dir_attr_copyto(dest->dist_dir_attr, src->dist_dir_attr);
 
-            PVFS_size dist_dir_bitmap_size = src->dist_dir_attr.bitmap_size *
+            dist_dir_bitmap_size = src->dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype);
             if (dist_dir_bitmap_size)
             {
@@ -184,7 +186,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->dist_dir_bitmap = NULL;
             }
 
-            PVFS_size dirent_handles_array_size = src->dist_dir_attr.num_servers *
+            dirent_handles_array_size = src->dist_dir_attr.num_servers *
                 sizeof(PVFS_handle);
 
             if (dirent_handles_array_size)

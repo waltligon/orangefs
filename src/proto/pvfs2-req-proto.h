@@ -2537,7 +2537,6 @@ endecode_fields_3_struct(
 );
 
 
-// to do - the green stuff below!
 #define PINT_SERVREQ_MGMT_SYS_EXEC_FILL(__req,   \
                                                     __cap,   \
                                                     __fsid,   \
@@ -2545,7 +2544,7 @@ endecode_fields_3_struct(
 						    __command)  \
 do {                                                         \
     memset(&(__req), 0, sizeof(__req));                      \
-    (__req).op = PVFS_SERVREQ_MGMT_SYS_EXEC;        \
+    (__req).op = PVFS_SERV_MGMT_SYS_EXEC;        \
     (__req).capability = (__cap);                            \
     (__req).u.mgmt_sys_exec.fs_id = (__fsid);    \
     (__req).u.mgmt_sys_exec.server = (__server);    \
@@ -2558,7 +2557,8 @@ struct PVFS_servresp_mgmt_sys_exec
 };
 endecode_fields_1_struct(
     PVFS_servresp_mgmt_sys_exec,
-    int32_t pid);
+    int32_t, pid);
+
 #define extra_size_PVFS_servresp_mgmt_sys_exec \
     PVFS_REQ_LIMIT_PID
 
@@ -2645,7 +2645,7 @@ decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
 /* - generic response with union of all op specific structs */
 struct PVFS_server_resp
 {
-    enum PVFS_server_op op;completed
+    enum PVFS_server_op op;
     PVFS_error status;
     union
     {
@@ -2660,7 +2660,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_rmdirent rmdirent;
         struct PVFS_servresp_chdirent chdirent;
         struct PVFS_servresp_getconfig getconfig;
-        struct PVFS_servresp_io io;completed
+        struct PVFS_servresp_io io;
         struct PVFS_servresp_write_completion write_completion;
         struct PVFS_servresp_statfs statfs;
         struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
@@ -2679,7 +2679,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
-        struct PVFS_servresp_mgmt_sys_exec mgmt_sys_exec;
+        struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+	struct PVFS_servresp_mgmt_sys_exec mgmt_sys_exec;
     } u;
 };
 endecode_fields_2_struct(

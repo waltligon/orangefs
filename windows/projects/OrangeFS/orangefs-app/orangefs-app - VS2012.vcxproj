@@ -102,6 +102,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;ORANGEFS_DEBUG;_CRT_SECURE_NO_WARNINGS;_DEBUG;__WXMSW__;_CRT_SECURE_NO_DEPRECATE_;__WXDEBUG__;wxUSE_GUI=1;WXUSINGDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\src\client\cp-library;..\..\..\openssl\include;..\..\..\wxWidgets\include\mswd;..\..\..\wxWidgets\include\msvc;..\..\..\wxWidgets\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -117,6 +118,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;ORANGEFS_DEBUG;_CRT_SECURE_NO_WARNINGS;_DEBUG;__WXMSW__;_CRT_SECURE_NO_DEPRECATE_;__WXDEBUG__;wxUSE_GUI=1;WXUSINGDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Visual Leak Detector\include;C:\wxWidgets-2.8.12\include;C:\wxWidgets-2.8.12\include\msvc\;C:\wxWidgets-2.8.12\lib\vc_dll\mswd;C:\Users\Trent\Documents\Visual Studio 2012\Projects\test-orangefs-app\openssl\include;C:\Users\Trent\Documents\Visual Studio 2012\Projects\test-orangefs-app\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>

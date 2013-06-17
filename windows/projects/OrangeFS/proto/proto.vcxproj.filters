@@ -15,24 +15,24 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\proto\PINT-le-bytefield.c">
+    <ClCompile Include="..\..\..\..\src\proto\PINT-le-bytefield.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\proto\PINT-reqproto-encode.c">
+    <ClCompile Include="..\..\..\..\src\proto\PINT-reqproto-encode.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\proto\PINT-reqproto-encode.h">
+    <ClInclude Include="..\..\..\..\src\proto\PINT-reqproto-encode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\proto\PINT-reqproto-module.h">
+    <ClInclude Include="..\..\..\..\src\proto\PINT-reqproto-module.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\proto\pvfs2-attr.h">
+    <ClInclude Include="..\..\..\..\src\proto\pvfs2-attr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\proto\pvfs2-req-proto.h">
+    <ClInclude Include="..\..\..\..\src\proto\pvfs2-req-proto.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
