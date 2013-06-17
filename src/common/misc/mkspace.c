@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 #include "pvfs2-internal.h"
 #include "pvfs2-attr.h"
@@ -134,6 +135,9 @@ int pvfs2_mkspace(
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
+    struct stat root_stat;
+    struct stat meta_stat;
+    struct stat data_stat;
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -148,6 +152,39 @@ int pvfs2_mkspace(
                    data_handle_ranges : "NONE"));
 
     new_root_handle = root_handle;
+
+
+    /* init stat buffers */
+    memset(&root_stat, 0, sizeof(root_stat));
+    memset(&meta_stat, 0, sizeof(meta_stat));
+    memset(&data_stat, 0, sizeof(data_stat));
+
+    /* call stat on root, meta, and data paths */
+    stat("/", &root_stat);
+    stat(meta_path, &meta_stat);
+    stat(data_path, &data_stat);
+
+    /* see if the metadata path is located on the root device */
+    if (meta_stat.st_dev == root_stat.st_dev) {
+        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
+        gossip_err("The MetadataStorageSpace path %s appears to be on "
+                "the root device.\n", meta_path);
+        gossip_err("It is recommended that the meta data be stored on a "
+                "dedicated partition.\n");
+        gossip_err("If you have a dedicated partition setup, please "
+                "be sure it is mounted.\n");   
+    }
+
+    /* see if the data path is located on the root device */
+    if (data_stat.st_dev == root_stat.st_dev) {
+        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
+        gossip_err("The DataStorageSpace path %s appears to be on "
+                "the root device.\n", data_path);
+        gossip_err("It is recommended that the data be stored on a "
+                "dedicated partition.\n");
+        gossip_err("If you have a dedicated partition setup, please "
+                "be sure it is mounted.\n");   
+    }
 
     /*
       if we're only creating a collection inside an existing
