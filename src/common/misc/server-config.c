@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/stat.h>
 #ifdef WIN32
 #include <io.h>
 #endif
@@ -1255,6 +1256,12 @@ DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    struct stat root_stat;
+    struct stat data_stat;
+
+    memset(&root_stat, 0, sizeof(root_stat));
+    memset(&data_stat, 0, sizeof(data_stat));
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1267,6 +1274,21 @@ DOTCONF_CB(get_data_path)
 
     config_s->data_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    /* call stat on root and the data path */
+    stat("/", &root_stat);
+    stat(config_s->data_path, &data_stat);
+
+    /* see if the data path is located on the root device */
+    if (data_stat.st_dev == root_stat.st_dev) {
+        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
+        gossip_err("The DataStorageSpace path %s appears to be on "
+                "the root device.\n", config_s->data_path);
+        gossip_err("It is recommended that the data be stored on a "
+                "dedicated partition.\n");
+        gossip_err("If you have a dedicated partition setup, please "
+                "be sure it is mounted.\n");
+    }
     return NULL;
 }
 
@@ -1274,6 +1296,12 @@ DOTCONF_CB(get_meta_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    struct stat root_stat;
+    struct stat meta_stat;
+
+    memset(&root_stat, 0, sizeof(root_stat));
+    memset(&meta_stat, 0, sizeof(meta_stat));
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1286,6 +1314,21 @@ DOTCONF_CB(get_meta_path)
 
     config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
+    /* call stat on root and the data path */
+    stat("/", &root_stat);
+    stat(config_s->meta_path, &meta_stat);
+
+    /* see if the data path is located on the root device */
+    if (meta_stat.st_dev == root_stat.st_dev) {
+        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
+        gossip_err("The MetadataStorageSpace path %s appears to be on "
+                "the root device.\n", config_s->meta_path);
+        gossip_err("It is recommended that the meta data be stored on a "
+                "dedicated partition.\n");
+        gossip_err("If you have a dedicated partition setup, please "
+                "be sure it is mounted.\n");
+    }
     return NULL;
 }
 
