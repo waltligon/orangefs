@@ -1256,11 +1256,6 @@ DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    struct stat root_stat;
-    struct stat data_stat;
-
-    memset(&root_stat, 0, sizeof(root_stat));
-    memset(&data_stat, 0, sizeof(data_stat));
 
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1275,20 +1270,6 @@ DOTCONF_CB(get_data_path)
     config_s->data_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
 
-    /* call stat on root and the data path */
-    stat("/", &root_stat);
-    stat(config_s->data_path, &data_stat);
-
-    /* see if the data path is located on the root device */
-    if (data_stat.st_dev == root_stat.st_dev) {
-        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
-        gossip_err("The DataStorageSpace path %s appears to be on "
-                "the root device.\n", config_s->data_path);
-        gossip_err("It is recommended that the data be stored on a "
-                "dedicated partition.\n");
-        gossip_err("If you have a dedicated partition setup, please "
-                "be sure it is mounted.\n");
-    }
     return NULL;
 }
 
@@ -1296,11 +1277,6 @@ DOTCONF_CB(get_meta_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    struct stat root_stat;
-    struct stat meta_stat;
-
-    memset(&root_stat, 0, sizeof(root_stat));
-    memset(&meta_stat, 0, sizeof(meta_stat));
 
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
@@ -1315,20 +1291,6 @@ DOTCONF_CB(get_meta_path)
     config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
 
-    /* call stat on root and the data path */
-    stat("/", &root_stat);
-    stat(config_s->meta_path, &meta_stat);
-
-    /* see if the data path is located on the root device */
-    if (meta_stat.st_dev == root_stat.st_dev) {
-        gossip_err("*** WARNING ***   *** WARNING ***   *** WARNING ***\n");
-        gossip_err("The MetadataStorageSpace path %s appears to be on "
-                "the root device.\n", config_s->meta_path);
-        gossip_err("It is recommended that the meta data be stored on a "
-                "dedicated partition.\n");
-        gossip_err("If you have a dedicated partition setup, please "
-                "be sure it is mounted.\n");
-    }
     return NULL;
 }
 
@@ -4630,8 +4592,7 @@ static int is_root_handle_in_my_range(
   create a storage space based on configuration settings object
   with the particular host settings local to the caller
 */
-int PINT_config_pvfs2_mkspace(
-    struct server_configuration_s *config)
+int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
 {
     int ret = 1;
     PVFS_handle root_handle = 0;
@@ -4689,6 +4650,54 @@ int PINT_config_pvfs2_mkspace(
                 GOSSIP_SERVER_DEBUG, "Creating new PVFS2 %s\n",
                 (create_collection_only ? "collection" :
                  "storage space"));
+
+            {
+                struct stat root_stat;
+                struct stat meta_stat;
+                struct stat data_stat;
+
+                memset(&root_stat, 0, sizeof(root_stat));
+                memset(&meta_stat, 0, sizeof(meta_stat));
+                memset(&data_stat, 0, sizeof(data_stat));
+
+                /* call stat on root and the data path */
+                stat("/", &root_stat);
+                stat(config->meta_path, &meta_stat);
+
+                /* see if the data path is located on the root device */
+                if (meta_stat.st_dev == root_stat.st_dev)
+                {
+                    gossip_err("*** WARNING ***   *** WARNING *** "
+                               "*** WARNING ***\n");
+                    gossip_err("The MetadataStorageSpace path %s "
+                               "appears to be on the root device.\n",
+                               config->meta_path);
+                    gossip_err("It is recommended that the meta data "
+                               "be stored on a dedicated partition.\n");
+                    gossip_err("If you have a dedicated partition setup, "
+                               "please be sure it is mounted.\n");
+                }
+
+                if (!create_collection_only)
+                {
+                    /* call stat on root and the data path */
+                    stat(config->data_path, &data_stat);
+
+                    /* see if the data path is located on the root device */
+                    if (data_stat.st_dev == root_stat.st_dev)
+                    {
+                        gossip_err("*** WARNING ***   *** WARNING *** "
+                                   "*** WARNING ***\n");
+                        gossip_err("The DataStorageSpace path %s appears "
+                                   "to be on the root device.\n",
+                                   config->data_path);
+                        gossip_err("It is recommended that the data "
+                                   "be stored on a dedicated partition.\n");
+                        gossip_err("If you have a dedicated partition setup, "
+                                   "please be sure it is mounted.\n");
+                    }
+                }
+            }
 
             ret = pvfs2_mkspace(
                 config->data_path, config->meta_path, cur_fs->file_system_name,

@@ -16,16 +16,20 @@
 /** Get a newly allocated inode to go with a negative dentry.
  */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_create(
-    struct inode *dir,
-    struct dentry *dentry,
-    int mode)
+static int pvfs2_create(struct inode *dir,
+                        struct dentry *dentry,
+                        int mode)
+#elif PVFS_KMOD_CREATE_TAKES_NAMEIDATA
+static int pvfs2_create(struct inode *dir,
+                        struct dentry *dentry,
+                        int mode,
+                        struct nameidata *nd)
 #else
-static int pvfs2_create(
-    struct inode *dir,
-    struct dentry *dentry,
-    int mode,
-    struct nameidata *nd)
+static int pvfs2_create(struct inode *dir,
+                        struct dentry *dentry,
+                        int mode,
+                        bool exclusive)
+                        /* PVFS could use to indicate exclusive open */
 #endif
 {
     int ret = -EINVAL;
@@ -33,8 +37,12 @@ static int pvfs2_create(
 
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_create: called\n");
 
-    inode = pvfs2_create_entry(
-        dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
+    inode = pvfs2_create_entry(dir,
+                               dentry,
+                               NULL,
+                               mode,
+                               PVFS2_VFS_OP_CREATE,
+                               &ret);
 
     if (inode)
     {
@@ -55,14 +63,16 @@ static int pvfs2_create(
  *  fsid into a handle for the object.
  */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-static struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry)
+static struct dentry *pvfs2_lookup(struct inode *dir,
+                                   struct dentry *dentry)
+#elif PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA
+static struct dentry *pvfs2_lookup(struct inode *dir,
+                                   struct dentry *dentry,
+                                   struct nameidata *nd)
 #else
-static struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry,
-    struct nameidata *nd)
+static struct dentry *pvfs2_lookup(struct inode *dir,
+                                   struct dentry *dentry,
+                                   int flags)
 #endif
 {
     int ret = -EINVAL;
@@ -79,7 +89,8 @@ static struct dentry *pvfs2_lookup(
       -EEXIST on O_EXCL opens, which is broken if we skip this lookup
       in the create path)
     */
-    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_NAME_DEBUG,
+                 "pvfs2_lookup called on %s\n", dentry->d_name.name);
 
     if (dentry->d_name.len > (PVFS2_NAME_LEN-1))
     {
@@ -94,23 +105,27 @@ static struct dentry *pvfs2_lookup(
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-#else
+#elif PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA
     /*
       if we're at a symlink, should we follow it? never attempt to
       follow negative dentries
     */
     new_op->upcall.req.lookup.sym_follow =
-        ((nd && (nd->flags & LOOKUP_FOLLOW) &&
-          (dentry->d_inode != NULL)) ?
-         PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
+         ((nd &&
+           (nd->flags & LOOKUP_FOLLOW) &&
+           (dentry->d_inode != NULL)) ?
+          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
+#else
+    new_op->upcall.req.lookup.sym_follow = flags & LOOKUP_FOLLOW;
 #endif
 
     if (dir)
     {
         sb = dir->i_sb;
         parent = PVFS2_I(dir);
-        if (parent && parent->refn.handle != PVFS_HANDLE_NULL 
-                && parent->refn.fs_id != PVFS_FS_ID_NULL)
+        if (parent &&
+            parent->refn.handle != PVFS_HANDLE_NULL &&
+            parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d using parent %llu\n",
               __FILE__, __func__, __LINE__, llu(parent->refn.handle));
@@ -119,14 +134,15 @@ static struct dentry *pvfs2_lookup(
         else
         {
 #if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
-            gossip_lerr("Critical error: i_ino cannot be relied on when using iget5/iget4\n");
+            gossip_lerr("Critical error: i_ino cannot be relied on "
+                        "when using iget5/iget4\n");
             op_release(new_op);
             return ERR_PTR(-EINVAL);
 #endif
             new_op->upcall.req.lookup.parent_refn.handle =
-                get_handle_from_ino(dir);
+                            get_handle_from_ino(dir);
             new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(sb)->fs_id;
+                            PVFS2_SB(sb)->fs_id;
         }
     }
     else
@@ -138,23 +154,25 @@ static struct dentry *pvfs2_lookup(
         */
         sb = dentry->d_inode->i_sb;
 	new_op->upcall.req.lookup.parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
+	                PVFS2_SB(sb)->root_handle;
 	new_op->upcall.req.lookup.parent_refn.fs_id =
-	    PVFS2_SB(sb)->fs_id;
+	                PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.lookup.d_name,
-	    dentry->d_name.name, PVFS2_NAME_LEN);
+	    dentry->d_name.name,
+            PVFS2_NAME_LEN);
 
-    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
-                "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
-                llu(new_op->upcall.req.lookup.parent_refn.handle),
-                new_op->upcall.req.lookup.parent_refn.fs_id,
-                ((new_op->upcall.req.lookup.sym_follow ==
-                  PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
+    gossip_debug(GOSSIP_NAME_DEBUG,
+                 "pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
+                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
+                 llu(new_op->upcall.req.lookup.parent_refn.handle),
+                 new_op->upcall.req.lookup.parent_refn.fs_id,
+                 ((new_op->upcall.req.lookup.sym_follow ==
+                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
 
-    ret = service_operation(
-        new_op, "pvfs2_lookup", 
-        get_interruptible_flag(dir));
+    ret = service_operation(new_op,
+                            "pvfs2_lookup", 
+                            get_interruptible_flag(dir));
 
     gossip_debug(GOSSIP_NAME_DEBUG, "Lookup Got %llu, fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.lookup.refn.handle),
@@ -206,8 +224,10 @@ static struct dentry *pvfs2_lookup(
     {
         struct dentry *res;
 
-        gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
-            __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count));
+        gossip_debug(GOSSIP_NAME_DEBUG,
+                     "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
+                     __FILE__, __func__, __LINE__, inode->i_ino,
+                     (int)atomic_read(&inode->i_count));
 
         /* update dentry/inode pair into dcache */
 #ifdef HAVE_D_SET_D_OP
@@ -221,11 +241,13 @@ static struct dentry *pvfs2_lookup(
         gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
                      (int)atomic_read(&inode->i_count));
         if (res)
+        {
 #ifdef HAVE_D_SET_D_OP
             d_set_d_op(res, &pvfs2_dentry_operations);
 #else
             res->d_op = &pvfs2_dentry_operations;
 #endif
+        }
 
         op_release(new_op);
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -236,8 +258,11 @@ static struct dentry *pvfs2_lookup(
     }
     else if (inode && is_bad_inode(inode))
     {
-        gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found bad inode [%lu] with count [%d]. Returning error [%d]", 
-            __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count), ret);
+        gossip_debug(GOSSIP_NAME_DEBUG,
+                     "%s:%s:%d Found bad inode [%lu] with count [%d]. "
+                     "Returning error [%d]", 
+                     __FILE__, __func__, __LINE__, inode->i_ino,
+                     (int)atomic_read(&inode->i_count), ret);
         ret = -EACCES;
         found_pvfs2_inode = PVFS2_I(inode);
         /* look for an error code, possibly set by pvfs2_read_inode(),

@@ -177,27 +177,24 @@ struct dentry * dentry
     }
 }
 
-/* should return 1 if dentry can still be trusted, else 0 */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_d_revalidate(
-    struct dentry *dentry,
-    int flags)
-{
-    return(pvfs2_d_revalidate_common(dentry));
-}
-
-#else
-
 /** Verify that dentry is valid.
+ *
+ * should return 1 if dentry can still be trusted, else 0 
  */
-static int pvfs2_d_revalidate(
-    struct dentry *dentry,
-    struct nameidata *nd)
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              int flags)
 {
-#ifdef LOOKUP_RCU
+#elif PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              struct nameidata *nd)
+{
+# ifdef LOOKUP_RCU
     if (nd->flags & LOOKUP_RCU)
+    {
         return -ECHILD;
-#endif
+    }
+# endif
 
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         ((!nd->flags) & (LOOKUP_CREATE)) )
@@ -206,10 +203,27 @@ static int pvfs2_d_revalidate(
                      "\n%s: Trusting intent; skipping getattr\n", __func__);
         return 1;
     }
+#else
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              unsigned int flags)
+{
+# ifdef LOOKUP_RCU
+    if (flags & LOOKUP_RCU)
+    {
+        return -ECHILD;
+    }
+# endif
+    if ((flags & LOOKKUP_FOLLOW) &&
+        !(flags & LOOKUP_CREATE))
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG,
+                     "\n%s: Trusting intent; skipping getattr\n", __func__);
+        return 1;
+    }
+#endif
+    /* All 3 implementations call this */
     return(pvfs2_d_revalidate_common(dentry));
 }
-
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /*
   to propagate an error, return a value < 0, as this causes

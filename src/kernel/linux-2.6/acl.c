@@ -750,7 +750,7 @@ int pvfs2_acl_chmod(struct inode *inode)
     {
         error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
-                "(access) returned %d\n", error);
+                      "(access) returned %d\n", error);
     }
 #elif defined(HAVE_POSIX_ACL_CLONE)
     error = posix_acl_chmod_masq(clone, inode->i_mode);
@@ -758,7 +758,7 @@ int pvfs2_acl_chmod(struct inode *inode)
     {
         error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
-                "(access) returned %d\n", error);
+                     "(access) returned %d\n", error);
     }
     posix_acl_release(clone);
 #else
@@ -773,22 +773,24 @@ out:
 #if defined(HAVE_THREE_PARAM_GENERIC_PERMISSION) || \
 	defined(HAVE_FOUR_PARAM_GENERIC_PERMISSION)
 static int pvfs2_check_acl(struct inode *inode, int mask
-#ifdef HAVE_THREE_PARAM_ACL_CHECK
+# ifdef HAVE_THREE_PARAM_ACL_CHECK
                            , unsigned int flags
-#endif /* HAVE_THREE_PARAM_ACL_CHECK */
-                          )
+# endif /* HAVE_THREE_PARAM_ACL_CHECK */
+                           )
 {
     struct posix_acl *acl = NULL;
 
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: called on inode %llu\n",
-            llu(get_handle_from_ino(inode)));
+                 llu(get_handle_from_ino(inode)));
 
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
 
-    if (IS_ERR(acl)) {
+    if (IS_ERR(acl))
+    {
         int error = PTR_ERR(acl);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: pvfs2_get_acl returned error %d\n",
-                error);
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "pvfs2_check_acl: pvfs2_get_acl returned error %d\n",
+                     error);
         return error;
     }
     if (acl) 
@@ -796,8 +798,8 @@ static int pvfs2_check_acl(struct inode *inode, int mask
         int error = posix_acl_permission(inode, acl, mask);
         posix_acl_release(acl);
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: posix_acl_permission "
-                " (inode %llu, acl %p, mask %x) returned %d\n",
-                 llu(get_handle_from_ino(inode)), acl, mask, error);
+                     " (inode %llu, acl %p, mask %x) returned %d\n",
+                     llu(get_handle_from_ino(inode)), acl, mask, error);
         return error;
     }
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl returning EAGAIN\n");
@@ -809,12 +811,13 @@ static int pvfs2_check_acl(struct inode *inode, int mask
 #ifdef HAVE_TWO_PARAM_PERMISSION
 int pvfs2_permission(struct inode *inode, int mask)
 #else
-int pvfs2_permission(struct inode *inode, int mask, 
-#ifdef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
-unsigned int flags)
-#else
-struct nameidata *nd)
-#endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
+int pvfs2_permission(struct inode *inode,
+                     int mask, 
+# ifdef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+                     unsigned int flags)
+# else
+                     struct nameidata *nd)
+# endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
 #endif /* HAVE_TWO_PARAM_PERMISSION */
 {
 #ifdef HAVE_CURRENT_FSUID
@@ -826,36 +829,42 @@ struct nameidata *nd)
 #ifdef HAVE_GENERIC_PERMISSION
     int ret;
 
-#if defined(HAVE_TWO_PARAM_GENERIC_PERMISSION)
+# if defined(HAVE_TWO_PARAM_GENERIC_PERMISSION)
     ret = generic_permission(inode, mask); 
-#elif defined(HAVE_THREE_PARAM_GENERIC_PERMISSION)
+# elif defined(HAVE_THREE_PARAM_GENERIC_PERMISSION)
     ret = generic_permission(inode, mask, pvfs2_check_acl); 
-#elif defined(HAVE_FOUR_PARAM_GENERIC_PERMISSION)
+# elif defined(HAVE_FOUR_PARAM_GENERIC_PERMISSION)
     ret = generic_permission(inode, mask, 0, pvfs2_check_acl); 
-#else
+# else
     #error generic_permission has an unknown number of parameters
-#endif
+# endif
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %llu mask = %o"
-                "mode = %o current->fsuid = %d "
-                "inode->i_uid = %d, inode->i_gid = %d "
-                "in_group_p = %d "
-                "(ret = %d)\n",
-                llu(get_handle_from_ino(inode)), mask, inode->i_mode, fsuid, 
-                inode->i_uid, inode->i_gid, 
-                in_group_p(inode->i_gid),
-                ret);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode [%o] & mask [%o] "
-                " & S_IRWXO [%o] = %o == mask [%o]?\n", 
-                inode->i_mode, mask, S_IRWXO, 
-                (inode->i_mode & mask & S_IRWXO), mask);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: did we check ACL's? (mode & S_IRWXG = %d)\n",
-                inode->i_mode & S_IRWXG);
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "pvfs2_permission failed: inode: %llu mask = %o"
+                     "mode = %o current->fsuid = %d "
+                     "inode->i_uid = %d, inode->i_gid = %d "
+                     "in_group_p = %d "
+                     "(ret = %d)\n",
+                     llu(get_handle_from_ino(inode)), mask, inode->i_mode,
+                     fsuid, inode->i_uid, inode->i_gid, 
+                     in_group_p(inode->i_gid),
+                     ret);
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "pvfs2_permission: mode [%o] & mask [%o] "
+                     " & S_IRWXO [%o] = %o == mask [%o]?\n", 
+                     inode->i_mode, mask, S_IRWXO, 
+                     (inode->i_mode & mask & S_IRWXO), mask);
+        gossip_debug(GOSSIP_ACL_DEBUG,c
+                     "pvfs2_permission: did we check ACL's? "
+                     "(mode & S_IRWXG = %d)\n",
+                     inode->i_mode & S_IRWXG);
     }
-    else {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission succeeded on inode %llu\n",
-                llu(get_handle_from_ino(inode)));
+    else
+    {
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "pvfs2_permission succeeded on inode %llu\n",
+                     llu(get_handle_from_ino(inode)));
     }
     return ret;
 #else 
@@ -905,8 +914,9 @@ struct nameidata *nd)
             /* ACL disallows access */
             if (error == -EACCES) 
             {
-                gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: acl disallowing "
-                        "access to file\n");
+                gossip_debug(GOSSIP_ACL_DEBUG,
+                             "pvfs2_permission: acl disallowing "
+                             "access to file\n");
                 goto check_capabilities;
             }
             /* No ACLs present? */
@@ -914,24 +924,30 @@ struct nameidata *nd)
             {
                 goto check_groups;
             }
-            gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: returning %d\n",
-                    error);
+            gossip_debug(GOSSIP_ACL_DEBUG,
+                         "pvfs2_permission: returning %d\n",
+                         error);
             /* Any other error */
             return error;
         }
 check_groups:
         if (in_group_p(inode->i_gid))
+        {
             mode >>= 3;
+        }
     }
     if ((mode & mask & S_IRWXO) == mask)
     {
         return 0;
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode (%o) & mask (%o) & S_IRWXO (%o) = %o == mask (%o)?\n",
-            mode, mask, S_IRWXO, mode & mask & S_IRWXO, mask);
+    gossip_debug(GOSSIP_ACL_DEBUG,
+                 "pvfs2_permission: mode (%o) & mask (%o) "
+                 "& S_IRWXO (%o) = %o == mask (%o)?\n",
+                 mode, mask, S_IRWXO, mode & mask & S_IRWXO, mask);
 check_capabilities:
     /* Are we allowed to override DAC */
-    if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
+    if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) ||
+         S_ISDIR(inode->i_mode))
     {
         if(capable(CAP_DAC_OVERRIDE))
         {

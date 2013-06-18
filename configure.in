@@ -894,7 +894,13 @@ fi
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
     [  --disable-threaded      Do not build threaded client library],
-    [build_threaded=$enableval],
+    [if "x$THREADED_KMOD_HELPER = xyes" ; then
+         build_threaded=yes
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
+     else
+         build_threaded=$enableval
+     fi
+    ],
     [build_threaded=yes])
 AC_SUBST(build_threaded)
 
