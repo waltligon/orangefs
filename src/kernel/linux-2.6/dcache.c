@@ -74,19 +74,20 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             goto invalid_exit;
 #endif
             new_op->upcall.req.lookup.parent_refn.handle =
-                get_handle_from_ino(parent_inode);
+                            get_handle_from_ino(parent_inode);
             new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(parent_inode->i_sb)->fs_id;
+                            PVFS2_SB(parent_inode->i_sb)->fs_id;
         }
         strncpy(new_op->upcall.req.lookup.d_name,
-                dentry->d_name.name, PVFS2_NAME_LEN);
+                dentry->d_name.name,
+                PVFS2_NAME_LEN);
 
         gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d interrupt flag [%d]\n", 
             __FILE__, __func__, __LINE__, get_interruptible_flag(parent_inode));
 
-        ret = service_operation(
-            new_op, "pvfs2_lookup", 
-            get_interruptible_flag(parent_inode));
+        ret = service_operation(new_op,
+                                "pvfs2_lookup", 
+                                get_interruptible_flag(parent_inode));
 
         if((new_op->downcall.status != 0) || 
            !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
@@ -96,7 +97,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                 "%s:%s:%d lookup failure |%s| or no match |%s|.\n", 
                 __FILE__, __func__, __LINE__,
                 (new_op->downcall.status != 0) ? "true" : "false",
-                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode)) ? "true" : "false");
+                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+                                ? "true" : "false");
             op_release(new_op);
 
             /* Avoid calling make_bad_inode() in this situation.  On 2.4
@@ -111,7 +113,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
              */
             pvfs2_make_bad_inode(inode);
 #endif
-            gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d setting revalidate_failed = 1\n", __FILE__, __func__, __LINE__);
+            gossip_debug(GOSSIP_DCACHE_DEBUG,
+                         "%s:%s:%d setting revalidate_failed = 1\n",
+                         __FILE__, __func__, __LINE__);
             /* set a flag that we can detect later in d_delete() */
             PVFS2_I(inode)->revalidate_failed = 1;
             d_drop(dentry);
@@ -153,10 +157,9 @@ invalid_exit:
 
 static int pvfs2_d_delete (
 #ifdef HAVE_D_DELETE_CONST
-const
+                           const
 #endif /* HAVE_D_DELETE_CONST */
-struct dentry * dentry
-)
+                           struct dentry * dentry)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: called on dentry %p.\n", __func__, dentry);
@@ -213,8 +216,8 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
         return -ECHILD;
     }
 # endif
-    if ((flags & LOOKKUP_FOLLOW) &&
-        !(flags & LOOKUP_CREATE))
+    if ((flags & LOOKUP_FOLLOW) &&
+        (!flags & LOOKUP_CREATE))
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG,
                      "\n%s: Trusting intent; skipping getattr\n", __func__);

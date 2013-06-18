@@ -4651,54 +4651,6 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
                 (create_collection_only ? "collection" :
                  "storage space"));
 
-            {
-                struct stat root_stat;
-                struct stat meta_stat;
-                struct stat data_stat;
-
-                memset(&root_stat, 0, sizeof(root_stat));
-                memset(&meta_stat, 0, sizeof(meta_stat));
-                memset(&data_stat, 0, sizeof(data_stat));
-
-                /* call stat on root and the data path */
-                stat("/", &root_stat);
-                stat(config->meta_path, &meta_stat);
-
-                /* see if the data path is located on the root device */
-                if (meta_stat.st_dev == root_stat.st_dev)
-                {
-                    gossip_err("*** WARNING ***   *** WARNING *** "
-                               "*** WARNING ***\n");
-                    gossip_err("The MetadataStorageSpace path %s "
-                               "appears to be on the root device.\n",
-                               config->meta_path);
-                    gossip_err("It is recommended that the meta data "
-                               "be stored on a dedicated partition.\n");
-                    gossip_err("If you have a dedicated partition setup, "
-                               "please be sure it is mounted.\n");
-                }
-
-                if (!create_collection_only)
-                {
-                    /* call stat on root and the data path */
-                    stat(config->data_path, &data_stat);
-
-                    /* see if the data path is located on the root device */
-                    if (data_stat.st_dev == root_stat.st_dev)
-                    {
-                        gossip_err("*** WARNING ***   *** WARNING *** "
-                                   "*** WARNING ***\n");
-                        gossip_err("The DataStorageSpace path %s appears "
-                                   "to be on the root device.\n",
-                                   config->data_path);
-                        gossip_err("It is recommended that the data "
-                                   "be stored on a dedicated partition.\n");
-                        gossip_err("If you have a dedicated partition setup, "
-                                   "please be sure it is mounted.\n");
-                    }
-                }
-            }
-
             ret = pvfs2_mkspace(
                 config->data_path, config->meta_path, cur_fs->file_system_name,
                 cur_fs->coll_id, root_handle, cur_meta_handle_range,
