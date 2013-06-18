@@ -9,7 +9,6 @@
 #define __REPLICATION_COMMON_UTILS_H
 
 #include "pvfs2-types.h"
-//#include "server-config.h"
 
 
 typedef struct replication_s

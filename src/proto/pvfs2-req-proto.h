@@ -100,6 +100,7 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
     PVFS_SERV_REPLICATE_PRIME = 52,
     PVFS_SERV_REPLICATE_NEXT = 53,
+    PVFS_SERV_REPL_WRITE_COMPLETION = 54,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -200,6 +201,10 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
+/* maximum number of replication endpoints for write completion response */
+#define PVFS_RESP_LIMIT_REPL_ENDPOINTS 32
+
+
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -1605,12 +1610,48 @@ endecode_fields_1_struct(
 struct PVFS_servresp_write_completion
 {
     PVFS_size total_completed; /* amount of data transferred */
+};
+endecode_fields_1_struct(
+   PVFS_servresp_write_completion,
+   PVFS_size, total_completed);
+
+/* write completion for replication */
+struct PVFS_servresp_repl_write_completion
+{
     replication_endpoint_status_t *endpt_status;
     PVFS_size endpt_status_count;
 };
-//endecode_fields_1_struct(
- //   PVFS_servresp_write_completion,
- //   PVFS_size, total_completed);
+#define encode_PVFS_servresp_repl_write_completion(pptr,x) do { \
+    int i=0; \
+    encode_PVFS_size(pptr,&((x)->endpt_status_count)); \
+    for (;i<(x)->endpt_status_count;i++) \
+    { \
+        encode_enum(pptr,&((x)->endpt_status[i].state));                       \
+        encode_skip4(pptr,);                                                   \
+        encode_PVFS_error(pptr,&((x)->endpt_status[i].error_code));            \
+        encode_skip4(pptr,);                                                   \
+        encode_PVFS_size(pptr,&((x)->endpt_status[i].writes_completed_bytes)); \
+    } \
+} while (0)
+
+#define decode_PVFS_servresp_repl_write_completion(pptr,x) do { \
+    int i=0; \
+    decode_PVFS_size(pptr, &(x)->endpt_status_count); \
+    (x)->endpt_status = decode_malloc(sizeof(*(x)->endpt_status) *      \
+                                              (x)->endpt_status_count); \
+    for (; i < (x)->endpt_status_count; i++) \
+    { \
+        decode_enum(pptr, &((x)->endpt_status[i].state));                      \
+        decode_skip4(pptr,);                                                   \
+        decode_PVFS_error(pptr, &((x)->endpt_status[i].error_code));           \
+        decode_skip4(pptr,);                                                   \
+        decode_PVFS_size(pptr, &((x)->endpt_status[i].writes_completed_bytes));\
+    } \
+} while (0)
+
+#define extra_size_PVFS_servresp_repl_write_completion \
+        ( sizeof(replication_endpoint_status_t) *      \
+          PVFS_RESP_LIMIT_REPL_ENDPOINTS )
 
 #define SMALL_IO_MAX_SEGMENTS 64
 
@@ -2692,6 +2733,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_getconfig getconfig;
         struct PVFS_servresp_io io;
         struct PVFS_servresp_write_completion write_completion;
+        struct PVFS_servresp_repl_write_completion repl_write_completion;
         struct PVFS_servresp_statfs statfs;
         struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
         struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;

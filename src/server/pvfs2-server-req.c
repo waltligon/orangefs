@@ -120,7 +120,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
     /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params},
     /* 52 */ {PVFS_SERV_REPLICATE_PRIME, &pvfs2_replicate_prime_params},
-    /* 53 */ {PVFS_SERV_REPLICATE_NEXT, &pvfs2_replicate_next_params}
+    /* 53 */ {PVFS_SERV_REPLICATE_NEXT, &pvfs2_replicate_next_params},
+    /* 54 */ {PVFS_SERV_REPL_WRITE_COMPLETION, NULL}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

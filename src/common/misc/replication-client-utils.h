@@ -7,6 +7,7 @@
 #ifndef __REPLICATION_CLIENT_UTILS_H
 #define __REPLICATION_CLIENT_UTILS_H
 
+#include "replication-common-utils.h"
 #include "server-config.h"
 
 

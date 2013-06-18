@@ -485,7 +485,7 @@ static PINT_sm_action io_send_completion_ack(
       fill in response -- status field is the only generic one we
       should have to set
     */
-    s_op->resp.op = PVFS_SERV_WRITE_COMPLETION;  /* not IO */
+    s_op->resp.op = PVFS_SERV_REPL_WRITE_COMPLETION;  /* not IO */
 
     /* determine the status based on the primary flow with consideration
      * from the "next" flows.
@@ -507,7 +507,6 @@ static PINT_sm_action io_send_completion_ack(
     if (s_op->u.io.primary_error_code)
     {
        s_op->resp.status = s_op->u.io.primary_error_code;
-       s_op->resp.u.write_completion.total_completed = 0;
     }
     else
     {
@@ -520,7 +519,6 @@ static PINT_sm_action io_send_completion_ack(
        * decode the rest of the response.
        */ 
       s_op->resp.status = s_op->u.io.replicate_d[index].endpt_status.error_code = 0;
-      s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transferred;
     }
 
     err = PINT_encode(

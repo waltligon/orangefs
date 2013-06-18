@@ -182,6 +182,12 @@ static void lebf_initialize(void)
                 req.u.io.file_req = &tmp_req;
                 reqsize = extra_size_PVFS_servreq_io;
                 break;
+            case PVFS_SERV_REPL_WRITE_COMPLETION:
+                noreq=1;
+                resp.u.repl_write_completion.endpt_status=NULL;
+                resp.u.repl_write_completion.endpt_status_count=0;
+                respsize = extra_size_PVFS_servresp_repl_write_completion;
+                break;
             case PVFS_SERV_IO:
                 req.u.io.io_dist = &tmp_dist;
                 req.u.io.file_req = &tmp_req;
@@ -558,6 +564,7 @@ static int lebf_encode_req(
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
+        case PVFS_SERV_REPL_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -630,6 +637,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
         CASE(PVFS_SERV_REPLICATE_PRIME, io);
         CASE(PVFS_SERV_REPLICATE_NEXT, io);
+        CASE(PVFS_SERV_REPL_WRITE_COMPLETION, repl_write_completion);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -791,6 +799,7 @@ static int lebf_decode_req(
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
+        case PVFS_SERV_REPL_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -854,6 +863,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
         CASE(PVFS_SERV_REPLICATE_PRIME, io);
         CASE(PVFS_SERV_REPLICATE_NEXT, io);
+        CASE(PVFS_SERV_REPL_WRITE_COMPLETION, repl_write_completion);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -1134,6 +1144,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                   break;
             case PVFS_SERV_INVALID:
             case PVFS_SERV_WRITE_COMPLETION:
+            case PVFS_SERV_REPL_WRITE_COMPLETION:
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
@@ -1315,6 +1326,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                    {
                       decode_free(resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
                       break;
+                   }
+
+                case PVFS_SERV_REPL_WRITE_COMPLETION:
+                   {
+                      if (resp->u.repl_write_completion.endpt_status_count)
+                      {
+                         decode_free(resp->u.repl_write_completion.endpt_status);
+                      }
                    }
 
                 case PVFS_SERV_GETCONFIG:
