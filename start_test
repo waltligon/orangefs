@@ -1,0 +1,65 @@
+#!/usr/bin/python
+
+#from OFSTest import *
+
+from OFSTest import OFSTestMain
+from OFSTest import OFSTestConfigMenu
+from OFSTest import OFSTestConfigFile
+import sys
+import getopt
+import os, errno
+
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc: # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise
+
+# defaults
+config_file = None
+output_dir = "."
+#print sys.argv
+optlist, args = getopt.getopt(sys.argv[1:], 'hf:d:')
+#print optlist
+
+for o, a  in optlist:
+	if o == "-d":
+		output_dir = a
+	if o == "-f":
+		config_file = a
+	if o == "-h":
+		print "start_test -f <path to config file> -d <output directory>"
+		exit()
+
+
+#print "Output dir is %s, config file is %s" % (output_dir,config_file)
+
+
+
+
+if config_file != None:
+    try:
+        print "trying" + config_file
+        test_driver = OFSTestMain.OFSTestMain(OFSTestConfigFile.OFSTestConfigFile())
+        print "setting config"
+        #ugly python hack
+        test_driver.setConfig(kwargs={"filename":config_file})
+        test_driver.printConfig()
+        print "done"
+    except ValueError:
+        print "File %s could not be read or invalid format." % config_file
+        test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
+        test_driver.setConfig()
+else:
+    test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
+    test_driver.setConfig()
+
+
+mkdir_p(output_dir)
+os.chdir(output_dir)
+
+test_driver.setupOFS()
+test_driver.runTest()
