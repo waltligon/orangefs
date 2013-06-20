@@ -2580,8 +2580,12 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                    gossip_lerr("%s:resp->u.repl_write_completion.endpt_status_count(%d).\n"
                               ,__func__,(int)resp->u.repl_write_completion.endpt_status_count);
                    replication_endpoint_status_print(resp->u.repl_write_completion.endpt_status
-                                                    ,resp->u.repl_write_completion.endpt_status_count); 
+                                                    ,resp->u.repl_write_completion.endpt_status_count);
+                   int i = resp->u.repl_write_completion.endpt_status_count-1; 
+                   *total_size += resp->u.repl_write_completion.endpt_status[i].writes_completed_bytes;
+                   gossip_lerr("%s:total_size(%d).\n",__func__,*(int *)total_size);
                 }
+
 
                 PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
             }
