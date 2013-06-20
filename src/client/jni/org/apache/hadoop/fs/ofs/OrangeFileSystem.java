@@ -147,14 +147,28 @@ public class OrangeFileSystem extends FileSystem {
     @Override
     public boolean delete(Path f, boolean recursive) throws IOException {
         boolean ret = false;
+        FileStatus status = null;
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + f);
         OFSLOG.debug((recursive) ? "Recursive Delete!" : "Non-recursive Delete");
-        if (!exists(f)) {
-            OFSLOG.debug("Path f =" + f + " doesn't exist!");
+        try {
+            status = getFileStatus(f);
+        }
+        catch (FileNotFoundException e) {
+            OFSLOG.debug(makeAbsolute(f) + " not found!");
             return false;
         }
-        if (isDir(f) && recursive) {
+        catch (IOException e) {
+            OFSLOG.error("File:" + makeAbsolute(f));
+            return false;
+        }
+        if(status.isDir()) {
+            if(!recursive) {
+                OFSLOG.debug("Couldn't delete Path f = " + f + " since it is "
+                        + "a directory but recursive is false.");
+                return false;
+            }
+            // Call recursive delete on path
             OFSLOG.debug("Path f =" + f
                     + " is a directory and recursive is true."
                     + " Recursively deleting directory.");
@@ -163,10 +177,12 @@ public class OrangeFileSystem extends FileSystem {
         }
         else {
             OFSLOG.debug("Path f =" + f
-                    + " exists and is a regular file. Deleting.");
-            int removeRet = orange.stdio.remove(fOFS.toString());
-            OFSLOG.debug("removeRet = " + removeRet);
-            ret = (removeRet == 0) ? true : false;
+                    + " exists and is a regular file. unlinking.");
+            ret = (orange.posix.unlink(fOFS.toString()) == 0) ? true : false;
+        }
+        // Return false on failure.
+        if(!ret) {
+            OFSLOG.debug("remove failed: ret == false\n");
         }
         return ret;
     }
@@ -177,10 +193,6 @@ public class OrangeFileSystem extends FileSystem {
         /* Stat file */
         try {
             FileStatus status = getFileStatus(f);
-            if (status == null) {
-                OFSLOG.debug(makeAbsolute(f) + " not found!");
-                return false;
-            }
         }
         catch (FileNotFoundException e) {
             OFSLOG.debug(makeAbsolute(f) + " not found!");
@@ -212,6 +224,7 @@ public class OrangeFileSystem extends FileSystem {
             throw new FileNotFoundException();
         }
         isdir = orange.posix.isDir(stats.st_mode) == 0 ? false : true;
+        OFSLOG.debug("file/directory=" + (isdir == true ? "directory" : "file"));
         /* Get UGO permissions out of st_mode... */
         intPermission = stats.st_mode & 0777;
         octal = Integer.toOctalString(intPermission);

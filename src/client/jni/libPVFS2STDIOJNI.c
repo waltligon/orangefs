@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <usrint.h>
+#include <posix-pvfs.h>
 #include "org_orangefs_usrint_PVFS2STDIOJNI.h"
 
 /* TODO: relocate these maybe to pvfs2-types.h? */
@@ -147,6 +150,9 @@ static inline int is_lostfound_dir(char * dirent_name)
 /* Recursively delete the path specified by dir. */
 static int recursive_delete(char *dir)
 {
+    JNI_PFI();
+    JNI_PRINT("dir=%s\n", dir);
+    int ret = -1;
     DIR * dirp = NULL;
     struct dirent * direntp = NULL;
 
@@ -169,23 +175,44 @@ static int recursive_delete(char *dir)
      * in this directory.
      */
     rewinddir(dirp);
-    do
+    while(1)
     {
-        direntp = readdir(dirp);
-        if (direntp && (direntp->d_type == DT_DIR))
+        errno = 0;
+        if((direntp = readdir(dirp)) == NULL)
         {
-            if (is_dot_dir(direntp->d_name) ||
-                    is_lostfound_dir(direntp->d_name))
+            if(errno != 0)
             {
-                continue;
+                JNI_PERROR();
+                return -1;
             }
-            int dir_abs_len = get_comb_len(dir, direntp->d_name);
-            char dir_abs[dir_abs_len];
-            memset(dir_abs, 0, dir_abs_len);
-            combine(dir, direntp->d_name, dir_abs);
-            recursive_delete(dir_abs);
+            break;
         }
-    } while (direntp);
+        if(is_dot_dir(direntp->d_name) || is_lostfound_dir(direntp->d_name))
+        {
+            continue;
+        }
+        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
+        char abs_path[abs_path_len];
+        memset((void *) abs_path, 0, abs_path_len);
+        combine(dir, direntp->d_name, abs_path);
+        /* Determine if this entry is a file or directory. */
+        struct stat buf;
+        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
+        if(ret < 0)
+        {
+            JNI_PERROR();
+            return ret;
+        }
+        if(S_ISDIR(buf.st_mode))
+        {
+            ret = recursive_delete(abs_path);
+            if(ret < 0)
+            {
+                JNI_ERROR("recursive_delete failed on path:%s\n", abs_path);
+                return -1;
+            }
+        }
+    }
 
     /* Close current directory before we attempt removal */
     if (closedir(dirp) != 0)
@@ -194,7 +221,7 @@ static int recursive_delete(char *dir)
         return -1;
     }
 
-    if (remove(dir) != 0)
+    if (rmdir(dir) != 0)
     {
         JNI_PERROR();
         return -1;
@@ -207,36 +234,50 @@ static int remove_files_in_dir(char *dir, DIR* dirp)
 {
     int ret = -1;
     struct dirent* direntp = NULL;
+    JNI_PFI();
     /* Rewind this directory stream back to the beginning. */
+    JNI_PRINT("rewinding dirp = %p\n", dirp);
     rewinddir(dirp);
-
     /* Loop over directory contents */
-    do
+    while(1)
     {
-        direntp = readdir(dirp);
-        if (direntp && (direntp->d_type != DT_DIR))
+        errno = 0;
+        if((direntp = readdir(dirp)) == NULL)
         {
-            size_t abs_path_len = get_comb_len(dir, direntp->d_name);
-            char abs_path[abs_path_len];
-            memset((void *) abs_path, 0, abs_path_len);
-            combine(dir, direntp->d_name, abs_path);
-            ret = remove(abs_path);
-            if (ret == -1)
-            {
-                JNI_PERROR();
-                return ret;
-            }
-        }
-        else
-        {
-            /* Print errno only if it's set */
-            if (errno)
+            if(errno != 0)
             {
                 JNI_PERROR();
                 return -1;
             }
+            break;
         }
-    } while (direntp != NULL );
+        JNI_PRINT("direntp->d_name = %s\n", direntp->d_name);
+        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
+        char abs_path[abs_path_len];
+        memset((void *) abs_path, 0, abs_path_len);
+        combine(dir, direntp->d_name, abs_path);
+        /* Determine if this entry is a file or directory. */
+        struct stat buf;
+        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
+        if(ret < 0)
+        {
+            JNI_PERROR();
+            return ret;
+        }
+        /* Skip directories. */
+        if(S_ISDIR(buf.st_mode))
+        {
+            continue;
+        }
+        /* Unlink file. */
+        JNI_PRINT("Unlinking file=%s\n", abs_path);
+        ret = unlink(abs_path);
+        if (ret == -1)
+        {
+            JNI_PERROR();
+            return ret;
+        }
+    }
     return 0;
 }
 

@@ -46,8 +46,8 @@
     {                                                                          \
         if(errno != 0)                                                         \
         {                                                                      \
-            fprintf(stderr, "%s%s\n\t", "Error detected in function: ",        \
-                    __PRETTY_FUNCTION__);                                      \
+            fprintf(stderr, "Error detected on line %d in function %s\n\t",    \
+                    __LINE__, __PRETTY_FUNCTION__);                            \
             perror("");                                                        \
             fflush(stderr);                                                    \
         }                                                                      \
