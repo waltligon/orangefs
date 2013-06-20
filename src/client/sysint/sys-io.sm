@@ -2351,7 +2351,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
     sm_p->u.io.write_ack_completion_count++;
 
     gossip_lerr("%s:write_ack_completion_count(%d).\n",__func__
-                                                      ,write_ack_completion_count);
+                                                      ,sm_p->u.io.write_ack_completion_count);
     return 0;
 }
 
