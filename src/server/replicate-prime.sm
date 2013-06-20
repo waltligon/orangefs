@@ -482,10 +482,9 @@ static PINT_sm_action io_send_completion_ack(
     s_op->encoded.total_size = 0;
 
     /*
-      fill in response -- status field is the only generic one we
-      should have to set
+      fill in response 
     */
-    s_op->resp.op = PVFS_SERV_REPL_WRITE_COMPLETION;  /* not IO */
+    s_op->resp.op = PVFS_SERV_REPL_WRITE_COMPLETION;  
 
     /* determine the status based on the primary flow with consideration
      * from the "next" flows.
@@ -510,15 +509,25 @@ static PINT_sm_action io_send_completion_ack(
     }
     else
     {
-      /* RAL TODO: the client does not need to retrieve bstream sizes, I will be returning
-       * the original bstream size and the actual bytes written.
-       */
-      int index = s_op->u.io.replicate_d_local_flow_index;
-      //s_op->ds_attr.u.datafile.b_size; contains the bstream size just prior to this write.
       /* if we send a non-zero response status, then the decoding mechanism does not
-       * decode the rest of the response.
+       * decode the rest of the response.  So, if we want the client to process the
+       * data, we MUST set resp.status to zero.
        */ 
-      s_op->resp.status = s_op->u.io.replicate_d[index].endpt_status.error_code = 0;
+      s_op->resp.status = 0;
+      s_op->resp.u.repl_write_completion.endpt_status_count = s_op->u.io.replicate_d_total_count;
+      s_op->resp.u.repl_write_completion.endpt_status = calloc(s_op->u.io.replicate_d_total_count,
+                                                               sizeof(*s_op->resp.u.repl_write_completion.endpt_status));
+      if (!s_op->resp.u.repl_write_completion.endpt_status)
+      {
+          s_op->resp.status = -PVFS_ENOMEM;
+      }
+      else
+      {
+          for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
+          {
+             s_op->resp.u.repl_write_completion.endpt_status[i] = s_op->u.io.replicate_d[i].endpt_status;
+          }
+      }
     }
 
     err = PINT_encode(

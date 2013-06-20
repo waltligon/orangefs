@@ -2299,7 +2299,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
 
     cur_ctx->write_ack.max_resp_sz = PINT_encode_calc_max_size(
                                                 PINT_ENCODE_RESP,
-                                                PVFS_SERV_WRITE_COMPLETION,
+                                                PVFS_SERV_REPL_WRITE_COMPLETION,
                                                 sm_p->u.io.encoding);
     cur_ctx->write_ack.encoded_resp_p = BMI_memalloc(
                                                 cur_ctx->msg.svr_addr,
@@ -2350,6 +2350,8 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
     cur_ctx->write_ack_in_progress = 1;
     sm_p->u.io.write_ack_completion_count++;
 
+    gossip_lerr("%s:write_ack_completion_count(%d).\n",__func__
+                                                      ,write_ack_completion_count);
     return 0;
 }
 
@@ -2480,6 +2482,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
         return ret;
     }
 
+ 
     /* save the datafile size */
     sm_p->u.io.dfile_size_array[cur_ctx->index] = resp->u.io.bstream_size;
 
@@ -2547,8 +2550,8 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
             struct PINT_decoded_msg decoded_resp;
             struct PVFS_server_resp *resp = NULL;
             /*
-              size for writes are reported in the final ack, but we
-              have to decode it first
+              size for writes are reported in the final ack, so we
+              decode the response and then check the values.
             */
             ret = PINT_serv_decode_resp(cur_ctx->msg.fs_id,
                                     cur_ctx->write_ack.encoded_resp_p,
@@ -2556,6 +2559,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                                     &cur_ctx->msg.svr_addr,
                                     cur_ctx->write_ack.recv_status.actual_size,
                                     &resp);
+            gossip_lerr("%s:resp->op(%d).\n",__func__,resp->op);
             if (ret == 0)
             {
                 gossip_debug(GOSSIP_IO_DEBUG,
@@ -2563,10 +2567,21 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                              lld(resp->u.write_completion.total_completed),
                              cur_ctx);
 
-                *total_size += resp->u.write_completion.total_completed;
-                
+                if (resp->op == PVFS_SERV_WRITE_COMPLETION)
+                {
+                   *total_size += resp->u.write_completion.total_completed;
+                }
+
                 /* pass along the error code from the server as well */
                 ret = resp->status;
+
+                if (resp->op == PVFS_SERV_REPL_WRITE_COMPLETION)
+                {
+                   gossip_lerr("%s:resp->u.repl_write_completion.endpt_status_count(%d).\n"
+                              ,__func__,(int)resp->u.repl_write_completion.endpt_status_count);
+                   replication_endpoint_status_print(resp->u.repl_write_completion.endpt_status
+                                                    ,resp->u.repl_write_completion.endpt_status_count); 
+                }
 
                 PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
             }
