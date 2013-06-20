@@ -19,7 +19,7 @@
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
                         int mode)
-#elif PVFS_KMOD_CREATE_TAKES_NAMEIDATA
+#elif defined(PVFS_KMOD_CREATE_TAKES_NAMEIDATA)
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
                         int mode,
@@ -65,7 +65,7 @@ static int pvfs2_create(struct inode *dir,
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static struct dentry *pvfs2_lookup(struct inode *dir,
                                    struct dentry *dentry)
-#elif PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA
+#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
 static struct dentry *pvfs2_lookup(struct inode *dir,
                                    struct dentry *dentry,
                                    struct nameidata *nd)
@@ -105,7 +105,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-#elif PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA
+#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
     /*
       if we're at a symlink, should we follow it? never attempt to
       follow negative dentries

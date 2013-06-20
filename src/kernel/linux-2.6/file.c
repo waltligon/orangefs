@@ -3288,7 +3288,7 @@ int pvfs2_fsync(struct file *file,
     pvfs2_kernel_op_t *new_op = NULL;
 
     /* required call */
-#if HAVE_FSYNC_LOFF_T_PARAMS
+#ifdef HAVE_FSYNC_LOFF_T_PARAMS
     filemap_write_and_wait_range(file->f_mapping, start, end);
 #else
     filemap_write_and_wait(file->f_mapping);

@@ -866,7 +866,7 @@ int pvfs2_permission(struct inode *inode,
                      " & S_IRWXO [%o] = %o == mask [%o]?\n", 
                      inode->i_mode, mask, S_IRWXO, 
                      (inode->i_mode & mask & S_IRWXO), mask);
-        gossip_debug(GOSSIP_ACL_DEBUG,c
+        gossip_debug(GOSSIP_ACL_DEBUG,
                      "pvfs2_permission: did we check ACL's? "
                      "(mode & S_IRWXG = %d)\n",
                      inode->i_mode & S_IRWXG);
