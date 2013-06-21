@@ -809,6 +809,11 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
     {
        replication_endpoint_status_print(&(s_op->u.io.replicate_d[i].endpt_status),1);
+       gossip_err("%s:error_code(%d):(%p)) \twrites_completed_bytes(%d):(%p).\n"
+                 ,__func__,(int)s_op->u.io.replicate_d[i].endpt_status.error_code
+                          ,&(s_op->u.io.replicate_d[i].endpt_status.error_code)
+                          ,(int)s_op->u.io.replicate_d[i].endpt_status.writes_completed_bytes
+                          ,&(s_op->u.io.replicate_d[i].endpt_status.writes_completed_bytes));
     }
 
 

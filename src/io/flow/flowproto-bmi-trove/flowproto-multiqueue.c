@@ -658,15 +658,20 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
 
               /* flow status for each replica is kept in the replica q-item, subordinate to the primary q-item */
               flow_data->prealloc_array[i].replicas[j].res = &(flow_d->repl_d[j].endpt_status);
-              gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
-                        ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&(flow_d->repl_d[j].endpt_status));
+              gossip_err("%s:flow_data->prealloc_array[%d].replicas[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p) "
+                         "flow_d->repl_d[%d].endpt_status.writes_completed_bytes(%p)\n"
+
+                        ,__func__,i,j,flow_data->prealloc_array[i].replicas[j].res,j,&(flow_d->repl_d[j].endpt_status)
+                        ,j,&(flow_d->repl_d[j].endpt_status.writes_completed_bytes));
            }
 
            /* The local flow status is kept in the primary q_item */
            flow_data->prealloc_array[i].res = &(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status);
-           gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p)\n"
+           gossip_err("%s:flow_data->prealloc_array[%d].res:(%p) flow_d->repl_d[%d].endpt_status:(%p) "
+                      "flow_d->repl_d[%d].endpt_status.writes_completed_bytes(%p)\n"
                      ,__func__,i,flow_data->prealloc_array[i].res,flow_d->repl_d_local_flow_index
-                     ,&(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status));
+                     ,&(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status)
+                     ,flow_d->repl_d_local_flow_index,&(flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status.writes_completed_bytes));
            gossip_err("%s:flow_data->prealloc_array[%d].res->state:(%s) error_code:(%d)\n"
                      ,__func__
                      ,i
@@ -2724,6 +2729,8 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
+    error_code = -PVFS_ENOMEM;
+
     gen_mutex_lock(&flow_d->flow_mutex);
 
     /* we are cancelling the entire flow */
@@ -2776,6 +2783,12 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
              flow_data->total_bytes_written += result_iter->out_size;
              flow_d->total_transferred      += result_iter->out_size;
              q_item->res->writes_completed_bytes += result_iter->out_size;
+             gossip_lerr("flow(%p):q_item(%p):%s:q_item->res(%p):q_item->res->writes_completed_bytes(%p).\n"
+                        ,flow_d
+                        ,q_item
+                        ,__func__
+                        ,q_item->res
+                        ,&q_item->res->writes_completed_bytes);
              gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
                        ,flow_d
                        ,q_item,__func__
