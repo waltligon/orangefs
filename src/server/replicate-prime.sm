@@ -496,6 +496,9 @@ static PINT_sm_action io_send_completion_ack(
     for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
     {
         replication_endpoint_status_print(&(s_op->u.io.replicate_d[i].endpt_status),1);
+        gossip_err("%s:error_code(%d) \tbytes written(%d).\n",__func__
+                                                             ,(int)s_op->u.io.replicate_d[i].endpt_status.error_code
+                                                             ,(int)s_op->u.io.replicate_d[i].endpt_status.writes_completed_bytes);
     }
 
     /* primary_error_code will be zero, unless there is an error within the state machine.  When the 

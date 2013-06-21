@@ -2775,6 +2775,7 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
              struct result_chain_entry* re = result_iter;
              flow_data->total_bytes_written += result_iter->out_size;
              flow_d->total_transferred      += result_iter->out_size;
+             q_item->res->writes_completed_bytes += result_iter->out_size;
              gossip_lerr("flow(%p):q_item(%p):%s:total-bytes-written(%d) \tresult_iter->out_size(%d)\n"
                        ,flow_d
                        ,q_item,__func__
