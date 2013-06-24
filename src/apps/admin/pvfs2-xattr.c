@@ -235,7 +235,7 @@ int main(int argc, char **argv)
              int dfile_count = src.u.pvfs2.attr.dfile_count;
              for (i=0; i<(copies * dfile_count); i++)
              {
-                 printf("Handle(%d):%llu\n",i,llu(myHandles[i]));
+                 printf("Handle(%d):%llu\t%llx\n",i,llu(myHandles[i]), llu(myHandles[i]));
              }
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.copies"
