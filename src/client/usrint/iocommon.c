@@ -1361,7 +1361,8 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
                                   &attributes_resp,
                                   NULL);
             IOCOMMON_CHECK_ERR(rc);
-            pd->s->file_pointer = attributes_resp.attr.size + (offset * unit_size);
+            pd->s->file_pointer = attributes_resp.attr.size +
+                                  (offset * unit_size);
             break;
         }
         default:
@@ -1369,34 +1370,65 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             errno = EINVAL;
             goto errorout;
         }
+    }
     
-    /* Sum the individal segment sizes */}
+    /* Sum the individal segment sizes */
     /* if this is a directory adjust token, the hard way */
     if (S_ISDIR(pd->s->mode))
     {
-        int dirent_no;
+        int dirent_no = 0;
+        int dirent_total_count = 0;
+        int dirent_read_count = 0;
         PVFS_credentials *credentials;
         PVFS_sysresp_readdir readdir_resp;
 
-        memset(&readdir_resp, 0, sizeof(readdir_resp));
-        iocommon_cred(&credentials);
+        if ((offset == 0 || unit_size == 0) && whence == SEEK_CUR)
+        {
+            /* just asking for file position don't change position */
+            goto local_exit;
+        }
+
+        if ((offset == 0 || unit_size == 0) && whence == SEEK_SET)
+        {
+            /* just asking for file position don't change position */
+            pd->s->token = PVFS_READDIR_START;
+            goto local_exit;
+        }
+
         dirent_no = pd->s->file_pointer / sizeof(PVFS_dirent);
         pd->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
         pd->s->token = PVFS_READDIR_START;
-        if(dirent_no)
+        if (dirent_no)
         {
+            dirent_read_count = dirent_no;
+            if (dirent_read_count > PVFS_REQ_LIMIT_DIRENT_COUNT)
+            {
+                dirent_read_count = PVFS_REQ_LIMIT_DIRENT_COUNT;
+            }
             errno = 0;
-            rc = PVFS_sys_readdir(pd->s->pvfs_ref,
-                                  pd->s->token,
-                                  dirent_no,
-                                  credentials,
-                                  &readdir_resp,
-                                  NULL);
-            IOCOMMON_CHECK_ERR(rc);
-            pd->s->token = readdir_resp.token;
-            free(readdir_resp.dirent_array);
+            while (dirent_total_count < dirent_no)
+            {
+                if (dirent_read_count > dirent_no - dirent_total_count)
+                {
+                    dirent_read_count = dirent_no - dirent_total_count;
+                }
+                memset(&readdir_resp, 0, sizeof(readdir_resp));
+                iocommon_cred(&credentials);
+                rc = PVFS_sys_readdir(pd->s->pvfs_ref,
+                                      pd->s->token,
+                                      dirent_read_count,
+                                      credentials,
+                                      &readdir_resp,
+                                      NULL);
+                IOCOMMON_CHECK_ERR(rc);
+                dirent_total_count += readdir_resp.pvfs_dirent_outcount;
+                pd->s->token = readdir_resp.token;
+                free(readdir_resp.dirent_array);
+            }
         }
     }
+
+local_exit:
     gen_mutex_unlock(&pd->s->lock);
     return pd->s->file_pointer;
 

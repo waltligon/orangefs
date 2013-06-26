@@ -2897,7 +2897,7 @@ void seekdir (DIR *dir, off_t offset)
 }
 
 /**
- * returns current position in a direcotry stream
+ * returns current position in a directory stream
  */
 off_t telldir (DIR *dir)
 {
@@ -2918,7 +2918,7 @@ off_t telldir (DIR *dir)
 }
 
 /**
- * closes a direcotry stream
+ * closes a directory stream
  */
 int closedir (DIR *dir)
 {

@@ -315,6 +315,7 @@ void load_glibc(void)
         libc_handle = RTLD_NEXT;
     }
     memset((void *)&glibc_ops, 0, sizeof(glibc_ops));
+    /* first set */
     glibc_ops.snprintf = dlsym(libc_handle, "snprintf");
     glibc_ops.open = dlsym(libc_handle, "open");
     glibc_ops.open64 = dlsym(libc_handle, "open64");
@@ -343,6 +344,7 @@ void load_glibc(void)
     glibc_ops.ftruncate64 = dlsym(libc_handle, "ftruncate64");
     glibc_ops.fallocate = dlsym(libc_handle, "posix_fallocate");
     glibc_ops.close = dlsym(libc_handle, "close");
+    /* stats */
     glibc_ops.stat = my_glibc_stat;
     glibc_redirect.stat = dlsym(libc_handle, "__xstat");
     glibc_ops.stat64 = my_glibc_stat64;
@@ -359,6 +361,7 @@ void load_glibc(void)
     glibc_redirect.lstat = dlsym(libc_handle, "__lxstat");
     glibc_ops.lstat64 = my_glibc_lstat64;
     glibc_redirect.lstat64 = dlsym(libc_handle, "__lxstat64");
+    /* times dups chowns mks */
     glibc_ops.futimesat = dlsym(libc_handle, "futimesat");
     glibc_ops.utimes = dlsym(libc_handle, "utimes");
     glibc_ops.utime = dlsym(libc_handle, "utime");
@@ -382,6 +385,7 @@ void load_glibc(void)
     glibc_ops.symlinkat = dlsym(libc_handle, "symlinkat");
     glibc_ops.link = dlsym(libc_handle, "link");
     glibc_ops.linkat = dlsym(libc_handle, "linkat");
+    /* readdirs and misc */
     glibc_ops.readdir = my_glibc_readdir;
     glibc_ops.getdents = my_glibc_getdents;
     glibc_ops.getdents64 = my_glibc_getdents64;
