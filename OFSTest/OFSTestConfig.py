@@ -58,6 +58,9 @@ class OFSTestConfig(object):
         temp = d.get('number_new_ec2_nodes')
         if temp != None:
             self.number_new_ec2_nodes = temp
+        # sanity check
+        if self.number_new_ec2_nodes > 0:
+	    self.using_ec2 = True
 
         temp = d.get('ec2_image')
         if temp != None:

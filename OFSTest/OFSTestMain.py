@@ -39,7 +39,7 @@ import OFSTestConfigFile
 import OFSTestConfigMenu
 import OFSTestConfigBuildbot
 import OFSTestNetwork
-
+import time
 
 class OFSTestMain(object):
     
@@ -74,7 +74,7 @@ class OFSTestMain(object):
             print "Testing with %d new EC2 nodes" % self.config.number_new_ec2_nodes
             self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine)
         
-        #ry:
+
         if len(self.config.node_ip_addresses) > 0:
             for i in range(len(self.config.node_ip_addresses)):
                 self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_ec2=self.config.using_ec2)

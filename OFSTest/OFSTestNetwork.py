@@ -151,7 +151,7 @@ class OFSTestNetwork(object):
         
         new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
         new_ofs_test_nodes = []
-        
+        first = True
         for i in new_instances:
             i.update()
             print "Instance %s at %s has state %s with code %r" % (i.id,i.ip_address,i.state,i.state_code)
@@ -164,7 +164,11 @@ class OFSTestNetwork(object):
             
                 
             #pprint(i.__dict__)
-        
+            if first == True:
+				print "Waiting for services to start"
+				time.sleep(30)
+				first = False
+	    
             # Create the node and get the instance name
             if "ubuntu" in image_name:
                 name = 'ubuntu'
