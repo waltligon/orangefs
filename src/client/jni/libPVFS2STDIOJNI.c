@@ -175,6 +175,7 @@ static int recursive_delete(char *dir)
      * in this directory.
      */
     rewinddir(dirp);
+    JNI_PRINT("rewinddir succeeded!\n");
     while(1)
     {
         errno = 0;
@@ -238,6 +239,7 @@ static int remove_files_in_dir(char *dir, DIR* dirp)
     /* Rewind this directory stream back to the beginning. */
     JNI_PRINT("rewinding dirp = %p\n", dirp);
     rewinddir(dirp);
+    JNI_PRINT("rewinddir succeeded!\n");
     /* Loop over directory contents */
     while(1)
     {
@@ -1107,6 +1109,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
         char fileNames[cnt][PVFS_PATH_MAX];
         memset(fileNames, 0, cnt * PVFS_PATH_MAX);
         rewinddir(dirp);
+        JNI_PRINT("rewinddir succeeded!\n");
         int i = 0;
         do
         {
