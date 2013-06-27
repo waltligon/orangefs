@@ -77,6 +77,7 @@ int PINT_init_dist_dir_state(
                 const int split_size)
 {
 	int i;
+        double cval;
 
 	assert(dist_dir_attr != NULL);
 
@@ -94,7 +95,8 @@ int PINT_init_dist_dir_state(
 	dist_dir_attr->num_servers = num_servers;
 	dist_dir_attr->server_no = server_no;
 	/* tree_height start from 0 */
-	dist_dir_attr->tree_height = (int)ceil(my_log2((double)num_servers)); 
+	cval = ceil(my_log2((double)num_servers)); 
+	dist_dir_attr->tree_height = (int)cval;
 
 	/* increase bitmap_size if 2^tree_height > 32
 	 * bitmap has at least 2^tree_height bits, that is, the number of leaves of a full tree. */

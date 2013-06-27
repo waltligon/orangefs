@@ -7,6 +7,7 @@
 #ifndef __EXTENT_UTILS_H
 #define __EXTENT_UTILS_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "str-utils.h"

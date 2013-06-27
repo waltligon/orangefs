@@ -4,11 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2-util.h"
 #include "gossip.h"
 

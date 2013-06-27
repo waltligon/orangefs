@@ -1,4 +1,4 @@
-ifdef BUILD_USRINT
+ifeq ($(build_usrint),yes)
 
 DIR := src/client/usrint
 
@@ -21,8 +21,10 @@ SRC := \
 USRC := \
 	$(DIR)/posix.c \
 	$(DIR)/stdio.c \
+	$(DIR)/selinux.c \
 	$(DIR)/fts.c \
-	$(DIR)/glob.c
+	$(DIR)/glob.c \
+	$(DIR)/error.c
 
 ifdef BUILD_JNI
 USRC += \
@@ -45,4 +47,4 @@ SRC := \
 
 LIBSRC += $(SRC)
 
-endif # BUILD_USRINT
+endif # build_usrint

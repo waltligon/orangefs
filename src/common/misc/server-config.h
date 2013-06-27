@@ -7,6 +7,7 @@
 #ifndef __SERVER_CONFIG_H
 #define __SERVER_CONFIG_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "src/common/llist/llist.h"
 #include "src/common/gossip/gossip.h"

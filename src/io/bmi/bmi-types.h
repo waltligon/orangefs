@@ -21,6 +21,7 @@
 #ifndef __BMI_TYPES_H
 #define __BMI_TYPES_H
 
+#include "pvfs2-internal.h"
 #include <stdlib.h>
 
 #ifdef WIN32

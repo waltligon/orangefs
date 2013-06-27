@@ -7,7 +7,7 @@
 #ifndef __XATTR_UTILS_H
 #define __XATTR_UTILS_H
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 
 #ifdef HAVE_SYS_XATTR_H
 #include <sys/xattr.h>

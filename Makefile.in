@@ -85,7 +85,6 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
-BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
 BUILD_HADOOP = @BUILD_HADOOP@
@@ -98,6 +97,7 @@ ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
 ENABLE_CAPCACHE = @ENABLE_CAPCACHE@
 ENABLE_CERTCACHE = @ENABLE_CERTCACHE@
 NEEDS_LIBRT = @NEEDS_LIBRT@
+LIB_NEEDS_LIBRT = @LIB_NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
@@ -125,6 +125,9 @@ endif
 # build which client libs
 build_shared = @build_shared@
 build_static = @build_static@
+build_threaded = @build_threaded@
+build_usrint = @build_usrint@
+build_symbolic = @build_symbolic@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -194,7 +197,7 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-BUILD_CFLAGS = @BUILD_CFLAGS@
+BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
@@ -205,11 +208,24 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 -lm @LIBS@ 
-LIBS_THREADED += -lpvfs2-threaded @LIBS@
+# Libraries - rt libs tend to depend on other libs so they go first
+LIBS += -lpvfs2
+ifdef LIB_NEEDS_LIBRT 
+	LIBS += -lrt
+endif
+LIBS += -lm @LIBS@ @THREAD_LIB@
+LIBS_THREADED += -lpvfs2-threaded
+ifdef LIB_NEEDS_LIBRT 
+	LIBS_THREADED += -lrt
+endif
+LIBS_THREADED += -lm @LIBS@ @THREAD_LIB@ 
 # need to include external dependency libs when building shared libraries
-DEPLIBS := @LIBS@
+ifdef LIB_NEEDS_LIBRT 
+	DEPLIBS += -lrt
+endif
+DEPLIBS += -lm @LIBS@ @THREAD_LIB@
 ULIBDEPLIBS := -lpvfs2
+# Misc defines
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -257,6 +273,7 @@ ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wundef -Wpointer-arith
     GCC_CFLAGS += -Wnested-externs
     GCC_CFLAGS += -Wredundant-decls
+    GCC_CFLAGS += -Wno-address -Wno-attributes
     # These are very noisy, and probably too strict.
     #GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
     #GCC_CFLAGS += -Wcast-qual
@@ -371,6 +388,11 @@ LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLI
 LIBS += @THREAD_LIB@ @OPENSSL_LIB@
 DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
 LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
+
+# Moved up to where libs are set
+# LIBS += @THREAD_LIB@
+# DEPLIBS += @THREAD_LIB@
+# LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
 # build BMI TCP?
@@ -545,6 +567,7 @@ LIBRARIES_STATIC := lib/libpvfs2.a
 LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
+
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
@@ -556,11 +579,12 @@ LIBRARIES_SHARED += lib/libbmi.so
 BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
-ifdef BUILD_USRINT
+ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
-LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
-LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
+# ifeq ($(build_symbolic),yes)
+# LIBRARIES_SHARED += lib/libofs-s.so
+# endif
 endif
 
 ifneq ($(build_static),yes)
@@ -572,6 +596,12 @@ ifneq ($(build_shared),yes)
 LIBRARIES_SHARED :=
 LIBRARIES_THREADED_SHARED := 
 endif
+
+ifneq ($(build_threaded),yes)
+LIBRARIES_THREADED_SHARED := 
+LIBRARIES_THREADED_STATIC :=
+endif
+
 
 LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
 LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
@@ -876,23 +906,19 @@ lib/libofs.a: $(ULIBOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(ULIBOBJS)
 
-# rule for building the _multithreaded_ ofs library
-lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
-	$(Q) "  RANLIBTHREADED	$@"
-	$(E)$(INSTALL) -d lib
-	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
-
 # rule for building the shared ofs library
 lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-# rule for building the shared ofs _multithreaded_ library
-lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS) lib/libpvfs2.so
-	$(Q) "  LDSO		$@"
-	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+# ifeq ($(build_symbolic),yes)
+# rule for building the shared ofs library
+# lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
+# 	$(Q) "  LDSO		$@"
+# 	$(E)$(INSTALL) -d lib
+# 	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+# endif
 
 # rules for building virtual libraries
 lib/liborangefs.a: lib/libpvfs2.a

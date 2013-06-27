@@ -69,7 +69,7 @@ int iocommon_fsync(pvfs_descriptor *pd)
     int orig_errno = errno;
     PVFS_credential *credential;
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
@@ -115,12 +115,13 @@ int iocommon_lookup_absolute(const char *abs_path,
     PVFS_sysresp_lookup resp_lookup;
     PVFS_path_t *Ppath;
 
-    debug("iocommon_lookup_absolute: called with %s\n", abs_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup_absolute: called with %s\n", abs_path);
 
     /* Initialize any variables */
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -269,10 +270,11 @@ int iocommon_lookup_relative(const char *rel_path,
     PVFS_credential *credential;
     PVFS_sysresp_lookup resp_lookup;
 
-    debug("iocommon_lookup_relative: called with %s\n", rel_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup_relative: called with %s\n", rel_path);
 
     /* Initialize any variables */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
     /* Set credential */
@@ -461,10 +463,11 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
-    debug("iocommon_create_file: called with %s\n", filename);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_create_file: called with %s\n", filename);
 
     /* Initialize */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     memset(&attr, 0, sizeof(attr));
     memset(&resp_create, 0, sizeof(resp_create));
 
@@ -535,7 +538,7 @@ int iocommon_create_file(const char *filename,
         }
         /* check for nocache flag */
         value = PINT_hint_get_value_by_type(file_creation_param,
-                                            PINT_HINT_NOCACHE,
+                                            PINT_HINT_CACHE,
                                             &length);
         if (value)
         {   
@@ -637,14 +640,17 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
     char *path = NULL;
     pvfs_descriptor *pd = NULL;
 
-    debug("iocommon_expand_path: called with %s\n", Ppath->expanded_path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_expand_path: called with %s\n", Ppath->expanded_path);
 
     path = PVFS_expand_path(Ppath->expanded_path, !follow_flag);
-    if (PATH_LOOKEDUP(Ppath))
+    if (PATH_LOOKEDUP(Ppath) && PATH_RESOLVED(Ppath))
     {
-        /* we're done */
+        /* we found a valid PVFS path
+         * so we're done - expand path does not set up a descriptor here
+         */
         *pdp = NULL;
-        goto errorout;
+        goto errorout; /* not really an error, but bailing out */
     }
     if (!PATH_ERROR(Ppath))
     {
@@ -655,7 +661,8 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         IOCOMMON_RETURN_ERR(rc);
 
         /* create a usrint file descriptor for it */
-        debug("iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
+        gossip_debug(GOSSIP_USRINT_DEBUG,
+               "iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -667,9 +674,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         if (S_ISDIR(sbuf.st_mode))
         {
             /* we assume path was qualified by PVFS_expand_path() */
-            int len = strnlen(path, PVFS_PATH_MAX);
-            pd->s->dpath = (char *)malloc(len + 1);
-            strncpy(pd->s->dpath, path, len);
+            pd->s->dpath = pvfs_dpath_insert(path);
         }
         gen_mutex_unlock(&pd->s->lock); /* this is ok after fstat */
 
@@ -696,82 +701,115 @@ errorout:
  */
 int iocommon_lookup(char *path,
                     int followflag,
-                    PVFS_object_ref *pref,
-                    PVFS_object_ref *fref,
-                    char **filename,
-                    PVFS_object_ref *pdir)
+                    PVFS_object_ref *pref, /* OUT parent ref */
+                    PVFS_object_ref *fref, /* OUT file ref */
+                    char **filename,       /* OUT text file name */
+                    PVFS_object_ref *pdir) /* IN path relative to this */
 {
     int rc = 0;
     int internal_follow = PVFS2_LOOKUP_LINK_FOLLOW;
-    char *parentdir = NULL;
-    char *dir = NULL;
-    char *file = NULL;
+    char *parentdir = NULL;      /* text of parent path */
+    char *file = NULL;           /* text of file name */
+    char *target = NULL;         /* temp could be parent dir or file name */
+    PVFS_object_ref *target_ref; /* temp ref could be dir or file name */
+    int skip_file_lookup = 0;    /* case where p and f are req but no p */
     pvfs_descriptor *pd = NULL;
     PVFS_path_t *Ppath = NULL;
     int flags = O_RDONLY;
     int mode = 0644;
     char error_path[PVFS_NAME_MAX];
 
-    debug("iocommon_lookup: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_lookup: called with %s\n", path);
 
     memset(error_path, 0, sizeof(error_path));
 
     rc = split_pathname(path, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
 
+    /* Four cases here:
+     * 1) caller requests pref and fref
+     *    look up the parentdir in the first section (via target)
+     *    then look up the file in the second section
+     * 2) caller requests only fref
+     *    look up the file in the first section (via target)
+     * 3) caller requests only pref
+     *    look up parentdir in the first section (via target)
+     * 4) caller requests neither pref nor fref
+     *    makes no sense - but can still return filename if requested
+     */
+
+    if (!fref && !pref)
+    {
+        /* fourth case, exit code copies file name if requested */
+        goto errorout;
+    }
     if (fref && !pref)
     {
+        /* second case */
         /* this will use the parent code to do the file lookup */
         /* in one request - unless it fails */
-        dir = path;
-        pref = fref;
-        fref = NULL;
+        target = path;
+        target_ref = fref;
         internal_follow = followflag;
     }
     else
     {
+        /* this is first or third or 4th case */
         /* this is the normal lookup the dir first, file second */
-        dir = parentdir;
+        /* when looking up parent dir, always follow sym links */
+        target = parentdir;
+        target_ref = pref;
     }
-    if (pref)
+    if (pref || fref)
     {
-        /* look up dir first */
+        /* this is first, second, or third case */
+        /* user asked for parent dir so look up dir first */
         if (!pdir)
         {
+            /* no relative path was provided */
             errno = 0;
-            rc = iocommon_lookup_absolute(dir,
+            rc = iocommon_lookup_absolute(target,
                                           internal_follow,
-                                          pref,
-                                          error_path,
+                                          target_ref, /* OUT */
+                                          error_path, /* OUT */
                                           sizeof(error_path));
         }
         else
         {
-            if (parentdir)
-             {
-                errno = 0;
-                rc = iocommon_lookup_relative(dir,
-                                              *pdir,
-                                              internal_follow,
-                                              pref,
-                                              error_path,
-                                              sizeof(error_path));
+            /* a relative path provided */
+            if (!parentdir && pref)
+            {
+                /* first or third case but no parentdir in path
+                 * split_pathname only returns a blank parentdir if
+                 * there is only a filename and no slashes.
+                 * The parent dir is pdir. Now look up file.
+                 */
+                target = file;
+                target_ref = fref;
+                *pref = *pdir;
+                internal_follow = followflag;
+                skip_file_lookup = 1; /* block the call to lookup_rel below */
             }
-            else
-            { 
-                pref = pdir;
-            }
+            errno = 0;
+            rc = iocommon_lookup_relative(target,
+                                          *pdir,
+                                          internal_follow,
+                                          target_ref, /* OUT */
+                                          error_path, /* OUT */
+                                          sizeof(error_path));
         }
     }
-    if (rc == 0 && pref && fref)
+    if (rc == 0 && pref && fref && !skip_file_lookup)
     {
-        /* now look up file */
+        /* this is first case */
+        /* we looked up parent, now look up file */
         errno = 0;
         rc = iocommon_lookup_relative(file,
                                       *pref,
                                       followflag,
-                                      fref,
-                                      error_path,
+                                      fref,       /* OUT */
+                                      error_path, /* OUT */
                                       sizeof(error_path));
     }
     /* check to see if we need to expand the path */
@@ -807,7 +845,7 @@ int iocommon_lookup(char *path,
         {
             /* opened a glibc file - just close it */       
             pvfs_free_descriptor(pd->fd);
-            /* need to reeturn some kind of code here */
+            /* need to return some kind of code here */
             return -1;
         }
         pref->fs_id = Ppath->fs_id;
@@ -856,7 +894,9 @@ pvfs_descriptor *iocommon_open(const char *path,
     int rc = 0;
     int orig_errno = errno;
     int follow_links = 0;
-    int open_dir = 0;
+    int cache_flag = 1;
+    int length = 0;
+    void *value = NULL;
     char *directory = NULL;
     char *filename = NULL;
     char error_path[PVFS_NAME_MAX];
@@ -867,7 +907,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     PVFS_credential *credential;
     PVFS_path_t *Ppath;
 
-    debug("iocommon_open: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "iocommon_open: called with %s\n", path);
 
     /* Initialize */
     memset(&file_ref, 0, sizeof(file_ref));
@@ -875,7 +915,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     memset(&attributes_resp, 0, sizeof(attributes_resp));
     memset(error_path, 0, sizeof(error_path));
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -888,7 +928,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     {
         if (PATH_LOOKEDUP(Ppath))
         {
-            if (Ppath->filename && (*Ppath->filename == '\0'))
+            if (Ppath->filename && (Ppath->filename[0] == '\0'))
             {
                 if (PATH_FOLLOWSYM(Ppath) && (flags & O_NOFOLLOW))
                 {
@@ -948,16 +988,28 @@ pvfs_descriptor *iocommon_open(const char *path,
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
 
-            if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
-                (*Ppath->filename == '\0'))
+            if (PATH_LOOKEDUP(Ppath))
             {
-                file_ref.fs_id = Ppath->fs_id;
-                file_ref.handle = Ppath->handle;
-                if (need_to_free)
+                if (Ppath->filename && Ppath->filename[0] == '\0')
                 {
-                    PVFS_free_path(Ppath);
+                    /* found pvfs file */
+                    file_ref.fs_id = Ppath->fs_id;
+                    file_ref.handle = Ppath->handle;
+                    if (need_to_free)
+                    {
+                        PVFS_free_path(Ppath);
+                    }
+                    goto found;
                 }
-                goto found;
+                else
+                {
+                    /* found non-pvfs file */
+                    if (need_to_free)
+                    {
+                        PVFS_free_path(Ppath);
+                    }
+                    return pd;
+                }
             }
             if (need_to_free)
             {
@@ -984,17 +1036,19 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int pathsz = strlen(pdir->s->dpath) + strlen(path);
-            tmp_path = (char *)malloc(pathsz + 2);
-            strcpy(tmp_path, pdir->s->dpath);
-            strcat(tmp_path, "/");
-            strcat(tmp_path, path);
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(directory);
+            int mlen = dlen + plen + 2;
+            tmp_path = (char *)malloc(mlen);
+            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
+            strncat(tmp_path, "/", 1);
+            strncat(tmp_path, directory, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
 
             if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
-                (*Ppath->filename == '\0'))
+                (Ppath->filename[0] == '\0'))
             {
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
@@ -1002,6 +1056,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                 free(tmp_path);
                 goto found;
             }
+            /* What if we found a glibc path? */
             PVFS_free_path(Ppath);
             free(tmp_path);
         }
@@ -1030,7 +1085,6 @@ pvfs_descriptor *iocommon_open(const char *path,
         /* clear error */
         rc = 0;
         errno = 0;
-        open_dir = 1; /* we are opening a directory filename is null */
     }
 
     if (!pdir)
@@ -1055,13 +1109,14 @@ pvfs_descriptor *iocommon_open(const char *path,
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
 
             if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
-                (*Ppath->filename == '\0'))
+                (Ppath->filename[0] == '\0'))
             {
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
                 PVFS_free_path(Ppath);
                 goto createfile;
             }
+            /* What if we found a glibc path? */
             PVFS_free_path(Ppath);
         }
     }
@@ -1084,17 +1139,19 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int pathsz = strlen(pdir->s->dpath) + strlen(directory);
-            tmp_path = (char *)malloc(pathsz + 2);
-            strcpy(tmp_path, pdir->s->dpath);
-            strcat(tmp_path, "/");
-            strcat(tmp_path, directory);
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(directory);
+            int mlen = dlen + plen + 2;
+            tmp_path = (char *)malloc(mlen);
+            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
+            strncat(tmp_path, "/", 1);
+            strncat(tmp_path, directory, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
 
             if (PATH_LOOKEDUP(Ppath) && Ppath->filename &&
-                (*Ppath->filename == '\0'))
+                (Ppath->filename[0] == '\0'))
             {
                 parent_ref.fs_id = Ppath->fs_id;
                 parent_ref.handle = Ppath->handle;
@@ -1102,6 +1159,7 @@ pvfs_descriptor *iocommon_open(const char *path,
                 free(tmp_path);
                 goto createfile;
             }
+            /* What if we found a glibc path? */
             PVFS_free_path(Ppath);
             free(tmp_path);
         }
@@ -1164,8 +1222,21 @@ finish:
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
-    debug("iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
-    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, 0);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_open calls pvfs_alloc_descriptor %d\n", -1);
+
+    /* check for cache flag */
+    /* At the moment the default is to cache */
+    cache_flag = 1;
+    value = PINT_hint_get_value_by_type(file_creation_param, /* hints */
+                                        PINT_HINT_CACHE,
+                                        &length);
+    if (value)
+    {
+        cache_flag = *(int *)value;
+    }
+    /* now allocate file descriptor */
+    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, cache_flag);
     if (!pd)
     {
         rc = -1;
@@ -1191,24 +1262,32 @@ finish:
     if (attributes_resp.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         pd->s->mode |= S_IFDIR;
+        /* set the path of this newly opened direcotry */
         if (pdir)
         {
-            pd->s->dpath = (char *)malloc(strlen(pdir->s->dpath) +
-                            strlen(path) + 2);
-            strcpy(pd->s->dpath, pdir->s->dpath);
-            strcat(pd->s->dpath, "/");
-            strcat(pd->s->dpath, path);
+            /* we opened relative to pdir so need to cat the paths */
+            char *tpath;
+            int dlen = strlen(pdir->s->dpath);
+            int plen = strlen(path);
+            int mlen = dlen + plen + 2;
+            tpath = (char *)malloc(mlen);
+            strncpy(tpath, pdir->s->dpath, dlen + 1);
+            strncat(tpath, "/", 1);
+            strncat(tpath, path, plen);
+            pd->s->dpath = pvfs_dpath_insert(tpath);
+            free(tpath);
         }
         else
         {
-            pd->s->dpath = (char *)malloc(strlen(path) + 1);
-            strcpy(pd->s->dpath, path);
+            /* opened absolute so just use the path */
+            pd->s->dpath = pvfs_dpath_insert(path);
         }
     }
     if (attributes_resp.attr.objtype == PVFS_TYPE_SYMLINK)
     {
         pd->s->mode |= S_IFLNK;
     }
+    /* ops below will lock if needed */
     gen_mutex_unlock(&pd->s->lock);
     gen_mutex_unlock(&pd->lock);
 
@@ -1224,9 +1303,21 @@ finish:
     if (flags & O_APPEND)
     {
         rc = iocommon_lseek(pd, 0, 0, SEEK_END);
+        IOCOMMON_CHECK_ERR(rc);
     }
 
+    goto cleanup;
+
 errorout:
+
+    /* if file was opened close it freeing up descriptor resources */
+    if (pd)
+    {
+        pvfs_free_descriptor(pd->fd);
+        pd = NULL;
+    }
+
+cleanup:
 
     /* Free directory and filename memory */
     if (directory)
@@ -1257,7 +1348,7 @@ int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
     int orig_errno = errno;
     PVFS_credential *credential;
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -1318,7 +1409,8 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
                                   &attributes_resp,
                                   NULL);
             IOCOMMON_CHECK_ERR(rc);
-            pd->s->file_pointer = attributes_resp.attr.size + (offset * unit_size);
+            pd->s->file_pointer = attributes_resp.attr.size +
+                                  (offset * unit_size);
             break;
         }
         default:
@@ -1332,32 +1424,62 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
     if (S_ISDIR(pd->s->mode))
     {
         int dirent_no;
+        int dirent_total_count = 0;
+        int dirent_read_count = 0;
         PVFS_credential *credential;
         PVFS_sysresp_readdir readdir_resp;
 
-        memset(&readdir_resp, 0, sizeof(readdir_resp));
-        rc = iocommon_cred(&credential);
-        if (rc != 0)
+        if ((offset == 0 || unit_size == 0) && whence == SEEK_CUR)
         {
-            goto errorout;
+            /* just asking for file position don't change position */
+            goto local_exit;
         }
+
+        if ((offset == 0 || unit_size == 0) && whence == SEEK_SET)
+        {
+            /* rewinding so set to start and go */
+            pd->s->token = PVFS_READDIR_START;
+            goto local_exit;
+        }
+
         dirent_no = pd->s->file_pointer / sizeof(PVFS_dirent);
         pd->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
         pd->s->token = PVFS_READDIR_START;
-        if(dirent_no)
+        if (dirent_no)
         {
+            dirent_read_count = dirent_no;
+            if (dirent_read_count > PVFS_REQ_LIMIT_DIRENT_COUNT)
+            {
+                dirent_read_count = PVFS_REQ_LIMIT_DIRENT_COUNT;
+            }
             errno = 0;
-            rc = PVFS_sys_readdir(pd->s->pvfs_ref,
-                                  pd->s->token,
-                                  dirent_no,
-                                  credential,
-                                  &readdir_resp,
-                                  NULL);
-            IOCOMMON_CHECK_ERR(rc);
-            pd->s->token = readdir_resp.token;
-            free(readdir_resp.dirent_array);
+            while (dirent_total_count << dirent_no)
+            {
+                if (dirent_read_count > dirent_no - dirent_total_count)
+                {
+                    dirent_read_count = dirent_no - dirent_total_count;
+                }
+                memset(&readdir_resp, 0, sizeof(readdir_resp));
+                rc = iocommon_cred(&credential);
+                if (rc != 0)
+                {
+                    goto errorout;
+                }
+                rc = PVFS_sys_readdir(pd->s->pvfs_ref,
+                                      pd->s->token,
+                                      dirent_read_count,
+                                      credential,
+                                      &readdir_resp,
+                                      NULL);
+                IOCOMMON_CHECK_ERR(rc);
+                dirent_total_count += readdir_resp.pvfs_dirent_outcount;
+                pd->s->token = readdir_resp.token;
+                free(readdir_resp.dirent_array);
+            }
         }
     }
+
+local_exit:
     gen_mutex_unlock(&pd->s->lock);
     return pd->s->file_pointer;
 
@@ -1381,7 +1503,8 @@ int iocommon_remove (const char *path,
     PVFS_credential *credential;
     PVFS_sys_attr attr;
 
-    debug("iocommon_remove: called with %s\n", path);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_remove: called with %s\n", path);
 
     /* Initialize */
     memset(&parent_ref, 0, sizeof(parent_ref));
@@ -1389,7 +1512,7 @@ int iocommon_remove (const char *path,
     memset(&attr, 0, sizeof(attr));
 
     /* Initialize the system interface for this process */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -1497,6 +1620,14 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
                          &newname, /* filename */
                          newpdir);
     IOCOMMON_RETURN_ERR(rc);
+
+    /* check for the trivial case */
+    if (newref.fs_id == oldref.fs_id &&
+        newref.handle == oldref.handle &&
+        !strcmp(oldname, newname))
+    {
+        return 0;
+    }
 
     errno = 0;
     rc = PVFS_sys_rename(oldname, oldref, newname, newref, creds, hints);
@@ -2263,7 +2394,8 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     PVFS_credential *creds;
     PVFS_sysresp_io io_resp;
 
-    debug("iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+           "iocommon_readorwrite_nocache: called with %d\n", (int)por->handle);
 
     if (!por)
     {
@@ -2411,7 +2543,8 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     PVFS_credential *credential;
     PVFS_sysresp_getattr getattr_response;
 
-    debug("iocommon_getattr: called with %d\n", (int)obj.handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_getattr: called with %d\n", (int)obj.handle);
 
     /* Initialize */
     memset(&getattr_response, 0, sizeof(getattr_response));
@@ -2454,7 +2587,8 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     int orig_errno = errno;
     PVFS_credential *credential;
 
-    debug("iocommon_setattr: called with %d\n", (int)obj.handle);
+    gossip_debug(GOSSIP_USRINT_DEBUG,
+                 "iocommon_setattr: called with %d\n", (int)obj.handle);
 
     /* check credential */
     rc = iocommon_cred(&credential);
@@ -2463,7 +2597,14 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
         goto errorout;
     }
 
-    /* now get attributes */
+    /* Should we automatically set CTIME here?
+     * Seems like a good place to do so, all updates of the "inode" must
+     * go through here, for all potential user level interfaces, so this
+     * might be a good idea.  Should only update if we change owner,
+     * group, permissions, more something else like that.
+     */
+
+    /* now set attributes */
     rc = PVFS_sys_setattr(obj, *attr, credential, NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -2648,7 +2789,7 @@ int iocommon_make_directory(const char *pvfs_path,
     memset(&parent_ref,  0, sizeof(parent_ref));
     memset(&resp_mkdir,  0, sizeof(resp_mkdir));
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -2739,7 +2880,7 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     memset(&parent_ref,  0, sizeof(parent_ref));
     memset(&resp_symlink,0, sizeof(resp_symlink));
 
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -3017,7 +3158,7 @@ int iocommon_access(const char *pvfs_path,
     memset(&attr, 0, sizeof(attr));
 
     /* Initialize the system interface for this process */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -3107,7 +3248,7 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
         return -1;
     }
     /* Initialize the system interface for this process */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -3125,9 +3266,9 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
     /* this is a fudge because they don't line up */
     buf->f_type = PVFS2_SUPER_MAGIC;
     buf->f_bsize = block_size; 
-    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/1024;
-    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/1024;
-    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/1024;
+    buf->f_blocks = statfs_resp.statfs_buf.bytes_total / 1024;
+    buf->f_bfree = statfs_resp.statfs_buf.bytes_available / 1024;
+    buf->f_bavail = statfs_resp.statfs_buf.bytes_available / 1024;
     buf->f_files = statfs_resp.statfs_buf.handles_total_count;
     buf->f_ffree = statfs_resp.statfs_buf.handles_available_count;
     buf->f_fsid.__val[0] = statfs_resp.statfs_buf.fs_id;
@@ -3152,7 +3293,7 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
         return -1;
     }
     /* Initialize the system interface for this process */
-    pvfs_sys_init();
+    PVFS_INIT(pvfs_sys_init);
     rc = iocommon_cred(&credential);
     if (rc != 0)
     {
@@ -3170,9 +3311,9 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
     /* this is a fudge because they don't line up */
     buf->f_type = PVFS2_SUPER_MAGIC;
     buf->f_bsize = block_size; 
-    buf->f_blocks = statfs_resp.statfs_buf.bytes_total/1024;
-    buf->f_bfree = statfs_resp.statfs_buf.bytes_available/1024;
-    buf->f_bavail = statfs_resp.statfs_buf.bytes_available/1024;
+    buf->f_blocks = statfs_resp.statfs_buf.bytes_total / 1024;
+    buf->f_bfree = statfs_resp.statfs_buf.bytes_available / 1024;
+    buf->f_bavail = statfs_resp.statfs_buf.bytes_available / 1024;
     buf->f_files = statfs_resp.statfs_buf.handles_total_count;
     buf->f_ffree = statfs_resp.statfs_buf.handles_available_count;
     buf->f_fsid.__val[0] = statfs_resp.statfs_buf.fs_id;

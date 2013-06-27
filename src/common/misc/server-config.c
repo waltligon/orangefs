@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -16,11 +17,14 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/stat.h>
 #ifdef WIN32
 #include <io.h>
 
 #include "wincommon.h"
 #endif
+
+#include "pvfs2-internal.h"
 
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
@@ -31,9 +35,7 @@
 #include "extent-utils.h"
 #include "mkspace.h"
 #include "pint-distribution.h"
-#include "pvfs2-config.h"
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 
 #ifdef HAVE_OPENSSL
 #include <openssl/evp.h>
@@ -1427,6 +1429,7 @@ DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1439,6 +1442,7 @@ DOTCONF_CB(get_data_path)
 
     config_s->data_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
     return NULL;
 }
 
@@ -1446,6 +1450,7 @@ DOTCONF_CB(get_meta_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
@@ -1458,6 +1463,7 @@ DOTCONF_CB(get_meta_path)
 
     config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
+
     return NULL;
 }
 
@@ -5124,8 +5130,7 @@ static int is_root_handle_in_my_range(
   create a storage space based on configuration settings object
   with the particular host settings local to the caller
 */
-int PINT_config_pvfs2_mkspace(
-    struct server_configuration_s *config)
+int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
 {
     int ret = 1;
     PVFS_handle root_handle = 0;

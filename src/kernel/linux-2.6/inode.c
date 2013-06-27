@@ -392,6 +392,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .listxattr = pvfs2_listxattr,
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
+# if defined(PVFS_KMOD_HAVE_GET_ACL)
+    .get_acl = pvfs2_get_acl,
+# endif
 #endif
 #ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
     .fill_handle = pvfs2_fill_handle,

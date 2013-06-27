@@ -10,10 +10,12 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
+#include <stdio.h>
+
+#include "pvfs2-internal.h"
 #include "pint-hint.h"
 #include "gossip.h"
-#include <stdio.h>
-#include <pvfs2-debug.h>
+#include "pvfs2-debug.h"
 
 DEFINE_STATIC_ENDECODE_FUNCS(uint64_t, uint64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int64_t, int64_t);
@@ -105,9 +107,9 @@ static const struct PINT_hint_info hint_types[] = {
      decode_func_uint32_t,
      sizeof(uint32_t)},
 
-    {PINT_HINT_NOCACHE,
+    {PINT_HINT_CACHE,
      0,
-     PVFS_HINT_NOCACHE_NAME,
+     PVFS_HINT_CACHE_NAME,
      encode_func_uint32_t,
      decode_func_uint32_t,
      sizeof(uint32_t)},
@@ -606,8 +608,9 @@ int PVFS_hint_import_env(PVFS_hint * out_hint)
     return 0;
 }
 
-void *PINT_hint_get_value_by_type(
-    struct PVFS_hint_s *hint, enum PINT_hint_type type, int *length)
+void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint,
+                                  enum PINT_hint_type type,
+                                  int *length)
 {
     PINT_hint *h;
 
@@ -629,8 +632,9 @@ void *PINT_hint_get_value_by_type(
     return NULL;
 }
 
-void *PINT_hint_get_value_by_name(
-    struct PVFS_hint_s *hint, const char *name, int *length)
+void *PINT_hint_get_value_by_name(struct PVFS_hint_s *hint,
+                                  const char *name,
+                                  int *length)
 {
     PINT_hint *h;
 
