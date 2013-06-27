@@ -198,6 +198,7 @@ static int recursive_delete(char *dir)
         combine(dir, direntp->d_name, abs_path);
         /* Determine if this entry is a file or directory. */
         struct stat buf;
+        JNI_PRINT("calling pvfs_stat_mask on file: %s\n", abs_path);
         ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
         if(ret < 0)
         {
@@ -1062,16 +1063,56 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getcUnlocked(JNIEnv *env, jobject obj,
 }
 
 /* Return the directory entries of this directory as an array of Java Strings */
-JNIEXPORT jobjectArray JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
+JNIEXPORT jobject JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getEntriesInDir(JNIEnv *env, jobject obj,
         jstring path)
 {
     JNI_PFI();
-    jobjectArray ret = (jobjectArray) NULL;
+    jclass arrayListClass = (*env)->FindClass(env, "java/util/ArrayList");
+    if(!arrayListClass)
+    {
+        JNI_ERROR("FindClass failed on class java/util/ArrayList\n");
+        return NULL_JOBJECT;
+    }
+    jmethodID midInit = (*env)->GetMethodID(env, arrayListClass, "<init>", 
+            "(I)V");
+    if(!midInit)
+    {
+        JNI_ERROR("GetMethodID failed on method: <init>\n");
+        return NULL_JOBJECT;
+    }
+    jobject objArrayList = (*env)->NewObject(env, arrayListClass, midInit,
+            (jint) JNI_INITIAL_ARRAY_LIST_SIZE);
+    if(!objArrayList)
+    {
+        JNI_ERROR("NewObject returned NULL.\n");
+        return NULL_JOBJECT;
+    }
+    jmethodID midAdd = (*env)->GetMethodID(env, arrayListClass, "add", 
+            "(Ljava/lang/Object;)Z");
+    if(!midAdd)
+    {
+        JNI_ERROR("GetMethodID failed on method: add.\n");
+        return NULL_JOBJECT;
+    }
+    jmethodID midEnsureCapacity = (*env)->GetMethodID(env, arrayListClass,
+            "ensureCapacity", "(I)V");
+    if(!midEnsureCapacity)
+    {
+        JNI_ERROR("GetMethodID failed on method: ensureCapacity.\n");
+        return NULL_JOBJECT;
+    }
 
     char cpath[PVFS_NAME_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
+    /* Check for exception. */
+    if((*env)->ExceptionCheck(env) == JNI_TRUE)
+    {
+        JNI_ERROR("Detected Exception following GetStringUTF.\n");
+        (*env)->ExceptionDescribe(env);
+        return NULL_JOBJECT;
+    }
 
     DIR * dirp = NULL;
     struct dirent * direntp = NULL;
@@ -1081,10 +1122,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
     if (!dirp)
     {
         JNI_PERROR();
-        return ret;
+        return NULL_JOBJECT;
     }
 
-    /* Iterate over directory entries counting entries we're concerned with. */
+    /* Iterate over directory entries and add valid filenames to ArrayList */
     int cnt = 0;
     do
     {
@@ -1096,47 +1137,43 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getFilesInDir(JNIEnv *env, jobject obj,
             {
                 continue;
             }
+            /* create java string from dirent name then add to object array */
+            jobject fileName = (*env)->NewStringUTF(env, direntp->d_name);
+            if(!fileName)
+            {
+                JNI_ERROR("NewStringUTF returned Null.\n");
+                goto error_out;
+            }           
+            //add entry name to ArrayList
+            jboolean addBoolean = (*env)->CallBooleanMethod(env, objArrayList,
+                    midAdd, fileName);
+            if (addBoolean == JNI_FALSE)
+            {
+                JNI_ERROR("CallBooleanMethod returned JNI_FALSE.\n");
+                goto error_out;
+            }
+            /* Increment count of valid directory entries */
             cnt++;
+            if(cnt % JNI_INITIAL_ARRAY_LIST_SIZE == 0)
+            {
+                /* Ensure capacity for the next entries. Not necessary,
+                 * but may reduce runtime by reducing incremental allocations
+                 * that would otherwise be required for directories with many
+                 * entries.
+                 */
+                (*env)->CallVoidMethod(env, objArrayList, midEnsureCapacity, 
+                        (jint) (cnt + JNI_INITIAL_ARRAY_LIST_SIZE));
+            }
         }
     } while (direntp);
-
     JNI_PRINT("dir entries = %d\n", cnt);
-
-    /* Now that we know how many entry names we're storing,
-     * make space and copy strings. */
-    if (cnt > 0)
+error_out:
+    if(closedir(dirp) != 0)
     {
-        char fileNames[cnt][PVFS_PATH_MAX];
-        memset(fileNames, 0, cnt * PVFS_PATH_MAX);
-        rewinddir(dirp);
-        JNI_PRINT("rewinddir succeeded!\n");
-        int i = 0;
-        do
-        {
-            direntp = readdir(dirp);
-            if (direntp)
-            {
-                if (is_dot_dir(direntp->d_name) ||
-                        is_lostfound_dir(direntp->d_name))
-                {
-                    continue;
-                }
-                strcpy(fileNames[i], direntp->d_name);
-                i++;
-            }
-        } while (direntp);
-
-        ret = (*env)->NewObjectArray(env, (jsize) cnt,
-                (*env)->FindClass(env, "java/lang/String"),
-                (*env)->NewStringUTF(env, ""));
-        /* Fill object array */
-        for (i = 0; i < cnt; i++)
-        {
-            jobject fileName = (*env)->NewStringUTF(env, fileNames[i]);
-            (*env)->SetObjectArrayElement(env, ret, i, fileName);
-        }
+        JNI_PERROR();
+        return NULL_JOBJECT;
     }
-    return (jobjectArray) ret;
+    return objArrayList;
 }
 
 JNIEXPORT jobjectArray JNICALL

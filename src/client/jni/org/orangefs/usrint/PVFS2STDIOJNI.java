@@ -6,6 +6,7 @@
 package org.orangefs.usrint;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 
 public class PVFS2STDIOJNI {
     public PVFS2STDIOJNIFlags f;
@@ -121,7 +122,7 @@ public class PVFS2STDIOJNI {
 
     public native int getcUnlocked(long stream);
 
-    public native String[] getFilesInDir(String path);
+    public native ArrayList getEntriesInDir(String path);
 
     public native String[] getUsernameGroupname(int uid, int gid);
 

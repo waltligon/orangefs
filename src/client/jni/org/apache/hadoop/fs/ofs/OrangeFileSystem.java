@@ -8,6 +8,7 @@ package org.apache.hadoop.fs.ofs;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -362,16 +363,16 @@ public class OrangeFileSystem extends FileSystem {
     public FileStatus[] listStatus(Path f) throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + makeAbsolute(f).toString());
-        String[] fileNames = orange.stdio.getFilesInDir(fOFS.toString());
-        if (fileNames == null)
+        ArrayList arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
+        if(arrayList == null) {
             return null;
-        for (int i = 0; i < fileNames.length; i++) {
-            fileNames[i] = makeAbsolute(f).toString() + "/" + fileNames[i];
         }
+        Object [] fileNames = arrayList.toArray();
+        String fAbs = makeAbsolute(f).toString() + "/";
         FileStatus[] statusArray = new FileStatus[fileNames.length];
         for (int i = 0; i < fileNames.length; i++) {
             try {
-                statusArray[i] = getFileStatus(new Path(fileNames[i]));
+                statusArray[i] = getFileStatus(new Path(fAbs + fileNames[i].toString()));
             }
             catch (FileNotFoundException e) {
                 // TODO
