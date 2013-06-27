@@ -1,5 +1,5 @@
 /* 
- * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2013 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -80,18 +80,21 @@ static PINT_sm_action mgmt_sys_exec_do_work(
     
 	pid = fork();
 	
+	
 	if ( pid == 0 )
 	{
 		// Child process
-		printf("Launching child process on %s with %s\n",
-		s_op->req->u.mgmt_sys_exec.server,
+		
+		printf("Launching child process from path %s with %s\n",
+		s_op->req->u.mgmt_sys_exec.path,
 		s_op->req->u.mgmt_sys_exec.command);
+		
 	}
 	else if (pid < 0 )
 	{
 		// failure
-		printf("failed to launch child process on %s with %s\n",
-		s_op->req->u.mgmt_sys_exec.server,
+		printf("failed to launch child process from path %s with %s\n",
+		s_op->req->u.mgmt_sys_exec.path,
 		s_op->req->u.mgmt_sys_exec.command);
 		js_p->error_code = PVFS_SYS_EXEC_FAILED;
 		return SM_ACTION_COMPLETE;

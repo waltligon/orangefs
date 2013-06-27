@@ -138,9 +138,7 @@ static PINT_sm_action mgmt_sys_exec_setup_msgpair(
 
     PINT_null_capability(&capability);
     
-	// get correct sys_exec fill here
-
-    PINT_SERVREQ_MGMT_SYS_EXEC_FILL(sm_p->msgarray_op.msgpair.req, capability, sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.fs_id,sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.server,sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.command);
+    PINT_SERVREQ_MGMT_SYS_EXEC_FILL(sm_p->msgarray_op.msgpair.req, capability, sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.fs_id,sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.path,sm_p->msgarray_op.msgpair.req.u.mgmt_sys_exec.command);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;

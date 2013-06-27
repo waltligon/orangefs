@@ -2524,14 +2524,14 @@ endecode_fields_1_struct(
 struct PVFS_servreq_mgmt_sys_exec
 {
     PVFS_fs_id fs_id;
-    char *server;
+    char *path;
     char *command;
     
 };
 endecode_fields_3_struct(
     PVFS_servreq_mgmt_sys_exec,
     PVFS_fs_id, fs_id,
-    string, server,
+    string, path,
     string, command
 
 );
@@ -2540,14 +2540,14 @@ endecode_fields_3_struct(
 #define PINT_SERVREQ_MGMT_SYS_EXEC_FILL(__req,   \
                                                     __cap,   \
                                                     __fsid,   \
-                                                    __server, \
+                                                    __path, \
 						    __command)  \
 do {                                                         \
     memset(&(__req), 0, sizeof(__req));                      \
     (__req).op = PVFS_SERV_MGMT_SYS_EXEC;        \
     (__req).capability = (__cap);                            \
     (__req).u.mgmt_sys_exec.fs_id = (__fsid);    \
-    (__req).u.mgmt_sys_exec.server = (__server);    \
+    (__req).u.mgmt_sys_exec.path = (__path);    \
     (__req).u.mgmt_sys_exec.command = (__command);    \
 } while (0)
 
