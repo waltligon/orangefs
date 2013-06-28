@@ -69,19 +69,21 @@ void calc_copy_ops( off64_t offset,
                     const struct iovec *vector
 );
 
-int calc_req_blk_cnt(uint64_t offset, size_t req_size);
+int calc_req_blk_cnt( uint64_t offset,
+                      size_t req_size
+);
 
+size_t sum_iovec_lengths( size_t iovec_count,
+                          const struct iovec *vector
+);
 
-size_t sum_iovec_lengths(size_t iovec_count, const struct iovec *vector);
-
-
-unsigned char read_full_block_into_ucache( pvfs_descriptor *pd, 
-                                           PVFS_size offset, 
-                                           struct ucache_req_s *req, 
-                                           int req_index, 
-                                           uint64_t * fent_size, 
-                                           size_t * req_size, 
-                                           int * req_blk_cnt 
+unsigned char read_full_block_into_ucache( pvfs_descriptor *pd,
+                                           PVFS_size offset,
+                                           struct ucache_req_s *req,
+                                           int req_index,
+                                           uint64_t *fent_size,
+                                           size_t *req_size,
+                                           int *req_blk_cnt
 );
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);

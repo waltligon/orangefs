@@ -1193,6 +1193,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(JNIEnv *env, jobject obj,
     char cpath[cpath_len + 1];
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
 
+    JNI_PRINT("\tpath = %s\n", cpath);
     if (((int) flags & O_CREAT) == O_CREAT)
     {
         JNI_PRINT("\tO_CREAT detected!\n");

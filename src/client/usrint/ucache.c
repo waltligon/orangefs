@@ -11,6 +11,7 @@
  * Experimental cache for user data. 
  *
  */
+#include <pvfs2-config.h>
 #include <gen-locks.h>
 #include <malloc.h>
 #include "usrint.h"

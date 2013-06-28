@@ -1131,7 +1131,7 @@ static int init_usrint_internal(void)
 #endif
 
     /* ucache initialization - assumes shared memory previously 
-     * aquired (using ucache daemon) 
+     * acquired (using ucache daemon) 
      */
     rc = ucache_initialize();
     if (rc < 0)
@@ -1140,10 +1140,12 @@ static int init_usrint_internal(void)
         /* Write a warning message in the ucache.log letting programmer know */
         ucache_enabled = 0;
 
-        /* Enable the writing of the error message and write the message to file. */
-        //gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);
-        //gossip_debug(GOSSIP_UCACHE_DEBUG, 
-        //    "WARNING: client caching configured enabled but couldn't inizialize\n");
+        /* Enable the writing of the error message and */
+        /* write the message to file. */
+        /* gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);*/
+        /* gossip_debug(GOSSIP_UCACHE_DEBUG, */
+        /*    "WARNING: client caching configured enabled but couldn't "
+         *    "inizialize\n");*/
 
     }
 #endif
@@ -2305,7 +2307,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->flags = flags;
 	    pd->s->dpath = NULL;
         glibc_ops.fstat(fd, &sbuf);
-	    pd->s->mode = sbuf.st_mode;
+        pd->s->mode = sbuf.st_mode;
         if (S_ISDIR(sbuf.st_mode))
         {
             /* need to get path for this fd from /proc */
