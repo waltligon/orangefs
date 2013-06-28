@@ -1418,12 +1418,13 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             errno = EINVAL;
             goto errorout;
         }
+    }
     
-    /* Sum the individal segment sizes */}
+    /* Sum the individal segment sizes */
     /* if this is a directory adjust token, the hard way */
     if (S_ISDIR(pd->s->mode))
     {
-        int dirent_no;
+        int dirent_no = 0;
         int dirent_total_count = 0;
         int dirent_read_count = 0;
         PVFS_credential *credential;
@@ -1437,7 +1438,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
 
         if ((offset == 0 || unit_size == 0) && whence == SEEK_SET)
         {
-            /* rewinding so set to start and go */
+            /* just asking for file position don't change position */
             pd->s->token = PVFS_READDIR_START;
             goto local_exit;
         }
@@ -1453,7 +1454,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
                 dirent_read_count = PVFS_REQ_LIMIT_DIRENT_COUNT;
             }
             errno = 0;
-            while (dirent_total_count << dirent_no)
+            while (dirent_total_count < dirent_no)
             {
                 if (dirent_read_count > dirent_no - dirent_total_count)
                 {
@@ -1661,10 +1662,10 @@ static int calc_copy_op_cnt(
     size_t size_left = req_size; /* Bytes left to convert to copy ops */
     size_t iovec_left = vector[0].iov_len; /* bytes left in this iovec */
     int vec_ndx = 0; /* Index into iovec array */
-    
+
     /* Compute the size of the first block to be transfered */
     size_t block_size_to_transfer = CACHE_BLOCK_SIZE - (offset % CACHE_BLOCK_SIZE);
-    
+
     int i;
     /* For every block identify source and destination locations in memory and
      * size of transfer between the ucache and memory buffer while maintaining:
@@ -1701,7 +1702,7 @@ static int calc_copy_op_cnt(
                 size_left -= iovec_left;
                 block_left = 0;
                 vec_ndx++; /* Done with this iovec and block */
-                
+
                 /* Only set the next iovec_left if one is available */
                 if(vec_ndx < iovec_count)
                 {
@@ -1713,7 +1714,7 @@ static int calc_copy_op_cnt(
              */
             copy_count++;
         }
-        
+
         /* Break when there are no more bytes to be read/written so that the
          * following if/else code block won't been run unless there is another
          * block of data to be transfered. */
@@ -1721,7 +1722,7 @@ static int calc_copy_op_cnt(
         {
             break;
         }
-        
+      
         if(size_left >= CACHE_BLOCK_SIZE)
         {
             /* Must transfer full block */
@@ -1772,12 +1773,12 @@ void calc_copy_ops(
         else
         {
             ucop[i].cache_pos = (char *)ureq[ureq_ndx].ublk_ptr +
-            (blk_tfer_size - blk_left);
+                    (blk_tfer_size - blk_left);
         }
         ucop[i].buff_pos = (char *)vector[vec_ndx].iov_base +
-        (vector[vec_ndx].iov_len - vec_left);
+                (vector[vec_ndx].iov_len - vec_left);
         ucop[i].blk_index = ureq[ureq_ndx].ublk_index;
-        
+
         if(vec_left > blk_left) /* Finish block */
         {
             if(size_left < blk_left)
@@ -1874,15 +1875,15 @@ int calc_req_blk_cnt(uint64_t offset, size_t req_size)
     }
     /* Count next blocks */
     size_t req_left = req_size - (CACHE_BLOCK_SIZE -
-    (offset % CACHE_BLOCK_SIZE));
+            (offset % CACHE_BLOCK_SIZE));
     int blk_cnt = req_left / CACHE_BLOCK_SIZE;
-    
+
     /* Account for last block if necessary */
     if((req_left - (blk_cnt * CACHE_BLOCK_SIZE)) != 0)
     {
         blk_cnt++;
     }
-    
+
     return (blk_cnt + 1); /* Add one to account for first block */
 }
 
@@ -1900,9 +1901,9 @@ size_t sum_iovec_lengths(size_t iovec_count, const struct iovec *vector)
 }
 
 /** Attempt to read a full CACHE_BLOCK_SIZE into the ucache block.
- * 
- * Also adjust req_size and req_blk_cnt used in
- * iocommon_readorwrite to account for the scenarios where less
+ *
+ * Also adjust req_size and req_blk_cnt used in 
+ * iocommon_readorwrite to account for the scenarios where less 
  * data was read from the file system than was requested.
  *
  * Also, fent_size is updated to inform the ucache of the largest file size
@@ -1925,32 +1926,29 @@ unsigned char read_full_block_into_ucache(
 {
     /* Return Boolean indicating we read a full ucache block */
     unsigned char rfb= 1;
-    
+
     /* The byte count read by iocommon_vreadorwrite */
     int vread_count = 0;
-    
+
     /* Attempt Read of Full Block From file system into user cache */
     struct iovec cache_vec = {req->ublk_ptr, CACHE_BLOCK_SIZE};
     lock_lock(get_lock(req->ublk_index));
     vread_count = iocommon_vreadorwrite(PVFS_IO_READ,
-                                        &pd->s->pvfs_ref,
-                                        req->ublk_tag,
-                                        1,
-                                        &cache_vec);
+            &pd->s->pvfs_ref, req->ublk_tag, 1, &cache_vec);
     
     /* After reading, attempt update of *fent_size */
     if((req->ublk_tag + vread_count) > *fent_size)
     {
         *fent_size = req->ublk_tag + vread_count;
     }
-    
+
     /* Were we able to completely read this block? */
     if(vread_count != CACHE_BLOCK_SIZE)
     {
         /* This is the index of the last valid cache block in the ureq array */
         /* so add 1 to the index to get the correct block count. */
         *req_blk_cnt = req_index + 1;
-        
+
         /* We need to recompute the req_size if less data was
          * read than was requested. */
         size_t new_req_size = 0;
@@ -2001,18 +1999,18 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             lock_unlock(ucache_lock);
         }
     }
-    
+
     if(!ucache_enabled || !pd->s->fent)
-   {
+    {
 #endif /* PVFS_UCACHE_ENABLE */
         /* Bypass the ucache */
         errno = 0;
         rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                   iovec_count, vector);
+                iovec_count, vector);
         return rc;
 #if PVFS_UCACHE_ENABLE
     }
-    
+
     /* How many bytes is the request? */
     /* Request is contiguous in file starting at offset. */
     /* Also, the iovec segments may be non-contiguous in memory */
@@ -2027,7 +2025,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     
 #if 0
     printf("iocommon_readorwrite: offset = %lu\treq_size = %lu\n",
-           offset, req_size);
+            offset, req_size);
     if(which == PVFS_IO_READ)
     {
         printf("attempting to read from ucache...\n");
@@ -2037,7 +2035,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         printf("attempting to write to ucache...\n");
     }
 #endif
-    
+
     /* Now, we know this isn't zero sized request */
     struct file_ent_s *fent = pd->s->fent;
     uint64_t new_file_size = fent->size;
@@ -2045,14 +2043,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     /* how many blocks the R/W request may encompass */
     int req_blk_cnt = calc_req_blk_cnt(offset, req_size);
     int transfered = 0; /* count of the bytes transfered */
-    
+
     /* If the ucache per file blk request threshold is exceeded, flush and
      * evict file, then peform nocache version of readorwrite. */
     if((req_blk_cnt + mtbl->num_blocks) > UCACHE_MAX_BLK_REQ)
     {
         /*
-         *       printf("flushing file from ucache, since it's grown too large and "
-         *           "continuing to service request without involving the ucache\n");
+         * printf("flushing file from ucache, since it's grown too large and "
+         *         "continuing to service request without involving the ucache\n");
          */
         /* Flush dirty blocks */
         rc = ucache_flush_file(pd->s->fent);
@@ -2060,33 +2058,33 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         {
             /* TODO: alert user there was an error when flushing the ucache */
         }
-        
+
         /* Bypass the ucache */
         rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                   iovec_count, vector);
+                iovec_count, vector);
         return rc;
     }
-    
+
     /* Now that we know the req_blk_cnt, allocate the required
      * space for tags, hits boolean, and ptr to block in ucache shared memory.
      */
     struct ucache_req_s ureq[req_blk_cnt];
     memset(ureq, 0, sizeof(struct ucache_req_s) * req_blk_cnt);
     ureq[0].ublk_tag = offset - (offset % CACHE_BLOCK_SIZE); /* first tag */
-    
+
     int i; /* index used for 'for loops' */
     /* Loop over positions storing tags (ment identifiers) */
     for(i = 1; i < req_blk_cnt; i++)
     {
         ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + CACHE_BLOCK_SIZE;
     }
-    
+
     /* Now that tags are set fill in array of lookup responses */
     for(i = 0; i < req_blk_cnt; i++)
     {
         struct ucache_req_s *this = &ureq[i];
         this->ublk_ptr = ucache_lookup(pd->s->fent, this->ublk_tag,
-                                       &(this->ublk_index));
+                &(this->ublk_index));
         if(this->ublk_ptr == (void *)NIL)
         {
             lock_lock(ucache_lock);
@@ -2106,7 +2104,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     {
         /* Loop over ureq structure and perform reads on misses */
         /* Keep track of how much has been read so we can know if the last
-         *          block successfully read is incomplete. */
+         * block successfully read is incomplete.
+		 */
         /* Re-read last block if partial */
         for(i = 0; i < req_blk_cnt; i++)
         {
@@ -2114,20 +2113,20 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             if(this->ublk_ptr == (void *) NILP) /* ucache miss on block*/
             {
                 this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
-                                               &(this->ublk_index));
-                
+                        &(this->ublk_index));
+
                 /* ucache_insert fail */
                 if(this->ublk_ptr == (void *) NILP)
                 {
                     /* Cannot cache the rest of this file */
                     /* either try some other sort of eviction or perform no cache */
-                    
+
                     /** Alert the user that we are no longer caching this file,
                      * since we couldn't obtain a free cache block.
                      */
                     /*TODO make this a gossip statement */
                     /* printf("Flushing file from cache. Couldn't obtain block.\n"); */
-                    
+
                     /* Flush dirty blocks */
                     rc = ucache_flush_file(pd->s->fent);
                     if(rc != 0)
@@ -2136,14 +2135,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          * the ucache
                          */
                         printf("warning: error detected when flushing file"
-                        " from ucache.\n");
+                                " from ucache.\n");
                     }
                     /* Bypass the ucache */
                     rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                               iovec_count, vector);
+                            iovec_count, vector);
                     return rc;
                 }
-                
+
                 /* Attempt read of full block from fs into ucache.
                  * Remember this locks, reads into, then unlocks the specifed
                  * block provided by this->ublk_ptr
@@ -2160,7 +2159,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             }
         }
     }
-    
+
     /* Read beginning and end blks into cache before writing if
      * either end of the request are unalligned.
      */
@@ -2168,7 +2167,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     {
         unsigned char first_block_hit = 0;
         unsigned char last_block_hit = 0;
-        
+
         /* Attempt insertion of blocks reported missed during lookup */
         for(i = 0; i < req_blk_cnt; i++)
         {
@@ -2177,20 +2176,20 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             {
                 /* Attempt to make room for missed blocks */
                 this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
-                                               &(this->ublk_index));
-                
+                        &(this->ublk_index));
+
                 /* ucache_insert fail */
                 if(this->ublk_ptr == (void *) NILP)
                 {
                     /* Cannot cache the rest of this file */
                     /* either try some other sort of eviction or perform no cache */
-                    
+
                     /** Alert the user that we are no longer caching this file,
                      * since we couldn't obtain a free cache block.
                      */
                     /*TODO make this a gossip statement */
                     printf("Flushing file from cache. Couldn't obtain block.\n");
-                    
+
                     /* Flush dirty blocks */
                     rc = ucache_flush_file(pd->s->fent);
                     if(rc != 0)
@@ -2199,11 +2198,11 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          * the ucache
                          */
                         printf("warning: error detected when flushing file"
-                        " from ucache.\n");
+                                " from ucache.\n");
                     }
                     /* Bypass the ucache */
                     rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                               iovec_count, vector);
+                            iovec_count, vector);
                     return rc;
                 }
             }
@@ -2219,11 +2218,11 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 }
             }
         }
-        
+
         /* We aren't concerned about ucache block on the interior of this
          * request, so we are only concerned about first and the last ucache
          * blocks of this request. */
-        
+
         /* Write would leave the first block incomplete if the offset starts
          * after the first block's tag or the request is less than a full sized
          * block */
@@ -2240,12 +2239,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 size_t copy_of_req_size = req_size;
                 int copy_of_req_blk_cnt = req_blk_cnt;
                 read_full_block_into_ucache(pd,
-                                            offset,
-                                            &ureq[0],
-                                            0,
-                                            &new_file_size,
-                                            &copy_of_req_size,
-                                            &copy_of_req_blk_cnt);
+                        offset, &ureq[0], 0, &new_file_size, &copy_of_req_size,
+                        &copy_of_req_blk_cnt);
             }
         }
         /* Last block if there is one and the write won't complete the block */
@@ -2260,25 +2255,22 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                  * like we intend on PVFS_IO_READ.
                  * Note that new_file_size may still be modified.
                  */
-                
+
                 size_t copy_of_req_size = req_size;
                 int copy_of_req_blk_cnt = req_blk_cnt;
                 read_full_block_into_ucache(pd,
-                                            offset,
-                                            &ureq[req_blk_cnt -1],
-                                            req_blk_cnt - 1,
-                                            &new_file_size,
-                                            &copy_of_req_size,
-                                            &copy_of_req_blk_cnt);
+                    offset, &ureq[req_blk_cnt -1], req_blk_cnt - 1,
+                        &new_file_size, &copy_of_req_size,
+                        &copy_of_req_blk_cnt);
             }
         }
-        
+
         /* After reading, attempt update of new_file_size */
         if(offset + req_size > new_file_size)
         {
             new_file_size = offset + req_size;
         }
-        
+
         /* Now that we're sure of what the new file size will be,
          * lock the global ucache lock and adjust the file entry's size
          * as perceived by the ucache, then unlock the ucache.
@@ -2287,14 +2279,13 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         fent->size = new_file_size;
         /* printf("fent->size = %lu KB\n", fent->size / 1024); */
         lock_unlock(ucache_lock);
-        
     }
-    
+
     /* At this point we know how many blocks the request will cover, the tags
      * (indexes into file) of the blocks, and the ptr to the corresponding
      * blk in memory, and the new file size max seen by ucache.
      */
-    
+
     /* If only one iovec then we can assume there will be req_blk_cnt
      * memcpy operations, otherwise we need to determine how many
      * memcpy operations will be required so we can create the ucache_copy_s
@@ -2308,13 +2299,13 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     else
     {
         copy_count = calc_copy_op_cnt(offset, req_size, req_blk_cnt,
-                                      iovec_count, vector);
+                iovec_count, vector);
     }
-    
+
     /* Create copy structure and fill with appropriate values */
     struct ucache_copy_s ucop[copy_count];
     calc_copy_ops(offset, req_size, &ureq[0], &ucop[0], copy_count, vector);
-    
+
     /* The ucache copy structure should now be filled and we can procede with
      * the necessary memcpy operations.
      */

@@ -500,6 +500,69 @@ CFLAGS += $(INTEL_CFLAGS)
 endif
 
 #################################################################
+# PVFS2 JNI Layer Flags and Variables
+# 
+# NOTES: 
+# Due  to depencies: 
+#    First, javac compiles the PVFS2 JNI Layer ".java" files.
+#    Second, javah generates headers included by the ".c" files of JNI layer.
+#    Since via src/client/jni/module.mk.in,
+#            ".c" files are added to ULIBSRC, which is used to build libofs,
+#            the PVFS2 JNI layer src is compiled.
+#
+#    Dependencies are specified later in the Makefile for the correct order
+#            of operations to take place.
+#
+#    JAVA_HOME is set via --with-jdk=<path_to_jdk> during the configure step 
+#            of PVFS2 build.
+#
+#    The JDK's include directory must be added to CFLAGS.
+#
+#   --enable-jni and --with-jdk=<path_to_jdk> must be specified during the 
+#            configure step to enable the jni layer to be built and 
+#            so JAVA_HOME can be set to the desired JDK.
+#
+#	--enable-shared must be specified during the configure step so that
+#            shared libraries will be built
+#
+ifdef BUILD_JNI
+JAVA_HOME := @JAVA_HOME@
+CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+JAVAC := $(JAVA_HOME)/bin/javac -J-Xmx256m
+JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
+JAR := $(JAVA_HOME)/bin/jar -J-Xmx256m
+JNI_DIR := $(srcdir)/src/client/jni
+ORGDIR := $(JNI_DIR)/org/orangefs/usrint
+ORGDOT := org.orangefs.usrint
+COMMONS_LOGGING_JAR := `ls $(JNI_DIR)/lib/commons-logging-api-*.jar`
+OFS_JNI_JAR := $(JNI_DIR)/lib/ofs_jni.jar
+JNIPOSIXHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
+JNISTDIOHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
+endif
+
+#################################################################
+# Hadoop Layer Variables
+#
+# NOTES:
+# This installation process will change after OrangeFS related Hadoop code is 
+#         commited to the Apache Hadoop Project.
+#
+#
+#
+#
+ifdef BUILD_HADOOP
+# Directory Containing PVFS2/Hadoop related .java files
+HADOOP_ORGDIR := $(JNI_DIR)/org/apache/hadoop/fs/ofs
+# Path to Hadoop Directory containing hadoop-core-*.jar
+HADOOP_PREFIX := @HADOOP_PREFIX@
+# Path to Hadoop's core Jar
+HADOOP_CORE_JAR := `ls $(HADOOP_PREFIX)/hadoop-core-*.jar`
+# Path to our temp PVFS jar file 
+#         (eventually will be a part of hadoop-core-*.jar)
+OFS_HADOOP_JAR := $(JNI_DIR)/lib/ofs_hadoop.jar
+endif
+
+#################################################################
 # Starter variables 
 
 # NOTES: These variables are used to categorize the various source
@@ -548,6 +611,16 @@ MISCSRC :=
 SMCGEN :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
+# JNIPOSIXJAVA represents posix.c related JAVA files
+JNIPOSIXJAVA :=
+# JNISTDIOJAVA represents stdio.c related JAVA files
+JNISTDIOJAVA :=
+# JNISTREAMSCHANNELSJAVA represents Java Streams and Channels built on top of
+#         JNIPOSIXJAVA and JNISTDIOJAVA
+JNISTREAMSCHANNELSJAVA :=
+# HADOOPJAVA represents OrangeFS/Hadoop related Java files
+# TODO: commit src to Apache Hadoop
+HADOOPJAVA :=
 
 ################################################################
 # Top level (default) targets
@@ -763,13 +836,23 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
+# JNIPOSIXCLS is a list of posix.c related JNI compiled classes
+JNIPOSIXCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNIPOSIXJAVA)))
+# JNISTDIOCLS is a list of stdio.c related JNI compiled classes
+JNISTDIOCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTDIOJAVA)))
+# JNISTREAMSCHANNELSCLS is a list of compiled classes representing Java
+#         Input and Ouput Streams and Channels.
+JNISTREAMSCHANNELSCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTREAMSCHANNELSJAVA)))
+# HADOOPCLS is a list of compiled classes representing PVFS2/Hadoop related classes.
+HADOOPCLS := $(patsubst %.java,%.class, $(filter %.java, $(HADOOPJAVA)))
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
+DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
@@ -969,6 +1052,54 @@ $(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
 	$(Q) "  LD 		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
 
+ifdef BUILD_HADOOP
+$(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
+	$(Q) "  JAVAC		$(HADOOPCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(HADOOP_CORE_JAR):$(OFS_JNI_JAR):$(JNI_DIR)" $(HADOOPJAVA)
+
+$(OFS_HADOOP_JAR): $(HADOOPCLS)
+	$(Q) "  JAR		$@"
+	$(E)$(JAR) cf $@ -C src/client/jni org/apache/hadoop/fs/ofs
+endif # BUILD_HADOOP
+
+ifdef BUILD_JNI
+$(JNISTREAMSCHANNELSCLS): $(JNISTREAMSCHANNELSJAVA)
+	$(Q) "  JAVAC		$(JNISTREAMSCHANNELSCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTREAMSCHANNELSJAVA)
+	
+$(OFS_JNI_JAR): $(JNIPOSIXCLS) $(JNISTDIOCLS) $(JNISTREAMSCHANNELSCLS)
+	$(Q) "  JAR		$@"
+	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/usrint
+
+$(JNIPOSIXCLS): $(JNIPOSIXJAVA)
+	$(Q) "  JAVAC		$(JNIPOSIXCLS)"
+	$(E)$(JAVAC) -cp $(JNI_DIR) $(JNIPOSIXJAVA)
+
+# Force the JNI posix .class files to be a dependency of the header file. 
+$(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
+	$(Q) "  JAVAH		$@"
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
+
+# Force the required javah generated header file to be a dependency of the 
+# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
+#         BUILD_HADOOP is defined.
+$(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
+
+$(JNISTDIOCLS): $(JNISTDIOJAVA)
+	$(Q) "  JAVAC		$(JNISTDIOCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTDIOJAVA)
+
+# Force the JNI stdio .class files to be a dependency of the header file.
+$(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
+	$(Q) "  JAVAH		$@"
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
+
+# Force the required javah generated header file to be a dependency of the 
+# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
+#         BUILD_HADOOP is defined.
+$(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
+endif # BUILD_JNI
+
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
@@ -1104,20 +1235,6 @@ docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
 publish: docs
 	$(srcdir)/maint/pvfs2-publish-pages `pwd`/doc
 
-ifdef BUILD_JNI
-jni:
-	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ make -e -C $(builddir)/src/client/jni jni
-jni_install:
-	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@  make -e -C $(builddir)/src/client/jni install
-endif
-
-ifdef BUILD_HADOOP
-hadoop:
-	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni hadoop
-hadoop_install:
-	prefix=@prefix@ JAVA_HOME=@JAVA_HOME@ HADOOP_DIR=@HADOOP_DIR@ make -e -C $(builddir)/src/client/jni install
-endif
-
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
 # don't get rid of generated files in dist releases
@@ -1153,9 +1270,16 @@ clean::
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf
 
+ifdef BUILD_HADOOP
+clean ::
+	$(E)rm -f $(HADOOPCLS) $(OFS_HADOOP_JAR)
+endif
+
 ifdef BUILD_JNI
 clean::
-	$(E)prefix=@prefix@ make -e -C $(builddir)/src/client/jni clean > /dev/null
+	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
+				$(ORGDIR)/*.class \
+    			$(OFS_JNI_JAR)
 endif
 
 ifndef DIST_RELEASE
@@ -1365,6 +1489,15 @@ endif
 	done
 
 	install -d $(sbindir)
+
+ifdef BUILD_HADOOP
+	install -m 755 $(OFS_HADOOP_JAR) $(libdir)
+endif
+
+ifdef BUILD_JNI
+	install -m 755 $(OFS_JNI_JAR) $(libdir)
+	install -m 755 $(COMMONS_LOGGING_JAR) $(libdir)
+endif
 
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)

@@ -1841,7 +1841,7 @@ int pvfs_descriptor_table_next(int start)
     int flags;
     int i;
     for (i = start; i < shmctrl->descriptor_table_size; i++)
-    {   
+    {
         if (!descriptor_table[i])
         {
             flags = glibc_ops.fcntl(i, F_GETFL);

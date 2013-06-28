@@ -56,18 +56,18 @@
 
 
 #ifndef DBG
-# define DBG 0 
+#define DBG 0 
 #endif
 
 #ifndef UCACHE_LOG_FILE
-# define UCACHE_LOG_FILE "/tmp/ucache.log"
+#define UCACHE_LOG_FILE "/tmp/ucache.log"
 #endif
 
 /* TODO: set this to an appropriate value. */
 #define GOSSIP_UCACHE_DEBUG 0x0010000000000000
 
 #ifndef LOCK_TYPE
-# define LOCK_TYPE 3 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
+#define LOCK_TYPE 3 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
 #endif
 
 #if (LOCK_TYPE == 0)

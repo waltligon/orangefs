@@ -18,6 +18,7 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
 
 /* Global Variables */
@@ -2073,6 +2074,7 @@ void print_dirty(struct mem_table_s *mtbl)
 } 
 
 /*  End of Internal Only Functions    */
+#endif /* PVFS_UCACHE_ENABLE */
 
 /*
  * Local variables:
