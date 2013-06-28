@@ -761,6 +761,8 @@ static void cleanup_usrint_internal(void)
         close_descriptor_area_list(qlist_entry(qh, pvfs_desc_list_t, link));
     }
     /* unlink our area - remains until all others have unmapped */
+    glibc_ops.munmap(shmctrl, shmsize);
+    glibc_ops.close(shmobj);
     glibc_ops.unlink(shmobjpath);
     /* clear globals */
     shmobj = -1;

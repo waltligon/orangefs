@@ -17,6 +17,7 @@
 #include "stdio-ops.h"
 #include "locks.h"
 
+#if 0
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
 # define USE_OFFSET 1
 #else
@@ -24,6 +25,44 @@
 #endif
 #define _IO_pos_BAD -1
 #define _IO_wide_NOT -1
+#endif
+
+/* PITA LIBC IO stuff that is defined to be hard to override */
+#ifdef getc
+#undef getc
+#endif
+
+#ifdef _IO_getc
+#undef _IO_getc
+#endif
+
+#ifdef putc
+#undef putc
+#endif
+
+#ifdef _IO_putc
+#undef _IO_putc
+#endif
+
+#ifdef _IO_putc_unlocked
+#undef _IO_putc_unlocked
+#endif
+int _IO_putc_unlocked(int c, _IO_FILE *stream);
+
+#ifdef _IO_getc_unlocked
+#undef _IO_getc_unlocked
+#endif
+int _IO_getc_unlocked(_IO_FILE *stream);
+
+#ifdef _IO_feof_unlocked
+#undef _IO_feof_unlocked
+#endif
+int _IO_feof_unlocked (_IO_FILE *stream);
+
+#ifdef _IO_ferror_unlocked
+#undef _IO_ferror_unlocked
+#endif
+int _IO_ferror_unlocked (_IO_FILE *stream);
 
 /* fdopendir not present until glibc2.5 */
 #if __GLIBC_PREREQ (2,5)
@@ -41,15 +80,17 @@ static int init_flag = 0;
 struct stdio_ops_s stdio_ops;
 static FILE open_files = {._chain = NULL};
 
-/* this is defined in openfile-util.g because it is used openfile-util.c
+/* this is defined in openfile-util.h because it is used openfile-util.c
  * _P_IO_MAGIC     0xF0BD0000
  */
 
+#if 0
 #define SETMAGIC(s,m)   do{(s)->_flags = (m) & _IO_MAGIC_MASK;}while(0)
 #define ISMAGICSET(s,m) (((s)->_flags & _IO_MAGIC_MASK) == (m))
 #define SETFLAG(s,f)    do{(s)->_flags |= ((f) & ~_IO_MAGIC_MASK);}while(0)
 #define CLEARFLAG(s,f)  do{(s)->_flags &= ~((f) & ~_IO_MAGIC_MASK);}while(0)
 #define ISFLAGSET(s,f)  (((s)->_flags & (f)) == (f))
+#endif
 
 /* STDIO implementation - this gives users something to link to
  * that will call back to the PVFS lib - also lets us optimize
@@ -659,6 +700,118 @@ FILE *fmemopen(void *buf, size_t size, const char *mode);
 FILE *open_memstream(char **ptr, size_t *sizeloc);
 #endif
 
+/** pvfs_set_to_put
+ * Helper function cchanges a stream from get to put if needed.
+ * Assumes locks, and stream argument validity is handled by caller.
+ */
+void pvfs_set_to_put(FILE *stream)
+{
+    /* Check to see if switching from read to write */
+    if (!ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
+    {
+        /* reset read pointer */
+        stream->_IO_read_ptr = stream->_IO_read_end;
+        /* set flag */
+        SETFLAG(stream, _IO_CURRENTLY_PUTTING);
+        /* indicate read buffer empty */
+        stream->_IO_read_end = stream->_IO_read_base;
+        stream->_IO_read_ptr = stream->_IO_read_end;
+        /* indicate write buffer empty */
+        stream->_IO_write_end = stream->_IO_buf_end;
+        stream->_IO_write_ptr = stream->_IO_write_base;
+    }
+}
+
+/** pvfs_write_buf
+ * Helper function to write out the contents of the stream buffer.
+ * Assumes locks, and stream argument validity is handled by caller.
+ */
+int pvfs_write_buf(FILE *stream)
+{
+    int rc = 0;
+    /* buffer is full - write the current buffer */
+#if PVFS_STDIO_DEBUG
+    fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
+            (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+            (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
+    rc = write(stream->_fileno,
+               stream->_IO_write_base,
+               stream->_IO_write_ptr - stream->_IO_write_base);
+    if (rc == -1)
+    {
+        SETFLAG(stream, _IO_ERR_SEEN);
+        return rc;
+    }
+    else if (rc < stream->_IO_write_ptr - stream->_IO_write_base)
+    {
+        /* short write but no error ??? */
+        SETFLAG(stream, _IO_ERR_SEEN);
+    }
+#if USE_OFFSET
+    if (stream->_offset != _IO_pos_BAD)
+    {
+        stream->_offset += rc;
+    }
+    else
+    {
+        stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+    }
+#endif
+    /* reset buffer */
+    stream->_IO_write_ptr = stream->_IO_write_base;
+    return rc;
+}
+
+/** pvfs_set_t_get
+ * Helper function to switch stream to get if needed
+ * Assumes locks, and stream argument validity is handled by caller.
+ */
+int pvfs_set_to_get(FILE *stream)
+{
+    int rc = 0;
+    rc = pvfs_write_buf(stream);
+    /* clear flag */
+    CLEARFLAG(stream, _IO_CURRENTLY_PUTTING);
+    /* indicate read buffer empty */
+    stream->_IO_read_end = stream->_IO_read_base;
+    stream->_IO_read_ptr = stream->_IO_read_end;
+    return rc;
+}
+
+int pvfs_read_buf(FILE *stream)
+{
+    int bytes_read;
+    /* buffer empty so read new buffer */
+    bytes_read = read(stream->_fileno,
+                      stream->_IO_read_base,
+                      stream->_IO_buf_end - stream->_IO_buf_base);
+    if (bytes_read == -1)
+    {
+        SETFLAG(stream, _IO_ERR_SEEN);
+        return -1;
+    }
+    else if (bytes_read == 0)
+    {
+        SETFLAG(stream, _IO_EOF_SEEN);
+    }
+#if USE_OFFSET
+    if (stream->_offset != _IO_pos_BAD)
+    {
+         stream->_offset += bytes_read;
+    }
+    else
+    {
+         stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+    }
+#endif
+    /* indicate end of read area */
+    stream->_IO_read_end = stream->_IO_read_base + bytes_read;
+    /* reset read pointer */
+    stream->_IO_read_ptr = stream->_IO_read_base;
+    return bytes_read;
+}
+
 /** Implements buffered write using Linux pointer model
  * 
  *  Two sets of pointers, one for reading one for writing
@@ -737,6 +890,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     if (ISFLAGSET(stream, _IO_UNBUFFERED))
     {
+        /* unbuffered, so write directly */
         rc = write(stream->_fileno, ptr, nmemb * size);
         if (rc >= 0)
         {
@@ -781,21 +935,10 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
 #endif
 
-    /* Check to see if switching from read to write */
-    if (!ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
-    {
-        /* reset read pointer */
-        stream->_IO_read_ptr = stream->_IO_read_end;
-        /* set flag */
-        SETFLAG(stream, _IO_CURRENTLY_PUTTING);
-        /* indicate read buffer empty */
-        stream->_IO_read_end = stream->_IO_read_base;
-        stream->_IO_read_ptr = stream->_IO_read_end;
-        /* indicate write buffer empty */
-        stream->_IO_write_end = stream->_IO_buf_end;
-        stream->_IO_write_ptr = stream->_IO_write_base;
-    }
+    /* set to put mode */
+    pvfs_set_to_put(stream);
 
+    /* caclulate bytes in req, bytes in buf, bytes not in buf */
     rsz = size * nmemb;
     rsz_buf = PVFS_util_min(rsz, stream->_IO_write_end - stream->_IO_write_ptr);
     rsz_extra = rsz - rsz_buf;
@@ -810,31 +953,12 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (rsz_extra)
     {
         /* buffer is full - write the current buffer */
-#if PVFS_STDIO_DEBUG
-        fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
-                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
-                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
-#endif
-        rc = write(stream->_fileno, stream->_IO_write_base,
-                        stream->_IO_write_ptr - stream->_IO_write_base);
+        rc = pvfs_write_buf(stream);
         if (rc == -1)
         {
-            SETFLAG(stream, _IO_ERR_SEEN);
             return 0;
         }
-#if USE_OFFSET
-        if (stream->_offset != _IO_pos_BAD)
-        {
-            stream->_offset += rc;
-        }
-        else
-        {
-            stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
-        }
-#endif
-        /* TODO: check for a short write */
-        /* reset buffer */
-        stream->_IO_write_ptr = stream->_IO_write_base;
+
         /* if there more data left in request than fits in a buffer */
         if(rsz_extra > stream->_IO_buf_end - stream->_IO_buf_base)
         {
@@ -931,41 +1055,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
         /* write buffer back */
-#if PVFS_STDIO_DEBUG
-        fprintf(stderr,"fread writing %d bytes to offset %d\n",
-                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
-                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
-#endif
-        rc = write(stream->_fileno,
-                   stream->_IO_write_base,
-                   stream->_IO_write_ptr - stream->_IO_write_base); 
+        rc = pvfs_set_to_get(stream);
         if (rc == -1)
         {
-            SETFLAG(stream, _IO_ERR_SEEN);
             return 0;
         }
-        else if (rc < stream->_IO_write_ptr - stream->_IO_write_base)
-        {
-            /* short write but no error ??? */
-            SETFLAG(stream, _IO_ERR_SEEN);
-        }
-#if USE_OFFSET
-        if (stream->_offset != _IO_pos_BAD)
-        {
-             stream->_offset += rc;
-        }
-        else
-        {
-             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
-        }
-#endif
-        /* reset write pointer */
-        stream->_IO_write_ptr = stream->_IO_write_base;
-        /* clear flag */
-        CLEARFLAG(stream, _IO_CURRENTLY_PUTTING);
-        /* indicate read buffer empty */
-        stream->_IO_read_end = stream->_IO_read_base;
-        stream->_IO_read_ptr = stream->_IO_read_end;
     }
 
     /* see if anything is in read buffer */
@@ -973,31 +1067,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         stream->_IO_read_ptr == stream->_IO_read_end)
     {
         /* buffer empty so read new buffer */
-        bytes_read = read(stream->_fileno, stream->_IO_read_base,
-                stream->_IO_buf_end - stream->_IO_buf_base);
-        if (bytes_read == -1)
-        {
-            SETFLAG(stream, _IO_ERR_SEEN);
-            return 0;
-        }
-        else if (bytes_read == 0)
-        {
-            SETFLAG(stream, _IO_EOF_SEEN);
-        }
-#if USE_OFFSET
-        if (stream->_offset != _IO_pos_BAD)
-        {
-             stream->_offset += bytes_read;
-        }
-        else
-        {
-             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
-        }
-#endif
-        /* indicate end of read area */
-        stream->_IO_read_end = stream->_IO_read_base + bytes_read;
-        /* reset read pointer */
-        stream->_IO_read_ptr = stream->_IO_read_base;
+        bytes_read = pvfs_read_buf(stream);
     }
 
     /* 
@@ -1052,30 +1122,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 if (bytes_read == rsz_extra)
                 {
                     /* then read next buffer */
-                    bytes_read = read(stream->_fileno,
-                                 stream->_IO_buf_base,
-                                 stream->_IO_buf_end - stream->_IO_buf_base);
-                    if (bytes_read == -1)
-                    {
-                        SETFLAG(stream, _IO_ERR_SEEN);
-                        return 0;
-                    }
-                    else if (bytes_read == 0)
-                    {
-                        SETFLAG(stream, _IO_EOF_SEEN);
-                    }
-#if USE_OFFSET
-                    if (stream->_offset != _IO_pos_BAD)
-                    {
-                        stream->_offset += bytes_read;
-                    }
-                    else
-                    {
-                        stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
-                    }
-#endif
-                    stream->_IO_read_end = stream->_IO_read_base + bytes_read;
-                    stream->_IO_read_ptr = stream->_IO_read_base;
+                    bytes_read = pvfs_read_buf(stream);
                     return rsz / size; /* num items read */
                 }
                 /* MIGHT have read to EOF - check for pipe, tty */
@@ -1083,30 +1130,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 return (rsz_buf + bytes_read) / size; /* num items read */
             }
             /* rest of request fits in a buffer - read next buffer */
-            bytes_read = read(stream->_fileno,
-                              stream->_IO_buf_base,
-                              stream->_IO_buf_end - stream->_IO_buf_base);
-            if (bytes_read == -1)
-            {
-                SETFLAG(stream, _IO_ERR_SEEN);
-                return 0;
-            }
-            else if (bytes_read == 0)
-            {
-                SETFLAG(stream, _IO_EOF_SEEN);
-            }
-#if USE_OFFSET
-            if (stream->_offset != _IO_pos_BAD)
-            {
-                 stream->_offset += bytes_read;
-            }
-            else
-            {
-                 stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
-            }
-#endif
-            stream->_IO_read_end = stream->_IO_read_base + bytes_read;
-            stream->_IO_read_ptr = stream->_IO_read_base;
+            bytes_read = pvfs_read_buf(stream);
             /* transfer remainder */
             rsz_extra = PVFS_util_min(rsz_extra,
                     stream->_IO_read_end - stream->_IO_read_ptr);
@@ -1188,20 +1212,10 @@ int fclose(FILE *stream)
     {
         if (stream->_IO_write_ptr > stream->_IO_write_base)
         {
-#if PVFS_STDIO_DEBUG
-            fprintf(stderr,"fclose writing %d bytes to offset %d\n",
-                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
-                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
-#endif
-            rc = write(stream->_fileno, stream->_IO_write_base,
-                        stream->_IO_write_ptr - stream->_IO_write_base);
-            if (rc == -1)   
-            {
-                SETFLAG(stream, _IO_ERR_SEEN);
-                return -1;
-            }
+            pvfs_write_buf(stream);
         }
     }
+
     if (!ISFLAGSET(stream, _IO_DELETE_DONT_CLOSE))
     {
         rc = close(stream->_fileno);
@@ -1378,22 +1392,7 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             stream->_IO_write_ptr > stream->_IO_write_base)
         {
             /* write buffer back */
-#if PVFS_STDIO_DEBUG
-            fprintf(stderr,"fseek writing %d bytes to offset %d\n",
-                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
-                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
-#endif
-            rc = write(stream->_fileno,
-                       stream->_IO_write_base,
-                       stream->_IO_write_ptr - stream->_IO_write_base); 
-            if (rc < 0)
-            {
-                SETFLAG(stream, _IO_ERR_SEEN);
-                rc = -1;
-                goto exitout;
-            }
-            /* reset write pointer */
-            stream->_IO_write_ptr = stream->_IO_write_base;
+            rc = pvfs_write_buf(stream);
         }
         else
         {
@@ -1732,9 +1731,19 @@ int putc(int c, FILE *stream)
     return fputc(c, stream);
 }
 
+int _IO_putc(int c, _IO_FILE *stream)
+{
+    return fputc(c, (FILE *)stream);
+}
+
 int putc_unlocked(int c, FILE *stream)
 {
     return fputc_unlocked(c, stream);
+}
+
+int _IO_putc_unlocked(int c, _IO_FILE *stream)
+{
+    return fputc_unlocked(c, (FILE *)stream);
 }
 
 /**
@@ -1938,9 +1947,19 @@ int getc(FILE *stream)
     return fgetc(stream);
 }
 
+int _IO_getc(_IO_FILE *stream)
+{
+    return fgetc((FILE *)stream);
+}
+
 int getc_unlocked(FILE *stream)
 {
     return fgetc_unlocked(stream);
+}
+
+int _IO_getc_unlocked(_IO_FILE *stream)
+{
+    return fgetc_unlocked((FILE *)stream);
 }
 
 /**
@@ -2351,6 +2370,11 @@ int feof (FILE *stream)
     return rc;
 }
 
+int _IO_feof_unlocked (_IO_FILE *stream)
+{
+    return feof_unlocked((FILE *)stream);
+}
+
 int feof_unlocked (FILE *stream)
 {
     int rc = 0;
@@ -2412,6 +2436,11 @@ int ferror (FILE *stream)
     unlock_stream(stream);
     gossip_debug(GOSSIP_USRINT_DEBUG, "ferror returns %d\n", rc);
     return rc;
+}
+
+int _IO_ferror_unlocked (_IO_FILE *stream)
+{
+    return ferror_unlocked((FILE *)stream);
 }
 
 int ferror_unlocked (FILE *stream)
@@ -2853,16 +2882,13 @@ void rewinddir (DIR *dir)
         return;
     }
     filepos = lseek64(dir->fileno, 0, SEEK_CUR);
-    if ((filepos - (dir->buf_act - dir->buf_base)) == 0)
+    if ((filepos - (dir->buf_act - dir->buf_base)) != 0)
     {
-        dir->buf_ptr = dir->buf_base;
-    }
-    else
-    {
-        dir->buf_act = dir->buf_base;
-        dir->buf_ptr = dir->buf_base;
         lseek64(dir->fileno, 0, SEEK_SET);
     }
+    /* force a re-read of the buffer in case things have changed */
+    dir->buf_act = dir->buf_base;
+    dir->buf_ptr = dir->buf_base;
 }
 
 /**

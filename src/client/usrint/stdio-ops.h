@@ -114,6 +114,28 @@ struct stdio_ops_s
     void (*funlockfile)(FILE *stream);
 };
 
+/* various declarations and defines for pvfs stdio layer */
+
+#if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
+# define USE_OFFSET 1
+#else
+# define USE_OFFSET 0
+#endif
+
+#define _IO_pos_BAD -1
+#define _IO_wide_NOT -1
+
+#define SETMAGIC(s,m)   do{(s)->_flags = (m) & _IO_MAGIC_MASK;}while(0)
+#define ISMAGICSET(s,m) (((s)->_flags & _IO_MAGIC_MASK) == (m))
+#define SETFLAG(s,f)    do{(s)->_flags |= ((f) & ~_IO_MAGIC_MASK);}while(0)
+#define CLEARFLAG(s,f)  do{(s)->_flags &= ~((f) & ~_IO_MAGIC_MASK);}while(0)
+#define ISFLAGSET(s,f)  (((s)->_flags & (f)) == (f))
+
+void pvfs_set_to_put(FILE *stream);
+int pvfs_write_buf(FILE *stream);
+int pvfs_set_to_get(FILE *stream);
+int pvfs_read_buf(FILE *stream);
+
 #endif
 
 /*

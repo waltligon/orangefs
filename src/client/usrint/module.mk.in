@@ -8,11 +8,11 @@ SRC := \
 	$(DIR)/iocommon.c \
 	$(DIR)/openfile-util.c \
 	$(DIR)/ucache.c \
-        $(DIR)/mmap.c \
+	$(DIR)/mmap.c \
 	$(DIR)/aiocommon.c \
 	$(DIR)/aio-pvfs.c \
-        $(DIR)/pvfs-path.c \
-        $(DIR)/pvfs-qualify-path.c
+	$(DIR)/pvfs-path.c \
+	$(DIR)/pvfs-qualify-path.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed
@@ -22,6 +22,7 @@ USRC := \
 	$(DIR)/posix.c \
 	$(DIR)/stdio.c \
 	$(DIR)/selinux.c \
+	$(DIR)/overunder.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
 	$(DIR)/error.c
