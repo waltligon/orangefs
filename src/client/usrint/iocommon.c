@@ -532,7 +532,7 @@ int iocommon_create_file(const char *filename,
             rc = iocommon_parse_serverlist(value, &layout->server_list,
                                            parent_ref.fs_id);
             if (rc < 0)
-            {   
+            {
                 return rc;
             }
         }
@@ -546,7 +546,7 @@ int iocommon_create_file(const char *filename,
         }
         /* look for hints handled on the server */
         if (PVFS_hint_check_transfer(&file_creation_param))
-        {   
+        {
             hints = file_creation_param;
         }
     }
@@ -1934,7 +1934,10 @@ unsigned char read_full_block_into_ucache(
     struct iovec cache_vec = {req->ublk_ptr, CACHE_BLOCK_SIZE};
     lock_lock(get_lock(req->ublk_index));
     vread_count = iocommon_vreadorwrite(PVFS_IO_READ,
-            &pd->s->pvfs_ref, req->ublk_tag, 1, &cache_vec);
+                                        &pd->s->pvfs_ref,
+                                        req->ublk_tag,
+                                        1,
+                                        &cache_vec);
     
     /* After reading, attempt update of *fent_size */
     if((req->ublk_tag + vread_count) > *fent_size)
@@ -2005,8 +2008,11 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 #endif /* PVFS_UCACHE_ENABLE */
         /* Bypass the ucache */
         errno = 0;
-        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                iovec_count, vector);
+        rc = iocommon_vreadorwrite(which,
+                                   &pd->s->pvfs_ref,
+                                   offset,
+                                   iovec_count,
+                                   vector);
         return rc;
 #if PVFS_UCACHE_ENABLE
     }
@@ -2025,7 +2031,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     
 #if 0
     printf("iocommon_readorwrite: offset = %lu\treq_size = %lu\n",
-            offset, req_size);
+           offset,
+           req_size);
     if(which == PVFS_IO_READ)
     {
         printf("attempting to read from ucache...\n");
@@ -2060,8 +2067,11 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         }
 
         /* Bypass the ucache */
-        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                iovec_count, vector);
+        rc = iocommon_vreadorwrite(which,
+                                   &pd->s->pvfs_ref,
+                                   offset,
+                                   iovec_count,
+                                   vector);
         return rc;
     }
 
@@ -2083,8 +2093,9 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     for(i = 0; i < req_blk_cnt; i++)
     {
         struct ucache_req_s *this = &ureq[i];
-        this->ublk_ptr = ucache_lookup(pd->s->fent, this->ublk_tag,
-                &(this->ublk_index));
+        this->ublk_ptr = ucache_lookup(pd->s->fent,
+                                       this->ublk_tag,
+                                       &(this->ublk_index));
         if(this->ublk_ptr == (void *)NIL)
         {
             lock_lock(ucache_lock);
@@ -2112,9 +2123,9 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             struct ucache_req_s *this = &ureq[i];
             if(this->ublk_ptr == (void *) NILP) /* ucache miss on block*/
             {
-                this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
-                        &(this->ublk_index));
-
+                this->ublk_ptr = ucache_insert(pd->s->fent,
+                                               this->ublk_tag,
+                                               &(this->ublk_index));
                 /* ucache_insert fail */
                 if(this->ublk_ptr == (void *) NILP)
                 {
@@ -2135,11 +2146,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          * the ucache
                          */
                         printf("warning: error detected when flushing file"
-                                " from ucache.\n");
+                               " from ucache.\n");
                     }
                     /* Bypass the ucache */
-                    rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                            iovec_count, vector);
+                    rc = iocommon_vreadorwrite(which,
+                                               &pd->s->pvfs_ref,
+                                               offset,
+                                               iovec_count,
+                                               vector);
                     return rc;
                 }
 
@@ -2175,9 +2189,9 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             if(this->ublk_ptr == (void *) NILP) /* ucache miss on block*/
             {
                 /* Attempt to make room for missed blocks */
-                this->ublk_ptr = ucache_insert(pd->s->fent, this->ublk_tag,
-                        &(this->ublk_index));
-
+                this->ublk_ptr = ucache_insert(pd->s->fent,
+                                               this->ublk_tag,
+                                               &(this->ublk_index));
                 /* ucache_insert fail */
                 if(this->ublk_ptr == (void *) NILP)
                 {
@@ -2198,11 +2212,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          * the ucache
                          */
                         printf("warning: error detected when flushing file"
-                                " from ucache.\n");
+                               " from ucache.\n");
                     }
                     /* Bypass the ucache */
-                    rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                            iovec_count, vector);
+                    rc = iocommon_vreadorwrite(which,
+                                               &pd->s->pvfs_ref,
+                                               offset,
+                                               iovec_count,
+                                               vector);
                     return rc;
                 }
             }
@@ -2239,8 +2256,12 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 size_t copy_of_req_size = req_size;
                 int copy_of_req_blk_cnt = req_blk_cnt;
                 read_full_block_into_ucache(pd,
-                        offset, &ureq[0], 0, &new_file_size, &copy_of_req_size,
-                        &copy_of_req_blk_cnt);
+                                            offset,
+                                            &ureq[0],
+                                            0,
+                                            &new_file_size,
+                                            &copy_of_req_size,
+                                            &copy_of_req_blk_cnt);
             }
         }
         /* Last block if there is one and the write won't complete the block */
@@ -2255,13 +2276,15 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                  * like we intend on PVFS_IO_READ.
                  * Note that new_file_size may still be modified.
                  */
-
                 size_t copy_of_req_size = req_size;
                 int copy_of_req_blk_cnt = req_blk_cnt;
                 read_full_block_into_ucache(pd,
-                    offset, &ureq[req_blk_cnt -1], req_blk_cnt - 1,
-                        &new_file_size, &copy_of_req_size,
-                        &copy_of_req_blk_cnt);
+                                            offset,
+                                            &ureq[req_blk_cnt -1],
+                                            req_blk_cnt - 1,
+                                            &new_file_size,
+                                            &copy_of_req_size,
+                                            &copy_of_req_blk_cnt);
             }
         }
 
@@ -2298,8 +2321,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     }
     else
     {
-        copy_count = calc_copy_op_cnt(offset, req_size, req_blk_cnt,
-                iovec_count, vector);
+        copy_count = calc_copy_op_cnt(offset,
+                                      req_size,
+                                      req_blk_cnt,
+                                      iovec_count,vector);
     }
 
     /* Create copy structure and fill with appropriate values */
@@ -2480,7 +2505,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
         errno = EBADF;
         return -1;
     }
-    //Ensure descriptor is used for the correct type of access
+    /* Ensure descriptor is used for the correct type of access */
     if ((which==PVFS_IO_READ && (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
         (which==PVFS_IO_WRITE && (O_RDONLY == (pd->s->flags & O_ACCMODE))))
     {
@@ -2488,7 +2513,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
         return PVFS_FD_FAILURE;
     }
 
-    //Create the memory request of a contiguous region: 'mem_req' x count
+    /* Create the memory request of a contiguous region: 'mem_req' x count */
     rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
 
     rc = iocommon_cred(&credential);
@@ -2511,7 +2536,8 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                       NULL);
     IOCOMMON_CHECK_ERR(rc);
 
-    assert(*ret_op_id!=-1);/*TODO: handle this*/
+    /* TODO: handle this */
+    assert(*ret_op_id!=-1);
 
     PVFS_Request_size(contig_memory_req, &req_size);
     gen_mutex_lock(&pd->s->lock);
