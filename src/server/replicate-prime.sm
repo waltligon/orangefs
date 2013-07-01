@@ -598,7 +598,8 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
     }
 
     /* set state to RUNNING for the local flow */
-    s_op->u.io.replicate_d[s_op->u.io.replicate_d_local_flow_index].endpt_status.state = RUNNING;
+    s_op->u.io.replicate_d[s_op->u.io.replicate_d_local_flow_index].endpt_status.state    = RUNNING;
+    s_op->u.io.replicate_d[s_op->u.io.replicate_d_local_flow_index].endpt_status.handle   = io->handle;
 
     /* initialize msgpairarray parameters */
     PINT_serv_init_msgarray_params( s_op, s_op->target_fs_id );
@@ -637,6 +638,9 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
                                          ,msg_p->req
                                          ,io->replication_handles[i]);
         gossip_lerr("%s(%d):msg_p->req.u.io.flow_type(%d).\n",__func__,i,(int)msg_p->req.u.io.flow_type);
+
+        /* save handle for each replica for later use */
+        s_op->u.io.replicate_d[i].endpt_status.handle   = msg_p->handle;
 
     }/*end for*/ 
 

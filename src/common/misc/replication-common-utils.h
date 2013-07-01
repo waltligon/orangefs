@@ -73,6 +73,7 @@ struct replication_endpoint_status_s
    replication_endpoint_state state;
    PVFS_error error_code;
    PVFS_size writes_completed_bytes;
+   PVFS_handle handle;
 };
 
 typedef struct replication_endpoint_status_s replication_endpoint_status_t;

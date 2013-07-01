@@ -1631,6 +1631,7 @@ struct PVFS_servresp_repl_write_completion
         encode_PVFS_error(pptr,&((x)->endpt_status[i].error_code));            \
         encode_skip4(pptr,);                                                   \
         encode_PVFS_size(pptr,&((x)->endpt_status[i].writes_completed_bytes)); \
+        encode_PVFS_handle(pptr,&((x)->endpt_status[i].handle));               \
     } \
 } while (0)
 
@@ -1646,6 +1647,7 @@ struct PVFS_servresp_repl_write_completion
         decode_PVFS_error(pptr, &((x)->endpt_status[i].error_code));           \
         decode_skip4(pptr,);                                                   \
         decode_PVFS_size(pptr, &((x)->endpt_status[i].writes_completed_bytes));\
+        decode_PVFS_handle(pptr, &((x)->endpt_status[i].handle));              \
     } \
 } while (0)
 

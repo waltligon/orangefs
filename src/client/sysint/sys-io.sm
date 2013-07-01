@@ -1653,6 +1653,8 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                 PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
                 assert(cur_ctx);
 
+
+                gossip_lerr("%s:sm_p->u.io.total_size(%d).\n",__func__,(int)sm_p->u.io.total_size);
                 ret = io_check_context_status(cur_ctx,
                                               sm_p->u.io.io_type,
                                               &sm_p->u.io.total_size);
@@ -2584,14 +2586,15 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                    int i;
                    for (i=0; i<resp->u.repl_write_completion.endpt_status_count; i++)
                    {
-                       gossip_err("%s:error_code(%d) \tbytes written(%d).\n"
+                       gossip_err("%s:error_code(%d) \tbytes written(%d) \thandle(%llu).\n"
                           ,__func__
                           ,(int)resp->u.repl_write_completion.endpt_status[i].error_code
-                          ,(int)resp->u.repl_write_completion.endpt_status[i].writes_completed_bytes);
+                          ,(int)resp->u.repl_write_completion.endpt_status[i].writes_completed_bytes
+                          ,llu(resp->u.repl_write_completion.endpt_status[i].handle));
                    }
                    i = resp->u.repl_write_completion.endpt_status_count-1; 
                    *total_size += resp->u.repl_write_completion.endpt_status[i].writes_completed_bytes;
-                   gossip_lerr("%s:total_size(%d).\n",__func__,*(int *)total_size);
+                   gossip_lerr("%s:total_size(%d).\n",__func__,(int)(*total_size));
                 }
 
 
