@@ -2847,25 +2847,15 @@ struct dirent64 *readdir64 (DIR *dir)
  */
 void rewinddir (DIR *dir)
 {
-    off64_t filepos;
- 
     gossip_debug(GOSSIP_USRINT_DEBUG, "rewinddir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
     }
-    filepos = lseek64(dir->fileno, 0, SEEK_CUR);
-    if ((filepos - (dir->buf_act - dir->buf_base)) == 0)
-    {
-        dir->buf_ptr = dir->buf_base;
-    }
-    else
-    {
-        dir->buf_act = dir->buf_base;
-        dir->buf_ptr = dir->buf_base;
-        lseek64(dir->fileno, 0, SEEK_SET);
-    }
+    lseek64(dir->fileno, 0, SEEK_SET);
+    dir->buf_act = dir->buf_base;
+    dir->buf_ptr = dir->buf_base;
 }
 
 /**
