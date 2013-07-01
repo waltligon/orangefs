@@ -15,6 +15,7 @@
 #include "usrint.h"
 #include <sys/syscall.h>
 #include <paths.h>
+#include <signal.h>
 #ifndef SYS_readdir
 #define SYS_readdir 89
 #endif
@@ -203,6 +204,11 @@ static void cleanup_usrint_internal(void)
                     GCC_DESTRUCTOR(CLEANUP_PRIORITY_PVFSLIB);
 /* static int pvfs_sys_init_elf(void) GCC_UNUSED; */
 static int pvfs_lib_init_flag = 0;      /* initialization done */
+
+/* table of signals handlers replace with ours */
+static void signal_handler(int sig);
+static void init_signal_handlers(void);
+static void (*default_handler[32])(int);
 
 posix_ops glibc_ops;
 
@@ -771,6 +777,51 @@ static void cleanup_usrint_internal(void)
     memset(shmobjpath, 0, sizeof(shmobjpath));
 }
 
+/** generic usrint signal handler
+ */
+static void signal_handler(int sig)
+{
+    cleanup_usrint_internal();
+    (*default_handler[sig])(sig);
+}
+
+/** sets up signal handlers to run cleanup on abort
+ *  abort (via various sources) does not run destructors
+ *  and thus we need to try to catch those and run it ourselves
+ *  The application might replace these handlers - they SHOULD call our
+ *  handler after theirs (unless they recover from the abort) but they
+ *  might not.  Not much we can do if they don't.  This should run
+ *  before any other handlers are set up.
+ */
+static void init_signal_handlers(void)
+{
+    default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
+    default_handler[SIGINT] = signal(SIGINT, signal_handler);
+    default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);
+    default_handler[SIGILL] = signal(SIGILL, signal_handler);
+    default_handler[SIGABRT] = signal(SIGABRT, signal_handler);
+    default_handler[SIGFPE] = signal(SIGFPE, signal_handler);
+    default_handler[SIGSEGV] = signal(SIGSEGV, signal_handler);
+    default_handler[SIGPIPE] = signal(SIGPIPE, signal_handler);
+    default_handler[SIGALRM] = signal(SIGALRM, signal_handler);
+    default_handler[SIGTERM] = signal(SIGTERM, signal_handler);
+    default_handler[SIGUSR1] = signal(SIGUSR1, signal_handler);
+    default_handler[SIGUSR2] = signal(SIGUSR2, signal_handler);
+    default_handler[SIGBUS] = signal(SIGBUS, signal_handler);
+    default_handler[SIGPOLL] = signal(SIGPOLL, signal_handler);
+    default_handler[SIGPROF] = signal(SIGPROF, signal_handler);
+    default_handler[SIGSYS] = signal(SIGSYS, signal_handler);
+    default_handler[SIGTRAP] = signal(SIGTRAP, signal_handler);
+    default_handler[SIGVTALRM] = signal(SIGVTALRM, signal_handler);
+    default_handler[SIGXCPU] = signal(SIGXCPU, signal_handler);
+    default_handler[SIGXFSZ] = signal(SIGXFSZ, signal_handler);;
+    default_handler[SIGIOT] = signal(SIGIOT, signal_handler);
+    /* default_handler[SIGEMT] = signal(SIGEMT, signal_handler); */
+    default_handler[SIGIO] = signal(SIGIO, signal_handler);
+    default_handler[SIGPWR] = signal(SIGPWR, signal_handler);
+    /* default_handler[SIGLOST] = signal(SIGLOST, signal_handler); */
+}
+
 #if PVFS_UCACHE_ENABLE
 /*
  * access function to see if cache is currently enabled
@@ -1162,6 +1213,9 @@ static int init_usrint_internal(void)
                    "PVFS AIO interface failed to initialize\n");
    }
 #endif
+
+    /* create handlers to run cleanup before aborting */
+    init_signal_handlers();
 
     init_debug("finished with initialization\n");
 

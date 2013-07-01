@@ -2873,19 +2873,16 @@ struct dirent64 *readdir64 (DIR *dir)
  */
 void rewinddir (DIR *dir)
 {
-    off64_t filepos;
- 
     gossip_debug(GOSSIP_USRINT_DEBUG, "rewinddir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
     }
-    filepos = lseek64(dir->fileno, 0, SEEK_CUR);
-    if ((filepos - (dir->buf_act - dir->buf_base)) != 0)
-    {
-        lseek64(dir->fileno, 0, SEEK_SET);
-    }
+    /* force fd back to zero position 
+     * this should be an in expensive operation
+     */
+    lseek64(dir->fileno, 0, SEEK_SET);
     /* force a re-read of the buffer in case things have changed */
     dir->buf_act = dir->buf_base;
     dir->buf_ptr = dir->buf_base;
