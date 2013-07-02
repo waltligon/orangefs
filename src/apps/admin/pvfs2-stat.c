@@ -19,6 +19,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-attr.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
@@ -391,7 +392,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %llu\n", llu(ref->handle));
-   fprintf(stdout, "  Mask          : %o\n",  attr->mask);
+   fprintf(stdout, "  Mask          : Octal: %o\n                : Hexidecimal: %x\n", attr->mask, attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
       fprintf(stdout, "  Permissions   : %o\n",  attr->perms);
@@ -417,6 +418,12 @@ void print_stats(const PVFS_object_ref * ref,
          }
       }
    }
+
+   if(attr->mask & PVFS_ATTR_SYS_REPLICATION)
+   {
+      fprintf(stdout, "  Replication   : ON\n");
+   }
+   else fprintf(stdout, "  Replication   : OFF\n");
 
    if(attr->mask & PVFS_ATTR_SYS_SIZE)
    {

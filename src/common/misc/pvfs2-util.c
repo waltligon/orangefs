@@ -2192,6 +2192,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_REPLICATION)
+    {
+	attrmask |= PVFS_ATTR_META_REPLICATION;
+    }
+
     /* we need the distribution in order to calculate block size */
     if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
     {
@@ -2297,6 +2302,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
     {
         sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
+    }
+    if (obj_mask & PVFS_ATTR_META_REPLICATION)
+    {
+        sys_mask |= PVFS_ATTR_SYS_REPLICATION;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed

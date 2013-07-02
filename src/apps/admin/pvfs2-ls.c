@@ -26,6 +26,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-attr.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
