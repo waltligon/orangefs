@@ -157,6 +157,7 @@ static int recursive_delete(char *dir)
     struct dirent * direntp = NULL;
 
     /* Open the directory specified by dir */
+    errno = 0;
     dirp = opendir(dir);
     if (!dirp)
     {
@@ -178,6 +179,7 @@ static int recursive_delete(char *dir)
     JNI_PRINT("rewinddir succeeded!\n");
     while(1)
     {
+        JNI_PRINT("calling readdir on dirp=%p\n", (void *) dirp);
         errno = 0;
         if((direntp = readdir(dirp)) == NULL)
         {
@@ -199,6 +201,7 @@ static int recursive_delete(char *dir)
         /* Determine if this entry is a file or directory. */
         struct stat buf;
         JNI_PRINT("calling pvfs_stat_mask on file: %s\n", abs_path);
+        errno = 0;
         ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
         if(ret < 0)
         {
@@ -217,12 +220,13 @@ static int recursive_delete(char *dir)
     }
 
     /* Close current directory before we attempt removal */
+    errno = 0;
     if (closedir(dirp) != 0)
     {
         JNI_PERROR();
         return -1;
     }
-
+    errno = 0;
     if (rmdir(dir) != 0)
     {
         JNI_PERROR();
@@ -261,6 +265,7 @@ static int remove_files_in_dir(char *dir, DIR* dirp)
         combine(dir, direntp->d_name, abs_path);
         /* Determine if this entry is a file or directory. */
         struct stat buf;
+        errno = 0;
         ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
         if(ret < 0)
         {
@@ -274,6 +279,7 @@ static int remove_files_in_dir(char *dir, DIR* dirp)
         }
         /* Unlink file. */
         JNI_PRINT("Unlinking file=%s\n", abs_path);
+        errno = 0;
         ret = unlink(abs_path);
         if (ret == -1)
         {
