@@ -795,18 +795,11 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, int fd)
 {
     JNI_PFI();
     int ret = -1;
-    struct statfs *ptr = 0;
-    ptr = (struct statfs *) calloc(1, sizeof(struct statfs));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct statfs!\n");
-        return (jobject) 0;
-    }
-    ret = fstatfs(fd, ptr);
+    struct statfs st;
+    ret = fstatfs(fd, &st);
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
     jobject statfs_obj;
@@ -873,22 +866,15 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimes(JNIEnv *env, jobject obj, int fd)
 {
     JNI_PFI();
     int ret = -1;
-    struct timeval *ptr = 0;
-    ptr = (struct timeval *) calloc(1, 2 * sizeof(struct timeval));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct timeval!\n");
-        return (jobject) 0;
-    }
-    ret = futimes(fd, ptr);
+    struct timeval tv[2];
+    ret = futimes(fd, tv);
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
     jobject timeval_obj;
-    if (fill_timeval(env, ptr, &timeval_obj) == 0)
+    if (fill_timeval(env, tv, &timeval_obj) == 0)
     {
         return timeval_obj;
     }
@@ -902,25 +888,18 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimesat(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     int ret = -1;
-    struct timeval *ptr = 0;
+    struct timeval tv[2];
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ptr = (struct timeval *) calloc(1, 2 * sizeof(struct timeval));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct timeval!\n");
-        return (jobject) 0;
-    }
-    ret = futimesat(dirfd, cpath, ptr);
+    ret = futimesat(dirfd, cpath, tv);
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
     jobject timeval_obj;
-    if (fill_timeval(env, ptr, &timeval_obj) == 0)
+    if (fill_timeval(env, tv, &timeval_obj) == 0)
     {
         return timeval_obj;
     }
@@ -1451,27 +1430,20 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_statfs(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     int ret = -1;
-    struct statfs *ptr = 0;
+    struct statfs st;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ptr = (struct statfs *) calloc(1, sizeof(struct statfs));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct statfs!\n");
-        return (jobject) 0;
-    }
-    ret = statfs(cpath, ptr);
+    ret = statfs(cpath, &st);
 
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
 
     jobject statfs_obj;
-    if (fill_statfs(env, ptr, &statfs_obj) == 0)
+    if (fill_statfs(env, &st, &statfs_obj) == 0)
     {
         return statfs_obj;
     }
@@ -1629,25 +1601,18 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utime(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     int ret = -1;
-    struct utimbuf *ptr = 0;
+    struct utimbuf utb;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ptr = (struct utimbuf *) calloc(1, sizeof(struct utimbuf));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct utimbuf!\n");
-        return (jobject) 0;
-    }
-    ret = utime(cpath, ptr);
+    ret = utime(cpath, &utb);
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
     jobject utimbuf_obj;
-    if (fill_utimbuf(env, ptr, &utimbuf_obj) == 0)
+    if (fill_utimbuf(env, &utb, &utimbuf_obj) == 0)
     {
         return utimbuf_obj;
     }
@@ -1661,25 +1626,18 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utimes(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     int ret = -1;
-    struct timeval *ptr = 0;
+    struct timeval tv[2];
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ptr = (struct timeval *) calloc(1, 2 * sizeof(struct timeval));
-    if (!ptr)
-    {
-        JNI_ERROR("couldn't allocate memory for struct timeval!\n");
-        return (jobject) 0;
-    }
-    ret = utimes(cpath, ptr);
+    ret = utimes(cpath, tv);
     if (ret < 0)
     {
         JNI_PERROR();
-        free((void *) ptr);
         return (jobject) 0;
     }
     jobject timeval_obj;
-    if (fill_timeval(env, ptr, &timeval_obj) == 0)
+    if (fill_timeval(env, tv, &timeval_obj) == 0)
     {
         return timeval_obj;
     }
