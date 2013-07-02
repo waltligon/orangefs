@@ -19,7 +19,6 @@
 
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
-#include "pvfs2-attr.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
