@@ -87,9 +87,15 @@ class OFSEC2ConnectionManager(object):
     def connect(self,debug=0):
             
         self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint=self.ec2_endpoint)
+        #self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint="https://cuer1.clemson.edu:8773/services/Cloud")
+        print self.ec2_region
+        
+        print "ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path)
+        
         self.ec2_connection = ec2.connection.EC2Connection(aws_access_key_id=self.ec2_access_key,aws_secret_access_key=self.ec2_secret_key,is_secure=self.ec2_is_secure,port=self.ec2_port
         ,debug=debug,region=self.ec2_region,path=self.ec2_path)
-
+        
+        print self.ec2_connection
     
     def setEC2Key(self,keyname,keylocation):
         self.instance_key = keyname
@@ -152,7 +158,9 @@ class OFSEC2ConnectionManager(object):
             time.sleep(10)
             count = count + 1
             pprint(reservation.__dict__)
-            
+         
+        # wait 30 seconds, to make sure everything is up and running.   
+        time.sleep(30)
         new_instances = [i for i in reservation.instances]
         
         
@@ -232,28 +240,31 @@ class OFSEC2ConnectionManager(object):
     
 def OFSEC2ConnectionManager_test_driver():
     
-    my_mgr = OFSEC2ConnectionManager("ec2-cred/ec2rc.sh")
-    my_mgr.connect()
-    #my_mgr.getAllEC2Instances()
+   # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
+    my_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
+    print "Connect to EC2"
+    #old_mgr.connect(debug=1)
+    my_mgr.connect(debug=1)
+    
+    print "Testing connection"
+    #old_mgr.printAllInstanceStatus()
+    #my_mgr.printAllInstanceStatus()
     #my_mgr.getAllImages()
     #my_mgr.deleteOldInstances(days_old=3)
-    my_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
-    node_list = my_mgr.createNewEC2Nodes(number_nodes=1,image_system="cloud-ubuntu-12.04",type="m1.small")
-    for node in node_list:
-        #node.runSingleCommand("hostname; uname -a")
-        node.runSingleCommandAsBatch("sudo apt-get -y install subversion < /dev/zero")
+    #old_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
+    my_mgr.setEC2Key("BuildBot2","/home/jburton/cuer1/buildbot2.pem")
+
+    
+    
+    
         
-    for node in node_list:
-        node.copyOFSSource(resource_type="SVN",resource="http://orangefs.org/svn/orangefs/trunk/test/scripts",dest_dir="/tmp/%s" % node.current_user)
-        #node.runSingleCommand("find / -name update_instance -print")
-        #node.runSingleCommand("ls -l /tmp/ubuntu")
-        node.changeDirectory("/tmp/%s/scripts" % node.current_user)
-        node.setEnvironmentVariable("VMSYSTEM","cloud-ubuntu-12.04")
-        
-        node.runSingleCommandAsBatch("bash /tmp/%s/scripts/update-cloud.sh" % node.current_user)
+    print "Creating Instances"
+    
+    node_list = my_mgr.createNewEC2Instances(number_nodes=1,image_system="cloud-rhel6",type="m1.small")
         
     #print my_mgr
     for node in node_list:
         my_mgr.terminateEC2Node(node)
+
 
 #OFSEC2ConnectionManager_test_driver()
