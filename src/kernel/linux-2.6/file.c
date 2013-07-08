@@ -3195,23 +3195,6 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_mmap: called on %s\n",
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
-
-    /* we don't support mmap writes, or SHARED mmaps at all */
-    if ((vma->vm_flags & VM_SHARED) || (vma->vm_flags & VM_MAYSHARE))
-    {
-        /* see if the fake_mmap_shared kmod option was set */
-        if (fake_mmap_shared) 
-        {
-            /* force vm sharing flags to be OFF */
-            vma->vm_flags &= ~VM_SHARED;    
-            vma->vm_flags &= ~VM_MAYSHARE;    
-        }
-        else
-        {
-            return -EINVAL;
-        }
-    }
-
     /*
       for mmap on pvfs2, make sure we use pvfs2 specific address
       operations by explcitly setting the operations
@@ -3223,14 +3206,13 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     vma->vm_flags |= VM_SEQ_READ;
     vma->vm_flags &= ~VM_RAND_READ;
 
-    /* have the kernel enforce readonly mmap support for us */
 #ifdef PVFS2_LINUX_KERNEL_2_4
     vma->vm_flags &= ~VM_MAYWRITE;
     return generic_file_mmap(file, vma);
 #else
     /* backing_dev_info isn't present on 2.4.x */
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-    return generic_file_readonly_mmap(file, vma);
+    return generic_file_mmap(file, vma);
 #endif
 }
 
