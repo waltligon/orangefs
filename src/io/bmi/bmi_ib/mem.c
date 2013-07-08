@@ -209,8 +209,13 @@ memcache_memfree(void *md, void *buf, bmi_size_t len)
     if (c) {
 	debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
 	      lld(c->len));
-	bmi_ib_assert(c->count == 1, "%s: buf %p len %lld count %d, expected 1",
-		      __func__, c->buf, lld(c->len), c->count);
+        if (c->count != 1)
+        {
+            error("%s: buf %p len %lld count %d, expected 1",
+                    __func__, c->buf, lld(c->len), c->count);
+            gen_mutex_unlock(&memcache_device->mutex);
+            return EINVAL;
+        }
 	/* cache it */
 	--c->count;
         if (c->count == 0) {
@@ -239,6 +244,12 @@ memcache_register(void *md, ib_buflist_t *buflist)
 
     buflist->memcache = bmi_ib_malloc(buflist->num *
 				      sizeof(*buflist->memcache));
+    if (!buflist->memcache)
+    {
+        error("%s: bmi_ib_malloc failed for %lld bytes", 
+                __func__, buflist->num * sizeof(*buflist->memcache));
+        return;
+    }
     gen_mutex_lock(&memcache_device->mutex);
     for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
@@ -259,12 +270,16 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	    c = memcache_add(memcache_device, buflist->buf.recv[i],
 	                     buflist->len[i]);
 	    /* XXX: replace error with return values, let caller deal */
-	    if (!c)
+	    if (!c) 
+            {
 		error("%s: no memory for cache entry", __func__);
+                goto out;
+            }
 	    ret = memcache_device->mem_register(c);
 	    if (ret) {
 		memcache_del(memcache_device, c);
 		error("%s: could not register memory", __func__);
+                goto out;
 	    }
 	}
 	buflist->memcache[i] = c;
@@ -280,6 +295,8 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	buflist->memcache[i] = cp;
 #endif
     }
+
+out:
     gen_mutex_unlock(&memcache_device->mutex);
 }
 
@@ -296,6 +313,7 @@ void memcache_preregister(void *md, const void *buf, bmi_size_t len,
     memcache_entry_t *c;
 
     return; /* cannot do this any more */
+
     gen_mutex_lock(&memcache_device->mutex);
     c = memcache_lookup_cover(memcache_device, buf, len);
     if (c) {
