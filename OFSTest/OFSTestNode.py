@@ -1052,7 +1052,8 @@ class OFSTestNode(object):
         '''
         # TBD: Add security.
         keypath = ""
-        
+        self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
+        self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
         self.addBatchCommand("sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
