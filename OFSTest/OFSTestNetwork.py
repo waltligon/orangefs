@@ -165,10 +165,10 @@ class OFSTestNetwork(object):
                 
             #pprint(i.__dict__)
             if first == True:
-				print "Waiting for services to start"
-				time.sleep(30)
-				first = False
-	    
+                print "Waiting for services to start"
+                time.sleep(30)
+                first = False
+    
             # Create the node and get the instance name
             if "ubuntu" in image_name:
                 name = 'ubuntu'
@@ -217,7 +217,8 @@ class OFSTestNetwork(object):
             node_list = self.created_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.updateNode)
         # Wait for reboot
-        time.sleep(20)
+        print "Waiting 60 seconds for nodes to reboot"
+        time.sleep(60)
     
     def installRequiredSoftware(self,node_list=None):
         if node_list == None:
