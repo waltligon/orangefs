@@ -9,7 +9,7 @@ cd `dirname $0`
 help()
 {
     SP=40
-    printf "%s\n" "Usage: pvfs2-start-all.sh -c <config_file_path> [OPTION]"
+    printf "%s\n" "Usage: pvfs2-stop-all.sh -c <config_file_path> [OPTION]"
     printf "%-${SP}s%s\n" "  -c, --conf <config_file_path>" "PVFS configuration file path"
 
     printf "%-${SP}s%s\n" "  -e, --exclusions <exclusions_string>" "String of space separated expressions: "
