@@ -144,12 +144,12 @@ class OFSTestNetwork(object):
         self.ec2_connection_manager.setEC2Key(key_name,key_location)
         
     
-    def createNewEC2Nodes(self,number_nodes,image_name,machine_type):
+    def createNewEC2Nodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None):
         
         # This function creates number nodes on the ec2 system. 
         # It returns a list of nodes
         
-        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
+        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type,associateip,domain)
         new_ofs_test_nodes = []
         first = True
         for i in new_instances:
@@ -163,7 +163,8 @@ class OFSTestNetwork(object):
                 print "Instance %s at %s has state %s with code %r" % (i.id,i.ip_address,i.state,i.state_code)
             
                 
-            #pprint(i.__dict__)
+            print "Dictionary of new instance:"
+            pprint(i.__dict__)
             if first == True:
                 print "Waiting for services to start"
                 time.sleep(30)

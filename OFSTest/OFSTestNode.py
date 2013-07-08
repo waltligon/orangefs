@@ -500,6 +500,7 @@ class OFSTestNode(object):
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
                 sudo apt-get install -y -q gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf fuse libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
+                sudo apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
                 sudo apt-get clean
 
                 #prepare source

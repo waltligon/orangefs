@@ -129,7 +129,7 @@ class OFSEC2ConnectionManager(object):
         return 0
         
         
-    def createNewEC2Instances(self,number_nodes,image_system,type):
+    def createNewEC2Instances(self,number_nodes,image_system,type,associate_ip=False,domain=None):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -158,12 +158,16 @@ class OFSEC2ConnectionManager(object):
             time.sleep(10)
             count = count + 1
             pprint(reservation.__dict__)
-         
-        # wait 30 seconds, to make sure everything is up and running.   
-        time.sleep(30)
+            
         new_instances = [i for i in reservation.instances]
         
-        
+        if associate_ip == True:
+            for i in new_instances:
+                print "Creating ip"
+                address = self.ec2_connection.allocate_address(domain)
+                print "Associating %s to %s with private ip %s" % (address.public_ip,i.id,i.ip_address)
+                self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
+                
         
         return new_instances
       

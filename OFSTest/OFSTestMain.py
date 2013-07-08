@@ -72,7 +72,7 @@ class OFSTestMain(object):
 
         if self.config.number_new_ec2_nodes > 0:
             print "Testing with %d new EC2 nodes" % self.config.number_new_ec2_nodes
-            self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine)
+            self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
         
 
         if len(self.config.node_ip_addresses) > 0:

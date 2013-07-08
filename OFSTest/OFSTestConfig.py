@@ -26,6 +26,8 @@ class OFSTestConfig(object):
         self.ofs_fs_name="pvfs2-fs"
         self.ofs_build_kmod = True
         self.ofs_mount_fuse = False
+        self.ec2_domain=None
+        self.ec2_associate_ip=False
     
     def setConfig(self,kwargs={}):
         pass
@@ -60,7 +62,7 @@ class OFSTestConfig(object):
             self.number_new_ec2_nodes = temp
         # sanity check
         if self.number_new_ec2_nodes > 0:
-	    self.using_ec2 = True
+            self.using_ec2 = True
 
         temp = d.get('ec2_image')
         if temp != None:
@@ -132,3 +134,10 @@ class OFSTestConfig(object):
         temp = d.get('ofs_mount_fuse')
         if temp != None:
             self.ofs_mount_fuse = temp
+        
+        temp = d.get('ec2_domain')
+        if temp != None:
+            self.ec2_domain = temp
+        temp = d.get('ec2_associate_ip')
+        if temp != None:
+            self.ec2_associate_ip = temp
