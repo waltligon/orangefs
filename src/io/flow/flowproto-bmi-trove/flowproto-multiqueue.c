@@ -2729,8 +2729,6 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
 
     gossip_err("flow(%p):q_item(%p):error_code(%d):Executing %s...\n",flow_d,q_item,(int)error_code,__func__);
 
-    error_code = -PVFS_ENOMEM;
-
     gen_mutex_lock(&flow_d->flow_mutex);
 
     /* we are cancelling the entire flow */
@@ -3250,6 +3248,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
     /* after all sends have completed, this value will represent the amount of data sent
      * times the number of copies.
      */
+    //NOTE: don't want to add actual_size if error occurred.
     flow_data->total_bytes_forwarded += actual_size;
 
     /* NOTE: buffer_in_use is shared between forwarding_bmi_recv_callback_fn, forwarding_bmi_send_callback_fn,
@@ -3288,7 +3287,7 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 
     if (forwarding_is_flow_complete(flow_data))
     {
-        gossip_lerr("flow(%p):q_item(%p):%s:Finished sending a buffer of data\n",flow_d,q_item,__func__);
+        gossip_lerr("flow(%p):q_item(%p):%s:Finished sending a buffer of data? %s\n",flow_d,q_item,__func__,error_code?"NO":"YES");
         if (flow_d->repl_d[flow_d->repl_d_local_flow_index].endpt_status.state == RUNNING)
         {
             assert(flow_data->total_bytes_recvd == flow_data->total_bytes_written);
