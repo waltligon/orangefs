@@ -46,9 +46,13 @@ def append2(testing_node,output=[]):
 
     return rc
 
+
+
+
 def bonnie(testing_node,output=[]):
 
-
+    print "Bonnie is broken!"
+    return -99
     rc = 0
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":

@@ -56,6 +56,7 @@ class OFSTestNode(object):
         #-------
         
         self.ip_address = ""
+        self.ext_ip_address = self.ip_address
         self.host_name = ""
         self.operating_system = ""
         self.package_system=""
@@ -326,7 +327,7 @@ class OFSTestNode(object):
             self.addBatchCommand("sudo apt-get -y -q dist-upgrade < /dev/zero")
         elif "suse" in self.distro.lower():
             self.addBatchCommand("sudo zypper --non-interactive update")
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             self.addBatchCommand("sudo yum update --disableexcludes=main -y")
             # Uninstall the old kernel
             self.addBatchCommand("sudo rpm -e kernel-`uname -r`")
@@ -348,6 +349,8 @@ class OFSTestNode(object):
             self.addBatchCommand(batch_commands)
 
         elif "suse" in self.distro.lower():
+            
+            
             print "TODO: Torque for "+self.distro
             return
 
@@ -364,7 +367,7 @@ class OFSTestNode(object):
             cd -
             '''
             self.addBatchCommand(batch_commands)
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             if "6." in self.distro:
                 batch_commands = '''
@@ -436,7 +439,7 @@ class OFSTestNode(object):
             sudo bash -c 'echo $logevent 255 >> /var/spool/torque/mom_priv/config' 
             ''' % pbsserver_name
             self.addBatchCommand(batch_commands)
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             if "6." in self.distro:
                 batch_commands = '''
@@ -473,7 +476,7 @@ class OFSTestNode(object):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsBatch("sudo /etc/init.d/torque-server restart")
             self.runSingleCommandAsBatch("sudo /etc/init.d/torque-scheduler restart")
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             self.runSingleCommandAsBatch("sudo /etc/init.d/munge stop")
             self.runSingleCommandAsBatch("sudo /etc/init.d/munge start")            
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_server stop")
@@ -487,7 +490,7 @@ class OFSTestNode(object):
     def restartTorqueMom(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsBatch("sudo /etc/init.d/torque-mom restart")
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
               
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
 
@@ -542,7 +545,7 @@ class OFSTestNode(object):
 
             '''
             self.addBatchCommand(batch_commands)
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "redhat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
@@ -1055,7 +1058,8 @@ class OFSTestNode(object):
         keypath = ""
         self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
         self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
-        self.addBatchCommand("sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        self.addBatchCommand("LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        print "LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
         client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
@@ -1085,14 +1089,16 @@ class OFSTestNode(object):
         if mount_fuse == True:
             print "Mounting OrangeFS service at tcp://%s:3396/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint)
             self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:3396/%s" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_fs_name),output)
-            print output
-            self.runSingleCommand("sleep 15")
+            #print output
+            
         else:
             print "Mounting OrangeFS service at tcp://%s:3396/%s at mountpoint %s" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint)
             self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:3396/%s %s" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint))
-            # wait 15 seconds for mount
-            self.addBatchCommand("sleep 15")
             self.runAllBatchCommands()
+        
+        print "Waiting 30 seconds for mount"            
+        time.sleep(30)
+
 
     def stopOFSClient(self):
         

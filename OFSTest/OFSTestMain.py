@@ -80,7 +80,9 @@ class OFSTestMain(object):
                 self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_ec2=self.config.using_ec2)
     #xcept AttributeError:
             #rint "Caught AttributeError. WTF?"
-            
+        
+        # make sure everyone can find each other
+        self.ofs_network.updateEtcHosts()
         
         
         
@@ -89,8 +91,8 @@ class OFSTestMain(object):
             print ""
             print "==================================================================="
             print "Updating New Nodes"
-                
             self.ofs_network.updateEC2Nodes()
+            
 
             print ""
             print "==================================================================="

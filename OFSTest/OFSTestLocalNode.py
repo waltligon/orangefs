@@ -42,7 +42,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
     def currentNodeInformation(self):
         super(OFSTestLocalNode,self).currentNodeInformation()
         self.user_name = self.runSingleCommandBacktick("whoami")
-        
+        self.ext_ip_address = self.runSingleCommandBacktick("ifconfig  | grep 'inet addr:'| grep -v '127.0.0.1' | cut -d: -f2 | awk '{ print $1}'")
         
         
         
@@ -151,7 +151,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s-e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ip_address),source,destinationNode.current_user,destinationNode.ip_address,destination)
+        rsync_command = "rsync %s -e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ext_ip_address,destination)
         return self.runSingleCommand(rsync_command)
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
@@ -163,7 +163,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s -e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ip_address),source_node.current_user,source_node.ip_address,source,destination)
+        rsync_command = "rsync %s -e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
         return self.runSingleCommand(rsync_command)  
     
     def getAliasesFromConfigFile(self,config_file_name):

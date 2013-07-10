@@ -32,6 +32,7 @@ from boto import *
 import Queue
 import threading
 import time
+from pprint import pprint
 
 class OFSTestNetwork(object):
 
@@ -149,34 +150,46 @@ class OFSTestNetwork(object):
         # This function creates number nodes on the ec2 system. 
         # It returns a list of nodes
         
-        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type,associateip,domain)
+        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
+        # new instances should have a 60 second delay to make sure everything is running.
+
+        ip_addresses = []
         new_ofs_test_nodes = []
         first = True
-        for i in new_instances:
-            i.update()
-            print "Instance %s at %s has state %s with code %r" % (i.id,i.ip_address,i.state,i.state_code)
+        for idx,instance in enumerate(new_instances):
+            instance.update()
+            #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
             
-            while i.state_code == 0:
+            while instance.state_code == 0:
                 
                 time.sleep(10)
-                i.update()
-                print "Instance %s at %s has state %s with code %r" % (i.id,i.ip_address,i.state,i.state_code)
+                instance.update()
+                #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
             
-                
-            print "Dictionary of new instance:"
-            pprint(i.__dict__)
-            if first == True:
-                print "Waiting for services to start"
-                time.sleep(30)
-                first = False
-    
+            
+        
+        # now that the instances are up, check the external ip
+        if associateip == True:
+            # if we need to associate an external ip address, do so
+            ip_addresses = self.ec2_connection_manager.associateIPAddresses(new_instances,domain)
+        else:
+            #otherwise use the default internal address
+            
+            for i in new_instances:
+                i.update()
+                print "Using existing ip address "+i.ip_address
+                #pprint(i.__dict__)
+                ip_addresses.append(i.ip_address)
+ 
+        for idx,instance in enumerate(new_instances):
             # Create the node and get the instance name
             if "ubuntu" in image_name:
                 name = 'ubuntu'
             else:
                 name = 'ec2-user'
-                
-            new_node = OFSTestRemoteNode.OFSTestRemoteNode(username=name,ip_address=i.ip_address,key=self.ec2_connection_manager.instance_key_location,local_node=self.local_master,is_ec2=True)
+            
+            new_node = OFSTestRemoteNode.OFSTestRemoteNode(username=name,ip_address=instance.ip_address,key=self.ec2_connection_manager.instance_key_location,local_node=self.local_master,is_ec2=True,ext_ip_address=ip_addresses[idx])
+
             new_ofs_test_nodes.append(new_node)
         
             # Add the node to the created nodes list.
@@ -184,7 +197,7 @@ class OFSTestNetwork(object):
         
         # upload the remote key to all the nodes
         for node in new_ofs_test_nodes:
-            self.runSimultaneousCommands(node_list=new_ofs_test_nodes,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ip_address])
+            self.runSimultaneousCommands(node_list=new_ofs_test_nodes,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
 
             
         # return the list of newly created nodes.
@@ -210,7 +223,25 @@ class OFSTestNetwork(object):
     def updateEC2Nodes(self):
         # This only updates the EC2 controlled nodes
         ec2_nodes = [node for node in self.created_nodes if node.is_ec2 == True]
-        self.updateNodes(ec2_nodes)       
+        self.updateNodes(ec2_nodes)   
+
+    def updateEtcHosts(self,node_list=None):
+        
+        #This function updates the etc hosts file on each node with the 
+        if node_list == None:
+            node_list = self.created_nodes
+        
+        
+        for node in node_list:
+            for n2 in node_list:
+                # can we ping the node?
+                print "Pinging %s from local node" % n2.host_name
+                rc = node.runSingleCommand("ping -c 1 %s" % n2.host_name)
+                # if not, add to the /etc/hosts file
+                if rc != 0:
+                    print "Could not ping %s at %s" % (n2.host_name,n2.ip_address)
+                    node.addBatchCommand("sudo bash -c 'echo %s %s >> /etc/hosts'" % (n2.ip_address,n2.host_name))
+            node.runAllBatchCommands()
             
         
     def updateNodes(self,node_list=None):

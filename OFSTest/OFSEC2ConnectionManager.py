@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 class OFSEC2ConnectionManager(object):
     
-    def __init__(self,ec2_config_file=None,region_name="nova"):
+    def __init__(self,ec2_config_file=None,region_name="RegionOne"):
         
         self.ec2_instance_names = {}
         self.ec2_instance_list = {}
@@ -129,7 +129,7 @@ class OFSEC2ConnectionManager(object):
         return 0
         
         
-    def createNewEC2Instances(self,number_nodes,image_system,type,associate_ip=False,domain=None):
+    def createNewEC2Instances(self,number_nodes,image_system,type):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -148,29 +148,36 @@ class OFSEC2ConnectionManager(object):
         
         print "Creating %d nodes" % number_nodes
         reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=type) 
-        time.sleep(10)
         
-        pprint(reservation.__dict__)
+        print "Waiting 60 seconds for all instances to start."
+        time.sleep(60)
         
         count = 0
         while len(reservation.instances) < number_nodes and count < 6:
             print "Waiting on instances"
             time.sleep(10)
             count = count + 1
-            pprint(reservation.__dict__)
+            #pprint(reservation.__dict__)
             
         new_instances = [i for i in reservation.instances]
         
-        if associate_ip == True:
-            for i in new_instances:
-                print "Creating ip"
-                address = self.ec2_connection.allocate_address(domain)
-                print "Associating %s to %s with private ip %s" % (address.public_ip,i.id,i.ip_address)
-                self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
-                
+        
         
         return new_instances
       
+    
+    def associateIPAddresses(self,instances=[],domain=None):
+        external_addresses = []
+        for i in instances:
+            print "Creating ip"
+            address = self.ec2_connection.allocate_address(domain)
+            print "Associating %s to %s with private ip %s" % (address.public_ip,i.id,i.ip_address)
+            self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
+            external_addresses.append(address.public_ip)
+            
+        print "Waiting 30 seconds for external networking"
+        time.sleep(30)
+        return external_addresses
     
     def manageExistingEC2Node(self,ec2_node):
         pass

@@ -20,11 +20,17 @@ import OFSTestNode
 
 class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
  
-    def __init__(self,username,ip_address,key,local_node,is_ec2=False):
+    def __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
         super(OFSTestRemoteNode,self).__init__()
         
         # need ip_address, user_name, host_name, and local keyfile to connect
         self.ip_address = ip_address
+        
+        # do we have an external ip address?
+        if ext_ip_address == None:
+            self.ext_ip_address = ip_address
+        else:
+            self.ext_ip_address = ext_ip_address
         self.current_user = username
         self.is_ec2 = is_ec2
         self.sshLocalKeyFile = key
@@ -37,7 +43,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         
     def getKeyFileFromLocal(self,localnode):
-        localnode.addRemoteKey(self.ip_address,self.sshLocalKeyFile)
+        localnode.addRemoteKey(self.ext_ip_address,self.sshLocalKeyFile)
         self.uploadNodeKeyFromLocal(localnode)
         
 
@@ -102,7 +108,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         script_file.write("exit\n")
         script_file.close()
 
-        command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < /tmp/runcommand.sh" % (self.sshLocalKeyFile,self.current_user,self.ip_address)
+        command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < /tmp/runcommand.sh" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)
         #command_v = shlex.split(command_line)
         #print command_line
         # run the script and capture the return code
@@ -142,7 +148,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
                 errdirect = " 2>" + errfile
         
         #start with the ssh command and open quote
-        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"" % (self.sshLocalKeyFile,self.current_user,self.ip_address)]
+        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -176,7 +182,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ip_address),source,destinationNode.current_user,destinationNode.ip_address,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ip_address,destination)
         return self.runSingleCommand(rsync_command)
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
@@ -188,19 +194,19 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ip_address),source_node.current_user,source_node.ip_address,source,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ip_address,source,destination)
         return self.runSingleCommand(rsync_command)
       
     def uploadNodeKeyFromLocal(self, local_node):
         
         # This function uploads a key 
-        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ip_address), self.ip_address)
+        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         # copy the file from the local node to the current node
-        self.sshLocalKeyFile=local_node.getRemoteKeyFile(self.ip_address)
+        self.sshLocalKeyFile=local_node.getRemoteKeyFile(self.ext_ip_address)
         rc = local_node.copyToRemoteNode(self.sshLocalKeyFile,self,'~/.ofstestkeys/',False)
         
         if rc != 0:
-            print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ip_address), self.ip_address)
+            print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
             return rc
         else:
             #set the ssh key file to the uploaded location.
@@ -210,13 +216,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def uploadRemoteKeyFromLocal(self,local_node,remote_address):
         # This function uploads a key for a remote node and adds it to the table
         # get the remote key name
-        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ip_address), self.ip_address)
+        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         remote_key = local_node.getRemoteKeyFile(remote_address)
         #copy it
         rc = local_node.copyToRemoteNode(remote_key,self,'~/.ofstestkeys/',False)
         #add it to the keytable
         if rc != 0:
-            print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ip_address), self.ip_address)
+            print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
             return rc
         else:
             #set the ssh key file to the uploaded location.

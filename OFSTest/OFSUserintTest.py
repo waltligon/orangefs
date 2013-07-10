@@ -60,7 +60,7 @@ def bonnie(testing_node,output=[]):
             return rc
             
     testing_node.changeDirectory(testing_node.ofs_mountpoint)
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location),output)
+    rc = testing_node.runSingleCommand("echo export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location),output)
     
 
     return rc
