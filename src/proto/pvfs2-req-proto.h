@@ -10,7 +10,7 @@
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pint-distribution.h"

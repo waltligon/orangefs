@@ -7,6 +7,7 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
+#include "pvfs2-internal.h"
 #include "job.h"
 #include "quicklist.h"
 

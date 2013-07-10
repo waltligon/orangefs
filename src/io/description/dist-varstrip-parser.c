@@ -7,6 +7,7 @@
 
 #include "dist-varstrip-parser.h"
 #include "pvfs2-dist-varstrip.h"
+#include "pvfs2-internal.h"
 #include "gossip.h"
 
 #include <stdlib.h>

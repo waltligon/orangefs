@@ -7,6 +7,7 @@
 #ifndef PVFS_DIST_VARSTRIP_PARSER_H
 #define PVFS_DIST_VARSTRIP_PARSER_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 
 struct PINT_dist_strips_s

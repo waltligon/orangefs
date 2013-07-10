@@ -7,6 +7,7 @@
 #ifndef __PINT_REQUEST_H
 #define __PINT_REQUEST_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 
 /* Forward declarations */

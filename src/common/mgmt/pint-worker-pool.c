@@ -9,6 +9,7 @@
 #include "pint-mgmt.h"
 
 #include "pvfs2-types.h"
+#include "pvfs2-internal.h"
 
 struct PINT_worker_impl PINT_worker_pool_impl =
 {

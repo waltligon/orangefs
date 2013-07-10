@@ -4,6 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+/* need this for #ifdefs below */
+#include "pvfs2-config.h"
+
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -17,6 +20,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
@@ -26,7 +30,6 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
 
 /* FIXME: obtaining HOST_NAME_MAX is platform specific and should be handled more generally */
 #ifndef HOST_NAME_MAX

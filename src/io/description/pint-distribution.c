@@ -13,6 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "internal.h"
 #include "pint-distribution.h"
 
 

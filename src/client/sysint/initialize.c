@@ -15,6 +15,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
 #include "rcache.h"
@@ -65,6 +66,8 @@ typedef enum
  * data structures.  Must be called before any other system interface
  * function.
  *
+ * This should run once and only one even in multithreaded environment.
+ *
  * the default_debug_mask is used if not overridden by the
  * PVFS2_DEBUGMASK environment variable at run-time.  allowable string
  * formats of the env variable are the same as the EventLogging line
@@ -74,12 +77,34 @@ typedef enum
  */
 int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
+    static int pvfs_sys_init_flag = 0; /* set to one when init is done */
+    static int pvfs_sys_init_in_progress = 0;
+    static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+
     int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
     char *event_mask = NULL;
+
+    if (pvfs_sys_init_flag)
+    {
+        /* quick test and out */
+        return 0;
+    }
+
+    /* multiple initers block here until init is done */
+    gen_mutex_lock(&init_mutex);
+    if (pvfs_sys_init_flag || pvfs_sys_init_in_progress)
+    {
+        /* a loop back from same process got through mutex */
+        gen_mutex_unlock(&init_mutex);
+        return 0;
+    }
+    pvfs_sys_init_in_progress = 1;
+
+    /* ready to initialize */
 
 #ifdef WIN32
     pint_client_pid = (int) GetCurrentProcessId();
@@ -103,18 +128,23 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
 
-/*  ignore error *
- *  if (ret < 0)
+    /*  ignore error */
+#if 0
+    if (ret < 0)
     {
         gossip_err("Error initializing event interface.\n");
         return (ret);
-    } */
-
+    }
+#endif
 
     /**
      * (ClientID, Rank, RequestID, Handle, Sys)
      */
-    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "", &PINT_client_sys_event_id);
+    PINT_event_define_event(NULL,
+                            "sys",
+                            "%d%d%d%llu%d",
+                            "",
+                            &PINT_client_sys_event_id);
 
     event_mask = getenv("PVFS2_EVENTMASK");
     if (event_mask)
@@ -254,14 +284,16 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
 
     /* start job timer */
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            NULL,
-            pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_CLIENT_JOB_TIMER,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    NULL,
+                    pint_client_sm_context);
     if(!smcb)
     {
-	return(-PVFS_ENOMEM);
+	ret = (-PVFS_ENOMEM);
+        goto local_exit;
     }
 
     ret = PINT_client_state_machine_post(smcb, NULL, NULL);
@@ -273,9 +305,10 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     /* keep track of this pointer for freeing on finalize */
     g_smcb = smcb;
 
-    return 0;
+    ret = 0;
+    goto local_exit;
 
-  error_exit:
+error_exit:
 
     id_gen_safe_finalize();
 
@@ -340,6 +373,12 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
 
     PINT_smcb_free(smcb);
+
+local_exit:
+
+    gen_mutex_unlock(&init_mutex);
+
+    pvfs_sys_init_flag = 1;
 
     return ret;
 }

@@ -46,6 +46,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -200,6 +201,9 @@ int main(int argc, char **argv)
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
+
+    /* Set up out malloc wrapper by grabbing pointers to glibc malloc */
+    init_glibc_malloc();
 
     /* Enable the gossip interface to send out stderr and set an
      * initial debug mask so that we can output errors at startup.

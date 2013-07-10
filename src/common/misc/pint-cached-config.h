@@ -7,6 +7,7 @@
 #ifndef __PINT_CACHED_CONFIG_H
 #define __PINT_CACHED_CONFIG_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-mgmt.h"

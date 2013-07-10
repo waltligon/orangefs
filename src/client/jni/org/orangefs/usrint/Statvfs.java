@@ -9,8 +9,8 @@ package org.orangefs.usrint;
 import java.lang.reflect.Field;
 
 /* Class representing C struct: 'struct statvfs' */
-public class Statvfs{
-    
+public class Statvfs {
+
     long f_bsize;
     long f_frsize;
     long f_blocks;
@@ -23,14 +23,16 @@ public class Statvfs{
     long f_flag;
     long f_namemax;
 
-    /* This probably won't get called much since we're depending upon a 
-     * native method to initialize this object.
+    /*
+     * This probably won't get called much since we're depending upon a native
+     * method to initialize this object.
      */
     Statvfs() {
 
     }
 
     /* Generic Object Dump to String */
+    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -41,13 +43,14 @@ public class Statvfs{
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for(Field field : fields ) {
+        for (Field field : fields) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            } catch(IllegalAccessException ex) {
+            }
+            catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

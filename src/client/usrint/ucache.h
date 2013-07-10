@@ -27,7 +27,7 @@
 #define SHM_ID1 'l'
 #define SHM_ID2 'm'
 #ifndef BLOCKS_IN_CACHE 
-#define BLOCKS_IN_CACHE 1024
+# define BLOCKS_IN_CACHE 1024
 #endif
 #define CACHE_SIZE (CACHE_BLOCK_SIZE * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
@@ -36,11 +36,11 @@
 #define NIL (-1)
 
 #ifndef UCACHE_MAX_BLK_REQ 
-#define UCACHE_MAX_BLK_REQ MEM_TABLE_ENTRY_COUNT
+# define UCACHE_MAX_BLK_REQ MEM_TABLE_ENTRY_COUNT
 #endif
 
 #ifndef UCACHE_MAX_REQ 
-#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * UCACHE_MAX_BLK_REQ)
+# define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * UCACHE_MAX_BLK_REQ)
 #endif
 
 /* Define multiple NILS to there's no need to cast for different types */
@@ -49,9 +49,9 @@
 #define NIL32 0XFFFFFFFF
 #define NIL64 0XFFFFFFFFFFFFFFFF
 #if (PVFS2_SIZEOF_VOIDP == 32)
-#define NILP NIL32
+# define NILP NIL32
 #elif (PVFS2_SIZEOF_VOIDP == 64)
-#define NILP NIL64
+# define NILP NIL64
 #endif
 
 

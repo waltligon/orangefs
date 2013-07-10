@@ -1152,7 +1152,7 @@ int main(int argc, char **argv)
     for(i = 0; i < tab->mntent_count; i++)
     {
 	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-	if (ret == 0)
+	if (ret == 0 || ret == -PVFS_EEXIST)
         {
 	    found_one = 1;
         }

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "tcache.h"
 #include "gossip.h"
 
@@ -93,6 +94,12 @@ void PINT_tcache_finalize(
     struct PINT_tcache_entry* tmp_entry;
 
     /* TODO: simplify by iterating LRU list instead of hash table */
+
+    if (!tcache)
+    {
+        gossip_err("PINT_tcache_finalize called with NULL pointer\n");
+        return;
+    }
 
     /* iterate through hash table and destroy all entries */
     for(i = 0; i < tcache->h_table->table_size; i++)

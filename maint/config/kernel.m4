@@ -66,6 +66,101 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include -I$lk_src_source/arch/${ARCH}/include/asm/mach-default"
 
 	fi
+
+    dnl between 3.6 and 3.9 create() lookup() and d_revalidate() lose
+    dnl their struct nameidata argument.  d_revalidate seems to be
+    dnl handled be we will test for the other two
+    dnl check create
+    AC_MSG_CHECKING([if kernel inode ops create takes nameidata])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+            extern int mycreate(struct inode *,
+                                struct dentry *,
+                                int,
+                                struct nameidata *);
+        ], [
+			static struct inode_operations in_op = {
+				  .create = mycreate
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_CREATE_TAKES_NAMEIDATA, 1,
+                [Define if kernel inode ops create takes nameidata not bool])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+
+    dnl check lookup
+    AC_MSG_CHECKING([if kernel inode ops lookup takes nameidata])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+            extern int mylookup(struct inode *,
+                                struct dentry *,
+                                struct nameidata *);
+        ], [
+			static struct inode_operations in_op = {
+				  .lookup = mylookup
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA, 1,
+                [Define if kernel inode ops lookup takes nameidata])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+
+    dnl check revalidate
+    AC_MSG_CHECKING([for if kernel dentry ops d_revalidate takes nameidata])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+		    #include <linux/dcache.h>
+            extern int myreval(struct dentry *, struct nameidata *);
+        ], [
+			static struct dentry_operations dc_op = {
+				  .d_revalidate = myreval
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA, 1,
+                [Define if kernel dentry ops d_revalidate takes nameidata])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+
+    dnl kernel 3.6-3.9 added get_acl as a method rather than using
+    dnl check_acl passed into generic_permissions
+    AC_MSG_CHECKING([if kernel inode ops has get_acl ])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+        ], [
+			static struct inode_operations in_op = {
+				  .get_acl = NULL
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_HAVE_GET_ACL, 1,
+                [Define if kernel inode ops has get_acl])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+
+	dnl kernel 3.6 (and possibly earlier) create arch/x86/include/generated/asm
+	dnl directory for files such as unistd_64.h.
+	if test -d ${lk_src}/arch/${ARCH}/include/generated ; then
+		CFLAGS="$CFLAGS -I${lk_src}/arch/${ARCH}/include/generated"
+	fi
        
         dnl if there are two different include paths (lk_src/include and 
         dnl lk_src_source/include) add the lk_src/include path to the CFLAGS
@@ -90,6 +185,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         if test $need_optimize_flag -eq 1; then
             CFLAGS="-Os $CFLAGS"
         fi
+
+dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
+        AC_MSG_CHECKING(for d_alloc_root)
+        AC_TRY_COMPILE(
+        [
+                #define __KERNEL__
+                #include <linux/fs.h>
+        ], [
+                struct inode  *root_inode;
+		        struct dentry *root_dentry;
+                root_dentry=d_alloc_root(root_inode);
+        ], [
+                AC_MSG_RESULT(yes)
+                AC_DEFINE(HAVE_D_ALLOC_ROOT, 1, [Define if kernel defines
+                          d_alloc_root]),
+        ], [
+                AC_MSG_RESULT(no)
+        ]
+        )
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it

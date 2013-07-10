@@ -1,8 +1,62 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
+<<<<<<< .working
 SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
+=======
+
+Rev 10182
+
+* Reworked usrint initialization to support fork/exec effectively,
+* particularly for shells (like bash).  File descriptors were moved to
+* a Posix shared memory object so that they can be passed from parent
+* to child in a fork and from one program to the next in an exec.  Fork
+* creates a new shm object and copies the parent's into it.  Exec takes
+* over the previous program's object but must modify internal pointers.
+* program loading OFS usrint for the first time creates and initializes
+* a new object.  File descriptor status structs can be shared from
+* parent to child on a fork.  Shared synchronization is used to manage
+* access to these objects.  Management of free space in the shared
+* objects is done in unshared user space memory using fairly simple
+* free lists.
+*
+* Added features to gen_locks to initialize recursive and shared mutexes
+* and shared conds for use in the new usrint features.
+
+Rev 10075
+
+* Added support for glob in usrint
+*
+* Fixed several bugs that involved using an uncleared buffer that becomes
+* corrupted.
+*
+* Added a malloc and associated functions wrapper that uses #defines to
+* replace malloc with PINT-malloc().  PINT-malloc() uses glibc malloc() (and not
+* a client program's replacement for malloc) to do memory management.  Inserts 
+* a magic number before each allocated buffer that is check on free to prevent
+* a number of common malloc related bugs.  Zeros newly allocarted buffer.
+* Zeros buffer being freed.  Can be adapted for other uses as well.  Includes
+* malloc debugging calls (currently controlled distinctly from gossip but
+* will be integrated into gossip).  Configure options can turn off some or
+* all of these features.  Also incAudes a set of functions clean-malloc() that
+* calls to the default version of malloc().  This makes pint-mem.c obsolete.
+*
+* Began migrating to a new initialization mechanism that uses a feature of
+* GCC __attrubute__((constructor)) that causes a routine to run before main.
+* This should enable us to remove the many calls to init routines currently in
+* the usrint code.  May not work on other compilers, but there may be an 
+* older alternative.  Worst case we replace the many calls with macros.  A
+* similar destructor attribute exists for shutdown
+*
+* Reworked implementation of stdin, stdout, stderr so that we can use them
+* effectively with freopen and OrangeFS files.  Reworked freopen to support
+* this.  Can still be disabled with configure.
+*
+* Made some changes to handling of locks in streams.
+
+orangefs-2.8.7 (Subversion Tag v2.8.7)
+>>>>>>> .merge-right.r10075
 
 Trunk
 
