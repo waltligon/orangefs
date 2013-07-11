@@ -124,9 +124,18 @@ public class OrangeFileSystem extends FileSystem {
             if (fParent != null && !exists(fParent)) {
                 /* Try to create the directories. */
                 if (!mkdirs(fParent, permission)) {
-                    throw new IOException(
-                            "Failed to create parent directorie(s): "
-                                    + fParent.toString());
+                    /* mkdirs could fail if another task creates the parent 
+                     * directory after we checked to see if the parent exists.
+                     * So, check if the parent exists again to make sure
+                     * mkdirs didn't fail because another task already
+                     * successfully called mkdir on the parent
+                     * directory/directories.
+                     */
+                    if(!exists(fParent)) {
+                        throw new IOException(
+                                "Failed to create parent directory/directories: "
+                                        + fParent.toString());
+                    }
                 }
             }
         }

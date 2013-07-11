@@ -55,7 +55,7 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (inChannel == null) {
             return;
         }
@@ -116,7 +116,7 @@ public class OrangeFileSystemInputStream extends InputStream implements
         throw new IOException("No support for marking.");
     }
 
-    public void seek(long pos) throws IOException {
+    public synchronized void seek(long pos) throws IOException {
         if (inChannel == null) {
             throw new IOException("InputChannel is null.");
         }
@@ -127,8 +127,12 @@ public class OrangeFileSystemInputStream extends InputStream implements
         inChannel.seek(pos);
     }
 
+    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+        return false;
+    }
+
     @Override
-    public long skip(long n) throws IOException {
+    public synchronized long skip(long n) throws IOException {
         if (n < 0) {
             return 0;
         }
