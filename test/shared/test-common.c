@@ -552,6 +552,19 @@ int create_directory(
    
     if(use_pvfs2_lib)
     {
+	/* Remove the directory before creating it. */
+	if(verbose) 
+        {
+            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, directory);
+        }
+        else
+        {
+            /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
+            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, directory);
+        }
+        ret = system(cmd);
+
+	
         if(verbose) 
         {
             snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir -m %o %s", pvfsEXELocation, mode, directory);
@@ -574,7 +587,10 @@ int create_directory(
     }
     else
     {
-        ret = mkdir(directory, mode);
+	/* A bit naive, but these test directories should be empty*/
+	ret = rmdir(directory);
+	
+	ret = mkdir(directory, mode);
         if(ret != 0)
         {
             ret = errno; /* Save errno for return */
