@@ -805,10 +805,11 @@ int PINT_verify_credential(const PVFS_credential *cred)
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
-    char buf[256];
+    char buf[256], sigbuf[16];
     int ret;
 #ifdef ENABLE_SECURITY_CERT
     X509 *cert;
+    int certcache_hit;
 #endif
 
     if (!cred)
@@ -817,10 +818,11 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
+                 PINT_util_bytes2str(cred->signature, sigbuf, 4));
+
     if (PINT_util_get_current_time() >= cred->timeout)
     {
-        char sigbuf[16]; 
-
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
                      "(timeout %llu)\n", 
                      PINT_util_bytes2str(cred->signature, sigbuf, 4),
@@ -834,7 +836,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 #endif
 
 #ifdef ENABLE_SECURITY_CERT
-    /* get X509 cert from certificate buffer */        
+    /* get X509 cert from certificate buffer */
     ret = PINT_cert_to_X509(&cred->certificate, &cert);
     if (ret != 0)
     {
@@ -842,15 +844,28 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-    /* verify the certificate (using the trust store) */
-    ret = PINT_verify_certificate(cert);
-    if (ret != 0)
-    {
-        /* Note: errors already logged */
-        X509_free(cert);
-        return 0;
-    }
+#ifdef ENABLE_CERTCACHE
+    /* check cert cache for cert */
+    certcache_hit = 
+        (PINT_certcache_lookup_entry(
+            (PVFS_certificate *) &cred->certificate) != NULL);
+#else
+    certcache_hit = 0;
+#endif
 
+    if (!certcache_hit)
+    {
+        /* verify the certificate (using the trust store)
+         * note: we don't cache a verified cert at this stage 
+         */
+        ret = PINT_verify_certificate(cert);
+        if (ret != 0)
+        {
+            /* Note: errors already logged */
+            X509_free(cert);
+            return 0;
+        }
+    }
     /* get certificate public key */
     pubkey = X509_get_pubkey(cert);
     if (pubkey == NULL)

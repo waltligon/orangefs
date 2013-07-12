@@ -1533,7 +1533,7 @@ static PINT_sm_action getattr_create_capability(
     /* Cache the new capability */
     if (insert_flag)
     {
-        ret = PINT_capcache_insert_entry(&resp_attr->capability);
+        ret = PINT_capcache_insert(&resp_attr->capability);
         if(ret < 0)
         {
             /* issue a warning */

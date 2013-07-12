@@ -7,6 +7,9 @@
 #include <string.h>
 #include <assert.h>
 
+/* leave first */
+#include "pvfs2-config.h"
+
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -364,6 +367,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credential *cred = NULL;
     int ret = -PVFS_EINVAL, capcache_hit;
+    DECLARE_PROFILER(profiler);
+
+    /* Profile validate operation */
+    INIT_PROFILER(profiler);
+    START_PROFILER(profiler);
 
     /*
       first we translate the dspace attributes into a more convenient
@@ -492,7 +500,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
         capcache_hit = 
-            (PINT_capcache_lookup_entry(&s_op->req->capability) != NULL);        
+            (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                  (capcache_hit) ? "hit" : "miss");
     }
@@ -537,6 +545,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                  "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op),
                  js_p->error_code);
+
+    FINISH_PROFILER("pv2", profiler, 1);
             
     return SM_ACTION_COMPLETE;
 }
