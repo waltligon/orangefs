@@ -463,8 +463,11 @@ int create_file(
     PVFS_credentials credentials;
     struct file_ref stFileRef;
    
+    /* Remove the file before trying to create it */
+    remove_file(linkName, use_pvfs2_lib, verbose); 
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
-   
+  
+ 
     if(use_pvfs2_lib)
     {
         ret = PVFS_util_resolve(fileName, 
