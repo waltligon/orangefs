@@ -573,7 +573,7 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
     }
 
     /* compute the hash table index using the data */
-    index = cache->methods.get_index(data);
+    index = cache->methods.get_index(data, cache->hash_limit);
 
     /* acquire the lock */
     LOCK_LOCK_NULL(&cache->lock);
@@ -600,7 +600,7 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
             gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: entry %p expired\n",
                          cache->desc, curr_entry);
 
-            PINT_seccache_remove(cache, curr_entry->data);
+            PINT_seccache_remove(cache, curr_entry);
 
             curr_entry = NULL;
             cache->stats.expired++;
@@ -647,7 +647,7 @@ int PINT_seccache_insert(seccache_t *cache,
     entry = cache->methods.new_entry(data);
 
     /* compute the hash table index */
-    index = cache->methods.get_index(data);
+    index = cache->methods.get_index(data, cache->hash_limit);
 
     /* remove expired entries in this chain */
     PINT_seccache_rm_expired_entries(cache, 0, index);
@@ -702,7 +702,7 @@ int PINT_seccache_remove(seccache_t *cache,
     LOCK_LOCK(&cache->lock);
 
     /* compute the hash table index */
-    index = cache->methods.get_index(entry);
+    index = cache->methods.get_index(entry->data, cache->hash_limit);
 
     /* remove entry */
     rem_entry = (seccache_entry_t *) PINT_llist_rem(

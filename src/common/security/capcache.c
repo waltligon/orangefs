@@ -25,14 +25,14 @@
 seccache_t *capcache = NULL;
 
 /*** capability cache methods ***/
-static seccache_entry_t *PINT_capcache_new_entry(void *data);
-static int PINT_capcache_expired(void *e1, void *e2);
-static void PINT_capcache_set_expired(void *entry, PVFS_time timeout);
-static uint16_t PINT_capcache_get_index(void *data);
-static int PINT_capcache_compare(void *data, void *entry);
-static void PINT_capcache_cleanup_entry(void *entry);
-static void PINT_capcache_debug(const char *prefix,
-                                void *entry);
+static seccache_entry_t *PINT_capcache_new_entry(void * data);
+static int PINT_capcache_expired(void * entry1, void * entry2);
+static void PINT_capcache_set_expired(void * entry, PVFS_time timeout);
+static uint16_t PINT_capcache_get_index(void * data, uint64_t hash_limit);
+static int PINT_capcache_compare(void * data, void * entry);
+static void PINT_capcache_cleanup_entry(void * entry);
+static void PINT_capcache_debug(const char * prefix,
+                                void * entry);
 
 /* method table */
 static seccache_methods_t capcache_methods = {
@@ -46,15 +46,15 @@ static seccache_methods_t capcache_methods = {
 };
 
 /*** capability cache helper functions ***/
-static int PINT_capcache_quick_cmp(void *data,
-                                   void *entry);
+static int PINT_capcache_quick_cmp(void * data,
+                                   void * entry);
 
 /*** capability cache methods ***/
 
 /** PINT_capcache_new_entry
  *  Create new cache entry
  */
-static seccache_entry_t *PINT_capcache_new_entry(void *data)
+static seccache_entry_t * PINT_capcache_new_entry(void * data)
 {
     PVFS_capability *cap = (PVFS_capability *) data;
     seccache_entry_t *entry;
@@ -91,7 +91,8 @@ static seccache_entry_t *PINT_capcache_new_entry(void *data)
  * timeout set to the current time.
  * Returns 0 if entry 'e2' has expired; otherwise, returns 1.
  */
-static int PINT_capcache_expired(void *entry1, void *entry2)
+static int PINT_capcache_expired(void * entry1, 
+                                 void * entry2)
 {
     if (((seccache_entry_t *) entry1)->expiration >=
         ((seccache_entry_t *) entry2)->expiration)
@@ -105,7 +106,8 @@ static int PINT_capcache_expired(void *entry1, void *entry2)
 /** PINT_capcache_setexpired
  *  Sets the capcache entry's timeout to "now"
  */
-static void PINT_capcache_set_expired(void *entry, PVFS_time timeout)
+static void PINT_capcache_set_expired(void * entry,
+                                      PVFS_time timeout)
 {
     seccache_entry_t *pentry = (seccache_entry_t *) entry;
     PVFS_capability *cap = (PVFS_capability *) pentry->data;
@@ -117,7 +119,6 @@ static void PINT_capcache_set_expired(void *entry, PVFS_time timeout)
     {
         pentry->expiration = cap->timeout;
     }
-
 }
 
 /** PINT_capcache_get_index
@@ -125,7 +126,8 @@ static void PINT_capcache_set_expired(void *entry, PVFS_time timeout)
  * The key is a concatenation of serveral capability fields.
  * Returns index of hash table.
  */
-static uint16_t PINT_capcache_get_index(void *data)
+static uint16_t PINT_capcache_get_index(void *data,
+                                        uint64_t hash_limit)
 {    
     PVFS_capability *cap = (PVFS_capability *) data;
     uint32_t seed = 42; //Seed Murmur3
@@ -159,7 +161,7 @@ static uint16_t PINT_capcache_get_index(void *data)
     hash1[0] += hash2[0];
     hash1[1] += hash2[1];
 
-    index = (uint16_t) (hash1[0] % CAPCACHE_HASH_LIMIT);
+    index = (uint16_t) (hash1[0] % hash_limit);
 
     return index;
 }
@@ -168,44 +170,43 @@ static uint16_t PINT_capcache_get_index(void *data)
  * Compares two PVFS_capability structures. Returns 0 if the
  * capabilities are equivalent. Returns nonzero otherwise.
  */
-static int PINT_capcache_compare(void *data, void *entry)
+static int PINT_capcache_compare(void * data,
+                                 void * entry)
 {
-   PVFS_capability *kcap, *ecap;
-   seccache_entry_t *pentry;
+    seccache_entry_t *pentry = (seccache_entry_t *) entry;
+    PVFS_capability *kcap, *ecap;
 
-   pentry = (seccache_entry_t *) entry;
+    /* ignore chain end marker */
+    if (pentry->data == NULL)
+    {
+        return 1;
+    }
 
-   /* ignore chain end marker */
-   if (pentry->data == NULL)
-   {
-       return 1;
-   }
+    ecap = (PVFS_capability *) pentry->data;
+    kcap = (PVFS_capability *) data;
 
-   ecap = (PVFS_capability *) pentry->data;
-   kcap = (PVFS_capability *) data;
+    /* if both sig_sizes are 0, they're null caps */
+    if (kcap->sig_size == 0 && ecap->sig_size == 0)
+    {
+        return 0;
+    }
+    /* sizes don't match -- shouldn't happen */
+    else if (kcap->sig_size != ecap->sig_size)
+    {
+        gossip_err("Warning: capability cache: signature size mismatch "
+                   "(key: %d   entry: %d)\n", kcap->sig_size, ecap->sig_size);
+        return 1;
+    }
 
-   /* if both sig_sizes are 0, they're null caps */
-   if (kcap->sig_size == 0 && ecap->sig_size == 0)
-   {
-       return 0;
-   }
-   /* sizes don't match -- shouldn't happen */
-   else if (kcap->sig_size != ecap->sig_size)
-   {
-       gossip_err("Warning: capability cache: signature size mismatch "
-                  "(key: %d   entry: %d)\n", kcap->sig_size, ecap->sig_size);
-       return 1;
-   }
-
-   /* compare signatures */
-   return memcmp(kcap->signature, ecap->signature, kcap->sig_size);
+    /* compare signatures */
+    return memcmp(kcap->signature, ecap->signature, kcap->sig_size);
 }
 
 /** PINT_capcache_cleanup_entry
  *  Frees allocated members of capcache_entry_s and then frees
  *  the entry.
  */
-static void PINT_capcache_cleanup_entry(void *entry)
+static void PINT_capcache_cleanup_entry(void * entry)
 {
     if (entry != NULL)
     {
@@ -225,8 +226,8 @@ static void PINT_capcache_cleanup_entry(void *entry)
  * Outputs the fields of a capability.
  * prefix should typically be "caching" or "removing".
  */
-static void PINT_capcache_debug(const char *prefix,
-                                void *data)
+static void PINT_capcache_debug(const char * prefix,
+                                void * data)
 {
     char sig_buf[10], mask_buf[10];
     PVFS_capability *cap;
@@ -270,7 +271,8 @@ static void PINT_capcache_debug(const char *prefix,
  * Compares two PVFS_capability structures. Returns 0 if the
  * capability fields are equivalent. Returns nonzero otherwise.
  */
-static int PINT_capcache_quick_cmp(void *data, void *entry)
+static int PINT_capcache_quick_cmp(void * data,
+                                   void * entry)
 {
     PVFS_capability *kcap, *ecap;
     seccache_entry_t *pentry;
@@ -297,13 +299,13 @@ static int PINT_capcache_quick_cmp(void *data, void *entry)
 /** PINT_capcache_quick_sign
  * Copy signature from cached capability if fields match
  */
-int PINT_capcache_quick_sign(PVFS_capability *cap)
+int PINT_capcache_quick_sign(PVFS_capability * cap)
 {
     seccache_entry_t *curr_entry = NULL;
     uint16_t index = 0;
     PVFS_capability *curr_cap;
 
-    index = capcache->methods.get_index(cap);
+    index = capcache->methods.get_index(cap, capcache->hash_limit);
 
     PINT_seccache_lock(capcache);
     
@@ -385,7 +387,7 @@ int PINT_capcache_finalize(void)
 }
 
 /* lookup entry using capability */
-seccache_entry_t *PINT_capcache_lookup(PVFS_capability *cap)
+seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap)
 {
 
     return PINT_seccache_lookup(capcache, cap);
@@ -398,7 +400,7 @@ int PINT_capcache_insert(PVFS_capability *cap)
 }
 
 /* remove capability entry */
-int PINT_capcache_remove(seccache_entry_t *entry)
+int PINT_capcache_remove(seccache_entry_t * entry)
 {
     return PINT_seccache_remove(capcache, entry);
 }

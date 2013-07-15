@@ -19,8 +19,6 @@
 #include "seccache.h"
 
 /* Capcache Macros - Adjust accordingly */
-/* Key type, so it can be swapped easily */
-#define KEY_T                   uint64_t
 /* Default timeout of capability-cache entry in seconds */
 #define CAPCACHE_TIMEOUT        10
 /* Number of capability cache entries capability cache can hold */
@@ -31,9 +29,6 @@
 #define CAPCACHE_HASH_LIMIT      128
 /* Frequency (in lookups) to debugging stats */
 #define CAPCACHE_STATS_FREQ     1000
-
-/* Global Variables */
-/* TODO: remove   extern seccache_t *capcache; */
 
 /* Externally Visible Capability Cache API */
 int PINT_capcache_init(void);

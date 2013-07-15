@@ -63,19 +63,19 @@ typedef enum {
 
 typedef struct seccache_entry_s {
     PVFS_time expiration;
-    void *data;
+    void * data;
     PVFS_size data_size;
 } seccache_entry_t;
 
 /* implementation-defined cache functions */
 typedef struct seccache_methods_s {
-    seccache_entry_t * (*new_entry)(void *data);
-    int (*expired)(void *entry1, void *entry2);
-    void (*set_expired)(void *entry, PVFS_time timeout);
-    uint16_t (*get_index)(void *data);
-    int (*compare)(void *data, void *entry);
-    void (*cleanup)(void *entry);
-    void (*debug)(const char *prefix, void *entry);
+    seccache_entry_t * (*new_entry)(void * data);
+    int (*expired)(void *entry1, void * entry2);
+    void (*set_expired)(void * entry, PVFS_time timeout);
+    uint16_t (*get_index)(void * data, uint64_t hash_limit);
+    int (*compare)(void * data, void * entry);
+    void (*cleanup)(void * entry);
+    void (*debug)(const char * prefix, void * entry);
 } seccache_methods_t;
 
 /* cache stats structure */
@@ -104,7 +104,7 @@ typedef struct seccache_s {
     uint64_t stats_freq;
     uint64_t stat_count;
     seccache_stats_t stats;
-    PINT_llist_p *hash_table;
+    PINT_llist_p * hash_table;
 } seccache_t;
 
 /*** externally visible cache API ***/

@@ -306,7 +306,7 @@ int PINT_security_cache_ca_cert(void)
     }
 
     /* insert cert into cache as root user */
-    ret = PINT_certcache_insert_entry(pcert, 0, 1, group_array);
+    ret = PINT_certcache_insert(pcert, 0, 1, group_array);
 
     PINT_cleanup_cert(pcert);
 
@@ -847,7 +847,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 #ifdef ENABLE_CERTCACHE
     /* check cert cache for cert */
     certcache_hit = 
-        (PINT_certcache_lookup_entry(
+        (PINT_certcache_lookup(
             (PVFS_certificate *) &cred->certificate) != NULL);
 #else
     certcache_hit = 0;
