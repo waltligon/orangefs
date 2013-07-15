@@ -1349,7 +1349,7 @@ int create_symlink(
     char cmd[PATH_MAX] = "";
     
     /* Remove symlink first */ 
-    remove_symlink(linkName,use_pvfs2_lib,verbose) 
+    remove_symlink(linkName,use_pvfs2_lib,verbose); 
     
     if(verbose) { printf("\tCreating symlink [%s] to [%s]:\n", linkName, linkTarget); }
     
