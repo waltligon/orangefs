@@ -343,7 +343,8 @@ static int mode2flags(const char *mode)
                 }
                 break;
             case 'b': /* this is ignored in POSIX */
-            case 'c': /* used in glibc ignored here */
+        case 't': /* text mode - ignored */    
+	case 'c': /* used in glibc ignored here */
             case 'e': /* used in glibc ignored here */
             case 'm': /* used in glibc ignored here */
                 break;
