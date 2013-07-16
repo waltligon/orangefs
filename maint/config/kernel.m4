@@ -201,7 +201,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         ], [
                 AC_MSG_RESULT(yes)
                 AC_DEFINE(HAVE_D_ALLOC_ROOT, 1, [Define if kernel defines
-                          d_alloc_root]),
+                          d_alloc_root])
         ], [
                 AC_MSG_RESULT(no)
         ]
