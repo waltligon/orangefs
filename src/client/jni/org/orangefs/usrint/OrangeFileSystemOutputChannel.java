@@ -27,7 +27,7 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
 
     /* Flush the outChannel and close the file */
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (fd < 0) {
             return;
         }
@@ -39,7 +39,7 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
     }
 
     /* Flush what's left in the channelBuffer to the file system */
-    void flush() throws IOException {
+    public synchronized void flush() throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open");
         }
@@ -55,11 +55,11 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
     }
 
     @Override
-    public boolean isOpen() {
+    public synchronized boolean isOpen() {
         return fd >= 0;
     }
 
-    public void seek(long pos) throws IOException {
+    public synchronized void seek(long pos) throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -71,7 +71,7 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         }
     }
 
-    public long tell() throws IOException {
+    public synchronized long tell() throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -90,7 +90,7 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
     }
 
     @Override
-    public int write(ByteBuffer src) throws IOException {
+    public synchronized int write(ByteBuffer src) throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }

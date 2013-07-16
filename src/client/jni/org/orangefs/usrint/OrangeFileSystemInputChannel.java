@@ -35,7 +35,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (fd < 0) {
             return;
         }
@@ -47,12 +47,12 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
     }
 
     @Override
-    public boolean isOpen() {
+    public synchronized boolean isOpen() {
         return fd >= 0;
     }
 
     @Override
-    public int read(ByteBuffer dst) throws IOException {
+    public synchronized int read(ByteBuffer dst) throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -112,7 +112,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
      * When this method is called, the position should equal 0, and the limit
      * should equal the capacity, via clear().
      */
-    private void readOFS() throws IOException {
+    private synchronized void readOFS() throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -125,7 +125,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         channelBuffer.position((int) ret);
     }
 
-    public void seek(long pos) throws IOException {
+    public synchronized void seek(long pos) throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -138,7 +138,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
     }
 
     /* Returns current position within the file */
-    public long tell() throws IOException {
+    public synchronized long tell() throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
