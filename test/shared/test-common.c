@@ -476,6 +476,9 @@ int create_file(
     PVFS_fs_id fs_id;
     PVFS_credential credential;
     struct file_ref stFileRef;
+    
+    /* Remove file first */ 
+    remove_file(fileName,use_pvfs2_lib,verbose);
    
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
    
@@ -1374,7 +1377,11 @@ int create_symlink(
     int  ret=0;
     char cmd[PATH_MAX] = "";
     
+    /* Remove symlink first */ 
+    remove_symlink(linkName,use_pvfs2_lib,verbose); 
+    
     if(verbose) { printf("\tCreating symlink [%s] to [%s]:\n", linkName, linkTarget); }
+    
     
     if(use_pvfs2_lib)
     {
