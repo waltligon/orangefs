@@ -464,7 +464,7 @@ int create_file(
     struct file_ref stFileRef;
    
     /* Remove the file before trying to create it */
-    remove_file(linkName, use_pvfs2_lib, verbose); 
+    remove_file(fileName, use_pvfs2_lib, verbose); 
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
   
  
