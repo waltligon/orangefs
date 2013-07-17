@@ -25,23 +25,22 @@
 seccache_t *capcache = NULL;
 
 /*** capability cache methods ***/
-static seccache_entry_t *PINT_capcache_new_entry(void * data);
-static int PINT_capcache_expired(void * entry1, void * entry2);
-static void PINT_capcache_set_expired(void * entry, PVFS_time timeout);
-static uint16_t PINT_capcache_get_index(void * data, uint64_t hash_limit);
-static int PINT_capcache_compare(void * data, void * entry);
-static void PINT_capcache_cleanup_entry(void * entry);
-static void PINT_capcache_debug(const char * prefix,
-                                void * entry);
+/* static int PINT_capcache_expired(void *entry1, void *entry2); */
+static void PINT_capcache_set_expired(seccache_entry_t *entry, PVFS_time timeout);
+static uint16_t PINT_capcache_get_index(void *data, uint64_t hash_limit);
+static int PINT_capcache_compare(void *data, void *entry);
+static void PINT_capcache_cleanup(void *data);
+static void PINT_capcache_debug(const char *prefix,
+                                void *data);
 
 /* method table */
-static seccache_methods_t capcache_methods = {
-    PINT_capcache_new_entry,
-    PINT_capcache_expired,
+static seccache_methods_t capcache_methods = {    
+    /* PINT_capcache_expired */
+    PINT_seccache_expired_default,
     PINT_capcache_set_expired,
     PINT_capcache_get_index,
     PINT_capcache_compare,
-    PINT_capcache_cleanup_entry,
+    PINT_capcache_cleanup,
     PINT_capcache_debug
 };
 
@@ -51,73 +50,21 @@ static int PINT_capcache_quick_cmp(void * data,
 
 /*** capability cache methods ***/
 
-/** PINT_capcache_new_entry
- *  Create new cache entry
- */
-static seccache_entry_t * PINT_capcache_new_entry(void * data)
-{
-    PVFS_capability *cap = (PVFS_capability *) data;
-    seccache_entry_t *entry;
-
-    if (cap == NULL)
-    {
-        return NULL;
-    }
-
-    /* allocate entry */
-    entry = (seccache_entry_t *) malloc(sizeof(seccache_entry_t));
-    if (entry == NULL)
-    {
-        return NULL;
-    }
-
-    /* copy capability */
-    entry->data = PINT_dup_capability(cap);
-    if (entry->data == NULL)
-    {
-        free(entry);
-        return NULL;
-    }
-    entry->data_size = sizeof(PVFS_capability);
-
-    /* note: expiration set when inserted into cache */
-    entry->expiration = 0xFFFFFFFF;
-
-    return entry;
-}
-
-/** PINT_capcache_expired
- * Compares capcache entry's timeout to that of a 'dummy' entry with the
- * timeout set to the current time.
- * Returns 0 if entry 'e2' has expired; otherwise, returns 1.
- */
-static int PINT_capcache_expired(void * entry1, 
-                                 void * entry2)
-{
-    if (((seccache_entry_t *) entry1)->expiration >=
-        ((seccache_entry_t *) entry2)->expiration)
-    {
-        /* entry has expired */
-        return 0;
-    }
-    return 1;
-}
-
 /** PINT_capcache_setexpired
  *  Sets the capcache entry's timeout to "now"
  */
-static void PINT_capcache_set_expired(void * entry,
+static void PINT_capcache_set_expired(seccache_entry_t *entry,
                                       PVFS_time timeout)
 {
-    seccache_entry_t *pentry = (seccache_entry_t *) entry;
-    PVFS_capability *cap = (PVFS_capability *) pentry->data;
+    
+    PVFS_capability *cap = (PVFS_capability *) entry->data;
 
-    pentry->expiration = time(NULL) + timeout;
+    entry->expiration = time(NULL) + timeout;
 
-    /* expire when cap times out if sooner */
-    if (cap->timeout < pentry->expiration)
+    /* do not set expiration past capability timeout */
+    if (cap->timeout < entry->expiration)
     {
-        pentry->expiration = cap->timeout;
+        entry->expiration = cap->timeout;
     }
 }
 
@@ -130,7 +77,7 @@ static uint16_t PINT_capcache_get_index(void *data,
                                         uint64_t hash_limit)
 {    
     PVFS_capability *cap = (PVFS_capability *) data;
-    uint32_t seed = 42; //Seed Murmur3
+    uint32_t seed = 42;
     uint64_t hash1[2] = { 0, 0};
     uint64_t hash2[2] = { 0, 0};
     uint16_t index = 0;
@@ -203,21 +150,13 @@ static int PINT_capcache_compare(void * data,
 }
 
 /** PINT_capcache_cleanup_entry
- *  Frees allocated members of capcache_entry_s and then frees
- *  the entry.
+ *  Frees allocated capability.
  */
-static void PINT_capcache_cleanup_entry(void * entry)
+static void PINT_capcache_cleanup(void *data)
 {
-    if (entry != NULL)
+    if (data != NULL)
     {
-        if (((seccache_entry_t *) entry)->data != NULL)
-        {
-            gossip_debug(GOSSIP_SECCACHE_DEBUG,
-                "\tcleaning up capability: %p\n", entry);
-            PINT_cleanup_capability((PVFS_capability *) 
-                                    ((seccache_entry_t *)entry)->data);
-        }
-        free(entry);
+        PINT_cleanup_capability((PVFS_capability *) data);
     }
 }
 
@@ -226,8 +165,8 @@ static void PINT_capcache_cleanup_entry(void * entry)
  * Outputs the fields of a capability.
  * prefix should typically be "caching" or "removing".
  */
-static void PINT_capcache_debug(const char * prefix,
-                                void * data)
+static void PINT_capcache_debug(const char *prefix,
+                                void *data)
 {
     char sig_buf[10], mask_buf[10];
     PVFS_capability *cap;
@@ -322,23 +261,27 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
 
     if (curr_entry != NULL)
     {
-        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry found!\n",
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry found\n",
                      __func__);
     }
     else
     {
-        SECCACHE_EXIT_FN();
         return 1;
     }
 
     /* copy capability timeout & signature */
     curr_cap = (PVFS_capability *) curr_entry->data;
+    /* check timeout */
+    if (PINT_util_get_current_time() >= curr_cap->timeout)
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry timed out\n",
+                     __func__);
+        return -1;
+    }
     cap->timeout = curr_cap->timeout;
     cap->sig_size = curr_cap->sig_size;
     memcpy(cap->signature, curr_cap->signature, 
            curr_cap->sig_size);
-
-    SECCACHE_EXIT_FN();
 
     return 0;
 }
@@ -353,20 +296,14 @@ int PINT_capcache_init(void)
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing capability cache...\n");
 
-    /* TODO: locking */
-
-    capcache = PINT_seccache_new("Capability", 
-                                 &capcache_methods,
-                                 CAPCACHE_HASH_LIMIT);
+    capcache = PINT_seccache_new("Capability", &capcache_methods, 0);
     if (capcache == NULL)
     {
         return -PVFS_ENOMEM;
     }
 
-    /* Set properties */
-    PINT_seccache_set(capcache, SECCACHE_SIZE_LIMIT, CAPCACHE_SIZE_LIMIT);
+    /* Set timeout */
     PINT_seccache_set(capcache, SECCACHE_TIMEOUT, CAPCACHE_TIMEOUT);
-    PINT_seccache_set(capcache, SECCACHE_ENTRY_LIMIT, CAPCACHE_ENTRY_LIMIT);    
 
     return 0;
 }
@@ -383,25 +320,43 @@ int PINT_capcache_finalize(void)
     PINT_seccache_cleanup(capcache);
 
     return 0;
-
 }
 
 /* lookup entry using capability */
 seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap)
 {
-
     return PINT_seccache_lookup(capcache, cap);
 }
 
 /* insert entry for capability */
 int PINT_capcache_insert(PVFS_capability *cap)
 {
-    return PINT_seccache_insert(capcache, cap, sizeof(PVFS_capability));
+    PVFS_capability *cachecap;
+    int ret = 0;
+
+    cachecap = PINT_dup_capability(cap);
+    if (cachecap == NULL)
+    {
+        ret = -PVFS_ENOMEM;
+    }
+
+    if (ret == 0)
+    {
+        ret = PINT_seccache_insert(capcache, cachecap, 
+                                   sizeof(PVFS_capability));
+    }
+
+    if (ret != 0)
+    {
+        PVFS_perror_gossip("PINT_certcache_insert: insert failed", ret);
+    }
+
+    return ret;
 }
 
 /* remove capability entry */
 int PINT_capcache_remove(seccache_entry_t * entry)
-{
+{    
     return PINT_seccache_remove(capcache, entry);
 }
 

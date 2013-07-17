@@ -53,6 +53,9 @@
 #ifdef ENABLE_CAPCACHE
 #include "capcache.h"
 #endif
+#ifdef ENABLE_CREDCACHE
+#include "credcache.h"
+#endif
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
@@ -599,6 +602,19 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_CAPCACHE_INIT;
 #endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CREDCACHE
+    /* initialize the credential cache */
+    ret = PINT_credcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize credential cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CREDCACHE_INIT;
+#endif
 
 #ifdef ENABLE_CERTCACHE
     /* initialize the certificate cache */

@@ -53,7 +53,7 @@ static void PINT_seccache_print_stats(seccache_t *cache)
     }
 
     cache->stat_count++;
-    if (cache->stat_count % cache->stats_freq == 0)
+    if (cache->stats_freq != 0 && cache->stat_count % cache->stats_freq == 0)
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "*** %s cache statistics "
                      "***\n", cache->desc);
@@ -75,27 +75,9 @@ static void PINT_seccache_print_stats(seccache_t *cache)
 
 static int lock_init(seccache_lock_t *lock)
 {
-    int ret = -1;
-
-    /* TODO: ability to disable locking */
-#if SECCACHE_LOCK_TYPE == 0
-    return 0;
-#elif SECCACHE_LOCK_TYPE == 1
-    pthread_mutexattr_t attr;
-    ret = pthread_mutexattr_init(&attr);
-    if (ret != 0) return -1;
-    ret = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-    if (ret != 0) return -1;
-    ret = pthread_mutex_init(lock, &attr);
-    if (ret != 0) return -1;
-#elif SECCACHE_LOCK_TYPE == 2
-    ret = pthread_spin_init(lock, 1);
-    if (ret != 0) return -1;
-#elif SECCACHE_LOCK_TYPE == 3
     *lock = (seccache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP;
-    ret = 0;
-#endif
-    return ret;
+
+    return 0;
 }
 
 /** lock_lock()
@@ -104,19 +86,7 @@ static int lock_init(seccache_lock_t *lock)
  */
 static inline int lock_lock(seccache_lock_t *lock)
 {
-    int ret = 0;
-    
-#if SECCACHE_LOCK_TYPE == 0
-    return ret;
-#elif SECCACHE_LOCK_TYPE == 1
-    ret = pthread_mutex_lock(lock);
-    return ret;
-#elif SECCACHE_LOCK_TYPE == 2
-    return pthread_spin_lock(lock);
-#elif SECCACHE_LOCK_TYPE == 3
-    ret = gen_mutex_lock(lock);
-    return ret;
-#endif
+    return gen_mutex_lock(lock);
 }
 
 /** lock_unlock()
@@ -125,15 +95,7 @@ static inline int lock_lock(seccache_lock_t *lock)
  */
 static inline int lock_unlock(seccache_lock_t *lock)
 {
-#if SECCACHE_LOCK_TYPE == 0
-    return 0;
-#elif SECCACHE_LOCK_TYPE == 1
-    return pthread_mutex_unlock(lock);
-#elif SECCACHE_LOCK_TYPE == 2
-    return pthread_spin_unlock(lock);
-#elif SECCACHE_LOCK_TYPE == 3
     return gen_mutex_unlock(lock);
-#endif
 }
 
 /** lock_trylock
@@ -145,27 +107,12 @@ static inline int lock_trylock(seccache_lock_t *lock)
 {
     int ret = -1;
 
-#if (SECCACHE_LOCK_TYPE == 0)
-    return 0;
-#elif (SECCACHE_LOCK_TYPE == 1)
-    ret = pthread_mutex_trylock(lock);
-    if (ret != 0)
-    {
-        ret = -1;
-    }
-#elif (SECCACHE_LOCK_TYPE == 2)
-    ret = pthread_spin_trylock(lock);
-    if (ret != 0)
-    {
-        ret = -1;
-    }
-#elif SECCACHE_LOCK_TYPE == 3
     ret = gen_mutex_trylock(lock);
     if (ret != 0)
     {
         ret = -1;
     }
-#endif
+
     if (ret == 0)
     {
         /* Unlock before leaving if lock wasn't already set */
@@ -185,8 +132,8 @@ static inline int lock_trylock(seccache_lock_t *lock)
  * entry freed, and removed from the linked list.
  */
 static int PINT_seccache_rm_expired_entries(seccache_t *cache,
-                                             PVFS_boolean all,
-                                             uint16_t index)
+                                            PVFS_boolean all,
+                                            uint16_t index)
 {
     seccache_entry_t now_entry;
     int hash_index;
@@ -221,7 +168,7 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
                 &now_entry,
                 cache->methods.expired)) != NULL)
             {
-                cache->methods.debug("***** REMOVING *****", rem_entry->data);
+                cache->methods.debug("*** Removing", rem_entry->data);
 
                 cache->methods.cleanup(rem_entry->data);
 
@@ -241,7 +188,7 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
                 &now_entry,
                 cache->methods.expired)) != NULL)
         {
-            cache->methods.debug("***** REMOVING *****", rem_entry->data);
+            cache->methods.debug("*** Removing", rem_entry->data);
 
             cache->methods.cleanup(rem_entry->data);
 
@@ -259,6 +206,17 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
     return 0;
 }   
 
+int PINT_seccache_expired_default(void *entry1, 
+                                  void *entry2)
+{
+    if (((seccache_entry_t *) entry1)->expiration >= 
+        ((seccache_entry_t *)entry2)->expiration)
+    {
+        /* entry has expired */
+        return 0;
+    }
+    return 1;
+}
 
 /*** end internal functions ***/
 
@@ -506,56 +464,6 @@ void PINT_seccache_cleanup(seccache_t *cache)
     free(cache);
 }
 
-/* create an entry using data (not inserted in cache).
-   Data is copied */
-/*** TODO: remove?*/
-#if 0
-seccache_entry_t *PINT_seccache_new(void *data,
-                                    PVFS_size data_size)
-{
-    seccache_entry_t *entry;
-
-    if (data == NULL || data_size == 0)
-    {
-        return NULL;
-    }
-
-    /* allocate entry */
-    entry = (seccache_entry_t *) malloc(sizeof(seccache_entry_t));
-    if (entry == NULL)
-    {
-        return NULL;
-    }
-
-    /* allocate data */
-    entry->data = (seccache_entry_t *) malloc(data_size);
-    if (entry->data == NULL)
-    {
-        free(entry);
-        return NULL;
-    }
-
-    /* copy data */
-    memcpy(entry->data, data, data_size);
-    entry->data_size = data_size;
-
-    entry->expiration = 0xFFFFFFFF;
-
-    return entry;
-}
-
-/* free entry memory */
-void PINT_seccache_cleanup_entry(seccache_entry_t *entry)
-{
-    if (entry->data != NULL)
-    {
-        free(entry->data);
-    }
-
-    free(entry);
-}
-#endif /* #if 0 */
-
 /* locates an entry given the specified data */
 seccache_entry_t * PINT_seccache_lookup(seccache_t *cache, 
                                         void *data)
@@ -567,6 +475,8 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
     
     if (cache == NULL || data == NULL)
     {
+        gossip_err("%s: invalid parameter\n", __func__);
+
         SECCACHE_EXIT_FN();
 
         return NULL;
@@ -644,7 +554,18 @@ int PINT_seccache_insert(seccache_t *cache,
     }
 
     /* create new entry */
-    entry = cache->methods.new_entry(data);
+    entry = (seccache_entry_t *) malloc(sizeof(seccache_entry_t));
+    if (entry == NULL)
+    {
+        SECCACHE_EXIT_FN();
+
+        return -PVFS_ENOMEM;
+    }
+
+    /* assign fields -- expiration is set by set_expired method later */
+    entry->data = data;
+    entry->data_size = data_size;
+    entry->expiration = 0xFFFFFFFF;
 
     /* compute the hash table index */
     index = cache->methods.get_index(data, cache->hash_limit);
@@ -654,7 +575,7 @@ int PINT_seccache_insert(seccache_t *cache,
 
     cache->methods.set_expired(entry, cache->timeout);
 
-    cache->methods.debug("Caching", entry->data);
+    cache->methods.debug("*** Caching", entry->data);
 
     /* acquire the lock */
     LOCK_LOCK(&cache->lock);
@@ -693,6 +614,8 @@ int PINT_seccache_remove(seccache_t *cache,
 
     if (cache == NULL || entry == NULL)
     {
+        gossip_err("%s: invalid parameter\n", __func__);
+
         SECCACHE_EXIT_FN();
 
         return -PVFS_EINVAL;
@@ -719,7 +642,7 @@ int PINT_seccache_remove(seccache_t *cache,
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: removed entry %p at "
                      "index %hd\n", cache->desc, rem_entry, index);
 
-        cache->methods.cleanup(rem_entry);
+        cache->methods.cleanup(rem_entry->data);
 
         free(rem_entry);
         cache->stats.removed++;
