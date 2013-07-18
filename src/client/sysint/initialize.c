@@ -112,7 +112,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     /**
      * (ClientID, Rank, RequestID, Handle, Sys)
      */
-    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "", &PINT_client_sys_event_id);
+    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "",
+                            &PINT_client_sys_event_id);
 
     event_mask = getenv("PVFS2_EVENTMASK");
     if (event_mask)
@@ -258,7 +259,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
    return 0;
 
-  error_exit:
+error_exit:
 
     id_gen_safe_finalize();
 

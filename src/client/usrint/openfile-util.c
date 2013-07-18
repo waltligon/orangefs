@@ -2062,7 +2062,7 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
     }
     if (descriptor_table[newfd])
     {
-        gossip_lerr("Trying to allocated descriptor where one "
+        gossip_lerr("Trying to allocate descriptor where one "
                     "appears to already exist\n");
         return NULL;
     }

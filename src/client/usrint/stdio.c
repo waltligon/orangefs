@@ -41,6 +41,18 @@ static int init_flag = 0;
 struct stdio_ops_s stdio_ops;
 static FILE open_files = {._chain = NULL};
 
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...);
+int __printf_chk (int flag, const char *format, ...);
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap);
+int __vprintf_chk (int flag, const char *format, va_list ap);
+int __dprintf_chk (int fd, int flag, const char *fmt, ...);
+int __vdprintf_chk (int fd, int flag, const char *fmt, va_list ap);
+char *__gets_chk (char *str, size_t n);
+char *__fgets_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+char *__fgets_unlocked_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+
 /* this is defined in openfile-util.g because it is used openfile-util.c
  * _P_IO_MAGIC     0xF0BD0000
  */
@@ -203,7 +215,7 @@ FILE *stderr = &pvfs_stderr_stream;
 #endif
 #endif
 
-/* this is gets called all over the place to make sure initialization is
+/* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
  * real init function - which in theory was done before main
  */
@@ -867,6 +879,14 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rsz / size; /* num items written */
 }
 
+/**
+ * __fread_chk
+ */
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread(ptr, size, nmemb, stream);
+}
+
 /*
  * fread implements the same buffer scheme as in fwrite
  */
@@ -896,6 +916,14 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     rc = fread_unlocked(ptr, size, nmemb, stream);
     unlock_stream(stream);
     return rc;
+}
+
+/**
+ * __fread_unlocked_chk
+ */
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread_unlocked(ptr, size, nmemb, stream);
 }
 
 size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -1797,6 +1825,14 @@ int putw(int wd, FILE *stream)
 }
 
 /**
+ * __fgets_chk
+ */
+char *__fgets_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets(s, size, stream);
+}
+
+/**
  * fgets reads up to size or a newline
  */
 char *fgets(char *s, int size, FILE *stream)
@@ -1828,6 +1864,14 @@ char *fgets(char *s, int size, FILE *stream)
     unlock_stream(stream);
     gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
     return rc;
+}
+
+/**
+ * __fgets_unlocked_chk
+ */
+char *__fgets_unlocked_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets_unlocked(s, size, stream);
 }
 
 char *fgets_unlocked(char *s, int size, FILE *stream)
@@ -1983,6 +2027,14 @@ int getw(FILE *stream)
 }
 
 /**
+ * __gets_check
+ */
+char *__gets_chk(char *s, size_t n)
+{
+    return gets(s);
+}
+
+/**
  * gets
  */
 char *gets(char *s)
@@ -2121,8 +2173,23 @@ int ungetc(int c, FILE *stream)
  */
 #if 0
 sprintf, snprintf, vsprintf, vsnprintf, asprintf, vasprintfm
-sscanf, vsscanf
+sscanf, vsscanf, asprintf, vasprintf
 #endif
+
+
+/**
+ * __dprintf_chk wrapper
+ */
+int __dprintf_chk(int fd, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vdprintf(fd, format, ap);
+    va_end(ap);
+    return len;
+}
 
 /**
  * dprintf wrapper
@@ -2136,6 +2203,14 @@ int dprintf(int fd, const char *format, ...)
     len = vdprintf(fd, format, ap);
     va_end(ap);
     return len;
+}
+
+/**
+ * __vdprintf_chk wrapper
+ */
+int __vdprintf_chk(int fd, int flag, const char *format, va_list ap)
+{
+    return vdprintf(fd, format, ap); /* this is in libc */
 }
 
 /**
@@ -2193,8 +2268,43 @@ int vfprintf(FILE *stream, const char *format, va_list ap)
     return rc;
 }
 
+/** These functions are wrappers in case glibc's headers have rewritten
+ * the calls
+ */
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stream, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __printf_chk (int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stdout, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap)
+{
+    return vfprintf(stream, format, ap);
+}
+
+int __vprintf_chk (int flag, const char *format, va_list ap)
+{
+    return vfprintf(stdout, format, ap);
+}
+
 /**
- * fprintf wrapper
+ * vfprintf wrapper
  */
 int vprintf(const char *format, va_list ap)
 {

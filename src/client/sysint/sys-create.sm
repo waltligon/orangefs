@@ -177,11 +177,12 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_CREATE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -201,7 +202,10 @@ PVFS_error PVFS_isys_create(
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &parent_ref.handle);
     sm_p->parent_ref = parent_ref;
 
     if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
