@@ -1688,8 +1688,6 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
     int i = 0;
     int failed;
 
-fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
-
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
         return(bmi_errno_to_pvfs(-ENAMETOOLONG));
