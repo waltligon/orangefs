@@ -179,6 +179,7 @@ class OFSEC2ConnectionManager(object):
         time.sleep(30)
         return external_addresses
     
+
     def manageExistingEC2Node(self,ec2_node):
         pass
     

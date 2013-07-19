@@ -10,37 +10,47 @@ def append(testing_node,output=[]):
     for i in range(25):
         test_string = "%s line%d\n" % (test_string,i)
     
-    # use a batchfile to create the files. This avoids redirect confusion
-    testing_node.addBatchCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location))
-    testing_node.addBatchCommand('echo "%s" > %s' % (test_string,local_reference))
-    testing_node.addBatchCommand('echo "%s" > %s' % (test_string,append_test))
-    testing_node.addBatchCommand('echo "%s" >> %s' % (test_string,local_reference))
-    testing_node.addBatchCommand('echo "%s" >> %s' % (test_string,append_test))
-    testing_node.runAllBatchCommands()
-   
+    
+    # use bash -c to create the files. This avoids redirect confusion
+    print 'bash -c \'echo "%s" > %s\''% (test_string,local_reference)
+    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference))
+    print 'bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test)
+    testing_node.runSingleCommand('bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test))
+    print 'bash -c \'echo "%s" >> %s\'' % (test_string,local_reference)
+    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference))
+    print 'bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test)
+    testing_node.runSingleCommand('bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test))
+    
+    
     # now diff it
-    rc = testing_node.runSingleCommand("diff -u %s %s" % (append_test, local_reference),output)
+    rc = testing_node.runSingleCommand("%s diff -u %s %s" % (preload, append_test, local_reference),output)
     return rc
 
 def append2(testing_node,output=[]):
     pvfs2_testdir = testing_node.ofs_mountpoint +"/append_dir"
-    append_test = testing_node.ofs_mountpoint +"/append_test2"
+    append_test =  pvfs2_testdir+"/append_test2"
     local_reference = testing_node.ofs_installation_location + "/append_ref2"
     
     test_string = ""
     for i in range(25):
         test_string = "%s line%d\n" % (test_string,i)
     
-    # use a batchfile to create the files. This avoids redirect confusion
-    testing_node.addBatchCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location))
-    testing_node.addBatchCommand("mkdir -p %s" % pvfs2_testdir)
-    testing_node.addBatchCommand('echo "%s" > %s' % (test_string,local_reference))
-    testing_node.addBatchCommand('echo "%s" > %s' % (test_string,append_test))
-    testing_node.addBatchCommand('echo "%s" >> %s' % (test_string,local_reference))
-    testing_node.addBatchCommand('echo "%s" >> %s' % (test_string,append_test))
-    testing_node.runAllBatchCommands()
+    # use bash -c to create the files. This avoids redirect confusion
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    
+    testing_node.runSingleCommand("%s mkdir -p %s" % (preload,pvfs2_testdir))
+
+    print 'bash -c \'echo "%s" > %s\''% (test_string,local_reference)
+    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference))
+    print 'bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test)
+    testing_node.runSingleCommand('bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test))
+    print 'bash -c \'echo "%s" >> %s\'' % (test_string,local_reference)
+    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference))
+    print 'bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test)
+    testing_node.runSingleCommand('bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test))
+    
    
-    rc = testing_node.runSingleCommand("diff -u %s %s" % (append_test, local_reference),output)
+    rc = testing_node.runSingleCommand("%s diff -u %s %s" % (preload, append_test, local_reference),output)
 
     return rc
 
@@ -91,13 +101,13 @@ def dbench(testing_node,output=[]):
         if rc != 0:
             return rc
 
-    preload = "export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("%s cp %s/dbench-3.03/client.txt %s" % (preload,testing_node.ofs_extra_tests_location,testing_node.ofs_mountpoint),output)
     if rc != 0:
         return rc
     
-    testing_node.changeDirectory(testing_node.ofs_mountpoint)
-    rc = testing_node.runSingleCommand("%s %s/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1" %(preload,testing_node.ofs_extra_tests_location),output)
+    #testing_node.changeDirectory(testing_node.ofs_mountpoint)
+    rc = testing_node.runSingleCommand("export %s; cd %s; %s/dbench-3.03/dbench -c client.txt 10 -t 300" %(preload,testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location),output)
        
     return rc
     
@@ -108,34 +118,34 @@ def fdtree(testing_node,output=[]):
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
     
-    preload = "export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
-    testing_node.changeDirectory(testing_node.ofs_mountpoint)
-    rc = testing_node.runSingleCommand("%s %s/fdtree-1.0.1/fdtree.bash -l 4 -d 5" % (preload,testing_node.ofs_extra_tests_location),output)
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    testing_node.changeDirectory("~")
+    rc = testing_node.runSingleCommand("%s cd %s; bash -c \"%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5\"" % (preload,testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location),output)
     
     return rc
     
 def fstest(testing_node,output=[]):
-    
-    testing_node.runSingleCommand("mkdir -p %s/fstest" % testing_node.ofs_mountpoint,output)
-    if testing_node.runSingleCommand( "[ -f %s/fstest ]" % testing_node.ofs_source_location):
-        rc = testing_node.runSingleCommand("gcc %s/test/automated/usrint-tests.d/fstest.c -o %s/fstest" % (testing_node.ofs_source_location,testing_node.ofs_source_location)),output
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    testing_node.runSingleCommand("%s mkdir -p %s/fstest" % (preload,testing_node.ofs_mountpoint,output))
+    if testing_node.runSingleCommand( "[ -f %s/fstest ]" % (testing_node.ofs_source_location)):
+        rc = testing_node.runSingleCommand("gcc %s/test/automated/usrint-tests.d/fstest.c -o %s/fstest" % (preload,testing_node.ofs_source_location,testing_node.ofs_source_location)),output
         if rc != 0:
             return rc
         
-        rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/fstest -p %s/fstest" %(testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
+        rc = testing_node.runSingleCommand("%s %s/fstest -p %s/fstest" %(preload,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
         
     return rc
 
 def fsx(testing_node,output=[]):
-    
-    testing_node.runSingleCommand("mkdir -p %s/fsx" % testing_node.ofs_mountpoint)
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    testing_node.runSingleCommand("%s mkdir -p %s/fsx" % (preload,testing_node.ofs_mountpoint))
     if testing_node.runSingleCommand( "[ -f %s/fsx ]" % testing_node.ofs_source_location):
         rc = testing_node.runSingleCommand("gcc %s/test/automated/usrint-tests.d/fsx.c -o %s/fsx" % (testing_node.ofs_source_location,testing_node.ofs_source_location),output)
         if rc != 0:
             
             return rc
     
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/fsx -N 1000 -W -R %s/fsx_testfile" %(testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
+    rc = testing_node.runSingleCommand("%s %s/fsx -N 1000 -W -R %s/fsx_testfile" %(preload,testing_node.ofs_extra_tests_location,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
     
     return rc
 
@@ -155,7 +165,7 @@ def iozone(testing_node,output=[]):
         if rc != 0:
             return rc
             
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; ./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" %(testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location,test_node.ofs_mountpoint),output)
+    rc = testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so ./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" %(testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location,test_node.ofs_mountpoint),output)
         
     return rc
     
@@ -215,13 +225,16 @@ def ltp(testing_node,output=[]):
     
     testing_node.changeDirectory('/tmp/ltp')
     
-    testing_node.addBatchCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location))
-    testing_node.addBatchCommand('sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
+    
+    testing_node.addBatchCommand('sudo LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
     rc = testing_node.runAllBatchCommands()
     if rc != 0:
         return rc
     
     failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log",output)
+    testing_node.changeDirectory("~")
+    
+    
     if failrc == 0:
         # if grep returns O, then there were failures.
         return 1
@@ -239,7 +252,8 @@ def ltp(testing_node,output=[]):
 
 def mkdir_usrint(testing_node,output=[]):
     
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint),output)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
 def shelltest(testing_node,output=[]):
@@ -248,12 +262,13 @@ def shelltest(testing_node,output=[]):
     #print testing_node.runSingleCommandBacktick("find /tmp -name pvfs2-shell-test.sh")
     #hack to workaround bug in pvfs2-shell-test.sh
     testing_node.changeDirectory("~")
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
+    rc = testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so cd %s; bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,testing_node.ofs_source_location,testing_node.ofs_mountpoint),output)
     return rc
 
 def symlink_usrint(testing_node,output=[]):
-    
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint),output)
+
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    rc = testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
 def tail(testing_node,output=[]):
@@ -267,16 +282,16 @@ def tail(testing_node,output=[]):
     
     # use a batchfile to create the files. This avoids redirect confusion
     #testing_node.addBatchCommand("%s > %s" % (test_string,local_reference))
-    testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s > %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,test_string,tail_test))
+    testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so %s > %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,test_string,tail_test))
    
     # now diff it
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; tail "+(testing_node.ofs_installation_location,testing_node.ofs_installation_location,tail_test),output)
+    rc = testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so tail "+(testing_node.ofs_installation_location,testing_node.ofs_installation_location,tail_test),output)
     return rc
     
     
 def vfs_usrint(testing_node,output=[]):
     filename = open(inspect.stack()[0][3]+".log","w")
-    preload = "export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("%s cp %s/bin/pvfs2-cp %s" % (preload,testing_node.ofs_installation_location,testing_node.ofs_mountpoint))
     testing_node.runSingleCommand("%s cp %s/pvfs2-cp %s" % (preload,testing_node.ofs_mountpoint,testing_node.ofs_installation_location))
     rc = testing_node.runSingleCommand("%s cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)

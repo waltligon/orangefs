@@ -51,8 +51,7 @@ def append2(testing_node,output=[]):
 
 def bonnie(testing_node,output=[]):
 
-    print "Bonnie is broken!"
-    return -99
+    
     rc = 0
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
@@ -71,7 +70,10 @@ def bonnie(testing_node,output=[]):
             return rc
         
     testing_node.changeDirectory(testing_node.ofs_mountpoint)
-    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1",output)
+    if "ubuntu" in testing_node.distro.lower():
+        rc = testing_node.runSingleCommand("echo \""+testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 \"",output)
+    else:
+        rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
     
 
     return rc
@@ -107,8 +109,14 @@ def dbench(testing_node,output=[]):
     if rc != 0:
         return rc
     
+    
     testing_node.changeDirectory(testing_node.ofs_mountpoint)
-    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1",output)
+    
+    
+    if "ubuntu" in testing_node.distro.lower():
+        rc = testing_node.runSingleCommand("echo \""+testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300\"",output)
+    else:
+        rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300 ",output)
        
     return rc
     
@@ -240,6 +248,8 @@ def ltp(testing_node,output=[]):
         return rc
     
     failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log",output)
+    testing_node.changeDirectory('~')
+
     if failrc == 0:
         # if grep returns O, then there were failures.
         return 1
@@ -257,8 +267,8 @@ def ltp(testing_node,output=[]):
 
 def mkdir_vfs(testing_node,output=[]):
 
-    
-    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint),output)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
 def shelltest(testing_node,output=[]):
@@ -273,8 +283,8 @@ def shelltest(testing_node,output=[]):
 
 def symlink_vfs(testing_node,output=[]):
 
-    
-    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint),output)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
 def tail(testing_node,output=[]):

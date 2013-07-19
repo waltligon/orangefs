@@ -37,12 +37,16 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         self.is_remote = False
         self.is_ec2 = False
         self.ip_address = "127.0.0.1"
+        self.current_user = self.runSingleCommandBacktick("whoami")
+        print self.current_user
         self.currentNodeInformation()
       
     def currentNodeInformation(self):
+        
         super(OFSTestLocalNode,self).currentNodeInformation()
-        self.user_name = self.runSingleCommandBacktick("whoami")
         self.ext_ip_address = self.runSingleCommandBacktick("ifconfig  | grep 'inet addr:'| grep -v '127.0.0.1' | cut -d: -f2 | awk '{ print $1}'")
+        
+        
         
         
         
@@ -100,7 +104,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
       
       
       
-    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False):
+    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         
         # This runs a single command via bash. To get all the environment variables in will require a little magic.
         outdirect = ""
@@ -119,8 +123,11 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             else:
                 errdirect = " 2>" + errfile
         
+        if remote_user == None:
+            remote_user = self.current_user
+        
         #start with the ssh command and open quote
-        command_chunks = ["/bin/bash -c '"]
+        command_chunks = ["/bin/bash -c \""]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -129,7 +136,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
           command_chunks.append("%s=%s; " % (variable,self.current_environment[variable]))
         #now append the command
         command_chunks.append(command)
-        command_chunks.append("'")
+        command_chunks.append("\"")
         command_chunks.append(outdirect)
         command_chunks.append(errdirect)
         
@@ -151,7 +158,8 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s -e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ext_ip_address,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ext_ip_address,destination)
+        print rsync_command
         return self.runSingleCommand(rsync_command)
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
@@ -163,7 +171,8 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
           rflag = ""
           
-        rsync_command = "rsync %s -e \"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
+        print rsync_command
         return self.runSingleCommand(rsync_command)  
     
     def getAliasesFromConfigFile(self,config_file_name):

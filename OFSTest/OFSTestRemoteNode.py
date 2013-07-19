@@ -36,8 +36,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         self.sshLocalKeyFile = key
         self.localnode = local_node
         
-        self.getKeyFileFromLocal(local_node)
+        
         super(OFSTestRemoteNode,self).currentNodeInformation()
+        self.getKeyFileFromLocal(local_node)
         
         #print "Host,kernel:  %s,%s" % (self.host_name,self.kernel_version)
         
@@ -126,7 +127,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
 
 
-    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False):
+    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         # Input command line 
         # Returns modified of command line
 
@@ -147,8 +148,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             else:
                 errdirect = " 2>" + errfile
         
+        if remote_user == None:
+            remote_user = self.current_user
+        
+            
+        
         #start with the ssh command and open quote
-        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)]
+        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" % (self.sshLocalKeyFile,remote_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -171,6 +177,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         #command_v[-1] = '"%s"' % command_v[-1]
         return command_line
     
+
     
      
     def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
@@ -183,6 +190,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
           rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ip_address,destination)
+        print rsync_command
         return self.runSingleCommand(rsync_command)
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
@@ -195,6 +203,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
           rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ip_address,source,destination)
+        print rsync_command
         return self.runSingleCommand(rsync_command)
       
     def uploadNodeKeyFromLocal(self, local_node):

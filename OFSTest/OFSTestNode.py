@@ -106,17 +106,47 @@ class OFSTestNode(object):
         self.ofs_extra_tests_location = ""
         self.kernel_version = ""
         self.ofs_mountpoint = ""
-        self.ofs_fs_name="pvfs2_fs"
+        self.ofs_fs_name="orangefs"
         
         # svn branch (or ofs source directory name)
         self.ofs_branch = ""
         #default tcp port
-        self.tcp_port = "3396"
+        self.ofs_tcp_port = "3396"
             
     def currentNodeInformation(self):
         
         self.distro = ""
         print "Getting current node information"
+        
+        # can we ssh in? We'll need the group if we can't, so let's try this first.
+        self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user)
+        
+        print "Current group is "+self.current_group
+
+        # direct access as root not good. Need to get the actual user in
+        # Gross hackery for SuseStudio images. OpenStack injects into root, not user.
+        if self.current_group.rstrip() == "":
+            self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
+            print "Current group (from root) is "+self.current_group
+            if self.current_group.rstrip() == "":
+                print "Could not access node at "+self.ip_address+" via ssh"
+                exit(-1)
+            
+            
+
+            rc = self.runSingleCommand(command="cp -r /root/.ssh /home/%s/" % self.current_user,remote_user="root")
+            if rc != 0:
+                print "Could not copy ssh key from /root/.ssh to /home/%s/ " % self.current_user
+                exit(rc)
+            
+            #get the user and group name of the home directory
+            
+            rc = self.runSingleCommand(command="chown -R %s:%s /home/%s/.ssh/" % (self.current_user,self.current_group,self.current_user),remote_user="root") 
+            if rc != 0:
+                print "Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group)
+                exit(rc)
+            
+        
         self.host_name = self.runSingleCommandBacktick("hostname -s")
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         self.processor_type = self.runSingleCommandBacktick("uname -p")
@@ -124,6 +154,8 @@ class OFSTestNode(object):
         print "%s %s %s" % (self.host_name,self.kernel_version,self.processor_type)
         # information for ubuntu and suse is in /etc/os-release
         #print self.runSingleCommand("find /etc/lsb-release 2> /dev/null")
+        
+        
 
         if self.runSingleCommandBacktick('find /etc -name "os-release" 2> /dev/null').rstrip() == "/etc/os-release":
             print "SuSE or Ubuntu based machine found"
@@ -143,6 +175,8 @@ class OFSTestNode(object):
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
             print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
+        
+        
         
         print "Distro is " + self.distro
         
@@ -186,13 +220,16 @@ class OFSTestNode(object):
     def addBatchCommand(self,command):
         self.batch_commands.append(command)
     
-    def runSingleCommand(self,command,output=[]):
+    def runSingleCommand(self,command,output=[],remote_user=None):
         
         # This runs a single command and returns the return code of that command
         # command, stdout, and stderr are in the output list
         
         #print command
-        command_line = self.prepareCommandLine(command)
+        if remote_user==None:
+            remote_user = self.current_user
+        
+        command_line = self.prepareCommandLine(command=command,remote_user=remote_user)
         
         if "awk" in command_line:
             print command_line
@@ -208,12 +245,16 @@ class OFSTestNode(object):
         return p.returncode
         
 
-      # run single command via the shell and return stdout Depricated
-    def runSingleCommandBacktick(self,command,output=[]):
+      
+    def runSingleCommandBacktick(self,command,output=[],remote_user=None):
         # This runs a single command and returns the stdout of that command.
         #print command
+          #print command
+        if remote_user==None:
+            remote_user = self.current_user
+      
         
-        self.runSingleCommand(command,output)
+        self.runSingleCommand(command=command,output=output,remote_user=remote_user)
         if len(output) >= 2:
             return output[1].rstrip('\n')
         else:
@@ -246,7 +287,7 @@ class OFSTestNode(object):
         
         
     
-    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False):
+    def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         # Implimented in the client. Should not be here.
         print "This should be implimented in the subclass, not in OFSTestNode."
         print "Trying naive attempt to create command list."
@@ -322,7 +363,7 @@ class OFSTestNode(object):
     
     def updateNode(self):
         print "Distro is " + self.distro
-        if "ubuntu" in self.distro.lower():
+        if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.addBatchCommand("sudo apt-get -y -q update")
             self.addBatchCommand("sudo apt-get -y -q dist-upgrade < /dev/zero")
         elif "suse" in self.distro.lower():
@@ -498,12 +539,12 @@ class OFSTestNode(object):
     def installRequiredSoftware(self):
         
         
-        if "ubuntu" in self.distro.lower():
+        if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
                 sudo apt-get install -y -q gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf fuse libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
-                sudo apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
+                #sudo apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
                 sudo apt-get clean
 
                 #prepare source
@@ -530,7 +571,8 @@ class OFSTestNode(object):
             #self.addBatchCommand('sudo make prepare &>/dev/null')
         elif "suse" in self.distro.lower():
             batch_commands = '''
-            zypper --non-interactive install gcc gcc-c++ gcc-gfortran flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip
+            # prereqs should be installed as part of the image. Thanx SuseStudio!
+            #zypper --non-interactive install gcc gcc-c++ gcc-gfortran flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano
             #install db4
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
@@ -541,6 +583,7 @@ class OFSTestNode(object):
             sudo modprobe -v fuse
             sudo chmod a+x /bin/fusermount
             sudo chmod a+r /etc/fuse.conf
+
 
 
             '''
@@ -863,7 +906,7 @@ class OFSTestNode(object):
         # create this directory on all nodes
         file.write("WORKINGDIR=/tmp/pvfs-pav-working\n")
         file.write("PROTOCOL=tcp\n")
-        file.write("PVFSTCCPORT=%s\n" % self.tcp_port)
+        file.write("PVFSTCCPORT=%s\n" % self.ofs_tcp_port)
         file.write("STORAGE=$WORKINGDIR/storage\n")
         file.write("SERVERLOG=$WORKINGDIR/log\n")
         file.write("MOUNTPOINT=%s\n" % self.ofs_mountpoint)
@@ -1058,8 +1101,8 @@ class OFSTestNode(object):
         keypath = ""
         self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
         self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
-        self.addBatchCommand("LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
-        print "LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab sudo %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
+        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
         client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
@@ -1087,13 +1130,13 @@ class OFSTestNode(object):
             print "OrangeFS already mounted at %s" % output[1]
             return
         if mount_fuse == True:
-            print "Mounting OrangeFS service at tcp://%s:3396/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint)
-            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:3396/%s" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_fs_name),output)
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
+            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
         else:
-            print "Mounting OrangeFS service at tcp://%s:3396/%s at mountpoint %s" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint)
-            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:3396/%s %s" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint))
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
+            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint))
             self.runAllBatchCommands()
         
         print "Waiting 30 seconds for mount"            

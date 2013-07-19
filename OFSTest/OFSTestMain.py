@@ -150,10 +150,10 @@ class OFSTestMain(object):
         self.ofs_network.startOFSClient()
         
         # this section is probably redundant and should be removed
-        print ""
-        print "==================================================================="
-        print "Start Client"
-        self.ofs_network.mountOFSFilesystem(mount_fuse=False)
+        #print ""
+        #print "==================================================================="
+        #print "Start Client"
+        #self.ofs_network.mountOFSFilesystem(mount_fuse=False)
         
 
         
@@ -245,12 +245,15 @@ class OFSTestMain(object):
             head_node.stopOFSClient()
             head_node.mountOFSFilesystem(mount_fuse=True)
             rc = head_node.checkMount()
+            
             mount_type = "fuse"
 
             if rc == 0:
                 output.write("VFS Tests (%s) ==================================================\n" % mount_type)
                     
                 output.close()
+                
+                
 
                 for callable in OFSVFSTest.__dict__.values():
                     try:
