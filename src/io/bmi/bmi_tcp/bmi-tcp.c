@@ -58,17 +58,24 @@ static int sc_test_busy = 0;
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
 		       int method_id,
 		       int init_flags);
+
 int BMI_tcp_finalize(void);
+
 int BMI_tcp_set_info(int option,
 		     void *inout_parameter);
+
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter);
+
 void *BMI_tcp_memalloc(bmi_size_t size,
 		       enum bmi_op_type send_recv);
+
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv);
+
 int BMI_tcp_unexpected_free(void *buffer);
+
 int BMI_tcp_post_send(bmi_op_id_t * id,
 		      bmi_method_addr_p dest,
 		      const void *buffer,
@@ -78,6 +85,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      void *user_ptr,
 		      bmi_context_id context_id,
                       PVFS_hint hints);
+
 int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				bmi_method_addr_p dest,
 				const void *buffer,
@@ -87,6 +95,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				void *user_ptr,
 				bmi_context_id context_id,
                                 PVFS_hint hints);
+
 int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      bmi_method_addr_p src,
 		      void *buffer,
@@ -97,6 +106,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *user_ptr,
 		      bmi_context_id context_id,
                       PVFS_hint hints);
+
 int BMI_tcp_test(bmi_op_id_t id,
 		 int *outcount,
 		 bmi_error_code_t * error_code,
@@ -104,6 +114,7 @@ int BMI_tcp_test(bmi_op_id_t id,
 		 void **user_ptr,
 		 int max_idle_time_ms,
 		 bmi_context_id context_id);
+
 int BMI_tcp_testsome(int incount,
 		     bmi_op_id_t * id_array,
 		     int *outcount,
@@ -113,10 +124,12 @@ int BMI_tcp_testsome(int incount,
 		     void **user_ptr_array,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
+
 int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct bmi_method_unexpected_info *info,
 			   int max_idle_time_ms);
+
 int BMI_tcp_testcontext(int incount,
 		     bmi_op_id_t * out_id_array,
 		     int *outcount,
@@ -125,9 +138,13 @@ int BMI_tcp_testcontext(int incount,
 		     void **user_ptr_array,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
+
 bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
+
 const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map);
+
 int BMI_tcp_query_addr_range(bmi_method_addr_p, const char *, int);
+
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_method_addr_p dest,
 			   const void *const *buffer_list,
@@ -139,6 +156,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   void *user_ptr,
 			   bmi_context_id context_id,
                            PVFS_hint hints);
+
 int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   bmi_method_addr_p src,
 			   void *const *buffer_list,
@@ -151,6 +169,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   void *user_ptr,
 			   bmi_context_id context_id,
                            PVFS_hint hints);
+
 int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_method_addr_p dest,
 				     const void *const *buffer_list,
@@ -162,8 +181,11 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     void *user_ptr,
 				     bmi_context_id context_id,
                                      PVFS_hint hints);
+
 int BMI_tcp_open_context(bmi_context_id context_id);
+
 void BMI_tcp_close_context(bmi_context_id context_id);
+
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
@@ -232,8 +254,11 @@ static struct iovec stat_io_vector[BMI_TCP_IOV_COUNT+1];
 
 /* internal utility functions */
 static int tcp_server_init(void);
+
 static void dealloc_tcp_method_addr(bmi_method_addr_p map);
+
 static int tcp_sock_init(bmi_method_addr_p my_method_addr);
+
 static int enqueue_operation(op_list_p target_list,
 			     enum bmi_op_type send_recv,
 			     bmi_method_addr_p map,
@@ -250,20 +275,33 @@ static int enqueue_operation(op_list_p target_list,
 			     bmi_size_t expected_size,
 			     bmi_context_id context_id,
                              int32_t event_id);
+
 static int tcp_cleanse_addr(bmi_method_addr_p map, int error_code);
+
 static int tcp_shutdown_addr(bmi_method_addr_p map);
+
 static int tcp_do_work(int max_idle_time);
+
 static int tcp_do_work_error(bmi_method_addr_p map);
+
 static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag);
+
 static int tcp_do_work_send(bmi_method_addr_p map, int* stall_flag);
+
 static int work_on_recv_op(method_op_p my_method_op,
 			   int *stall_flag);
+
 static int work_on_send_op(method_op_p my_method_op,
 			   int *blocked_flag, int* stall_flag);
+
 static int tcp_accept_init(int *socket, char** peer);
+
 static method_op_p alloc_tcp_method_op(void);
+
 static void dealloc_tcp_method_op(method_op_p old_op);
+
 static int handle_new_connection(bmi_method_addr_p map);
+
 static int tcp_post_send_generic(bmi_op_id_t * id,
                                  bmi_method_addr_p dest,
                                  const void *const *buffer_list,
@@ -274,6 +312,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
                                  void *user_ptr,
                                  bmi_context_id context_id,
                                  PVFS_hint hints);
+
 static int tcp_post_recv_generic(bmi_op_id_t * id,
                                  bmi_method_addr_p src,
                                  void *const *buffer_list,
@@ -286,10 +325,17 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
                                  void *user_ptr,
                                  bmi_context_id context_id,
                                  PVFS_hint hints);
-static int payload_progress(int s, void *const *buffer_list, const bmi_size_t* 
-    size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
-    char* enc_hdr, bmi_size_t* env_amt_complete);
+
+static int payload_progress(int s,
+                            void *const *buffer_list,
+                            const bmi_size_t* size_list,
+                            int list_count,
+                            bmi_size_t total_size,
+                            int* list_index,
+                            bmi_size_t* current_index_complete,
+                            enum bmi_op_type send_recv,
+                            char* enc_hdr,
+                            bmi_size_t* env_amt_complete);
 
 #if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
 static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data);
@@ -601,6 +647,7 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 {
     char *tcp_string = NULL;
     char *delim = NULL;
+    char *subzone = NULL;
     char *hostname = NULL;
     bmi_method_addr_p new_addr = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
@@ -613,21 +660,37 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 	return (NULL);
     }
 
+    /* check for network subzone */
+    if ((delim = index(tcp_string, '-')) == NULL)
+    {
+        /* no subzone found so carry on */
+        subzone = NULL;
+    }
+    else
+    {
+        char *slash;
+        if ((slash = index(delim, '/')) == NULL)
+        {
+            goto errorout;
+        }
+        subzone = (char *)malloc((slash - delim) + 1);
+        strncpy(subzone, delim, (slash = delim));
+        subzone[delim - tcp_string] = '\0';
+    }
+
     /* start breaking up the method information */
     /* for normal tcp, it is simply hostname:port */
     if ((delim = index(tcp_string, ':')) == NULL)
     {
 	gossip_lerr("Error: malformed tcp address.\n");
-	free(tcp_string);
-	return (NULL);
+        goto errorout;
     }
 
     /* looks ok, so let's build the method addr structure */
     new_addr = alloc_tcp_method_addr();
     if (!new_addr)
     {
-	free(tcp_string);
-	return (NULL);
+        goto errorout;
     }
     tcp_addr_data = new_addr->method_data;
 
@@ -635,25 +698,38 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
     if (ret != 1)
     {
 	gossip_lerr("Error: malformed tcp address.\n");
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
+        goto errorout;
     }
 
     hostname = (char *) malloc((delim - tcp_string + 1));
     if (!hostname)
     {
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
+        goto errorout;
     }
     strncpy(hostname, tcp_string, (delim - tcp_string));
     hostname[delim - tcp_string] = '\0';
 
+    tcp_addr_data->subzone = subzone;
     tcp_addr_data->hostname = hostname;
 
     free(tcp_string);
     return (new_addr);
+
+errorout:
+
+    if (new_data)
+    {
+	dealloc_tcp_method_addr(new_addr);
+    }
+    if (subzone)
+    {
+        free (subzone);
+    }
+    if (tcp_string)
+    {
+        free(tcp_string);
+    }
+    return (NULL);
 }
 
 

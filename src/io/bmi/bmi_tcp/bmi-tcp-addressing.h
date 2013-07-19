@@ -51,11 +51,12 @@ struct tcp_allowed_connection_s {
  * connections are made */
 struct tcp_addr
 {
-    bmi_method_addr_p map;		/* points back to generic address */ \
+    bmi_method_addr_p map;		/* points back to generic address */
     BMI_addr_t bmi_addr;
     /* stores error code for addresses that are broken for some reason */
     int addr_error;		
     char *hostname;
+    char *subzone;
     int port;
     int socket;
     /* flag that indicates this address represents a
