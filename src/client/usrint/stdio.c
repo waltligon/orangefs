@@ -2881,7 +2881,7 @@ void rewinddir (DIR *dir)
         return;
     }
     /* force fd back to zero position 
-     * this should be an in expensive operation
+     * this should be an inexpensive operation
      */
     lseek64(dir->fileno, 0, SEEK_SET);
     /* force a re-read of the buffer in case things have changed */

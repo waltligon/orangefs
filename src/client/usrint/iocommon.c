@@ -610,7 +610,7 @@ int iocommon_create_file(const char *filename,
                          dist,
                          &resp_create,
                          layout,
-                         NULL);
+                         hints);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_create.ref;
 

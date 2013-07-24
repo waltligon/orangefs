@@ -104,41 +104,81 @@ void clean_free(void *ptr)
     typedef uint32_t ptrint_t;
 #endif
 
-/* we want to call real malloc below */
+/* we don't want any crazy redefs below
+ * want to call real malloc, free, etc.
+ * our .h file does lots of defs, and we
+ * don't want them here they are for users
+ */
 #ifdef malloc
 #undef malloc
+#endif
+
+#ifdef PINT_malloc
+#undef PINT_malloc
 #endif
 
 #ifdef calloc
 #undef calloc
 #endif
 
+#ifdef PINT_calloc
+#undef PINT_calloc
+#endif
+
 #ifdef realloc
 #undef realloc
+#endif
+
+#ifdef PINT_realloc
+#undef PINT_realloc
 #endif
 
 #ifdef valloc
 #undef valloc
 #endif
 
+#ifdef PINT_valloc
+#undef PINT_valloc
+#endif
+
 #ifdef posix_memalign
 #undef posix_memalign
+#endif
+
+#ifdef PINT_posix_memalign
+#undef PINT_posix_memalign
 #endif
 
 #ifdef memalign
 #undef memalign
 #endif
 
+#ifdef PINT_memalign
+#undef PINT_memalign
+#endif
+
 #ifdef strdup
 #undef strdup
+#endif
+
+#ifdef PINT_strdup
+#undef PINT_strdup
 #endif
 
 #ifdef strndup
 #undef strndup
 #endif
 
+#ifdef PINT_strndup
+#undef PINT_strndup
+#endif
+
 #ifdef free
 #undef free
+#endif
+
+#ifdef PINT_free
+#undef PINT_free
 #endif
 
 /* These routines call glibc version unless we don't have a pointer to

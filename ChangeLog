@@ -6,6 +6,11 @@ SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
 =======
 
+Rev 10315
+
+Fixed a bug when turning off malloc redirect.  Fixed bug prefenting hints
+being passed in to open.  Added a few comments.
+
 Rev 10182
 
 * Reworked usrint initialization to support fork/exec effectively,
