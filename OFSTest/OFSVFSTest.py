@@ -1,6 +1,7 @@
 import inspect
 
 
+
 def append(testing_node,output=[]):
     
 
@@ -139,7 +140,7 @@ def fstest(testing_node,output=[]):
     testing_node.runSingleCommand("mkdir -p %s/fstest" % testing_node.ofs_mountpoint,output)
     
     if testing_node.runSingleCommand( "[ -f %s/fstest ]" % testing_node.ofs_source_location):
-        rc = testing_node.runSingleCommand("gcc %s/test/automated/vfs-tests.d/fstest.c -o %s/fstest" % (testing_node.ofs_source_location,testing_node.ofs_source_location)),output
+        rc = testing_node.runSingleCommand("gcc %s/test/automated/vfs-tests.d/fstest.c -o %s/fstest" % (testing_node.ofs_source_location,testing_node.ofs_source_location),output)
         if rc != 0:
             return rc
     
@@ -171,19 +172,19 @@ def iozone(testing_node,output=[]):
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
-    testing_node.changeDirectory("%s/iozone3_239/src/current" % testing_node.ofs_extra_tests_location,output)
+    testing_node.changeDirectory("%s/iozone3_239/src/current" % testing_node.ofs_extra_tests_location)
    
     # check to see if we have already compiled iozone
     if testing_node.runSingleCommand( "[ -f %s/iozone3_239/src/current/iozone ]" % testing_node.ofs_extra_tests_location):
-        rc = testing_node.runSingleCommand("patch -p5 < %s/test/automated/vfs-tests.d/iozone.patch",output)
+        rc = testing_node.runSingleCommand("patch -p5 < %s/test/automated/vfs-tests.d/iozone.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             return rc
         
-        rc = testing_node.runSingleCommand("./make linux",output)
+        rc = testing_node.runSingleCommand("make linux",output)
         if rc != 0:
             return rc
     
-    rc = testing_node.runSingleCommand("./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" % test_node.ofs_mountpoint,output)
+    rc = testing_node.runSingleCommand("./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" % testing_node.ofs_mountpoint,output)
         
     return rc
     
@@ -192,7 +193,7 @@ def ltp(testing_node,output=[]):
     
     LTP_ARCHIVE_VERSION = "ltp-full-20120903"
     LTP_ARCHIVE_TYPE = ".bz2"
-    LTP_ARCHIVE = LTP_ARCHIVE_VERSION + LTP_ARCHIVE_TYPE
+    LTP_ARCHIVE = "%s%s" % (LTP_ARCHIVE_VERSION,LTP_ARCHIVE_TYPE)
     LTP_URL = "http://devorange.clemson.edu/pvfs"
     
     rc = 0
@@ -242,7 +243,8 @@ def ltp(testing_node,output=[]):
     testing_node.runSingleCommand("umask 0")
     
     testing_node.changeDirectory('/tmp/ltp')
-        
+    
+    print 'sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location)    
     rc = testing_node.runSingleCommandAsBatch('sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
     if rc != 0:
         return rc
@@ -267,7 +269,7 @@ def ltp(testing_node,output=[]):
 
 def mkdir_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
@@ -283,7 +285,7 @@ def shelltest(testing_node,output=[]):
 
 def symlink_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
     
@@ -315,3 +317,17 @@ def vfs_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
+tests = [ append,
+append2,
+bonnie,
+dbench,
+fdtree,
+fstest,
+fsx,
+iozone,
+ltp,
+mkdir_vfs,
+shelltest,
+symlink_vfs,
+tail,
+vfs_cp ]

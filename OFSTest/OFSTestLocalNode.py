@@ -62,8 +62,10 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
      
     def runAllBatchCommands(self):
      
+        
         # Open file with mode 700
-        script_file = open("/tmp/runcommand.sh",'w')
+        batchfile = "./runcommand%d.sh" % OFSTestNode.batch_count
+        script_file = open(batchfile,'w')
         script_file.write("#!/bin/bash\n")
         
         for element in self.current_environment:
@@ -90,17 +92,25 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         script_file.close()
         
-        os.chmod("/tmp/runcommand.sh",0755)
+        os.chmod(batchfile,0755)
         
         # run the command and capture stdout and stderr
         
-        rc = subprocess.call("/tmp/runcommand.sh",shell=True)
         
-       
-        # clear the batch commands list
-        self.batch_commands = []
+        p = subprocess.Popen(batchfile,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
-        return rc
+        # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
+        del output[:]
+        output.append(command_line)
+        for i in p.communicate():
+            output.append(i)
+        
+        # now clear out the batch commands list
+        self.batch_commands = []    
+        OFSTestNode.batch_count = OFSTestNode.batch_count+1
+
+        return p.returncode
+        
       
       
       

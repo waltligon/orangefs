@@ -249,8 +249,8 @@ class OFSTestNetwork(object):
             node_list = self.created_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.updateNode)
         # Wait for reboot
-        print "Waiting 60 seconds for nodes to reboot"
-        time.sleep(60)
+        print "Waiting 90 seconds for nodes to reboot"
+        time.sleep(90)
     
     def installRequiredSoftware(self,node_list=None):
         if node_list == None:

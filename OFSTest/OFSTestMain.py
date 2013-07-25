@@ -40,6 +40,8 @@ import OFSTestConfigMenu
 import OFSTestConfigBuildbot
 import OFSTestNetwork
 import time
+import sys
+import traceback
 
 class OFSTestMain(object):
     
@@ -56,7 +58,7 @@ class OFSTestMain(object):
     def writeOutput(self,filename,function,rc):
         output = open(filename,'a+')
         if rc != 0:
-            output.write("%s........................................FAIL: RC = %d\n" % (function.__name__,rc))
+            output.write("%s........................................FAIL: RC = %r\n" % (function.__name__,rc))
         else:
             output.write("%s........................................PASS.\n" % function.__name__)
         output.close()
@@ -205,40 +207,99 @@ class OFSTestMain(object):
             output.write("Sysint Tests ==================================================\n")
             output.close()
 
-            for callable in OFSSysintTest.__dict__.values():
+            for callable in OFSSysintTest.tests:
+                #print "Running %s" % callable.__name__
                 try:
-                    #print "Running %s" % callable.__name__
                     rc = head_node.runOFSTest("sysint",callable)
                     self.writeOutput(filename,callable,rc)
-                except AttributeError:
+                except:
+                    print "Unexpected error:", sys.exc_info()[0]
+                    traceback.print_exc()
                     pass
-                except TypeError:
-                    pass
+
+            print "Cleaning up "+head_node.ofs_mountpoint
+            head_node.runSingleCommand("%s/bin/pvfs2-rm %s/*" % (head_node.ofs_installation_location,head_node.ofs_mountpoint))
+            head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
 
         if self.config.run_vfs_tests == True:
             output = open(filename,'a+')
             mount_type = "kmod"
-            #head_node.stopOFSClient()
-            #head_node.mountOFSFilesystem(mount_fuse=False)
+            head_node.unmountOFS()
+            head_node.mountOFSFilesystem(mount_fuse=False)
             rc = head_node.checkMount()
-            rc = 0
+            
             if rc == 0:
                 output.write("VFS Tests (%s) ==================================================\n" % mount_type)
 
                 output.close()
 
-                for callable in OFSVFSTest.__dict__.values():
+                for callable in OFSVFSTest.tests:
                     try:
                         rc = head_node.runOFSTest("vfs-%s" % mount_type,callable)
                         self.writeOutput(filename,callable,rc)
-                    except AttributeError:
+                    except:
+                        print "Unexpected error:", sys.exc_info()[0]
+                        traceback.print_exc()
                         pass
-                    except TypeError:
-                        pass
+                    #except AttributeError:
+                    #    print "AttributeError running %s" % callable.__name__
+                    #    pass
+                    #    
+                    #except TypeError:
+                    #    print "AttributeError running %s" % callable.__name__
+                    #    pass
+                print "Cleaning up "+head_node.ofs_mountpoint
+                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
+                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+
             else:
                 output.write("VFS Tests (%s) could not run. Mount failed.=======================\n" % mount_type)
                     
                 output.close()
+
+
+        if self.config.run_usrint_tests == True:
+            # stop the client and remove the kernel module before running usrint tests
+            #if self.config.ofs_mount_fuse == True:
+            if False == True:
+                output = open(filename,'a+')
+                output.write("Usrint Tests not compatible with fuse=====================================\n")
+                output.close()
+            else:
+                head_node.unmountOFS()
+                #head_node.stopOFSClient()
+                #for node in self.ofs_network.created_nodes:
+                
+                
+                
+                output = open(filename,'a+')
+                output.write("Usrint Tests ==================================================\n")
+                output.close()
+
+                for callable in OFSUserintTest.tests:
+                    try:
+                        rc = head_node.runOFSTest("usrint",callable)
+                        self.writeOutput(filename,callable,rc)
+                    except:
+                        print "Unexpected error:", sys.exc_info()[0]
+                        traceback.print_exc()
+                        pass
+                    '''
+                    except AttributeError:
+                        pass
+                    except TypeError:
+                        pass
+                    except:
+                        pass
+                    '''    
+                print "Cleaning up "+head_node.ofs_mountpoint
+                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
+                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+                
+   
+
+
+
         
         if self.config.ofs_mount_fuse == True:
             output = open(filename,'a+')
@@ -255,53 +316,31 @@ class OFSTestMain(object):
                 
                 
 
-                for callable in OFSVFSTest.__dict__.values():
+                for callable in OFSVFSTest.tests:
                     try:
                         rc = head_node.runOFSTest("vfs-%s" % mount_type,callable)
                         self.writeOutput(filename,callable,rc)
-                    except AttributeError:
+                    except:
+                        print "Unexpected error:", sys.exc_info()[0]
+                        traceback.print_exc()
                         pass
-                    except TypeError:
-                        pass
+                                                
+                print "Cleaning up "+head_node.ofs_mountpoint
+                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
+                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+
             else:
                 output.write("VFS Tests (%s) could not run. Mount failed.=======================\n" % mount_type)
                     
                 output.close()
         
         
-        if self.config.run_usrint_tests == True:
-            # stop the client and remove the kernel module before running usrint tests
-            if self.config.ofs_mount_fuse == True:
-                output = open(filename,'a+')
-                output.write("Usrint Tests not compatible with fuse=====================================\n")
-                output.close()
-            else:
-                head_node.stopOFSClient()
-                #for node in self.ofs_network.created_nodes:
-                print "setting environment variables for userint tests"
-                
-                
-                output = open(filename,'a+')
-                output.write("Usrint Tests ==================================================\n")
-                output.close()
-
-                for callable in OFSUserintTest.__dict__.values():
-                    try:
-                        rc = head_node.runOFSTest("usrint",callable)
-                        self.writeOutput(filename,callable,rc)
-                    except AttributeError:
-                        pass
-                    except TypeError:
-                        pass
-                    except:
-                        pass
             
-   
-
 
         if self.config.ec2_delete_after_test == True:
             print ""
             print "==================================================================="
             print "Terminating Nodes"
             self.ofs_network.terminateAllEC2Nodes()
+
 

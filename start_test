@@ -42,7 +42,7 @@ for o, a  in optlist:
 
 if config_file != None:
     try:
-        print "trying" + config_file
+#        print "trying" + config_file
         test_driver = OFSTestMain.OFSTestMain(OFSTestConfigFile.OFSTestConfigFile())
         print "setting config"
         #ugly python hack

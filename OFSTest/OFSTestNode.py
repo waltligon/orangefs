@@ -19,6 +19,7 @@ import cmd
 import time
 import sys
 import xml.etree.ElementTree as ET
+import traceback
 #import scriptine.shell
 
 ###############################################################################################'
@@ -42,7 +43,8 @@ import xml.etree.ElementTree as ET
 #
 ################################################################################################
 
-
+# global variable for batch counting
+batch_count = 0
 
 class OFSTestNode(object):
     
@@ -112,6 +114,7 @@ class OFSTestNode(object):
         self.ofs_branch = ""
         #default tcp port
         self.ofs_tcp_port = "3396"
+        
             
     def currentNodeInformation(self):
         
@@ -162,9 +165,9 @@ class OFSTestNode(object):
             pretty_name = self.runSingleCommandBacktick("cat /etc/os-release | grep PRETTY_NAME")
             [var,self.distro] = pretty_name.split("=")
         # for redhat based distributions, information is in /etc/system-release
-        elif self.runSingleCommandBacktick('find /etc -name "system-release" 2> /dev/null').rstrip() == "/etc/system-release":
+        elif self.runSingleCommandBacktick('find /etc -name "redhat-release" 2> /dev/null').rstrip() == "/etc/redhat-release":
             print "RedHat based machine found"
-            self.distro = self.runSingleCommandBacktick("cat /etc/system-release")
+            self.distro = self.runSingleCommandBacktick("cat /etc/redhat-release")
         elif self.runSingleCommandBacktick('find /etc -name "lsb-release" 2> /dev/null').rstrip() == "/etc/lsb-release":
             print "Ubuntu based machine found"
             print self.runSingleCommandBacktick("cat /etc/lsb-release ")
@@ -231,8 +234,8 @@ class OFSTestNode(object):
         
         command_line = self.prepareCommandLine(command=command,remote_user=remote_user)
         
-        if "awk" in command_line:
-            print command_line
+        #if "awk" in command_line:
+        #    print command_line
         #print command_line
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
@@ -276,12 +279,20 @@ class OFSTestNode(object):
                 
         rc = test_function(self,output)
 
-        logfile_h = open(logfile,"w+")
-        logfile_h.write('COMMAND:' + output[0]+'\n')
-        logfile_h.write('RC: %d\n' % rc)
-        logfile_h.write('STDOUT:' + output[1]+'\n')
-        logfile_h.write('STDERR:' + output[2]+'\n')
+        try:
+            logfile_h = open(logfile,"w+")
+            logfile_h.write('COMMAND:' + output[0]+'\n')
+            logfile_h.write('RC: %r\n' % rc)
+            logfile_h.write('STDOUT:' + output[1]+'\n')
+            logfile_h.write('STDERR:' + output[2]+'\n')
+            
+        except:
+            
+            traceback.print_exc()
+            rc = -99
+        
         logfile_h.close()
+            
         
         return rc
         
@@ -294,17 +305,17 @@ class OFSTestNode(object):
         return command
        
       # Run a single command as a batchfile. Some systems require this for passwordless sudo
-    def runSingleCommandAsBatch(self,command):
+    def runSingleCommandAsBatch(self,command,output=[]):
         self.addBatchCommand(command)
-        self.runAllBatchCommands()
+        self.runAllBatchCommands(output)
     
-    def runBatchFile(self,filename):
+    def runBatchFile(self,filename,output=[]):
         #copy the old batch file to the batch commands list
         batch_file = open(filename,'r')
         self.batch_commands = batch_file.readlines()
         
         # Then run it
-        self.runAllBatchCommands()
+        self.runAllBatchCommands(output)
 
       # copy files from the current node to a destination node.
     def copyToRemoteNode(self,source, destinationNode, destination):
@@ -543,7 +554,11 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo apt-get install -y -q gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf fuse libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
+                sudo apt-get install -y -q gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
+                # needed for Ubuntu 10.04
+                sudo apt-get install -y -q linux-image < /dev/null
+                # will fail on Ubuntu 10.04. Run separately to not break anything
+                sudo apt-get install -y -q fuse < /dev/null
                 #sudo apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
                 sudo apt-get clean
 
@@ -555,7 +570,7 @@ class OFSTestNode(object):
                 sudo cp /boot/config-`uname -r` .config
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
-                sudo modprobe -v fuse
+                sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
 
@@ -592,8 +607,8 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs &> yum.out
-                sudo modprobe -v fuse
+                sudo yum -y install gcc gcc-c++ gcc-gfortran fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs 
+                sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
 
@@ -1101,7 +1116,7 @@ class OFSTestNode(object):
         keypath = ""
         self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
         self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
-        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
         print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
@@ -1143,6 +1158,11 @@ class OFSTestNode(object):
         time.sleep(30)
 
 
+    def unmountOFS(self):
+        print "Unmounting OrangeFS mounted at " + self.ofs_mountpoint
+        self.addBatchCommand("sudo umount %s" % self.ofs_mountpoint)
+        self.addBatchCommand("sleep 10")
+
     def stopOFSClient(self):
         
         '''
@@ -1153,9 +1173,7 @@ class OFSTestNode(object):
         # let teardown always succeed.  pvfs2-client might already be killed
         # and pvfs2 kernel module might not be loaded yet 
         '''
-        print "Unmounting OrangeFS mounted at " + self.ofs_mountpoint
-        self.addBatchCommand("sudo umount %s" % self.ofs_mountpoint)
-        self.addBatchCommand("sleep 10")
+        self.unmountOFS()
         print "Stopping pvfs2-client process"
         self.addBatchCommand("sudo killall pvfs2-client")
         self.addBatchCommand("sleep 10")

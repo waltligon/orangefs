@@ -1,14 +1,16 @@
 #!/usr/bin/python
 import OFSTestNode
 
+
+
 def cp(testing_node,output=[]):
 
     def copy_test_pvt(testing_node,source,destination,local,args,output=[]):
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args)
-        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args))
+        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args),output)
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args)
-        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args))
-        result = testing_node.runSingleCommandBacktick("diff %s %s" % (source,local))
+        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args),output)
+        testing_node.runSingleCommand("diff %s %s" % (source,local),output)
         #print "diff %s %s" % (source,local)
         #print "copy_test_pvt: Diff %s " % (result)
         return rc
@@ -137,7 +139,7 @@ def misc(testing_node,output=[]):
 
 def mkdir_sysint(testing_node,output=[]):
     #note update test programs to remove old directories first!
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
 
@@ -148,10 +150,12 @@ def ping(testing_node,output=[]):
     return rc
 
 def symlink_sysint(testing_node,output=[]):
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mountpoint,options),output)
     return rc
 
 def zerofill(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
+
+tests = [ cp,misc,mkdir_sysint,ping,symlink_sysint,zerofill]

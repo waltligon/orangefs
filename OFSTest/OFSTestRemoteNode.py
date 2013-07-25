@@ -83,9 +83,12 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         # ok, now let's get the os version.
         # should have the architecture and version from the kernel name 
-    def runAllBatchCommands(self):
+    def runAllBatchCommands(self,output=[]):
+
+        
         # Open file with mode 700
-        script_file = open("/tmp/runcommand.sh",'w')
+        batchfilename = "./runcommand%d.sh" % OFSTestNode.batch_count
+        script_file = open(batchfilename,'w')
         script_file.write("#!/bin/bash\n")
         script_file.write("script runcommand\n")
         
@@ -109,16 +112,21 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         script_file.write("exit\n")
         script_file.close()
 
-        command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < /tmp/runcommand.sh" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)
-        #command_v = shlex.split(command_line)
-        #print command_line
-        # run the script and capture the return code
-        rc = subprocess.call(command_line,shell=True)
-    
+        command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < %s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address,batchfilename)
+        p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
+        
+        # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
+        del output[:]
+        output.append(command_line)
+        for i in p.communicate():
+            output.append(i)
+        
         # now clear out the batch commands list
         self.batch_commands = []    
+        OFSTestNode.batch_count = OFSTestNode.batch_count+1
+
+        return p.returncode
         
-        return rc
 
     
             
