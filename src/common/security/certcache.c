@@ -224,27 +224,33 @@ static int PINT_certcache_compare(void * data,
                   ((certcache_data_t *) pentry->data)->subject);
 }
 
+/** PINT_certcache_cleanup_data
+ * Frees certcache_data_t struct.
+ */
+static void PINT_certcache_cleanup_data(certcache_data_t *certdata)
+{
+    if (certdata->expiration != NULL)
+    {
+        M_ASN1_UTCTIME_free(certdata->expiration);
+    }
+    if (certdata->group_array != NULL)
+    {
+        free(certdata->group_array);
+        certdata->group_array = NULL;
+    }
+
+    free(certdata);        
+}
+
 /** PINT_certcache_cleanup()
- *  Frees allocated members of certcache_data_t.
+ * Free cache entry method
  */
 static void PINT_certcache_cleanup(void *entry)
 {
-
-    certcache_data_t *certdata;
-
     if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
     {
-        certdata = (certcache_data_t *) ((seccache_entry_t *) entry)->data;
-        if (certdata->expiration != NULL)
-        {
-            M_ASN1_UTCTIME_free(certdata->expiration);
-        }
-        if (certdata->group_array != NULL)
-        {
-            free(certdata->group_array);
-            certdata->group_array = NULL;
-        }
-        free(certdata);        
+        PINT_certcache_cleanup_data((certcache_data_t *) 
+                                    ((seccache_entry_t *) entry)->data);
     }
 }
 
@@ -313,7 +319,7 @@ seccache_entry_t * PINT_certcache_lookup(PVFS_certificate * cert)
 
     entry = PINT_seccache_lookup(certcache, data);
 
-    PINT_certcache_cleanup(data);
+    PINT_certcache_cleanup_data(data);
 
     return entry;
 }
