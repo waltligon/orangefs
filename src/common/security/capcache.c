@@ -29,7 +29,7 @@ seccache_t *capcache = NULL;
 static void PINT_capcache_set_expired(seccache_entry_t *entry, PVFS_time timeout);
 static uint16_t PINT_capcache_get_index(void *data, uint64_t hash_limit);
 static int PINT_capcache_compare(void *data, void *entry);
-static void PINT_capcache_cleanup(void *data);
+static void PINT_capcache_cleanup(void *entry);
 static void PINT_capcache_debug(const char *prefix,
                                 void *data);
 
@@ -149,14 +149,15 @@ static int PINT_capcache_compare(void * data,
     return memcmp(kcap->signature, ecap->signature, kcap->sig_size);
 }
 
-/** PINT_capcache_cleanup_entry
+/** PINT_capcache_cleanup
  *  Frees allocated capability.
  */
-static void PINT_capcache_cleanup(void *data)
+static void PINT_capcache_cleanup(void *entry)
 {
-    if (data != NULL)
+    if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
     {
-        PINT_cleanup_capability((PVFS_capability *) data);
+        PINT_cleanup_capability((PVFS_capability *) 
+                                 ((seccache_entry_t *)entry)->data);
     }
 }
 

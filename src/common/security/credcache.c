@@ -35,7 +35,7 @@ static uint16_t PINT_credcache_get_index(void *data,
                                          uint64_t hash_limit);
 static int PINT_credcache_compare(void *data, 
                                   void *entry);
-static void PINT_credcache_cleanup(void *data);
+static void PINT_credcache_cleanup(void *entry);
 static void PINT_credcache_debug(const char * prefix, 
                                  void *data);
 
@@ -135,14 +135,15 @@ static int PINT_credcache_compare(void *data,
     return memcmp(kcred->signature, ecred->signature, kcred->sig_size);
 }
 
-/** PINT_credcache_cleanup_entry()
- *  Frees credential and then frees the entry.
+/** PINT_credcache_cleanup()
+ *  Frees credential
  */
-static void PINT_credcache_cleanup(void *data)
+static void PINT_credcache_cleanup(void *entry)
 {
-    if (data != NULL)
+    if (entry != NULL && ((seccache_entry_t *)entry)->data != NULL)
     {
-        PINT_cleanup_credential((PVFS_credential *) data);
+        PINT_cleanup_credential((PVFS_credential *) 
+                                  ((seccache_entry_t *)entry)->data);
     }
 }
 

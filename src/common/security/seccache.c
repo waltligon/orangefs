@@ -170,7 +170,7 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
             {
                 cache->methods.debug("*** Removing", rem_entry->data);
 
-                cache->methods.cleanup(rem_entry->data);
+                cache->methods.cleanup(rem_entry);
 
                 cache->stats.removed++;
                 cache->stats.entry_count--;
@@ -190,7 +190,7 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
         {
             cache->methods.debug("*** Removing", rem_entry->data);
 
-            cache->methods.cleanup(rem_entry->data);
+            cache->methods.cleanup(rem_entry);
 
             free(rem_entry);
 
@@ -588,9 +588,9 @@ int PINT_seccache_insert(seccache_t *cache,
         return -PVFS_ENOMEM;
     }
 
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: entry %p added to the "
-                 "head of the linked list @ index = %d\n", cache->desc, 
-                 entry, index);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: entry %p (data %p) added "
+                 "to the head of the linked list @ index = %d\n", cache->desc,
+                 entry, entry->data, index);
 
     /* unlock the cache lock */
     LOCK_UNLOCK(&cache->lock);
@@ -642,7 +642,7 @@ int PINT_seccache_remove(seccache_t *cache,
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: removed entry %p at "
                      "index %hd\n", cache->desc, rem_entry, index);
 
-        cache->methods.cleanup(rem_entry->data);
+        cache->methods.cleanup(rem_entry);
 
         free(rem_entry);
         cache->stats.removed++;

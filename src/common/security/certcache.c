@@ -42,7 +42,7 @@ static uint16_t PINT_certcache_get_index(void *data,
                                          uint64_t hash_limit);
 static int PINT_certcache_compare(void *data, 
                                   void *entry);
-static void PINT_certcache_cleanup(void *data);
+static void PINT_certcache_cleanup(void *entry);
 static void PINT_certcache_debug(const char *prefix, 
                                  void *data);
 
@@ -227,12 +227,14 @@ static int PINT_certcache_compare(void * data,
 /** PINT_certcache_cleanup()
  *  Frees allocated members of certcache_data_t.
  */
-static void PINT_certcache_cleanup(void *data)
+static void PINT_certcache_cleanup(void *entry)
 {
-    certcache_data_t *certdata = (certcache_data_t *) data;
 
-    if (certdata != NULL)
+    certcache_data_t *certdata;
+
+    if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
     {
+        certdata = (certcache_data_t *) ((seccache_entry_t *) entry)->data;
         if (certdata->expiration != NULL)
         {
             M_ASN1_UTCTIME_free(certdata->expiration);
@@ -242,7 +244,7 @@ static void PINT_certcache_cleanup(void *data)
             free(certdata->group_array);
             certdata->group_array = NULL;
         }
-        free(certdata);
+        free(certdata);        
     }
 }
 

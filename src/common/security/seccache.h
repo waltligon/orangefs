@@ -61,7 +61,7 @@ typedef struct seccache_methods_s {
     void (*set_expired)(seccache_entry_t *entry, PVFS_time timeout);
     uint16_t (*get_index)(void *data, uint64_t hash_limit);
     int (*compare)(void *data, void *entry);
-    void (*cleanup)(void *data);
+    void (*cleanup)(void *entry);
     void (*debug)(const char *prefix, void *data);
 } seccache_methods_t;
 
