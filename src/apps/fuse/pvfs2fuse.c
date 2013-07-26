@@ -1096,7 +1096,9 @@ enum {
    KEY_VERSION,
 };
 
+#ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
 #define PVFS2FUSE_OPT(t, p, v) { t, offsetof(struct pvfs2fuse, p), v }
 
 static struct fuse_opt pvfs2fuse_opts[] = {
@@ -1328,7 +1330,7 @@ int main(int argc, char *argv[])
    fuse_opt_insert_arg( &args, 1, "-odirect_io" );
    fuse_opt_insert_arg( &args, 1, "-oattr_timeout=0");
    fuse_opt_insert_arg( &args, 1, "-omax_write=524288");
-   if ( getpid() == 0 )
+   if ( getuid() == 0 )
 	  fuse_opt_insert_arg( &args, 1, "-oallow_other" );
    fuse_opt_insert_arg( &args, 1, "-s" );
     
