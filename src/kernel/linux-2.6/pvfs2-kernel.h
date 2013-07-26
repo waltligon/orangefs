@@ -137,7 +137,7 @@ typedef unsigned long sector_t;
 
 #define PVFS2_BUFMAP_WAIT_TIMEOUT_SECS      30
 
-#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
+#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     900 /* 15 minutes */
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
