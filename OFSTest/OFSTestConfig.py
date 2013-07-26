@@ -22,12 +22,29 @@ class OFSTestConfig(object):
         self.run_sysint_tests = False
         self.run_usrint_tests = False
         self.run_vfs_tests = False
+        self.run_fuse_tests = False
         self.run_mpi_tests = False
         self.ofs_fs_name="pvfs2-fs"
         self.ofs_build_kmod = True
-        self.ofs_mount_fuse = False
+        
         self.ec2_domain=None
         self.ec2_associate_ip=False
+
+        # install options
+        self.mount_OFS_after_setup = True
+        self.ofs_mount_as_fuse = False
+        self.install_testing_benchmarks = True
+        self.install_OFS_server = True
+        self.install_OFS_client = True
+        self.install_MPI = False
+        
+        # existing config
+        self.ofs_installation_location = None
+        self.ofs_extra_tests_location = None
+        self.ofs_pvfs2tab_file = None
+        self.ofs_source_location = None
+        self.ofs_config_file = None
+        self.delete_existing_data = False
     
     def setConfig(self,kwargs={}):
         pass
@@ -131,13 +148,51 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_build_kmod = temp
         
+        # depricated. for backward compatibility
         temp = d.get('ofs_mount_fuse')
         if temp != None:
-            self.ofs_mount_fuse = temp
+            self.run_fuse_tests = temp
         
+        temp = d.get('run_fuse_tests')
+        if temp != None:
+            self.run_fuse_tests = temp
+
         temp = d.get('ec2_domain')
         if temp != None:
             self.ec2_domain = temp
         temp = d.get('ec2_associate_ip')
         if temp != None:
             self.ec2_associate_ip = temp
+
+        temp = d.get('ofs_mount_as_fuse')
+        if temp != None:
+            self.run_fuse_tests = temp
+            
+        temp = d.get('mount_OFS_after_setup')
+        if temp != None:
+            self.mount_OFS_after_setup = temp
+
+        temp = d.get('ofs_mount_as_fuse')
+        if temp != None:
+            self.ofs_mount_as_fuse = temp
+
+        temp = d.get('install_testing_benchmarks')
+        if temp != None:
+            self.install_testing_benchmarks = temp
+
+
+        temp = d.get('install_OFS_server')
+        if temp != None:
+            self.install_OFS_server = temp
+
+
+        temp = d.get('install_OFS_client')
+        if temp != None:
+            self.install_OFS_client = temp
+
+
+        temp = d.get('install_MPI')
+        if temp != None:
+            self.install_MPI = temp
+        
+        

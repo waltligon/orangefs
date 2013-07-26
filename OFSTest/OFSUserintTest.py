@@ -130,7 +130,7 @@ def fstest(testing_node,output=[]):
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("%s mkdir -p %s/fstest" % (preload,testing_node.ofs_mountpoint))
     if testing_node.runSingleCommand( "[ -f %s/fstest ]" % (testing_node.ofs_source_location)):
-        rc = testing_node.runSingleCommand("gcc %s/test/automated/usrint-tests.d/fstest.c -o %s/fstest" % (preload,testing_node.ofs_source_location,testing_node.ofs_source_location),output)
+        rc = testing_node.runSingleCommand("gcc %s/test/automated/usrint-tests.d/fstest.c -o %s/fstest" % (testing_node.ofs_source_location,testing_node.ofs_source_location),output)
         if rc != 0:
             return rc
         
@@ -157,8 +157,9 @@ def iozone(testing_node,output=[]):
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
+    testing_node.changeDirectory("%s/iozone3_239/src/current" % testing_node.ofs_extra_tests_location)
     if testing_node.runSingleCommand( "[ -f %s/iozone3_239/src/current/iozone ]" % testing_node.ofs_extra_tests_location):       
-        testing_node.changeDirectory("%s/iozone3_239/src/current" % testing_node.ofs_extra_tests_location)
+        
         rc = testing_node.runSingleCommand("patch -p5 < %s/test/automated/usrint-tests.d/iozone.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             return rc
@@ -308,7 +309,7 @@ fdtree,
 fstest,
 fsx,
 iozone,
-ltp,
+#ltp,
 mkdir_usrint,
 shelltest,
 symlink_usrint,

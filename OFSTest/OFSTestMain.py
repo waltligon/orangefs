@@ -266,8 +266,8 @@ class OFSTestMain(object):
                 output.write("Usrint Tests not compatible with fuse=====================================\n")
                 output.close()
             else:
-                head_node.unmountOFS()
-                #head_node.stopOFSClient()
+                #head_node.unmountOFS()
+                head_node.stopOFSClient()
                 #for node in self.ofs_network.created_nodes:
                 
                 
@@ -301,7 +301,7 @@ class OFSTestMain(object):
 
 
         
-        if self.config.ofs_mount_fuse == True:
+        if self.config.run_fuse_tests == True:
             output = open(filename,'a+')
             head_node.stopOFSClient()
             head_node.mountOFSFilesystem(mount_fuse=True)
