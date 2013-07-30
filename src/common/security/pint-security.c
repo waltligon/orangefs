@@ -1257,7 +1257,7 @@ void PINT_security_error(const char *prefix, int err)
         break;
     default:
         /* debug PVFS/errno error */
-        PVFS_strerror_r((int) err, errstr, 256);
+        PVFS_strerror_r(err, errstr, 256);
         errstr[255] = '\0';
         gossip_err("%s: %s\n", prefix, errstr);
     }
