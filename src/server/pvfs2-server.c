@@ -2042,7 +2042,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if(argc < optind)
+    if(argc <= optind)
     {
         gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;
