@@ -910,6 +910,7 @@ if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
     CFLAGS="$CFLAGS -g $CC_OPT"
 fi
 
+
 dnl Options that are not yet working
 dnl --------------------------------
 dnl AC_ARG_ENABLE(profiling,
@@ -1443,7 +1444,9 @@ case "$host_os" in
     *darwin*)
 	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
     	TARGET_OS_DARWIN=1
+        CFLAGS="$CFLAGS -D__DARWIN__"
 	AC_SUBST(TARGET_OS_DARWIN)
+        AC_SUBST(CFLAGS)
     ;;
     *linux*)
 	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)

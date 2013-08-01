@@ -9,7 +9,6 @@
 /* These are standard declaration and  must go before the undefs below */
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
@@ -62,8 +61,23 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
+
 {
+#ifdef __DARWIN__
+    void *ptr;
+    int rc;
+    rc = posix_memalign(&ptr, alignment, size);
+    if (rc)
+    {
+        return ptr;
+    }
+    else
+    {
+        return NULL;
+    }
+#else
     return memalign(alignment, size);
+#endif
 }
 
 int clean_posix_memalign(void **ptr, size_t alignment, size_t size)
