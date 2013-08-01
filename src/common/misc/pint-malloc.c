@@ -7,6 +7,7 @@
  */
 
 /* These are standard declaration and  must go before the undefs below */
+#include "pvfs2-config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -14,6 +15,10 @@
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 /* locally configured options - must be edited here before compile */
 #if 0
