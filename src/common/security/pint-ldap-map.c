@@ -29,7 +29,7 @@
 #include "cert-util.h"
 
 /* global LDAP connection handle */
-static LDAP *ldap;
+static LDAP *ldap = NULL;
 
 /* LDAP handle mutex */
 static gen_mutex_t ldap_mutex = GEN_MUTEX_INITIALIZER;
@@ -311,19 +311,21 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
 
     /* read subject from cert */
     ret = PINT_cert_to_X509(&cred->certificate, &xcert);
-    PINT_SECURITY_CHECK_RET(ret);
+    PINT_SECURITY_CHECK_RET(ret, "could not convert internal cert\n");
 
     xsubject = X509_get_subject_name(xcert);
-    PINT_SECURITY_CHECK_NULL(xsubject, PINT_ldap_map_user_exit);
+    PINT_SECURITY_CHECK_NULL(xsubject, PINT_ldap_map_user_exit,
+                             "could not retrieve cert subject\n");
 
     X509_NAME_oneline(xsubject, subject, sizeof(subject));
     subject[sizeof(subject) - 1] = '\0';
 
     if (subject[0] == '\0')
     {
-        gossip_err("%s: no certificate subject\n", __func__);
+        
         ret = -PVFS_ESECURITY;
-        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit, 
+                            "no certificate subject\n");
     }
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: using subject %s\n", __func__,
@@ -333,13 +335,10 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
     {
         /* parse the CN */
         ret = parse_subject_cn(subject, name, sizeof(name));
-        if (ret != 0)
-        {
-            gossip_err("%s: cannot parse CN from certificate %s\n", 
-                       __func__, subject);
-            PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
-        }
-
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit,
+                            "cannot parse CN from certificate %s\n",
+                            subject);
+        
         /* set LDAP search parameters */
         scope = config->ldap_search_scope;
 
@@ -360,20 +359,16 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
     {
         /* allocate the base */
         base = (char *) malloc(strlen(subject) + 1);
-        if (base == NULL)
-        {
-            PINT_SECURITY_CHECK(-PVFS_ENOMEM, PINT_ldap_map_user_exit);
+        if (base == NULL){
+            PINT_SECURITY_CHECK(-PVFS_ENOMEM, PINT_ldap_map_user_exit,
+                                "out of memory\n");
         }
         free_flag = 1;
 
         /* convert the DN */
         ret = convert_dn(subject, base, strlen(subject) + 1);
-        if (ret != 0)
-        {
-            gossip_err("%s: cannot convert certificate DN: %d\n", __func__,
-                       ret);
-            PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
-        }
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit,
+                            "cannot convert certificate DN: %d\n", ret);        
 
         scope = LDAP_SCOPE_BASE;
 
@@ -697,7 +692,10 @@ void PINT_ldap_finalize(void)
     gen_mutex_lock(&ldap_mutex);
 
     /* disconnect from the LDAP server */
-    ldap_unbind_ext_s(ldap, NULL, NULL);
+    if (ldap != NULL)
+    {
+        ldap_unbind_ext_s(ldap, NULL, NULL);
+    }
 
     ldap = NULL;
 
