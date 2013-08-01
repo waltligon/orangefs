@@ -1307,7 +1307,11 @@ int pvfs2_fill_sb(struct super_block *sb,
                  root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
+#ifdef HAVE_D_ALLOC_ROOT
     root_dentry = d_alloc_root(root);
+#else
+    root_dentry = d_make_root(root);
+#endif
     if (!root_dentry)
     {
         iput(root);

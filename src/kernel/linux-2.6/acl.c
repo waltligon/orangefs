@@ -190,7 +190,7 @@ fail:
 /**
  * Routines that retrieve and/or set ACLs for PVFS2 files.
  */
-static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
+struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
 {
     struct posix_acl *acl;
     int ret;
