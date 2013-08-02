@@ -84,8 +84,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             CFLAGS="-Os $CFLAGS"
         fi
 
-    dnl hubcap start
-
     dnl by 3.4 create's third argument changed from int to umode_t.
     tmp_cflags=$CFLAGS
     CFLAGS="$CFLAGS -Werror"
@@ -165,12 +163,17 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
     CFLAGS=$tmp_cflags
 
-    dnl hubcap end
-
     dnl between 3.6 and 3.9 create() lookup() and d_revalidate() lose
     dnl their struct nameidata argument.  d_revalidate seems to be
-    dnl handled be we will test for the other two
-    dnl check create
+    dnl handled be we will test for the other two check create.
+    dnl Create args for different versions:
+    dnl  3.2: (struct inode *,struct dentry *,int, struct nameidata *);
+    dnl  3.4: (struct inode *,struct dentry *,umode_t,struct nameidata *)
+    dnl  3.6: (struct inode *,struct dentry *, umode_t, bool);
+    dnl  a previous test (if kernel inode ops create uses umode_t) sets
+    dnl  a define that helps us in this test.
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([if kernel inode ops create takes nameidata])
 	AC_TRY_COMPILE(
         [
@@ -178,7 +181,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		    #include <linux/fs.h>
             extern int mycreate(struct inode *,
                                 struct dentry *,
+		    #ifdef PVFS_KMOD_CREATE_USES_UMODE_T
+		                umode_t mode,
+		    #else
                                 int,
+		    #endif
                                 struct nameidata *);
         ], [
 			static struct inode_operations in_op = {
@@ -192,16 +199,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl check lookup
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([if kernel inode ops lookup takes nameidata])
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
 		    #include <linux/fs.h>
-            extern int mylookup(struct inode *,
-                                struct dentry *,
-                                struct nameidata *);
+            extern struct dentry *mylookup(struct inode *,
+                                           struct dentry *,
+                                           struct nameidata *);
         ], [
 			static struct inode_operations in_op = {
 				  .lookup = mylookup
@@ -214,8 +224,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl check revalidate
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([for if kernel dentry ops d_revalidate takes nameidata])
 	AC_TRY_COMPILE(
         [
@@ -235,6 +248,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl kernel 3.6-3.9 added get_acl as a method rather than using
     dnl check_acl passed into generic_permissions
@@ -1308,6 +1322,33 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_DEFINE(HAVE_ENCODEFH_EXPORT_OPERATIONS, 1, Define if export_operations has an encode_fh member),
 	    AC_MSG_RESULT(no)
 	)
+
+        dnl between 3.4 and 3.6 the encode_fh function in
+        dnl "struct export_operations" stopped having a dentry pointer
+        dnl and a connectable flag as arguments, intead encode_fh
+        dnl has both the child and parent inodes as arguments.
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+        AC_MSG_CHECKING([if kernel export ops get inode from dentry])
+        AC_TRY_COMPILE([
+            #define __KERNEL__
+            #include <linux/fs.h>
+            #include <linux/exportfs.h>
+            extern int myencode(struct dentry *,
+                                __u32 *,
+                                int *,
+                                int);
+            ], [
+            static struct export_operations ex_op = {.encode_fh = myencode};
+            ], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_ENCODE_FS_USES_DENTRY, 1,
+               [Define if kernel export ops encode_fh has dentry arg])
+            ], [
+            AC_MSG_RESULT(no)
+            ]
+        )
+	CFLAGS=$tmp_cflags
 
 	dnl Using -Werror is not an option, because some arches throw lots of
 	dnl warnings that would trigger false negatives.  We know that the

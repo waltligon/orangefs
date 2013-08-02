@@ -31,7 +31,7 @@ static int pvfs2_create(struct inode *dir,
 #else
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
-                        int mode,
+                        umode_t mode,
                         bool exclusive)
                         /* PVFS could use to indicate exclusive open */
 #endif
@@ -76,7 +76,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 #else
 static struct dentry *pvfs2_lookup(struct inode *dir,
                                    struct dentry *dentry,
-                                   int flags)
+                                   unsigned int flags)
 #endif
 {
     int ret = -EINVAL;
