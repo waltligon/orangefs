@@ -102,6 +102,10 @@ typedef pthread_cond_t  gen_cond_t;
 # endif /* PTHREAD_RECURSIVE */
 #endif /* __USE_GNU */
 
+#ifdef __DARWIN__
+# define GEN_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+#endif
+
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_posix_mutex_trylock(m)

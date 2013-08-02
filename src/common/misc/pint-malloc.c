@@ -7,6 +7,7 @@
  */
 
 /* These are standard declaration and  must go before the undefs below */
+#include <pvfs2-config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
@@ -15,6 +16,10 @@
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 /* locally configured options - must be edited here before compile */
 #if 0
@@ -63,7 +68,21 @@ void *clean_valloc(size_t size)
 
 void *clean_memalign(size_t alignment, size_t size)
 {
+#ifdef __DARWIN__
+    void *ptr;
+    int rc;
+    rc = posix_memalign(&ptr, alignment, size);
+    if (rc)
+    {
+       return ptr;
+    }
+    else
+    {
+       return NULL;
+    }
+#else
     return memalign(alignment, size);
+#endif
 }
 
 int clean_posix_memalign(void **ptr, size_t alignment, size_t size)

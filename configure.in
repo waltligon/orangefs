@@ -1326,6 +1326,8 @@ case "$host_os" in
     *darwin*)
 	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
     	TARGET_OS_DARWIN=1
+	CFLAGS="$CFLAGS -D__DARWIN__"
+	AC_SUBST(CFLAGS)
 	AC_SUBST(TARGET_OS_DARWIN)
     ;;
     *linux*)
