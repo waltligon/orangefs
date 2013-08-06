@@ -1077,6 +1077,8 @@ struct profiler
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
 #define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
+#define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
+        "/orangefs-service-users"
 
 typedef unsigned char *PVFS_cert_data;
 
