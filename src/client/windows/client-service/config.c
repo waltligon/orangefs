@@ -37,6 +37,8 @@ extern struct qhash_table user_cache;
 
 #define ERROR_MSG_LEN            255
 
+#define STR_BUF_LEN              320
+
 #define KEYWORD_ARGS_CHECK()        do { \
                                         if (strlen(args) == 0) { \
                                             _snprintf(error_msg, ERROR_MSG_LEN, \
@@ -203,8 +205,10 @@ static KEYWORD_CB(user_mode)
 static KEYWORD_CB(user)
 {
     char *token, *p;
-    char user_name[256];
-    char uid[16], gid[16];
+    char user_name[STR_BUF_LEN];
+    char uidbuf[16], gidbuf[16];
+    PVFS_uid uid;
+    PVFS_gid gid;
     int i, ret = 0;
     PVFS_credential credential;
 
@@ -214,19 +218,19 @@ static KEYWORD_CB(user)
     if (token)
     {
         /* copy user name */
-        strncpy(user_name, token, 256);
+        strncpy(user_name, token, STR_BUF_LEN);
 
         token = strtok(NULL, " \t");
         if (token)
         {
-            uid[0] = gid[0] = '\0';
+            uidbuf[0] = gidbuf[0] = '\0';
             i = 0;
             p = token;
             while (*p && *p != ':' && i < 15)
             {
                 if (isdigit(*p))
                 {
-                    uid[i++] = *p++;
+                    uidbuf[i++] = *p++;
                 }
                 else 
                 {
@@ -234,7 +238,7 @@ static KEYWORD_CB(user)
                     break;
                 }
             }
-            uid[i] = '\0';
+            uidbuf[i] = '\0';
             if (ret == 0)
             {
                 if (*p == ':')
@@ -244,7 +248,7 @@ static KEYWORD_CB(user)
                 {
                     if (isdigit(*p))
                     {
-                        gid[i++] = *p++;
+                        gidbuf[i++] = *p++;
                     }
                     else 
                     {
@@ -252,7 +256,7 @@ static KEYWORD_CB(user)
                         break;
                     }
                 }
-                gid[i] = '\0';
+                gidbuf[i] = '\0';
             }
         }
         else
@@ -266,16 +270,26 @@ static KEYWORD_CB(user)
     }
 
     if (ret == 0)
-        ret = !(strlen(uid) > 0 && strlen(gid) > 0);
+        ret = !(strlen(uidbuf) > 0 && strlen(gidbuf) > 0);
 
     if (ret == 0)
     {
-        /* add user to cache with no expiration */
-        /* TODO: updated security */
-        init_credential(&credential);
-        credential.userid = atoi(uid);
-        credential_add_group(&credential, atoi(gid));
+        /* get numeric uid/gid, checking for error */
+        uid = atoi(uidbuf);
+        if (uid == 0 && strcmp(uidbuf, "0"))
+        {
+            return -1;
+        }
+        gid = atoi(gidbuf);
+        if (gid == 0 && strcmp(gidbuf, "0"))
+        {
+            return -1;
+        }
         
+        /* set up credential */
+        init_credential(uid, &gid, 1, &credential);
+
+        /* add user to cache with no expiration */
         add_cache_user(user_name, &credential, NULL);
 
         PINT_cleanup_credential(&credential);
@@ -320,7 +334,7 @@ static KEYWORD_CB(debug)
         /* optional debug mask */
         if (strlen(args) > 0) 
         {
-            strncpy(options->debug_mask, args, 256);
+            strncpy(options->debug_mask, args, STR_BUF_LEN);
             options->debug_mask[255] = '\0';
         }
         else
@@ -352,9 +366,9 @@ static KEYWORD_CB(security_mode)
 {
     KEYWORD_ARGS_CHECK();
 
-    if (!stricmp(args, "none"))
+    if (!stricmp(args, "default"))
     {
-        options->security_mode = SECURITY_MODE_NONE;
+        options->security_mode = SECURITY_MODE_DEFAULT;
     }
     else if (!stricmp(args, "key"))
     {
@@ -366,7 +380,7 @@ static KEYWORD_CB(security_mode)
     }
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"none\","
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"default\","
             "\"key\" or \"certificate\"", keyword);
         return KEYWORD_ERR_INVALID_ARGS;
     }
@@ -447,13 +461,13 @@ static KEYWORD_CB(cert_security)
 
 static KEYWORD_CB(ldap)
 {
-    char temp[256], *token;
+    char temp[STR_BUF_LEN], *token;
     int ret;
 
     if (!stricmp(keyword, "ldap-host"))
     {
         /* parse string of form ldap[s]://host[:port] */      
-        strncpy(temp, args, 256);
+        strncpy(temp, args, STR_BUF_LEN);
         token = strtok(temp, ":/");
         if (token != NULL)
         {
@@ -494,7 +508,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-bind-dn"))
     {
         /* the dn of the user used to bind to the ldap host */
-        strncpy(options->ldap.bind_dn, args, 256);
+        strncpy(options->ldap.bind_dn, args, STR_BUF_LEN);
         options->ldap.bind_dn[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;
@@ -511,7 +525,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-search-root"))
     {
         /* dn of the object from which to start the search */
-        strncpy(options->ldap.search_root, args, 256);
+        strncpy(options->ldap.search_root, args, STR_BUF_LEN);
         options->ldap.search_root[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;
@@ -893,7 +907,7 @@ int get_config(PORANGEFS_OPTIONS options,
 {
     FILE *config_file;
     PCONFIG_KEYWORD_DEF keyword_def;
-    char line[256], copy[256], *keyword, *pargs, args[256];
+    char line[STR_BUF_LEN], *pline, keyword[STR_BUF_LEN], args[STR_BUF_LEN];
     int ret = 0, i, debug_file_flag = FALSE;
 
     config_file = open_config_file(error_msg, error_msg_len);
@@ -907,30 +921,38 @@ int get_config(PORANGEFS_OPTIONS options,
     while (!feof(config_file))
     {
         line[0] = '\0';
-        fgets(line, 256, config_file);
+        fgets(line, sizeof(line), config_file);
+        line[sizeof(line)-1] = '\0';
 
         /* remove \n */        
         if (strlen(line) > 0 && line[strlen(line)-1] == '\n')
             line[strlen(line)-1] = '\0';
         
         /* check line -- # used for comments */
-        if (strlen(line) > 0 && line[0] != '#')
+        if (strlen(line) > 0)
         {
-            /* make a copy */
-            strncpy(copy, line, 256);
-            /* parse line */
-            keyword = strtok(copy, " \t");
-            if (keyword == NULL)
+            /* skip whitespace and comments */
+            pline = line;
+            EAT_WS(pline);
+            if (!(*pline) || *pline == '#')
                 continue;
 
-            /* set arguments */
-            memset(args, 0, 256);
-            pargs = strtok(NULL, " \t");
-            if (pargs != NULL)
+            /* get keyword */
+            i = 0;
+            while (*pline && (*pline != ' ' || *pline == '\t'))
             {
-                strncpy(args, pargs, 256);
-                args[255] = '\0';
+                keyword[i++] = *pline++;
             }
+            keyword[i] = '\0';
+
+            /* get arguments */
+            EAT_WS(pline);
+            i = 0;
+            while (*pline)
+            {
+                args[i++] = *pline++;
+            }
+            args[i] = '\0';
             
             memset(error_msg, 0, error_msg_len);
 

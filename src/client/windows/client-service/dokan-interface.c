@@ -411,6 +411,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
     ASN1_UTCTIME *expires;
+    PVFS_gid gid;
     int ret;
 
     DbgPrint("   get_requestor_credential: enter\n");
@@ -447,10 +448,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     /* system user functions as root */
     if (!stricmp(user_name, "SYSTEM"))
     {
-        init_credential(credential);
-        credential->userid = 0;
-        credential_add_group(credential, 0);
-        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+        gid = 0;
+        init_credential(0, &gid, 1, credential);
 
         CloseHandle(htoken);
 
@@ -531,8 +530,6 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
             /* if cache hit -- return credential */
             entry = qhash_entry(item, struct context_entry, hash_link);
             PINT_copy_credential(&(entry->credential), credential);
-            /* update timeout */
-            credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
             DbgPrint("   get_credential:  found (%d:%d)\n", 
                       credential->userid, credential->group_array[0]);
         }
@@ -2211,16 +2208,15 @@ PVFS_Dokan_get_disk_free_space(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int ret, err;
+    PVFS_gid gid = 0;
     PVFS_credential credential;
 
     DbgPrint("GetDiskFreeSpace\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
-    err = init_credential(&credential);
+    err = init_credential(0, &gid, 1, &credential);
     CRED_CHECK("GetDiskFreeSpace", err);
-    credential_add_group(&credential, 0);
-    credential_set_timeout(&credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
 
     ret = fs_get_diskfreespace(&credential,
                                (PVFS_size *) FreeBytesAvailable, 

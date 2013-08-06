@@ -230,10 +230,7 @@ int get_ldap_credential(char *userid,
 
     if (ret == 0 && uid != -1 && gid != -1)
     {
-        init_credential(credential);
-        credential->userid = uid;
-        credential_add_group(credential, gid);
-        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+        init_credential(uid, &gid, 1, credential);
     }
     else if (ret == 0)
     {

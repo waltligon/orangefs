@@ -6,7 +6,7 @@
    
 /*
  * User cache functions - to speed credential lookup, the 
- * OrangeFS credential (UID/GID) are cached with the username.
+ * OrangeFS credential (UID/groups) are cached with the username.
  * Cache entries from certificates expire when the certificate 
  * expires.
  */
@@ -95,7 +95,7 @@ int get_cache_user(char *user_name,
         entry = qhash_entry(link, struct user_entry, hash_link);
         PINT_copy_credential(&(entry->credential), credential);
         /* Update timeout */
-        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+        /*credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT); */
         DbgPrint("   get_cache_user: hit for %s (%u:%u)\n", user_name,
             credential->userid, credential->group_array[0]);
 

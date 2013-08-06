@@ -207,10 +207,7 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
                 if (ret == 0)
                 {
                     /* initialize and fill in credential */
-                    init_credential(credential);
-                    credential->userid = uid;
-                    credential_add_group(credential, gid);
-                    credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
+                    init_credential(uid, &gid, 1, credential);
                 }
                 else
                 {

@@ -12,26 +12,65 @@
 
 #include "pint-util.h"
 
+#include "client-service.h"
 #include "cred.h"
+#include "key.h"
 
-/* initialize credential - credential must be allocated */ 
-int init_credential(PVFS_credential *cred)
+extern PORANGEFS_OPTIONS goptions;
+
+/* initialize and sign credential - credential must be allocated */ 
+int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
+                    PVFS_credential *cred)
 {
-    if (cred == NULL)
+    int ret = 0;
+
+    if (group_array == NULL || cred == NULL || num_groups == 0)
     {
         return -PVFS_EINVAL;
     }
 
-    memset(cred, 0, sizeof(PVFS_credential));
+    memset(cred, 0, sizeof(PVFS_credential));    
 
-    /* blank issuer */
-    cred->issuer = strdup("");
+    /* fill in issuer */
+    cred->issuer = (char *) malloc(PVFS_REQ_LIMIT_ISSUER);
     if (!cred->issuer)
     {
         return -PVFS_ENOMEM;
     }
+    strcpy(cred->issuer, "C:");
+    if (!gethostname(cred->issuer+2, PVFS_REQ_LIMIT_ISSUER-3))
+    {
+        free(cred->issuer);
+        return -PVFS_ENOMEM;
+    }
 
-    return 0;
+    /* fill in uid/groups for non-cert modes */
+    if (goptions->security_mode != SECURITY_MODE_CERT)
+    {
+        cred->group_array = (PVFS_gid *) malloc(sizeof(PVFS_gid) * num_groups);
+        if (!cred->issuer || !cred->group_array)
+        {
+            return -PVFS_ENOMEM;
+        }
+
+        /* set groups and uid */
+        cred->num_groups = num_groups;
+        memcpy(cred->group_array, group_array, sizeof(PVFS_gid) * num_groups);
+        cred->userid = uid;
+
+        /* default timeout */
+        cred->timeout = time(NULL) + PVFS2_DEFAULT_CREDENTIAL_TIMEOUT;
+
+        if (goptions->security_mode == SECURITY_MODE_KEY)
+        {
+            if ((ret = key_sign_credential(cred)) != 0)
+            {
+                cleanup_credential(cred);
+            }
+        }
+    }
+
+    return ret;
 }
 
 /* free credential fields - caller must free credential */
@@ -77,6 +116,8 @@ int credential_in_group(PVFS_credential *cred, PVFS_gid group)
 }
 
 /* add group to credential group list */
+/* TODO: remove? */
+#if 0
 void credential_add_group(PVFS_credential *cred, PVFS_gid group)
 {
     PVFS_gid *group_array;
@@ -111,3 +152,4 @@ void credential_set_timeout(PVFS_credential *cred, PVFS_time timeout)
 {
     cred->timeout = PINT_util_get_current_time() + timeout;
 }
+#endif
