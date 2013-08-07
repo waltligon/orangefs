@@ -409,6 +409,7 @@ static int write_credential(const PVFS_credential *cred,
     return EXIT_SUCCESS;
 }
 
+#ifdef ENABLE_SECURITY_KEY
 int allowed(const struct passwd *pwd, const struct group *grp)
 {
     uid_t uid;
@@ -435,7 +436,6 @@ int allowed(const struct passwd *pwd, const struct group *grp)
     if (uid == 0 && gid == 0)
         return 0;
 
-#ifdef ENABLE_SECURITY_KEY
     /* Parse users out of the service user file if root owns it. */
     if (stat(filepath, &st) == 0)
         if (st.st_uid == 0) {
@@ -482,13 +482,13 @@ int allowed(const struct passwd *pwd, const struct group *grp)
             }
             close(fd);
         }
-#endif
 
     /* Pass this user through. */
     if (pwd->pw_uid == uid && grp->gr_gid == gid)
         return 0;
     return 1;
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -580,11 +580,13 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
+#ifdef ENABLE_SECURITY_KEY
     if (allowed(pwd, grp) != 0) {
         fprintf(stderr, "error: cannot generate a credential for user "
                 "%s and group %s\n", pwd->pw_name, grp->gr_name);
         return EPERM;
     }
+#endif
 
 #ifdef HAVE_GETGROUPLIST
 
