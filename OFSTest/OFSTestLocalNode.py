@@ -38,7 +38,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         self.is_ec2 = False
         self.ip_address = "127.0.0.1"
         self.current_user = self.runSingleCommandBacktick("whoami")
-        print self.current_user
+        #print self.current_user
         self.currentNodeInformation()
       
     def currentNodeInformation(self):
@@ -169,8 +169,13 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
           rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ext_ip_address,destination)
-        print rsync_command
-        return self.runSingleCommand(rsync_command)
+        
+        output = []
+        rc = self.runSingleCommand(rsync_command,output)
+        if rc != 0:
+            print "Could not copy to remote node"
+            print output
+        return rc
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
         # This runs the copy command remotely 
@@ -182,16 +187,21 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
           rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
-        print rsync_command
-        return self.runSingleCommand(rsync_command)  
+        
+        output = []
+        rc = self.runSingleCommand(rsync_command,output)
+        if rc != 0:
+            print "Could not copy to remote node"
+            print output
+        return rc
     
     def getAliasesFromConfigFile(self,config_file_name):
         
-        print "examining "+config_file_name
+        print "Examining "+config_file_name
         alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
-        print alias
+#        print alias
         alias = self.runSingleCommandBacktick('cat '+config_file_name)
-        print alias
+#        print alias
         alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
         print "Alias is "+ alias
         

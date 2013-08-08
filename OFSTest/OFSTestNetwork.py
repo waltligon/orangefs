@@ -178,7 +178,7 @@ class OFSTestNetwork(object):
             for i in new_instances:
                 i.update()
                 print "Using existing ip address "+i.ip_address
-                #pprint(i.__dict__)
+                #(i.__dict__)
                 ip_addresses.append(i.ip_address)
  
         for idx,instance in enumerate(new_instances):
@@ -257,54 +257,79 @@ class OFSTestNetwork(object):
             node_list = self.created_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
 
-    def buildOFSFromSource(self,resource_type,resource_location,build_node=None,download_location="",configure_opts="",make_opts="",build_kmod=True):
+    def buildOFSFromSource(self,
+        resource_type,
+        resource_location,
+        download_location=None,
+        build_node=None,
+        build_kmod=True,
+        enable_strict=False,
+        enable_fuse=False,
+        enable_shared=False,
+        ofs_prefix="/opt/orangefs",
+        db4_prefix="/opt/db4",
+        configure_opts="",
+        make_opts="",
+        debug=False):
+        
         if build_node == None:
             build_node = self.created_nodes[0]
             
-        if download_location == "":
-            download_location = "/tmp/%s/" % build_node.current_user
+        if download_location == None:
+            download_location = "/home/%s/" % build_node.current_user
         
         if resource_type == "LOCAL":
             # copy from the local to the buildnode, then pretend it is a "buildnode" resource.
             # shameless hack.
-            self.local_master.copyToRemoteNode(resource_location,build_node,download_location,True)
+            rc = self.local_master.copyToRemoteNode(resource_location,build_node,download_location,True)
             resource_type == "BUILDNODE"
             resource_location = download_location
         
-        build_node.copyOFSSource(resource_type,resource_location,download_location)
-        #"TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz",)
-        build_node.configureOFSSource(configure_opts,build_kmod)
-        build_node.makeOFSSource(make_opts)
+        rc = build_node.copyOFSSource(resource_type,resource_location,download_location)
+        if rc != 0:
+            return rc
+
+        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,configure_opts=configure_opts)
+        if rc != 0:
+            return rc
+        
+        rc = build_node.makeOFSSource(make_opts)
+        if rc != 0:
+            return rc
+        
+        return rc
 
     
     def installOFSBuild(self,build_node=None,install_opts=""):
         if build_node == None:
             build_node = self.created_nodes[0]
-        build_node.installOFSSource(install_opts)
+        return build_node.installOFSSource(install_opts)
     
-    def buildAndInstallOFSFromSource(self,resource_type,resource_location,build_node=None,download_location="",configure_opts="",make_opts="",install_opts="",build_kmod=True):
+    '''
+    def buildAndInstallOFSFromSource(self,resource_type,resource_location,build_node=None,download_location="",configure_opts="",make_opts="",install_opts="",build_kmod=True,debug=True):
         if build_node == None:
             build_node = self.created_nodes[0]
         self.buildOFSFromSource(resource_type,resource_location,build_node,download_location,configure_opts,make_opts,build_kmod)
         self.installOFSBuild(build_node,install_opts)
         self.installOFSTests(build_node,configure_opts)
+    '''
 
     def installOFSTests(self,client_node=None,configure_options=""):
         if client_node == None:
             client_node = self.created_nodes[0]
-        client_node.installOFSTests(configure_options)
+        return client_node.installOFSTests(configure_options)
 
     def installBenchmarks(self,client_node=None,configure_options=""):
         if client_node == None:
             client_node = self.created_nodes[0]
-        client_node.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/%s/benchmarks" % client_node.current_user)
+        return client_node.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/home/%s/benchmarks" % client_node.current_user)
         
     def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts=""):
         if node_list == None:
             node_list = self.created_nodes
         if master_node == None:
             master_node = self.created_nodes[0]
-        master_node.configureOFSServer(node_list,ofs_fs_name,pvfs2genconfig_opts)
+        return master_node.configureOFSServer(node_list,ofs_fs_name,pvfs2genconfig_opts)
         
     def copyOFSToNodeList(self,destination_list=None):
         if destination_list == None:
@@ -340,7 +365,7 @@ class OFSTestNetwork(object):
                     #print "Queue length is %d" % self.queue.qsize()
                     list = self.queue.get()
                     
-                    print "Copying %r" % list
+                    #print "Copying %r" % list
                     self.manager.copyOFSToNodeList(list)
                     
                         
@@ -392,7 +417,7 @@ class OFSTestNetwork(object):
         client_node.mountOFSFilesystem(mount_fuse=mount_fuse)
         time.sleep(10)
         print "Checking mount"
-        mount_res=client_node.runSingleCommandBacktick("mount")
+        mount_res=client_node.runSingleCommandBacktick("mount | grep -i pvfs")
         print mount_res
         #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mountpoint)
         #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mountpoint)

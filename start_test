@@ -42,13 +42,13 @@ for o, a  in optlist:
 
 if config_file != None:
     try:
-#        print "trying" + config_file
+        print "Using configuration from "+ config_file
         test_driver = OFSTestMain.OFSTestMain(OFSTestConfigFile.OFSTestConfigFile())
-        print "setting config"
+        #print "setting config"
         #ugly python hack
         test_driver.setConfig(kwargs={"filename":config_file})
-        test_driver.printConfig()
-        print "done"
+        #test_driver.printConfig()
+        #print "done"
     except ValueError:
         print "File %s could not be read or invalid format." % config_file
         test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())

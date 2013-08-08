@@ -120,7 +120,30 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Downloading and Installing OrangeFS from %s resource %s" % (self.config.ofs_resource_type,self.config.ofs_resource_location)
 
-        self.ofs_network.buildAndInstallOFSFromSource(resource_type=self.config.ofs_resource_type,resource_location=self.config.ofs_resource_location,configure_opts=self.config.configure_opts,build_kmod=self.config.ofs_build_kmod)
+        rc = self.ofs_network.buildOFSFromSource(
+        resource_type=self.config.ofs_resource_type,
+        resource_location=self.config.ofs_resource_location,
+        build_kmod=self.config.ofs_build_kmod,
+        enable_strict=self.config.enable_strict,
+        enable_fuse=self.config.install_fuse,
+        enable_shared=self.config.install_shared,
+        ofs_prefix=self.config.install_prefix,
+        db4_prefix=self.config.db4_prefix,
+        configure_opts=self.config.configure_opts,
+        debug=self.config.ofs_compile_debug
+        )
+        
+        if rc != 0:
+            print "Could not build OrangeFS. Aborting."
+            return rc
+        
+        rc = self.ofs_network.installOFSBuild(install_opts=install_opts)
+        if rc != 0:
+            print "Could not install OrangeFS. Aborting."
+        
+        
+        self.installOFSTests()
+
       
         print ""
         print "==================================================================="

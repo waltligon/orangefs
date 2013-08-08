@@ -197,6 +197,14 @@ def ltp(testing_node,output=[]):
     LTP_URL = "http://devorange.clemson.edu/pvfs"
     
     rc = 0
+   
+    # check for fuse
+    tmp = []
+    testing_node.checkMount(tmp)
+    if "pvfs2fuse" in tmp[1]:
+        print "LTP test cannot be run for filesystem mounted via fuse"
+        return -99
+    
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
@@ -238,20 +246,25 @@ def ltp(testing_node,output=[]):
         
     testing_node.runSingleCommand("cp %s/test/automated/vfs-tests.d/ltp-pvfs-testcases runtest/" % testing_node.ofs_source_location)
     testing_node.runSingleCommand("cp %s/test/automated/vfs-tests.d/ltp-pvfs-testcases /tmp/ltp/runtest/" % testing_node.ofs_source_location)
-    testing_node.runSingleCommand("mkdir -p %s/ltp-tmp" % testing_node.ofs_source_location)
+    testing_node.runSingleCommand("mkdir -p %s/ltp-tmp" % testing_node.ofs_mountpoint)
     testing_node.runSingleCommand("chmod 777 %s/ltp-tmp" % testing_node.ofs_mountpoint)
     testing_node.runSingleCommand("umask 0")
+    
     
     testing_node.changeDirectory('/tmp/ltp')
     
     print 'sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location)    
-    rc = testing_node.runSingleCommandAsBatch('sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
-    if rc != 0:
-        return rc
-    
-    failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log",output)
+    rc = testing_node.runSingleCommandAsBatch('sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
+#    if rc != 0:
+#        return rc
+    # check to see if log file is there
+    if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases.log ]"):
+        return 1
+
+    failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log" % testing_node.ofs_installation_location,output)
     testing_node.changeDirectory('~')
 
+  
     if failrc == 0:
         # if grep returns O, then there were failures.
         return 1
@@ -325,7 +338,7 @@ fdtree,
 fstest,
 fsx,
 iozone,
-#ltp,
+ltp,
 mkdir_vfs,
 shelltest,
 symlink_vfs,

@@ -119,18 +119,18 @@ class OFSTestNode(object):
     def currentNodeInformation(self):
         
         self.distro = ""
-        print "Getting current node information"
+        #print "Getting current node information"
         
         # can we ssh in? We'll need the group if we can't, so let's try this first.
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user)
         
-        print "Current group is "+self.current_group
+        #print "Current group is "+self.current_group
 
         # direct access as root not good. Need to get the actual user in
         # Gross hackery for SuseStudio images. OpenStack injects into root, not user.
         if self.current_group.rstrip() == "":
             self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
-            print "Current group (from root) is "+self.current_group
+            #print "Current group (from root) is "+self.current_group
             if self.current_group.rstrip() == "":
                 print "Could not access node at "+self.ip_address+" via ssh"
                 exit(-1)
@@ -154,30 +154,33 @@ class OFSTestNode(object):
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         self.processor_type = self.runSingleCommandBacktick("uname -p")
         
-        print "%s %s %s" % (self.host_name,self.kernel_version,self.processor_type)
+        #print "%s %s %s" % (self.host_name,self.kernel_version,self.processor_type)
         # information for ubuntu and suse is in /etc/os-release
         #print self.runSingleCommand("find /etc/lsb-release 2> /dev/null")
         
         
 
         if self.runSingleCommandBacktick('find /etc -name "os-release" 2> /dev/null').rstrip() == "/etc/os-release":
-            print "SuSE or Ubuntu based machine found"
+            #print "SuSE or Ubuntu based machine found"
             pretty_name = self.runSingleCommandBacktick("cat /etc/os-release | grep PRETTY_NAME")
             [var,self.distro] = pretty_name.split("=")
         # for redhat based distributions, information is in /etc/system-release
         elif self.runSingleCommandBacktick('find /etc -name "redhat-release" 2> /dev/null').rstrip() == "/etc/redhat-release":
-            print "RedHat based machine found"
+            #print "RedHat based machine found"
             self.distro = self.runSingleCommandBacktick("cat /etc/redhat-release")
         elif self.runSingleCommandBacktick('find /etc -name "lsb-release" 2> /dev/null').rstrip() == "/etc/lsb-release":
-            print "Ubuntu based machine found"
-            print self.runSingleCommandBacktick("cat /etc/lsb-release ")
+            #print "Ubuntu based machine found"
+            #print self.runSingleCommandBacktick("cat /etc/lsb-release ")
             pretty_name = self.runSingleCommandBacktick("cat /etc/lsb-release | grep DISTRIB_DESCRIPTION")
-            print "Pretty name " + pretty_name
+            #print "Pretty name " + pretty_name
             [var,self.distro] = pretty_name.split("=")    
         # Mac OS X 
+        elif self.runSingleCommandBacktick('find /etc -name "SuSE-release" 2> /dev/null').rstrip() == "/etc/SuSE-release":
+            self.distro = runSingleCommandBacktick("head -n 1 /etc/SuSE-release").rstrip()
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
-            print "Mac OS X based machine found"
+            #print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
+        
         
         
         
@@ -361,7 +364,12 @@ class OFSTestNode(object):
             rflag = ""
           
         rsync_command = "rsync %s %s %s" % (rflag,source,destination)
-        self.runSingleCommand(rsync_command)
+        output = []
+        rc = self.runSingleCommand(rsync_command, output)
+        if rc != 0:
+            print rsync_command+" failed!"
+            print output
+        return rc
       
  
     #============================================================================
@@ -373,10 +381,10 @@ class OFSTestNode(object):
     #=============================================================================
     
     def updateNode(self):
-        print "Distro is " + self.distro
+        #print "Distro is " + self.distro
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.addBatchCommand("sudo apt-get -y -q update")
-            self.addBatchCommand("sudo apt-get -y -q dist-upgrade < /dev/zero")
+            self.addBatchCommand("sudo apt-get -y update")
+            self.addBatchCommand("sudo apt-get -y dist-upgrade < /dev/zero")
         elif "suse" in self.distro.lower():
             self.addBatchCommand("sudo zypper --non-interactive update")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
@@ -385,8 +393,10 @@ class OFSTestNode(object):
             self.addBatchCommand("sudo rpm -e kernel-`uname -r`")
             #Update grub from current kernel to installed kernel
             self.addBatchCommand('sudo perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
-        self.addBatchCommand("sudo /sbin/reboot")
+        
         self.runAllBatchCommands()
+        print "Rebooting Node "+self.host_name+" at "+self.ip_address
+        self.runSingleCommandAsBatch("sudo /sbin/reboot")
     
     def installTorqueServer(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
@@ -587,7 +597,7 @@ class OFSTestNode(object):
         elif "suse" in self.distro.lower():
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
-            #zypper --non-interactive install gcc gcc-c++ gcc-gfortran flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano
+            #zypper --non-interactive install gcc gcc-c++ gcc-gfortran flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano 
             #install db4
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
@@ -640,6 +650,7 @@ class OFSTestNode(object):
 
     def copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword):
     
+        output = []
         self.ofs_branch = os.path.basename(svnurl)
     
         svn_options = ""
@@ -648,25 +659,35 @@ class OFSTestNode(object):
         
         print "svn export %s %s" % (svnurl,svn_options)
         self.changeDirectory(dest_dir)
-        self.runSingleCommand("svn export %s %s" % (svnurl,svn_options))
-        self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
-        print "svn exported to %s" % self.ofs_source_location
+        rc = self.runSingleCommand("svn export %s %s" % (svnurl,svn_options),output)
+        if rc != 0:
+            print "Could not export from svn"
+            print output
+            return rc
+        else:
+            self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
+            print "svn exported to %s" % self.ofs_source_location
         
         # svn --export directory --username --password
-        pass
+        return rc
 
 
     def installBenchmarks(self,tarurl="http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz",dest_dir="",configure_options="",make_options="",install_options=""):
         if dest_dir == "":
-            dest_dir = "/tmp/%s" % self.current_user
+            dest_dir = "/home/%s/" % self.current_user
         print "Installing benchmarks from "+tarurl
         tarfile = os.path.basename(tarurl)
+        output = []
         
         #make sure the directory is there
         self.runSingleCommand("mkdir -p "+dest_dir)
         self.changeDirectory(dest_dir)
         self.runSingleCommand("rm " + tarfile)
-        self.runSingleCommand("wget " + tarurl)
+        rc = self.runSingleCommand("wget " + tarurl, output)
+        if rc != 0:
+            print "Could not download benchmarks"
+            print output
+            return rc
         tarflags = ""
         taridx = 0
     
@@ -687,12 +708,17 @@ class OFSTestNode(object):
           return 1
     
         tardir = tarfile[:taridx]
-        self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
-        print self.runSingleCommandBacktick("ls %s" % dest_dir)
+        rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
+        #print self.runSingleCommandBacktick("ls %s" % dest_dir)
+        if rc != 0:
+            print "Could not untar benchmarks"
+            print output
+            return rc
         
         self.ofs_extra_tests_location = dest_dir+"/benchmarks" 
-        print "Extra tests location: "+self.ofs_extra_tests_location
-        print self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location)
+        #print "Extra tests location: "+self.ofs_extra_tests_location
+        #print self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location)
+        
     
     def makeFromTarFile(self,tarurl,dest_dir,configure_options="",make_options="",install_options=""):
         tarfile = os.path.basename(tarurl)
@@ -733,7 +759,12 @@ class OFSTestNode(object):
         self.runSingleCommand("mkdir -p "+dest_dir)
         self.changeDirectory(dest_dir)
         self.runSingleCommand("rm " + tarfile)
-        self.runSingleCommand("wget " + tarurl)
+        output = []
+        rc = self.runSingleCommand("wget " + tarurl,output)
+        if rc != 0:
+            print "Could not download OrangeFS"
+            print output
+            return rc
         tarflags = ""
         taridx = 0
         
@@ -753,7 +784,11 @@ class OFSTestNode(object):
           print "%s Not a tarfile" % tarurl
           return 1
         
-        self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
+        rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile),output)
+        if rc != 0:
+            print "Could not untar OrangeFS"
+            print output
+            return rc
         
         #remove the extension from the tarfile for the directory. That is the assumption
         self.ofs_branch = tarfile[:taridx]
@@ -761,20 +796,26 @@ class OFSTestNode(object):
         self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
         # Change directory /tmp/user/
         # source_location = /tmp/user/source
-        return 0
+        return rc
   
     def copyOFSSourceFromDirectory(self,directory,dest_dir):
         if directory != dest_dir:
-            self.copyLocal(directory,dest_dir,True)
+            rc = self.copyLocal(directory,dest_dir,True)
         self.ofs_source_location = dest_dir
+        return rc
       
     def copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
-        pass
+        #implemented in subclass
+        return 0
+        
       
       
     def copyOFSSource(self,resource_type,resource,dest_dir,username="",password=""):
         # Make directory dest_dir
-        self.runSingleCommand("mkdir -p %s" % dest_dir)
+        rc = self.runSingleCommand("mkdir -p %s" % dest_dir)
+        if rc != 0:
+            print "Could not mkdir -p %s" %dest_dir
+            return rc
           
         
         # ok, now what kind of resource do we have here?
@@ -782,10 +823,10 @@ class OFSTestNode(object):
         #
         # svn
         if resource_type == "SVN":
-          self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
+          rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
         # elseif tarball
         elif resource_type == "TAR":
-          self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
+          rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
         elif resource_type == "REMOTEDIR":
           # elseif remote_directory
           # is the resource a hostname or ipaddress?
@@ -799,67 +840,80 @@ class OFSTestNode(object):
           pass
         elif resouce_type == "BUILDNODE":
           # else local directory
-          self.copyOFSSourceFromDirectory(resource,dest_dir)
+          rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
         else:
           print "Resource type %s not supported!\n" % resource_type
-          return 1
+          return -1
         
         
-        return 0
+        return rc
         
         
       
-    def configureOFSSource(self,configure_options="",build_kmod=True):
+    def configureOFSSource(self,
+        build_kmod=True,
+        enable_strict=False,
+        enable_fuse=False,
+        enable_shared=False,
+        ofs_prefix="/opt/orangefs",
+        db4_prefix="/opt/db4",
+        configure_opts="",
+        debug=False):
+    
         
         # Change directory to source location.
         self.current_directory = self.ofs_source_location
         # Run prepare.
-        print "Current directory is %s" % self.current_directory
-        self.runSingleCommand("./prepare")
+        output = []
+        rc = self.runSingleCommand("./prepare",output)
+        if rc != 0:
+            print self.ofs_source_location+"/prepare failed!" 
+            print output
+            return rc
+        
         # get the kernel version if it has been updated
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         
         self.kernel_source_location = "/lib/modules/%s" % self.kernel_version
         
         #default_options = "--disable-karma --enable-shared --enable-static --enable-ucache --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % self.kernel_source_location
-        if configure_options == "":
-            configure_options = "--enable-shared --enable-strict --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs"
+        
+        configure_opts = configure_opts+" --with-db=%s --prefix=%s" % (ofs_prefix,db4_prefix)
         
         if build_kmod == True:
-         configure_options = "%s --with-kernel=%s/build " % (configure_options,self.kernel_source_location)
+            configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
-        #if configure_options == "":
-        #  configure_options = default_options
-        #configure_options = default_options+configure_options
+        if enable_strict == True:
+            configure_opts = configure_opts+" --enable-strict"
+
+        if enable_shared == True:
+            configure_opts = configure_opts+" --enable-shared"
+
+        if enable_fuse == True:
+            configure_opts = configure_opts+" --enable-fuse"
         
-        print "./configure %s" % configure_options
         
-        rc = self.runSingleCommand("./configure %s" % configure_options)
+        
+        rc = self.runSingleCommand("./configure %s" % configure_opts, output)
         # did configure run correctly?
-        
-        self.ofs_installation_location = "/tmp/orangefs"
-        '''
-        add back later
-        #look for --prefix to find installation location
-        # split the list like for a shell command
-        configure_options_v = shlex.split(configure_options)
-        print "Parsing configure options"
-        for element in configure_options_v:
-            if "--prefix=" in element:
-                # if we have found the prefix element, set the install location
-                print "element is %s" % element
-                self.ofs_installation_location=element[9:]
-                break
-            else:
-            #otherwise, continue
-                continue
-        '''
+        if rc == 0:
+            self.ofs_installation_location = ofs_prefix
+        else:
+            print "Configuration of OrangeFS at %s Failed!" % self.ofs_source_location
+            print output
+            
+
         return rc
         
     def checkMount(self,output=[]):
-        print "Running mount check"
         mount_check = self.runSingleCommand("mount | grep %s" % self.ofs_mountpoint,output)
-        print output[1]
+        '''    
+        if mount_check == 0:
+            print "OrangeFS mount found: "+output[1]
+        else:
+            print "OrangeFS mount not found!"
+            print output
+        '''
         return mount_check
 
     def getAliasesFromConfigFile(self,config_file_name):
@@ -871,8 +925,19 @@ class OFSTestNode(object):
     def makeOFSSource(self,make_options=""):
         # Change directory to source location.
         self.changeDirectory(self.ofs_source_location)
-        self.runSingleCommand("make")
-        self.runSingleCommand("make kmod")
+        output = []
+        rc = self.runSingleCommand("make "+make_options, output)
+        if rc != 0:
+            print "Build (make) of of OrangeFS at %s Failed!" % self.ofs_source_location
+            print output
+            return rc
+        
+        rc = self.runSingleCommand("make kmod",output)
+        if rc != 0:
+            print "Build (make) of of OrangeFS-kmod at %s Failed!" % self.ofs_source_location
+            print output
+            
+        return rc
 
     def getKernelVersion(self):
         #if self.kernel_version != "":
@@ -882,20 +947,46 @@ class OFSTestNode(object):
       
     def installOFSSource(self,install_options=""):
         self.changeDirectory(self.ofs_source_location)
-        self.runSingleCommand("make install")
-        self.runSingleCommand("make kmod_install kmod_prefix=/tmp/orangefs")
+        output = []
+        rc = self.runSingleCommand("make install",output)
+        if rc != 0:
+            print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
+            print output
+            return rc
+        self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location)
+        if rc != 0:
+            print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
+            print output
+            return rc
+
         
     def installOFSTests(self,configure_options=""):
         
+        output = []
         if configure_options == "":
-            configure_options = "--enable-shared --enable-fuse --enable-strict --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs"
+            configure_options = "--with-db=/opt/db4 --prefix=%s" % self.ofs_installation_location
         
  
         
         self.changeDirectory("%s/test" % self.ofs_source_location)
-        self.runSingleCommand("./configure %s"% configure_options)
-        self.runSingleCommand("make all")
-        self.runSingleCommand("make install")
+        rc = self.runSingleCommand("./configure %s"% configure_options)
+        if rc != 0:
+            print "Could not configure OrangeFS tests"
+            print output
+            return rc
+        
+        rc = self.runSingleCommand("make all")
+        if rc != 0:
+            print "Could not build (make) OrangeFS tests"
+            print output
+            return rc
+   
+        rc = self.runSingleCommand("make install")
+        if rc != 0:
+            print "Could not install OrangeFS tests"
+            print output
+        return rc
+   
 
     def generatePAVConf(self,**kwargs):
         
@@ -953,9 +1044,10 @@ class OFSTestNode(object):
         #=============================================================================
 
     def copyOFSInstallationToNode(self,destinationNode):
-        self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
+        rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
         destinationNode.ofs_installation_location = self.ofs_installation_location
         destinationNode.ofs_branch =self.ofs_branch
+        return rc
        
       
        
@@ -998,9 +1090,14 @@ class OFSTestNode(object):
         else:
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf %s --quiet" % (self.ofs_installation_location,self.ofs_installation_location,configuration_options)
         
-        print "Generating config "+ genconfig_str
+        print "Generating orangefs.conf "+ genconfig_str
         # run genconfig
-        self.runSingleCommand(genconfig_str)
+        output = []
+        rc = self.runSingleCommand(genconfig_str,output)
+        if rc != 0:
+            print "Could not generate orangefs.conf file."
+            print output
+        return rc
         
      
         
@@ -1117,12 +1214,14 @@ class OFSTestNode(object):
         self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
         self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
         self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        print "Starting pvfs2-client: "
         print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
+        print ""
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
-        client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
-        print "Client log output"
-        print client_log
+        #client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
+        #print "Client log output"
+        #print client_log
         
       
     def mountOFSFilesystem(self,mount_fuse=False):

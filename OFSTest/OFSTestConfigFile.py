@@ -15,7 +15,7 @@ class OFSTestConfigFile(OFSTestConfig):
         #read the file into a dictionary
         
         filename = kwargs.get('filename')
-        print "Filename is "+filename
+        #print "Reading configuration from file "+filename
         if filename == None:
             print "Cannot find filename" 
             return
@@ -23,7 +23,7 @@ class OFSTestConfigFile(OFSTestConfig):
         d = {}
         with open(filename) as f:
             for line in f:
-                print line
+                #print line
                 # ignore comments
                 if line.lstrip() == "" or (line.lstrip())[0] == '#':
                     continue

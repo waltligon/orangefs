@@ -52,7 +52,7 @@ def misc(testing_node,output=[]):
 
     def drop_caches(testing_node,output=[]):
         dc_out = testing_node.runSingleCommandBacktick("%s/bin/pvfs2-drop-caches -m %s 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_mountpoint),output)
-        print "dc out = "+dc_out
+        #print "dc out = "+dc_out
         #if  != 0:
         #    print "pvfs2-chmod failed with code %d" % rc
         #    return 1

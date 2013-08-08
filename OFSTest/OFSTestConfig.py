@@ -26,16 +26,37 @@ class OFSTestConfig(object):
         self.run_mpi_tests = False
         self.ofs_fs_name="pvfs2-fs"
         self.ofs_build_kmod = True
+        self.ofs_compile_debug = True
         
         self.ec2_domain=None
         self.ec2_associate_ip=False
+        
+        #configure options
+        
+        # --enable-fuse
+        self.install_fuse=self.run_fuse_tests
+    
+        # --prefix=
+        self.install_prefix = "/opt/orangefs"
+        
+        # --with-db=
+        self.db4_prefix = "/opt/db4"
 
+        # add --with-kernel option
+        self.install_OFS_client = self.ofs_build_kmod
+
+        # add --enable=shared
+        self.install_shared = self.run_usrint_tests
+        
+        # --enable-strict
+        self.enable_strict = True
+        
+        
         # install options
         self.mount_OFS_after_setup = True
-        self.ofs_mount_as_fuse = False
+        self.ofs_mount_as_fuse = self.install_fuse
         self.install_testing_benchmarks = True
         self.install_OFS_server = True
-        self.install_OFS_client = True
         self.install_MPI = False
         
         # existing config
@@ -96,7 +117,7 @@ class OFSTestConfig(object):
         temp = d.get('node_ip_addresses')
         if temp != None:
             nodelist = temp.split(" ")
-            print nodelist
+            #print nodelist
             for node in nodelist:
                 self.node_ip_addresses.append(node)
         
@@ -104,7 +125,7 @@ class OFSTestConfig(object):
         if temp != None:
             
             userlist = temp.split(" ")
-            print userlist
+            #print userlist
             for user in userlist:
                 self.node_usernames.append(user)
         
@@ -175,6 +196,7 @@ class OFSTestConfig(object):
         temp = d.get('ofs_mount_as_fuse')
         if temp != None:
             self.ofs_mount_as_fuse = temp
+            
 
         temp = d.get('install_testing_benchmarks')
         if temp != None:
@@ -194,5 +216,40 @@ class OFSTestConfig(object):
         temp = d.get('install_MPI')
         if temp != None:
             self.install_MPI = temp
+            
+                # --enable-fuse
+        temp = d.get('install_fuse')
+        if temp != None:
+            self.install_fuse=temp
+    
+        # --prefix=
+        temp = d.get('install_prefix')
+        if temp != None:
+            self.install_prefix = temp
+        
+        # --with-db=
+        # disabled 
+        ''' 
+        temp = d.get('db4_prefix')
+        if temp != None:
+            self.db4_prefix = temp
+        '''
+
+        # add --with-kernel option
+        temp = d.get('install_ofs_client')
+        if temp != None:
+            self.install_OFS_client = temp
+    
+
+        # add --enable=shared
+        temp = d.get('install_shared')
+        if temp != None:
+            self.install_shared = temp
+        
+        # --enable-strict
+        temp = d.get('enable_strict')
+        if temp != None:
+            self.enable_strict = temp
+        
         
         

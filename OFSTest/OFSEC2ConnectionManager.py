@@ -48,12 +48,12 @@ class OFSEC2ConnectionManager(object):
                 # check for EC2_ACCESS_KEY
                 (export,variable,self.ec2_access_key) = re.split(' |=',line.rstrip())    
                 #print line_v
-                print "%s,%s,%s" %    (export,variable,self.ec2_access_key)
+                #print "%s,%s,%s" %    (export,variable,self.ec2_access_key)
             elif "export EC2_SECRET_KEY" in line:
                 # check for EC2_SECRET_KEY
                 
                 (export,variable,self.ec2_secret_key) = re.split(" |=",line.rstrip())    
-                print "%s,%s,%s" %    (export,variable,self.ec2_secret_key)
+                #print "%s,%s,%s" %    (export,variable,self.ec2_secret_key)
                 
             elif "export EC2_URL" in line:
                 # check for EC2_URL
@@ -61,7 +61,7 @@ class OFSEC2ConnectionManager(object):
                 url_v = re.split(" |=|://|:|/",line.rstrip())
                 
                 #(export,variable,secure,self.ec2_endpoint,port_string,path...)
-                print url_v
+                #print url_v
                 
                 
                 # is_secure? http = false, https = true
@@ -88,14 +88,14 @@ class OFSEC2ConnectionManager(object):
             
         self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint=self.ec2_endpoint)
         #self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint="https://cuer1.clemson.edu:8773/services/Cloud")
-        print self.ec2_region
+        print "EC2 region is %r" % self.ec2_region
         
-        print "ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path)
+        #print "ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path)
         
         self.ec2_connection = ec2.connection.EC2Connection(aws_access_key_id=self.ec2_access_key,aws_secret_access_key=self.ec2_secret_key,is_secure=self.ec2_is_secure,port=self.ec2_port
         ,debug=debug,region=self.ec2_region,path=self.ec2_path)
         
-        print self.ec2_connection
+        print "EC2 connection is %r" % self.ec2_connection
     
     def setEC2Key(self,keyname,keylocation):
         self.instance_key = keyname
