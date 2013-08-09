@@ -55,9 +55,10 @@ class OFSTestConfig(object):
         # install options
         self.mount_OFS_after_setup = True
         self.ofs_mount_as_fuse = self.install_fuse
-        self.install_testing_benchmarks = True
+        self.install_tests = True
         self.install_OFS_server = True
         self.install_MPI = False
+        self.install_opts = ""
         
         # existing config
         self.ofs_installation_location = None
@@ -198,9 +199,9 @@ class OFSTestConfig(object):
             self.ofs_mount_as_fuse = temp
             
 
-        temp = d.get('install_testing_benchmarks')
+        temp = d.get('install_tests')
         if temp != None:
-            self.install_testing_benchmarks = temp
+            self.install_tests = temp
 
 
         temp = d.get('install_OFS_server')
@@ -251,5 +252,8 @@ class OFSTestConfig(object):
         if temp != None:
             self.enable_strict = temp
         
+        temp = d.get('install_opts')
+        if temp != None:
+            self.install_opts = temp
         
         

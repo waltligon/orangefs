@@ -44,6 +44,8 @@ class OFSTestNetwork(object):
            
         self.created_nodes = []
         
+        print "==================================================================="
+        print "Checking Local machine"
         self.local_master = OFSTestLocalNode.OFSTestLocalNode()
         
 
@@ -149,6 +151,8 @@ class OFSTestNetwork(object):
         
         # This function creates number nodes on the ec2 system. 
         # It returns a list of nodes
+        print "===========================================================" 
+        print "Creating New EC2/OpenStack Nodes"
         
         new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
         # new instances should have a 60 second delay to make sure everything is running.
@@ -177,9 +181,12 @@ class OFSTestNetwork(object):
             
             for i in new_instances:
                 i.update()
-                print "Using existing ip address "+i.ip_address
+                print "Instance %s using current IP %s" % (i.id,i.ip_address)
                 #(i.__dict__)
                 ip_addresses.append(i.ip_address)
+
+        print "===========================================================" 
+        print "Adding new nodes to OFS cluster"
  
         for idx,instance in enumerate(new_instances):
             # Create the node and get the instance name
@@ -201,6 +208,7 @@ class OFSTestNetwork(object):
 
             
         # return the list of newly created nodes.
+        
         return new_ofs_test_nodes
 
     def terminateEC2Node(self,remote_node):
@@ -231,17 +239,19 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.created_nodes
         
-        
+        print "===========================================================" 
+        print "Verifying nostname resolution"
         for node in node_list:
             for n2 in node_list:
                 # can we ping the node?
-                print "Pinging %s from local node" % n2.host_name
+                #print "Pinging %s from local node" % n2.host_name
                 rc = node.runSingleCommand("ping -c 1 %s" % n2.host_name)
                 # if not, add to the /etc/hosts file
                 if rc != 0:
-                    print "Could not ping %s at %s" % (n2.host_name,n2.ip_address)
+                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.host_name,n2.ip_address,n2.host_name)
                     node.addBatchCommand("sudo bash -c 'echo %s %s >> /etc/hosts'" % (n2.ip_address,n2.host_name))
             node.runAllBatchCommands()
+        
             
         
     def updateNodes(self,node_list=None):

@@ -36,13 +36,13 @@ for o, a  in optlist:
 
 
 #print "Output dir is %s, config file is %s" % (output_dir,config_file)
-
-
+print "==================================================================="
+print "Welcome to the OrangeFS Setup and Testing System"
 
 
 if config_file != None:
     try:
-        print "Using configuration from "+ config_file
+        #print "Using configuration from "+ config_file
         test_driver = OFSTestMain.OFSTestMain(OFSTestConfigFile.OFSTestConfigFile())
         #print "setting config"
         #ugly python hack
@@ -61,5 +61,6 @@ else:
 mkdir_p(output_dir)
 os.chdir(output_dir)
 
-test_driver.setupOFS()
-test_driver.runTest()
+rc = test_driver.setupOFS()
+if rc == 0:
+    test_driver.runTest()

@@ -69,11 +69,11 @@ class OFSTestMain(object):
 
         filename = "OFSTestsetup.log"
 
-        print "Connecting to EC2/OpenStack"
+        
         self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
 
         if self.config.number_new_ec2_nodes > 0:
-            print "Testing with %d new EC2 nodes" % self.config.number_new_ec2_nodes
+            #print " %d new EC2 nodes" % self.config.number_new_ec2_nodes
             self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
         
 
@@ -118,7 +118,7 @@ class OFSTestMain(object):
 
         print ""
         print "==================================================================="
-        print "Downloading and Installing OrangeFS from %s resource %s" % (self.config.ofs_resource_type,self.config.ofs_resource_location)
+        print "Downloading and building OrangeFS from %s resource %s" % (self.config.ofs_resource_type,self.config.ofs_resource_location)
 
         rc = self.ofs_network.buildOFSFromSource(
         resource_type=self.config.ofs_resource_type,
@@ -137,28 +137,52 @@ class OFSTestMain(object):
             print "Could not build OrangeFS. Aborting."
             return rc
         
-        rc = self.ofs_network.installOFSBuild(install_opts=install_opts)
-        if rc != 0:
-            print "Could not install OrangeFS. Aborting."
-        
-        
-        self.installOFSTests()
-
-      
         print ""
         print "==================================================================="
-        print "Installing Benchmarks"
+        print "Installing OrangeFS to "+self.config.install_prefix
+
+        
+        rc = self.ofs_network.installOFSBuild(install_opts=self.config.install_opts)
+        if rc != 0:
+            print "Could not install OrangeFS. Aborting."
+            return rc
+        
+        if self.config.install_tests == True:
+            print ""
+            print "==================================================================="
+            print "Installing OrangeFS Tests"
 
 
-        self.ofs_network.installBenchmarks()
+            rc = self.ofs_network.installOFSTests()
+            if rc != 0:
+                print "Could not install OrangeFS tests. Aborting."
+                return rc
+
+      
+            print ""
+            print "==================================================================="
+            print "Installing Third-Party Benchmarks"
 
 
+            rc = self.ofs_network.installBenchmarks()
+            if rc != 0:
+                print "Could not install third-party benchmarks. Aborting."
+                return rc
+
+
+
+
+        print ""
+        print "==================================================================="
+        print "Configure OrangeFS Server"
+
+        self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts)
 
         print ""
         print "==================================================================="
         print "Copy installation to all nodes"
 
-        self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts)
+
         self.ofs_network.copyOFSToNodeList()
 
 
@@ -171,15 +195,10 @@ class OFSTestMain(object):
 #        if self.config.ofs_mount_fuse == False:
         print ""
         print "==================================================================="
-        print "Start Client"
+        print "Start OFS Client"
         self.ofs_network.startOFSClient()
         
-        # this section is probably redundant and should be removed
-        #print ""
-        #print "==================================================================="
-        #print "Start Client"
-        #self.ofs_network.mountOFSFilesystem(mount_fuse=False)
-        
+
 
         
         #Mpich depends on pvfs2 and must be installed afterwards 
@@ -197,6 +216,8 @@ class OFSTestMain(object):
         print "Setup PAV Conf"
         self.ofs_network.generatePAVConf()
         '''
+        
+        return 0
 
     def runTest(self):
         print ""

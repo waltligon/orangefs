@@ -85,7 +85,8 @@ class OFSEC2ConnectionManager(object):
                 
                
     def connect(self,debug=0):
-            
+        
+        print "Connecting to EC2/OpenStack region=%s endpoint=%s" % (self.ec2_region_name,self.ec2_endpoint)
         self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint=self.ec2_endpoint)
         #self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint="https://cuer1.clemson.edu:8773/services/Cloud")
         print "EC2 region is %r" % self.ec2_region
@@ -146,7 +147,7 @@ class OFSEC2ConnectionManager(object):
             return None
         
         
-        print "Creating %d nodes" % number_nodes
+        print "Creating %d new %s %s instances." % (number_nodes,type,image_system)
         reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=type) 
         
         print "Waiting 60 seconds for all instances to start."
@@ -161,7 +162,8 @@ class OFSEC2ConnectionManager(object):
             
         new_instances = [i for i in reservation.instances]
         
-        
+        for i in new_instances:
+            print "Created new EC2 instance %s " % i.id
         
         return new_instances
       
@@ -169,9 +171,9 @@ class OFSEC2ConnectionManager(object):
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
         for i in instances:
-            print "Creating ip"
+            #print "Creating ip"
             address = self.ec2_connection.allocate_address(domain)
-            print "Associating %s to %s with private ip %s" % (address.public_ip,i.id,i.ip_address)
+            print "Associating ext IP %s to %s with int IP %s" % (address.public_ip,i.id,i.ip_address)
             self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
             external_addresses.append(address.public_ip)
             

@@ -31,6 +31,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
 
 
     def __init__(self):
+        print "-----------------------------------------------------------"    
         super(OFSTestLocalNode,self).__init__()
         
         # Local nodes are neither remote nor EC2
@@ -40,6 +41,8 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         self.current_user = self.runSingleCommandBacktick("whoami")
         #print self.current_user
         self.currentNodeInformation()
+        print "Local machine"
+        print "-----------------------------------------------------------"    
       
     def currentNodeInformation(self):
         
@@ -197,13 +200,13 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
     
     def getAliasesFromConfigFile(self,config_file_name):
         
-        print "Examining "+config_file_name
-        alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
+        #print "Examining "+config_file_name
+        #alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
 #        print alias
-        alias = self.runSingleCommandBacktick('cat '+config_file_name)
+        #alias = self.runSingleCommandBacktick('cat '+config_file_name)
 #        print alias
         alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        print "Alias is "+ alias
+        #print "Alias is "+ alias
         
         config_file = open(config_file_name,'r')
         

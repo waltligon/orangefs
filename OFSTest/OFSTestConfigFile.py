@@ -15,7 +15,8 @@ class OFSTestConfigFile(OFSTestConfig):
         #read the file into a dictionary
         
         filename = kwargs.get('filename')
-        #print "Reading configuration from file "+filename
+        print "==================================================================="
+        print "Reading configuration from file "+filename
         if filename == None:
             print "Cannot find filename" 
             return
@@ -45,6 +46,7 @@ class OFSTestConfigFile(OFSTestConfig):
 
         
         self.setConfigFromDict(d)
+        
         
 '''
 config = OFSTestConfigFile()

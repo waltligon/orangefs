@@ -21,6 +21,8 @@ import OFSTestNode
 class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
  
     def __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
+
+        print "-----------------------------------------------------------"    
         super(OFSTestRemoteNode,self).__init__()
         
         # need ip_address, user_name, host_name, and local keyfile to connect
@@ -35,11 +37,14 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         self.is_ec2 = is_ec2
         self.sshLocalKeyFile = key
         self.localnode = local_node
-        
+        self.ssh_command = "/usr/bin/ssh -i %s %s@%s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)
         
         super(OFSTestRemoteNode,self).currentNodeInformation()
         self.getKeyFileFromLocal(local_node)
         
+        
+        print "SSH: "+self.ssh_command
+         
         #print "Host,kernel:  %s,%s" % (self.host_name,self.kernel_version)
         
         
@@ -52,13 +57,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def getAliasesFromConfigFile(self,config_file_name):
         
         # read the file from the server
-        print "examining "+config_file_name
-        alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
-        print alias
-        alias = self.runSingleCommandBacktick('cat '+config_file_name)
-        print alias
+        #print "examining "+config_file_name
+        #alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
+        #print alias
+        #alias = self.runSingleCommandBacktick('cat '+config_file_name)
+        #print alias
         alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        print "Alias is "+ alias
+        #print "Alias is "+ alias
         
         alias_lines = alias.split('\n')
         
@@ -73,8 +78,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
                 aliases.append(element[1].rstrip())
                 
             
-        print "aliases returned: "
-        print aliases    
+        #print "OrangeFS Aliases: "
+        #print aliases    
         return aliases
          
         
@@ -162,7 +167,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             
         
         #start with the ssh command and open quote
-        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" % (self.sshLocalKeyFile,remote_user,self.ext_ip_address)]
+        command_chunks = [self.ssh_command + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes "']
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -227,7 +232,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def uploadNodeKeyFromLocal(self, local_node):
         
         # This function uploads a key 
-        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
+        #print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         # copy the file from the local node to the current node
         self.sshLocalKeyFile=local_node.getRemoteKeyFile(self.ext_ip_address)
         rc = local_node.copyToRemoteNode(self.sshLocalKeyFile,self,'~/.ofstestkeys/',False)
@@ -243,7 +248,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def uploadRemoteKeyFromLocal(self,local_node,remote_address):
         # This function uploads a key for a remote node and adds it to the table
         # get the remote key name
-        print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
+        #print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         remote_key = local_node.getRemoteKeyFile(remote_address)
         #copy it
         rc = local_node.copyToRemoteNode(remote_key,self,'~/.ofstestkeys/',False)

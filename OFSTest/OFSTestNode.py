@@ -154,7 +154,7 @@ class OFSTestNode(object):
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         self.processor_type = self.runSingleCommandBacktick("uname -p")
         
-        #print "%s %s %s" % (self.host_name,self.kernel_version,self.processor_type)
+        
         # information for ubuntu and suse is in /etc/os-release
         #print self.runSingleCommand("find /etc/lsb-release 2> /dev/null")
         
@@ -183,8 +183,8 @@ class OFSTestNode(object):
         
         
         
+        print "Node: %s %s %s %s" % (self.host_name,self.distro,self.kernel_version,self.processor_type)
         
-        print "Distro is " + self.distro
         
        
       #==========================================================================
@@ -395,7 +395,7 @@ class OFSTestNode(object):
             self.addBatchCommand('sudo perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
         
         self.runAllBatchCommands()
-        print "Rebooting Node "+self.host_name+" at "+self.ip_address
+        print "Node "+self.host_name+" at "+self.ip_address+" updated. Rebooting."
         self.runSingleCommandAsBatch("sudo /sbin/reboot")
     
     def installTorqueServer(self):
@@ -718,7 +718,7 @@ class OFSTestNode(object):
         self.ofs_extra_tests_location = dest_dir+"/benchmarks" 
         #print "Extra tests location: "+self.ofs_extra_tests_location
         #print self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location)
-        
+        return 0
     
     def makeFromTarFile(self,tarurl,dest_dir,configure_options="",make_options="",install_options=""):
         tarfile = os.path.basename(tarurl)
@@ -878,7 +878,7 @@ class OFSTestNode(object):
         
         #default_options = "--disable-karma --enable-shared --enable-static --enable-ucache --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % self.kernel_source_location
         
-        configure_opts = configure_opts+" --with-db=%s --prefix=%s" % (ofs_prefix,db4_prefix)
+        configure_opts = configure_opts+" --prefix=%s --with-db=%s" % (ofs_prefix,db4_prefix)
         
         if build_kmod == True:
             configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
@@ -953,11 +953,12 @@ class OFSTestNode(object):
             print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
             print output
             return rc
-        self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location)
+        self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
         if rc != 0:
             print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
             print output
-            return rc
+        
+        return rc
 
         
     def installOFSTests(self,configure_options=""):
@@ -1105,7 +1106,7 @@ class OFSTestNode(object):
     def startOFSServer(self):
         # remove the old storage directory.
         self.changeDirectory(self.ofs_installation_location)
-        print self.runSingleCommand("pwd")
+        #print self.runSingleCommand("pwd")
         # initialize the storage
         
         '''
@@ -1121,21 +1122,22 @@ class OFSTestNode(object):
         '''
         
         # This is sloppy, but should work. Ideally should reimplement in python, but don't want to reinvent the wheel.
-        print "Attempting to start OFSServer"
-        print "Hostname is %s" % self.host_name
+        print "Attempting to start OFSServer for host %s" % self.host_name
         
-        self.runSingleCommand("ls -l %s" % self.ofs_installation_location)
-        print "Installation location is %s" % self.ofs_installation_location
+        #self.runSingleCommand("ls -l %s" % self.ofs_installation_location)
+        #print "Installation location is %s" % self.ofs_installation_location
         #print "Running command \"grep 'Alias ' %s/etc/orangefs.conf | grep %s | cut -d ' ' -f 2\"" % (self.ofs_installation_location,self.host_name)
         alias_list = self.getAliasesFromConfigFile(self.ofs_installation_location + "/etc/orangefs.conf")
         #aliases = self.runSingleCommandBacktick('grep "Alias " %s/etc/orangefs.conf | grep %s | cut -d " " -f 2' % (self.ofs_installation_location,self.host_name))
-        
+        if len(alias_list) == 0:
+            print "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location
+            return -1
         
         for alias in alias_list:
           # create the storage space, if necessary.
             if self.host_name in alias:
                 self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
-                self.runSingleCommand("cat %s/etc/orangefs.conf")
+                #self.runSingleCommand("cat %s/etc/orangefs.conf")
               
                 self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias))
               
@@ -1161,7 +1163,7 @@ class OFSTestNode(object):
         # set the debug mask
         self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mountpoint))
        
-        
+        return 0
         
     def stopOFSServer(self):
         
