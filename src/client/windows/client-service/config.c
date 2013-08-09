@@ -24,6 +24,8 @@
 
 extern struct qhash_table user_cache;
 
+QLIST_HEAD(user_list);
+
 #define LDAP_SCOPE_ONELEVEL    0x01
 #define LDAP_SCOPE_SUBTREE     0x02
 
@@ -36,8 +38,6 @@ extern struct qhash_table user_cache;
 #define KEYWORD_ERR_INVALID_ARGS  -3
 
 #define ERROR_MSG_LEN            255
-
-#define STR_BUF_LEN              320
 
 #define KEYWORD_ARGS_CHECK()        do { \
                                         if (strlen(args) == 0) { \
@@ -210,7 +210,15 @@ static KEYWORD_CB(user)
     PVFS_uid uid;
     PVFS_gid gid;
     int i, ret = 0;
-    PVFS_credential credential;
+    PCONFIG_USER_ENTRY user_entry;
+    
+
+    if (options->user_mode != USER_MODE_LIST)
+    {
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be in list mode", 
+            keyword);
+        return KEYWORD_ERR_UNEXPECTED;
+    }
 
     /* tokenize arguments */
     token = strtok(args, " \t");
@@ -285,14 +293,20 @@ static KEYWORD_CB(user)
         {
             return -1;
         }
-        
-        /* set up credential */
-        init_credential(uid, &gid, 1, &credential);
 
-        /* add user to cache with no expiration */
-        add_cache_user(user_name, &credential, NULL);
+        /* set up user entry for list */
+        user_entry = (PCONFIG_USER_ENTRY) malloc(sizeof(CONFIG_USER_ENTRY));
+        if (user_entry != NULL)
+        {
+            strncpy(user_entry->user_name, user_name, STR_BUF_LEN);
+            user_entry->user_name[STR_BUF_LEN-1] = '\0';
 
-        PINT_cleanup_credential(&credential);
+            user_entry->uid = uid;
+            user_entry->gid = gid;
+        }
+
+        /* insert entry */
+        qlist_add_tail(&user_entry->link, &user_list);
     }
 
     return ret;
@@ -917,6 +931,9 @@ int get_config(PORANGEFS_OPTIONS options,
 
     set_defaults(options);
 
+    /* initialize user list */
+    /*INIT_QLIST_HEAD(&user_list);*/
+
     /* parse options from the file */
     while (!feof(config_file))
     {
@@ -1211,6 +1228,68 @@ int get_config(PORANGEFS_OPTIONS options,
 get_config_exit:
 
     close_config_file(config_file);
+
+    return ret;
+}
+
+/* add users from list to cache 
+ * NOTE: goptions must have been initialized
+ */
+int add_users(PORANGEFS_OPTIONS options,
+              char *error_msg,
+              unsigned int error_msg_len)
+{
+    int ret = 0, add_flag = 0;
+    struct qlist_head *iterator = NULL, *scratch = NULL;
+    PCONFIG_USER_ENTRY user_entry;
+    PVFS_credential cred;
+
+    if (options->user_mode == USER_MODE_LIST)
+    {
+        /* add users from list to cache */
+        qlist_for_each_safe(iterator, scratch, &user_list)
+        {
+            user_entry = qlist_entry(iterator, CONFIG_USER_ENTRY, link);
+            if (user_entry == NULL)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "internal error");
+                ret = -1;
+                break;
+            }
+
+            /* create credential */
+            ret = init_credential(user_entry->uid, &user_entry->gid, 1, &cred);
+            if (ret != 0)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "could not init credential for %s", user_entry->user_name);
+                break;
+            }
+
+            /* add user to cache with no expiration */
+            ret = add_cache_user(user_entry->user_name, &cred, NULL);
+            if (ret != 0)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "could not add %s to cache", user_entry->user_name);
+                break;
+            }
+
+            add_flag = 1;
+
+            /* free list entry and credential fields */
+            free(user_entry);
+
+            PINT_cleanup_credential(&cred);
+        }
+    }
+
+    if (options->user_mode == USER_MODE_LIST && ret == 0 && add_flag == 0)
+    {
+        _snprintf(error_msg, error_msg_len, "Initialization (fatal): no users");
+        ret = -1;
+    }
 
     return ret;
 }

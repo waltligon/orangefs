@@ -11,7 +11,20 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#include "pvfs2-types.h"
+#include "quicklist.h"
+
 #include "client-service.h"
+
+#define STR_BUF_LEN              320
+
+/* struct for user entries */
+typedef struct {
+    char user_name[STR_BUF_LEN];
+    PVFS_uid uid;
+    PVFS_gid gid;
+    struct qlist_head link;
+} CONFIG_USER_ENTRY, *PCONFIG_USER_ENTRY;
 
 /* callback definition for keyword processing */
 typedef struct {
@@ -23,5 +36,9 @@ typedef struct {
 int get_config(PORANGEFS_OPTIONS options,
                char *error_msg,
                unsigned int error_msg_len);
+
+int add_users(PORANGEFS_OPTIONS options,
+              char *error_msg,
+              unsigned int error_msg_len);
 
 #endif

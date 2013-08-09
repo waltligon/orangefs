@@ -48,7 +48,7 @@ int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
     if (goptions->security_mode != SECURITY_MODE_CERT)
     {
         cred->group_array = (PVFS_gid *) malloc(sizeof(PVFS_gid) * num_groups);
-        if (!cred->issuer || !cred->group_array)
+        if (!cred->group_array)
         {
             return -PVFS_ENOMEM;
         }
@@ -68,6 +68,10 @@ int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
                 cleanup_credential(cred);
             }
         }
+    }
+    else
+    {
+        /* TODO */
     }
 
     return ret;

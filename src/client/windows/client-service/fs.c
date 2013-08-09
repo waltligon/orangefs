@@ -37,13 +37,13 @@ int split_path(char *fs_path,
     int ret;
 
     /* get base dir */
-    ret = PINT_get_base_dir(fs_path, base_dir, base_dir_len);
+    ret = PINT_get_base_dir(fs_path, base_dir, (int) base_dir_len);
 
     if (ret != 0)
         return ret;
 
     /* get entry name */
-    ret = PINT_remove_base_dir(fs_path, entry_name, entry_name_len);
+    ret = PINT_remove_base_dir(fs_path, entry_name, (int) entry_name_len);
 
     return ret;
 }
@@ -721,7 +721,7 @@ int fs_io(enum PVFS_io_type io_type,
     /* get memory buffer */
     file_req = PVFS_BYTE;
 
-    ret = PVFS_Request_contiguous(buffer_len, PVFS_BYTE, &(mem_req));
+    ret = PVFS_Request_contiguous((int32_t) buffer_len, PVFS_BYTE, &(mem_req));
     if (ret != 0)
         goto fs_io_exit;
 

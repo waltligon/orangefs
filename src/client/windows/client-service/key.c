@@ -24,7 +24,7 @@ int key_sign_credential(PVFS_credential *cred)
     /* TODO: cache key in goptions */
 
     /* read in client private key */
-    fkey = fopen(goptions->key_file, "rb");
+    fkey = fopen(goptions->key_file, "r");
     if (fkey == NULL)
     {
         return -PVFS_ENOENT;

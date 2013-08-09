@@ -398,7 +398,7 @@ void WINAPI service_ctrl(DWORD ctrl_code)
 void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
-    int ret;
+    int ret, ret2;
     char error_msg[512];    
     char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
 
@@ -415,18 +415,25 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     /* point global options */
     goptions = options;    
-        
+
+    if (ret == 0)
+    {
+        /* add users (in list mode) */
+        ret2 = add_users(options, error_msg, 512);
+    }
+   
     debug = options->debug;
 
     init_service_log();
 
-    if (ret != 0)
+    if (ret != 0 || ret2 != 0)
     {
         report_error_event(error_msg, TRUE);
         close_service_log();
         close_event_log();
         return;
     }
+
 
     if (!check_mount_point(options->mount_point))
         return;
@@ -774,6 +781,13 @@ int main(int argc, char **argv, char **envp)
 
       /* point goptions */
       goptions = options;
+
+      /* add users -- list mode */
+      if (add_users(options, error_msg, 512) != 0)
+      {
+          err = 1;
+          goto main_exit;
+      }
 
       /* override with mount point from command line */
       if (strlen(mount_point) > 0)

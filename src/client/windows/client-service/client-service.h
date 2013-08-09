@@ -11,7 +11,7 @@
 #ifndef __CLIENT_SERVICE_H
 #define __CLIENT_SERVICE_H
 
-#include "quicklist.h"
+#include "wincommon.h"
 
 #define USER_MODE_NONE 0
 #define USER_MODE_LIST 1
