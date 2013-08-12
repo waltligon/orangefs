@@ -282,6 +282,10 @@ class OFSTestNetwork(object):
         make_opts="",
         debug=False):
         
+        output = []
+        
+        print "Resource type is "+resource_type+" location is "+resource_location
+        
         if build_node == None:
             build_node = self.created_nodes[0]
             
@@ -291,11 +295,28 @@ class OFSTestNetwork(object):
         if resource_type == "LOCAL":
             # copy from the local to the buildnode, then pretend it is a "buildnode" resource.
             # shameless hack.
+            #print "Local resource"
+            # get the basename from the resource location
+            dir_list = os.path.basename(resource_location)
+            #print dir_list
+            # add the directory to the download location
+            #download_location = "%s%s" % (download_location,dir_list)
+            # create the destination directory
+            #rc = build_node.runSingleCommand("mkdir -p "+download_location)
+            #print "Copying source from %s to %s" % (resource_location,build_node.host_name)
             rc = self.local_master.copyToRemoteNode(resource_location,build_node,download_location,True)
-            resource_type == "BUILDNODE"
-            resource_location = download_location
+            if rc != 0:
+                print "Could not copy source from %s to %s" % (resource_location,build_node.host_name)
+                return rc
+            #rc = build_node.runSingleCommand("ls -l "+download_location+dir_list,output)
+            #print output
+            
+            #print "Calling build_node.copyOFSSource(%s,%s,%s)" %(resource_type,resource_location,download_location+dir_list)
         
-        rc = build_node.copyOFSSource(resource_type,resource_location,download_location)
+        resource_type = "BUILDNODE"
+        resource_location = download_location+dir_list
+        rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list)
+        
         if rc != 0:
             return rc
 
@@ -342,25 +363,32 @@ class OFSTestNetwork(object):
         return master_node.configureOFSServer(node_list,ofs_fs_name,pvfs2genconfig_opts)
         
     def copyOFSToNodeList(self,destination_list=None):
+
+        # This is a multi-threaded recursive copy routine.
+        # Function copies OrangeFS from list[0] to list[len/2]
+        # Then it partitions the list into two parts and copies again
+        #
+        # For an eight node setup [0:7], copy is as follows:
+        # 1: 0->4
+        # 2: 0->2 4->6
+        # 3: 0->1 2->3 4->5 6->7
+        
         if destination_list == None:
             destination_list = self.created_nodes
+            
         # This assumes that the OFS installation is at the destination_list[0]
         list_length = len(destination_list)
         
         # If our list is of length 1 or less, return.
         if list_length <= 1:
-            return
+            return 
         
         #copy from list[0] to list[list_length/2]
         print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
-        destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
         
-        
-        #Run the following commands on separate threads
-        # self.copyOFSToNodeList(destination_list[:(list_length/2)-1])
-        # self.copyOFSToNodeList(destination_list[list_length/2:])
-
-        #partition the list.
+        # Todo: Throw an exception if the copy fails.
+       
         queue = Queue.Queue()
         class CopyThread(threading.Thread):
 
@@ -393,8 +421,9 @@ class OFSTestNetwork(object):
             t.start()
               
         #populate queue with data   
+
+
         queue.put(destination_list[:list_length/2])
-        
         queue.put(destination_list[list_length/2:])
            
            #wait on the queue until everything has been processed     
@@ -418,6 +447,8 @@ class OFSTestNetwork(object):
         client_node.installKernelModule()
         #client_node.runSingleCommand('/sbin/lsmod | grep pvfs')
         client_node.startOFSClient()
+
+
         time.sleep(10)
         #client_node.runSingleCommand('ps aux | grep pvfs')
     

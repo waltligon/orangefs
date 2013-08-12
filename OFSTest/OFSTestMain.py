@@ -176,27 +176,37 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Configure OrangeFS Server"
 
-        self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts)
+        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts)
+        if rc != 0:
+            print "Could not configure OrangeFS servers. Aborting."
+            return rc
+
 
         print ""
         print "==================================================================="
         print "Copy installation to all nodes"
 
 
-        self.ofs_network.copyOFSToNodeList()
+        rc = self.ofs_network.copyOFSToNodeList()
+        # should handle this with exceptions.
 
 
         
         print ""
         print "==================================================================="
         print "Start OFS Server"
-        self.ofs_network.startOFSServers()
+        
+        rc = self.ofs_network.startOFSServers()
+        # also need to handle error conditions
+   
+
         
 #        if self.config.ofs_mount_fuse == False:
         print ""
         print "==================================================================="
         print "Start OFS Client"
-        self.ofs_network.startOFSClient()
+        rc = self.ofs_network.startOFSClient()
+
         
 
 

@@ -799,9 +799,12 @@ class OFSTestNode(object):
         return rc
   
     def copyOFSSourceFromDirectory(self,directory,dest_dir):
+        rc = 0
         if directory != dest_dir:
             rc = self.copyLocal(directory,dest_dir,True)
         self.ofs_source_location = dest_dir
+        dest_list = os.path.basename(dest_dir)
+        self.ofs_branch = dest_list[-1]
         return rc
       
     def copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
@@ -821,7 +824,9 @@ class OFSTestNode(object):
         # ok, now what kind of resource do we have here?
         # switch on resource_type
         #
-        # svn
+        
+        #print "Copy "+ resource_type+ " "+ resource+ " "+dest_dir
+        
         if resource_type == "SVN":
           rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
         # elseif tarball
@@ -838,7 +843,8 @@ class OFSTestNode(object):
         elif resource_type == "LOCAL":
           #Must be "pushed" from local node to current node
           pass
-        elif resouce_type == "BUILDNODE":
+          #rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
+        elif resource_type == "BUILDNODE":
           # else local directory
           rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
         else:
@@ -862,9 +868,13 @@ class OFSTestNode(object):
     
         
         # Change directory to source location.
-        self.current_directory = self.ofs_source_location
+        self.changeDirectory(self.ofs_source_location)
         # Run prepare.
         output = []
+        cwd = self.runSingleCommandBacktick("pwd")
+        print cwd
+        ls = self.runSingleCommandBacktick("ls -l")
+        print ls
         rc = self.runSingleCommand("./prepare",output)
         if rc != 0:
             print self.ofs_source_location+"/prepare failed!" 
@@ -1104,7 +1114,8 @@ class OFSTestNode(object):
         
       
     def startOFSServer(self):
-        # remove the old storage directory.
+        
+        output = []
         self.changeDirectory(self.ofs_installation_location)
         #print self.runSingleCommand("pwd")
         # initialize the storage
@@ -1139,11 +1150,19 @@ class OFSTestNode(object):
                 self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
                 #self.runSingleCommand("cat %s/etc/orangefs.conf")
               
-                self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias))
-              
+                rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                if rc != 0:
+                    print "Could not create OrangeFS storage space"
+                    print output
+                    return rc
               
                 #now start the server
-                self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias))
+                rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                if rc != 0:
+                    print "Could not start OrangeFS server"
+                    print output
+                    return rc
+
                 #self.runAllBatchCommands()
                 # give the servers 15 seconds to get running
                 print "Starting OrangeFS servers..."
