@@ -409,7 +409,6 @@ static int write_credential(const PVFS_credential *cred,
     return EXIT_SUCCESS;
 }
 
-#ifdef ENABLE_SECURITY_KEY
 int allowed(const struct passwd *pwd, const struct group *grp)
 {
     uid_t uid;
@@ -488,7 +487,6 @@ int allowed(const struct passwd *pwd, const struct group *grp)
         return 0;
     return 1;
 }
-#endif
 
 int main(int argc, char **argv)
 {
@@ -580,13 +578,11 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
-#ifdef ENABLE_SECURITY_KEY
     if (allowed(pwd, grp) != 0) {
         fprintf(stderr, "error: cannot generate a credential for user "
                 "%s and group %s\n", pwd->pw_name, grp->gr_name);
         return EPERM;
     }
-#endif
 
 #ifdef HAVE_GETGROUPLIST
 
