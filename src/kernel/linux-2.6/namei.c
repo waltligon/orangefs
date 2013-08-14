@@ -22,12 +22,16 @@ static int pvfs2_create(struct inode *dir,
 #elif defined(PVFS_KMOD_CREATE_TAKES_NAMEIDATA)
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
+#ifdef PVFS_KMOD_CREATE_USES_UMODE_T
+                        umode_t mode,
+#else
                         int mode,
+#endif
                         struct nameidata *nd)
 #else
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
-                        int mode,
+                        umode_t mode,
                         bool exclusive)
                         /* PVFS could use to indicate exclusive open */
 #endif
@@ -72,7 +76,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 #else
 static struct dentry *pvfs2_lookup(struct inode *dir,
                                    struct dentry *dentry,
-                                   int flags)
+                                   unsigned int flags)
 #endif
 {
     int ret = -EINVAL;
@@ -335,7 +339,11 @@ static int pvfs2_mknod(
 static int pvfs2_mknod(
     struct inode *dir,
     struct dentry *dentry,
+#ifdef PVFS_KMOD_MKNOD_USES_UMODE_T
+    umode_t mode,
+#else
     int mode,
+#endif
     dev_t rdev)
 #endif
 {
@@ -371,7 +379,11 @@ static int pvfs2_symlink(
 static int pvfs2_mkdir(
     struct inode *dir,
     struct dentry *dentry,
+#ifdef PVFS_KMOD_MKDIR_USES_UMODE_T
+    umode_t mode)
+#else
     int mode)
+#endif
 {
     int ret = -EINVAL;
     struct inode *inode = NULL;

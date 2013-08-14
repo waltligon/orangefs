@@ -35,7 +35,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src_source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
-
 	dnl kernels > 2.6.32 now use generated/autoconf.h
         dnl look in lk_src for the generated autoconf.h
 	if test -f $lk_src/include/generated/autoconf.h ; then
@@ -43,7 +42,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	else
 		CFLAGS="$CFLAGS -imacros $lk_src/include/linux/autoconf.h"
 	fi
-
 
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
@@ -69,10 +67,113 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
+        dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
+        dnl optimization flag of some sort is set. To complicate matters 
+        dnl checks in earlier versions break when optimization is turned on.
+        need_optimize_flag=0
+	AC_MSG_CHECKING(for sanity of linux/fs.h include)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [],
+		AC_MSG_RESULT(yes),
+		AC_MSG_RESULT(no)
+                need_optimize_flag=1,
+	)
+        if test $need_optimize_flag -eq 1; then
+            CFLAGS="-Os $CFLAGS"
+        fi
+
+    dnl by 3.4 create's third argument changed from int to umode_t.
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
+    AC_MSG_CHECKING([if kernel inode ops create uses umode_t])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+            extern int mycreate(struct inode *,
+                                struct dentry *,
+                                umode_t,
+                                struct nameidata *);
+        ], [
+			static struct inode_operations in_op = {
+				  .create = mycreate
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_CREATE_USES_UMODE_T, 1,
+                [Define if kernel inode ops create uses umode_t not int])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+    CFLAGS=$tmp_cflags
+
+
+    dnl by 3.4 mkdir's third argument changed from int to umode_t.
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
+    AC_MSG_CHECKING([if kernel inode ops mkdir uses umode_t])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+            extern int mymkdir(struct inode *,
+                                struct dentry *,
+                                umode_t);
+        ], [
+			static struct inode_operations in_op = {
+				  .mkdir = mymkdir
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_MKDIR_USES_UMODE_T, 1,
+                [Define if kernel inode ops mkdir uses umode_t not int])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+    CFLAGS=$tmp_cflags
+
+
+    dnl by 3.4 mknod's third argument changed from int to umode_t.
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
+    AC_MSG_CHECKING([if kernel inode ops mknod uses umode_t])
+	AC_TRY_COMPILE(
+        [
+		    #define __KERNEL__
+		    #include <linux/fs.h>
+            extern int mymknod(struct inode *,
+                                struct dentry *,
+                                umode_t,
+                                dev_t);
+        ], [
+			static struct inode_operations in_op = {
+				  .mknod = mymknod
+			};
+		], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_KMOD_MKNOD_USES_UMODE_T, 1,
+                [Define if kernel inode ops mknod uses umode_t not int])
+        ], [
+            AC_MSG_RESULT(no)
+        ]
+	)
+    CFLAGS=$tmp_cflags
+
     dnl between 3.6 and 3.9 create() lookup() and d_revalidate() lose
     dnl their struct nameidata argument.  d_revalidate seems to be
-    dnl handled be we will test for the other two
-    dnl check create
+    dnl handled be we will test for the other two check create.
+    dnl Create args for different versions:
+    dnl  3.2: (struct inode *,struct dentry *,int, struct nameidata *);
+    dnl  3.4: (struct inode *,struct dentry *,umode_t,struct nameidata *)
+    dnl  3.6: (struct inode *,struct dentry *, umode_t, bool);
+    dnl  a previous test (if kernel inode ops create uses umode_t) sets
+    dnl  a define that helps us in this test.
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([if kernel inode ops create takes nameidata])
 	AC_TRY_COMPILE(
         [
@@ -80,7 +181,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		    #include <linux/fs.h>
             extern int mycreate(struct inode *,
                                 struct dentry *,
+		    #ifdef PVFS_KMOD_CREATE_USES_UMODE_T
+		                umode_t mode,
+		    #else
                                 int,
+		    #endif
                                 struct nameidata *);
         ], [
 			static struct inode_operations in_op = {
@@ -94,16 +199,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl check lookup
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([if kernel inode ops lookup takes nameidata])
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
 		    #include <linux/fs.h>
-            extern int mylookup(struct inode *,
-                                struct dentry *,
-                                struct nameidata *);
+            extern struct dentry *mylookup(struct inode *,
+                                           struct dentry *,
+                                           struct nameidata *);
         ], [
 			static struct inode_operations in_op = {
 				  .lookup = mylookup
@@ -116,8 +224,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl check revalidate
+    tmp_cflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
     AC_MSG_CHECKING([for if kernel dentry ops d_revalidate takes nameidata])
 	AC_TRY_COMPILE(
         [
@@ -137,6 +248,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             AC_MSG_RESULT(no)
         ]
 	)
+    CFLAGS=$tmp_cflags
 
     dnl kernel 3.6-3.9 added get_acl as a method rather than using
     dnl check_acl passed into generic_permissions
@@ -171,23 +283,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             CFLAGS="$CFLAGS -I$lk_src/include"
         fi
 
-        dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
-        dnl optimization flag of some sort is set. To complicate matters 
-        dnl checks in earlier versions break when optimization is turned on.
-        need_optimize_flag=0
-	AC_MSG_CHECKING(for sanity of linux/fs.h include)
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/fs.h>
-	], [],
-		AC_MSG_RESULT(yes),
-		AC_MSG_RESULT(no)
-                need_optimize_flag=1,
-	)
-        if test $need_optimize_flag -eq 1; then
-            CFLAGS="-Os $CFLAGS"
-        fi
-
 dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(for d_alloc_root)
         AC_TRY_COMPILE(
@@ -206,8 +301,6 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
                 AC_MSG_RESULT(no)
         ]
         )
-
-
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -631,6 +724,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 
 	fi
 
+	tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
 	dnl Rely on the fact that there is an external vfs_statfs that is
@@ -889,13 +983,10 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		[#define __KERNEL__
 		 #include <linux/ioctl32.h>
 		 ] )
-        tmp_cflags=$CFLAGS
-        CFLAGS="$CFLAGS -Werror"
 	AC_CHECK_HEADERS([linux/compat.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/compat.h>
 		 ] )
-	CFLAGS=$tmp_cflags
 	AC_CHECK_HEADERS([linux/syscalls.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/syscalls.h>
@@ -954,8 +1045,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl generic_permission in < 2.6.38 has three parameters
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for three-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -971,8 +1062,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl generic_permission in >= 2.6.38 and 3.0.x has four parameters
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for four-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -988,8 +1079,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl generic_permission in >= 3.1.x has two parameters
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for two-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1005,8 +1096,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl set_nlink is defined in 3.2.x 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for set_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1022,8 +1113,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl inc_nlink is defined in 3.2.x 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for inc_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1039,8 +1130,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl drop_nlink is defined in 3.2.x 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for drop_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1056,8 +1147,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl clear_nlink is defined in 3.2.x 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for clear_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1090,10 +1181,11 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_DEFINE(HAVE_POSIX_ACL_EQUIV_MODE_UMODE_T, 1, [Define if posix_acl_equiv_mode accepts umode_t type]),
 	AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
         dnl check for posix_acl_create
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for posix_acl_create)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1111,8 +1203,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 
         dnl check for posix_acl_chmod
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for posix_acl_chmod)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1132,8 +1224,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 
 
         dnl check for posix_acl_clone
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for posix_acl_clone)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1172,6 +1264,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_DEFINE(HAVE_FSYNC_LOFF_T_PARAMS, 1, [Define if fsync has loff_t params]),
 	AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
 
 	AC_MSG_CHECKING(for generic_getxattr api in kernel)
@@ -1229,6 +1322,33 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_DEFINE(HAVE_ENCODEFH_EXPORT_OPERATIONS, 1, Define if export_operations has an encode_fh member),
 	    AC_MSG_RESULT(no)
 	)
+
+        dnl between 3.4 and 3.6 the encode_fh function in
+        dnl "struct export_operations" stopped having a dentry pointer
+        dnl and a connectable flag as arguments, intead encode_fh
+        dnl has both the child and parent inodes as arguments.
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+        AC_MSG_CHECKING([if kernel export ops get inode from dentry])
+        AC_TRY_COMPILE([
+            #define __KERNEL__
+            #include <linux/fs.h>
+            #include <linux/exportfs.h>
+            extern int myencode(struct dentry *,
+                                __u32 *,
+                                int *,
+                                int);
+            ], [
+            static struct export_operations ex_op = {.encode_fh = myencode};
+            ], [
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(PVFS_ENCODE_FS_USES_DENTRY, 1,
+               [Define if kernel export ops encode_fh has dentry arg])
+            ], [
+            AC_MSG_RESULT(no)
+            ]
+        )
+	CFLAGS=$tmp_cflags
 
 	dnl Using -Werror is not an option, because some arches throw lots of
 	dnl warnings that would trigger false negatives.  We know that the
@@ -1494,33 +1614,29 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         dnl If they don't match, gcc complains about
 	dnl passing argument ... from incompatible pointer type, hence the
 	dnl need for the -Werror and -Wall.
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror -Wall"
-    AC_MSG_CHECKING(for two param permission)
-    AC_TRY_COMPILE(
-      [
-        #define __KERNEL__
-        #include <linux/kernel.h>
-        #include <linux/slab.h>
-        #include <linux/fs.h>
-        #include <linux/namei.h>
-        int ctor(struct inode *i, int a)
-        {
-            return 0;
-        }
-        struct inode_operations iop = {
-            .permission = ctor,
-        };
-      ],
-      [ ],
-      [
-        AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1,                 [Define
-if kernel's inode_operations has two parameters permission function])
-      ],
-      [AC_MSG_RESULT(no)]
-    )
-	CFLAGS=$tmp_cflags
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror -Wall"
+	AC_MSG_CHECKING(for two param permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		#include <linux/fs.h>
+		#include <linux/namei.h>
+		int ctor(struct inode *i, int a)
+		{
+			return 0;
+		}
+		struct inode_operations iop = {
+			.permission = ctor,
+		};
+	], [
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
+	AC_MSG_RESULT(no)
+	)
+	dnl CFLAGS=$tmp_cflags
 
 
         dnl 2.6.24 changed the constructor parameter signature of
@@ -1721,7 +1837,7 @@ if kernel's inode_operations has two parameters permission function])
         dnl newer 2.6 kernels (2.6.29-ish) use current_fsuid() macro instead
         dnl of accessing task struct fields directly
         tmp_cflags=$CFLAGS
-        CFLAGS="$CFLAGS -Werror "
+        CFLAGS="$CFLAGS -Werror"
         AC_MSG_CHECKING(for current_fsuid)
         AC_TRY_COMPILE([
                 #define __KERNEL__
@@ -1785,8 +1901,11 @@ if kernel's inode_operations has two parameters permission function])
 	AC_DEFINE(HAVE_CTL_NAME, 1, Define if struct ctl_table has ctl_name member),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
 	dnl Removed .strategy from struct ctl_table.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING([whether struct ctl_table has strategy])
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1822,6 +1941,7 @@ if kernel's inode_operations has two parameters permission function])
 	AC_DEFINE(HAVE_XATTR_HANDLER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
 	dnl 2.6.33 changed the parameter signature of xattr_handler set 
 	dnl member functions to have a sixth argument and changed the first
@@ -2117,7 +2237,10 @@ if kernel's inode_operations has two parameters permission function])
 	AC_DEFINE(HAVE_GET_SB_MEMBER_FILE_SYSTEM_TYPE, 1, [Define if get_sb is a member of file_system_type struct]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for dirty_inode flag)
 	AC_TRY_COMPILE([
                 #define __KERNEL__

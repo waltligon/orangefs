@@ -285,6 +285,8 @@ extern struct xattr_handler pvfs2_xattr_default_handler;
 
 #endif
 
+extern struct posix_acl *pvfs2_get_acl(struct inode *inode, int type);
+
 static inline int convert_to_internal_xattr_flags(int setxattr_flags)
 {
     int internal_flag = 0;

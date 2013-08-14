@@ -40,6 +40,7 @@
  * Probably not in the fast-path though...
  */
 
+#ifdef PVFS_USE_OLD_ACL_FORMAT
 /*
  * PVFS2 ACL decode
  */
@@ -184,11 +185,12 @@ fail:
     gossip_err("pvfs2_acl_encode: returning EINVAL\n");
     return ERR_PTR(-EINVAL);
 }
+#endif /* PVFS_USE_OLD_ACL_FORMAT */
 
 /**
  * Routines that retrieve and/or set ACLs for PVFS2 files.
  */
-static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
+struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
 {
     struct posix_acl *acl;
     int ret;
@@ -233,7 +235,11 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         acl = pvfs2_acl_decode(value, ret);
+#else
+        acl = posix_acl_from_xattr(value, ret);
+#endif
     }
     else if (ret == -ENODATA || ret == -ENOSYS)
     {
@@ -335,11 +341,25 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         value = pvfs2_acl_encode(acl, &size);
         if (IS_ERR(value))
         {
             return (int) PTR_ERR(value);
         }
+#else
+        value = (char *) kmalloc(PVFS_MAX_XATTR_VALUELEN, GFP_KERNEL);
+        if (IS_ERR(value)) 
+        {
+            return (int) PTR_ERR(value);
+        }
+        size = posix_acl_to_xattr(acl, value, PVFS_MAX_XATTR_VALUELEN);
+        if (size < 0)
+        {
+            error = size;
+            goto errorout;
+        }
+#endif
     }
     gossip_debug(GOSSIP_ACL_DEBUG,
                  "pvfs2_set_acl: name %s, value %p, size %zd, "
@@ -351,6 +371,8 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
      * does not exist.
      */
     error = pvfs2_inode_setxattr(inode, "", name, value, size, 0);
+
+errorout:
     if (value) 
     {
         kfree(value);
