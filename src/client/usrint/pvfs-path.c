@@ -429,12 +429,13 @@ err:
 int is_pvfs_path(const char **path, int skip_last_lookup)
 {
     int rc = 0;
-    PVFS_path_t *Ppath;
     char *newpath = NULL ;
 #if PVFS_USRINT_KMOUNT
     int npsize;
     struct stat sbuf;
     struct statfs fsbuf;
+#else
+    PVFS_path_t *Ppath;
 #endif
     
     if(pvfs_sys_init())
@@ -451,13 +452,13 @@ int is_pvfs_path(const char **path, int skip_last_lookup)
 #if PVFS_USRINT_KMOUNT
     memset(&sbuf, 0, sizeof(sbuf));
     memset(&fsbuf, 0, sizeof(fsbuf));
-    npsize = strnlen(path, PVFS_PATH_MAX) + 1;
+    npsize = strnlen(*path, PVFS_PATH_MAX) + 1;
     newpath = (char *)malloc(npsize);
     if (!newpath)
     {
         return 0; /* let glibc sort out the error */
     }
-    strncpy(newpath, path, npsize);
+    strncpy(newpath, *path, npsize);
     
     /* first try to stat the path */
     /* this must call standard glibc stat */
