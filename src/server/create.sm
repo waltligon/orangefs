@@ -243,7 +243,8 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 
     /* For now only support stuffing of ROUND_ROBIN layouts.
-     * As a performance enhancement, don't create a stuffed file when the current environment only has one server.
+     * As a performance enhancement, don't create a stuffed
+     * file when the current environment only has one server.
      * This prevents unstuffing from being called by the client sys-io machine.
     */
     if((server_type & PINT_SERVER_TYPE_IO) &&
