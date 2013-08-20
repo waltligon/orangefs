@@ -28,6 +28,7 @@
 
 struct options {
     char *userid;
+    uint32_t exp;
 };
 
 #define USERID_PWD_LIMIT    256
@@ -267,12 +268,19 @@ int parse_args(int argc, char **argv, struct options *options)
     }
 
     options->userid = NULL;
+    options->exp = 0;
 
     for (argi = 1; argi < argc; argi++)
     {
         if (!strcmp(argv[argi], "-h") || !(strcmp(argv[argi], "--help")))
         {
             return 1;
+        }
+        if (!strcmp(argv[argi], "-d"))
+        {
+            options->exp = strtol(argv[++argi], NULL, 10);
+            if (errno == ERANGE)
+                return 1;
         }
         else if (argv[argi][0] == '-')
         {
@@ -301,8 +309,9 @@ int main(int argc, char **argv)
 
     if (parse_args(argc, argv, &options) != 0)
     {
-        fprintf(stderr, "USAGE: %s [-h|--help] [username]\n", argv[0]);
+        fprintf(stderr, "USAGE: %s [-h|--help] [-d expiration time] [username]\n", argv[0]);
         fprintf(stderr, "   Requests certificate and private key from OrangeFS file system.\n"
+                        "   Expiration time is in minutes.\n"
                         "   Files are stored in user's home directory.\n");
         return 1;
     }    
@@ -454,7 +463,7 @@ int main(int argc, char **argv)
     /* send get-user-cert request */
     ret = PVFS_mgmt_get_user_cert(tab->mntent_array[fs_num].fs_id,
                                   userid, pwd, (uint32_t) addr_count,
-                                  addr_array, &cert, &privkey);
+                                  addr_array, &cert, &privkey, options.exp);
     if (ret == 0)
     {
         ret = store_cert_and_key(&cert, &privkey);
