@@ -612,7 +612,7 @@ AC_ARG_WITH(kernel,
     if ! test -d $withval ; then
            AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
     fi
-    if ! test -r $withval/include/linux/version.h ; then
+    if ! test -r $withval/include/linux/version.h && ! test -r $withval/include/generated/uapi/linux/version.h ; then
        AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
 

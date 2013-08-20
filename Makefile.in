@@ -1495,9 +1495,12 @@ endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
-NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h)
+# version.h moved in linux 3.7
+VERSION_DOT_H := $(shell if test -r $(LINUX_KERNEL_SRC)/include/linux/version.h ;then ls $(LINUX_KERNEL_SRC)/include/linux/version.h ;elif test -r $(LINUX_KERNEL_SRC)/include/generated/uapi/linux/version.h ;then ls $(LINUX_KERNEL_SRC)/include/generated/uapi/linux/version.h ;else echo /tmp/version.h.NOT.FOUND; fi)
+
+NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(VERSION_DOT_H))
 ifeq ($(NUM_UTS_LINES),1)
-    KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+    KERNEL_VERS := $(shell grep UTS_RELEASE $(VERSION_DOT_H) | cut -d\" -f2)
 else
     # multiple locations of utsrelease.h, just find and grep so we don't have to change again
     KERNEL_VERS := $(shell find ${LINUX_KERNEL_SRC}/include -name utsrelease.h -exec grep UTS_RELEASE '{}' \; | cut -d \" -f2 )
