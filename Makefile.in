@@ -70,6 +70,10 @@ sysconfdir = $(DESTDIR)@sysconfdir@
 VPATH = $(srcdir)
 SHELL = @SHELL@
 INSTALL = @INSTALL@
+
+# UID for security mode
+UID := $(shell id -u)
+
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
@@ -1511,16 +1515,23 @@ ifdef BUILD_SERVER
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
 	touch $(bindir)/.pvfs2-genconfig-key
-	test $$EUID -eq 0 && chmod ug+s ${bindir}/pvfs2-gencred
+        ifeq ($(UID),0)
+		chmod ug+s ${bindir}/pvfs2-gencred
+        endif
     endif
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
-	test $$EUID -eq 0 && chmod ug+s ${bindir}/pvfs2-gencred
+        ifeq ($(UID),0)
+		chmod ug+s ${bindir}/pvfs2-gencred
+        endif
     endif
 endif
-	# create log and etc dirs under install dir
+	# create etc dir under install dir
 	install -d $(sysconfdir)
 endif
+
+install_security::
+	
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
