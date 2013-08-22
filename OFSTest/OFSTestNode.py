@@ -132,7 +132,7 @@ class OFSTestNode(object):
             self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
             #print "Current group (from root) is "+self.current_group
             if self.current_group.rstrip() == "":
-                print "Could not access node at "+self.ip_address+" via ssh"
+                print "Could not access node at "+self.ext_ip_address+" via ssh"
                 exit(-1)
             
             
@@ -150,7 +150,16 @@ class OFSTestNode(object):
                 exit(rc)
             
         
-        self.host_name = self.runSingleCommandBacktick("hostname -s")
+        self.host_name = self.runSingleCommandBacktick("hostname")
+        
+        if len(self.host_name) > 15:
+            #truncate host_name if necessary
+            short_host_name = self.host_name[:15]
+            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_host_name)
+            self.runSingleCommandAsBatch("sudo hostname %s" % short_host_name)
+            print "Truncating hostname %s to %s" % (self.host_name,short_host_name)
+            self.host_name = self.host_name[:15]
+
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         self.processor_type = self.runSingleCommandBacktick("uname -p")
         
@@ -176,7 +185,7 @@ class OFSTestNode(object):
             [var,self.distro] = pretty_name.split("=")    
         # Mac OS X 
         elif self.runSingleCommandBacktick('find /etc -name "SuSE-release" 2> /dev/null').rstrip() == "/etc/SuSE-release":
-            self.distro = runSingleCommandBacktick("head -n 1 /etc/SuSE-release").rstrip()
+            self.distro = self.runSingleCommandBacktick("head -n 1 /etc/SuSE-release").rstrip()
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
             #print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
@@ -345,6 +354,8 @@ class OFSTestNode(object):
     #
     #---------------------
     def getRemoteKeyFile(self,address):
+        #print "Looking for %s in keytable for %s" % (address,self.host_name)
+        #print self.keytable
         return self.keytable[address]
       
     def addRemoteKey(self,address,keylocation):
@@ -461,7 +472,7 @@ class OFSTestNode(object):
                     sudo bash -c "echo %s > /var/lib/torque/server_name"
 
                 ''' % (self.processor_type,self.host_name,self.host_name)
-                
+            #print batch_commands    
             self.addBatchCommand(batch_commands)
         
         self.runAllBatchCommands()
@@ -531,7 +542,8 @@ class OFSTestNode(object):
                 sudo bash -c 'echo \$logevent 255 >> /var/lib/torque/mom_priv/config' 
                 sudo /etc/init.d/munge start
                 ''' % (self.processor_type,pbsserver_name)
-            self.addBatchCommand(batch_commands)   
+            self.addBatchCommand(batch_commands) 
+        #print batch_commands  
         self.runAllBatchCommands()
             
     def restartTorqueServer(self):
@@ -564,7 +576,7 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo apt-get install -y -q gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
+                sudo apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
                 # needed for Ubuntu 10.04
                 sudo apt-get install -y -q linux-image < /dev/null
                 # will fail on Ubuntu 10.04. Run separately to not break anything
@@ -580,6 +592,10 @@ class OFSTestNode(object):
                 sudo cp /boot/config-`uname -r` .config
                 sudo make oldconfig &> /dev/null
                 sudo make prepare &>/dev/null
+                if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
+                then
+                sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
+                fi
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
@@ -597,7 +613,7 @@ class OFSTestNode(object):
         elif "suse" in self.distro.lower():
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
-            #zypper --non-interactive install gcc gcc-c++ gcc-gfortran flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano 
+            #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
             #install db4
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
@@ -605,6 +621,10 @@ class OFSTestNode(object):
             sudo make oldconfig &> /dev/null
             sudo make modules_prepare &>/dev/null
             sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
+            if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
+            then
+            sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
+            fi
             sudo modprobe -v fuse
             sudo chmod a+x /bin/fusermount
             sudo chmod a+r /etc/fuse.conf
@@ -617,7 +637,7 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs 
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs 
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
@@ -653,13 +673,21 @@ class OFSTestNode(object):
         output = []
         self.ofs_branch = os.path.basename(svnurl)
     
+        #export svn by default. This merely copies from SVN without allowing update
         svn_options = ""
-        if svnusername != "" and svnpassword != "":
-          svn_options = "%s --username %s --password %s" % (svn_options, svnusername,svnpassword)
+        svn_action = "export --force"
         
-        print "svn export %s %s" % (svnurl,svn_options)
+        # use the co option if we have a username and password
+        if svnusername != "" and svnpassword != "":
+            svn_options = "%s --username %s --password %s" % (svn_options, svnusername,svnpassword)
+            svn_action = "co"
+        
+            
+        
+        
+        print "svn %s %s %s" % (svn_action,svnurl,svn_options)
         self.changeDirectory(dest_dir)
-        rc = self.runSingleCommand("svn export %s %s" % (svnurl,svn_options),output)
+        rc = self.runSingleCommand("svn %s %s %s" % (svn_action,svnurl,svn_options),output)
         if rc != 0:
             print "Could not export from svn"
             print output
@@ -668,7 +696,7 @@ class OFSTestNode(object):
             self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
             print "svn exported to %s" % self.ofs_source_location
         
-        # svn --export directory --username --password
+        
         return rc
 
 
@@ -749,6 +777,7 @@ class OFSTestNode(object):
         self.changeDirectory(tardir)
         self.runSingleCommand("./prepare")
         self.runSingleCommand("./configure "+ configure_options)
+        
         self.runSingleCommand("make "+ make_options)
         self.runSingleCommand("make install "+install_options)
     
@@ -863,6 +892,7 @@ class OFSTestNode(object):
         enable_shared=False,
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
+        security_mode=None,
         configure_opts="",
         debug=False):
     
@@ -871,10 +901,10 @@ class OFSTestNode(object):
         self.changeDirectory(self.ofs_source_location)
         # Run prepare.
         output = []
-        cwd = self.runSingleCommandBacktick("pwd")
-        print cwd
-        ls = self.runSingleCommandBacktick("ls -l")
-        print ls
+        #cwd = self.runSingleCommandBacktick("pwd")
+        #print cwd
+        #ls = self.runSingleCommandBacktick("ls -l")
+        #print ls
         rc = self.runSingleCommand("./prepare",output)
         if rc != 0:
             print self.ofs_source_location+"/prepare failed!" 
@@ -886,7 +916,6 @@ class OFSTestNode(object):
         
         self.kernel_source_location = "/lib/modules/%s" % self.kernel_version
         
-        #default_options = "--disable-karma --enable-shared --enable-static --enable-ucache --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % self.kernel_source_location
         
         configure_opts = configure_opts+" --prefix=%s --with-db=%s" % (ofs_prefix,db4_prefix)
         
@@ -902,7 +931,12 @@ class OFSTestNode(object):
         if enable_fuse == True:
             configure_opts = configure_opts+" --enable-fuse"
         
-        
+        if security_mode == None:
+            pass
+        elif security_mode.lower() == "key":
+            configure_opts = configure_opts+" --enable-security-key"
+        elif security_mode.lower() == "cert":
+            configure_opts = configure_opts+" --enable-security-cert"
         
         rc = self.runSingleCommand("./configure %s" % configure_opts, output)
         # did configure run correctly?
@@ -936,6 +970,7 @@ class OFSTestNode(object):
         # Change directory to source location.
         self.changeDirectory(self.ofs_source_location)
         output = []
+        rc = self.runSingleCommand("make clean")
         rc = self.runSingleCommand("make "+make_options, output)
         if rc != 0:
             print "Build (make) of of OrangeFS at %s Failed!" % self.ofs_source_location
@@ -1062,14 +1097,14 @@ class OFSTestNode(object):
        
       
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location=""):
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",security=None):
         # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf
         self.ofs_fs_name=ofs_fs_name
         
         self.changeDirectory(self.ofs_installation_location)
         
         if ofs_storage_location == "":
-            self.ofs_storage_location = self.ofs_installation_location + "/data"
+            self.ofs_storage_location  = self.ofs_installation_location + "/data"
         else:
             self.ofs_storage_location = self.ofs_storage_location
            
@@ -1095,6 +1130,13 @@ class OFSTestNode(object):
         ''' 
       
         security_args = ""
+        if security == None:
+            pass
+        elif security.lower() == "key":
+            security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
+        elif security.lower() == "cert":
+            pass
+            
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         if configuration_options == "":
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,ofs_host_str,self.ofs_storage_location,security_args,self.ofs_installation_location,self.ofs_branch)
@@ -1147,17 +1189,26 @@ class OFSTestNode(object):
         for alias in alias_list:
           # create the storage space, if necessary.
             if self.host_name in alias:
-                self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
+                #self.runSingleCommand("rm -rf %s" % self.ofs_storage_location)
+                #self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
                 #self.runSingleCommand("cat %s/etc/orangefs.conf")
+                
               
                 rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
                 if rc != 0:
-                    print "Could not create OrangeFS storage space"
-                    print output
-                    return rc
+                    #if you could not create, then try deleting and recreating
+                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -r %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                    if rc != 0:
+                        print "Could not create OrangeFS storage space"
+                        print output
+                        return rc
               
                 #now start the server
-                rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                server_start = "%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
+                print server_start
+                rc = self.runSingleCommand(server_start,output)
+                
                 if rc != 0:
                     print "Could not start OrangeFS server"
                     print output
@@ -1216,7 +1267,7 @@ class OFSTestNode(object):
         self.runAllBatchCommands()
         
      
-    def startOFSClient(self):
+    def startOFSClient(self,security=None):
         # Starting the OFS Client is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
         '''
@@ -1232,11 +1283,18 @@ class OFSTestNode(object):
         '''
         # TBD: Add security.
         keypath = ""
+        if security==None:
+            pass
+        elif security.lower() == "key":
+            keypath = "--keypath=%s/etc/pvfs2-clientkey.pem" % self.ofs_installation_location
+        elif security.lower() == "cert":
+            pass
+
         self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
         self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
-        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch))
+        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
         print "Starting pvfs2-client: "
-        print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch)
+        print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath)
         print ""
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
@@ -1278,7 +1336,7 @@ class OFSTestNode(object):
         time.sleep(30)
 
 
-    def unmountOFS(self):
+    def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mountpoint
         self.addBatchCommand("sudo umount %s" % self.ofs_mountpoint)
         self.addBatchCommand("sleep 10")
@@ -1293,7 +1351,7 @@ class OFSTestNode(object):
         # let teardown always succeed.  pvfs2-client might already be killed
         # and pvfs2 kernel module might not be loaded yet 
         '''
-        self.unmountOFS()
+        self.unmountOFSFilesystem()
         print "Stopping pvfs2-client process"
         self.addBatchCommand("sudo killall pvfs2-client")
         self.addBatchCommand("sleep 10")

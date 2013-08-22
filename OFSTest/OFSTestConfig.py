@@ -14,6 +14,7 @@ class OFSTestConfig(object):
         self.ec2_machine = ""
         self.ec2_delete_after_test = False
         self.node_ip_addresses = []
+        self.node_ext_ip_addresses = []
         self.node_usernames = []
         self.ofs_resource_location = ""
         self.ofs_resource_type = ""
@@ -50,6 +51,13 @@ class OFSTestConfig(object):
         
         # --enable-strict
         self.enable_strict = True
+        
+        # disable security. Options are "Key" and "Cert"
+        self.ofs_security_mode = None
+        
+        
+        self.svn_username = None
+        #self.svn_password = None
         
         
         # install options
@@ -121,6 +129,14 @@ class OFSTestConfig(object):
             #print nodelist
             for node in nodelist:
                 self.node_ip_addresses.append(node)
+
+        temp = d.get('node_ext_ip_addresses')
+        if temp != None:
+            nodelist = temp.split(" ")
+            #print nodelist
+            for node in nodelist:
+                self.node_ext_ip_addresses.append(node)
+
         
         temp = d.get('node_usernames')
         if temp != None:
@@ -129,6 +145,12 @@ class OFSTestConfig(object):
             #print userlist
             for user in userlist:
                 self.node_usernames.append(user)
+        
+        # one username for all nodes
+        temp = d.get('node_username')
+        if temp != None:
+            for node in nodelist:
+                self.node_usernames.append(temp)
         
         temp = d.get('ofs_resource_location')
         if temp != None:
@@ -255,5 +277,10 @@ class OFSTestConfig(object):
         temp = d.get('install_opts')
         if temp != None:
             self.install_opts = temp
+        
+        temp = d.get('ofs_security_mode')
+        if temp != None:
+            self.ofs_security_mode = temp
+        
         
         

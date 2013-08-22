@@ -73,16 +73,34 @@ class OFSTestMain(object):
         self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
 
         if self.config.number_new_ec2_nodes > 0:
+            print "===========================================================" 
+            print "Creating %d new EC2/OpenStack Nodes"
+
             #print " %d new EC2 nodes" % self.config.number_new_ec2_nodes
             self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
         
 
         if len(self.config.node_ip_addresses) > 0:
+            print "===========================================================" 
+            print "Adding %d Existing Nodes to OFS cluster" % len(self.config.node_ip_addresses)
+
             for i in range(len(self.config.node_ip_addresses)):
-                self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_ec2=self.config.using_ec2)
-    #xcept AttributeError:
-            #rint "Caught AttributeError. WTF?"
+                # do we have an external ip address
+                if len(self.config.node_ext_ip_addresses) > 0:
+                    ext_ip_address = self.config.node_ext_ip_addresses[i]
+                else:
+                    # if not, underlying functionality will use one IP for both.
+                    ext_ip_address = None
+                
+                self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_ec2=self.config.using_ec2,ext_ip_address=ext_ip_address)
         
+        print "===========================================================" 
+        print "Distributing SSH keys"
+        
+        self.ofs_network.uploadKeys()
+        
+        print "===========================================================" 
+        print "Verifying hostname resolution"
         # make sure everyone can find each other
         self.ofs_network.updateEtcHosts()
         
@@ -92,7 +110,7 @@ class OFSTestMain(object):
         if self.config.using_ec2 == True:
             print ""
             print "==================================================================="
-            print "Updating New Nodes"
+            print "Updating New Nodes (This may take awhile...)"
             self.ofs_network.updateEC2Nodes()
             
 
@@ -101,7 +119,7 @@ class OFSTestMain(object):
             print "Installing Required Software"
             self.ofs_network.installRequiredSoftware()
 
-            ''' Skip Torque install until mpi finished
+            #Skip Torque install until mpi finished
             print ""
             print "==================================================================="
             print "Installing Torque" 
@@ -113,8 +131,9 @@ class OFSTestMain(object):
             print "Check Torque"
             self.ofs_network.checkTorque()
 
-            '''
+            
 
+            
 
         print ""
         print "==================================================================="
@@ -130,6 +149,7 @@ class OFSTestMain(object):
         ofs_prefix=self.config.install_prefix,
         db4_prefix=self.config.db4_prefix,
         configure_opts=self.config.configure_opts,
+        security_mode=self.config.ofs_security_mode,
         debug=self.config.ofs_compile_debug
         )
         
@@ -170,13 +190,15 @@ class OFSTestMain(object):
                 return rc
 
 
+        
+
 
 
         print ""
         print "==================================================================="
         print "Configure OrangeFS Server"
 
-        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts)
+        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts,security=self.config.ofs_security_mode)
         if rc != 0:
             print "Could not configure OrangeFS servers. Aborting."
             return rc
@@ -190,7 +212,14 @@ class OFSTestMain(object):
         rc = self.ofs_network.copyOFSToNodeList()
         # should handle this with exceptions.
 
+        if self.config.ofs_security_mode != None:
+            if self.config.ofs_security_mode.lower() == "key":
+                print ""
+                print "==================================================================="
+                print "Generating OrangeFS security keys"
 
+                rc = self.ofs_network.generateOFSKeys()
+            
         
         print ""
         print "==================================================================="
@@ -205,7 +234,7 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         print "Start OFS Client"
-        rc = self.ofs_network.startOFSClient()
+        rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
 
         
 
@@ -278,7 +307,7 @@ class OFSTestMain(object):
         if self.config.run_vfs_tests == True:
             output = open(filename,'a+')
             mount_type = "kmod"
-            head_node.unmountOFS()
+            head_node.unmountOFSFilesystem()
             head_node.mountOFSFilesystem(mount_fuse=False)
             rc = head_node.checkMount()
             

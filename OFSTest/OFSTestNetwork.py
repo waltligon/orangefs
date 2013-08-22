@@ -69,20 +69,14 @@ class OFSTestNetwork(object):
         else:
             return None
         
-    def addRemoteNode(self,username,ip_address,key,is_ec2=False):
+    def addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
         #This function adds a remote node
         
         # Is this a remote machine or an existing ec2 node?
-        remote_node = OFSTestRemoteNode.OFSTestRemoteNode(username=username,ip_address=ip_address,key=key,local_node=self.local_master,is_ec2=is_ec2)
+        remote_node = OFSTestRemoteNode.OFSTestRemoteNode(username=username,ip_address=ip_address,key=key,local_node=self.local_master,is_ec2=is_ec2,ext_ip_address=ext_ip_address)
+        
         
      
-        # Get everybodys keys straight.
-        for existing_node in self.created_nodes:
-         #   if remote_address != '127.0.0.1': #skip localhost
-            # upload key for new node to old node
-            existing_node.uploadRemoteKeyFromLocal(self.local_master,remote_node.ip_address)
-            # upload key for old node to new node
-            remote_node.uploadRemoteKeyFromLocal(self.local_master,existing_node.ip_address)
                 
         # Add to the node dictionary
         self.created_nodes.append(remote_node)
@@ -151,8 +145,6 @@ class OFSTestNetwork(object):
         
         # This function creates number nodes on the ec2 system. 
         # It returns a list of nodes
-        print "===========================================================" 
-        print "Creating New EC2/OpenStack Nodes"
         
         new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
         # new instances should have a 60 second delay to make sure everything is running.
@@ -203,13 +195,34 @@ class OFSTestNetwork(object):
             self.created_nodes.append(new_node)
         
         # upload the remote key to all the nodes
-        for node in new_ofs_test_nodes:
-            self.runSimultaneousCommands(node_list=new_ofs_test_nodes,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
+        #self.uploadKeys(new_ofs_test_nodes)
+        #for node in new_ofs_test_nodes:
+        #    self.runSimultaneousCommands(node_list=new_ofs_test_nodes,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
 
             
         # return the list of newly created nodes.
         
         return new_ofs_test_nodes
+
+    def uploadKeys(self,node_list=None):
+        # if a list is not provided upload all keys
+        if node_list == None:
+            node_list = self.created_nodes
+            
+        
+        #for remote_node in node_list:
+        #    for existing_node in node_list:
+                
+                
+                # upload key for new node to old node
+        #        existing_node.uploadRemoteKeyFromLocal(self.local_master,remote_node.ext_ip_address)
+                # upload key for old node to new node
+        #        if remote_node != existing_node:
+        #            remote_node.uploadRemoteKeyFromLocal(self.local_master,existing_node.ext_ip_address)
+
+        for node in node_list:
+            self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
+
 
     def terminateEC2Node(self,remote_node):
                 
@@ -239,8 +252,7 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.created_nodes
         
-        print "===========================================================" 
-        print "Verifying nostname resolution"
+ 
         for node in node_list:
             for n2 in node_list:
                 # can we ping the node?
@@ -249,8 +261,9 @@ class OFSTestNetwork(object):
                 # if not, add to the /etc/hosts file
                 if rc != 0:
                     print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.host_name,n2.ip_address,n2.host_name)
-                    node.addBatchCommand("sudo bash -c 'echo %s %s >> /etc/hosts'" % (n2.ip_address,n2.host_name))
+                    node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.host_name,n2.host_name))
             node.runAllBatchCommands()
+        node.host_name = node.runSingleCommandBacktick("hostname")
         
             
         
@@ -261,6 +274,14 @@ class OFSTestNetwork(object):
         # Wait for reboot
         print "Waiting 90 seconds for nodes to reboot"
         time.sleep(90)
+        # workaround for strange cuer1 issue where hostname changes on reboot.
+        for node in node_list:
+            tmp_host_name = node.runSingleCommandBacktick("hostname")
+            if tmp_host_name != node.host_name:
+                print "Hostname changed from %s to %s! Resetting to %s" % (node.host_name,tmp_host_name,node.host_name)
+                node.runSingleCommandAsBatch("sudo hostname %s" % node.host_name)
+                
+        #self.updateEtcHosts()
     
     def installRequiredSoftware(self,node_list=None):
         if node_list == None:
@@ -278,11 +299,13 @@ class OFSTestNetwork(object):
         enable_shared=False,
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
+        security_mode=None,
         configure_opts="",
         make_opts="",
         debug=False):
         
         output = []
+        dir_list = ""
         
         print "Resource type is "+resource_type+" location is "+resource_location
         
@@ -313,14 +336,14 @@ class OFSTestNetwork(object):
             
             #print "Calling build_node.copyOFSSource(%s,%s,%s)" %(resource_type,resource_location,download_location+dir_list)
         
-        resource_type = "BUILDNODE"
-        resource_location = download_location+dir_list
+            resource_type = "BUILDNODE"
+            resource_location = download_location+dir_list
         rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list)
         
         if rc != 0:
             return rc
 
-        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,configure_opts=configure_opts)
+        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,configure_opts=configure_opts,security_mode=security_mode)
         if rc != 0:
             return rc
         
@@ -355,12 +378,12 @@ class OFSTestNetwork(object):
             client_node = self.created_nodes[0]
         return client_node.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/home/%s/benchmarks" % client_node.current_user)
         
-    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts=""):
+    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
         if node_list == None:
             node_list = self.created_nodes
         if master_node == None:
             master_node = self.created_nodes[0]
-        return master_node.configureOFSServer(node_list,ofs_fs_name,pvfs2genconfig_opts)
+        return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
         
     def copyOFSToNodeList(self,destination_list=None):
 
@@ -386,6 +409,7 @@ class OFSTestNetwork(object):
         #copy from list[0] to list[list_length/2]
         print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
         rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        
         
         # Todo: Throw an exception if the copy fails.
        
@@ -441,12 +465,16 @@ class OFSTestNetwork(object):
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.startOFSServer)
         time.sleep(20)
 
-    def startOFSClient(self,client_node=None):
+    def startOFSClientAllNodes(self):
+        for node in created_nodes:
+            self.startOFSClient(node)
+            
+    def startOFSClient(self,client_node=None,security=None):
         if client_node == None:
             client_node = self.created_nodes[0]
         client_node.installKernelModule()
         #client_node.runSingleCommand('/sbin/lsmod | grep pvfs')
-        client_node.startOFSClient()
+        client_node.startOFSClient(security=security)
 
 
         time.sleep(10)
@@ -462,6 +490,13 @@ class OFSTestNetwork(object):
         print mount_res
         #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mountpoint)
         #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mountpoint)
+    
+    def mountOFSFilesystemAllNodes(self,mount_fuse=False):
+        
+        # todo: make this multithreaded
+        for node in created_nodes:
+            self.mountOFSFilesystem(mount_fuse=mount_fuse,client_node=node)
+        
     def stopOFSClient(self,client_node=None):
         if client_node == None:
             client_node = self.created_nodes[0]
@@ -469,7 +504,20 @@ class OFSTestNetwork(object):
         #client_node.runSingleCommand("mount")
         #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mountpoint)
         #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mountpoint)
+
+    def stopOFSClientAllNodes(self):
+        
+        # todo: make this multithreaded
+        for node in created_nodes:
+            self.stopOFSClient(node)
+
     
+    def unmountOFSFilesystemAllNodes(self):
+        
+        # todo: make this multithreaded
+        for node in created_nodes:
+            self.unmountOFSFilesystem(node)
+
     def terminateAllEC2Nodes(self):
         for node in self.created_nodes:
              if node.is_ec2 == True:
@@ -524,6 +572,9 @@ class OFSTestNetwork(object):
             pass
             
     def checkTorque(self):
+        
+        pbsnodeout = self.created_nodes[0].runSingleCommandBacktick("pbsnodes")
+        print pbsnodeout
         pbsnodeout = self.created_nodes[0].runSingleCommandBacktick("pbsnodes -l | grep down | awk '{print \$1}'")
         print pbsnodeout
         return pbsnodeout.split("\n")
@@ -582,7 +633,126 @@ class OFSTestNetwork(object):
             headnode = self.created_nodes[0]
     
         headnode.installMpich2()
-       
+    
+    def generateOFSKeys(self):
+        rc = self.generateOFSServerKeys()
+        if rc != 0:
+            return rc
+        rc = self.generateOFSClientKeys()
+        if rc != 0:
+            return rc
+        rc = self.generateOFSKeystoreFile()
+        if rc != 0:
+            return rc
+        return 0
+        
+    
+    def generateOFSServerKeys(self):
+        
+        #for each server, create a private server key at <orangefs>/etc/orangefs-serverkey.pem
+        #cd /tmp/$USER/keys
+        #openssl genrsa -out orangefs-serverkey-(remote host_name).pem 2048
+        #copy  orangefs-serverkey-(remote_hostname).pem <orangefs>/etc/
+        output = []
+        security_node = self.created_nodes[0]
+        
+        security_node.runSingleCommand("mkdir -p /tmp/%s/security" % security_node.current_user)
+        security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
+        
+        for node in self.created_nodes:
+            keyname = "orangefs-serverkey-%s.pem" % node.host_name
+            rc = security_node.runSingleCommand("openssl genrsa -out %s 2048" % keyname,output)
+            if rc != 0:
+                print "Could not create server security key for "+node.hostname
+                print output 
+                return rc
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
+            if rc != 0:
+                print "Could not copy server security key %s for %s " % (keyname,node.host_name)
+                print output 
+                return rc
+            
+            
+            #rc = node.runSingleCommand("chown 
+        
+
+
+        return 0
+    
+    def generateOFSClientKeys(self):
+
+        # cd /tmp/$USER/keys
+        # for each client
+        #   openSSl genrsa -out pvfs2-clientkey-{hostname}.pem 1024
+        #   copy pvfs2-clientkey-{hostname).pem hostname:{orangefs}/etc
+                
+        
+        output = []
+        security_node = self.created_nodes[0]
+        
+        security_node.runSingleCommand("mkdir -p /tmp/%s/security" % security_node.current_user)
+        security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
+
+        for node in self.created_nodes:
+            keyname = "pvfs2-clientkey-%s.pem" % node.host_name
+            rc = security_node.runSingleCommand("openssl genrsa -out %s 1024" % keyname,output)
+            if rc != 0:
+                print "Could not create client security key for "+node.hostname
+                print output 
+                return rc
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
+            if rc != 0:
+                print "Could not copy client security key %s for %s " % (keyname,node.hostname)
+                print output 
+                return rc
+
+
+        return 0
+    
+    def generateOFSKeystoreFile(self):
+        # cd /tmp/$USER/keys
+        # for each server
+        #   echo "S:{hostname} >> orangefs-keystore
+        #   openssl rsa -in orangefs-serverkey.pem -pubout  >> orangefs_keystore
+        # 
+        # for each client 
+        #   echo "C:{hostname} >> orangefs-keystore
+        #   openssl rsa -in pvfs2clientkey.pem -pubout  >> orangefs_keystore
+        
+        # copy orangefs_keystore to all remote servers
+        # 
+        # sudo chown root:root /opt/orangefs/etc/pvfs2-clientkey.pem
+        # sudo chmod 600 /opt/orangefs/etc/pvfs2-clientkey.pem
+        
+        output = []
+        security_node = self.created_nodes[0]
+        
+        security_node.runSingleCommand("mkdir -p /tmp/%s/security" % security_node.current_user)
+        security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
+        
+        # generate the keystore for entire network
+        for node in self.created_nodes:
+            
+            server_keyname = "orangefs-serverkey-%s.pem" % node.host_name
+            client_keyname = "pvfs2-clientkey-%s.pem" % node.host_name
+            security_node.runSingleCommand('echo "S%s: >> orangefs-keystore' % node.host_name)
+            security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % server_keyname)
+            security_node.runSingleCommand('echo "C%s: >> orangefs-keystore' % node.host_name)
+            security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % client_keyname)
+            
+        for node in self.created_nodes:
+
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destinationNode=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
+            if rc != 0:
+                print "Could not copy keystore for %s " % (node.hostname)
+                print output 
+                return rc
+            
+
+        
+        return 0
+        
+        
         
 def test_driver():
     my_node_manager = OFSTestNetwork()

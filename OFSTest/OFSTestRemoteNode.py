@@ -167,7 +167,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             
         
         #start with the ssh command and open quote
-        command_chunks = [self.ssh_command + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes "']
+        
+        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" %  (self.sshLocalKeyFile,remote_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
