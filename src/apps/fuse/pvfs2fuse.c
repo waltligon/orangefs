@@ -748,7 +748,7 @@ static int pvfs_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler
 		 if (filler(buf, cur_file, NULL, 0))
 			break;
 	  }
-	  token += rd_response.pvfs_dirent_outcount;
+	  token = rd_response.token;
 
 	  if (rd_response.pvfs_dirent_outcount)
 	  {
@@ -756,7 +756,7 @@ static int pvfs_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler
 		 rd_response.dirent_array = NULL;
 	  }
 
-   } while(rd_response.pvfs_dirent_outcount == pvfs_dirent_incount);
+   } while(token != PVFS_READDIR_END);
 
    return 0;
 }
