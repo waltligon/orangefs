@@ -56,6 +56,7 @@ machine pvfs2_client_mgmt_sys_exec_sm
  */
 PVFS_error PVFS_imgmt_sys_exec(
     PVFS_fs_id fs_id,
+    char * command_line,
     const PVFS_credential *credential,
     PVFS_BMI_addr_t addr,
     PVFS_mgmt_op_id *op_id,
@@ -84,6 +85,9 @@ PVFS_error PVFS_imgmt_sys_exec(
     sm_p->msgarray_op.msgpair.fs_id = fs_id;
     sm_p->msgarray_op.msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgarray_op.msgpair.svr_addr = addr;
+    sm_p->u.mgmt_sys_exec.command = command_line;
+    sm_p->u.mgmt_sys_exec.path = ".";
+    
 
     PVFS_hint_copy(hints, &sm_p->hints);
 
@@ -98,6 +102,7 @@ PVFS_error PVFS_imgmt_sys_exec(
  */
 PVFS_error PVFS_mgmt_sys_exec(
     PVFS_fs_id fs_id,
+    char* command_line,
     const PVFS_credential *credential,
     PVFS_BMI_addr_t addr,
     PVFS_hint hints)
@@ -107,7 +112,8 @@ PVFS_error PVFS_mgmt_sys_exec(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_sys_exec entered\n");
 
-    ret = PVFS_imgmt_noop(fs_id, credential, addr, &op_id, hints, NULL);
+    printf ("Calling mgmt_sys_exec for %s\n",command_line);
+    ret = PVFS_imgmt_sys_exec(fs_id, command_line, credential, addr, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_sys_exec call", ret);

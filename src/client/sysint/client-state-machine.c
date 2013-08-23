@@ -381,10 +381,12 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm}
+    {&pvfs2_client_mgmt_get_dirdata_array_sm},
+    {&pvfs2_client_mgmt_sys_exec_sm}
 #ifdef ENABLE_SECURITY_CERT
     ,{&pvfs2_client_mgmt_get_user_cert_sm}
 #endif
+
 };
 
 

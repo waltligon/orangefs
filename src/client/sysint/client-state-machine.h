@@ -611,6 +611,14 @@ struct PINT_client_mgmt_get_uid_list_sm
     uint32_t *uid_count;               /* out */
 };
 
+struct PINT_client_mgmt_sys_exec_sm
+{
+  char * path;
+  char * command;
+  
+  
+};
+
 #ifdef ENABLE_SECURITY_CERT
 struct PINT_client_mgmt_get_user_cert_sm
 {
@@ -714,6 +722,7 @@ typedef struct PINT_client_sm
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
         struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
+	struct PINT_client_mgmt_sys_exec_sm mgmt_sys_exec;
 #ifdef ENABLE_SECURITY_CERT
         struct PINT_client_mgmt_get_user_cert_sm mgmt_get_user_cert;
 #endif
@@ -815,10 +824,11 @@ enum
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
+    PVFS_MGMT_SYS_EXEC		= 83,
 #ifdef ENABLE_SECURITY_CERT
-    PVFS_MGMT_GET_USER_CERT        = 83,
+    PVFS_MGMT_GET_USER_CERT        = 84,
 #endif
-    PVFS_MGMT_SYS_EXEC		= 84,
+    
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -828,9 +838,9 @@ enum
 #define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
 #ifdef ENABLE_SECURITY_CERT
-#define PVFS_OP_MGMT_MAXVALID 84
+#define PVFS_OP_MGMT_MAXVALID 85
 #else
-#define PVFS_OP_MGMT_MAXVALID 83
+#define PVFS_OP_MGMT_MAXVALID 84
 #endif
 #define PVFS_OP_MGMT_MAXVAL 199
 
@@ -940,6 +950,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_array_sm;
 #ifdef ENABLE_SECURITY_CERT
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_user_cert_sm;
 #endif
+extern struct PINT_state_machine_s pvfs2_client_mgmt_sys_exec_sm;
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;

@@ -53,8 +53,9 @@ ifdef BUILD_SERVER
                 $(DIR)/mgmt-get-dirent.c \
                 $(DIR)/mgmt-create-root-dir.c \
                 $(DIR)/mgmt-split-dirent.c \
-		$(DIR)/mgmt-get-user-cert.c
-
+		$(DIR)/mgmt-get-user-cert.c \
+		$(DIR)/mgmt-sys-exec.c
+		
 	# c files that should be added to server library
 	SERVERSRC += \
 		$(SERVER_SMCGEN)

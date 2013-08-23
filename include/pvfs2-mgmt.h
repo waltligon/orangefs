@@ -470,6 +470,14 @@ PVFS_error PVFS_mgmt_get_user_cert(
     PVFS_certificate *cert,
     PVFS_security_key *privkey);
 
+PVFS_error PVFS_mgmt_sys_exec(
+    PVFS_fs_id fs_id,
+    char * command_line,
+    const PVFS_credential *credential,
+    PVFS_BMI_addr_t addr,
+    PVFS_hint hints);
+
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

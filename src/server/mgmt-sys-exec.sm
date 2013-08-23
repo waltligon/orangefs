@@ -77,7 +77,7 @@ static PINT_sm_action mgmt_sys_exec_do_work(
 	struct timeval oldest;
 
     // Launch the process on separate thread
-    
+    /*
 	pid = fork();
 	
 	
@@ -96,12 +96,13 @@ static PINT_sm_action mgmt_sys_exec_do_work(
 		printf("failed to launch child process from path %s with %s\n",
 		s_op->req->u.mgmt_sys_exec.path,
 		s_op->req->u.mgmt_sys_exec.command);
-		js_p->error_code = PVFS_SYS_EXEC_FAILED;
+		//js_p->error_code = PVFS_SYS_EXEC_FAILED;
+		//js_p->error_code = -1;
 		return SM_ACTION_COMPLETE;
 	}
-	
+	*/
 	// get the PID and return it.
-	s_op->req->u.mgmt_sys_exec.pid = pid;
+	//s_op->req->u.mgmt_sys_exec.pid = pid;
     
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;

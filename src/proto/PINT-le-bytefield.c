@@ -26,6 +26,7 @@
 #include "pvfs2-internal.h"
 #include "pint-hint.h"
 #include "security-util.h"
+#include <client-state-machine.h>
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -348,6 +349,8 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_user_cert_keyreq.fs_id = 0;
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq;
                 break;
+	    case PVFS_SERV_MGMT_SYS_EXEC:
+		break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -530,6 +533,7 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+	CASE(PVFS_SERV_MGMT_SYS_EXEC,mgmt_sys_exec);
 
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -635,6 +639,8 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+	CASE(PVFS_SERV_MGMT_SYS_EXEC,mgmt_sys_exec);
+
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -760,7 +766,9 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+	CASE(PVFS_SERV_MGMT_SYS_EXEC,mgmt_sys_exec);
 
+	
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -855,6 +863,8 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+	CASE(PVFS_SERV_MGMT_SYS_EXEC,mgmt_sys_exec);
+
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -1061,6 +1071,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.unstuff.credential.group_array);
                 decode_free(req->u.unstuff.credential.signature);
                 break;
+
+	    case PVFS_SERV_MGMT_SYS_EXEC:
 
             case PVFS_SERV_GETCONFIG:
             case PVFS_SERV_LOOKUP_PATH:
@@ -1276,6 +1288,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       decode_free(resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
                       break;
                    }
+                case PVFS_SERV_MGMT_SYS_EXEC:
+
 
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:

@@ -31,6 +31,9 @@ struct options
     char* fs_path_hack;
     char* fs_path_real;
     char* mnt_point;
+    char* server_name;
+    char* command_line;
+    char* directory_name;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -38,7 +41,7 @@ static void usage(int argc, char** argv);
 static void print_mntent(
     struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
-static int noop_all_servers(PVFS_fs_id fsid);
+static int execute_program_on_server(PVFS_fs_id fsid, char * server_name, char * command_line);
 static void print_error_details(PVFS_error_details * error_details);
 static void print_root_check_error_details(PVFS_error_details * error_details);
 
@@ -145,10 +148,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(5) Verifying that all servers are responding...\n");
+    printf("\n(5) Execute remote program...\n");
 
-    /* send noop to everyone */
-    ret = noop_all_servers(cur_fs);
+    /* execute the program */
+    ret = execute_program_on_server(cur_fs,user_opts->server_name,user_opts->command_line);
     if(ret < 0)
     {
         fprintf(stderr, "Failure: could not communicate with "
@@ -267,7 +270,7 @@ int main(int argc, char **argv)
  *
  * returns -PVFS_error on failure, 0 on success
  */
-static int noop_all_servers(PVFS_fs_id fsid)
+static int execute_program_on_server(PVFS_fs_id fsid, char * server_name, char * command_line)
 {
     PVFS_credential creds;
     int ret = -1;
@@ -309,18 +312,39 @@ static int noop_all_servers(PVFS_fs_id fsid)
 
     for (i = 0; i < count; i++)
     {
-	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
-	if (ret == 0)
+	
+	
+	char match[100];
+	sprintf(match,"%s",PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+	
+	/*printf("Looking for %s in %s\n",server_name,match);*/
+	if (strstr(match,server_name))
 	{
-	    printf("Ok\n");
-	}
-	else
-	{
-	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
-                   PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
-	    return ret;
+	  
+	  printf("Found   %s ",
+		PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+	  ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
+	  if (ret == 0)
+	  {
+	      printf("Ok\n");
+	  }
+	  else
+	  {
+	      printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
+		    PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+	      return ret;
+	  }
+	  ret = PVFS_mgmt_sys_exec(fsid,command_line,&creds,addr_array[i],NULL);
+	  if (ret == 0)
+	  {
+	      printf("Ok\n");
+	  }
+	  else
+	  {
+	      printf("FAILURE: PVFS_mgmt_sys_exec failed for server: %s\n",
+		    PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+	      return ret;
+	  }
 	}
     }
     free(addr_array);
@@ -494,9 +518,10 @@ static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:";
+    char flags[] = "vm:s:c:";
     int one_opt = 0;
     int len;
+    int path_optind = 0;
 
     struct options* tmp_opts = NULL;
     int ret = -1;
@@ -543,6 +568,53 @@ static struct options* parse_args(int argc, char* argv[])
 		 * a slash off of the mount point
 		 */
 		strcat(tmp_opts->mnt_point, "/");
+		/* save the optind number */
+		path_optind = optind;
+		break;
+	    case('s'):
+		len = strlen(optarg)+1;
+		tmp_opts->server_name = (char*)malloc(len+1);
+		if (!tmp_opts->server_name)
+		{
+		    free(tmp_opts);
+		    return NULL;
+		}
+		memset(tmp_opts->server_name, 0, len+1);
+		ret = sscanf(optarg, "%s", tmp_opts->server_name);
+		if (ret < 1){
+		    free(tmp_opts);
+		    return NULL;
+		}
+		break;
+	    case('c'):
+		len = strlen(optarg)+1;
+		tmp_opts->command_line = (char*)malloc(len+1);
+		if (!tmp_opts->command_line)
+		{
+		    free(tmp_opts);
+		    return NULL;
+		}
+		memset(tmp_opts->command_line, 0, len+1);
+		ret = sscanf(optarg, "%s", tmp_opts->command_line);
+		if (ret < 1){
+		    free(tmp_opts);
+		    return NULL;
+		}
+		break;
+	    case('d'):
+		len = strlen(optarg)+1;
+		tmp_opts->directory_name = (char*)malloc(len+1);
+		if (!tmp_opts->directory_name)
+		{
+		    free(tmp_opts);
+		    return NULL;
+		}
+		memset(tmp_opts->directory_name, 0, len+1);
+		ret = sscanf(optarg, "%s", tmp_opts->directory_name);
+		if (ret < 1){
+		    free(tmp_opts);
+		    return NULL;
+		}
 		break;
 	    case('?'):
 		usage(argc, argv);
@@ -559,13 +631,13 @@ static struct options* parse_args(int argc, char* argv[])
     /* get the path of the file system, this one has a trailing slash
      * tacked on, see comment below for why 
      */
-    tmp_opts->fs_path_hack = (char *) malloc(strlen(argv[argc-1]) + 2);
+    tmp_opts->fs_path_hack = (char *) malloc(strlen(argv[path_optind-1]) + 2);
     if (tmp_opts->fs_path_hack == NULL)
     {
 	free(tmp_opts);
 	return NULL;
     }
-    ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_hack);
+    ret = sscanf(argv[path_optind-1], "%s", tmp_opts->fs_path_hack);
     if (ret < 1)
     {
 	free(tmp_opts->fs_path_hack);
@@ -579,14 +651,14 @@ static struct options* parse_args(int argc, char* argv[])
     strcat(tmp_opts->fs_path_hack, "/");
     
     /* also preserve the real path, to use in print statements elsewhre */
-    tmp_opts->fs_path_real = (char *) malloc(strlen(argv[argc-1]) + 2);
+    tmp_opts->fs_path_real = (char *) malloc(strlen(argv[path_optind-1]) + 2);
     if (tmp_opts->fs_path_real == NULL)
     {
 	free(tmp_opts->fs_path_hack);
 	free(tmp_opts);
 	return NULL;
     }
-    ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_real);
+    ret = sscanf(argv[path_optind-1], "%s", tmp_opts->fs_path_real);
     if (ret < 1)
     {
 	free(tmp_opts->fs_path_hack);
@@ -666,8 +738,8 @@ static void print_error_details(PVFS_error_details * error_details)
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "%s version %s\n\n", argv[0], PVFS2_VERSION);
-    fprintf(stderr, "Usage  : %s -m file_system_path\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
+    fprintf(stderr, "Usage  : %s -m file_system_path -s server_name -c command_line", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -s node0001 -c '/bin/ls -l'\n", argv[0]);
     return;
 }
 
