@@ -259,19 +259,33 @@ int store_cert_and_key(PVFS_certificate *cert, PVFS_security_key *key)
 
 int parse_args(int argc, char **argv, struct options *options)
 {
+    int argi;
+
     if (options == NULL || argv == NULL)
     {
         return -1;
     }
 
-    /* just read userid as 1st param for now */
     options->userid = NULL;
-    if (argc == 2)
+
+    for (argi = 1; argi < argc; argi++)
     {
-        options->userid = argv[1];
+        if (!strcmp(argv[argi], "-h") || !(strcmp(argv[argi], "--help")))
+        {
+            return 1;
+        }
+        else if (argv[argi][0] == '-')
+        {
+            fprintf(stderr, "Invalid option: %s\n", argv[argi]);
+            return -1;
+        }
+        else
+        {
+            options->userid = argv[argi];
+        }
     }
 
-    return (argc > 2) ? -1 : 0;
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -287,7 +301,9 @@ int main(int argc, char **argv)
 
     if (parse_args(argc, argv, &options) != 0)
     {
-        fprintf(stderr, "USAGE: %s [username]\n", argv[0]);
+        fprintf(stderr, "USAGE: %s [-h|--help] [username]\n", argv[0]);
+        fprintf(stderr, "   Requests certificate and private key from OrangeFS file system.\n"
+                        "   Files are stored in user's home directory.\n");
         return 1;
     }    
 
@@ -332,7 +348,7 @@ int main(int argc, char **argv)
     printf("Using username %s...\n", userid);
 
     /* prompt for password */
-    EVP_read_pw_string(pwd, USERID_PWD_LIMIT, "Enter password: ", 0);
+    EVP_read_pw_string(pwd, USERID_PWD_LIMIT, "Enter file system password: ", 0);
 
     /* init PVFS - setup addr list */
     tab = PVFS_util_parse_pvfstab(NULL);
@@ -390,7 +406,7 @@ int main(int argc, char **argv)
 
     /* init file system */
     ret = PVFS_sys_fs_add(&tab->mntent_array[fs_num]);
-    if (ret != 0)
+    if (ret != 0 && ret != -PVFS_EEXIST)
     {
         PVFS_perror("PVFS_sys_fs_add", ret);
         PVFS_sys_finalize();

@@ -140,10 +140,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     /**
      * (ClientID, Rank, RequestID, Handle, Sys)
      */
-    PINT_event_define_event(NULL,
-                            "sys",
-                            "%d%d%d%llu%d",
-                            "",
+    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "",
                             &PINT_client_sys_event_id);
 
     event_mask = getenv("PVFS2_EVENTMASK");
@@ -168,6 +165,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_DIST_INIT;
     
+    /* Initialize the security subsystem */
     ret = PINT_client_security_initialize();
     if (ret < 0)
     {
@@ -231,6 +229,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_JOB_INIT;
 
+    /* initialize the state machine engine */
     ret = PINT_client_state_machine_initialize();
     if (ret < 0)
     {

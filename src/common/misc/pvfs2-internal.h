@@ -73,7 +73,7 @@
 
 /* This should be included everywhere in the code */
 #include "pint-malloc.h" 
-#endif /* __KERNEL__ */
+#endif /* not __KERNEL__ */
 
 /* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
  * to print out a PVFS_handle, which is typedefed to a uint64_t.  On

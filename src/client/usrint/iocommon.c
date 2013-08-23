@@ -610,7 +610,7 @@ int iocommon_create_file(const char *filename,
                          dist,
                          &resp_create,
                          layout,
-                         NULL);
+                         hints);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_create.ref;
 
@@ -618,6 +618,10 @@ errorout:
     if (dist)
     {
         PVFS_sys_dist_free(dist);
+    }
+    if (layout)
+    {
+        free(layout);
     }
     return rc;
 }
@@ -2763,6 +2767,28 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 
     errno = 0;
     rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
+    return rc;
+}
+
+int iocommon_getmod(pvfs_descriptor *pd, mode_t *mode)
+{
+    int rc = 0;
+    PVFS_sys_attr attr;
+
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Initialize */
+    memset(&attr, 0, sizeof(attr));
+
+    errno = 0;
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_PERM);
+    if (!rc)
+    {
+        *mode = attr.perms & 07777;
+    }
     return rc;
 }
 

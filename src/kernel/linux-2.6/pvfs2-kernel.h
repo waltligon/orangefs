@@ -137,7 +137,7 @@ typedef unsigned long sector_t;
 
 #define PVFS2_BUFMAP_WAIT_TIMEOUT_SECS      30
 
-#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
+#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     900 /* 15 minutes */
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
@@ -284,6 +284,8 @@ extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
 
 #endif
+
+extern struct posix_acl *pvfs2_get_acl(struct inode *inode, int type);
 
 static inline int convert_to_internal_xattr_flags(int setxattr_flags)
 {

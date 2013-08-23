@@ -66,11 +66,14 @@ sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
 sysconfdir = $(DESTDIR)@sysconfdir@
-logdir = $(DESTDIR)${prefix}/log
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
 INSTALL = @INSTALL@
+
+# UID for security mode
+UID := $(shell id -u)
+
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
@@ -95,6 +98,7 @@ BUILD_KERNEL = @BUILD_KERNEL@
 ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
 ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
 ENABLE_CAPCACHE = @ENABLE_CAPCACHE@
+ENABLE_CREDCACHE = @ENABLE_CREDCACHE@
 ENABLE_CERTCACHE = @ENABLE_CERTCACHE@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 LIB_NEEDS_LIBRT = @LIB_NEEDS_LIBRT@
@@ -1414,6 +1418,7 @@ install:: all
 else
 install:: all install_doc
 	install -d $(includedir)
+	install -m 644 $(builddir)/include/orange.h $(includedir)
 	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
@@ -1510,17 +1515,23 @@ ifdef BUILD_SERVER
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
 	touch $(bindir)/.pvfs2-genconfig-key
-	test $$EUID -eq 0 && chmod ug+s ${bindir}/pvfs2-gencred
+        ifeq ($(UID),0)
+		chmod ug+s ${bindir}/pvfs2-gencred
+        endif
     endif
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
-	test $$EUID -eq 0 && chmod ug+s ${bindir}/pvfs2-gencred
+        ifeq ($(UID),0)
+		chmod ug+s ${bindir}/pvfs2-gencred
+        endif
     endif
 endif
-	# create log and etc dirs under install dir
+	# create etc dir under install dir
 	install -d $(sysconfdir)
-	install -d $(logdir)
 endif
+
+install_security::
+	
 
 ifneq (,$(LINUX_KERNEL_SRC))
 

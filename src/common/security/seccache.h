@@ -13,8 +13,9 @@
 
 #include "pvfs2-types.h"
 #include "llist.h"
+#include "gen-locks.h"
 
-/* macro that prints function info */
+/* macros that debug entering/exiting functions */
 #define SECCACHE_ENTER_FN() do { \
                                 gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: enter\n", __func__); \
                             } while (0)
@@ -35,22 +36,7 @@
 #define SECCACHE_STATS_FREQ_DEFAULT      1000
 
 /* cache locking */
-#ifndef SECCACHE_LOCK_TYPE
-#define SECCACHE_LOCK_TYPE 3
-#endif 
-
-#if (SECCACHE_LOCK_TYPE == 0) /* no locking */
-    #define seccache_lock_t uint64_t
-#elif (SECCACHE_LOCK_TYPE == 1)
-    #include <pthread.h>
-    #define seccache_lock_t pthread_mutex_t
-#elif (SECCACHE_LOCK_TYPE == 2)
-    #include <pthread.h>
-    #define seccache_lock_t pthread_spinlock_t
-#elif (SECCACHE_LOCK_TYPE == 3)
-    #include "gen-locks.h"
-    #define seccache_lock_t gen_mutex_t
-#endif
+#define seccache_lock_t gen_mutex_t
 #define SECCACHE_LOCK_SIZE sizeof(seccache_lock_t)
 
 typedef enum {
@@ -68,14 +54,15 @@ typedef struct seccache_entry_s {
 } seccache_entry_t;
 
 /* implementation-defined cache functions */
+/* note: some entry params declared "void *" for compatibility with
+   PINT_llist functions */
 typedef struct seccache_methods_s {
-    seccache_entry_t * (*new_entry)(void *data);
     int (*expired)(void *entry1, void *entry2);
-    void (*set_expired)(void *entry, PVFS_time timeout);
-    uint16_t (*get_index)(void *data);
+    void (*set_expired)(seccache_entry_t *entry, PVFS_time timeout);
+    uint16_t (*get_index)(void *data, uint64_t hash_limit);
     int (*compare)(void *data, void *entry);
     void (*cleanup)(void *entry);
-    void (*debug)(const char *prefix, void *entry);
+    void (*debug)(const char *prefix, void *data);
 } seccache_methods_t;
 
 /* cache stats structure */
@@ -110,7 +97,7 @@ typedef struct seccache_s {
 /*** externally visible cache API ***/
 
 /* returns a new security cache structure */
-seccache_t * PINT_seccache_new(const char *desc,
+seccache_t *PINT_seccache_new(const char *desc,
                                seccache_methods_t *methods,
                                uint64_t hash_limit);
 /* set a security cache property (entry max etc.) */
@@ -120,6 +107,9 @@ int PINT_seccache_set(seccache_t *cache,
 /* returns security cache property or MAX_INT on error */
 uint64_t PINT_seccache_get(seccache_t *cache,
                            seccache_prop_t prop);
+
+int PINT_seccache_expired_default(void *entry1,
+                                  void *entry2);
 
 /* lock cache for special operations */
 int PINT_seccache_lock(seccache_t *cache);
@@ -132,29 +122,18 @@ void PINT_seccache_reset_stats(seccache_t *cache);
 /* deletes cache, freeing all memory */
 void PINT_seccache_cleanup(seccache_t *cache);
 
-
-/* create an entry using data (not inserted in cache).
-   Data is copied */
-/* TODO: remove? 
-seccache_entry_t *PINT_seccache_new_entry(void *data, 
-                                          PVFS_size data_size);
-*/
-
 /* locates an entry */
-seccache_entry_t * PINT_seccache_lookup(seccache_t *cache, 
-                                        void *data);
+seccache_entry_t *PINT_seccache_lookup(seccache_t *cache, 
+                                       void *data);
+
 /* inserts an entry with the given data */
 int PINT_seccache_insert(seccache_t *cache,
                          void *data,
                          PVFS_size data_size);
+
 /* removes an entry */
 int PINT_seccache_remove(seccache_t *cache,
                          seccache_entry_t *entry);
-
-/* free entry memory */
-/* TODO: remove? 
-void PINT_seccache_cleanup_entry(seccache_entry_t *entry);
-*/
 
 #endif
 

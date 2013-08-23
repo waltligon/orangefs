@@ -27,7 +27,7 @@ struct PINT_hint_info
 {
     enum PINT_hint_type type;
     int flags;
-    const char * name;
+    const char *name;
     void (*encode)(char **pptr, void *value);
     void (*decode)(char **pptr, void *value);
     int length;
@@ -201,18 +201,18 @@ int PVFS_hint_add_internal(
 
 int PVFS_hint_replace(
     PVFS_hint *hint,
-    const char *type,
+    const char *name,
     int length,
     void *value)
 {
     const struct PINT_hint_info *info;
 
-    info = PINT_hint_get_info_by_name(type);
+    info = PINT_hint_get_info_by_name(name);
     if(info)
     {
         return PVFS_hint_replace_internal(hint, info->type, length, value);
     }
-    return PVFS_hint_add(hint, type, length, value);
+    return PVFS_hint_add(hint, name, length, value);
 }
 
 int PVFS_hint_replace_internal(
@@ -251,7 +251,7 @@ int PVFS_hint_replace_internal(
 
 int PVFS_hint_add(
     PVFS_hint *hint,
-    const char *type,
+    const char *name,
     int length,
     void *value)
 {
@@ -259,7 +259,7 @@ int PVFS_hint_add(
     const struct PINT_hint_info *info;
     PINT_hint *new_hint;
 
-    info = PINT_hint_get_info_by_name(type);
+    info = PINT_hint_get_info_by_name(name);
     if(info)
     {
         ret = PINT_hint_check(hint, info->type);
@@ -295,7 +295,7 @@ int PVFS_hint_add(
     else
     {
         new_hint->type = PINT_HINT_UNKNOWN;
-        new_hint->type_string = strdup(type);
+        new_hint->type_string = strdup(name);
 
         /* always transfer unknown hints */
         new_hint->flags = PINT_HINT_TRANSFER;
@@ -309,11 +309,11 @@ int PVFS_hint_add(
     return 0;
 }
 
-int PVFS_hint_check(PVFS_hint *hints, const char *type)
+int PVFS_hint_check(PVFS_hint *hints, const char *name)
 {
     const struct PINT_hint_info *info;
 
-    info = PINT_hint_get_info_by_name(type);
+    info = PINT_hint_get_info_by_name(name);
     return PINT_hint_check(hints, info->type);
 }
 
@@ -343,7 +343,10 @@ static int PINT_hint_check(PVFS_hint *hints, enum PINT_hint_type type)
 {
     PINT_hint *tmp;
 
-    if(!hints) return 0;
+    if(!hints)
+    {
+        return 0;
+    }
 
     tmp = *hints;
     while(tmp)
@@ -501,7 +504,7 @@ void PVFS_hint_free(PVFS_hint hint)
  * PVFS2_HINTS =
  *'pvfs.hint.request_id:10+pvfs.hint.client_id:30'
  */
-int PVFS_hint_import_env(PVFS_hint * out_hint)
+int PVFS_hint_import_env(PVFS_hint *out_hint)
 {
     char * env;
     char * env_copy;

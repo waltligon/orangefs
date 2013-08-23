@@ -36,18 +36,20 @@ DECLARE_ERRNO_MAPPING_AND_FN();
 */
 int PVFS_strerror_r(int errnum, char *buf, int n)
 {
-    int ret = 0;
-    int limit = PVFS_util_min(n, MAX_PVFS_STRERROR_LEN);
-    int tmp = PVFS_get_errno_mapping(-errnum);
+    int ret = 0, limit, map_err;
 
-    if (IS_PVFS_NON_ERRNO_ERROR(-errnum))
+    limit = PVFS_util_min(n, MAX_PVFS_STRERROR_LEN);    
+
+    map_err = PVFS_get_errno_mapping(errnum);
+
+    if (IS_PVFS_NON_ERRNO_ERROR(abs(errnum)))
     {
-        snprintf(buf, limit, "%s", PINT_non_errno_strerror_mapping[tmp]);
+        snprintf(buf, limit, "%s", PINT_non_errno_strerror_mapping[map_err]);
     }
     else
     {
 #if defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
-        char *tmpbuf = strerror_r(tmp, buf, limit);
+        char *tmpbuf = strerror_r(map_err, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
             limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
@@ -55,11 +57,12 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         }
         ret = (tmpbuf ? 0 : -1);
 #elif defined(WIN32)
-        ret = (int) strerror_s(buf, (size_t) limit, tmp);
+        ret = (int) strerror_s(buf, (size_t) limit, map_err);
 #else 
-        ret = (int)strerror_r(tmp, buf, (size_t)limit);
+        ret = (int)strerror_r(map_err, buf, (size_t)limit);
 #endif
     }
+
     return ret;
 }
 

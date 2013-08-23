@@ -7,14 +7,18 @@
  */
 
 /* These are standard declaration and  must go before the undefs below */
+#include "pvfs2-config.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 /* locally configured options - must be edited here before compile */
 #if 0
@@ -62,8 +66,23 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
+
 {
+#ifdef __DARWIN__
+    void *ptr;
+    int rc;
+    rc = posix_memalign(&ptr, alignment, size);
+    if (rc)
+    {
+        return ptr;
+    }
+    else
+    {
+        return NULL;
+    }
+#else
     return memalign(alignment, size);
+#endif
 }
 
 int clean_posix_memalign(void **ptr, size_t alignment, size_t size)
@@ -104,41 +123,85 @@ void clean_free(void *ptr)
     typedef uint32_t ptrint_t;
 #endif
 
-/* we want to call real malloc below */
+/* we don't want any crazy redefs below
+ * want to call real malloc, free, etc.
+ * our .h file does lots of defs, and we
+ * don't want them here they are for users
+ */
 #ifdef malloc
 #undef malloc
+#endif
+
+#ifdef PINT_malloc
+#undef PINT_malloc
+#endif
+
+#ifdef PINT_malloc_minimum
+#undef PINT_malloc_minimum
 #endif
 
 #ifdef calloc
 #undef calloc
 #endif
 
+#ifdef PINT_calloc
+#undef PINT_calloc
+#endif
+
 #ifdef realloc
 #undef realloc
+#endif
+
+#ifdef PINT_realloc
+#undef PINT_realloc
 #endif
 
 #ifdef valloc
 #undef valloc
 #endif
 
+#ifdef PINT_valloc
+#undef PINT_valloc
+#endif
+
 #ifdef posix_memalign
 #undef posix_memalign
+#endif
+
+#ifdef PINT_posix_memalign
+#undef PINT_posix_memalign
 #endif
 
 #ifdef memalign
 #undef memalign
 #endif
 
+#ifdef PINT_memalign
+#undef PINT_memalign
+#endif
+
 #ifdef strdup
 #undef strdup
+#endif
+
+#ifdef PINT_strdup
+#undef PINT_strdup
 #endif
 
 #ifdef strndup
 #undef strndup
 #endif
 
+#ifdef PINT_strndup
+#undef PINT_strndup
+#endif
+
 #ifdef free
 #undef free
+#endif
+
+#ifdef PINT_free
+#undef PINT_free
 #endif
 
 /* These routines call glibc version unless we don't have a pointer to
@@ -231,6 +294,18 @@ static inline int my_glibc_posix_memalign(void **mem,
             return posix_memalign(mem, alignment, size);
         }
     }
+}
+
+void *PINT_malloc_minimum(size_t size)
+{
+    void *mem;
+    mem = my_glibc_malloc(size);
+    if (!mem)
+    {
+        return NULL;
+    }
+    memset(mem, 0, size);
+    return mem;
 }
 
 typedef struct extra_s

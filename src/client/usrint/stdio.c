@@ -80,7 +80,19 @@ static int init_flag = 0;
 struct stdio_ops_s stdio_ops;
 static FILE open_files = {._chain = NULL};
 
-/* this is defined in openfile-util.h because it is used openfile-util.c
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...);
+int __printf_chk (int flag, const char *format, ...);
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap);
+int __vprintf_chk (int flag, const char *format, va_list ap);
+int __dprintf_chk (int fd, int flag, const char *fmt, ...);
+int __vdprintf_chk (int fd, int flag, const char *fmt, va_list ap);
+char *__gets_chk (char *str, size_t n);
+char *__fgets_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+char *__fgets_unlocked_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+/* this is defined in openfile-util.g because it is used openfile-util.c
  * _P_IO_MAGIC     0xF0BD0000
  */
 
@@ -244,7 +256,7 @@ FILE *stderr = &pvfs_stderr_stream;
 #endif
 #endif
 
-/* this is gets called all over the place to make sure initialization is
+/* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
  * real init function - which in theory was done before main
  */
@@ -270,6 +282,10 @@ static inline void lock_init_stream(FILE *stream)
     if (!stream->_lock)
     {
         stream->_lock = (_PVFS_lock_t *)malloc(sizeof(_PVFS_lock_t));
+        if (!stream->_lock)
+        {
+            return;
+        }
         ZEROMEM(stream->_lock, sizeof(_PVFS_lock_t));
     }
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
@@ -508,6 +524,7 @@ static int init_stream (FILE *stream, int flags, int bufsize)
         {
             return -1;
         }
+        ZEROMEM(stream->_IO_buf_base, bufsize);
     }
     stream->_IO_buf_end      = stream->_IO_buf_base + bufsize;
     stream->_IO_read_base    = stream->_IO_buf_base;
@@ -560,7 +577,7 @@ FILE *fdopen(int fd, const char *mode)
         errno = ENOMEM;
         return NULL; 
     }
-    /* memset(newfile, 0, sizeof(FILE)); - handled by PINT_malloc */
+    ZEROMEM(newfile, sizeof(FILE));
 
     /* initize lock for this stream */
     /* SETFLAG(newfile, _IO_USER_LOCK); */
@@ -991,6 +1008,14 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rsz / size; /* num items written */
 }
 
+/**
+ * __fread_chk
+ */
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread(ptr, size, nmemb, stream);
+}
+
 /*
  * fread implements the same buffer scheme as in fwrite
  */
@@ -1020,6 +1045,14 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     rc = fread_unlocked(ptr, size, nmemb, stream);
     unlock_stream(stream);
     return rc;
+}
+
+/**
+ * __fread_unlocked_chk
+ */
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread_unlocked(ptr, size, nmemb, stream);
 }
 
 size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -1806,6 +1839,14 @@ int putw(int wd, FILE *stream)
 }
 
 /**
+ * __fgets_chk
+ */
+char *__fgets_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets(s, size, stream);
+}
+
+/**
  * fgets reads up to size or a newline
  */
 char *fgets(char *s, int size, FILE *stream)
@@ -1837,6 +1878,14 @@ char *fgets(char *s, int size, FILE *stream)
     unlock_stream(stream);
     gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
     return rc;
+}
+
+/**
+ * __fgets_unlocked_chk
+ */
+char *__fgets_unlocked_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets_unlocked(s, size, stream);
 }
 
 char *fgets_unlocked(char *s, int size, FILE *stream)
@@ -2002,6 +2051,14 @@ int getw(FILE *stream)
 }
 
 /**
+ * __gets_check
+ */
+char *__gets_chk(char *s, size_t n)
+{
+    return gets(s);
+}
+
+/**
  * gets
  */
 char *gets(char *s)
@@ -2081,6 +2138,7 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
         {
             return -1;
         }
+        ZEROMEM(*lnptr, *n);
     }
     p = *lnptr;
     do {
@@ -2140,8 +2198,23 @@ int ungetc(int c, FILE *stream)
  */
 #if 0
 sprintf, snprintf, vsprintf, vsnprintf, asprintf, vasprintfm
-sscanf, vsscanf
+sscanf, vsscanf, asprintf, vasprintf
 #endif
+
+
+/**
+ * __dprintf_chk wrapper
+ */
+int __dprintf_chk(int fd, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vdprintf(fd, format, ap);
+    va_end(ap);
+    return len;
+}
 
 /**
  * dprintf wrapper
@@ -2155,6 +2228,14 @@ int dprintf(int fd, const char *format, ...)
     len = vdprintf(fd, format, ap);
     va_end(ap);
     return len;
+}
+
+/**
+ * __vdprintf_chk wrapper
+ */
+int __vdprintf_chk(int fd, int flag, const char *format, va_list ap)
+{
+    return vdprintf(fd, format, ap); /* this is in libc */
 }
 
 /**
@@ -2212,8 +2293,43 @@ int vfprintf(FILE *stream, const char *format, va_list ap)
     return rc;
 }
 
+/** These functions are wrappers in case glibc's headers have rewritten
+ * the calls
+ */
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stream, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __printf_chk (int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stdout, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap)
+{
+    return vfprintf(stream, format, ap);
+}
+
+int __vprintf_chk (int flag, const char *format, va_list ap)
+{
+    return vfprintf(stdout, format, ap);
+}
+
 /**
- * fprintf wrapper
+ * vfprintf wrapper
  */
 int vprintf(const char *format, va_list ap)
 {
@@ -2762,7 +2878,7 @@ DIR *fdopendir (int fd)
     {
         return NULL;
     }
-    memset(dstr, 0, sizeof(DIR));
+    ZEROMEM(dstr, sizeof(DIR));
     SETMAGIC(dstr, DIRSTREAM_MAGIC);
     dstr->fileno = fd;
     dstr->buf_base = (char *)malloc(DIRBUFSIZE);
@@ -2772,6 +2888,7 @@ DIR *fdopendir (int fd)
         free(dstr);
         return NULL;
     }
+    ZEROMEM(dstr->buf_base, DIRBUFSIZE);
     dstr->buf_end = dstr->buf_base + DIRBUFSIZE;
     dstr->buf_act = dstr->buf_base;
     dstr->buf_ptr = dstr->buf_base;
@@ -2881,7 +2998,7 @@ void rewinddir (DIR *dir)
         return;
     }
     /* force fd back to zero position 
-     * this should be an in expensive operation
+     * this should be an inexpensive operation
      */
     lseek64(dir->fileno, 0, SEEK_SET);
     /* force a re-read of the buffer in case things have changed */
@@ -2983,6 +3100,7 @@ int scandir (const char *dir,
     {
         return -1;
     }
+    ZEROMEM(*namelist, asz * sizeof(struct dirent *));
     /* loop through the dirents */
     for(i = 0, de = readdir(dp); de; i++, de = readdir(dp))
     {
@@ -3060,6 +3178,7 @@ int scandir64 (const char *dir,
     {
         return -1;
     }
+    ZEROMEM(*namelist, asz * sizeof(struct dirent *));
     /* loop through the dirents */
     for(i = 0, de = readdir64(dp); de; i++, de = readdir64(dp))
     {

@@ -9,7 +9,6 @@
 #define PINT_MALLOC_H
 
 #include <stdint.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,6 +27,7 @@ struct glibc_malloc_ops_s
 
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
+extern void *PINT_malloc_minimum(size_t size);
 extern void *PINT_malloc(size_t size);
 extern void *PINT_calloc(size_t nmemb, size_t size);
 extern int   PINT_posix_memalign(void **mem, size_t alignment, size_t size);
@@ -43,23 +43,23 @@ extern void  PINT_free(void *mem);
 /* Defaults if not defined in pvfs2-config.h */
 
 #ifndef PVFS_MALLOC_REDEF
-#define PVFS_MALLOC_REDEF 1
+# define PVFS_MALLOC_REDEF 1
 #endif
 
 #ifndef PVFS_MALLOC_MAGIC
-#define PVFS_MALLOC_MAGIC 1
+# define PVFS_MALLOC_MAGIC 1
 #endif
 
 #ifndef PVFS_MALLOC_CHECK_ALIGN
-#define PVFS_MALLOC_CHECK_ALIGN 1
+# define PVFS_MALLOC_CHECK_ALIGN 1
 #endif
 
 #ifndef PVFS_MALLOC_ZERO
-#define PVFS_MALLOC_ZERO 1
+# define PVFS_MALLOC_ZERO 1
 #endif
 
 #ifndef PVFS_MALLOC_FREE_ZERO
-#define PVFS_MALLOC_FREE_ZERO 1
+# define PVFS_MALLOC_FREE_ZERO 1
 #endif
 
 #define PVFS_MALLOC_MAGIC_NUM 0xFAE00000
@@ -68,117 +68,126 @@ extern void  PINT_free(void *mem);
 
 /* Make sure code that calls default malloc gets our version */
 
-#ifdef malloc
-#undef malloc
-#endif
-#define malloc PINT_malloc
+# ifdef malloc
+#  undef malloc
+# endif
+# define malloc PINT_malloc
 
-#ifdef calloc
-#undef calloc
-#endif
-#define calloc PINT_calloc
+# ifdef calloc
+#  undef calloc
+# endif
+# define calloc PINT_calloc
 
-#ifdef posix_memalign
-#undef posix_memalign
-#endif
-#define posix_memalign PINT_posix_memalign
+# ifdef posix_memalign
+#  undef posix_memalign
+# endif
+# define posix_memalign PINT_posix_memalign
 
-#ifdef memalign
-#undef memalign
-#endif
-#define memalign PINT_memalign
+# ifdef memalign
+#  undef memalign
+# endif
+# define memalign PINT_memalign
 
-#ifdef valloc
-#undef valloc
-#endif
-#define valloc PINT_valloc
+# ifdef valloc
+#  undef valloc
+# endif
+# define valloc PINT_valloc
 
-#ifdef realloc
-#undef realloc
-#endif
-#define realloc PINT_realloc
+# ifdef realloc
+#  undef realloc
+# endif
+# define realloc PINT_realloc
 
-#ifdef strdup
-#undef strdup
-#endif
-#define strdup PINT_strdup
+# ifdef strdup
+#  undef strdup
+# endif
+# define strdup PINT_strdup
 
-#ifdef strndup
-#undef strndup
-#endif
-#define strndup PINT_strndup
+# ifdef strndup
+#  undef strndup
+# endif
+# define strndup PINT_strndup
 
-#ifdef free
-#undef free
-#endif
-#define free PINT_free
+# ifdef free
+#  undef free
+# endif
+# define free PINT_free
 
-#ifdef cfree
-#undef cfree
-#endif
-#define cfree PINT_free
+# ifdef cfree
+#  undef cfree
+# endif
+# define cfree PINT_free
 
-#else
+#else /* PVFS_MALLOC_REDEF */
 
 /* Make sure code that directly calls our malloc just gets the default */
 
-#ifdef PINT_malloc
-#undef PINT_malloc
-#endif
-#define PINT_malloc malloc
+# ifdef malloc
+#  undef malloc
+# endif
+# ifndef PVFS_MALLOC_REDEF_OVERRIDE
+#  define malloc PINT_malloc_minimum
+# endif
 
-#ifdef PINT_calloc
-#undef PINT_calloc
-#endif
-#define PINT_calloc calloc
+# ifdef PINT_malloc
+#  undef PINT_malloc
+# endif
+# ifndef PVFS_MALLOC_REDEF_OVERRIDE
+#  define PINT_malloc PINT_malloc_minimum
+# endif
 
-#ifdef PINT_posix_memalign
-#undef PINT_posix_memalign
-#endif
-#define PINT_posix_memalign posix_memalign
+# ifdef PINT_calloc
+#  undef PINT_calloc
+# endif
+# define PINT_calloc calloc
 
-#ifdef PINT_memalign
-#undef PINT_memalign
-#endif
-#define PINT_memalign memalign
+# ifdef PINT_posix_memalign
+#  undef PINT_posix_memalign
+# endif
+# define PINT_posix_memalign posix_memalign
 
-#ifdef PINT_valloc
-#undef PINT_valloc
-#endif
-#define PINT_valloc valloc
+# ifdef PINT_memalign
+#  undef PINT_memalign
+# endif
+# define PINT_memalign memalign
 
-#ifdef PINT_realloc
-#undef PINT_realloc
-#endif
-#define PINT_realloc realloc
+# ifdef PINT_valloc
+#  undef PINT_valloc
+# endif
+# define PINT_valloc valloc
 
-#ifdef PINT_strdup
-#undef PINT_strdup
-#endif
-#define PINT_strdup strdup
+# ifdef PINT_realloc
+#  undef PINT_realloc
+# endif
+# define PINT_realloc realloc
 
-#ifdef PINT_strndup
-#undef PINT_strndup
-#endif
-#define PINT_strndup strndup
+# ifdef PINT_strdup
+#  undef PINT_strdup
+# endif
+# define PINT_strdup strdup
 
-#ifdef PINT_free
-#undef PINT_free
-#endif
-#define PINT_free free
+#  ifdef PINT_strndup
+#  undef PINT_strndup
+# endif
+# define PINT_strndup strndup
+
+# ifdef PINT_free
+#  undef PINT_free
+# endif
+# define PINT_free free
 
 #endif
 
 #if !PVFS_MALLOC_ZERO || !PVFS_MALLOC_REDEF
-#define ZEROMEM(p,s) memset((p), 0, (s))
+# define ZEROMEM(p,s) memset((p), 0, (s))
 #else
-#define ZEROMEM(p,s) 
+# define ZEROMEM(p,s) 
 #endif
 
 #if !PVFS_MALLOC_FREE_ZERO || !PVFS_MALLOC_REDEF
-#define ZEROFREE(p,s) memset((p), 0, (s))
+# define ZEROFREE(p,s) memset((p), 0, (s))
 #else
-#define ZEROFREE(p,s) 
+# define ZEROFREE(p,s) 
 #endif
 
 #endif

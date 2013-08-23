@@ -53,6 +53,9 @@
 #ifdef ENABLE_CAPCACHE
 #include "capcache.h"
 #endif
+#ifdef ENABLE_CREDCACHE
+#include "credcache.h"
+#endif
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
@@ -600,6 +603,19 @@ static int server_initialize(
     *server_status_flag |= SERVER_CAPCACHE_INIT;
 #endif /* ENABLE_CAPCACHE */
 
+#ifdef ENABLE_CREDCACHE
+    /* initialize the credential cache */
+    ret = PINT_credcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize credential cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CREDCACHE_INIT;
+#endif
+
 #ifdef ENABLE_CERTCACHE
     /* initialize the certificate cache */
     ret = PINT_certcache_init();
@@ -904,7 +920,8 @@ static int server_initialize_subsystems(
             break;
         }
 
-        ret = PINT_cached_config_handle_load_mapping(cur_fs);
+        ret = PINT_cached_config_handle_load_mapping(cur_fs,
+                &server_config);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
@@ -2026,7 +2043,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if(argc < optind)
+    if(argc <= optind)
     {
         gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;

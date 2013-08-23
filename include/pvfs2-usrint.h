@@ -49,6 +49,10 @@
 #include <sys/time.h>
 #include <sys/vfs.h>
 
+/* define open flags unique to PVFS here */
+#define O_HINTS     02000000  /* PVFS hints are present */
+#define O_NOTPVFS   04000000  /* Open non-PVFS files if possible */
+
 /* define FD flags unique to PVFS here */
 #define PVFS_FD_NOCACHE 0x10000
 

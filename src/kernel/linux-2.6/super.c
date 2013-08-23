@@ -1162,6 +1162,7 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
 #endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
 
 #ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
+#ifdef PVFS_ENCODE_FS_USES_DENTRY
 int pvfs2_encode_fh(struct dentry *dentry,
                     __u32 *fh,
                     int *max_len,
@@ -1220,6 +1221,50 @@ int pvfs2_encode_fh(struct dentry *dentry,
 out:
    return type;
 }
+#else
+int pvfs2_encode_fh(struct inode *inode,
+                    __u32 *fh,
+                    int *max_len,
+                    struct inode *parent)
+{
+   int len = parent ? 6 : 3;
+   int type = 1;
+   PVFS_object_ref handle;
+
+   if (*max_len < len) {
+     gossip_lerr("fh buffer is too small for encoding\n");
+     *max_len = len;
+     type =  255;
+     goto out;
+   }
+
+   handle = PVFS2_I(inode)->refn;
+   gossip_debug(GOSSIP_SUPER_DEBUG,
+                "Encoding fh: handle %llu, fsid %u\n",
+                handle.handle, handle.fs_id);
+
+   fh[0] = handle.handle >> 32;
+   fh[1] = handle.handle & 0xffffffff;
+   fh[2] = handle.fs_id;
+
+   if (parent)
+   {
+      handle = PVFS2_I(parent)->refn;
+      fh[3] = handle.handle >> 32;
+      fh[4] = handle.handle & 0xffffffff;
+      fh[5] = handle.fs_id;
+
+      type = 2;
+      gossip_debug(GOSSIP_SUPER_DEBUG,
+                   "Encoding parent: handle %llu, fsid %u\n",
+                   handle.handle, handle.fs_id);
+   }
+   *max_len = len;
+
+out:
+   return type;
+}
+#endif /* PVFS_ENCODE_FS_USES_DENTRY */
 #endif /* HAVE_ENCODEFH_EXPORT_OPERATIONS */
 
 static struct export_operations pvfs2_export_ops =
@@ -1307,7 +1352,11 @@ int pvfs2_fill_sb(struct super_block *sb,
                  root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
+#ifdef HAVE_D_ALLOC_ROOT
     root_dentry = d_alloc_root(root);
+#else
+    root_dentry = d_make_root(root);
+#endif
     if (!root_dentry)
     {
         iput(root);

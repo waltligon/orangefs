@@ -15,7 +15,7 @@ for file in orangefs-serverkey*.pem
 do
     server=`echo $file | sed 's/orangefs-serverkey-//' | sed 's/\.pem//'`
     scp $file ${server}:${install_dir}/etc/orangefs-serverkey.pem
-    scp keystore ${server}:${install_dir}/etc/keystore
+    scp orangefs-keystore ${server}:${install_dir}/etc/orangefs-keystore
 done
 
 # copy client keys

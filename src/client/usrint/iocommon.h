@@ -245,6 +245,8 @@ extern int iocommon_deleattr(pvfs_descriptor *pd, const char * key);
 
 extern int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group);
 
+extern int iocommon_getmod(pvfs_descriptor *pd, mode_t *mode);
+
 extern int iocommon_chmod(pvfs_descriptor *pd, mode_t mode);
 
 extern int iocommon_make_directory(const char *pvfs_path,

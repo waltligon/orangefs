@@ -188,7 +188,7 @@ static int pvfs2_d_delete (
 static int pvfs2_d_revalidate(struct dentry *dentry,
                               int flags)
 {
-#elif PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA
+#elif defined(PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA)
 static int pvfs2_d_revalidate(struct dentry *dentry,
                               struct nameidata *nd)
 {
@@ -199,8 +199,7 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
     }
 # endif
 
-    if (nd && (nd->flags & LOOKUP_FOLLOW) &&
-        ((!nd->flags) & (LOOKUP_CREATE)) )
+    if (nd && (nd->flags & LOOKUP_FOLLOW) && (!(nd->flags & LOOKUP_CREATE)) )
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG,
                      "\n%s: Trusting intent; skipping getattr\n", __func__);
@@ -217,7 +216,7 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
     }
 # endif
     if ((flags & LOOKUP_FOLLOW) &&
-        (!flags & LOOKUP_CREATE))
+        (!(flags & LOOKUP_CREATE)))
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG,
                      "\n%s: Trusting intent; skipping getattr\n", __func__);

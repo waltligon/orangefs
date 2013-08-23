@@ -137,24 +137,15 @@ int PINT_security_initialize(void)
         return ret;
     }    
 
-    /* check for server private key */
-    if (config->serverkey_path == NULL)
-    {
-        gossip_err("ServerKey not defined in configuration file... "
-                   "aborting\n");
-
-        PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error);
-    }
+    PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error,
+                             "ServerKey not defined in configuration file... "
+                             "aborting\n");
 
 #ifdef ENABLE_SECURITY_KEY
 
-    if (config->keystore_path == NULL)
-    {
-        gossip_err("Keystore not defined in configuration file... "
-                   "aborting\n");
-
-        PINT_SECURITY_CHECK_NULL(config->keystore_path, init_error);
-    }
+    PINT_SECURITY_CHECK_NULL(config->keystore_path, init_error,
+                             "Keystore not defined in configuration file... "
+                             "aborting\n");
 
     security_privkey = EVP_PKEY_new();
     ret = load_private_key(config->serverkey_path);
@@ -184,33 +175,33 @@ int PINT_security_initialize(void)
 
     /* load the CA cert */
     ret = PINT_init_trust_store();
-    PINT_SECURITY_CHECK(ret, init_error);
+    PINT_SECURITY_CHECK(ret, init_error, "could not initialize trust store\n");
 
-    if (config->ca_file == NULL)
-    {
-        gossip_err("CAPath not defined in configuration file... "
-                   "aborting\n");
-
-        PINT_SECURITY_CHECK_NULL(config->ca_file, init_error);
-    }
+    PINT_SECURITY_CHECK_NULL(config->ca_file, init_error,
+                             "CAFile not defined in configuration file... "
+                             "aborting\n");
 
     ret = PINT_load_cert_from_file(config->ca_file, &ca_cert);
-    PINT_SECURITY_CHECK(ret, init_error);
-
+    PINT_SECURITY_CHECK(ret, init_error, "could not open cert file %s:\n", 
+                        config->ca_file);
+    
     ret = PINT_add_trusted_certificate(ca_cert);
-    PINT_SECURITY_CHECK(ret, init_error);
+    PINT_SECURITY_CHECK(ret, init_error, 
+                        "could not add CA cert to trust store\n");
 
     /* load private key */
     ret = PINT_load_key_from_file(config->serverkey_path, &security_privkey);
-    PINT_SECURITY_CHECK(ret, init_error);
+    PINT_SECURITY_CHECK(ret, init_error, "could not load private key file %s\n",
+                        config->serverkey_path);
 
     /* get public key */
     security_pubkey = X509_get_pubkey(ca_cert);
-    PINT_SECURITY_CHECK_NULL(security_pubkey, init_error);
+    PINT_SECURITY_CHECK_NULL(security_pubkey, init_error, "could not load "
+                             "CA cert public key\n");
 
     /* initialize LDAP */
     ret = PINT_ldap_initialize();
-    PINT_SECURITY_CHECK(ret, init_error);
+    PINT_SECURITY_CHECK(ret, init_error, "could not initialize LDAP\n");
 
 #endif /* ENABLE_SECURITY_CERT */
 
@@ -1257,7 +1248,7 @@ void PINT_security_error(const char *prefix, int err)
         break;
     default:
         /* debug PVFS/errno error */
-        PVFS_strerror_r((int) err, errstr, 256);
+        PVFS_strerror_r(err, errstr, 256);
         errstr[255] = '\0';
         gossip_err("%s: %s\n", prefix, errstr);
     }
