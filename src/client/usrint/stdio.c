@@ -2026,6 +2026,7 @@ int getw(FILE *stream)
     return wd;
 }
 
+#ifndef GETS_IS_GONE
 /**
  * __gets_check
  */
@@ -2068,6 +2069,7 @@ char *gets(char *s)
     return s;
 #endif
 }
+#endif /* GETS_IS_GONE */
 
 /**
  * getline
