@@ -1510,6 +1510,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for kzalloc)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#include <linux/kconfig.h>
 		#include <linux/slab.h>
 	], [
 		void * a;
