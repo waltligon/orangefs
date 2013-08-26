@@ -1506,11 +1506,27 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
 	    )
 
+	dnl Check for kconfig.h... at some revision levels, some 
+	dnl tests (Check for kzalloc) use IS_ENABLED indirectly 
+	dnl through includes... 
+	AC_MSG_CHECKING(for kconfig.h) 
+	AC_TRY_COMPILE([
+		#include <linux/kconfig.h>
+	], [
+		;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KCONFIG, 1, Define if kconfig.h exists),
+	AC_MSG_RESULT(no)
+	)
+
 	dnl Check for kzalloc
 	AC_MSG_CHECKING(for kzalloc)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
 		#include <linux/kconfig.h>
+		#endif
 		#include <linux/slab.h>
 	], [
 		void * a;
