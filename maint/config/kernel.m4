@@ -67,6 +67,16 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
+        dnl After the "UAPI header file split" in linux-3.9.7, the
+        dnl uapi header file locations need to be added to CFLAGS.
+        if test -n "${ARCH}" -a  
+           test -d $lk_src_source/arch/${ARCH}/include/uapi; then
+             CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include/uapi"
+        fi
+        if test -d $lk_src_source/include/uapi; then
+             CFLAGS="$CFLAGS -I$lk_src_source/include/uapi"
+        fi
+
         dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
         dnl optimization flag of some sort is set. To complicate matters 
         dnl checks in earlier versions break when optimization is turned on.
