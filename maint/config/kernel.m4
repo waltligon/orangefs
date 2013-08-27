@@ -72,10 +72,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         if test -n "${ARCH}" -a  
            test -d $lk_src_source/arch/${ARCH}/include/uapi; then
              CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include/uapi"
+             CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include/generated/uapi"
         fi
         if test -d $lk_src_source/include/uapi; then
              CFLAGS="$CFLAGS -I$lk_src_source/include/uapi"
         fi
+
+	dnl Check for kconfig.h... at some revision levels, many
+	dnl tests use IS_ENABLED indirectly through includes... 
+	AC_MSG_CHECKING(for kconfig.h) 
+	AC_TRY_COMPILE([
+		#include <linux/kconfig.h>
+	], [
+		;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KCONFIG, 1, Define if kconfig.h exists),
+	AC_MSG_RESULT(no)
+	)
 
         dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
         dnl optimization flag of some sort is set. To complicate matters 
@@ -436,6 +450,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for struct kmem_cache in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
 
@@ -454,6 +471,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/slab.h>
 		static int flags = SLAB_KERNEL;
 	], [],
@@ -467,6 +487,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/mm.h>
 		#include <linux/backing-dev.h>
 		static struct backing_dev_info bdi = {
@@ -960,8 +983,12 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_MSG_RESULT(no)
 	    )
 
+
 	AC_CHECK_HEADERS([linux/posix_acl.h], [], [], 
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/fs.h>
 		 #ifdef HAVE_XATTR 
 		 #include <linux/xattr.h> 
@@ -970,6 +997,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 
 	AC_CHECK_HEADERS([linux/posix_acl_xattr.h], [], [], 
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/fs.h>
 		 #ifdef HAVE_XATTR 
 		 #include <linux/xattr.h> 
@@ -979,6 +1009,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl linux-2.6.11 had xattr_acl.h, but 2.6.12 did not!
 	AC_CHECK_HEADERS([linux/xattr_acl.h], [], [], 
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/fs.h>
 		 #ifdef HAVE_XATTR
 		 #include <linux/xattr.h>
@@ -995,10 +1028,16 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		 ] )
 	AC_CHECK_HEADERS([linux/compat.h], [], [], 
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/compat.h>
 		 ] )
 	AC_CHECK_HEADERS([linux/syscalls.h], [], [], 
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/syscalls.h>
 		 ] )
 	AC_CHECK_HEADERS([asm/ioctl32.h], [], [], 
@@ -1179,6 +1218,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for posix_acl_equiv_mode umode_t)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/posix_acl.h>
 		struct posix_acl *acl;
@@ -1199,6 +1241,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for posix_acl_create)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/posix_acl.h>
 		struct posix_acl *acl;
@@ -1218,6 +1263,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for posix_acl_chmod)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/posix_acl.h>
 		struct posix_acl *acl;
@@ -1239,6 +1287,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for posix_acl_clone)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/posix_acl.h>
 		struct posix_acl *acl;
@@ -1282,6 +1333,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel has it defined
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/xattr.h>
 		int generic_getxattr(struct inode *inode)
@@ -1370,6 +1424,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+	    #ifdef HAVE_KCONFIG
+	    #include <linux/kconfig.h>
+	    #endif
 	    #include <linux/buffer_head.h>
 	    extern int try_to_release_page(struct page *page, int gfp_mask);
 	    ], [],
@@ -1397,6 +1454,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for int return in kmem_cache_destroy)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+	    #ifdef HAVE_KCONFIG
+	    #include <linux/kconfig.h>
+	    #endif
 	    #include <linux/slab.h>
 	    extern int kmem_cache_destroy(kmem_cache_t *);
 	    ], [],
@@ -1481,6 +1541,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for int return value of kmem_cache_destroy)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/slab.h>
 		], [
 		int i = kmem_cache_destroy(NULL);
@@ -1506,20 +1569,6 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
 	    )
 
-	dnl Check for kconfig.h... at some revision levels, some 
-	dnl tests (Check for kzalloc) use IS_ENABLED indirectly 
-	dnl through includes... 
-	AC_MSG_CHECKING(for kconfig.h) 
-	AC_TRY_COMPILE([
-		#include <linux/kconfig.h>
-	], [
-		;
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KCONFIG, 1, Define if kconfig.h exists),
-	AC_MSG_RESULT(no)
-	)
-
 	dnl Check for kzalloc
 	AC_MSG_CHECKING(for kzalloc)
 	AC_TRY_COMPILE([
@@ -1541,6 +1590,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for two arguments to register_sysctl_table)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/sysctl.h>
 		#include <linux/proc_fs.h>
 	], [
@@ -1571,6 +1623,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for obsolete struct page count without underscore)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+	    #ifdef HAVE_KCONFIG
+	    #include <linux/kconfig.h>
+	    #endif
 	    #include <linux/mm.h>
 	], [
 	    struct page *p;
@@ -1602,6 +1657,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for destructor param to kmem_cache_create)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+	    #ifdef HAVE_KCONFIG
+	    #include <linux/kconfig.h>
+	    #endif
 	    #include <linux/slab.h>
 	], [
 	   kmem_cache_create("config-test", 0, 0, 0, NULL, NULL);
@@ -1622,6 +1680,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for one-param kmem_cache_create constructor)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
 		void ctor(void *req)
@@ -1641,6 +1702,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for two param permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
 		#include <linux/fs.h>
@@ -1672,6 +1736,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for two-param kmem_cache_create constructor)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
 		void ctor(struct kmem_cache *cachep, void *req)
@@ -1862,6 +1929,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(for current_fsuid)
         AC_TRY_COMPILE([
                 #define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
                 #include <linux/sched.h>
                 #include <linux/cred.h>
         ], [
@@ -1877,6 +1947,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(if kernel backing_dev_info struct has a name field)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/backing-dev.h>
 	], [
@@ -1896,6 +1969,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(for bdi_init)
         AC_TRY_COMPILE([
                 #define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/backing-dev.h>
         ], [
@@ -1948,6 +2024,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for five-param xattr_handler.get)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/dcache.h>
 		#include <linux/xattr.h>
 		static struct xattr_handler x;
@@ -1973,6 +2052,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for six-param xattr_handler.set)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/dcache.h>
 		#include <linux/xattr.h>
 		static struct xattr_handler x;
@@ -1995,6 +2077,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for const s_xattr member in super_block struct)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/xattr.h>
 		struct super_block sb;
