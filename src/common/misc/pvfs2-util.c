@@ -182,7 +182,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
                                     PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
-                                    NULL, cred);
+                                    NULL, NULL, cred);
 }
 
 #ifdef ENABLE_SECURITY_MODE
@@ -194,18 +194,17 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
  * group - string representation of numeric gid
  * timeout - in seconds; value of 0 will result in default (1 hour)
  * keypath - path to client private key file
+ * certpath - path to client certificate file
  * cred - the credential object
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
     int filedes[2], errordes[2];
     int ret;
-#ifdef ENABLE_SECURITY_CERT
-    char *certpath;
-#endif
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
@@ -213,7 +212,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     }
 
 #ifdef ENABLE_SECURITY_CERT
-    certpath = getenv("PVFS2CERT_FILE");
+    if (!certpath && getenv("PVFS2CERT_FILE"))
+    {
+        certpath = getenv("PVFS2CERT_FILE");
+    }
 #endif
 
     memset(&newsa, 0, sizeof(newsa));
@@ -275,7 +277,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         if (certpath)
         {
             *ptr++ = "-c";
-            *ptr++ = certpath;
+            *ptr++ = (char*)certpath;
         }
 #endif
         *ptr++ = NULL;
@@ -588,7 +590,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
  * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     if (cred == NULL)
     {
