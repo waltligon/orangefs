@@ -91,6 +91,31 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl Check for vmtruncate. vmtruncate has been deprecated for
+	dnl a while, it is gone by 3.8. 
+	dnl "The whole truncate sequence needs to be implemented in ->setattr"
+	dnl      ./Documentation/filesystems/porting
+	dnl google "__kfree_rcu breaks third-party kernel code" to learn
+	dnl why -O2 is needed in CFLAGS for this test...
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -O2"
+	AC_MSG_CHECKING(for vmtruncate) 
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/mm.h>
+	], [
+                struct iattr *iattr;
+                struct inode *inode;
+		vmtruncate(inode, iattr->ia_size);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_VMTRUNCATE, 1, Define if vmtruncate exists),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+
         dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
         dnl optimization flag of some sort is set. To complicate matters 
         dnl checks in earlier versions break when optimization is turned on.

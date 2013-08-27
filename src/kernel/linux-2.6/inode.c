@@ -205,7 +205,11 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         if ((iattr->ia_valid & ATTR_SIZE) &&
            iattr->ia_size != i_size_read(inode)) 
         {
+#ifdef HAVE_VMTRUNCATE
             ret = vmtruncate(inode, iattr->ia_size);
+#else
+            ret = inode_newsize_ok(inode, iattr->ia_size);
+#endif
             if (ret)
                 return ret;
         }
@@ -374,7 +378,9 @@ struct inode_operations pvfs2_file_inode_operations =
     listxattr: pvfs2_listxattr,
 #endif
 #else
+#ifdef HAVE_VMTRUNCATE
     .truncate = pvfs2_truncate,
+#endif
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
 #ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
