@@ -57,15 +57,37 @@ class OFSTestNode(object):
         #
         #-------
         
+        # list of OrangeFS Aliases
+        self.alias_list = None
+        
+        # ip address on internal network
         self.ip_address = ""
+        
+        # ip address on external network
         self.ext_ip_address = self.ip_address
+        
+        # current hostname
         self.host_name = ""
-        self.operating_system = ""
+        
+        # operating system
+        self.distro = ""
+        
+        # package system (rpm/dpkg)
         self.package_system=""
+        
+        # location of the linux kernel source
         self.kernel_source_location = ""
+        
+        # kernel version (uname -r)
         self.kernel_version=""
+        
+        # is this a remote machine?
         self.is_remote=True
+        
+        # is this an ec2/openstack instance?
         self.is_ec2=False
+        
+        # type of processor (i386/x86_64)
         self.processor_type = "x86_64"
         
         #------
@@ -74,9 +96,18 @@ class OFSTestNode(object):
         #
         #-------
         
+        # main user login. Usually ec2-user for ec2 instances.
         self.current_user = ""
+        
+        # current working directory
         self.current_directory = "~"
+        #previous directory
+        self.previous_directory = "~"
+        
+        # current environment variables
         self.current_environment = {}
+        
+        # commands written to a batch file
         self.batch_commands = []
         
         #-------------------------------------------------------
@@ -90,7 +121,7 @@ class OFSTestNode(object):
         # The keytable is a dictionary of locations of keys to remote machines on the current node.
         #
         #--------------------------------------------------------
-          
+
         self.sshLocalKeyFile = ""
         self.sshNodeKeyFile = ""
         self.keytable = {}
@@ -101,21 +132,45 @@ class OFSTestNode(object):
         #
         #----------------------------------------------------------
        
+        # This is the location of the OrangeFS source
         self.ofs_source_location = ""
+        
+        # This is the location of the OrangeFS storage
         self.ofs_storage_location = ""
-        self.kernel_source_location = ""
+
+        # This is where OrangeFS is installed. Defaults to /opt/orangefs
         self.ofs_installation_location = ""
+        
+        # This is the location of the third party benchmarks
         self.ofs_extra_tests_location = ""
-        self.kernel_version = ""
+
+        # This is the mountpoint for OrangeFS
         self.ofs_mountpoint = ""
+        
+        # This is the OrangeFS service name. pvfs2-fs < 2.9, orangefs >= 2.9
         self.ofs_fs_name="orangefs"
         
         # svn branch (or ofs source directory name)
         self.ofs_branch = ""
-        #default tcp port
+        
+        # default tcp port
         self.ofs_tcp_port = "3396"
         
-            
+        # berkeley db4 location
+        self.db4_dir = "/opt/db4"
+        self.db4_lib_dir = self.db4_dir+"/lib"
+        
+         
+
+    #==========================================================================
+    # 
+    # currentNodeInformation
+    #
+    # Logs into the node to gain information about the system
+    #
+    #==========================================================================
+    
+
     def currentNodeInformation(self):
         
         self.distro = ""
@@ -126,8 +181,8 @@ class OFSTestNode(object):
         
         #print "Current group is "+self.current_group
 
-        # direct access as root not good. Need to get the actual user in
-        # Gross hackery for SuseStudio images. OpenStack injects into root, not user.
+        # Direct access as root not good. Need to get the actual user in
+        # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
         if self.current_group.rstrip() == "":
             self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
             #print "Current group (from root) is "+self.current_group
@@ -136,7 +191,7 @@ class OFSTestNode(object):
                 exit(-1)
             
             
-
+            # copy the ssh key to the user's directory
             rc = self.runSingleCommand(command="cp -r /root/.ssh /home/%s/" % self.current_user,remote_user="root")
             if rc != 0:
                 print "Could not copy ssh key from /root/.ssh to /home/%s/ " % self.current_user
@@ -144,31 +199,31 @@ class OFSTestNode(object):
             
             #get the user and group name of the home directory
             
+            # change the owner of the .ssh directory from root to the login user
             rc = self.runSingleCommand(command="chown -R %s:%s /home/%s/.ssh/" % (self.current_user,self.current_group,self.current_user),remote_user="root") 
             if rc != 0:
                 print "Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group)
                 exit(rc)
             
-        
+        # get the hostname
         self.host_name = self.runSingleCommandBacktick("hostname")
         
+        # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
         if len(self.host_name) > 15:
-            #truncate host_name if necessary
             short_host_name = self.host_name[:15]
             self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_host_name)
             self.runSingleCommandAsBatch("sudo hostname %s" % short_host_name)
             print "Truncating hostname %s to %s" % (self.host_name,short_host_name)
             self.host_name = self.host_name[:15]
 
+        # get kernel version and processor type
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         self.processor_type = self.runSingleCommandBacktick("uname -p")
         
         
+        # Find the distribution. Unfortunately Linux distributions each have their own file for distribution information.
+            
         # information for ubuntu and suse is in /etc/os-release
-        #print self.runSingleCommand("find /etc/lsb-release 2> /dev/null")
-        
-        
-
         if self.runSingleCommandBacktick('find /etc -name "os-release" 2> /dev/null').rstrip() == "/etc/os-release":
             #print "SuSE or Ubuntu based machine found"
             pretty_name = self.runSingleCommandBacktick("cat /etc/os-release | grep PRETTY_NAME")
@@ -1180,13 +1235,14 @@ class OFSTestNode(object):
         #self.runSingleCommand("ls -l %s" % self.ofs_installation_location)
         #print "Installation location is %s" % self.ofs_installation_location
         #print "Running command \"grep 'Alias ' %s/etc/orangefs.conf | grep %s | cut -d ' ' -f 2\"" % (self.ofs_installation_location,self.host_name)
-        alias_list = self.getAliasesFromConfigFile(self.ofs_installation_location + "/etc/orangefs.conf")
+        if self.alias_list == None:
+            self.alias_list = self.getAliasesFromConfigFile(self.ofs_installation_location + "/etc/orangefs.conf")
         #aliases = self.runSingleCommandBacktick('grep "Alias " %s/etc/orangefs.conf | grep %s | cut -d " " -f 2' % (self.ofs_installation_location,self.host_name))
-        if len(alias_list) == 0:
+        if len(self.alias_list) == 0:
             print "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location
             return -1
         
-        for alias in alias_list:
+        for alias in self.alias_list:
           # create the storage space, if necessary.
             if self.host_name in alias:
                 #self.runSingleCommand("rm -rf %s" % self.ofs_storage_location)
@@ -1205,14 +1261,15 @@ class OFSTestNode(object):
                         return rc
               
                 #now start the server
-                server_start = "%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
+               
+                server_start = "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
                 print server_start
-                rc = self.runSingleCommand(server_start,output)
+                rc = self.runSingleCommandAsBatch(server_start,output)
                 
-                if rc != 0:
-                    print "Could not start OrangeFS server"
-                    print output
-                    return rc
+                #if rc != 0:
+                #    print "Could not start OrangeFS server"
+                #    print output
+                #    return rc
 
                 #self.runAllBatchCommands()
                 # give the servers 15 seconds to get running
@@ -1318,10 +1375,15 @@ class OFSTestNode(object):
         mount > allmount.log
         '''
         output = []
+        
+        
         rc = self.checkMount(output)
         if rc == 0:
             print "OrangeFS already mounted at %s" % output[1]
             return
+        if self.ofs_mountpoint == "":
+            self.ofs_mountpoint = "/tmp/mount/orangefs"
+        self.runSingleCommand("mkdir -p %s" % self.ofs_mountpoint)
         if mount_fuse == True:
             print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
             self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)

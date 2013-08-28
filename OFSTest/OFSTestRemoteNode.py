@@ -89,6 +89,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         # ok, now let's get the os version.
         # should have the architecture and version from the kernel name 
     def runAllBatchCommands(self,output=[]):
+        OFSTestNode.batch_count = OFSTestNode.batch_count+1
 
         
         # Open file with mode 700
@@ -128,7 +129,6 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         # now clear out the batch commands list
         self.batch_commands = []    
-        OFSTestNode.batch_count = OFSTestNode.batch_count+1
 
         return p.returncode
         

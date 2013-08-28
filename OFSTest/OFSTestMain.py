@@ -234,7 +234,7 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         print "Start OFS Client"
-        rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
+        rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
 
         
 

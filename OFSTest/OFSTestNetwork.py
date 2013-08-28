@@ -465,9 +465,9 @@ class OFSTestNetwork(object):
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.startOFSServer)
         time.sleep(20)
 
-    def startOFSClientAllNodes(self):
-        for node in created_nodes:
-            self.startOFSClient(node)
+    def startOFSClientAllNodes(self,security=None):
+        for node in self.created_nodes:
+            self.startOFSClient(node,security)
             
     def startOFSClient(self,client_node=None,security=None):
         if client_node == None:
@@ -700,7 +700,7 @@ class OFSTestNetwork(object):
                 print "Could not create client security key for "+node.hostname
                 print output 
                 return rc
-            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
                 print "Could not copy client security key %s for %s " % (keyname,node.hostname)
                 print output 
@@ -735,19 +735,32 @@ class OFSTestNetwork(object):
             
             server_keyname = "orangefs-serverkey-%s.pem" % node.host_name
             client_keyname = "pvfs2-clientkey-%s.pem" % node.host_name
-            security_node.runSingleCommand('echo "S%s: >> orangefs-keystore' % node.host_name)
-            security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % server_keyname)
-            security_node.runSingleCommand('echo "C%s: >> orangefs-keystore' % node.host_name)
+            if node.alias_list == None:
+                node.alias_list = node.getAliasesFromConfigFile(node.ofs_installation_location + "/etc/orangefs.conf")
+            if len(node.alias_list) == 0:
+                print "Could not get aliases"
+                return -1
+            for alias in node.alias_list:
+                if node.host_name in alias:
+                    security_node.runSingleCommand('echo "S:%s" >> orangefs-keystore' % alias)
+                    security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % server_keyname)
+                
+            security_node.runSingleCommand('echo "C:%s" >> orangefs-keystore' % node.host_name)
             security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % client_keyname)
             
         for node in self.created_nodes:
 
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destinationNode=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy keystore for %s " % (node.hostname)
+                print "Could not copy keystore for %s " % (node.host_name)
                 print output 
                 return rc
-            
+            #now protect the files
+            rc = node.runSingleCommand("chmod 400 %s/etc/*.pem" % node.ofs_installation_location)
+            if rc != 0:
+                print "Could not protect keys on %s " % (node.host_name)
+                print output 
+                return rc
 
         
         return 0
