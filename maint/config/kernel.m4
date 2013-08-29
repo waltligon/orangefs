@@ -115,6 +115,29 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 	CFLAGS=$tmp_cflags
 
+        dnl in 3.8 a "user namespace" parameter was added to 
+        dnl posix_acl_from_xattr... 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -O2"
+	AC_MSG_CHECKING(for namespace parameter in posix_acl_from_xattr) 
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		#include <linux/posix_acl_xattr.h>
+	], [
+		int i;
+		char *c;
+		posix_acl_from_xattr(&init_user_ns, c, i);
+
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_USER_NAMESPACE, 1, Define if the user namespace has been added to posix_acl_from_xattr and posix_acl_to_xattr),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
 
         dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
         dnl optimization flag of some sort is set. To complicate matters 
