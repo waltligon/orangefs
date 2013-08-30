@@ -1319,7 +1319,7 @@ class OFSTestNode(object):
 
     #-------------------------------
     #
-    # copyOFSInstallationToNode
+    # opyOFSInstallationToNode
     #
     # this copies an entire OrangeFS installation from the current node to destinationNode.
     # Also sets the ofs_installation_location and ofs_branch on the destination
@@ -1331,6 +1331,9 @@ class OFSTestNode(object):
         rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
         destinationNode.ofs_installation_location = self.ofs_installation_location
         destinationNode.ofs_branch =self.ofs_branch
+	# TODO: Copy ofs_conf_file, don't just link
+        rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destinationNode, self.ofs_conf_file, True)
+        destinationNode.ofs_conf_file =self.ofs_conf_file
         return rc
        
     #-------------------------------
