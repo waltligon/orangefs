@@ -346,4 +346,4 @@ class OFSTestConfig(object):
             patchlist = temp.split(" ")
             #print patchlist
             for patch in patchlist:
-                self.ofs_patch_files.append(node)
+                self.ofs_patch_files.append(patch)
