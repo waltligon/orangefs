@@ -1688,7 +1688,7 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
     int i = 0;
     int failed;
 
-fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
+// fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
 
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
@@ -1710,6 +1710,7 @@ fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
         *new_addr = new_ref->bmi_addr;
         return (0);
     }
+// fprintf(stderr, "\taddr not found, go to methods\n");
 
     /* Now we will run through each method looking for one that
      * responds successfully.  It is assumed that they are already
@@ -1720,32 +1721,45 @@ fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
     while ((i < active_method_count) &&
            !(meth_addr = active_method_table[i]->method_addr_lookup(id_string)))
     {
+// fprintf(stderr, "\tLooking up in active method\n");
         i++;
     }
 
     /* if not found, try to bring it up now */
     failed = 0;
-    if (!meth_addr) {
-        for (i=0; i<known_method_count; i++) {
+    if (!meth_addr)
+    {
+        for (i = 0; i < known_method_count; i++)
+        {
             const char *name;
             /* only bother with those not active */
             int j;
             for (j=0; j<active_method_count; j++)
+            {
                 if (known_method_table[i] == active_method_table[j])
+                {
                     break;
+                }
+            }
             if (j < active_method_count)
+            {
                 continue;
+            }
 
             /* well-known that mapping is "x" -> "bmi_x" */
             name = known_method_table[i]->method_name + 4;
-            if (!strncmp(id_string, name, strlen(name))) {
+            if (!strncmp(id_string, name, strlen(name)))
+            {
+// fprintf(stderr, "\tActivating method\n");
                 ret = activate_method(known_method_table[i]->method_name, 0, 0);
-                if (ret < 0) {
+                if (ret < 0)
+                {
                     failed = 1;
                     break;
                 }
+// fprintf(stderr, "\tLooking up in method\n");
                 meth_addr = known_method_table[i]->
-                    method_addr_lookup(id_string);
+                                          method_addr_lookup(id_string);
                 i = active_method_count - 1;  /* point at the new one */
                 break;
             }

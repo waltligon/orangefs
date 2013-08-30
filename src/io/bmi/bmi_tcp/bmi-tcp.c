@@ -6,6 +6,8 @@
 
 /* TCP/IP implementation of a BMI method */
 
+#define BMI_TCP_ZONE 1
+
 #include "pvfs2-internal.h"
 
 #include <errno.h>
@@ -378,6 +380,7 @@ const struct bmi_method_ops bmi_tcp_ops = {
 static struct
 {
     int method_flags;
+    int connect_test;
     int method_id;
     bmi_method_addr_p listen_addr;
 } tcp_method_params;
@@ -443,6 +446,14 @@ enum
  */
 static int forceful_cancel_mode = 0;
 
+#ifdef BMI_TCP_ZONE
+/* hangs on to the zone when connecting to config server
+ * for later checking against server addresses
+ */
+static char *tcp_zone = NULL;
+static int tcp_zone_len = 0;
+#endif
+
 /*
   Socket buffer sizes, currently these default values will be used 
   for the clients... (TODO)
@@ -477,6 +488,8 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
     struct tcp_addr *tcp_addr_data = NULL;
     int i = 0;
 
+// gossip_err("Initializing TCP\n");
+
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
 
     /* check args */
@@ -491,6 +504,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
     /* zero out our parameter structure and fill it in */
     memset(&tcp_method_params, 0, sizeof(tcp_method_params));
     tcp_method_params.method_id = method_id;
+    tcp_method_params.connect_test = 1;
     tcp_method_params.method_flags = init_flags;
 
     if (init_flags & BMI_INIT_SERVER)
@@ -634,6 +648,8 @@ int BMI_tcp_finalize(void)
     return (0);
 }
 
+/* temp def for now */
+#define TCP_DEFAULT_CONNECT_TRYS 50
 
 /*
  * BMI_tcp_method_addr_lookup()
@@ -647,89 +663,185 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 {
     char *tcp_string = NULL;
     char *delim = NULL;
-    char *subzone = NULL;
+#ifdef BMI_TCP_ZONE
+    char *zone = NULL;
+    int zone_len = 0;
+#endif
     char *hostname = NULL;
     bmi_method_addr_p new_addr = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
 
-    tcp_string = string_key("tcp", id_string);
-    if (!tcp_string)
+    /* Loop over available tcp addresses in id_string to find
+     * the right one
+     */
+    while(id_string)
     {
-	/* the string doesn't even have our info */
-	return (NULL);
-    }
+        tcp_string = string_key("tcp", id_string);
+        if (!tcp_string)
+        {
+	    /* the string doesn't even have our info */
+	    return (NULL);
+        }
 
-    /* check for network subzone */
-    if ((delim = index(tcp_string, '-')) == NULL)
-    {
-        /* no subzone found so carry on */
-        subzone = NULL;
-    }
-    else
-    {
-        char *slash;
-        if ((slash = index(delim, '/')) == NULL)
+// fprintf(stderr, "Method matched\n");
+
+        /* looks ok, so let's build the method addr structure */
+        new_addr = alloc_tcp_method_addr();
+        if (!new_addr)
         {
             goto errorout;
         }
-        subzone = (char *)malloc((slash - delim) + 1);
-        strncpy(subzone, delim, (slash = delim));
-        subzone[delim - tcp_string] = '\0';
-    }
+        tcp_addr_data = new_addr->method_data;
 
-    /* start breaking up the method information */
-    /* for normal tcp, it is simply hostname:port */
-    if ((delim = index(tcp_string, ':')) == NULL)
-    {
-	gossip_lerr("Error: malformed tcp address.\n");
-        goto errorout;
-    }
+#ifdef BMI_TCP_ZONE
+        /* check for network zone */
+        if ( ((delim = strpbrk(id_string, "-:/")) == NULL) ||
+            (*delim != '-') )
+        {
+            /* no zone found so carry on */
+            zone = NULL;
+        }
+        else
+        {
+            char *delim2;
 
-    /* looks ok, so let's build the method addr structure */
-    new_addr = alloc_tcp_method_addr();
-    if (!new_addr)
-    {
-        goto errorout;
-    }
-    tcp_addr_data = new_addr->method_data;
+            if ( ((delim2 = strpbrk(delim, ":/")) == NULL) ||
+                 (*delim2 != ':') )
+            {
+                /* incorrect string format */
+                goto errorout;
+            }
+            zone_len = delim2 - delim;
+            zone = (char *)malloc(zone_len + 1);
+            strncpy(zone, delim, zone_len);
+            zone[zone_len + 1] = '\0';
+        }
+#endif
 
-    ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
-    if (ret != 1)
-    {
-	gossip_lerr("Error: malformed tcp address.\n");
-        goto errorout;
-    }
+        /* start breaking up the method information */
+        /* for normal tcp, it is simply hostname:port */
+        if ((delim = index(tcp_string, ':')) == NULL)
+        {
+	    gossip_lerr("Error: malformed tcp address.\n");
+            goto errorout;
+        }
 
-    hostname = (char *) malloc((delim - tcp_string + 1));
-    if (!hostname)
-    {
-        goto errorout;
-    }
-    strncpy(hostname, tcp_string, (delim - tcp_string));
-    hostname[delim - tcp_string] = '\0';
+        ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
+        if (ret != 1)
+        {
+	    gossip_lerr("Error: malformed tcp address.\n");
+            goto errorout;
+        }
 
-    tcp_addr_data->subzone = subzone;
-    tcp_addr_data->hostname = hostname;
+        hostname = (char *) malloc((delim - tcp_string + 1));
+        if (!hostname)
+        {
+            goto errorout;
+        }
+        strncpy(hostname, tcp_string, (delim - tcp_string));
+        hostname[delim - tcp_string] = '\0';
 
-    free(tcp_string);
-    return (new_addr);
+        tcp_addr_data->hostname = hostname;
+
+#ifdef BMI_TCP_ZONE
+        if (tcp_method_params.method_flags & BMI_INIT_SERVER)
+        {
+            tcp_addr_data->zone = zone;
+        }
+        else if (tcp_method_params.connect_test)
+        {
+            /* make sure we can actually talk to this addresss */
+            int connect_cnt = TCP_DEFAULT_CONNECT_TRYS;
+
+            do
+            {
+                if (connect_cnt-- <= 0)
+                {
+                    /* failure - never responded */
+// fprintf(stderr, "connect timed out\n");
+                    goto errorout;
+                }
+                ret = tcp_sock_init(new_addr);
+                if (ret < 0)
+                {
+                    /* error - connect returned a tcp error */
+// fprintf(stderr, "tcp_sock_init returned error\n");
+                    goto errorout;
+                }
+// fprintf(stderr, "connect test started\n");
+            } while (tcp_addr_data->not_connected);
+
+            /* save the successful zone info */
+// fprintf(stderr, "connect test successful for zone %s\n", zone);
+            tcp_method_params.connect_test = 0;
+            tcp_addr_data->zone = zone;
+            tcp_zone = zone;
+            tcp_zone_len = zone_len;
+
+            /* we could drop the connection here if we wanted to */
+        }
+        else  /* client && !connect_test */
+        {
+            /* zone passed in must match saved zone if there is one */
+            if (tcp_zone)
+            {
+// fprintf(stderr,"testing for zone match %s %s\n", zone, tcp_zone);
+                if ((tcp_zone_len != zone_len) ||
+                    (strncmp(tcp_zone, zone, tcp_zone_len)))
+                {
+                    /* does not match zone */
+// fprintf(stderr,"does not match\n");
+                    goto errorout;
+                }
+// fprintf(stderr,"zone match\n");
+                /* zone matches ... */
+            }
+            /* or no zone set so we assume any zone is OK */
+        } /* else */
+#endif
+
+        /* we have success */
+        break;
 
 errorout:
 
-    if (new_data)
-    {
-	dealloc_tcp_method_addr(new_addr);
-    }
-    if (subzone)
-    {
-        free (subzone);
-    }
+        /* frees hostname and zone if they are present */
+        if (new_addr)
+        {
+	    dealloc_tcp_method_addr(new_addr);
+            new_addr = NULL;
+        }
+        if (tcp_string)
+        {
+            free(tcp_string);
+            tcp_string = NULL;
+        }
+
+        hostname = NULL;
+        zone = NULL;
+        zone_len = 0;
+        delim = NULL;
+
+        /* this might skip several non-tcp addrs */
+        /* it mimics what id done at the top of the loop */
+        id_string = strstr(id_string, "tcp");
+        id_string = index(id_string, ',');
+        /* at the top of the loop we'll look for more tcp addrs */
+        if (id_string)
+        {
+            /* found a comma, there are more addresses in the string */
+            id_string++; /* skip the comma */
+        }
+
+    } /* while loop */
+
+    /* either success or not found (new_addr == NULL) */
     if (tcp_string)
     {
         free(tcp_string);
     }
-    return (NULL);
+    return (new_addr);
 }
 
 
@@ -2027,6 +2139,8 @@ static void dealloc_tcp_method_addr(bmi_method_addr_p map)
 
     if (tcp_addr_data->hostname)
 	free(tcp_addr_data->hostname);
+    if (tcp_addr_data->zone)
+	free(tcp_addr_data->zone);
     if (tcp_addr_data->peer)
         free(tcp_addr_data->peer);
 

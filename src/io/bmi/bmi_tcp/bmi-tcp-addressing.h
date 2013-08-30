@@ -56,7 +56,7 @@ struct tcp_addr
     /* stores error code for addresses that are broken for some reason */
     int addr_error;		
     char *hostname;
-    char *subzone;
+    char *zone;
     int port;
     int socket;
     /* flag that indicates this address represents a
