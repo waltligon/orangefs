@@ -1046,6 +1046,7 @@ class OFSTestNode(object):
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
         security_mode=None,
+        ofs_patch_files=[],
         configure_opts="",
         debug=False):
     
@@ -1058,6 +1059,10 @@ class OFSTestNode(object):
         #print cwd
         #ls = self.runSingleCommandBacktick("ls -l")
         #print ls
+        
+        for patch in ofs_patch_files:
+            self.runSingleCommand("patch -c -p1 < %s" % ofs_patch_files)
+        
         rc = self.runSingleCommand("./prepare",output)
         if rc != 0:
             print self.ofs_source_location+"/prepare failed!" 

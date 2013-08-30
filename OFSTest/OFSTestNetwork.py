@@ -2,24 +2,6 @@
 #
 # OFSTestNetwork.py
 #
-# Create the class with three lists of OFSTestNodes
-#
-# Client nodes
-# Server nodes
-# Build nodes
-#
-# We will also always have exactly one local node.
-# Local node
-#
-# Client Nodes: These nodes run the OrangeFS client. All tests are run on all client nodes
-#
-# Server Nodes: These nodes run the OrangeFS server. 
-#
-# Build Nodes: All software is built on the build nodes and copied to other nodes.
-#
-# Local Node: The local machine. May or may not serve any other role.
-#
-#
 
 
 import re
@@ -300,6 +282,7 @@ class OFSTestNetwork(object):
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
         security_mode=None,
+        ofs_patch_files=[],
         configure_opts="",
         make_opts="",
         debug=False):
@@ -343,7 +326,7 @@ class OFSTestNetwork(object):
         if rc != 0:
             return rc
 
-        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,configure_opts=configure_opts,security_mode=security_mode)
+        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode)
         if rc != 0:
             return rc
         

@@ -1,20 +1,77 @@
 #!/usr/bin/python
 
+###############################################################################
+#
+# OFSTestConfig
+# 
+# This class holds the configuration for OrangeFS
+#
+################################################################################
+
+
+
+###############################################################################################'
+#
+# class OFSTestNode(object)
+#
+# OrangeFS is a complex file system with a wide variety of functionality that
+# can run on many different systems in many different configurations. This
+# class holds the variables that control OrangeFS setup and testing
+# 
+################################################################################################
+
 class OFSTestConfig(object):
     
     def __init__(self):
         
-        self.log_file = ""
+        #------------------------------
+        #
+        # setup variables
+        #
+        #------------------------------
+        
+        # name of output logfile
+        self.log_file = "OFSTest.log"
+        
+        # are we using OpenStack/EC2
         self.using_ec2 = False
+        
+        # Location of the ec2rc.sh file
         self.ec2rc_sh = ""
+        
+        # path of ssh key used to acce
         self.ssh_key_filepath = ""
+        
+        # list of differing keypaths if applicable
+        # TODO: Add multikey functionality.
+        self.ssh_key_filepaths = []
+        
+        # Internal ec2 key name. Must be consistant accross nodes.
         self.ec2_key_name = ""
+        
+        # Number of new ec2 nodes to be created. 
+        # If == 0, then using existing nodes.
         self.number_new_ec2_nodes = 0
+        
+        # Image name to be launched for ec2 instance.
+        # Must be consistant across nodes.
         self.ec2_image = ""
+        
+        # ec2 machine type (e.g. m1.medium)
+        # Must be consistant across nodes.
         self.ec2_machine = ""
+        
+        # Should the nodes be deleted after testing?
         self.ec2_delete_after_test = False
+        
+        # list of node ip addresses. If a private network is used, this is the
+        # Internal network.
         self.node_ip_addresses = []
+        
+        # list of addresses accessible from the local machine.
+        # if node_ip_addresses is accessible, this need not be set.
         self.node_ext_ip_addresses = []
+        
         self.node_usernames = []
         self.ofs_resource_location = ""
         self.ofs_resource_type = ""
@@ -31,6 +88,7 @@ class OFSTestConfig(object):
         
         self.ec2_domain=None
         self.ec2_associate_ip=False
+        
         
         #configure options
         
@@ -55,6 +113,7 @@ class OFSTestConfig(object):
         # disable security. Options are "Key" and "Cert"
         self.ofs_security_mode = None
         
+        self.ofs_source_patches=[]
         
         self.svn_username = None
         #self.svn_password = None
@@ -282,5 +341,9 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_security_mode = temp
         
-        
-        
+        temp = d.get('ofs_source_patches')
+        if temp != None:
+            patchlist = temp.split(" ")
+            #print patchlist
+            for patch in patchlist:
+                self.ofs_source_patches.append(node)

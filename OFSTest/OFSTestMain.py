@@ -148,6 +148,7 @@ class OFSTestMain(object):
         enable_shared=self.config.install_shared,
         ofs_prefix=self.config.install_prefix,
         db4_prefix=self.config.db4_prefix,
+        ofs_patch_files=self.config.ofs_patch_files,
         configure_opts=self.config.configure_opts,
         security_mode=self.config.ofs_security_mode,
         debug=self.config.ofs_compile_debug
