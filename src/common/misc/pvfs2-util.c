@@ -1703,7 +1703,7 @@ int PVFS_util_init_defaults(void)
         if (failed_indices[i])
         {
             PVFS_util_remove_internal_mntent(
-                &tab->mntent_array[failed_indices[i]]);
+                          &tab->mntent_array[failed_indices[i]]);
         }
         else
         {

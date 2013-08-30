@@ -1609,13 +1609,8 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 	CFLAGS=$tmp_cflags
 
-        dnl 2.6.27 changed the parameter signature of
-	dnl inode_operations->permission.  Check for this newer two-param style
-        dnl If they don't match, gcc complains about
-	dnl passing argument ... from incompatible pointer type, hence the
-	dnl need for the -Werror and -Wall.
-	dnl tmp_cflags=$CFLAGS
-	dnl CFLAGS="$CFLAGS -Werror -Wall"
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for two param permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -1636,7 +1631,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
 	AC_MSG_RESULT(no)
 	)
-	dnl CFLAGS=$tmp_cflags
+	CFLAGS=$tmp_cflags
 
 
         dnl 2.6.24 changed the constructor parameter signature of

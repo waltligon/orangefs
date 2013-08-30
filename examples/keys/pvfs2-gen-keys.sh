@@ -32,13 +32,13 @@ if [ "$1x" = "-cx" ]; then
 fi
 
 if [ ${#servers[*]} -eq 0 -a ${#clients[*]} -eq 0 ]; then
-    echo "USAGE: $0 [-s <servers...>] [-c <clients...>]"
+    echo "USAGE: $0 [-a] [-s <servers...>] [-c <clients...>]"
     exit 1
 fi
 
 # backup keystore
-if [ $append -ne 1 -a -f keystore ]; then
-    mv keystore keystore.bak
+if [ $append -ne 1 -a -f orangefs-keystore ]; then
+    mv orangefs-keystore orangefs-keystore.bak
 fi
 
 for server in ${servers[*]}
@@ -47,8 +47,8 @@ do
     openssl genrsa -out orangefs-serverkey-${server}.pem 2048
     chmod 600 orangefs-serverkey-${server}.pem
     # append public key to keystore
-    echo "S:${server}" >> keystore
-    openssl rsa -in orangefs-serverkey-${server}.pem -pubout >> keystore
+    echo "S:${server}" >> orangefs-keystore
+    openssl rsa -in orangefs-serverkey-${server}.pem -pubout >> orangefs-keystore
     echo "Created orangefs-serverkey-${server}.pem"
 done
 
@@ -58,9 +58,9 @@ do
     openssl genrsa -out pvfs2-clientkey-${client}.pem 1024
     chmod 600 pvfs2-clientkey-${client}.pem
     # append public key to keystore
-    echo "C:${client}" >> keystore
-    openssl rsa -in pvfs2-clientkey-${client}.pem -pubout >> keystore
+    echo "C:${client}" >> orangefs-keystore
+    openssl rsa -in pvfs2-clientkey-${client}.pem -pubout >> orangefs-keystore
     echo "Created pvfs2-clientkey-${client}.pem"
 done
 
-chmod 600 keystore
+chmod 600 orangefs-keystore

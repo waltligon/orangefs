@@ -853,6 +853,24 @@ int pvfs_close(int fd)
         }
     }
 #endif
+    /* see if we need to clear any mode bits */
+    if (pd->s && pd->s->fsops == &pvfs_ops)
+    {
+        mode_t mode;
+        if (pd->s->clrflags)
+        {
+            iocommon_getmod(pd, &mode);
+            if (pd->s->clrflags & O_CLEAR_READ)
+            {
+                mode &= ~S_IRUSR;
+            }
+            if (pd->s->clrflags & O_CLEAR_WRITE)
+            {
+                mode &= ~S_IWUSR;
+            }
+            iocommon_chmod(pd, mode);
+        }
+    }
 
     /* free descriptor */
     rc = pvfs_free_descriptor(pd->fd);

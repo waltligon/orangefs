@@ -269,6 +269,7 @@
     <ClInclude Include="..\..\..\..\src\common\misc\pint-cached-config.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-eattr.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-hint.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-malloc.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-mem.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-perf-counter.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-util.h" />

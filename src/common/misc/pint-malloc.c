@@ -136,6 +136,10 @@ void clean_free(void *ptr)
 #undef PINT_malloc
 #endif
 
+#ifdef PINT_malloc_minimum
+#undef PINT_malloc_minimum
+#endif
+
 #ifdef calloc
 #undef calloc
 #endif
@@ -290,6 +294,18 @@ static inline int my_glibc_posix_memalign(void **mem,
             return posix_memalign(mem, alignment, size);
         }
     }
+}
+
+void *PINT_malloc_minimum(size_t size)
+{
+    void *mem;
+    mem = my_glibc_malloc(size);
+    if (!mem)
+    {
+        return NULL;
+    }
+    memset(mem, 0, size);
+    return mem;
 }
 
 typedef struct extra_s

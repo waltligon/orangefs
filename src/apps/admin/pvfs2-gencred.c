@@ -409,12 +409,90 @@ static int write_credential(const PVFS_credential *cred,
     return EXIT_SUCCESS;
 }
 
+int allowed(const struct passwd *pwd, const struct group *grp)
+{
+    uid_t uid;
+    gid_t gid;
+    char *filepath;
+    struct stat st;
+    int fd;
+    unsigned long len;
+    char buf[129];
+    char *s, *user, *puser;
+    unsigned long offset;
+    struct passwd pwd_buf;
+    struct passwd *pwd2;
+    char pwd_data_buf[128];
+
+    /* Verify whether the current user is allowed to generate a
+       credential for pwd and grp. Return 0 if allowed.*/
+
+    uid = getuid();
+    gid = getgid();
+    filepath = PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS;
+
+    /* Pass root through. */
+    if (uid == 0 && gid == 0)
+        return 0;
+
+    /* Parse users out of the service user file if root owns it. */
+    if (stat(filepath, &st) == 0)
+        if (st.st_uid == 0) {
+            if ((fd = open(filepath, O_RDONLY)) == -1) {
+                return 1;
+            }
+            offset = 0;
+            while (1) {
+                if ((len = read(fd, buf+offset, 128-offset)) < 0) {
+                    close(fd);
+                    return 1;
+                }
+                if (len == 0)
+                    break;
+                buf[offset+len] = 0;
+                s = buf;
+                user = 0;
+                while (puser = user, user = strsep(&s, " \t\n")) {
+                    if (*user == 0)
+                        continue;
+                    /* A user name has been parsed. */
+                    if (s != 0) {
+                        /* Call getpwnam_r to avoid trouble with
+                           previous call to getpwnam. */
+                        pwd2 = &pwd_buf;
+                        if (getpwnam_r(user, &pwd_buf, pwd_data_buf,
+                                       128, &pwd2) != 0) {
+                            fprintf(stderr, "error: with getpwnam_r\n");
+                            abort();
+                        }
+                        /* User does not exist. */
+                        if (pwd2 == 0)
+                            continue;
+                        if (pwd2->pw_uid == uid) {
+                            close(fd);
+                            return 0;
+                        }
+                    }
+                }
+                if (s == 0) {
+                    strcpy(buf, puser);
+                    offset = strlen(puser);
+                }
+            }
+            close(fd);
+        }
+
+    /* Pass this user through. */
+    if (pwd->pw_uid == uid && grp->gr_gid == gid)
+        return 0;
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     options_t opts;
     const struct passwd *pwd;
     const struct group *grp;
-    uid_t euid;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
     int ngroups;
     PVFS_credential credential;
@@ -500,18 +578,9 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
-    euid = getuid();
-    if (euid && pwd->pw_uid != euid)
-    {
-        fprintf(stderr, "error: only %s and root can generate a credential "
-                "for %s\n", pwd->pw_name, pwd->pw_name);
-        return EPERM;
-    }
-
-    if (euid && grp->gr_gid != getgid())
-    {
-        fprintf(stderr, "error: cannot generate a credential for group %s: "
-                "Permission denied\n", grp->gr_name);
+    if (allowed(pwd, grp) != 0) {
+        fprintf(stderr, "error: cannot generate a credential for user "
+                "%s and group %s\n", pwd->pw_name, grp->gr_name);
         return EPERM;
     }
 
