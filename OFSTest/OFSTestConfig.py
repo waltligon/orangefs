@@ -113,7 +113,7 @@ class OFSTestConfig(object):
         # disable security. Options are "Key" and "Cert"
         self.ofs_security_mode = None
         
-        self.ofs_source_patches=[]
+        self.ofs_patch_files=[]
         
         self.svn_username = None
         #self.svn_password = None
@@ -341,9 +341,9 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_security_mode = temp
         
-        temp = d.get('ofs_source_patches')
+        temp = d.get('ofs_patch_files')
         if temp != None:
             patchlist = temp.split(" ")
             #print patchlist
             for patch in patchlist:
-                self.ofs_source_patches.append(node)
+                self.ofs_patch_files.append(node)

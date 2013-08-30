@@ -74,7 +74,7 @@ class OFSTestMain(object):
 
         if self.config.number_new_ec2_nodes > 0:
             print "===========================================================" 
-            print "Creating %d new EC2/OpenStack Nodes"
+            print "Creating %d new EC2/OpenStack Nodes" % self.config.number_new_ec2_nodes
 
             #print " %d new EC2 nodes" % self.config.number_new_ec2_nodes
             self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
