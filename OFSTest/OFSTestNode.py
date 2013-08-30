@@ -159,7 +159,7 @@ class OFSTestNode(object):
         # berkeley db4 location
         self.db4_dir = "/opt/db4"
         self.db4_lib_dir = self.db4_dir+"/lib"
-        
+        self.ofs_conf_file = None
          
 
     #==========================================================================
@@ -224,6 +224,7 @@ class OFSTestNode(object):
         # Find the distribution. Unfortunately Linux distributions each have their own file for distribution information.
             
         # information for ubuntu and suse is in /etc/os-release
+
         if self.runSingleCommandBacktick('find /etc -name "os-release" 2> /dev/null').rstrip() == "/etc/os-release":
             #print "SuSE or Ubuntu based machine found"
             pretty_name = self.runSingleCommandBacktick("cat /etc/os-release | grep PRETTY_NAME")
@@ -246,7 +247,7 @@ class OFSTestNode(object):
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
         
         
-        
+        # print out node information
         print "Node: %s %s %s %s" % (self.host_name,self.distro,self.kernel_version,self.processor_type)
         
         
@@ -318,8 +319,6 @@ class OFSTestNode(object):
       
     def runSingleCommandBacktick(self,command,output=[],remote_user=None):
         # This runs a single command and returns the stdout of that command.
-        #print command
-          #print command
         if remote_user==None:
             remote_user = self.current_user
       
@@ -344,9 +343,11 @@ class OFSTestNode(object):
             logfile = "%s-%s.log" % (package,test_function.__name__)
         
                 
+        # Run the test function
         rc = test_function(self,output)
 
         try:
+            # write the command, return code, stdout and stderr of last program to logfile
             logfile_h = open(logfile,"w+")
             logfile_h.write('COMMAND:' + output[0]+'\n')
             logfile_h.write('RC: %r\n' % rc)
@@ -384,12 +385,14 @@ class OFSTestNode(object):
         # Then run it
         self.runAllBatchCommands(output)
 
-      # copy files from the current node to a destination node.
+    # copy files from the current node to a destination node.
     def copyToRemoteNode(self,source, destinationNode, destination):
+        # implimented in subclass
         pass
       
-      # copy files from a remote node to the current node.
+    # copy files from a remote node to the current node.
     def copyFromRemoteNode(self,sourceNode, source, destination):
+        # implimented in subclass
         pass
       
     def writeToOutputFile(self,command_line,cmd_out,cmd_err):
@@ -421,7 +424,7 @@ class OFSTestNode(object):
      
      
     def copyLocal(self, source, destination, recursive):
-        # This runs the copy command remotely 
+        # This runs the copy command locally 
         rflag = ""
         # verify source file exists
         if recursive == True:
@@ -446,6 +449,15 @@ class OFSTestNode(object):
     #
     #=============================================================================
     
+    #-------------------------------
+    #
+    # updateNode
+    #
+    # This function updates the software on the node via the package management system
+    #
+    #-------------------------------
+    
+    
     def updateNode(self):
         #print "Distro is " + self.distro
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
@@ -464,6 +476,13 @@ class OFSTestNode(object):
         print "Node "+self.host_name+" at "+self.ip_address+" updated. Rebooting."
         self.runSingleCommandAsBatch("sudo /sbin/reboot")
     
+    #-------------------------------
+    #
+    # installTorqueServer
+    #
+    # This function installs and configures the torque server from the package management system on the node.
+    #
+    #-------------------------------
     def installTorqueServer(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
@@ -601,6 +620,15 @@ class OFSTestNode(object):
         #print batch_commands  
         self.runAllBatchCommands()
             
+    #-------------------------------
+    #
+    # restartTorqueServer
+    #
+    # When installed from the package manager, torque doesn't start with correct options. This restarts it.
+    #
+    #-------------------------------
+
+
     def restartTorqueServer(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsBatch("sudo /etc/init.d/torque-server restart")
@@ -614,7 +642,15 @@ class OFSTestNode(object):
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_sched start")
             
 
-        #self.runAllBatchCommands()
+        
+    #-------------------------------
+    #
+    # restartTorqueMom
+    #
+    # When installed from the package manager, torque doesn't start with correct options. This restarts it.
+    #
+    #-------------------------------
+
     
     def restartTorqueMom(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
@@ -622,6 +658,15 @@ class OFSTestNode(object):
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
               
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
+
+
+    #-------------------------------
+    #
+    # installRequiredSoftware
+    #
+    # This installs all the prerequisites for building and testing OrangeFS from the package management system
+    #
+    #-------------------------------
 
 
     def installRequiredSoftware(self):
@@ -657,19 +702,13 @@ class OFSTestNode(object):
 
             '''
             self.addBatchCommand(batch_commands)
-            #self.addBatchCommand("sudo apt-get install -y -q gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf torque-server torque-scheduler torque-client < /dev/null")
-            #self.addBatchCommand('SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`')
-            #self.addBatchCommand('cd /usr/src/${SOURCENAME}')
-            #self.addBatchCommand('sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null')
-            #self.addBatchCommand('cd ${SOURCENAME}/')
-            #self.addBatchCommand('sudo cp /boot/config-`uname -r` .config')
-            #self.addBatchCommand('sudo make oldconfig &> /dev/null')
-            #self.addBatchCommand('sudo make prepare &>/dev/null')
+            
+            
         elif "suse" in self.distro.lower():
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
             #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
-            #install db4
+            
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
             sudo cp /boot/config-`uname -r` .config
@@ -700,28 +739,39 @@ class OFSTestNode(object):
             '''
             self.addBatchCommand(batch_commands)
 
+        # db4 is built from scratch for all systems to have a consistant version.
         batch_commands = '''
         
-        if [ ! -d /opt/db4 ]
+        if [ ! -d %s ]
         then
             cd ~
             wget -q http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
             tar zxf db-4.8.30.tar.gz &> /dev/null
             cd db-4.8.30/build_unix
             echo "Configuring Berkeley DB 4.8.30..."
-            ../dist/configure --prefix=/opt/db4 &> db4conf.out
+            ../dist/configure --prefix=%s &> db4conf.out
             echo "Building Berkeley DB 4.8.30..."
             make &> db4make.out
-            echo "Installing Berkeley DB 4.8.30 to /opt/db4..."
+            echo "Installing Berkeley DB 4.8.30 to %s..."
             sudo make install &> db4install.out
         fi
         exit
         exit
-        '''
+        ''' % (self.db4_dir,self.db4_dir,self.db4_dir)
         
+        self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
         self.runAllBatchCommands()
-        self.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:$LD_LIBRARY_PATH")
+        self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
+
+    #-------------------------------
+    #
+    # copyOFSSourceFromSVN
+    #
+    # This copies the source from an SVN branch
+    #
+    #-------------------------------
+
 
     def copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword):
     
@@ -753,6 +803,15 @@ class OFSTestNode(object):
         
         
         return rc
+
+
+    #-------------------------------
+    #
+    # install benchmarks
+    #
+    # This downloads and untars the thirdparty benchmarks
+    #
+    #-------------------------------
 
 
     def installBenchmarks(self,tarurl="http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz",dest_dir="",configure_options="",make_options="",install_options=""):
@@ -803,6 +862,16 @@ class OFSTestNode(object):
         #print self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location)
         return 0
     
+    
+    
+    #-------------------------------
+    #
+    # makeFromTarFile
+    #
+    # This is a generic function to ./configure, make, make install a tarball
+    #
+    #-------------------------------
+
     def makeFromTarFile(self,tarurl,dest_dir,configure_options="",make_options="",install_options=""):
         tarfile = os.path.basename(tarurl)
         self.changeDirectory(dest_dir)
@@ -835,6 +904,17 @@ class OFSTestNode(object):
         
         self.runSingleCommand("make "+ make_options)
         self.runSingleCommand("make install "+install_options)
+    
+    
+    #-------------------------------
+    #
+    # copyOFSSourceFromRemoteTarball
+    #
+    # This downloads the source from a remote tarball. Several forms are 
+    # supported
+    #
+    #-------------------------------
+    
     
     def copyOFSSourceFromRemoteTarball(self,tarurl,dest_dir):
     
@@ -882,6 +962,15 @@ class OFSTestNode(object):
         # source_location = /tmp/user/source
         return rc
   
+    #-------------------------------
+    #
+    # copyOFSSourceFromDirectory
+    #
+    # This copies the source from a local directory
+    #
+    #-------------------------------
+
+
     def copyOFSSourceFromDirectory(self,directory,dest_dir):
         rc = 0
         if directory != dest_dir:
@@ -890,6 +979,15 @@ class OFSTestNode(object):
         dest_list = os.path.basename(dest_dir)
         self.ofs_branch = dest_list[-1]
         return rc
+    
+    #-------------------------------
+    #
+    # copyOFSSourceFromSVN
+    #
+    # This copies the source from a remote directory
+    #
+    #-------------------------------
+
       
     def copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
         #implemented in subclass
@@ -913,21 +1011,14 @@ class OFSTestNode(object):
         
         if resource_type == "SVN":
           rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
-        # elseif tarball
         elif resource_type == "TAR":
           rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
         elif resource_type == "REMOTEDIR":
-          # elseif remote_directory
-          # is the resource a hostname or ipaddress?
-          # if hostname, then look up the ip address
-          # check the ipaddress in the key table
-          # if we have it, then copy directory from the remote to the dest_dir, recursively.
-          # create a new node for the remote node.
           self.copyOFSSourceFromRemoteNode(directory,dest_dir)
         elif resource_type == "LOCAL":
-          #Must be "pushed" from local node to current node
-          pass
-          #rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
+            # Must be "pushed" from local node to current node.
+            # Get around this by copying to the buildnode, then resetting type.
+            pass
         elif resource_type == "BUILDNODE":
           # else local directory
           rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
@@ -938,7 +1029,14 @@ class OFSTestNode(object):
         
         return rc
         
-        
+    #-------------------------------
+    #
+    # configureOFSSource
+    #
+    # This prepares the OrangeFS source and runs the configure command.
+    #
+    #-------------------------------
+
       
     def configureOFSSource(self,
         build_kmod=True,
@@ -974,6 +1072,8 @@ class OFSTestNode(object):
         
         configure_opts = configure_opts+" --prefix=%s --with-db=%s" % (ofs_prefix,db4_prefix)
         
+        # various configure options
+        
         if build_kmod == True:
             configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
@@ -986,7 +1086,10 @@ class OFSTestNode(object):
         if enable_fuse == True:
             configure_opts = configure_opts+" --enable-fuse"
         
+        
         if security_mode == None:
+            # no security mode, ignore
+            # must come first to prevent exception
             pass
         elif security_mode.lower() == "key":
             configure_opts = configure_opts+" --enable-security-key"
@@ -994,8 +1097,10 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --enable-security-cert"
         
         rc = self.runSingleCommand("./configure %s" % configure_opts, output)
+        
         # did configure run correctly?
         if rc == 0:
+            # set the OrangeFS installation location to the prefix.
             self.ofs_installation_location = ofs_prefix
         else:
             print "Configuration of OrangeFS at %s Failed!" % self.ofs_source_location
@@ -1003,9 +1108,22 @@ class OFSTestNode(object):
             
 
         return rc
+    
+    #-------------------------------
+    #
+    # checkMount
+    #
+    # This looks to see if a given mountpoint is mounted.
+    # return == 0 => mounted
+    # return != 0 => not mounted
+    #
+    #-------------------------------
+
         
-    def checkMount(self,output=[]):
-        mount_check = self.runSingleCommand("mount | grep %s" % self.ofs_mountpoint,output)
+    def checkMount(self,mountpoint=None,output=[]):
+        if mountpoint == None:
+            mountpoint = self.ofs_mountpoint
+        mount_check = self.runSingleCommand("mount | grep %s" % mountpoint,output)
         '''    
         if mount_check == 0:
             print "OrangeFS mount found: "+output[1]
@@ -1020,6 +1138,15 @@ class OFSTestNode(object):
         pass
         
         
+    #-------------------------------
+    #
+    # makeOFSSource
+    #
+    # This makes the OrangeFS source
+    #
+    #-------------------------------
+
+    
     
     def makeOFSSource(self,make_options=""):
         # Change directory to source location.
@@ -1038,18 +1165,40 @@ class OFSTestNode(object):
             print output
             
         return rc
+    
+    #-------------------------------
+    #
+    # getKernelVerions
+    #
+    # wrapper for uname -r
+    #
+    #-------------------------------
+
+
 
     def getKernelVersion(self):
         #if self.kernel_version != "":
         #  return self.kernel_version
         return self.runSingleCommand("uname -r")
-     
+
+    #-------------------------------
+    #
+    # installOFSSource
+    #
+    # This looks to see if a given mountpoint is mounted
+    #
+    #-------------------------------
       
-    def installOFSSource(self,install_options=""):
+    def installOFSSource(self,install_options="",install_as_root=False):
         self.changeDirectory(self.ofs_source_location)
         output = []
-        rc = self.runSingleCommand("make install",output)
+        if install_as_root == True:
+            rc = self.runSingleCommandAsBatch("sudo make install",output)
+        else:
+            rc = self.runSingleCommand("make install",output)
+        
         if rc != 0:
+            
             print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
             print output
             return rc
@@ -1060,12 +1209,22 @@ class OFSTestNode(object):
         
         return rc
 
+    #-------------------------------
+    #
+    # installOFSTests
+    #
+    # this installs the OrangeFS test programs
+    #
+    #-------------------------------
+
+    
         
     def installOFSTests(self,configure_options=""):
         
         output = []
+        
         if configure_options == "":
-            configure_options = "--with-db=/opt/db4 --prefix=%s" % self.ofs_installation_location
+            configure_options = "--with-db=%s --prefix=%s" % (self.db4_dir,self.ofs_installation_location)
         
  
         
@@ -1088,6 +1247,15 @@ class OFSTestNode(object):
             print output
         return rc
    
+
+    #-------------------------------
+    #
+    # generatePAVConf
+    #
+    # generates the pav.conf file for MPI testing
+    #
+    #-------------------------------
+
 
     def generatePAVConf(self,**kwargs):
         
@@ -1144,16 +1312,35 @@ class OFSTestNode(object):
         #
         #=============================================================================
 
+    #-------------------------------
+    #
+    # copyOFSInstallationToNode
+    #
+    # this copies an entire OrangeFS installation from the current node to destinationNode.
+    # Also sets the ofs_installation_location and ofs_branch on the destination
+    #
+    #-------------------------------
+
+
     def copyOFSInstallationToNode(self,destinationNode):
         rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
         destinationNode.ofs_installation_location = self.ofs_installation_location
         destinationNode.ofs_branch =self.ofs_branch
         return rc
        
+    #-------------------------------
+    #
+    # configureOFSServer
+    #
+    # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf 
+    #
+    #-------------------------------
       
+    
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",security=None):
-        # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
+        
+            
         self.ofs_fs_name=ofs_fs_name
         
         self.changeDirectory(self.ofs_installation_location)
@@ -1205,12 +1392,30 @@ class OFSTestNode(object):
         if rc != 0:
             print "Could not generate orangefs.conf file."
             print output
+            return rc
+        
+        # do we need to copy the file to a new location?
+        if ofs_conf_file == None:
+            self.ofs_conf_file = self.ofs_installation_location+"/etc/orangefs.conf"
+        else:
+            rc = self.copyLocal(self.ofs_installation_location+"/etc/orangefs.conf",ofs_conf_file,False)
+            if rc != 0:
+                print "Could not copy orangefs.conf file to %s. Using %s/etc/orangefs.conf" % (ofs_conf_file,self.ofs_installation_location)
+                self.ofs_conf_file = self.ofs_installation_location+"/etc/orangefs.conf"
+            else:
+                self.ofs_conf_file = ofs_conf_file
         return rc
         
-     
+    #-------------------------------
+    #
+    # startOFSServer
+    #
+    # This function starts the orangefs server
+    #
+    #-------------------------------
         
       
-    def startOFSServer(self):
+    def startOFSServer(self,run_as_root=False):
         
         output = []
         self.changeDirectory(self.ofs_installation_location)
@@ -1235,24 +1440,30 @@ class OFSTestNode(object):
         #self.runSingleCommand("ls -l %s" % self.ofs_installation_location)
         #print "Installation location is %s" % self.ofs_installation_location
         #print "Running command \"grep 'Alias ' %s/etc/orangefs.conf | grep %s | cut -d ' ' -f 2\"" % (self.ofs_installation_location,self.host_name)
+
+        # need to get the alias list from orangefs.conf file
         if self.alias_list == None:
-            self.alias_list = self.getAliasesFromConfigFile(self.ofs_installation_location + "/etc/orangefs.conf")
+            self.alias_list = self.getAliasesFromConfigFile(self.ofs_conf_file)
+
         #aliases = self.runSingleCommandBacktick('grep "Alias " %s/etc/orangefs.conf | grep %s | cut -d " " -f 2' % (self.ofs_installation_location,self.host_name))
+        
         if len(self.alias_list) == 0:
             print "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location
             return -1
-        
+
+        # for all the aliases in the file
         for alias in self.alias_list:
-          # create the storage space, if necessary.
+            # if the alias is for THIS host
             if self.host_name in alias:
+                
                 #self.runSingleCommand("rm -rf %s" % self.ofs_storage_location)
                 #self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
                 #self.runSingleCommand("cat %s/etc/orangefs.conf")
                 
-              
+                # create storage space for the server
                 rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
                 if rc != 0:
-                    #if you could not create, then try deleting and recreating
+                    # If storage space is already there, creating it will fail. Try deleting and recreating.
                     rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -r %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
                     rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
                     if rc != 0:
@@ -1260,9 +1471,14 @@ class OFSTestNode(object):
                         print output
                         return rc
               
-                #now start the server
-               
-                server_start = "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
+                
+                # Are we running this as root? 
+                prefix = "" 
+                if run_as_root == True:
+                    prefix = "sudo LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
+                    
+                    
+                server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
                 print server_start
                 rc = self.runSingleCommandAsBatch(server_start,output)
                 
@@ -1276,9 +1492,9 @@ class OFSTestNode(object):
                 print "Starting OrangeFS servers..."
                 time.sleep(15)
     
-    #   print "Checking to see if OrangeFS servers are running..."
-    #   running = self.runSingleCommand("ps aux | grep pvfs2")
-    #      print running
+        #   print "Checking to see if OrangeFS servers are running..."
+        #   running = self.runSingleCommand("ps aux | grep pvfs2")
+        #      print running
           
         #Now set up the pvfs2tab_file
         self.ofs_mountpoint = "/tmp/mount/orangefs"
@@ -1303,13 +1519,21 @@ class OFSTestNode(object):
         
         # if it's still alive, use kill -9
         
-        #============================================================================
-        #
-        # OFSClientFunctions
-        #
-        # These functions implement functionality for an OrangeFS client
-        #
-        #=============================================================================
+    #============================================================================
+    #
+    # OFSClientFunctions
+    #
+    # These functions implement functionality for an OrangeFS client
+    #
+    #=============================================================================
+    
+    #-------------------------------
+    #
+    # installKernelModule
+    #
+    # This function inserts the kernel module into the kernel
+    #
+    #-------------------------------
 
     def installKernelModule(self):
         
@@ -1324,6 +1548,13 @@ class OFSTestNode(object):
         self.runAllBatchCommands()
         
      
+    #-------------------------------
+    #
+    # startOFSClient
+    #
+    # This function starts the orangefs client
+    #
+    #-------------------------------
     def startOFSClient(self,security=None):
         # Starting the OFS Client is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
@@ -1347,20 +1578,29 @@ class OFSTestNode(object):
         elif security.lower() == "cert":
             pass
 
-        self.addBatchCommand("export LD_LIBRARY_PATH=/opt/db4/lib:%s/lib" % self.ofs_installation_location)
-        self.addBatchCommand("export PVFS2TAB_FILE=%s/etc/orangefstab" % self.ofs_installation_location)
-        self.addBatchCommand("sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
+        
         print "Starting pvfs2-client: "
-        print "sudo LD_LIBRARY_PATH=/opt/db4/lib:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath)
+        print "sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath)
         print ""
+        
+        # start the client 
+        self.addBatchCommand("sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
+        # change the protection on the logfile to 644
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
         #client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         #print "Client log output"
         #print client_log
         
+    #-------------------------------
+    #
+    # mountOFSFilesystem
+    #
+    # This function mounts OrangeFS via kernel module or fuse
+    #
+    #-------------------------------
       
-    def mountOFSFilesystem(self,mount_fuse=False):
+    def mountOFSFilesystem(self,mount_fuse=False,mountpoint=None):
         # Mounting the OFS Filesystem is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
         '''
@@ -1376,19 +1616,28 @@ class OFSTestNode(object):
         '''
         output = []
         
-        
+        # is the filesystem already mounted?
         rc = self.checkMount(output)
         if rc == 0:
             print "OrangeFS already mounted at %s" % output[1]
             return
-        if self.ofs_mountpoint == "":
+        
+        # where is this to be mounted?
+        if mountpoint != None:
+            self.ofs_mountpoint = mountpoint
+        elif self.ofs_mountpoint == "":
             self.ofs_mountpoint = "/tmp/mount/orangefs"
+
+        # create the mountpoint directory    
         self.runSingleCommand("mkdir -p %s" % self.ofs_mountpoint)
+        
+        # mount with fuse
         if mount_fuse == True:
             print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
             self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
+        #mount with kmod
         else:
             print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
             self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint))
@@ -1397,11 +1646,27 @@ class OFSTestNode(object):
         print "Waiting 30 seconds for mount"            
         time.sleep(30)
 
-
+    #-------------------------------
+    #
+    # mountOFSFilesystem
+    #
+    # This function unmounts OrangeFS. Works for both kmod and fuse
+    #
+    #-------------------------------
+    
     def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mountpoint
         self.addBatchCommand("sudo umount %s" % self.ofs_mountpoint)
         self.addBatchCommand("sleep 10")
+
+    #-------------------------------
+    #
+    # stopOFSClient
+    #
+    # This function stops the orangefs client
+    #
+    #-------------------------------
+    
 
     def stopOFSClient(self):
         
@@ -1425,6 +1690,14 @@ class OFSTestNode(object):
         self.runAllBatchCommands()
         
     
+    #-------------------------------
+    #
+    # setupMPIEnvironment
+    #
+    # This function sets up the environment for MPI testing
+    #
+    #-------------------------------
+    
         
     def setupMPIEnvironment(self):
         
@@ -1442,10 +1715,19 @@ class OFSTestNode(object):
         self.addBatchCommand("cp -ar %s/soft/mpich2 ${CLUSTER_DIR}" % self.ofs_source_location)
         self.addBatchCommand("cp -ar %s ${CLUSTER_DIR}/pvfs2" % self.ofs_installation_location)
         self.runAllBatchCommands()
+    
+    #-------------------------------
+    #
+    # installMPICH2
+    #
+    # This function installs mpich2 software
+    #
+    #-------------------------------
+    
 
     def installMpich2(self,location=None):
         if location == None:
-            location = "/tmp/%s/mpich2" % self.current_user
+            location = "/home/%s/mpich2" % self.current_user
             
         url = "http://devorange.clemson.edu/pvfs/mpich2-1.5.tar.gz"
         # just to make debugging less painful
@@ -1492,7 +1774,7 @@ class OFSTestNode(object):
             print "Make of MPICH failed."
             self.changeDirectory(tempdir)
             return rc
-        
+
         rc = self.runSingleCommand("make install > mpich2install-${CVSTAG} 2> /dev/null" % self.ofs_branch)
         if rc != 0:
             print "Install of MPICH failed."
@@ -1500,44 +1782,6 @@ class OFSTestNode(object):
             return rc
         
         return 0
-
-        #============================================================================
-        #
-        # OFSTestFunctions
-        #
-        # These functions implement functionality to test the OFSSystem Move??? Yes!
-        #
-        #=============================================================================
-      
-    def setAutomatedTestEnvironment(self):
-        # This function sets the environment for an automated test to run.PVFS2_MOUNTPOINT=/tmp/ubuntu/pvfs2-nightly/20130415/branches/stable/mount
-        #self.setEnvironmentVariable("USERLIB_SCRIPTS","%s/userint-tests.d" % self.ofs_installation_location)
-        #self.setEnvironmentVariable("SYSINT_SCRIPTS","%s/sysint-tests.d" % self.ofs_installation_location)
-        #self.setEnvironmentVariable("VFS_SCRIPTS","%s/vfs-tests.d" % self.ofs_installation_location)
-        #self.setEnvironmentVariable("LOGNAME",self.current_user)
-        #self.setEnvironmentVariable("SVNBRANCH",self.ofs_branch)
-        self.setEnvironmentVariable("PVFS2_MOUNTPOINT",self.ofs_mountpoint)
-        self.setEnvironmentVariable("PVFS2_DEST",self.ofs_installation_location)
-        self.setEnvironmentVariable("EXTRA_TESTS",self.ofs_extra_tests_location)
-        
-        
-        
-
-        pass
-      
-
-      
-
-    def runGroupTest(self,test_group):
-        pass
-     
-    def runSingleTest(self,test_group,test_name):
-        pass
-
-    def runAllTests(self):
-        pass
-      
- 
 
 
     
