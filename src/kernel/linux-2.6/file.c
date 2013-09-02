@@ -509,11 +509,11 @@ populate_shared_memory:
         goto out;
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag(%d)\n"
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag (%llu)\n"
                                   ,__func__
                                   ,rw->fnstr
                                   ,llu(rw->pvfs2_inode->refn.handle)
-                                  ,(int)new_op->tag);
+                                  ,llu(new_op->tag));
 
     /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
@@ -2533,7 +2533,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * as the case may be.
          */
         gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation aio_cancel "
-                     "(tag %lld, op %p)\n", __func__, lld(op->tag), op);
+                     "(tag %llu, op %p)\n", __func__, llu(op->tag), op);
         pvfs2_clean_up_interrupted_operation(op);
         /* 
          * However, we need to make sure that 
@@ -2601,7 +2601,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
             op->priv = NULL;
             spin_unlock(&op->lock);
             gossip_debug(GOSSIP_FILE_DEBUG, "Trying to cancel operation in "
-                    " progress %ld\n", (unsigned long) op->tag);
+                    " progress %llu\n", llu(op->tag));
             /* 
              * if operation is in progress we need to send 
              * a cancellation upcall for this tag 
