@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2012 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  *
@@ -7,19 +7,100 @@
  *
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include <openssl/pem.h>
 
 #include "pint-util.h"
 
 #include "client-service.h"
 #include "cred.h"
-#include "key.h"
 
 extern PORANGEFS_OPTIONS goptions;
 
+int sign_credential(const char *key_file, 
+                    PVFS_credential *cred)
+{
+    FILE *fkey;
+    EVP_PKEY *privkey;
+    const EVP_MD *md;
+    EVP_MD_CTX mdctx;
+    int ret;
+
+    if (key_file == NULL || cred == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* TODO: cache key in goptions */
+
+    /* read in client private key */
+    fkey = fopen(key_file, "r");
+    if (fkey == NULL)
+    {
+        return -PVFS_ENOENT;
+    }
+
+    privkey = PEM_read_PrivateKey(fkey, NULL, NULL, NULL);
+
+    fclose(fkey);
+
+    if (privkey == NULL)
+    {
+        /* TODO */
+        return -PVFS_ESECURITY;
+    }
+
+    /* sign credential using private key */
+    cred->signature = (PVFS_signature) malloc(EVP_PKEY_size(privkey));
+    if (cred->signature == NULL)
+    {
+        EVP_PKEY_free(privkey);
+        return -PVFS_ENOMEM;
+    }
+
+    md = EVP_sha1();
+    EVP_MD_CTX_init(&mdctx);
+
+    ret = EVP_SignInit_ex(&mdctx, md, NULL);
+    ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(&mdctx, cred->group_array, 
+                          cred->num_groups * sizeof(PVFS_gid));
+    ret &= EVP_SignUpdate(&mdctx, cred->issuer, 
+                          strlen(cred->issuer) * sizeof(char));
+    ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    if (!ret)
+    {
+        /* TODO */
+        free(cred->signature);
+        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_PKEY_free(privkey);
+        return -PVFS_ESECURITY;
+    }
+    ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size, privkey);
+    if (!ret)
+    {
+        /* TODO */
+        free(cred->signature);
+        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_PKEY_free(privkey);
+        return -PVFS_ESECURITY;
+    }
+
+    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_PKEY_free(privkey);
+
+    return 0;
+}
+
+
 /* initialize and sign credential - credential must be allocated */ 
-int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
+int init_credential(PVFS_uid uid,
+                    PVFS_gid group_array[],
+                    uint32_t num_groups,
                     PVFS_credential *cred)
 {
     int ret = 0;
@@ -63,7 +144,7 @@ int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
 
         if (goptions->security_mode == SECURITY_MODE_KEY)
         {
-            if ((ret = key_sign_credential(cred)) != 0)
+            if ((ret = sign_credential(goptions->key_file, cred)) != 0)
             {
                 cleanup_credential(cred);
             }
@@ -71,7 +152,7 @@ int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
     }
     else
     {
-        /* TODO */
+        /* certificate mode--mapped by server */
     }
 
     return ret;

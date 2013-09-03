@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -328,11 +328,11 @@ static unsigned int get_profile_dir(HANDLE huser,
     return 0;
 }
 
-/* retrieve OrangeFS credential from cert */
-int get_cert_credential(HANDLE huser,
-                         char *userid,
-                         PVFS_credential *credential,
-                         ASN1_UTCTIME **expires)
+/* retrieve OrangeFS credential from proxy cert */
+int get_proxy_cert_credential(HANDLE huser,
+                              char *userid,
+                              PVFS_credential *credential,
+                              ASN1_UTCTIME **expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
          cert_pattern[MAX_PATH];
@@ -345,11 +345,11 @@ int get_cert_credential(HANDLE huser,
     size_t err_size;
     char error_msg[256], errstr[256];
 
-    DbgPrint("   get_cert_credential: enter\n");
+    DbgPrint("   get_proxy_cert_credential: enter\n");
     
     if (userid == NULL || credential == NULL || expires == NULL)
     {
-        DbgPrint("   get_cert_credential: invalid parameter\n");
+        DbgPrint("   get_proxy_cert_credential: invalid parameter\n");
         return -1;
     }
 
@@ -426,6 +426,7 @@ int get_cert_credential(HANDLE huser,
             if (ret == 0) 
                 sk_X509_push(chain, chain_cert);
         }
+
         if (ret != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "Error loading cert %s. See "
@@ -498,7 +499,21 @@ get_cert_credential_exit:
     if (ca_cert != NULL)
         X509_free(ca_cert);
 
-    DbgPrint("   get_cert_credential: exit\n");
+    DbgPrint("   get_proxy_cert_credential: exit\n");
+
+    return ret;
+}
+
+/* retrieve OrangeFS credential from user cert */
+int get_user_cert_credential(HANDLE huser,
+                             char *userid,
+                             PVFS_credential *credential,
+                             ASN1_UTCTIME **expires)
+{
+    /* 1. build certificate/keyfile path--profile or cert-dir
+       2. fill in fields (append certificate data to credential)
+       3. sign credential */
+    int ret = 0;
 
     return ret;
 }

@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -58,7 +58,6 @@ typedef struct
     int cert_mode;
     char cert_dir_prefix[MAX_PATH];
     char ca_file[MAX_PATH];
-    char cert_file[MAX_PATH];
     LDAP_OPTIONS ldap;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
 
