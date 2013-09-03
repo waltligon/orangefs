@@ -26,7 +26,6 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-lookup.c \
 	$(DIR)/sys-truncate.c \
 	$(DIR)/sys-io.c \
-	$(DIR)/sys-small-io.c \
 	$(DIR)/sys-create.c \
 	$(DIR)/sys-mkdir.c \
 	$(DIR)/sys-remove.c \
@@ -52,8 +51,10 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-remove-dirent.c \
 	$(DIR)/mgmt-create-dirent.c \
 	$(DIR)/mgmt-get-dirdata-handle.c \
-        $(DIR)/mgmt-get-uid-list.c \
+	$(DIR)/mgmt-get-uid-list.c \
 	$(DIR)/mgmt-get-dirdata-array.c
+
+#	$(DIR)/sys-small-io.c \
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

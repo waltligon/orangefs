@@ -349,7 +349,7 @@ struct PVFS_servreq_remove
 };
 endecode_fields_3a_struct(
     PVFS_servreq_remove,
-    PVFS_credential, credential;
+    PVFS_credential, credential,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
@@ -968,8 +968,8 @@ struct PVFS_servreq_mkdir
 };
 endecode_fields_7_struct(
     PVFS_servreq_mkdir,
-    PVFS_fs_id, fs_id;
-    int32_t, num_dirent_files_req,
+    PVFS_fs_id, fs_id,
+    int32_t, num_dirent_files,
     PVFS_handle, handle,
     PVFS_handle, parent,
     PVFS_SID, parent_sid,
@@ -1038,7 +1038,7 @@ endecode_fields_6aa_struct(
     PVFS_handle, new_handle,
     PVFS_handle, handle,
     PVFS_handle, dirent_handle,
-    PVFS_fs_id, fs_id;
+    PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, new_sid_array,
     PVFS_SID, sid_array);

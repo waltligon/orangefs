@@ -10,8 +10,8 @@
 #include <db.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pvfs2-types.h>
-#include <pvfs3-handle.h>
+#include "pvfs2-types.h"
+#include "pvfs3-handle.h"
 #include "sidcacheval.h"
 #include "sid.h"
 
@@ -61,9 +61,39 @@ extern DBC    *SID_attr_cursor[SID_NUM_ATTR];
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*
  * This function initializes a SID_cacheval_t struct to default values
-*/
-void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
+ */
+extern void SID_cacheval_init(SID_cacheval_t **cacheval_t);
 
+/*
+ * This function creates a SID_cacheval_t struct with the attributes that are passed to
+ * this function by dynamically creating the SID_cacheval_t. The url attribute cannot
+ * be null otherwise the SID_cacheval_t is not dynamically created
+ *
+ * Returns 0 on success, otherwise -1 is returned
+ */
+extern int SID_cacheval_alloc(SID_cacheval_t **cacheval_t,
+                       int sid_attributes[], 
+                       BMI_addr sid_bmi,
+                       char *sid_url);
+
+/*
+ * This function clean up a SID_cacheval_t struct by freeing the dynamically
+ * created SID_cacheval_t struct
+*/
+extern void SID_cacheval_free(SID_cacheval_t **cacheval_t);
+
+/*
+ * This function packs up the data for the SID_cacheval_t to store in the
+ * sid cache
+ */
+extern void SID_cacheval_pack(SID_cacheval_t *the_sids_attrs, DBT *data);
+
+/*
+ * This function unpacks the data recieved from the database, mallocs the 
+ * SID_cacheval_t struct, and sets the values inside of the SID_cacheval_t 
+ * struct with the data retrieved from the database
+ */
+extern void SID_cacheval_unpack(SID_cacheval_t **the_sids_attrs, DBT *data);
 
 /* <======================= SID CACHE FUNCTIONS =======================> */
 /*
@@ -71,30 +101,30 @@ void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
  * number of sids in the file is returned though the parameter db_records
  * 
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_load_sid_cache_from_file(DB **dbp,
-                                 const char *file_name, 
-                                 int *db_records);
+ */
+extern int SID_cache_load(DB **dbp,
+                   const char *file_name, 
+                   int *db_records);
 
 /*
  * This function dumps the contents of the sid cache in ASCII to the file
  * specified through the outpfile parameter
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_dump_sid_cache_to_file(DB **dbp,
-                               const char *file_name,
-                               int db_records);
+ */
+extern int SID_cache_store(DB **dbp,
+                    const char *file_name,
+                    int db_records);
 
 /*
  * This function stores the sid into the sid cache
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_store_sid_into_sid_cache(DB **dbp,
-                                 PVFS_SID *sid_server,
-                                 SID_cacheval_t *cacheval_t, 
-                                 int *db_records);
+ */
+extern int SID_cache_add_server(DB **dbp,
+                         PVFS_SID *sid_server,
+                         SID_cacheval_t *cacheval_t, 
+                         int *db_records);
 
 /*
  * This function searches for a sid in the sid cache. The sid  value
@@ -103,32 +133,19 @@ int SID_store_sid_into_sid_cache(DB **dbp,
  * in the database for the sid if it is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_retrieve_sid_from_sid_cache(DB **dbp,
-                                    PVFS_SID *sid_server,
-                                    SID_cacheval_t **cacheval_t);
+ */
+extern int SID_cache_lookup_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            SID_cacheval_t **cacheval_t);
 
 /*
  * This function searches for a sid in the sid cache, retrieves the struct,
  * malloc's the char * passed in, and copies the bmi address of the retrieved
  * struct into that char *.
  */
-int SID_bmi_lookup_from_sid_cache(DB **dbp,
-                                  PVFS_SID *search_sid,
-                                  char **bmi_addr);
-
-/*
- * This function packs up the data for the SID_cacheval_t to store in the
- * sid cache
-*/
-void SID_pack_SID_cacheval_data(SID_cacheval_t *the_sids_attrs, DBT *data);
-
-/*
- * This function unpacks the data recieved from the database, mallocs the 
- * SID_cacheval_t struct, and sets the values inside of the SID_cacheval_t 
- * struct with the data retrieved from the database
-*/
-void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data);
+extern int SID_cache_lookup_bmi(DB **dbp,
+                         PVFS_SID *search_sid,
+                         char **bmi_addr);
 
 /*
  * This function updates the sid in the sid cache to all the new values 
@@ -137,71 +154,59 @@ void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data);
  * is found in the sid cache
  *
  * Returns 0 on success, otherwise returns an error 
-*/
-int SID_update_sid_in_sid_cache(DB **dbp,
-                                PVFS_SID *sid_server,
-                                SID_cacheval_t *new_attrs);
+ */
+extern int SID_cache_update_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            SID_cacheval_t *new_attrs);
 
 /*
  * This function updates the attributes for a sid in the database if a sid
  * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_update_attributes_in_sid(DB **dbp,
-                                 PVFS_SID *sid_server,
-                                 SID_cacheval_t *current_sid_attrs, 
-                                 int new_attr[]);
+ */
+extern int SID_cache_update_attrs(DB **dbp,
+                           PVFS_SID *sid_server,
+                           int new_attr[]);
+
+extern int SID_cache_copy_attrs(SID_cacheval_t *current_sid_attrs, 
+                         int new_attr[]);
 
 /*
  * This function updates the bmi address for a sid in the database if a sid
  * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_update_bmi_address_in_sid(DB **dbp,
-                                  PVFS_SID *sid_server,
-                                  SID_cacheval_t *current_sid_attrs, 
-                                  BMI_addr new_bmi_addr);
+ */
+extern int SID_cache_update_bmi(DB **dbp,
+                         PVFS_SID *sid_server,
+                         BMI_addr new_bmi_addr);
+
+extern int SID_cache_copy_bmi(SID_cacheval_t *current_sid_attrs, 
+                       BMI_addr new_bmi_addr);
 
 /*
  * This function updates the url address for a sid in the database if a sid
  * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_update_url_in_sid(DB **dbp,
-                          PVFS_SID *sid_server,
-                          SID_cacheval_t **current_sid_attrs, 
-                          char *new_url);
+ */
+extern int SID_cache_update_url(DB **dbp,
+                         PVFS_SID *sid_server,
+                         char *new_url);
+
+extern int SID_cache_copy_url(SID_cacheval_t **current_sid_attrs, 
+                       char *new_url);
 
 /*
  * This function deletes a record from the sid cache if a sid with a matching
  * sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code 
-*/
-int SID_delete_sid_from_sid_cache(DB **dbp,
-                                  PVFS_SID *sid_server,
-                                  int *db_records);
-
-/*
- * This function creates a SID_cacheval_t struct with the attributes that are passed to
- * this function by dynamically creating the SID_cacheval_t. The url attribute cannot
- * be null otherwise the SID_cacheval_t is not dynamically created
- *
- * Returns 0 on success, otherwise -1 is returned
-*/
-int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t,
-                              int sid_attributes[], 
-                              BMI_addr sid_bmi,
-                              char *sid_url);
-
-/*
- * This function clean up a SID_cacheval_t struct by freeing the dynamically
- * created SID_cacheval_t struct
-*/
-void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t);
+ */
+extern int SID_cache_delete_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            int *db_records);
 
 /*
  * This function retrieves entries from a primary database and stores them into a
@@ -217,55 +222,59 @@ void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t);
  *
  * If the cache is larger than the buffer, the entry that does not fit is saved in
  * bulk_next_key global variable.
-*/
-int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb,
+ */
+extern int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb,
                                      int size_of_retrieve_mb, 
                                      DB *dbp,
                                      DBC **dbcursorp,
                                      DBT *output);
 
 /*
- * This function inserts entries from the input bulk buffer DBT into a database.
+ * This function inserts entries from the input bulk buffer DBT
+ * into a database.
  *
  * The function uses the output from SID_bulk_retrieve as its input.
  *
  * The malloc'ed bulk buffer DBT's are freed at the end of this function.
-*/
-int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input);
+ */
+extern int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input);
 
 
 /* <======================== DATABASE FUNCTIONS =======================> */
 /* 
  * The functions zeros out the database types key and data values so they
  * are initialized before they are used
+ */
+extern void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey);
+
+
+/*
+***********************************************************************
+* The following is the order in which the functions should be called to
+* the open the sidcache:                                              
+* 1. SID_create_open_environment (
+*                    If an environment is not needed then this function 
+*                    can be skipped and the environment variable can be
+*                    passed as NULL to rest of the database functions) 
+* 2. SID_create_open_sid_cache
+* 3. SID_create_open_assoc_sec_dbs
+* 4. SID_create_open_dbcs        
+***********************************************************************
 */
-void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey);
-
-
-/*************************************************************************************
-* The following is the order in which the functions should be called to              *
-* the open the sidcache:                                                             *
-* 1. SID_create_open_environment (If an environment is not needed then this function *
-*                                 can be skipped and the environment variable can be *
-*                                 passed as NULL to rest of the database functions)  *
-* 2. SID_create_open_sid_cache                                                       *
-* 3. SID_create_open_assoc_sec_dbs                                                   *
-* 4. SID_create_open_dbcs                                                            *
-*************************************************************************************/
 /*
  * This function creates and opens the environement handle
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_create_open_environment(DB_ENV **envp);
+ */
+extern int SID_create_open_environment(DB_ENV **envp);
 
 /*
  * This function creates and opens the primary database handle, which
  * has the DB_HASH as the access method
  *
  * Returns 0 on success, otherwise returns an error code 
-*/
-int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
+ */
+extern int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
 
 /*
  * This function creates, opens, and associates the secondary attribute
@@ -275,8 +284,8 @@ int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
  * the same key values
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
+ */
+extern int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
                                   DB *dbp,
                                   DB *secondary_dbs[], 
                                   int (* secdbs_callback_functions[])(
@@ -290,8 +299,8 @@ int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
  * attribute databases in the database cursor pointer array
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
+ */
+extern int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
 
 
 /************************************************************************
@@ -304,16 +313,16 @@ int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
  * This function closes the database cursors in the cursors pointer array
  * 
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_close_dbcs(DBC *db_cursors[]);
+ */
+extern int SID_close_dbcs(DBC *db_cursors[]);
 
 /*
  * This function closes the primary database, secondary attribute databases,
  * and environment handles
  *
  * Returns 0 on success, otherwise returns an error code
-*/
-int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[]);
+ */
+extern int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[]);
 
 #endif /* SIDCACHE_H */
 

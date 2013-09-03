@@ -13,7 +13,7 @@
 #define PATH_H 1
 
 #include <stdio.h>
-#include <pvfs2.h>
+#include "pvfs2.h"
 
 #define PVFS_PATH_MAGIC (0xfafbfcfdfefff000)
 #define PVFS_PATH_QUALIFIED (0x001)
@@ -103,7 +103,7 @@ static __inline__ PVFS_path_t *PVFS_new_path(const char *orig_path)
     newp->orig_path = (char *)orig_path;
     newp->pvfs_path = NULL;
     newp->fs_id = 0;
-    newp->handle = 0;
+    newp->handle = PVFS_HANDLE_NULL;
     newp->filename = NULL;
     return newp;
 }

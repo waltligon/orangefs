@@ -62,20 +62,46 @@ typedef struct SID_server_list_s
     struct qlist_head link;
 } SID_server_list_t;
 
+extern SID_policy_t SID_policies[]; /* defined in compiled policy files */
+
+#define PVFS_POLICY_MAX 10 /* FIXME */
+
 int SID_get_attr (DB *pri,
                   const DBT *pkey,
                   const DBT *pdata,
                   DBT *skey,
                   int attr_ix);
 
+int SID_do_join(SID_policy_t *policy, DBC **join_curs);
+
+int SID_join_count(DBC *join_curs, int *count);
+
+int SID_first_record(SID_policy_t *policy,
+                     DBC **join_curs,
+                     DBT *key,
+                     DBT *value);
+
+int SID_next_record(SID_policy_t *policy,
+                    DBC **join_curs,
+                    DBT *key,
+                    DBT *value);
+
+void SID_clear_selected(int size);
+
+int SID_is_selected(int value);
+
+void SID_select(int value);
+
+int SID_cmp(SID_cmpop_t cmpop, int v1, int v2);
+
+int SID_add_query_list(SID_server_list_t *sid_list,
+                       DBT *key,
+                       DBT *value);
+
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
                        int *copies,
                        SID_server_list_t *sid_list);
-
-extern SID_policy_t SID_policies[]; /* defined in compiled policy files */
-
-#define PVFS_POLICY_MAX 10 /* FIXME */
 
 #endif
 

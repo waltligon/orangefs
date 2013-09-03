@@ -23,6 +23,7 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-util.h"
 #include "pvfs2-request.h"
+#include "pvfs3-handle.h"
 
 #endif /* __PVFS2_H */
 

@@ -1777,8 +1777,8 @@ static int dbpf_keyval_do_remove(
     db_key.flags = DB_DBT_USERMEM;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "keyval_db->del(handle= %llu, type = %c, key= %*s (%d)) size=%d\n",
-                 PVFS_OID_str(key_entry.handle),
+                 "keyval_db->del(handle= %s, type = %c, key= %*s (%d)) size=%d\n",
+                 PVFS_OID_str(&key_entry.handle),
                  key_entry.type,
                  key->buffer_sz,
                  key_entry.key,

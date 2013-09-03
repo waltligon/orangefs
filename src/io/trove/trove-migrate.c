@@ -75,6 +75,7 @@ static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
 static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
                                      const char* data_path,
                                      const char* meta_path);
+#endif
 
 /*
  * Migration Table
@@ -98,8 +99,8 @@ struct migration_s
 struct migration_s migration_table[] =
 {
 /*    { 0, 1, 3, migrate_collection_0_1_3 },
-    { 0, 1, 4, migrate_collection_0_1_4 }, */
-    { 0, 1, 5, migrate_collection_0_1_5 },
+    { 0, 1, 4, migrate_collection_0_1_4 },
+    { 0, 1, 5, migrate_collection_0_1_5 }, */
     { 0, 0, 0, NULL }
 };
 
@@ -976,7 +977,7 @@ static DB *dbpf_db_open(
     return db_p;
 }
 
-
+#if 0
 /*
  * write_distdir_keyvals_0_1_5
  *
@@ -1472,4 +1473,4 @@ context=%lld\n",
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s:exit.\n ", __func__);
     return ret;
 }
->>>>>>> .merge-right.r9977
+#endif

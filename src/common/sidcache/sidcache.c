@@ -2,17 +2,17 @@
  * (C) 2012 Clemson University
  *
  * See COPYING in top-level directory.
-*/
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <pvfs3-handle.h>
-#include <pvfs2-debug.h>
-#include <gossip.h>
-#include <server-config-mgr.h>
+#include "gossip.h"
+#include "pvfs2-debug.h"
+#include "pvfs3-handle.h"
 #include "sidcache.h"
+#include "server-config-mgr.h"
 
 /* Length of string representation of PVFS_SID */
 /* #define SID_STR_LEN (37) in sidcache.h */
@@ -48,7 +48,7 @@ DB_TXN *SID_txn;                    /* Main transaction variable */
 /* <========================= STATIC FUNCTIONS ============================> */
 static int SID_initialize_secondary_dbs(DB *secondary_dbs[]);
 static int SID_initialize_database_cursors(DBC *db_cursors[]);
-static int SID_parse_input_file_header(FILE *inpfile, int *records_in_file);
+static int SID_cache_parse_header(FILE *inpfile, int *records_in_file);
 
 /* <====================== INITIALIZATION FUNCTIONS =======================> */
 
@@ -59,7 +59,7 @@ static int SID_parse_input_file_header(FILE *inpfile, int *records_in_file);
  * On success 0 is returned, otherwise the index that is not equal to NULL
  * is returned unless the index is 0, then -1 is returned
  */
-int SID_initialize_secondary_dbs(DB *secondary_dbs[])
+static int SID_initialize_secondary_dbs(DB *secondary_dbs[])
 {
     int ret =  0;
     int i = 0;
@@ -90,7 +90,7 @@ int SID_initialize_secondary_dbs(DB *secondary_dbs[])
  * On success 0 is returned, otherwise the index that is not equal to NULL
  * is returned unless the index is 0, then -1 is returned
  */
-int SID_initialize_database_cursors(DBC *db_cursors[])
+static int SID_initialize_database_cursors(DBC *db_cursors[])
 {
     int ret = 0;
     int i = 0;
@@ -115,13 +115,85 @@ int SID_initialize_database_cursors(DBC *db_cursors[])
     return(ret);
 }
 
+/* <====================== SID_cacheval_t FUNCTIONS =======================> */
+
 /*
  * This function initializes a SID_cacheval_t struct to default values
 */
-void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t)
+void SID_cacheval_init(SID_cacheval_t **cacheval)
 {
-    memset((*cacheval_t)->attr, -1, (sizeof(int) * SID_NUM_ATTR));
-    memset(&((*cacheval_t)->bmi_addr), -1, sizeof(BMI_addr));
+    memset((*cacheval)->attr, -1, (sizeof(int) * SID_NUM_ATTR));
+    memset(&((*cacheval)->bmi_addr), -1, sizeof(BMI_addr));
+}
+
+/** HELPER - assigns DBT for cacheval
+ *
+ * This function marshalls the data for the SID_cacheval_t to store in the 
+ * sidcache
+*/
+void SID_cacheval_pack(SID_cacheval_t *cacheval, DBT *data)
+{
+    data->data = cacheval;
+    data->size = (sizeof(int) * SID_NUM_ATTR) +
+                 sizeof(BMI_addr) +
+                 strlen(cacheval->url) +
+                 1;
+}
+
+/* HELPER - LOADS cacheval
+ *
+ * This function creates a SID_cacheval_t struct with the
+ * attributes that are passed to
+ * this function by dynamically creating the SID_cacheval_t.
+ * The url attribute cannot
+ * be null otherwise the SID_cacheval_t is not dynamically created
+ *
+ * Returns 0 on success, otherwise -1 is returned
+ */
+int SID_cacheval_alloc(SID_cacheval_t **cacheval,
+                              int sid_attributes[],
+                              BMI_addr sid_bmi,
+                              char *sid_url)
+{
+    if(!sid_url)
+    {
+        gossip_err("The url passed to SID_cacheval_alloc is NULL\n");
+        *cacheval = NULL;
+        return(-1);
+    }
+
+    /* Mallocing space for the SID_cacheval_t struct */
+    *cacheval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) +
+                                          (strlen(sid_url) + 1));
+    SID_cacheval_init(cacheval);
+    
+    /* Setting the values of the SID_cacheval_t struct */    
+    memcpy((*cacheval)->attr, sid_attributes, (sizeof(int) * SID_NUM_ATTR));
+    memcpy(&((*cacheval)->bmi_addr), &sid_bmi, sizeof(BMI_addr));
+    strncpy((*cacheval)->url, sid_url, (strlen(sid_url) + 1));
+
+    return(0);
+}
+
+/*
+ * This function clean up a SID_cacheval_t struct by freeing the dynamically
+ * created SID_cacheval_t struct
+ */
+void SID_cacheval_free(SID_cacheval_t **cacheval_t)
+{
+    free(*cacheval_t);
+}
+
+/** HELPER - copies cacheval out of DBT
+ *
+ * This function unpacks the data recieved from the database, mallocs the 
+ * SID_cacheval_t struct, and sets the values inside of the SID_cacheval_t 
+ * struct with the data retrieved from the database
+ */
+void SID_cacheval_unpack(SID_cacheval_t **cacheval, DBT *data)
+{              
+    *cacheval = malloc(data->size);
+    memcpy(*cacheval, data->data, data->size);
 }
 
 /* <====================== SID CACHE FUNCTIONS ============================> */
@@ -140,7 +212,7 @@ void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t)
  * The attr_position array is malloced inside of this file and is freed
  * inside the close_dbs_env function
  */
-int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
+static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
 {
     int i = 0, j = 0;             /* Loop index variables */
     char **attrs_strings;         /* Strings of the attributes in the file */
@@ -228,7 +300,8 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
         {
             gossip_debug(GOSSIP_SIDCACHE_DEBUG, 
                          "Attribute: %s is an invalid attribute, "
-                         "and it will not be added\n", attrs_strings[i]);
+                         "and it will not be added\n",
+                         attrs_strings[i]);
             attr_positions[i] = -1;
             valid_attrs_in_file--;
         }
@@ -244,18 +317,17 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
     return(0);
 }
 
-
-
 /** SID_LOAD
  *
- * This function loads the contents of the sid cache from a input file. The
- * number of sids in the file is returned through the parameter db_records
+ * This function loads the contents an input file into the cache.
+ * SID records in the file are added to the current contents of the
+ * cache.  Duplicates are ...
  *
  * Returns 0 on success, otherwise returns an error code
+ * The number of sids in the file is returned through the
+ * parameter db_records.
  */
-int SID_load_sid_cache_from_file(DB **dbp,
-                                 const char *file_name,
-                                 int *num_db_records)
+int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
 {
     int ret = 0;                      /* Function return value */
     int i = 0, j = 0;                 /* Loop index variables */
@@ -283,12 +355,13 @@ int SID_load_sid_cache_from_file(DB **dbp,
     if(!inpfile)
     {
         gossip_err("Could not open the file %s in "
-                   "SID_load_cache_from_file\n", file_name);
+                   "SID_load_cache_from_file\n",
+                   file_name);
         return(-1);
     }
 
     /* Getting the attributes from the input file */
-    ret = SID_parse_input_file_header(inpfile, &records_in_file);
+    ret = SID_cache_parse_header(inpfile, &records_in_file);
     if(ret)
     {
         fclose(inpfile);
@@ -340,34 +413,38 @@ int SID_load_sid_cache_from_file(DB **dbp,
         if(ret)
         {
             /* Skips adding sid to sid cache */
-            goto bad_sid;
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error parsing PVFS_SID in "
+                         "SID_load_cache_from_file function\n");
+            continue;
         }
 
-        ret = SID_create_SID_cacheval_t(&current_sid_cacheval,
-                                        sid_attributes,
-                                        tmp_bmi, tmp_url);
+        /* This allocates and fills in the cacheval */
+        ret = SID_cacheval_alloc(&current_sid_cacheval,
+                                 sid_attributes,
+                                 tmp_bmi, tmp_url);
         if(ret)
         {
+            /* Presumably out of memory */
             return(ret);
         }
     
         /* Storing the current sid from the input file into the sid cache */
-        ret = SID_store_sid_into_sid_cache(dbp,
-                                           &current_sid,
-                                           current_sid_cacheval,
-                                           num_db_records);
+        ret = SID_cache_add_server(dbp,
+                                   &current_sid,
+                                   current_sid_cacheval,
+                                   num_db_records);
         if(ret)
         {
+            /* Need to examine error and decide if we should continue or
+             * not - for now we stop and close the input file
+             */
             fclose(inpfile);
-            SID_clean_up_SID_cacheval_t(&current_sid_cacheval);
+            SID_cacheval_free(&current_sid_cacheval);
             return(ret);
         }
 
-        SID_clean_up_SID_cacheval_t(&current_sid_cacheval);
-
-        bad_sid:
-            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error parsing PVFS_SID in "
-                         "SID_load_cache_from_file function\n");
+        SID_cacheval_free(&current_sid_cacheval);
     }
    
     fclose(inpfile);
@@ -380,18 +457,18 @@ int SID_load_sid_cache_from_file(DB **dbp,
  *
  * Returns 0 on success, otherwise returns error code
 */
-int SID_store_sid_into_sid_cache(DB **dbp,
-                                 PVFS_SID *sid_server,
-                                 SID_cacheval_t *cacheval_t,
-                                 int *num_db_records)
+int SID_cache_add_server(DB **dbp,
+                         PVFS_SID *sid_server,
+                         SID_cacheval_t *cacheval,
+                         int *num_db_records)
 {
     int ret = 0;          /* Function return value */
     DBT key, data;        /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
 
     if(PVFS_SID_is_null(sid_server))
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error: PVFS_SID in "
-                     "SID_store_sid_into "
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error: PVFS_SID in SID_store_sid_into "
                      "sid_cache function is currently NULL\n");
         return(-1);
     }
@@ -403,7 +480,7 @@ int SID_store_sid_into_sid_cache(DB **dbp,
 
     /* Marshalling the data of the SID_cacheval_t struct */
     /* to store it in the primary db */
-    SID_pack_SID_cacheval_data(cacheval_t, &data);
+    SID_cacheval_pack(cacheval, &data);
 
     /* Placing the data into the database */
     ret = (*dbp)->put(*dbp,            /* Primary database pointer */
@@ -412,11 +489,12 @@ int SID_store_sid_into_sid_cache(DB **dbp,
                       &data,           /* Data is marshalled SID_cacheval_t */
                       DB_NOOVERWRITE); /* Do not allow for overwrites because */
                                        /* this is the primary database */
-
+    /* with DB_NOOVERWRITE does this return an error on a dup? */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error inserting sid into the \
-                     sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error inserting sid into the sid cache : %s\n",
+                     db_strerror(ret));
         return(ret);
     }
 
@@ -435,14 +513,15 @@ int SID_store_sid_into_sid_cache(DB **dbp,
  *
  * This function searches for a SID in the sidcache. The PVFS_SID value
  * (sid_server parameter) must be initialized before this function is used.
- * The SID_cacheval_t will malloced and set to the values of the attibutes
+ * The *cacheval will be malloced and set to the values of the attibutes
  * in the database for the sid if it is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
+ * Caller is expected to free the cacheval via SID_cacheval_free
  */
-int SID_retrieve_sid_from_sid_cache(DB **dbp,
-                                    PVFS_SID *sid_server,
-                                    SID_cacheval_t **cacheval_t)
+int SID_cache_lookup_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            SID_cacheval_t **cacheval)
 {
     int ret = 0;
     DBT key, data;
@@ -459,17 +538,15 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp,
                       0);    /* get flags */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error getting sid from "
-                     "sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error getting sid from sid cache : %s\n",
+                     db_strerror(ret));
         return(ret);
     }
 
     /* Unmarshalling the data from the database for the SID_cacheval_t struct */
-    SID_unpack_SID_cacheval_data(cacheval_t, &data);
+    SID_cacheval_unpack(cacheval, &data);
     
-    /* *cacheval_t = malloc(data.size); */
-    /* memcpy(*cacheval_t, data.data, data.size); */
-
     return(ret);
 }
 
@@ -478,16 +555,16 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp,
  * This function searches for a sid in the sid cache, retrieves the struct,
  * malloc's the char * passed in, and copies the bmi address of the retrieved
  * struct into that char *.
+ *
+ * Caller is expected to free the bmi_addr memory
  */
-int SID_bmi_lookup_from_sid_cache(DB **dbp,
-                                  PVFS_SID *search_sid,
-                                  char **bmi_addr)
+int SID_cache_lookup_bmi(DB **dbp, PVFS_SID *search_sid, char **bmi_addr)
 {
     SID_cacheval_t *temp;
     int ret;
 
     /* Retrieve the corresponding value */
-    ret = SID_retrieve_sid_from_sid_cache(dbp, search_sid, &temp);
+    ret = SID_cache_lookup_server(dbp, search_sid, &temp);
 
     if (ret)
     {
@@ -508,33 +585,6 @@ int SID_bmi_lookup_from_sid_cache(DB **dbp,
     return ret;
 }
 
-/** HELPER - assigns DBT for cacheval
- *
- * This function marshalls the data for the SID_cacheval_t to store in the 
- * sidcache
-*/
-void SID_pack_SID_cacheval_data(SID_cacheval_t *the_sids_attrs,
-                                DBT *data)
-{
-    data->data = the_sids_attrs;
-    data->size = (sizeof(int) * SID_NUM_ATTR) +
-                 sizeof(BMI_addr) +
-                 strlen(the_sids_attrs->url) +
-                 1;
-}
-
-/** HELPER - copies cacheval out of DBT
- *
- * This function unpacks the data recieved from the database, mallocs the 
- * SID_cacheval_t struct, and sets the values inside of the SID_cacheval_t 
- * struct with the data retrieved from the database
- */
-void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data)
-{              
-    *the_sids_attrs = malloc(data->size);
-    memcpy(*the_sids_attrs, data->data, data->size);
-}
-
 /** SID_UPDATE
  *
  * This function updates a record in the sid cache to any new values 
@@ -544,9 +594,9 @@ void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data)
  *
  * Returns 0 on success, otherwise returns error code
  */
-int SID_update_sid_in_sid_cache(DB **dbp,
-                                PVFS_SID *sid_server,
-                                SID_cacheval_t *new_attrs)
+int SID_cache_update_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            SID_cacheval_t *new_attrs)
 {
     int ret = 0;                   /* Function return value */
     SID_cacheval_t *current_attrs; /* Temp SID_cacheval_t used to get current 
@@ -554,52 +604,37 @@ int SID_update_sid_in_sid_cache(DB **dbp,
    
     if(new_attrs == NULL)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The new attributes passed to "
-                     "SID_update_sid_in_sid_cache is NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "The new attributes passed to "
+                     "SID_cache_update_server is NULL\n");
         return(-1);
     }
  
     /* Getting the sid from the sid cache */
-    ret = SID_retrieve_sid_from_sid_cache(dbp,
-                                          sid_server,
-                                          &current_attrs);
+    ret = SID_cache_lookup_server(dbp, sid_server, &current_attrs);
     if(ret)
     {
         return(ret);
     }
 
     /* Updating the old attributes to the new values */
-    SID_update_attributes_in_sid(NULL,
-                                 NULL,
-                                 current_attrs,
-                                 new_attrs->attr);
+    SID_cache_copy_attrs(current_attrs, new_attrs->attr);
         
     /* Updating the old bmi address to the new bmi_address */
-    SID_update_bmi_address_in_sid(NULL,
-                                  NULL,
-                                  current_attrs,
-                                  new_attrs->bmi_addr);
+    SID_cache_copy_bmi(current_attrs, new_attrs->bmi_addr);
    
     /* Updating the old url to the new url */
-    SID_update_url_in_sid(NULL,
-                          NULL,
-                          &current_attrs,
-                          new_attrs->url);
+    SID_cache_copy_url(&current_attrs, new_attrs->url);
 
     /* Deleting the old record from the sid cache */
-    ret = SID_delete_sid_from_sid_cache(dbp,
-                                        sid_server,
-                                        NULL);
+    ret = SID_cache_delete_server(dbp, sid_server, NULL);
     if(ret)
     {
         return(ret);
     }
     
     /* Adding the updated SID_cacheval_t struct back to the sid cache */
-    ret = SID_store_sid_into_sid_cache(dbp,
-                                       sid_server,
-                                       current_attrs,
-                                       NULL);
+    ret = SID_cache_add_server(dbp, sid_server, current_attrs, NULL);
     if(ret)
     {
         return(ret);
@@ -608,7 +643,7 @@ int SID_update_sid_in_sid_cache(DB **dbp,
     /* Freeing the dynamically created bmi address in the SID_cacheval_t
      * struct 
      */
-    SID_clean_up_SID_cacheval_t(&current_attrs);
+    SID_cacheval_free(&current_attrs);
 
     return(ret);
 }
@@ -624,80 +659,72 @@ int SID_update_sid_in_sid_cache(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_update_attributes_in_sid(DB **dbp,
-                                 PVFS_SID *sid_server,
-                                 SID_cacheval_t *current_sid_attrs,
-                                 int new_attr[])
+int SID_cache_update_attrs(DB **dbp,
+                           PVFS_SID *sid_server,
+                           int new_attr[])
 {
     int ret = 0;
     int i = 0;   /* Loop index variable */
+    SID_cacheval_t *sid_attrs;
 
     /* If sid_server is not passed in as NULL then only the attr's 
      * will be changed for the sid 
      */
-    if(sid_server)
+    if(!dbp || !sid_server)
     {
-        SID_cacheval_t *sid_attrs;
-        /* Getting the sid from the sid cache */
-        ret = SID_retrieve_sid_from_sid_cache(dbp,
-                                              sid_server,
-                                              &sid_attrs);
-        if(ret)
-        {
-            return(ret);
-        }
-        
-        for(i = 0; i < SID_NUM_ATTR; i++)
-        {
-            /* If the new value is different the original value, then the 
-             * original value is updated to the new attribute value 
-             */
-            if(sid_attrs->attr[i] != new_attr[i])
-            {
-                sid_attrs->attr[i] = new_attr[i];
-            }
-        }
-
-        /* Deleting the old record from the sid cache */
-        ret = SID_delete_sid_from_sid_cache(dbp,
-                                            sid_server,
-                                            NULL);
-        if(ret)
-        {
-            return(ret);
-        }
-
-        ret = SID_store_sid_into_sid_cache(dbp,
-                                           sid_server,
-                                           sid_attrs,
-                                           NULL);
-        if(ret)
-        {
-            SID_clean_up_SID_cacheval_t(&sid_attrs);
-            return(ret);
-        }
-
-        SID_clean_up_SID_cacheval_t(&sid_attrs);
-        return(ret);    
+        return(-EINVAL);
     }
-    /* The attr's are being updated with other attributes with
-     * SID_update_sid_in_sid_cache
-     * function, so only the current_sid_attrs need to change 
-     */
-    else
+    /* Getting the sid from the cache */
+    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    if(ret)
     {
-        for(i = 0; i < SID_NUM_ATTR; i++)
-        {
-            /* If the new value is different the original value, then the 
-             * original value is updated to the new attribute value 
-             */
-            if(current_sid_attrs->attr[i] != new_attr[i])
-            {
-                current_sid_attrs->attr[i] = new_attr[i];
-            }
-        }
         return(ret);
     }
+        
+    for(i = 0; i < SID_NUM_ATTR; i++)
+    {
+        /* If the new value is different the original value, then the 
+         * original value is updated to the new attribute value 
+         */
+        if(sid_attrs->attr[i] != new_attr[i])
+        {
+            sid_attrs->attr[i] = new_attr[i];
+        }
+    }
+
+    /* Deleting the old record from the cache */
+    ret = SID_cache_delete_server(dbp, sid_server, NULL);
+    if(ret)
+    {
+        return(ret);
+    }
+
+    ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+    if(ret)
+    {
+        SID_cacheval_free(&sid_attrs);
+        return(ret);
+    }
+
+    SID_cacheval_free(&sid_attrs);
+    return(ret);    
+}
+
+/* The attr's are being updated with other attributes with
+ * SID_cache_update_server
+ * function, so only the current_sid_attrs need to change 
+ */
+int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
+                         int new_attr[])
+{
+    int ret = 0;
+    int i;
+
+    for(i = 0; i < SID_NUM_ATTR; i++)
+    {
+        current_attrs->attr[i] = new_attr[i];
+    }
+    return(ret);
 }
 
 /*
@@ -706,70 +733,59 @@ int SID_update_attributes_in_sid(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_update_bmi_address_in_sid(DB **dbp,
-                                  PVFS_SID *sid_server,
-                                  SID_cacheval_t *current_sid_attrs,
-                                  BMI_addr new_bmi_addr)
+int SID_cache_update_bmi(DB **dbp, PVFS_SID *sid_server, BMI_addr new_bmi_addr)
 {
     int ret = 0;
+    SID_cacheval_t *sid_attrs;
 
     /* If sid_server is not passed in as NULL then only the bmi address 
      * will be changed for the sid 
      */
-    if(sid_server)
+    if(!dbp || !sid_server)
     {
-        SID_cacheval_t *sid_attrs;
-        /* Getting the sid from the sid cache */
-        ret = SID_retrieve_sid_from_sid_cache(dbp,
-                                              sid_server,
-                                              &sid_attrs);
+        return(-EINVAL);
+    }
+    /* Getting the sid from the sid cache */
+    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    if(ret)
+    {
+        return(ret);
+    }
+        
+    if(sid_attrs->bmi_addr != new_bmi_addr)
+    {
+        sid_attrs->bmi_addr = new_bmi_addr;
+
+        /* Deleting the old record from the sid cache */
+        ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
-        
-        if(sid_attrs->bmi_addr != new_bmi_addr)
-        {
-            sid_attrs->bmi_addr = new_bmi_addr;
 
-            /* Deleting the old record from the sid cache */
-            ret = SID_delete_sid_from_sid_cache(dbp,
-                                                sid_server,
-                                                NULL);
-            if(ret)
-            {
+        ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+        if(ret)
+        {
+            SID_cacheval_free(&sid_attrs);
             return(ret);
-            }
-
-            ret = SID_store_sid_into_sid_cache(dbp,
-                                               sid_server,
-                                               sid_attrs,
-                                               NULL);
-            if(ret)
-            {
-                SID_clean_up_SID_cacheval_t(&sid_attrs);
-                return(ret);
-            }
         }
-
-        SID_clean_up_SID_cacheval_t(&sid_attrs);
-        return(ret);    
     }
-    else
-    {
-        /* The bmi address is being updated with other attributes with
-         * SID_update_sid_in_sid_cache
-         * function, so only the current_sid_attrs need to change 
-         */
-        if(current_sid_attrs->bmi_addr != new_bmi_addr)
-        {
-            current_sid_attrs->bmi_addr = new_bmi_addr;
-        }
-        return(ret);
-    }   
+
+    SID_cacheval_free(&sid_attrs);
+    return(ret);    
 }
 
+/* The bmi address is being updated with other attributes with
+ * SID_cache_update_server
+ * function, so only the current_sid_attrs need to change 
+ */
+int SID_cache_copy_bmi(SID_cacheval_t *current_attrs, BMI_addr new_bmi_addr)
+{
+    int ret = 0;
 
+    current_attrs->bmi_addr = new_bmi_addr;
+    return(ret);
+}
 
 /*
  * This function updates the url address for a sid in the database if a sid
@@ -777,122 +793,107 @@ int SID_update_bmi_address_in_sid(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_update_url_in_sid(DB **dbp,
-                          PVFS_SID *sid_server,
-                          SID_cacheval_t **current_sid_attrs,
-                          char *new_url)
+int SID_cache_update_url(DB **dbp, PVFS_SID *sid_server, char *new_url)
 {
     int ret = 0;
     int tmp_attrs[SID_NUM_ATTR];
     BMI_addr tmp_bmi;
+    SID_cacheval_t *sid_attrs;
 
-    if(!new_url)
+    if(!dbp || !sid_server || !new_url)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                     "The url passed into SID_update_url_in_sid \
-                     function is currently NULL\n");
-        return(-1);
+                     "The url passed into SID_cache_update_url "
+                     "function is currently NULL\n");
+        return(-EINVAL);
     }
 
-    /* If sid_server is not passed in as NULL then only the url will
-     * be changed for the sid 
-     */
-    if(sid_server)
+    /* Getting the sid from the sid cache */
+    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    if(ret)
     {
+        return(ret);
+    }
+   
+    if(!(strcmp(sid_attrs->url, new_url)))
+    {
+        /* The new url is the same as the current */
+        /* url so no changes need to happen */
+        SID_cacheval_free(&sid_attrs);
+        return(ret);
+    }
+    else
+    {
+        memcpy(tmp_attrs, sid_attrs->attr, sizeof(int) * SID_NUM_ATTR);
+        memcpy(&tmp_bmi, &(sid_attrs->bmi_addr), sizeof(BMI_addr));
+            
+        SID_cacheval_free(&sid_attrs);
+        ret = SID_cacheval_alloc(&sid_attrs, tmp_attrs, tmp_bmi, new_url);    
+        if(ret)
+        {
+            return(ret);
+        }        
 
-        SID_cacheval_t *sid_attrs;
-
-        /* Getting the sid from the sid cache */
-        ret = SID_retrieve_sid_from_sid_cache(dbp,
-                                              sid_server,
-                                              &sid_attrs);
+        /* Deleting the old record from the sid cache */
+        ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
-   
-        if(!(strcmp(sid_attrs->url, new_url)))
+
+        /* Adding the updated SID_cacheval_t struct back to the sid cache */
+        ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+        if(ret)
         {
-            /* The new url is the same as the current */
-            /* url so no changes need to happen */
-            SID_clean_up_SID_cacheval_t(&sid_attrs);
+            SID_cacheval_free(&sid_attrs);
             return(ret);
         }
-        else
-        {
-            memcpy(tmp_attrs, sid_attrs->attr, sizeof(int) * SID_NUM_ATTR);
-            memcpy(&tmp_bmi, &(sid_attrs->bmi_addr), sizeof(BMI_addr));
-            
-            SID_clean_up_SID_cacheval_t(&sid_attrs);
-            ret = SID_create_SID_cacheval_t(&sid_attrs,
-                                            tmp_attrs,
-                                            tmp_bmi,
-                                            new_url);    
-            if(ret)
-            {
-                return(ret);
-            }        
-
-            /* Deleting the old record from the sid cache */
-            ret = SID_delete_sid_from_sid_cache(dbp,
-                                                sid_server,
-                                                NULL);
-            if(ret)
-            {
-                return(ret);
-            }
-
-            /* Adding the updated SID_cacheval_t struct back to the sid cache */
-            ret = SID_store_sid_into_sid_cache(dbp,
-                                               sid_server,
-                                               sid_attrs,
-                                               NULL);
-            if(ret)
-            {
-                SID_clean_up_SID_cacheval_t(&sid_attrs);
-                return(ret);
-            }
     
-            SID_clean_up_SID_cacheval_t(&sid_attrs);
-            return(ret);    
-        }
+        SID_cacheval_free(&sid_attrs);
+        return(ret);    
     }
-    /* The url is being updated with other attributes with
-     * SID_update_sid_in_sid_cache
-     * function, so only the current_sid_attrs need to change 
+}
+
+
+/* The url is being updated with other attributes with
+ * SID_cache_update_server
+ * function, so only the current_sid_attrs need to change 
+ */
+int SID_cache_copy_url(SID_cacheval_t **current_attrs, char *new_url)
+{
+    int ret = 0;
+    BMI_addr tmp_bmi;
+    int tmp_attrs[SID_NUM_ATTR];
+
+    /* The new new url is the same as the old url so nothing needs
+     * to be updated
      */
+    if((!strcmp((*current_attrs)->url, new_url)) || (!new_url))
+    {
+        return(ret);
+    }
     else
     {
-        /* The new new url is the same as the old url so nothing needs
-           to be updated */
-        if((!strcmp((*current_sid_attrs)->url, new_url)) || (!new_url))
-        {
-            return(ret);
-        }
-        else
-        {
-            memcpy(tmp_attrs, (*current_sid_attrs)->attr,
-                              sizeof(int) * SID_NUM_ATTR);
-            memcpy(&tmp_bmi, &((*current_sid_attrs)->bmi_addr),
-                              sizeof(BMI_addr));
-            
-            /* Freeing the current SID_cacheval_t struct to change the
-             * url address to the new address 
-             */
-            SID_clean_up_SID_cacheval_t(current_sid_attrs);
+        memcpy(tmp_attrs,
+               (*current_attrs)->attr,
+               sizeof(int) * SID_NUM_ATTR);
+        memcpy(&tmp_bmi,
+               &((*current_attrs)->bmi_addr),
+               sizeof(BMI_addr));
         
-            /* Setting the current bmi address to the new values */
-            ret = SID_create_SID_cacheval_t(current_sid_attrs,
-                                            tmp_attrs,
-                                            tmp_bmi,
-                                            new_url);
-            if(ret)
-            {
-                return(ret);
-            }
-            
+        /* Freeing the current SID_cacheval_t struct to change the
+         * url address to the new address 
+         */
+        SID_cacheval_free(current_attrs);
+        
+        /* Setting the current bmi address to the new values */
+        ret = SID_cacheval_alloc(current_attrs, tmp_attrs, tmp_bmi, new_url);
+        if(ret)
+        {
             return(ret);
         }
+            
+        return(ret);
     }
 }
 
@@ -903,9 +904,9 @@ int SID_update_url_in_sid(DB **dbp,
   *
   * Returns 0 on success, otherwise returns an error code 
   */
-int SID_delete_sid_from_sid_cache(DB **dbp,
-                                  PVFS_SID *sid_server,
-                                  int *db_records)
+int SID_cache_delete_server(DB **dbp,
+                            PVFS_SID *sid_server,
+                            int *db_records)
 {
     int ret = 0; /* Function return value */
     DBT key;     /* Primary sid key  */
@@ -939,58 +940,14 @@ int SID_delete_sid_from_sid_cache(DB **dbp,
     return(ret);
 }
 
-/* HELPER - LOADS cacheval
- *
- * This function creates a SID_cacheval_t struct with the
- * attributes that are passed to
- * this function by dynamically creating the SID_cacheval_t.
- * The url attribute cannot
- * be null otherwise the SID_cacheval_t is not dynamically created
- *
- * Returns 0 on success, otherwise -1 is returned
- */
-int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t,
-                              int sid_attributes[],
-                              BMI_addr sid_bmi,
-                              char *sid_url)
-{
-    if(!sid_url)
-    {
-        gossip_err("The url passed to SID_create_SID_cacheval_t is NULL\n");
-        *cacheval_t = NULL;
-        return(-1);
-    }
-
-    /* Mallocing space for the SID_cacheval_t struct */
-    *cacheval_t = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) +
-                                          (strlen(sid_url) + 1));
-    SID_initialize_SID_cacheval_t(cacheval_t);
-    
-    /* Setting the values of the SID_cacheval_t struct */    
-    memcpy((*cacheval_t)->attr, sid_attributes, (sizeof(int) * SID_NUM_ATTR));
-    memcpy(&((*cacheval_t)->bmi_addr), &sid_bmi, sizeof(BMI_addr));
-    strncpy((*cacheval_t)->url, sid_url, (strlen(sid_url) + 1));
-
-    return(0);
-}
-
-/*
- * This function clean up a SID_cacheval_t struct by freeing the dynamically
- * created SID_cacheval_t struct
- */
-void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t)
-{
-    free(*cacheval_t);
-}
-
 /** SID_STORE
  *
- * This function dumps the contents of the sid cache in ASCII to the file
+ * This function writes the contents of the sid cache in ASCII to the file
  * specified through the outpfile parameter parameter
  *
  * Returns 0 on success, otherwise returns error code
  */
-int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
+int SID_cache_store(DB **dbp, const char *file_name, int db_records)
 {
     int ret = 0;                   /* Function return value */
     int i = 0;                     /* Loop index variable */
@@ -1029,7 +986,8 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
     if(ret)
     {
         gossip_err("Error occured when trying to create cursor in \
-                    SID_dump_sid_cache function: %s", db_strerror(ret));
+                    SID_dump_sid_cache function: %s",
+                    db_strerror(ret));
         return(ret);
     }
 
@@ -1054,7 +1012,8 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
         {
             if(attr_positions[attr_pos_index] != -1)
             {
-                fprintf(outpfile, "%s ",
+                fprintf(outpfile,
+                        "%s ",
                         SID_attr_map[attr_positions[attr_pos_index]]);
             }
             attr_pos_index++;
@@ -1071,7 +1030,7 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
         /* Iterating over the database to get the sids */
         while(cursorp->get(cursorp, &key, &data, DB_NEXT) == 0)
         {
-            SID_unpack_SID_cacheval_data(&tmp_sid_attrs, &data);
+            SID_cacheval_unpack(&tmp_sid_attrs, &data);
         
             PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
             PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
@@ -1081,22 +1040,24 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
             {
                 if(attr_positions[attr_pos_index] != -1)
                 {
-                    fprintf(outpfile, "%d ",
+                    fprintf(outpfile,
+                            "%d ",
                            tmp_sid_attrs->attr[attr_positions[attr_pos_index]]);
                 }
                 attr_pos_index++;
             }
             /* Resetting the attribute position index
-               to 0 so the next SID_cacheval_t
-               will have its attributes in the correct
-               positions in the attrs array */
+             * to 0 so the next SID_cacheval_t
+             * will have its attributes in the correct
+             * positions in the attrs array
+             */
             attr_pos_index = 0;
 
             fprintf(outpfile, "%d ", tmp_sid_attrs->bmi_addr);
             fprintf(outpfile, "%s ", tmp_sid_attrs->url);
             fprintf(outpfile, "%s\n", tmp_sid_str);
  
-            SID_clean_up_SID_cacheval_t(&tmp_sid_attrs);
+            SID_cacheval_free(&tmp_sid_attrs);
         }
     }
     /* If there was not single valid attribute in the input file, then all
@@ -1132,7 +1093,7 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
         /* Iterating over the database to get the sids */
         while(cursorp->get(cursorp, &key, &data, DB_NEXT) == 0)
         {
-            SID_unpack_SID_cacheval_data(&tmp_sid_attrs, &data);
+            SID_cacheval_unpack(&tmp_sid_attrs, &data);
         
             PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
             PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
@@ -1147,7 +1108,7 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
             fprintf(outpfile, "%s ", tmp_sid_attrs->url);
             fprintf(outpfile, "%s\n", tmp_sid_str);
  
-            SID_clean_up_SID_cacheval_t(&tmp_sid_attrs);
+            SID_cacheval_free(&tmp_sid_attrs);
         }
     }
 
@@ -1155,8 +1116,9 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-            "Error closing cursor in SID_dump_sid_cache function: %s\n",
-            db_strerror(ret));
+                     "Error closing cursor in SID_cache_store "
+                     "function: %s\n",
+                     db_strerror(ret));
         return(ret);
     }
 
@@ -1183,7 +1145,7 @@ int SID_dump_sid_cache_to_file(DB **dbp, const char *file_name, int db_records)
 */
 int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb,
                                      int size_of_retrieve_mb,
-                                     DB *dbp,
+                                     DB  *dbp,
                                      DBC **dbcursorp,
                                      DBT *output)
 {
@@ -1318,10 +1280,6 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
 
     return ret;
 }
-
-
-
-
 
 /* <======================== DATABASE FUNCTIONS ==========================> */
 /*
@@ -1780,9 +1738,7 @@ int SID_load(void)
     }
 
     /* load cache from file */
-    ret = SID_load_sid_cache_from_file(&SID_db,
-                                       filename,
-                                       &records_imported);
+    ret = SID_cache_load(&SID_db, filename, &records_imported);
     if (ret < 0)
     {
         /* something failed, close up the database */
@@ -1799,7 +1755,7 @@ errorout:
  * so we can reload at some future startup and not have to discover
  * everything
  */
-int SID_save(void)
+int SID_save(char *path)
 {
     int ret = -1;
     int records_exported = 0;
@@ -1808,16 +1764,23 @@ int SID_save(void)
     int fnlen;
     PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
 
-    /* figure out the path to the cached data file */
-    srv_conf = PINT_server_config_mgr_get_config(fsid);
-    fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
-    filename = (char *)malloc(fnlen + 1);
-    strncpy(filename, srv_conf->meta_path, fnlen + 1);
-    strncat(filename, "/SIDcache", fnlen + 1);
-    PINT_server_config_mgr_put_config(srv_conf);
+    if (!path)
+    {
+        /* figure out the path to the cached data file */
+        srv_conf = PINT_server_config_mgr_get_config(fsid);
+        fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
+        filename = (char *)malloc(fnlen + 1);
+        strncpy(filename, srv_conf->meta_path, fnlen + 1);
+        strncat(filename, "/SIDcache", fnlen + 1);
+        PINT_server_config_mgr_put_config(srv_conf);
+    }
+    else
+    {
+        filename = path;
+    }
 
     /* dump cache to the file */
-    ret = SID_dump_sid_cache_to_file(&SID_db, filename, records_exported);
+    ret = SID_cache_store(&SID_db, filename, records_exported);
     if (ret < 0)
     {
         return ret;
@@ -1832,6 +1795,13 @@ int SID_save(void)
 int SID_finalize(void)
 {
     int ret = -1;
+
+    /* save cache contents to a file */
+    ret = SID_save(NULL);
+    if (ret < 0)
+    {
+        return ret;
+    }
 
     /* close cursors */
     ret = SID_close_dbcs(SID_attr_cursor);

@@ -22,6 +22,7 @@
 #define __TROVE_TYPES_H
 
 /* PVFS type mappings */
+#include "pvfs3-handle.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 

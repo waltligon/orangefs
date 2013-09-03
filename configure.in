@@ -368,38 +368,41 @@ dnl a function to check if we have the required gtk stuff for the
 dnl karma gui
 test_for_karma()
 {
-  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
-     AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
-     if `pkg-config --exists gtk+-2.0` ; then
-        AC_MSG_RESULT(yes)
-        GTKLIBS=`pkg-config --libs gtk+-2.0`
-        GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
+    AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+    if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+        AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
+        if `pkg-config --exists gtk+-2.0` ; then
+            AC_MSG_RESULT(yes)
+            GTKLIBS=`pkg-config --libs gtk+-2.0`
+            GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
 
-        AC_SUBST(GTKLIBS)
-        AC_SUBST(GTKCFLAGS)
-        BUILD_KARMA="1"
-        AC_SUBST(BUILD_KARMA)
-     else
-        AC_MSG_RESULT(no)
-     fi
-  fi
+            AC_SUBST(GTKLIBS)
+            AC_SUBST(GTKCFLAGS)
+            BUILD_KARMA="1"
+            AC_SUBST(BUILD_KARMA)
+        else
+            AC_MSG_RESULT(no)
+        fi
+    fi
 }
 
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[  --enable-karma         Enables optional gui.  (Enabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
-   fi
-],
-[test_for_karma]
+  fi
+]
 )
 
 dnl shared or static client library (see --enable-shared below)
 AC_ARG_ENABLE(static,
 [  --disable-static        Do not build static client library],
-[build_static=$enableval], [build_static=yes])
+[  build_static=$enableval
+], 
+[  build_static=yes
+]
+)
 AC_SUBST(build_static)
 
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
@@ -761,58 +764,87 @@ dnl a function to check for FUSE
 dnl
 test_for_fuse()
 {
-  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
-    AC_MSG_CHECKING([for FUSE library])
-    if `pkg-config --exists fuse` ; then
-       AC_MSG_RESULT(yes)
-       FUSE_LDFLAGS=`pkg-config --libs fuse`
-       FUSE_CFLAGS=`pkg-config --cflags fuse`
+    AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+    if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+        AC_MSG_CHECKING([for FUSE library])
+        if `pkg-config --exists fuse` ; then
+             AC_MSG_RESULT(yes)
+             FUSE_LDFLAGS=`pkg-config --libs fuse`
+             FUSE_CFLAGS=`pkg-config --cflags fuse`
 
-       AC_SUBST(FUSE_LDFLAGS)
-       AC_SUBST(FUSE_CFLAGS)
-       BUILD_FUSE="1"
-       AC_SUBST(BUILD_FUSE)
+             AC_SUBST(FUSE_LDFLAGS)
+             AC_SUBST(FUSE_CFLAGS)
+             BUILD_FUSE="1"
+             AC_SUBST(BUILD_FUSE)
+        else
+             AC_MSG_RESULT(no)
+             AC_MSG_ERROR([FUSE: FUSE library not found. Check LD_LIBRARY_PATH.])
+        fi
     else
-            AC_MSG_ERROR([FUSE: FUSE library not found. Check LD_LIBRARY_PATH.])
+        AC_MSG_RESULT(no)
+        AC_MSG_ERROR(FUSE: pkg-config not available. Please install pkg-config.)
     fi
-  else
-          AC_MSG_ERROR(FUSE: pkg-config not available. Please install pkg-config.)
-  fi
 }
 
 dnl FUSE component
 AC_ARG_ENABLE(fuse,
-[  --enable-fuse           **EXPERIMENTAL** Enable FUSE component],
-[
-if test "x$enableval" = "xyes" ; then
-   test_for_fuse
-   CFLAGS="$CFLAGS -D__PVFS2_ENABLE_FUSE__"
-fi
-],
+    [  --enable-fuse           **EXPERIMENTAL** Enable FUSE component],
+    [
+        if test "x$enableval" = "xyes" ; then
+            test_for_fuse
+            CFLAGS="$CFLAGS -D__PVFS2_ENABLE_FUSE__"
+        fi
+    ]
 )
 
 dnl
-dnl a function to check for uuid
-dnl man page claims this is in e2fsprogs
+dnl a test to check for uuid
+dnl uuid is part of util-linux-ng
 dnl so might want to add a check for that
 dnl if this fails
 dnl
-AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-if test "x$HAVE_PKGCONFIG" = "xyes" ; then
-   AC_MSG_CHECKING([for FUSE library])
-   if `pkg-config --exists uuid` ; then
-      AC_MSG_RESULT(yes)
-      UUID_LDFLAGS=`pkg-config --libs uuid`
-      UUID_CFLAGS=`pkg-config --cflags uuid`
-      AC_SUBST(UUID_LDFLAGS)
-      AC_SUBST(UUID_CFLAGS)
-   else
-      AC_MSG_ERROR([UUID: UUID library not found. Check LD_LIBRARY_PATH.])
-   fi
-else
-   AC_MSG_ERROR(UUID: pkg-config not available. Please install pkg-config.)
-fi
+dnl AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+dnl if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+dnl     AC_MSG_CHECKING([for FUSE library])
+dnl     if `pkg-config --exists uuid` ; then
+dnl         AC_MSG_RESULT(yes)
+dnl         UUID_LDFLAGS=`pkg-config --libs uuid`
+dnl         UUID_CFLAGS=`pkg-config --cflags uuid`
+dnl         AC_SUBST(UUID_LDFLAGS)
+dnl         AC_SUBST(UUID_CFLAGS)
+dnl     else
+dnl         AC_MSG_RESULT(no)
+dnl         AC_MSG_ERROR([UUID: UUID library not found. Check LD_LIBRARY_PATH.])
+dnl     fi
+dnl else
+dnl     AC_MSG_ERROR(UUID: pkg-config not available. Please install pkg-config.)
+dnl fi
+
+dnl
+dnl Check for UUID library features
+dnl Need to add a --with-uuid= for this
+dnl
+AC_MSG_CHECKING([for UUID library])
+OLD_LIBS=$LIBS
+LIBS="$LIBS -luuid"
+AC_TRY_LINK(
+    [#include <uuid/uuid.h>],
+    [
+        uuid_t oid;
+        uuid_is_null(oid);
+    ],
+    [   AC_MSG_RESULT(yes)
+        UUID_LDFLAGS="-luuid"
+        UUID_CFLAGS=""
+        AC_SUBST(UUID_LDFLAGS)
+        AC_SUBST(UUID_CFLAGS)
+    ],
+    [
+        AC_MSG_RESULT(no)
+        LIBS=$OLDLIBS
+        AC_MSG_ERROR([UUID: UUID library not found. Check LD_LIBRARY_PATH.])
+    ]
+)
 
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
@@ -906,8 +938,12 @@ AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
-[  --enable-shared         Build shared client library],
-[build_shared=$enableval], [build_shared=no])
+[  --disable-shared         Build shared client library],
+[build_shared=$enableval
+], 
+[build_shared=yes
+]
+)
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static
@@ -1484,7 +1520,6 @@ src/apps/ucache/module.mk
 src/apps/kernel/linux/module.mk
 src/apps/user/module.mk
 src/io/trove/module.mk
-dnl src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
 src/common/misc/module.mk
 src/common/quickhash/module.mk

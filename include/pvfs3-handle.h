@@ -10,32 +10,40 @@
 #include <stdint.h>
 #include <uuid/uuid.h>
 
+#define OID_SZ 16
+#define OID_STR_SZ 36
+#define SID_SZ 16
+#define SID_STR_SZ 36
+
+#define DW(x,y) (((uint64_t)(x))>>(y))
+#define SW(x,y) (((uint32_t)(x))>>(y))
+
 /* uuid_t is an unsigned char[16] array and thus passes by reference */
 
 /** Unique identifier for a server on a PVFS3 file system  128-bit */
 typedef struct {uuid_t u;} PVFS_SID __attribute__ ((__aligned__ (8)));
 
 #define encode_PVFS_SID(pptr,pbuf) do { \
-    memcpy(*(pptr), (pbuf), 16); \
-    *(pptr) += 16; \
+    memcpy(*(pptr), (pbuf), SID_SZ); \
+    *(pptr) += SID_SZ; \
 } while (0)
     
 #define decode_PVFS_SID(pptr,pbuf) do { \
-    memcpy((pbuf), *(pptr), 16); \
-    *(pptr) += 16; \
+    memcpy((pbuf), *(pptr), SID_SZ); \
+    *(pptr) += SID_SZ; \
 } while (0)
     
 /** Unique identifier for an object on a PVFS3 file system  128-bit */
 typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
 
 #define encode_PVFS_OID(pptr,pbuf) do { \
-    memcpy(*(pptr), (pbuf), 16); \
-    *(pptr) += 16; \
+    memcpy(*(pptr), (pbuf), OID_SZ); \
+    *(pptr) += OID_SZ; \
 } while (0)
     
 #define decode_PVFS_OID(pptr,pbuf) do { \
-    memcpy((pbuf), *(pptr), 16); \
-    *(pptr) += 16; \
+    memcpy((pbuf), *(pptr), OID_SZ); \
+    *(pptr) += OID_SZ; \
 } while (0)
 
 #define PVFS_HANDLE_NULL_INIT {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
@@ -102,9 +110,9 @@ static __inline__ void PVFS_OID_bin2str(const PVFS_OID *oid, char *str)
 
 static __inline__ char *PVFS_OID_str(const PVFS_OID *oid)
 {
-    static char str[17];
+    static char str[OID_STR_SZ + 1];
     uuid_unparse(oid->u, str);
-    str[17] = 0;
+    str[OID_STR_SZ] = 0;
     return str;
 }
 
@@ -112,18 +120,22 @@ static __inline__ uint32_t PVFS_OID_hash32(const PVFS_OID *oid)
 {
     /* this might need an alternate implementation on some */
     /* architectures, but is fine in an all-intel world */
-    void *q = &oid;
-    int32_t *p = q;
-    return p[0] + p[1] + p[2] + p[3];
+    char *p = (char *)oid;
+    return SW(p[0],0)  + SW(p[1],8)  + SW(p[2],16)  + SW(p[3],24)  + 
+           SW(p[4],0)  + SW(p[5],8)  + SW(p[6],16)  + SW(p[7],24)  +
+           SW(p[8],0)  + SW(p[9],8)  + SW(p[10],16) + SW(p[11],24) +
+           SW(p[12],0) + SW(p[13],8) + SW(p[14],16) + SW(p[15],24);
 }
 
 static __inline__ uint64_t PVFS_OID_hash64(const PVFS_OID *oid)
 {
     /* this might need an alternate implementation on some */
     /* architectures, but is fine in an all-intel world */
-    void *q = &oid;
-    int64_t *p = q;
-    return p[0] + p[1];
+    char *p = (char *)oid;
+    return DW(p[0],0)   + DW(p[1],8)   + DW(p[2],16)  + DW(p[3],24)  + 
+           DW(p[4],32)  + DW(p[5],40)  + DW(p[6],48)  + DW(p[7],56)  +
+           DW(p[8],0)   + DW(p[9],8)   + DW(p[10],16) + DW(p[11],24) +
+           DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
 #define PVFS_OID_encode(d,s) PVFS_OID_cpy(((PVFS_OID *)d),(s))
@@ -186,9 +198,9 @@ static __inline__ void PVFS_SID_bin2str(const PVFS_SID *sid, char *str)
 
 static __inline__ char *PVFS_SID_str(const PVFS_SID *sid)
 {
-    static char str[17];
+    static char str[SID_STR_SZ + 1];
     uuid_unparse(sid->u, str);
-    str[17] = 0;
+    str[SID_STR_SZ] = 0;
     return str;
 }
 
@@ -196,18 +208,22 @@ static __inline__ uint32_t PVFS_SID_hash32(const PVFS_SID *sid)
 {
     /* this might need an alternate implementation on some */
     /* architectures, but is fine in an all-intel world */
-    void *q = &sid;
-    int32_t *p = q;
-    return p[0] + p[1] + p[2] + p[3];
+    char *p = (char *)sid;
+    return SW(p[0],0)  + SW(p[1],8)  + SW(p[2],16)  + SW(p[3],24)  + 
+           SW(p[4],0)  + SW(p[5],8)  + SW(p[6],16)  + SW(p[7],24)  +
+           SW(p[8],0)  + SW(p[9],8)  + SW(p[10],16) + SW(p[11],24) +
+           SW(p[12],0) + SW(p[13],8) + SW(p[14],16) + SW(p[15],24);
 }
 
 static __inline__ uint64_t PVFS_SID_hash64(const PVFS_SID *sid)
 {
     /* this might need an alternate implementation on some */
     /* architectures, but is fine in an all-intel world */
-    void *q = &sid;
-    int64_t *p = q;
-    return p[0] + p[1];
+    char *p = (char *)sid;
+    return DW(p[0],0)   + DW(p[1],8)   + DW(p[2],16)  + DW(p[3],24)  + 
+           DW(p[4],32)  + DW(p[5],40)  + DW(p[6],48)  + DW(p[7],56)  +
+           DW(p[8],0)   + DW(p[9],8)   + DW(p[10],16) + DW(p[11],24) +
+           DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
 #define PVFS_SID_encode(d,s) PVFS_SID_cpy(((PVFS_SID *)d),(s))

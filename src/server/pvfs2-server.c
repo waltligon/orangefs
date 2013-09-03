@@ -1264,7 +1264,7 @@ static int server_check_if_root_directory_created( void )
     PINT_server_op *tmp_sop = NULL;
     int ret = -1, outcount = 0;
 
-    PVFS_handle root_handle = 0;
+    PVFS_handle root_handle = PVFS_HANDLE_NULL;
     PVFS_dist_dir_attr dist_dir_attr;
 
     /* iterate through list of file systems */
