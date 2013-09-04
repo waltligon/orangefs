@@ -446,10 +446,11 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     
     /* system user functions as root */
+    /* TODO! */
     if (!stricmp(user_name, "SYSTEM"))
     {
         gid = 0;
-        init_credential(0, &gid, 1, credential);
+        init_credential(0, &gid, 1, NULL, NULL, credential);
 
         CloseHandle(htoken);
 
@@ -471,7 +472,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         else if (goptions->user_mode == USER_MODE_CERT)
         {
             /* load credential from certificate */
-            ret = get_cert_credential(htoken, user_name, credential, &expires);
+            ret = get_proxy_cert_credential(htoken, user_name, credential, &expires);
             if (ret == 0)
             {
                 add_cache_user(user_name, credential, expires);
@@ -483,7 +484,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
                 ret = -ERROR_ACCESS_DENIED;
             }
         }
-        else /* user-mode == LDAP */ 
+        else if (goptions->user_mode == USER_MODE_LDAP) 
         {
             ret = get_ldap_credential(user_name, credential);
             if  (ret == 0)
@@ -496,6 +497,10 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
                    result is access denied */
                 ret = -ERROR_ACCESS_DENIED;
             }
+        }
+        else if (goptions->user_mode == USER_MODE_SERVER)
+        {
+            ret = get_user_cert_credential(user_name, credential, &expires);
         }
     }
 
@@ -2215,7 +2220,8 @@ PVFS_Dokan_get_disk_free_space(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
-    err = init_credential(0, &gid, 1, &credential);
+    /* TODO! */
+    err = init_credential(0, &gid, 1, NULL, NULL, &credential);
     CRED_CHECK("GetDiskFreeSpace", err);
 
     ret = fs_get_diskfreespace(&credential,

@@ -101,6 +101,8 @@ int sign_credential(const char *key_file,
 int init_credential(PVFS_uid uid,
                     PVFS_gid group_array[],
                     uint32_t num_groups,
+                    const char *key_file,
+                    const PVFS_certificate *cert,
                     PVFS_credential *cred)
 {
     int ret = 0;
@@ -126,33 +128,50 @@ int init_credential(PVFS_uid uid,
     }
 
     /* fill in uid/groups for non-cert modes */
-    if (goptions->security_mode != SECURITY_MODE_CERT)
+    cred->group_array = (PVFS_gid *) malloc(sizeof(PVFS_gid) * num_groups);
+    if (!cred->group_array)
     {
-        cred->group_array = (PVFS_gid *) malloc(sizeof(PVFS_gid) * num_groups);
-        if (!cred->group_array)
+         return -PVFS_ENOMEM;
+    }
+
+    /* set groups and uid */
+    cred->num_groups = num_groups;
+    memcpy(cred->group_array, group_array, sizeof(PVFS_gid) * num_groups);
+    cred->userid = uid;
+
+    /* default timeout */
+    cred->timeout = time(NULL) + PVFS2_DEFAULT_CREDENTIAL_TIMEOUT;
+
+    /* append certificate if necessary */
+    if (cert != NULL)
+    {
+        cred->certificate.buf = (PVFS_cert_data) malloc(cert->buf_size);
+        if (cred->certificate.buf == NULL)
         {
+            cleanup_credential(cred);
             return -PVFS_ENOMEM;
         }
 
-        /* set groups and uid */
-        cred->num_groups = num_groups;
-        memcpy(cred->group_array, group_array, sizeof(PVFS_gid) * num_groups);
-        cred->userid = uid;
-
-        /* default timeout */
-        cred->timeout = time(NULL) + PVFS2_DEFAULT_CREDENTIAL_TIMEOUT;
-
-        if (goptions->security_mode == SECURITY_MODE_KEY)
+        memcpy(cred->certificate.buf, cert->buf, cert->buf_size);
+        cred->certificate.buf_size = cert->buf_size;
+    }
+  
+    /* sign credential depending on mode */
+    if (goptions->security_mode == SECURITY_MODE_KEY)
+    {
+        if ((ret = sign_credential((key_file != NULL) ? key_file : goptions->key_file, cred)) != 0)
         {
-            if ((ret = sign_credential(goptions->key_file, cred)) != 0)
-            {
-                cleanup_credential(cred);
-            }
+            cleanup_credential(cred);
+            return ret;
         }
     }
-    else
+    else if (goptions->security_mode == SECURITY_MODE_CERT)
     {
-        /* certificate mode--mapped by server */
+        if ((ret = sign_credential(key_file, cred)) != 0)
+        {
+            cleanup_credential(cred);
+            return ret;
+        }
     }
 
     return ret;

@@ -13,10 +13,11 @@
 
 #include "wincommon.h"
 
-#define USER_MODE_NONE 0
-#define USER_MODE_LIST 1
-#define USER_MODE_CERT 2
-#define USER_MODE_LDAP 3
+#define USER_MODE_NONE   0
+#define USER_MODE_LIST   1
+#define USER_MODE_CERT   2
+#define USER_MODE_LDAP   3
+#define USER_MODE_SERVER 4
 
 #define SECURITY_MODE_DEFAULT 0
 #define SECURITY_MODE_KEY     1

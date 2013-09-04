@@ -27,6 +27,7 @@
 #include "cert.h"
 #include "user-cache.h"
 #include "cred.h"
+#include "cert-util.h"
 
 #define OPENSSL_CERT_ERROR    0xFFFF
 
@@ -63,6 +64,7 @@ static void _report_cert_error(char *message, char *fn_name)
 }
 
 /* load certificate from file (PEM format) */
+/* TODO: remove 
 static unsigned long load_cert_from_file(char *path, 
                                          X509 **cert)
 {
@@ -84,6 +86,7 @@ static unsigned long load_cert_from_file(char *path,
 
     return 0;
 }
+*/
 
 static int get_proxy_auth_ex_data_cred()
 {
@@ -207,7 +210,7 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
                 if (ret == 0)
                 {
                     /* initialize and fill in credential */
-                    init_credential(uid, &gid, 1, credential);
+                    init_credential(uid, &gid, 1, NULL, NULL, credential);
                 }
                 else
                 {
@@ -417,12 +420,12 @@ int get_proxy_cert_credential(HANDLE huser,
         /* load proxy cert */
         if (!stricmp(find_data.cFileName, "cert.0"))
         {
-            ret = load_cert_from_file(cert_path, &cert);
+            ret = PINT_load_cert_from_file(cert_path, &cert);
         }
         else
         {
             /* load intermediate certs (including user cert) */
-            ret = load_cert_from_file(cert_path, &chain_cert);
+            ret = PINT_load_cert_from_file(cert_path, &chain_cert);
             if (ret == 0) 
                 sk_X509_push(chain, chain_cert);
         }
@@ -450,7 +453,7 @@ int get_proxy_cert_credential(HANDLE huser,
         goto get_cert_credential_exit;
 
     /* load CA cert */
-    ret = load_cert_from_file(goptions->ca_file, &ca_cert);
+    ret = PINT_load_cert_from_file(goptions->ca_file, &ca_cert);
     if (ret != 0)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: error loading CA "
@@ -465,7 +468,7 @@ int get_proxy_cert_credential(HANDLE huser,
 
     if (ret == 0)
     {        
-        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));        
+        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
     }
 
 get_cert_credential_exit:
@@ -504,16 +507,154 @@ get_cert_credential_exit:
     return ret;
 }
 
+#define ORANGEFS_USER_VAR_LEN    15
+
+/* copy string segment */
+#define COPY_STR_SEG(pin, pout, ind, start, end) \
+    for (ind = (start); ind < (end); ind++) \
+       *pout++ = pin[ind]
+                    
+/* Replace %ORANGEFS_USER% with userid */
+int expand_path(const char *inpath, 
+                const char *userid, 
+                char *outpath, 
+                unsigned int outlen)
+{
+    char *uppath, *pvar, *pseg, *pout;
+    unsigned int i, nvars, ind, tstart[16], sstart;
+
+    if (inpath == NULL || strlen(inpath) == 0 ||
+        userid == NULL || strlen(userid) == 0 ||
+        outpath == NULL || outlen == 0) 
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* make upper case string */
+    uppath = strdup(inpath);
+    
+    _strupr(uppath);
+
+    /* find %ORANGEFS_USER% tokens */
+    for (i = 0, pseg = uppath; 
+        (pvar = strstr(pseg, "%ORANGEFS_USER%")) && i < 16;
+        pseg += (pvar - pseg) + ORANGEFS_USER_VAR_LEN)
+    {
+        tstart[i++] = pvar - uppath;
+    }
+         
+    nvars = i;
+
+    /* check output length */
+    if (strlen(inpath) - (nvars * ORANGEFS_USER_VAR_LEN) + 
+        (nvars * strlen(userid)) + 1 > outlen)
+    {
+        free(uppath);
+        return -PVFS_EOVERFLOW;
+    }
+
+    /* no substitutions to make */
+    if (nvars == 0)
+    {
+        /* simply copy string - note length already checked */
+        strcpy(outpath, inpath);
+
+        return 0;
+    }
+
+    /* replace each token */
+    for (i = 0, sstart = 0, outpath[0] = '\0', pout = outpath;
+        i < nvars; 
+        sstart += tstart[i] + ORANGEFS_USER_VAR_LEN, i++)
+    {
+        /* append segment prior to token i */
+        COPY_STR_SEG(inpath, pout, ind, sstart, tstart[i]);
+
+        /* append userid substitution */
+        COPY_STR_SEG(userid, pout, ind, 0, strlen(userid));
+
+        /* segment after last token */
+        if (i+1 == nvars)
+        {
+            /* copy remainder of string */
+            COPY_STR_SEG(inpath, pout, ind, tstart[i] + ORANGEFS_USER_VAR_LEN, 
+                strlen(inpath));
+        }        
+    }
+    
+    /* null-terminate output string */
+    *pout = '\0';
+
+    free(uppath);
+
+    return 0;
+}
+
+
 /* retrieve OrangeFS credential from user cert */
-int get_user_cert_credential(HANDLE huser,
-                             char *userid,
-                             PVFS_credential *credential,
+int get_user_cert_credential(char *userid,
+                             PVFS_credential *cred,
                              ASN1_UTCTIME **expires)
 {
+    int ret = 0;
+    char key_file[MAX_PATH], cert_file[MAX_PATH];
+    X509 *xcert = NULL;
+    PVFS_certificate *cert = NULL;
+    PVFS_gid group_array[1] = { PVFS_GID_MAX };
+
     /* 1. build certificate/keyfile path--profile or cert-dir
        2. fill in fields (append certificate data to credential)
-       3. sign credential */
-    int ret = 0;
+       3. sign credential 
+     */
+    if (userid == NULL || strlen(userid) == 0 || cred == NULL ||
+        expires == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* expand the key file path */
+    ret = expand_path(goptions->key_file, userid, key_file, MAX_PATH);
+    if (ret != 0)
+    {
+        /* TODO: error reporting */
+        return ret;
+    }
+
+    /* expand the cert file path */
+    ret = expand_path(goptions->cert_dir_prefix, userid, cert_file, MAX_PATH);
+    if (ret != 0)
+    {
+        /* TODO: error reporting */
+        return ret;
+    }
+
+    /* read the certificate file */
+    ret = PINT_load_cert_from_file(cert_file, &xcert);
+    if (ret != 0)
+    {
+        /* TODO: error reporting */
+        return ret; 
+    }
+
+    /* convert X509 struct to PVFS_certificate */
+    ret = PINT_X509_to_cert(xcert, &cert);
+    if (ret != 0)
+    {
+        /* TODO: error reporting */
+        X509_free(xcert);
+        return ret;
+    }
+
+    /* get the expiration time for caching */
+    *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(xcert));
+
+    /* free X509 cert */
+    X509_free(xcert);
+
+    /* initialize the credential */
+    ret = init_credential(PVFS_UID_MAX, group_array, 1, key_file, cert, cred);
+
+    PINT_cleanup_cert(cert);
 
     return ret;
 }

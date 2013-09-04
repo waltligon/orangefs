@@ -188,17 +188,22 @@ static KEYWORD_CB(user_mode)
     {
         options->user_mode = USER_MODE_LIST;
     }
-    else if (!stricmp(args, "cert"))
+    else if (!stricmp(args, "certificate"))
     {
+        options->user_mode = USER_MODE_CERT;
     }
     else if (!stricmp(args, "ldap"))
     {
         options->user_mode = USER_MODE_LDAP;
     }
+    else if (!stricmp(args, "server"))
+    {
+        options->user_mode = USER_MODE_SERVER;
+    }
     else
     {
         _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"list\" "
-            "or \"ldap\"", keyword);
+            "\"certificate\", \"ldap\" or \"server\"", keyword);
         return KEYWORD_ERR_INVALID_ARGS;
     }
 
@@ -819,7 +824,7 @@ int add_users(PORANGEFS_OPTIONS options,
             }
 
             /* create credential */
-            ret = init_credential(user_entry->uid, &user_entry->gid, 1, &cred);
+            ret = init_credential(user_entry->uid, &user_entry->gid, 1, NULL, NULL, &cred);
             if (ret != 0)
             {
                 _snprintf(error_msg, error_msg_len, "Initialization (fatal): "

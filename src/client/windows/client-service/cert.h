@@ -25,8 +25,7 @@ int get_proxy_cert_credential(HANDLE huser,
                               PVFS_credential *credential,
                               ASN1_UTCTIME **expires);
 
-int get_user_cert_credential(HANDLE huser,
-                             char *userid,                             
+int get_user_cert_credential(char *userid,
                              PVFS_credential *credential,
                              ASN1_UTCTIME **expires);
 

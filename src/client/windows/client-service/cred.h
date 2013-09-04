@@ -14,6 +14,7 @@
 #include "pvfs2-req-proto.h"
 
 int init_credential(PVFS_uid uid, PVFS_gid group_array[], uint32_t num_groups,
+                    const char *key_file, const PVFS_certificate *cert, 
                     PVFS_credential *cred);
 
 void cleanup_credential(PVFS_credential *cred);                              

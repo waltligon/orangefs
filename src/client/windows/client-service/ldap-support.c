@@ -230,7 +230,7 @@ int get_ldap_credential(char *userid,
 
     if (ret == 0 && uid != -1 && gid != -1)
     {
-        init_credential(uid, &gid, 1, credential);
+        init_credential(uid, &gid, 1, NULL, NULL, credential);
     }
     else if (ret == 0)
     {
