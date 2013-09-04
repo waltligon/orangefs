@@ -2769,8 +2769,6 @@ DOTCONF_CB(get_alias_list)
  	len++;
     }
 
-// fprintf(stderr, "BMI address parsed [%s]\n", ptr);
-
     if (!config_s->host_aliases)
     {
         config_s->host_aliases = PINT_llist_new();

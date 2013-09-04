@@ -488,9 +488,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
     struct tcp_addr *tcp_addr_data = NULL;
     int i = 0;
 
-// gossip_err("Initializing TCP\n");
-
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
 
     /* check args */
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
@@ -581,7 +579,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
         "%d", &bmi_tcp_recv_event_id);
 
     gen_mutex_unlock(&interface_mutex);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
                   "TCP/IP module successfully initialized.\n");
     return (0);
 
@@ -643,7 +641,7 @@ int BMI_tcp_finalize(void)
     /* NOTE: we are trusting the calling BMI layer to deallocate 
      * all of the method addresses (this will close any open sockets)
      */
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -684,7 +682,7 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 	    return (NULL);
         }
 
-// fprintf(stderr, "Method matched\n");
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Method matched\n");
 
         /* looks ok, so let's build the method addr structure */
         new_addr = alloc_tcp_method_addr();
@@ -759,21 +757,21 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
                 if (connect_cnt-- <= 0)
                 {
                     /* failure - never responded */
-// fprintf(stderr, "connect timed out\n");
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect timed out\n");
                     goto errorout;
                 }
                 ret = tcp_sock_init(new_addr);
                 if (ret < 0)
                 {
                     /* error - connect returned a tcp error */
-// fprintf(stderr, "tcp_sock_init returned error\n");
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "tcp_sock_init returned error\n");
                     goto errorout;
                 }
-// fprintf(stderr, "connect test started\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect test started\n");
             } while (tcp_addr_data->not_connected);
 
             /* save the successful zone info */
-// fprintf(stderr, "connect test successful for zone %s\n", zone);
+            gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect test successful for zone %s\n", zone);
             tcp_method_params.connect_test = 0;
             tcp_addr_data->zone = zone;
             tcp_zone = zone;
@@ -786,15 +784,15 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
             /* zone passed in must match saved zone if there is one */
             if (tcp_zone)
             {
-// fprintf(stderr,"testing for zone match %s %s\n", zone, tcp_zone);
+                 gossip_debug(GOSSIP_BMI_DEBUG_TCP, "testing for zone match %s %s\n", zone, tcp_zone);
                 if ((tcp_zone_len != zone_len) ||
                     (strncmp(tcp_zone, zone, tcp_zone_len)))
                 {
                     /* does not match zone */
-// fprintf(stderr,"does not match\n");
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "does not match\n");
                     goto errorout;
                 }
-// fprintf(stderr,"zone match\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_TCP, "zone match\n");
                 /* zone matches ... */
             }
             /* or no zone set so we assume any zone is OK */
@@ -824,7 +822,7 @@ errorout:
         delim = NULL;
 
         /* this might skip several non-tcp addrs */
-        /* it mimics what id done at the top of the loop */
+        /* it mimics what is done at the top of the loop */
         id_string = strstr(id_string, "tcp");
         id_string = index(id_string, ',');
         /* at the top of the loop we'll look for more tcp addrs */

@@ -1688,7 +1688,7 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
     int i = 0;
     int failed;
 
-// fprintf(stderr, "BMI_addr_lookup: %s\n", id_string);
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_addr_lookup: %s\n", id_string);
 
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
@@ -1710,7 +1710,7 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
         *new_addr = new_ref->bmi_addr;
         return (0);
     }
-// fprintf(stderr, "\taddr not found, go to methods\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "\taddr not found, go to methods\n");
 
     /* Now we will run through each method looking for one that
      * responds successfully.  It is assumed that they are already
@@ -1721,7 +1721,7 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
     while ((i < active_method_count) &&
            !(meth_addr = active_method_table[i]->method_addr_lookup(id_string)))
     {
-// fprintf(stderr, "\tLooking up in active method\n");
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "\tLooking up in active method\n");
         i++;
     }
 
@@ -1750,14 +1750,14 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
             name = known_method_table[i]->method_name + 4;
             if (!strncmp(id_string, name, strlen(name)))
             {
-// fprintf(stderr, "\tActivating method\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "\tActivating method\n");
                 ret = activate_method(known_method_table[i]->method_name, 0, 0);
                 if (ret < 0)
                 {
                     failed = 1;
                     break;
                 }
-// fprintf(stderr, "\tLooking up in method\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "\tLooking up in method\n");
                 meth_addr = known_method_table[i]->
                                           method_addr_lookup(id_string);
                 i = active_method_count - 1;  /* point at the new one */

@@ -68,6 +68,7 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->fs_mntops
 
 #define DEFINE_MY_GET_NEXT_FSENT
+#define PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE 2048
 static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab);
 static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry);
 
@@ -1935,12 +1936,12 @@ int PVFS_util_resolve_absolute(const char* local_path)
 
 static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab)
 {
-    char linestr[500];
+    char linestr[PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE];
     int linelen = 0;
     char * strtok_ctx;
     char * nexttok; 
     PINT_fstab_entry_t * fsentry;
-    if(!fgets(linestr, 500, tab))
+    if(!fgets(linestr, PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE, tab))
     {
         return NULL;
     }
