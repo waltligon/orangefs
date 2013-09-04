@@ -9,7 +9,6 @@
 #define PINT_MALLOC_H
 
 #include <stdint.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
 

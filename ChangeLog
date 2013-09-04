@@ -2,6 +2,18 @@
 OrangeFS Release ChangeLog
 -----------------------
 
+Rev 10349
+
+* - Fixed bug in iocommon_open where the variable directory 
+*   was used instead of the argument path before calling iocommon_expand_path
+* - Fixed bug in closedir where the fd was never getting closed thus
+*   leaving lots of fd's open in some cases
+* - Fixed bug in is_pvfs_path where argument path was referenced without
+*   a dereference (not sure how that ever worked)
+* - BMI_add_to_socket_collection and related macros were not checking
+*   for errors from epoll_ctl, some are expected but errno was not reset
+*   leaving to issues later on
+
 Rev 10182
 
 * Reworked usrint initialization to support fork/exec effectively,

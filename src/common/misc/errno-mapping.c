@@ -55,6 +55,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
             limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
             strncpy(buf, tmpbuf, (size_t)limit);
         }
+        /* A misnomer - tempbuf is guaranteed to be non-null */
         ret = (tmpbuf ? 0 : -1);
 #elif defined(WIN32)
         ret = (int) strerror_s(buf, (size_t) limit, tmp);
