@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-internal.h"
 
 /* A list of all allocated pvfs2 inode objects */
 #ifdef HAVE_SPIN_LOCK_UNLOCKED
@@ -174,7 +175,7 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         spin_unlock(&next_tag_value_lock);
         new_op->upcall.type = type;
         new_op->attempts = 0;
-        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %llu %s)\n", new_op, llu(new_op->tag), get_opname_string(new_op));
 
 #ifdef HAVE_CURRENT_FSUID
         new_op->upcall.uid = current_fsuid();
@@ -206,7 +207,7 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
-        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %llu)\n", pvfs2_op, llu(pvfs2_op->tag));
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
