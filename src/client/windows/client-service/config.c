@@ -713,7 +713,8 @@ int get_config(PORANGEFS_OPTIONS options,
 
             /* get keyword */
             i = 0;
-            while (*pline && (*pline != ' ' || *pline == '\t'))
+            while (*pline && (*pline != ' ' || *pline == '\t') &&
+                (i < sizeof(keyword)-1))
             {
                 keyword[i++] = *pline++;
             }
@@ -722,7 +723,7 @@ int get_config(PORANGEFS_OPTIONS options,
             /* get arguments */
             EAT_WS(pline);
             i = 0;
-            while (*pline)
+            while (*pline && (i < sizeof(args)-1))
             {
                 args[i++] = *pline++;
             }
@@ -758,11 +759,27 @@ int get_config(PORANGEFS_OPTIONS options,
 
     } /* feof */
 
+    if (options->user_mode == USER_MODE_NONE && 
+        options->security_mode == SECURITY_MODE_CERT)
+    {
+        options->user_mode = USER_MODE_SERVER;
+    }
+
     if (options->user_mode == USER_MODE_NONE)
     {
         _snprintf(error_msg, error_msg_len, 
             "Configuration file (fatal): "
-            "Must specify user-mode (list or ldap)");
+            "Must specify user-mode (list, certificate, ldap or server)");
+        ret = -1;
+        goto get_config_exit;
+    }
+
+    if (options->security_mode == SECURITY_MODE_CERT &&
+        options->user_mode != USER_MODE_SERVER)
+    {
+        _snprintf(error_msg, error_msg_len,
+            "Configuration file (fatal): "
+            "User-mode must be server if security-mode is certificate");
         ret = -1;
         goto get_config_exit;
     }

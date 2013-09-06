@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-handle.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-uid-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-iterate-handles-list.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-misc.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-noop.c" />
@@ -399,6 +400,11 @@
       <FileType>Document</FileType>
     </CustomBuild>
     <CustomBuild Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.sm">
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>

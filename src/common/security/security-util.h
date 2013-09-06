@@ -30,6 +30,12 @@ void PINT_debug_credential(const PVFS_credential *cred,
                            const PVFS_gid *group_array);
 void PINT_cleanup_credential(PVFS_credential *cred);
 
+#ifdef WIN32
+int PINT_get_security_path(const char *inpath, 
+                           const char *userid, 
+                           char *outpath, 
+                           unsigned int outlen);
+#endif
 
 #endif /* _SECURITY_UTIL_H_ */
 

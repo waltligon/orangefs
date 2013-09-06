@@ -2221,7 +2221,7 @@ PVFS_Dokan_get_disk_free_space(
 
     /* use root credential for this function */
     /* TODO! */
-    err = init_credential(0, &gid, 1, NULL, NULL, &credential);
+    err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("GetDiskFreeSpace", err);
 
     ret = fs_get_diskfreespace(&credential,

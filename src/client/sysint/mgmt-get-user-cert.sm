@@ -13,7 +13,6 @@
 
 #include <string.h>
 #include <sys/stat.h>
-#include <pwd.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -28,6 +27,7 @@
 #include "pvfs2-internal.h"
 #include "gossip.h"
 #include "cert-util.h"
+
 
 #define PVFS_USER_CERT_KEY_SIZE    1024
 

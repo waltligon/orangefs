@@ -28,6 +28,7 @@
 #include "user-cache.h"
 #include "cred.h"
 #include "cert-util.h"
+#include "security-util.h"
 
 #define OPENSSL_CERT_ERROR    0xFFFF
 
@@ -507,6 +508,9 @@ get_cert_credential_exit:
     return ret;
 }
 
+/* TODO: remove */
+#if 0
+
 #define ORANGEFS_USER_VAR_LEN    15
 
 /* copy string segment */
@@ -589,7 +593,7 @@ int expand_path(const char *inpath,
 
     return 0;
 }
-
+#endif
 
 /* retrieve OrangeFS credential from user cert */
 int get_user_cert_credential(char *userid,
@@ -613,7 +617,7 @@ int get_user_cert_credential(char *userid,
     }
 
     /* expand the key file path */
-    ret = expand_path(goptions->key_file, userid, key_file, MAX_PATH);
+    ret = PINT_get_security_path(goptions->key_file, userid, key_file, MAX_PATH);
     if (ret != 0)
     {
         /* TODO: error reporting */
@@ -621,7 +625,7 @@ int get_user_cert_credential(char *userid,
     }
 
     /* expand the cert file path */
-    ret = expand_path(goptions->cert_dir_prefix, userid, cert_file, MAX_PATH);
+    ret = PINT_get_security_path(goptions->cert_dir_prefix, userid, cert_file, MAX_PATH);
     if (ret != 0)
     {
         /* TODO: error reporting */

@@ -171,6 +171,9 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\client\sysint\acache.h">
@@ -301,12 +304,15 @@
     <CustomBuild Include="..\..\..\..\src\client\sysint\sys-symlink.sm">
       <Filter>SM Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
-      <Filter>SM Files</Filter>
-    </None>
-    <None Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.sm">
+    <None Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.sm">
       <Filter>SM Files</Filter>
     </None>
   </ItemGroup>
