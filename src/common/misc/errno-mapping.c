@@ -48,7 +48,9 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     }
     else
     {
-#if defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
+#if defined(__DARWIN__)
+    ret = strerror_r(tmp, buf, (size_t)limit);
+#elif defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
