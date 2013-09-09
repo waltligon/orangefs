@@ -555,7 +555,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
                            GetThreadId(GetCurrentThread()));
 #else
             temp_size = sprintf(bptr, ".%06ld (%ld)] ", (long)tv.tv_usec, 
-                           gen_thread_self());
+                           (long int)gen_thread_self());
 #endif
             bptr += temp_size;
             bsize -= temp_size;
