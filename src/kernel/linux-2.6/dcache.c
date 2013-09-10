@@ -236,6 +236,9 @@ static int pvfs2_d_hash(
     const struct dentry *parent,
     const struct inode *inode,
     struct qstr *hash
+#elif defined(HAVE_TWO_PARAM_D_HASH_WITH_CONST)
+    const struct dentry *parent,
+    struct qstr *hash
 #else
     struct dentry *parent,
     struct qstr *hash
@@ -248,15 +251,22 @@ static int pvfs2_d_hash(
     return 0;
 }
 
-#ifdef HAVE_SEVEN_PARAM_D_COMPARE
-static int pvfs2_d_compare(
-                            const struct dentry *parent, 
-                            const struct inode * pinode,
-                            const struct dentry *dentry, 
-                            const struct inode *inode,
-                            unsigned int len, 
-                            const char *str, 
-                            const struct qstr *name)
+#if defined  HAVE_SEVEN_PARAM_D_COMPARE || HAVE_FIVE_PARAM_D_COMPARE
+#if defined HAVE_SEVEN_PARAM_D_COMPARE
+static int pvfs2_d_compare(const struct dentry *parent, 
+                           const struct inode * pinode,
+                           const struct dentry *dentry, 
+                           const struct inode *inode,
+                           unsigned int len, 
+                           const char *str, 
+                           const struct qstr *name)
+#else /* HAVE_FIVE_PARAM_D_COMPARE */
+static int pvfs2_d_compare(const struct dentry *parent, 
+                           const struct dentry *dentry, 
+                           unsigned int len, 
+                           const char *str, 
+                           const struct qstr *name)
+#endif /* HAVE_SEVEN_PARAM_D_COMPARE */
 {
     int i = 0;
     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_compare: "
@@ -287,7 +297,7 @@ static int pvfs2_d_compare(
              (d_name->hash == name->hash) &&
              (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
-#endif /* HAVE_SEVEN_PARAM_D_COMPARE */
+#endif /* HAVE_SEVEN_PARAM_D_COMPARE || HAVE_FIVE_PARAM_D_COMPARE */
 
 
 /** PVFS2 implementation of VFS dentry operations */
@@ -329,7 +339,11 @@ static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
   local_count = atomic_read(&entry->d_count);
 #else
   spin_lock(&entry->d_lock);
+#ifdef HAVE_DENTRY_LOCKREF_STRUCT
+  local_count = entry->d_lockref.count;
+#else
   local_count = entry->d_count;
+#endif /* HAVE_DENTRY_LOCKREF_STRUCT */
   spin_unlock(&entry->d_lock);
 #endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
 

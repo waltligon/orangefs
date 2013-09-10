@@ -785,6 +785,77 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 			AC_MSG_RESULT(no)
 		)
 
+		AC_MSG_CHECKING(for kiocbSetCancelled)
+		dnl kiocbSetCancelled is gone by 3.11...
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/wait.h>
+			#include <linux/aio.h>
+		],
+                [
+                        struct kiocb *iocb;
+                        kiocbSetCancelled(iocb);
+                ],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_KIOCBSETCANCELLED, 1, Define if kiocbSetCancelled exists),
+			AC_MSG_RESULT(no)
+		)
+
+		AC_MSG_CHECKING(for atomic ki_users)
+		dnl ki_users member in struct kiocb is atomic_t (not int)
+		dnl in 3.11
+	        tmp_cflags=$CFLAGS
+	        CFLAGS="$CFLAGS -Werror"
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/wait.h>
+			#include <linux/aio.h>
+		],
+                [
+                        struct kiocb *iocb;
+                        atomic_dec(&iocb->ki_users);
+                ],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(KI_USERS_ATOMIC, 1, Define if ki_users is atomic),
+			AC_MSG_RESULT(no)
+		)
+		tmp_cflags=$CFLAGS
+
+		AC_MSG_CHECKING(for aio_put_req returns int)
+		dnl aio_put_req is void by 3.11
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/wait.h>
+			#include <linux/aio.h>
+		],
+                [
+                        struct kiocb *iocb;
+                        int r;
+                        r = aio_put_req(iocb);
+                ],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(AIO_PUT_REQ_RETURNS_INT, 1, Define if aio_put_req returns int),
+			AC_MSG_RESULT(no)
+		)
+
+		AC_MSG_CHECKING(for kiocb_set_cancel_fn)
+		dnl by 3.11 there's a function for setting the ki_cancel
+		dnl member in a struct of type kiocb.
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/wait.h>
+			#include <linux/aio.h>
+		],
+                [
+                        struct kiocb *iocb;
+                        int (*aio_cancel)(struct kiocb *, struct io_event *);
+                        kiocb_set_cancel_fn(iocb, aio_cancel);
+                ],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_KIOCB_SET_CANCEL_FN, 1, Define if we have kiocb_set_cancel_fn),
+			AC_MSG_RESULT(no)
+		)
+
 		tmp_cflags=$CFLAGS
 		dnl if this test passes, the signature of aio_read has changed to the new one 
 		CFLAGS="$CFLAGS -Werror"
@@ -1537,6 +1608,26 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(NO)
 		)
 
+	dnl by 3.11 the invalidatepage address_space_operation has three
+	dnl has three arguments.
+	AC_MSG_CHECKING(for three argument invalidatepage function)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		], 
+                [
+			struct address_space_operations aso;
+
+			struct page *p;
+			unsigned int i,j;
+
+			aso.invalidatepage(p,i,j);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_THREE_ARGUMENT_INVALIDATEPAGE, 1, Define if invalidatepage function has three arguments),
+		AC_MSG_RESULT(NO)
+		)
+
 	dnl In 2.6.18.1 and newer, including <linux/config.h> will throw off a
 	dnl warning 
 	tmp_cflags=${CFLAGS}
@@ -2241,6 +2332,30 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
         CFLAGS=$tmp_cflags
 
+        dnl in 3.11 dentry operations struct d_hash function went back to just
+        dnl having 2 parameters, similar to the way is was back in 2.6,
+        dnl only the first parameter is "const struct dentry *" instead of
+        dnl "struct dentry *"... 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for two-param dentry_operations.d_hash with const)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_hash_t(const struct dentry *d, 
+                                    struct qstr * q)
+                { return 0; }
+	], 
+	[ 
+                d.d_hash = d_hash_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_D_HASH_WITH_CONST, 1, [Define if d_hash member of dentry_operations has two params, where the first param is a const ]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
         dnl dentry operations struct d_compare function has a different 
         dnl signature in 2.6.38 and newer, split out dentry/inodes, string and
@@ -2271,6 +2386,31 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
         CFLAGS=$tmp_cflags
 
+        dnl dentry operations struct d_compare function has five parameters
+        dnl in 3.11
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for five-param dentry_operations.d_compare)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_compare_t(const struct dentry *d1, 
+                                       const struct dentry *d2, 
+                                       unsigned int len, 
+                                       const char *str, 
+                                       const struct qstr *qstr)
+                { return 0; }
+	], 
+	[ 
+                d.d_compare = d_compare_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FIVE_PARAM_D_COMPARE, 1, [Define if d_compare member of dentry_operations has five params]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
         dnl dentry operations struct d_delete argumentis constified in  
         dnl 2.6.38 and newer
@@ -2311,6 +2451,28 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_DENTRY_D_COUNT_ATOMIC, 1, [Define if d_count member of dentry is of type atomic_t]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl in 3.11 struct dentry no longer has a d_count member,
+        dnl the ref count is in its own structure, and that structure
+        dnl (struct lockref d_lockref) contains the ref count.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for dentry with lockref struct)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                unsigned int x;
+	], 
+	[ 
+                x = d.d_lockref.count
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DENTRY_LOCKREF_STRUCT, 1, [Define if dentry struct has a lockref struct member]),
 	AC_MSG_RESULT(no)
 	)
         CFLAGS=$tmp_cflags

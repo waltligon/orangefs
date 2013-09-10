@@ -107,11 +107,22 @@ static int pvfs2_readpages(
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+static void pvfs2_invalidatepage(struct page *page, 
+                                 unsigned int offset,
+                                 unsigned int length)
+#else
 static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
+#endif
 {
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
+                "(offset is %u)\n", page, offset);
+#else
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
+#endif
 
     ClearPageUptodate(page);
     ClearPageMappedToDisk(page);
