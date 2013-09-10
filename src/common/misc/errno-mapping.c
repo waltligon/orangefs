@@ -48,13 +48,16 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     }
     else
     {
-#if defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
+#if defined(__DARWIN__)
+    ret = strerror_r(tmp, buf, (size_t)limit);
+#elif defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
             limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
             strncpy(buf, tmpbuf, (size_t)limit);
         }
+        /* A misnomer - tempbuf is guaranteed to be non-null */
         ret = (tmpbuf ? 0 : -1);
 #elif defined(WIN32)
         ret = (int) strerror_s(buf, (size_t) limit, tmp);

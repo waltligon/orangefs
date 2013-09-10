@@ -3025,16 +3025,18 @@ off_t telldir (DIR *dir)
  */
 int closedir (DIR *dir)
 {
+    int rc;
     gossip_debug(GOSSIP_USRINT_DEBUG, "closedir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return -1;
     }
+    rc = close(dir->fileno);
     free(dir->buf_base);
     dir->_flags = 0;
     free(dir);
-    return 0;
+    return rc;
 }
 
 #ifdef PVFS_SCANDIR_VOID

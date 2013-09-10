@@ -2013,7 +2013,7 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
                                         PVFS_object_ref *file_ref,
                                         int use_cache)
  {
-    int dupfd = -1, flags = 0; 
+    int dupfd = -1, flags = 0, rc = 0; 
     pvfs_descriptor *pd;
     /* insure one thread at a time is in */
     /* fd setup section */
@@ -2030,8 +2030,23 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
     {
         /* PVFS file allocate a real descriptor for it */
         newfd = dupfd = glibc_ops.dup(shmobj);
+        if (newfd < 0)
+        {
+            gossip_lerr("dup failed in alloc_des\n");
+            return NULL;
+        }
         flags = glibc_ops.fcntl(newfd, F_GETFD);
-        glibc_ops.fcntl(newfd, F_SETFD, flags | FD_CLOEXEC);
+        if (flags < 0)
+        {
+            gossip_lerr("fcntl failed in alloc_des\n");
+            return NULL;
+        }
+        rc = glibc_ops.fcntl(newfd, F_SETFD, flags | FD_CLOEXEC);
+        if (rc < 0)
+        {
+            gossip_lerr("fcntl failed in alloc_des\n");
+            return NULL;
+        }
     }
     else
     {
@@ -2041,6 +2056,7 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
             flags = glibc_ops.fcntl(newfd, F_GETFL);
             if (flags < 0)
             {
+                gossip_lerr("fcntl failed in alloc_des\n");
                 return NULL;
             }
         }
@@ -2056,8 +2072,23 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
                 return NULL;
             }
             newfd = dupfd = glibc_ops.dup2(shmobj, newfd);
+            if (newfd < 0)
+            {
+                gossip_lerr("dup2 failed in alloc_des\n");
+                return NULL;
+            }
             flags = glibc_ops.fcntl(newfd, F_GETFD);
-            glibc_ops.fcntl(newfd, F_SETFD, flags | FD_CLOEXEC);
+            if (flags < 0)
+            {
+                gossip_lerr("fcntl failed in alloc_des\n");
+                return NULL;
+            }
+            rc = glibc_ops.fcntl(newfd, F_SETFD, flags | FD_CLOEXEC);
+            if (rc < 0)
+            {
+                gossip_lerr("fcntl failed in alloc_des\n");
+                return NULL;
+            }
         }
     }
     if (descriptor_table[newfd])
@@ -2199,6 +2230,15 @@ int pvfs_dup_descriptor(int oldfd, int newfd, int flags, int fcntl_dup)
                         errno = EMFILE;
                         return -1;
                     }
+                }
+                if (errno != EBADF)
+                {
+                    gossip_err("error in pvfs_dup_descriptor\n");
+                }
+                else
+                {
+                    /* EBADF means an unused fd - not a real error */
+                    errno = 0;
                 }
             }
             else /* this is dup2 or dup3 */

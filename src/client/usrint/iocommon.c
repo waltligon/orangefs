@@ -998,12 +998,12 @@ pvfs_descriptor *iocommon_open(const char *path,
              */
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(directory);
+            int plen = strlen(path);
             int mlen = dlen + plen + 2;
             tmp_path = (char *)malloc(mlen);
             strncpy(tmp_path, pdir->s->dpath, dlen + 1);
             strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            strncat(tmp_path, path, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);

@@ -28,6 +28,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
 
+
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -793,7 +794,7 @@ static PINT_sm_action create_parent_getattr_inspect(
                  * directly into a 64 bit integer, rather than converting
                  * from the int format that dotconf supports.
                  */
-                ret = sscanf(val[i], SCANF_lld, &tmp_val);
+                ret = sscanf(val[i], SCANF_lld, (SCANF_lld_type *)&tmp_val);
                 if(ret != 1)
                 {
                     gossip_err(

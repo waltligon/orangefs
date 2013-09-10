@@ -119,6 +119,7 @@ typedef unsigned long sector_t;
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
+#include "pvfs2-internal.h"
 
 /*
   this attempts to disable the annotations used by the 'sparse' kernel
@@ -209,12 +210,12 @@ enum pvfs2_vfs_op_states {
 #define get_op(op) \
     do {\
         atomic_inc(&(op)->aio_ref_count);\
-        gossip_debug(GOSSIP_CACHE_DEBUG, "(get) Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+        gossip_debug(GOSSIP_CACHE_DEBUG, "(get) Alloced OP (%p:%llu)\n", op, llu((op)->tag));\
     } while(0)
 #define put_op(op) \
     do {\
         if (atomic_sub_and_test(1, &(op)->aio_ref_count) == 1) {\
-            gossip_debug(GOSSIP_CACHE_DEBUG, "(put) Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+            gossip_debug(GOSSIP_CACHE_DEBUG, "(put) Releasing OP (%p:%llu)\n", op, llu((op)->tag));\
             op_release(op);\
         }\
     } while(0)
@@ -224,7 +225,7 @@ enum pvfs2_vfs_op_states {
 /* Defines for controlling whether I/O upcalls are for async or sync operations */
 enum PVFS_async_io_type 
 {
-     PVFS_VFS_SYNC_IO = 0,
+    PVFS_VFS_SYNC_IO = 0,
     PVFS_VFS_ASYNC_IO = 1,
 };
 
@@ -981,7 +982,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode);
 
 int pvfs2_unmount_sb(struct super_block *sb);
 
-int pvfs2_cancel_op_in_progress(unsigned long tag);
+int pvfs2_cancel_op_in_progress(uint64_t tag);
 
 PVFS_time pvfs2_convert_time_field(void *time_ptr);
 
