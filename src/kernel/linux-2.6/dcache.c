@@ -251,7 +251,7 @@ static int pvfs2_d_hash(
     return 0;
 }
 
-#if defined  HAVE_SEVEN_PARAM_D_COMPARE || HAVE_FIVE_PARAM_D_COMPARE
+#if defined  HAVE_SEVEN_PARAM_D_COMPARE || defined HAVE_FIVE_PARAM_D_COMPARE
 #if defined HAVE_SEVEN_PARAM_D_COMPARE
 static int pvfs2_d_compare(const struct dentry *parent, 
                            const struct inode * pinode,
