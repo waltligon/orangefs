@@ -107,11 +107,22 @@ static int pvfs2_readpages(
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+static void pvfs2_invalidatepage(struct page *page, 
+                                 unsigned int offset,
+                                 unsigned int length)
+#else
 static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
+#endif
 {
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
+                "(offset is %u)\n", page, offset);
+#else
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
+#endif
 
     ClearPageUptodate(page);
     ClearPageMappedToDisk(page);
@@ -205,7 +216,11 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         if ((iattr->ia_valid & ATTR_SIZE) &&
            iattr->ia_size != i_size_read(inode)) 
         {
+#ifdef HAVE_VMTRUNCATE
             ret = vmtruncate(inode, iattr->ia_size);
+#else
+            ret = inode_newsize_ok(inode, iattr->ia_size);
+#endif
             if (ret)
                 return ret;
         }
@@ -374,7 +389,9 @@ struct inode_operations pvfs2_file_inode_operations =
     listxattr: pvfs2_listxattr,
 #endif
 #else
+#ifdef HAVE_VMTRUNCATE
     .truncate = pvfs2_truncate,
+#endif
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
 #ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
