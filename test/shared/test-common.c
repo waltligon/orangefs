@@ -100,7 +100,7 @@ int create_pvfs2tab_file(
 
 
     /* Construct unique name for pvfstab file (use the pid to make it unique) */
-    retval = snprintf(buffer, sizeof(buffer), "/usr/tmp/pvfs2tab_%d", getpid());
+    retval = snprintf(buffer, sizeof(buffer), "/tmp/pvfs2tab_%d", getpid());
     if ((retval+1) > sizeof(buffer))  /* retval does not include NULL terminator */
     {
         print_error("Internal variable \"buffer\" too short.\n"
@@ -464,6 +464,7 @@ int create_file(
     struct file_ref stFileRef;
    
     /* Remove the file before trying to create it */
+    printf("\tRemoving file if it exists. Any errors may be safely ignored.");
     remove_file(fileName, use_pvfs2_lib, verbose); 
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
   
@@ -536,6 +537,7 @@ int create_directory(
     if(use_pvfs2_lib)
     {
 	/* Remove the directory before creating it. */
+	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
 	if(verbose) 
         {
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, directory);
@@ -571,6 +573,7 @@ int create_directory(
     else
     {
 	/* A bit naive, but these test directories should be empty*/
+	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
 	ret = rmdir(directory);
 	
 	ret = mkdir(directory, mode);
@@ -698,7 +701,8 @@ int remove_file(
     }
     else
     {
-        ret = unlink(fileName);
+        
+	ret = unlink(fileName);
         if(ret != 0)
         {
             ret = errno;
