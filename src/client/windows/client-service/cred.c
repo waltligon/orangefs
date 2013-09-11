@@ -197,7 +197,9 @@ int init_credential(PVFS_uid uid,
     /* sign credential depending on mode */
     if (goptions->security_mode == SECURITY_MODE_KEY)
     {
-        if ((ret = sign_credential((key_file != NULL) ? key_file : goptions->key_file, cred)) != 0)
+        if ((ret = sign_credential((key_file != NULL) ? 
+                                    key_file : 
+                                    goptions->key_file, cred)) != 0)
         {
             cleanup_credential(cred);
             return ret;

@@ -386,7 +386,7 @@ int get_proxy_cert_credential(HANDLE huser,
             userid, cert_dir);
         report_cert_error(error_msg);
         ret = -1;
-        goto get_cert_credential_exit;
+        goto get_proxy_cert_credential_exit;
     }
 
     do
@@ -426,7 +426,7 @@ int get_proxy_cert_credential(HANDLE huser,
     }
     
     if (ret != 0)
-        goto get_cert_credential_exit;
+        goto get_proxy_cert_credential_exit;
 
     /* load CA cert */
     ret = PINT_load_cert_from_file(goptions->ca_file, &ca_cert);
@@ -436,7 +436,7 @@ int get_proxy_cert_credential(HANDLE huser,
             "certificate %s. See subsequent log messages for details", 
             userid, goptions->ca_file);
         report_cert_error(error_msg);
-        goto get_cert_credential_exit;
+        goto get_proxy_cert_credential_exit;
     }
 
     /* read and cache credential from certificate */
@@ -447,7 +447,7 @@ int get_proxy_cert_credential(HANDLE huser,
         *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
     }
 
-get_cert_credential_exit:
+get_proxy_cert_credential_exit:
 
     /* error handling */
     if (ret == OPENSSL_CERT_ERROR)

@@ -53,7 +53,7 @@ int fs_initialize(const char *tabfile,
                   char *error_msg,
                   size_t error_msg_len)
 {
-    int ret, i, found_one = 0;
+    int ret;
     char errbuf[256];
 
     /* read tab file */
@@ -70,26 +70,22 @@ int fs_initialize(const char *tabfile,
     if (ret < 0)
     {
         PVFS_strerror_r(ret, errbuf, 256);
-        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", errbuf);
+        _snprintf(error_msg, error_msg_len, "fs_initialize: PVFS_sys_initialize "
+            "returned '%s' (%d)", errbuf, ret);
         return ret;
     }
     
     /* initialize file systems */
-    for (i = 0; i < tab->mntent_count; i++)
+    ret = PVFS_sys_fs_add(&tab->mntent_array[0]);
+    if (ret != 0)
     {
-        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-        if (ret == 0)
-            found_one = 1;
-    }
-
-    if (!found_one)
-    {
-        _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
-            "file systems from %s", tab->tabfile_name);
+        _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize "
+            "file system from %s.\n\nCheck whether file system is running and "
+            "network route from client to server", tab->tabfile_name);
 
         PINT_release_pvfstab();
         PVFS_sys_finalize();
-        return -1;
+        return ret;
     }
 
     return 0;

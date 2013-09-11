@@ -623,10 +623,11 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "Could not get tabfile path (%d)\n", ret);
         goto exit_main;
-    }   
+    }
+    
+    tab = PVFS_util_parse_pvfstab(tabfile);
 #endif
 
-    tab = PVFS_util_parse_pvfstab(tabfile);    
     if (tab == NULL)
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");

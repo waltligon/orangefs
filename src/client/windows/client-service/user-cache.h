@@ -16,6 +16,9 @@
 #include "pvfs2.h"
 #include "quickhash.h"
 
+#define USER_CACHE_HIT    0
+#define USER_CACHE_MISS   1
+
 struct user_entry
 {
     struct qhash_head hash_link;

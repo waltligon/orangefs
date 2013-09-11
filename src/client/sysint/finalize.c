@@ -29,6 +29,8 @@ extern job_context_id pint_client_sm_context;
 
 extern PINT_smcb *g_smcb;
 
+extern int pvfs_sys_init_flag;
+
 /* PVFS_finalize
  *
  * shuts down the PVFS system interface
@@ -90,7 +92,10 @@ int PVFS_sys_finalize()
 
     PINT_client_state_machine_release(g_smcb);
 
+    pvfs_sys_init_flag = 0;
+
     finiflag = 1;
+    
     gen_mutex_unlock(&finimutex);
     return 0;
 }

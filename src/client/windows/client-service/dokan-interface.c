@@ -419,8 +419,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     char buffer[1024], user_name[256], domain_name[256];
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
-    ASN1_UTCTIME *expires;
-    int ret;
+    ASN1_UTCTIME *expires = NULL;
+    int cache_hit, ret = 0;
 
     DbgPrint("   get_requestor_credential: enter\n");
 
@@ -463,8 +463,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     }
 
     /* search user list for credential */
-    ret = get_cache_user(user_name, credential);
-    if (ret == 1)
+    cache_hit = get_cache_user(user_name, credential);
+    if (cache_hit == USER_CACHE_MISS)
     {
         /* cache miss */
         if (goptions->user_mode == USER_MODE_LIST)
@@ -478,34 +478,20 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         {
             /* load credential from certificate */
             ret = get_proxy_cert_credential(htoken, user_name, credential, &expires);
-            if (ret == 0)
-            {
-                add_cache_user(user_name, credential, expires);
-            }
-            else
-            {
-                /* error reporting has been done through DbgPrint...
-                   result is access denied */
-                ret = -ERROR_ACCESS_DENIED;
-            }
         }
         else if (goptions->user_mode == USER_MODE_LDAP) 
         {
             ret = get_ldap_credential(user_name, credential);
-            if  (ret == 0)
-            {
-                add_cache_user(user_name, credential, NULL);
-            }
-            else
-            {
-                /* error reporting has been done through DbgPrint...
-                   result is access denied */
-                ret = -ERROR_ACCESS_DENIED;
-            }
         }
         else if (goptions->user_mode == USER_MODE_SERVER)
         {
             ret = get_user_cert_credential(user_name, credential, &expires);
+        }
+
+        /* cache user if credential created */
+        if (ret == 0)
+        {
+            add_cache_user(user_name, credential, expires);
         }
     }
 
@@ -513,7 +499,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     DbgPrint("   get_requestor_credential: exit\n");
 
-    return ret;
+    /* if credential can't be created report access denied */
+    return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
 }
 
 /* Get FS credential from cache or mapping system (based on requestor) */
