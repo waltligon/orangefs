@@ -74,9 +74,17 @@ static int threaded_queues_init(struct PINT_manager_s *manager,
             free(w->threads);
             gen_cond_destroy(&w->cond);
         }
+/* On Darwin, thread_id is a structure, not a value. */
+#if defined(__DARWIN__)
+        gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p:thread #%d.\n"
+                                      ,__func__
+                                      ,w->threads[i].thread_id,i);
+#else
         gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d:thread #%d.\n"
                                       ,__func__
                                       ,(int)w->threads[i].thread_id,i);
+#endif		
+
     }
 
 exit:
@@ -340,11 +348,19 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     manager = worker->manager;
     gen_mutex_unlock(&thread->mutex);
 
+#if defined(__DARWIN__)
+    gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %p:worker location is %p: manager location is %p.\n"
+                                  ,__func__
+                                  ,thread->thread_id
+                                  ,worker
+                                  ,manager);
+#else
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %d:worker location is %p: manager location is %p.\n"
                                   ,__func__
                                   ,(int)thread->thread_id
                                   ,worker
                                   ,manager);
+#endif
 
     gen_mutex_lock(&worker->mutex);
     op_count = worker->attr.ops_per_queue;
@@ -355,11 +371,19 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     }
     gen_mutex_unlock(&worker->mutex);
 
+#if defined(__DARWIN__)
+    gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %p:op-count is %d:timeout is %d.\n"
+                                  ,__func__
+                                  ,thread->thread_id
+                                  ,op_count
+                                  ,timeout);
+#else
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %d:op-count is %d:timeout is %d.\n"
                                   ,__func__
                                   ,(int)thread->thread_id
                                   ,op_count
                                   ,timeout);
+#endif
     qentries = malloc(sizeof(PINT_queue_entry_t *) * op_count);
     if(!qentries)
     {
@@ -370,9 +394,16 @@ static void *PINT_worker_queues_thread_function(void * ptr)
 
     gen_mutex_lock(&thread->mutex);
     thread->running = 1;
+
+#if defined(__DARWIN__)
+    gossip_debug(GOSSIP_MGMT_DEBUG,"%s: starting thread function for thread_id %p\n"
+                                  ,__func__
+                                  ,thread->thread_id);
+#else
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s: starting thread function for thread_id %d\n"
                                   ,__func__
                                   ,(int)thread->thread_id);
+#endif
     while(thread->running)
     {
         /* unlock the thread mutex to allow someone else
@@ -437,20 +468,41 @@ static void *PINT_worker_queues_thread_function(void * ptr)
 
             if(op_count > 0)
             {
+
+#if defined(__DARWIN__)
+                gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: op_count is %d.\n"
+                                              ,__func__
+                                              ,thread->thread_id,op_count);
+#else
                 gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d: op_count is %d.\n"
                                               ,__func__
                                               ,(int)thread->thread_id,op_count);
+#endif
                 for(i = 0; i < op_count; ++i)
                 {
                     struct PINT_op_entry *op_entry;
+
+#if defined(__DARWIN__)
+                    gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: i is %d.\n"
+                                                  ,__func__
+                                                  ,thread->thread_id,i);
+#else
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d: i is %d.\n"
                                                   ,__func__
                                                   ,(int)thread->thread_id,i);
+#endif
                     op = PINT_op_from_qentry(qentries[i]);
                     /* service the operation */
+
+#if defined(__DARWIN__)
+                    gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: calling PINT_manager_service_op.\n"
+                                                  ,__func__
+                                                  ,thread->thread_id);
+#else
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d: calling PINT_manager_service_op.\n"
                                                   ,__func__
                                                   ,(int)thread->thread_id);
+#endif
                     ret = PINT_manager_service_op(
                         manager, op, &service_time, &error);
                     if(ret < 0)
@@ -459,9 +511,15 @@ static void *PINT_worker_queues_thread_function(void * ptr)
                         goto free_ops;
                     }
 
+#if defined(__DARWIN__)
+                    gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: calling PINT_manager_complete_op.\n"
+                                                  ,__func__
+                                                  ,thread->thread_id);
+#else
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d: calling PINT_manager_complete_op.\n"
                                                   ,__func__
                                                   ,(int)thread->thread_id);
+#endif
                     ret = PINT_manager_complete_op(
                         manager, op, error);
                     if(ret < 0)
