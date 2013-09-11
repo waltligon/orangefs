@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <openssl/err.h>
 #include <openssl/pem.h>
 
 #include "pint-util.h"
@@ -20,44 +21,62 @@
 
 extern PORANGEFS_OPTIONS goptions;
 
+/* sign credential using specified PEM private key file */
 int sign_credential(const char *key_file, 
                     PVFS_credential *cred)
 {
     FILE *fkey;
     EVP_PKEY *privkey;
+    BOOL key_flag = FALSE;
     const EVP_MD *md;
     EVP_MD_CTX mdctx;
-    int ret;
+    int ret = 0, err;
+
+    DbgPrint("    sign_credential: enter\n");
 
     if (key_file == NULL || cred == NULL)
     {
+        report_error("   sign_credential:", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
-    /* TODO: cache key in goptions */
-
-    /* read in client private key */
-    fkey = fopen(key_file, "r");
-    if (fkey == NULL)
+    if (goptions->security_mode == SECURITY_MODE_KEY)
     {
-        return -PVFS_ENOENT;
+        privkey = (EVP_PKEY *) goptions->private_key;
     }
-
-    privkey = PEM_read_PrivateKey(fkey, NULL, NULL, NULL);
-
-    fclose(fkey);
-
-    if (privkey == NULL)
+    else
     {
-        /* TODO */
-        return -PVFS_ESECURITY;
+        /* read in client private key */
+        fkey = fopen(key_file, "r");
+        if (fkey == NULL)
+        {
+            err = errno;
+            report_error("   sign_credential:", PVFS_errno_to_error(err));
+            return err;
+        }
+
+        privkey = PEM_read_PrivateKey(fkey, NULL, NULL, NULL);
+
+        fclose(fkey);
+
+        if (privkey == NULL)
+        {
+            report_error("   sign_credential:", -PVFS_ESECURITY);
+            return -PVFS_ESECURITY;
+        }
+
+        key_flag = TRUE;
     }
 
     /* sign credential using private key */
     cred->signature = (PVFS_signature) malloc(EVP_PKEY_size(privkey));
     if (cred->signature == NULL)
     {
-        EVP_PKEY_free(privkey);
+        report_error("   sign_credential:", -PVFS_ENOMEM);
+        if (key_flag)
+        {
+            EVP_PKEY_free(privkey);
+        }
         return -PVFS_ENOMEM;
     }
 
@@ -74,28 +93,37 @@ int sign_credential(const char *key_file,
     ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
     if (!ret)
     {
-        /* TODO */
-        free(cred->signature);
-        EVP_MD_CTX_cleanup(&mdctx);
-        EVP_PKEY_free(privkey);
-        return -PVFS_ESECURITY;
+        ret = -PVFS_ESECURITY;
+        goto sign_credential_error;
     }
     ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size, privkey);
     if (!ret)
     {
-        /* TODO */
-        free(cred->signature);
-        EVP_MD_CTX_cleanup(&mdctx);
-        EVP_PKEY_free(privkey);
-        return -PVFS_ESECURITY;
+        ret = -PVFS_ESECURITY;
+        goto sign_credential_error;
     }
 
+    ret = 0;
+
+    goto sign_credential_exit;
+
+sign_credential_error:
+
+    report_error("   sign_credential: signing error:", -PVFS_ESECURITY);
+    free(cred->signature);
+
+sign_credential_exit:
+
     EVP_MD_CTX_cleanup(&mdctx);
-    EVP_PKEY_free(privkey);
+    if (key_flag)
+    {
+        EVP_PKEY_free(privkey);
+    }
 
-    return 0;
+    DbgPrint("    sign_credential: exit (%d)\n", ret);
+
+    return ret;
 }
-
 
 /* initialize and sign credential - credential must be allocated */ 
 int init_credential(PVFS_uid uid,
@@ -107,8 +135,11 @@ int init_credential(PVFS_uid uid,
 {
     int ret = 0;
 
+    DbgPrint("    init_credential: enter\n");
+
     if (group_array == NULL || cred == NULL || num_groups == 0)
     {
+        report_error("   init_credential:", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
@@ -118,20 +149,27 @@ int init_credential(PVFS_uid uid,
     cred->issuer = (char *) malloc(PVFS_REQ_LIMIT_ISSUER);
     if (!cred->issuer)
     {
+        report_error("   init_credential:", -PVFS_ENOMEM);
         return -PVFS_ENOMEM;
     }
     strcpy(cred->issuer, "C:");
-    if (!gethostname(cred->issuer+2, PVFS_REQ_LIMIT_ISSUER-3))
+    if (gethostname(cred->issuer+2, PVFS_REQ_LIMIT_ISSUER-3) == SOCKET_ERROR)
     {
+        char errbuf[256];
+
+        _snprintf(errbuf, sizeof(errbuf), "    init_credential (gethostname): %d", 
+            WSAGetLastError());
+        report_error(errbuf, -PVFS_EINVAL);
         free(cred->issuer);
-        return -PVFS_ENOMEM;
+        return ret;
     }
 
     /* fill in uid/groups for non-cert modes */
     cred->group_array = (PVFS_gid *) malloc(sizeof(PVFS_gid) * num_groups);
     if (!cred->group_array)
     {
-         return -PVFS_ENOMEM;
+        report_error("   init_credential:", -PVFS_ENOMEM);
+        return -PVFS_ENOMEM;
     }
 
     /* set groups and uid */
@@ -173,6 +211,8 @@ int init_credential(PVFS_uid uid,
             return ret;
         }
     }
+
+    DbgPrint("   init_credential: exit (%d)\n", ret);
 
     return ret;
 }

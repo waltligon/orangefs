@@ -13,18 +13,17 @@
 
 #include "wincommon.h"
 
-#define USER_MODE_NONE   0
-#define USER_MODE_LIST   1
-#define USER_MODE_CERT   2
-#define USER_MODE_LDAP   3
-#define USER_MODE_SERVER 4
+#define STR_BUF_LEN         320
+
+#define USER_MODE_NONE        0
+#define USER_MODE_LIST        1
+#define USER_MODE_CERT        2
+#define USER_MODE_LDAP        3
+#define USER_MODE_SERVER      4
 
 #define SECURITY_MODE_DEFAULT 0
 #define SECURITY_MODE_KEY     1
 #define SECURITY_MODE_CERT    2
-
-#define CERT_MODE_PROXY 0
-#define CERT_MODE_USER  1
 
 typedef struct
 {
@@ -49,14 +48,14 @@ typedef struct
                  new_dir_perms;
     int debug;
     int debug_stderr;
-    char debug_mask[256];
+    char debug_mask[STR_BUF_LEN];
     int debug_file_flag;
     char debug_file[MAX_PATH];
     int user_mode;
     int security_mode;
     int security_timeout;
     char key_file[MAX_PATH];
-    int cert_mode;
+    void *private_key;
     char cert_dir_prefix[MAX_PATH];
     char ca_file[MAX_PATH];
     LDAP_OPTIONS ldap;
@@ -66,5 +65,7 @@ void DbgPrint(char *format, ...);
 
 BOOL report_error_event(char *message, 
                         BOOL startup);
+
+void report_error(const char *msg, int err);
 
 #endif

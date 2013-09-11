@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <openssl/err.h>
+
 #include "gen-locks.h"
 #include "gossip.h"
 
@@ -118,8 +120,8 @@ DWORD init_event_log()
     return GetLastError();
 }
 
-/* Report an error to the Event Log, service log (file), and stderr. The 
-   entire text of the message is displayed without modification. */
+/* Report an error to the Event Log, service log (file), and debug
+   log. The entire text of the message is displayed without modification. */
 BOOL report_error_event(char *message, BOOL startup)
 {
     char *strings[1];
@@ -136,6 +138,9 @@ BOOL report_error_event(char *message, BOOL startup)
             fprintf(stderr, "%s\n", message);
         }
     }
+
+    DbgPrint("Error reported:\n");
+    DbgPrint("%s\n", message);
 
     if (hevent_log != NULL)
     {
@@ -201,6 +206,42 @@ void close_event_log()
 {
     if (hevent_log != NULL)
         DeregisterEventSource(hevent_log);
+}
+
+/* report error through logging mechanism */
+void report_error(const char *msg, int err)
+{
+    unsigned long ssl_err;
+    char errstr[1024], errbuf[256];
+
+    errstr[0] = '\0';
+    if (msg)
+    {
+        _snprintf(errstr, sizeof(errstr), "%s\n", msg);
+    }
+
+    if (err == -PVFS_ESECURITY)
+    {
+        /* build string from OpenSSL error queue */        
+        while ((ssl_err = ERR_get_error()) != 0)
+        {
+            ERR_error_string_n(ssl_err, errbuf, sizeof(errbuf));
+            errbuf[sizeof(errbuf)-1] = '\0';
+            if (strlen(errstr) + strlen(errbuf) + 2 < sizeof(errstr))
+            {
+                strcat(errstr, errbuf);
+                strcat(errstr, "\n");
+            }
+        }
+    }
+    else
+    {
+        PVFS_strerror_r(err, errstr, sizeof(errstr)-1);
+        errstr[sizeof(errstr)-1] = '\0';
+    }
+
+    report_error_event(errstr, FALSE);
+
 }
 
 BOOL check_mount_point(const char *mount_point)

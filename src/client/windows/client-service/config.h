@@ -16,8 +16,6 @@
 
 #include "client-service.h"
 
-#define STR_BUF_LEN              320
-
 /* struct for user entries */
 typedef struct {
     char user_name[STR_BUF_LEN];

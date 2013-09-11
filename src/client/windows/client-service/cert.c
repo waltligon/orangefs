@@ -64,31 +64,6 @@ static void _report_cert_error(char *message, char *fn_name)
 
 }
 
-/* load certificate from file (PEM format) */
-/* TODO: remove 
-static unsigned long load_cert_from_file(char *path, 
-                                         X509 **cert)
-{
-    FILE *f;
-
-    if (path == NULL || cert == NULL)
-        return -1;
-
-    f = fopen(path, "r");
-    if (f == NULL)
-        return errno;
-
-    *cert = PEM_read_X509(f, NULL, NULL, NULL);
-
-    fclose(f);
-
-    if (*cert == NULL)
-        return OPENSSL_CERT_ERROR;
-
-    return 0;
-}
-*/
-
 static int get_proxy_auth_ex_data_cred()
 {
     static volatile int idx = -1;
@@ -508,93 +483,6 @@ get_cert_credential_exit:
     return ret;
 }
 
-/* TODO: remove */
-#if 0
-
-#define ORANGEFS_USER_VAR_LEN    15
-
-/* copy string segment */
-#define COPY_STR_SEG(pin, pout, ind, start, end) \
-    for (ind = (start); ind < (end); ind++) \
-       *pout++ = pin[ind]
-                    
-/* Replace %ORANGEFS_USER% with userid */
-int expand_path(const char *inpath, 
-                const char *userid, 
-                char *outpath, 
-                unsigned int outlen)
-{
-    char *uppath, *pvar, *pseg, *pout;
-    unsigned int i, nvars, ind, tstart[16], sstart;
-
-    if (inpath == NULL || strlen(inpath) == 0 ||
-        userid == NULL || strlen(userid) == 0 ||
-        outpath == NULL || outlen == 0) 
-    {
-        return -PVFS_EINVAL;
-    }
-
-    /* make upper case string */
-    uppath = strdup(inpath);
-    
-    _strupr(uppath);
-
-    /* find %ORANGEFS_USER% tokens */
-    for (i = 0, pseg = uppath; 
-        (pvar = strstr(pseg, "%ORANGEFS_USER%")) && i < 16;
-        pseg += (pvar - pseg) + ORANGEFS_USER_VAR_LEN)
-    {
-        tstart[i++] = pvar - uppath;
-    }
-         
-    nvars = i;
-
-    /* check output length */
-    if (strlen(inpath) - (nvars * ORANGEFS_USER_VAR_LEN) + 
-        (nvars * strlen(userid)) + 1 > outlen)
-    {
-        free(uppath);
-        return -PVFS_EOVERFLOW;
-    }
-
-    /* no substitutions to make */
-    if (nvars == 0)
-    {
-        /* simply copy string - note length already checked */
-        strcpy(outpath, inpath);
-
-        return 0;
-    }
-
-    /* replace each token */
-    for (i = 0, sstart = 0, outpath[0] = '\0', pout = outpath;
-        i < nvars; 
-        sstart += tstart[i] + ORANGEFS_USER_VAR_LEN, i++)
-    {
-        /* append segment prior to token i */
-        COPY_STR_SEG(inpath, pout, ind, sstart, tstart[i]);
-
-        /* append userid substitution */
-        COPY_STR_SEG(userid, pout, ind, 0, strlen(userid));
-
-        /* segment after last token */
-        if (i+1 == nvars)
-        {
-            /* copy remainder of string */
-            COPY_STR_SEG(inpath, pout, ind, tstart[i] + ORANGEFS_USER_VAR_LEN, 
-                strlen(inpath));
-        }        
-    }
-    
-    /* null-terminate output string */
-    *pout = '\0';
-
-    free(uppath);
-
-    return 0;
-}
-#endif
-
 /* retrieve OrangeFS credential from user cert */
 int get_user_cert_credential(char *userid,
                              PVFS_credential *cred,
@@ -610,9 +498,13 @@ int get_user_cert_credential(char *userid,
        2. fill in fields (append certificate data to credential)
        3. sign credential 
      */
+    
+    DbgPrint("   get_user_cert_credential: enter\n");
+
     if (userid == NULL || strlen(userid) == 0 || cred == NULL ||
         expires == NULL)
     {
+        report_error("   get_user_cert_credential:", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
@@ -620,7 +512,7 @@ int get_user_cert_credential(char *userid,
     ret = PINT_get_security_path(goptions->key_file, userid, key_file, MAX_PATH);
     if (ret != 0)
     {
-        /* TODO: error reporting */
+        report_error("   get_user_cert_credential (key file path):", ret);        
         return ret;
     }
 
@@ -628,7 +520,7 @@ int get_user_cert_credential(char *userid,
     ret = PINT_get_security_path(goptions->cert_dir_prefix, userid, cert_file, MAX_PATH);
     if (ret != 0)
     {
-        /* TODO: error reporting */
+        report_error("   get_user_cert_credential (cert file path):", ret);        
         return ret;
     }
 
@@ -636,7 +528,7 @@ int get_user_cert_credential(char *userid,
     ret = PINT_load_cert_from_file(cert_file, &xcert);
     if (ret != 0)
     {
-        /* TODO: error reporting */
+        report_error("   get_user_cert_credential (cert load):", ret);        
         return ret; 
     }
 
@@ -644,7 +536,7 @@ int get_user_cert_credential(char *userid,
     ret = PINT_X509_to_cert(xcert, &cert);
     if (ret != 0)
     {
-        /* TODO: error reporting */
+        report_error("   get_user_cert_credential (convert cert):", ret);        
         X509_free(xcert);
         return ret;
     }

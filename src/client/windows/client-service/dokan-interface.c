@@ -98,7 +98,6 @@ void DbgPrint(char *format, ...)
     if (g_DebugMode) 
     {
         char buffer[DEBUG_BUF_SIZE];        
-        /* SYSTEMTIME sys_time; */            
         va_list argp;
 
         va_start(argp, format);
@@ -109,17 +108,7 @@ void DbgPrint(char *format, ...)
 #ifdef _DEBUG
         /* debug to debugger window */
         OutputDebugString(buffer);
-#endif
-        /*
-        GetLocalTime(&sys_time);
-        fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%4u) %s", 
-                sys_time.wYear, sys_time.wMonth, sys_time.wDay, 
-                sys_time.wHour, sys_time.wMinute, sys_time.wSecond, sys_time.wMilliseconds,
-                GetThreadId(GetCurrentThread()),
-                buffer);
-        fflush(g_DebugFile);
-        */
-        
+#endif        
         /* use gossip to debug to file or stderr (set in config file) */
         gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, "%s", buffer);
     }
@@ -400,10 +389,30 @@ int cred_compare(void *key,
     return (entry->context == *((ULONG64 *) key));
 }
 
+/* get credential for the "SYSTEM" user */
+static int get_system_credential(PVFS_credential *credential)
+{
+    int ret = 0;
+    PVFS_gid group_array[] = { 0 };
+    ASN1_UTCTIME *expires;
+
+    /* fill in "root" credential for client-side user mapping */
+    if (goptions->user_mode != USER_MODE_SERVER)
+    {
+        ret = init_credential(0, group_array, 1, NULL, NULL, credential);
+    }
+    else
+    {
+        ret = get_user_cert_credential("SYSTEM", credential, &expires);
+    }
+
+    return ret;
+}
+
 /* Get credential for requestor.
    Assumes credential is allocated but fields are not. */
-static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
-                                     PVFS_credential *credential)
+static int get_requestor_credential(PDOKAN_FILE_INFO file_info,                                    
+                                    PVFS_credential *credential)
 {
     HANDLE htoken;
     PTOKEN_USER token_user;
@@ -411,7 +420,6 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
     ASN1_UTCTIME *expires;
-    PVFS_gid gid;
     int ret;
 
     DbgPrint("   get_requestor_credential: enter\n");
@@ -444,17 +452,14 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         return err * -1;
     }
 
+    DbgPrint("   get_requestor_credential: requestor: %s\n", user_name);
     
-    /* system user functions as root */
-    /* TODO! */
+    /* get credential for system user */
     if (!stricmp(user_name, "SYSTEM"))
     {
-        gid = 0;
-        init_credential(0, &gid, 1, NULL, NULL, credential);
-
         CloseHandle(htoken);
 
-        return 0;
+        return get_system_credential(credential);
     }
 
     /* search user list for credential */
@@ -606,22 +611,39 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credential *credential, int perm
 {
     int mask;
 
-    /* root user (uid 0 or gid 0) always has rights */
-    if (credential->userid == 0 || credential_in_group(credential, 0))
-        return 1;
+    if (goptions->user_mode != USER_MODE_SERVER)
+    {
+        /* root user (uid 0 or gid 0) always has rights */
+        if (credential->userid == 0 || credential_in_group(credential, 0))
+            return 1;
     
-    if (attr->owner == credential->userid)
-        /* use owner mask */
-        mask = (attr->perms >> 6) & 7;
-    else if (credential_in_group(credential, attr->group))
-        /* use group mask */
-        mask = (attr->perms >> 3) & 7;
-    else
-        /* use other mask */
-        mask = attr->perms & 7;
+        if (attr->owner == credential->userid)
+            /* use owner mask */
+            mask = (attr->perms >> 6) & 7;
+        else if (credential_in_group(credential, attr->group))
+            /* use group mask */
+            mask = (attr->perms >> 3) & 7;
+        else
+            /* use other mask */
+            mask = attr->perms & 7;
 
-    if (mask & perm)
-        return 1;
+        if (mask & perm)
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        /* in server-side user mode, user is listed as having permission if 
+           any users have permission; server will handle insufficent perms. 
+           FUTURE: request rights mask from server (need new server request)
+         */        
+        if (((attr->perms & 7) & perm) || (((attr->perms >> 3) & 7) & perm) ||
+            (((attr->perms >> 6) & 7) & perm))
+        {
+            return 1;
+        }    
+    }
 
     return 0;
 }
@@ -2220,8 +2242,7 @@ PVFS_Dokan_get_disk_free_space(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
-    /* TODO! */
-    err = get_credential(DokanFileInfo, &credential);
+    err = get_system_credential(&credential);
     CRED_CHECK("GetDiskFreeSpace", err);
 
     ret = fs_get_diskfreespace(&credential,

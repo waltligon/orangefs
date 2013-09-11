@@ -14,6 +14,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <openssl/err.h>
+#include <openssl/pem.h>
+
 #include "pvfs2-types.h"
 #include "security-util.h"
 
@@ -412,10 +415,33 @@ static KEYWORD_CB(security_mode)
 
 static KEYWORD_CB(key_file)
 {
+    FILE *f;
+    char errbuf[256];
+
     KEYWORD_ARGS_CHECK();
 
     strncpy(options->key_file, args, MAX_PATH-2);
     options->key_file[MAX_PATH-2] = '\0';
+
+    /* cache private key in key mode */
+    if (options->security_mode == SECURITY_MODE_KEY)
+    {
+        f = fopen(options->key_file, "r");
+        if (f == NULL)
+        {
+            strerror_s(errbuf, sizeof(errbuf), errno);
+            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: could not open file "
+                "%s: %s (%d)", keyword, options->key_file, errbuf, errno);
+            return KEYWORD_ERR_INVALID_ARGS;
+        }
+    
+        options->private_key = PEM_read_PrivateKey(f, NULL, NULL, NULL);
+        if (options->private_key == NULL) {
+            report_error("   key-file option:", -PVFS_ESECURITY);
+        }
+
+        fclose(f);
+    }
 
     return 0;
 }
@@ -445,24 +471,7 @@ static KEYWORD_CB(cert_security)
 {
     KEYWORD_ARGS_CHECK();
 
-    if (!stricmp(keyword, "cert-mode"))
-    {
-        if (!stricmp(args, "proxy"))
-        {
-            options->cert_mode = CERT_MODE_PROXY;
-        }
-        else if (!stricmp(args, "user")) 
-        {
-            options->cert_mode = CERT_MODE_USER;
-        }
-        else
-        {
-            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"proxy\""
-                " or \"user\"", keyword);
-            return KEYWORD_ERR_INVALID_ARGS;
-        }
-    }
-    else if (!stricmp(keyword, "ca-file") || !stricmp(keyword, "ca-path"))
+    if (!stricmp(keyword, "ca-file") || !stricmp(keyword, "ca-path"))
     {
         strncpy(options->ca_file, args, MAX_PATH-2);
         options->ca_file[MAX_PATH-2] = '\0';
