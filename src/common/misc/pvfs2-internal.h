@@ -116,10 +116,12 @@
 #  define llu(x) (x)
 #  define lld(x) (x)
 #  define SCANF_lld "%lld"
+#  define SCANF_lld_type long
 #elif SIZEOF_LONG_INT == 8
 #  define llu(x) (unsigned long long)(x)
 #  define lld(x) (long long)(x)
 #  define SCANF_lld "%ld"
+#  define SCANF_lld_type long
 #else
 #  error Unexpected sizeof(long int)
 #endif
