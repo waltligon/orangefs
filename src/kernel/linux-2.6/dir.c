@@ -114,8 +114,12 @@ static void readdir_handle_dtor(readdir_handle_t *rhandle)
  */
 static int pvfs2_readdir(
     struct file *file,
+#ifdef HAVE_READDIR_FILE_OPERATIONS
     void *dirent,
     filldir_t filldir)
+#else
+    struct dir_context *ctx)
+#endif
 {
     int ret = 0, buffer_index, token_set = 0;
     PVFS_ds_position pos = 0;
@@ -265,7 +269,11 @@ get_new_buffer_index:
        gossip_debug(GOSSIP_DIR_DEBUG,"%s: calling filldir of \".\" with pos = %llu\n"
                                     ,__func__
                                     ,llu(pos));
+#ifdef HAVE_READDIR_FILE_OPERATIONS
        if ( (ret=filldir(dirent,".",1,pos,ino,DT_DIR)) < 0)
+#else
+       if ( (ret=dir_emit(ctx,".",1,ino,DT_DIR)) < 0)
+#endif
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
@@ -283,7 +291,11 @@ get_new_buffer_index:
        gossip_debug(GOSSIP_DIR_DEBUG,"%s: calling filldir of \"..\" with pos = %llu\n"
                                     ,__func__
                                     ,llu(pos));
+#ifdef HAVE_READDIR_FILE_OPERATIONS
        if ( (ret=filldir(dirent,"..",2,pos,ino,DT_DIR)) < 0)
+#else
+       if ( (ret=dir_emit(ctx,"..",2,ino,DT_DIR)) < 0)
+#endif
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
@@ -303,7 +315,11 @@ get_new_buffer_index:
         gossip_debug(GOSSIP_DIR_DEBUG, 
                     "calling filldir for %s with len %d, pos %ld\n",
                      current_entry, len, (unsigned long) pos);
+#ifdef HAVE_READDIR_FILE_OPERATIONS
         if ( (ret=filldir(dirent, current_entry, len, pos, current_ino, DT_UNKNOWN)) < 0)
+#else
+        if ( (ret=dir_emit(ctx,current_entry,len,current_ino,DT_UNKNOWN)) < 0)
+#endif
         {
            gossip_debug(GOSSIP_DIR_DEBUG, "filldir() failed. ret:%d\n",ret);
            if (token_set && (i < 2))
@@ -960,7 +976,11 @@ struct file_operations pvfs2_dir_operations =
     release : pvfs2_file_release,
 #else
     .read = generic_read_dir,
+#ifdef HAVE_READDIR_FILE_OPERATIONS
     .readdir = pvfs2_readdir,
+#else
+    .iterate = pvfs2_readdir,
+#endif
 #ifdef HAVE_READDIRPLUS_FILE_OPERATIONS
     .readdirplus = pvfs2_readdirplus,
 #endif

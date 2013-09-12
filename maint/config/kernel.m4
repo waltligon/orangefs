@@ -690,6 +690,21 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(no)
 	)
 	
+	dnl checking if we have a  readdir callback in file_operations
+	AC_MSG_CHECKING(for readdir member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdir = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIR_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdir callback),
+	    AC_MSG_RESULT(no)
+	    )
+
 	dnl checking if we have a readdirplus callback in file_operations
 	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
 	AC_TRY_COMPILE([
