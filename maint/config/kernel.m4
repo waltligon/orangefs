@@ -111,6 +111,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_CHECKING(for vmtruncate) 
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/mm.h>
 	], [
