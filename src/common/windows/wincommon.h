@@ -24,6 +24,8 @@
 #define index(s, c)    strchr(s, c)
 #define snprintf(s, n, f, ...)    _snprintf(s, n, f, __VA_ARGS__)
 #define strdup(s)      _strdup(s)
+#define strcasecmp     stricmp
+#define strncasecmp    strnicmp
 
 /*
  * gettimeofday

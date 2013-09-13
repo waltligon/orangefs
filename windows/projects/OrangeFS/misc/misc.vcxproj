@@ -91,6 +91,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -113,6 +114,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
@@ -136,6 +138,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -154,6 +157,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
@@ -175,6 +179,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -201,6 +206,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -220,7 +226,9 @@
     <ClCompile Include="..\..\..\..\src\common\dotconf\dotconf.c" />
     <ClCompile Include="..\..\..\..\src\common\llist\llist.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\digest.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\dist-dir-utils.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\extent-utils.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\md5.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\mmap-ra-cache.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\msgpairarray.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-cached-config.c" />
@@ -241,7 +249,9 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\common\dotconf\dotconf.h" />
     <ClInclude Include="..\..\..\..\src\common\llist\llist.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\dist-dir-utils.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\extent-utils.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\md5.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\mkspace.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\mmap-ra-cache.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\msgpairarray.h" />

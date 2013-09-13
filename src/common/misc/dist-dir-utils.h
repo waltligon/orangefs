@@ -77,7 +77,7 @@ int PINT_init_dist_dir_state(
 		PVFS_dist_dir_bitmap *bitmap_ptr,
 		const int num_servers, 
 		const int server_no, 
-		const int pre_dsg_num_server,
+		int pre_dsg_num_server,
                 const int split_size);
 int PINT_is_dist_dir_bucket_active(
 		const PVFS_dist_dir_attr *dist_dir_attr_p, 

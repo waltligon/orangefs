@@ -74,7 +74,7 @@ int PINT_init_dist_dir_state(
 		const int num_servers, 
 		const int server_no, 
 		int pre_dsg_num_server,
-                int split_size)
+                const int split_size)
 {
 	int i;
 
