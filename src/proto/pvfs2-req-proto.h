@@ -1006,27 +1006,25 @@ struct PVFS_servreq_mkdir
     */
     PVFS_handle_extent_array handle_extent_array;
 
-    /* NOTE: not using these now, may add these fields upon discussion */
     /* distributed directory request parameters */
-    /*
-       uint32_t num_total_dirdata_servers;
-       uint32_t num_initial_dirdata_servers;
-       */
+    int32_t distr_dir_servers_initial;
+    int32_t distr_dir_servers_max;
+    int32_t distr_dir_split_size;
 
-    /* assume all num_dirent_files are active */
-    int32_t num_dirent_files_req;
     /* NOTE: leave layout as final field so that we can deal with encoding
      * errors */
     PVFS_sys_layout layout;
 };
-endecode_fields_7_struct(
+endecode_fields_9_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_credential, credential,
     PVFS_object_attr, attr,
     PVFS_handle_extent_array, handle_extent_array,
-    int32_t, num_dirent_files_req,
+    int32_t, distr_dir_servers_initial,
+    int32_t, distr_dir_servers_max,
+    int32_t, distr_dir_split_size,
     PVFS_sys_layout, layout);
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
@@ -1038,7 +1036,9 @@ endecode_fields_7_struct(
                                 __fs_id,               \
                                 __ext_array,           \
                                 __attr,                \
-                                __num_dirent_files_req,\
+                                __distr_dir_servers_initial,\
+                                __distr_dir_servers_max,\
+                                __distr_dir_split_size,\
                                 __layout,              \
                                 __hints)               \
 do {                                                   \
@@ -1052,7 +1052,9 @@ do {                                                   \
         (__ext_array).extent_count;                    \
     (__req).u.mkdir.handle_extent_array.extent_array = \
         (__ext_array).extent_array;                    \
-    (__req).u.mkdir.num_dirent_files_req = (__num_dirent_files_req); \
+    (__req).u.mkdir.distr_dir_servers_initial = (__distr_dir_servers_initial); \
+    (__req).u.mkdir.distr_dir_servers_max = (__distr_dir_servers_max); \
+    (__req).u.mkdir.distr_dir_split_size = (__distr_dir_split_size); \
     (__req).u.mkdir.layout = __layout;                \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \

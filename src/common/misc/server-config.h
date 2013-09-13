@@ -178,7 +178,6 @@ typedef struct server_configuration_s
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */
     uint32_t  *precreate_low_threshold; /* threshold for each ds type */
-    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles when creating a new directory */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -247,6 +246,10 @@ typedef struct server_configuration_s
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;
+
+    int32_t distr_dir_servers_initial;
+    int32_t distr_dir_servers_max;
+    int32_t distr_dir_split_size;
 } server_configuration_s;
 
 int PINT_parse_config(

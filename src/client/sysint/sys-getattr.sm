@@ -1791,7 +1791,7 @@ static PINT_sm_action getattr_set_sys_response(
 
         if (sm_p->getattr.req_attrmask & PVFS_ATTR_DISTDIR_ATTR)
         {
-           sysresp->attr.dirdata_count =
+           sysresp->attr.distr_dir_servers_max =
                attr->dist_dir_attr.num_servers;
             sysresp->attr.mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
         }

@@ -654,7 +654,9 @@ int PVFS_util_copy_sys_attr(
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
-        dest_attr->dirdata_count = src_attr->dirdata_count;
+        dest_attr->distr_dir_servers_initial = src_attr->distr_dir_servers_initial;
+        dest_attr->distr_dir_servers_max = src_attr->distr_dir_servers_max;
+        dest_attr->distr_dir_split_size = src_attr->distr_dir_split_size;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;

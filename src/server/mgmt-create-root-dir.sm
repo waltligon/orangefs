@@ -300,7 +300,8 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
             &attr->dist_dir_bitmap,
             num_total_dirdata_servers,
             0,
-            num_initial_dirdata_servers);
+            num_initial_dirdata_servers,
+            100);
 
     assert(ret == 0);
 
@@ -685,9 +686,6 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
     sys_attr.perms = 0777;
     sys_attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     sys_attr.objtype = PVFS_TYPE_DIRECTORY;
-    // use all dirdata servers
-    sys_attr.dirdata_count = 
-        s_op->attr.dist_dir_attr.num_servers;
 
     memset(&layout, 0, sizeof(layout));
     layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
@@ -716,6 +714,8 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
         meta_handle_extent_array,
         sys_attr,
         s_op->attr.dist_dir_attr.num_servers,
+        s_op->attr.dist_dir_attr.num_servers,
+        s_op->attr.dist_dir_attr.split_size,
         layout,
         NULL);
 

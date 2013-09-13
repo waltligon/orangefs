@@ -917,7 +917,7 @@ int PVFS_fsck_validate_dir(
     set_return_code(&ret, err);
 
     /* get the dirdata handles and validate */
-    dirdata_count = attributes->attr.dirdata_count;
+    dirdata_count = attributes->attr.distr_dir_servers_max;
     dirdata_handles = (PVFS_handle *) malloc(dirdata_count * sizeof(PVFS_handle));
     if(!dirdata_handles)
     {
