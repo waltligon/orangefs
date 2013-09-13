@@ -66,32 +66,6 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
-#if 0
-/* we now debug through gossip */
-void DbgInit()
-{
-    char exe_path[MAX_PATH], *p;
-    int ret;
-
-    if (g_DebugMode)
-    {
-        /* create log file in exe directory */
-        ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
-        if (ret != 0)
-        {
-            /* get directory */
-            p = strrchr(exe_path, '\\');
-            if (p)
-                *p = '\0';
-
-            strcat(exe_path, "\\orangefs.log");
-
-            g_DebugFile = fopen(exe_path, "a");
-        }
-    }
-}
-#endif
-
 #define DEBUG_BUF_SIZE    8192
 void DbgPrint(char *format, ...)
 {
@@ -113,16 +87,6 @@ void DbgPrint(char *format, ...)
         gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, "%s", buffer);
     }
 }
-
-#if 0
-void DbgClose()
-{
-    if (g_DebugFile != NULL) {
-        fprintf(g_DebugFile, "\n");
-        fclose(g_DebugFile);
-    }
-}
-#endif
 
 /* map a file system error code to a Dokan/Windows code 
    -1 is used as a default error */
@@ -389,26 +353,6 @@ int cred_compare(void *key,
     return (entry->context == *((ULONG64 *) key));
 }
 
-/* get credential for the "SYSTEM" user */
-static int get_system_credential(PVFS_credential *credential)
-{
-    int ret = 0;
-    PVFS_gid group_array[] = { 0 };
-    ASN1_UTCTIME *expires;
-
-    /* fill in "root" credential for client-side user mapping */
-    if (goptions->user_mode != USER_MODE_SERVER)
-    {
-        ret = init_credential(0, group_array, 1, NULL, NULL, credential);
-    }
-    else
-    {
-        ret = get_user_cert_credential("SYSTEM", credential, &expires);
-    }
-
-    return ret;
-}
-
 /* Get credential for requestor.
    Assumes credential is allocated but fields are not. */
 static int get_requestor_credential(PDOKAN_FILE_INFO file_info,                                    
@@ -426,42 +370,51 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     /* get requesting user information */
     htoken = DokanOpenRequestorToken(file_info);
-    if (htoken == INVALID_HANDLE_VALUE)
+    if (htoken != INVALID_HANDLE_VALUE)
     {
-        DbgPrint("   get_requestor_credential: DokanOpenRequestorToken failed\n");
-        return -ERROR_INVALID_HANDLE;
+        if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
+        {
+            err = GetLastError();
+            DbgPrint("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
+            CloseHandle(htoken);
+            return err * -1;
+        }   
+
+        token_user = (PTOKEN_USER) buffer;
+
+        if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
+                              domain_name, &domain_len, &snu))
+        {
+            err = GetLastError();
+            DbgPrint("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
+            CloseHandle(htoken);
+            return err * -1;
+        }        
     }
-
-    if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
+    else
     {
-        err = GetLastError();
-        DbgPrint("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
-        CloseHandle(htoken);
-        return err * -1;
-    }
+        /* not all operations have a requestor */
+        DbgPrint("   get_requestor_credential: no requestor\n");
 
-    token_user = (PTOKEN_USER) buffer;
-
-    if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
-                          domain_name, &domain_len, &snu))
-    {
-        err = GetLastError();
-        DbgPrint("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
-        CloseHandle(htoken);
-
-        return err * -1;
+        if (goptions->user_mode == USER_MODE_SERVER)
+        {
+            /* this will cause the code below to use the certificate for the
+               SYSTEM user */
+            strcpy(user_name, "SYSTEM");
+        }
+        else
+        {
+            ret = get_system_credential(credential);
+            if (ret != 0)
+            {
+                report_error("Error: no system credential", ret);
+            }
+            return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
+        }
     }
 
     DbgPrint("   get_requestor_credential: requestor: %s\n", user_name);
     
-    /* get credential for system user */
-    if (!stricmp(user_name, "SYSTEM"))
-    {
-        CloseHandle(htoken);
-
-        return get_system_credential(credential);
-    }
-
     /* search user list for credential */
     cache_hit = get_cache_user(user_name, credential);
     if (cache_hit == USER_CACHE_MISS)
@@ -469,10 +422,16 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         /* cache miss */
         if (goptions->user_mode == USER_MODE_LIST)
         {
-            /* credential should be cached, so can't locate credential
-               for requesting user */
-            DbgPrint("   get_requestor_credential:  user %s not found\n", user_name);
-            ret = -ERROR_USER_PROFILE_LOAD;
+            /* get system user credential */
+            if (!stricmp(user_name, "SYSTEM"))
+            {
+                ret = get_system_credential(credential);
+            }
+            else
+            {
+                DbgPrint("   get_requestor_credential:  user %s not found\n", user_name);
+                ret = -ERROR_USER_PROFILE_LOAD;
+            }
         }
         else if (goptions->user_mode == USER_MODE_CERT)
         {
@@ -485,7 +444,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         }
         else if (goptions->user_mode == USER_MODE_SERVER)
         {
-            ret = get_user_cert_credential(user_name, credential, &expires);
+            ret = get_user_cert_credential(htoken, user_name, credential, &expires);
         }
 
         /* cache user if credential created */
@@ -499,7 +458,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     DbgPrint("   get_requestor_credential: exit\n");
 
-    /* if credential can't be created report access denied */
+    /* if credential can't be created return access denied */
     return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
 }
 
@@ -1356,7 +1315,7 @@ PVFS_Dokan_get_file_information(
     {       
         filename = (char *) malloc(strlen(fs_path) + 1);
         MALLOC_CHECK(filename);
-        PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);        
+        PINT_remove_base_dir(fs_path, filename, (int) strlen(fs_path) + 1);        
         
         ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr, 
             HandleFileInformation);
@@ -2229,7 +2188,7 @@ PVFS_Dokan_get_disk_free_space(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
-    err = get_system_credential(&credential);
+    err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("GetDiskFreeSpace", err);
 
     ret = fs_get_diskfreespace(&credential,

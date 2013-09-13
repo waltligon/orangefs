@@ -31,6 +31,8 @@
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
 
+#define report_startup_error(msg, err)    _report_error(msg, err, TRUE)
+
 /* globals */
 SERVICE_STATUS_HANDLE hstatus;
 SERVICE_STATUS service_status;
@@ -120,6 +122,103 @@ DWORD init_event_log()
     return GetLastError();
 }
 
+/* Close our Event Log source */
+void close_event_log()
+{
+    if (hevent_log != NULL)
+        DeregisterEventSource(hevent_log);
+}
+
+/* get OpenSSL error message */
+void get_security_error(const char *msg,
+                        char *errstr,
+                        size_t errlen)
+{
+    unsigned long ssl_err;
+    char errbuf[256];
+
+    errstr[0] = '\0';
+
+    if (msg)
+    {
+        _snprintf(errstr, errlen, "%s\n", msg);
+        errstr[errlen-1] = '\0';
+    }
+
+    while ((ssl_err = ERR_get_error()) != 0)
+    {
+        ERR_error_string_n(ssl_err, errbuf, sizeof(errbuf));
+        errbuf[sizeof(errbuf)-1] = '\0';
+        if (strlen(errstr) + strlen(errbuf) + 2 < errlen)
+        {
+            strcat(errstr, errbuf);
+            strcat(errstr, "\n");
+        }
+    }
+
+}
+
+/* get OrangeFS error message */
+void get_orangefs_error(const char *msg,
+                        int err,
+                        char *errstr,
+                        size_t errlen)
+{
+    char errbuf[256];
+
+    errstr[0] = '\0';
+    if (msg)
+    {
+        _snprintf(errstr, errlen, "%s: ", msg);
+        errstr[errlen-1] = '\0';
+    }
+
+
+    PVFS_strerror_r(err, errbuf, sizeof(errbuf));
+    errbuf[sizeof(errbuf)-1] = '\0';
+
+    strncat(errstr, errbuf, errlen-strlen(errstr)-1);
+
+}
+
+/* get Windows error message */
+void get_windows_error(const char *msg, 
+                       DWORD err,
+                       char *errstr,
+                       size_t errlen)
+{
+    LPVOID msg_buf;
+    LPTSTR win_msg;
+
+    errstr[0] = '\0';
+
+    /* Get Windows error message */
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+                  FORMAT_MESSAGE_FROM_SYSTEM |
+                  FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,
+                  err,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPTSTR) &msg_buf,
+                  0, NULL);
+
+    if (msg_buf == NULL)
+    {
+        return;
+    }
+
+    win_msg = (LPTSTR) msg_buf;
+    /* remove trailing \r\n from win_msg */
+    if (win_msg[strlen(win_msg)-1] == '\n')
+        win_msg[strlen(win_msg)-1] = '\0';
+    if (win_msg[strlen(win_msg)-1] == '\r')
+        win_msg[strlen(win_msg)-1] = '\0';
+    
+    _snprintf(errstr, errlen, "%s: %s (%u)", msg, win_msg, err);
+
+    LocalFree(win_msg);
+}
+
 /* Report an error to the Event Log, service log (file), and debug
    log. The entire text of the message is displayed without modification. */
 BOOL report_error_event(char *message, BOOL startup)
@@ -153,94 +252,32 @@ BOOL report_error_event(char *message, BOOL startup)
     return FALSE;
 }
 
-/* Return the Windows error message for the specified code.
-   The returned string must be freed with LocalFree. */
-LPTSTR get_windows_message(DWORD err)
-{
-    LPVOID msg_buf;
-
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-                  FORMAT_MESSAGE_FROM_SYSTEM |
-                  FORMAT_MESSAGE_IGNORE_INSERTS,
-                  NULL,
-                  err,
-                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                  (LPTSTR) &msg_buf,
-                  0, NULL);
-
-    return (LPTSTR) msg_buf;
-}
-
-/* Report a Windows error to the Event Log 
-   Format is {prefix}{windows msg} ({err}) */
-BOOL report_windows_error(char *prefix, DWORD err)
-{
-    LPTSTR win_msg, message;
-    size_t msg_len;
-    BOOL ret;
-
-    win_msg = get_windows_message(err);
-    if (win_msg == NULL)
-        return FALSE;
-
-    /* remove trailing \r\n from win_msg */
-    if (win_msg[strlen(win_msg)-1] == '\n')
-        win_msg[strlen(win_msg)-1] = '\0';
-    if (win_msg[strlen(win_msg)-1] == '\r')
-        win_msg[strlen(win_msg)-1] = '\0';
-
-    msg_len = strlen(prefix)+strlen(win_msg)+16;
-    message = (LPTSTR) LocalAlloc(0, msg_len);
-    _snprintf(message, msg_len, "%s%s (%u)", prefix, win_msg, err);
-
-    ret = report_error_event(message, TRUE);
-
-    LocalFree(message);
-    LocalFree(win_msg);
-
-    return ret;
-}
-
-/* Close our Event Log source */
-void close_event_log()
-{
-    if (hevent_log != NULL)
-        DeregisterEventSource(hevent_log);
-}
-
 /* report error through logging mechanism */
-void report_error(const char *msg, int err)
+void _report_error(const char *msg,
+                   int err,
+                   BOOL startup)
 {
-    unsigned long ssl_err;
-    char errstr[1024], errbuf[256];
-
-    errstr[0] = '\0';
-    if (msg)
-    {
-        _snprintf(errstr, sizeof(errstr), "%s\n", msg);
-    }
-
+    char errstr[1024];
+    
     if (err == -PVFS_ESECURITY)
     {
-        /* build string from OpenSSL error queue */        
-        while ((ssl_err = ERR_get_error()) != 0)
-        {
-            ERR_error_string_n(ssl_err, errbuf, sizeof(errbuf));
-            errbuf[sizeof(errbuf)-1] = '\0';
-            if (strlen(errstr) + strlen(errbuf) + 2 < sizeof(errstr))
-            {
-                strcat(errstr, errbuf);
-                strcat(errstr, "\n");
-            }
-        }
+        get_security_error(msg, errstr, sizeof(errstr));
+    }
+    else if ((-err) & PVFS_ERROR_BIT)
+    {
+        get_orangefs_error(msg, err, errstr, sizeof(errstr));
+    }
+    else if (err != 0)
+    {
+        get_windows_error(msg, (DWORD) err, errstr, sizeof(errstr));
     }
     else
     {
-        PVFS_strerror_r(err, errstr, sizeof(errstr)-1);
+        strncpy(errstr, msg, sizeof(errstr));
         errstr[sizeof(errstr)-1] = '\0';
     }
 
-    report_error_event(errstr, FALSE);
+    report_error_event(errstr, startup);
 
 }
 
@@ -264,7 +301,7 @@ BOOL check_mount_point(const char *mount_point)
     mask = GetLogicalDrives();
     if (mask == 0)
     {
-        report_windows_error("GetLogicalDrives failed: ", GetLastError());
+        report_error("GetLogicalDrives failed: ", GetLastError());
         return FALSE;
     }
 
@@ -469,7 +506,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     if (ret != 0 || ret2 != 0)
     {
-        report_error_event(error_msg, TRUE);
+        report_startup_error(error_msg, (ret != 0) ? ret : ret2);
         close_service_log();
         close_event_log();
         return;
@@ -508,7 +545,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
         {
             _snprintf(error_msg, sizeof(error_msg), "Fatal init error: could "
                 "not start cache thread: %u", ret);
-            report_error_event(error_msg, TRUE);
+            report_startup_error(error_msg, ret);
             close_service_log();
             close_event_log();
             free(options);
@@ -546,7 +583,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     }
     else
     {
-        report_windows_error("RegisterServiceCtrlHandler failed: ", GetLastError());
+        report_error("RegisterServiceCtrlHandler failed: ", GetLastError());
     }
 
     qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
@@ -578,7 +615,7 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
     else
     {
         err = GetLastError();
-        report_windows_error("CreateThread (main) failed: ", err);
+        report_error("CreateThread (main) failed: ", err);
     }
 
     service_debug("thread_start exit\n");
@@ -596,7 +633,7 @@ DWORD thread_stop()
     if (!TerminateThread(hthread, 0))
     {
         err = GetLastError();
-        report_windows_error("TerminateThread (main) failed: ", err);
+        report_error("TerminateThread (main) failed: ", err);
     }
 
     service_debug("thread_stop exit\n");
@@ -619,7 +656,7 @@ DWORD cache_thread_start()
     if (hcache_thread == NULL)
     {
         err = GetLastError();
-        report_windows_error("CreateThread (user cache) failed: ", err);
+        report_error("CreateThread (user cache) failed: ", err);
     }
 
     return err;
@@ -633,7 +670,7 @@ DWORD cache_thread_stop()
         if (!TerminateThread(hcache_thread, 0))
         {
             err = GetLastError();
-            report_windows_error("TerminateThread (user cache) failed: ", err);
+            report_error("TerminateThread (user cache) failed: ", err);
         }
 
     return err;
@@ -687,7 +724,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
             if (ret != 0)
             {
                 service_debug("Retrying fs initialization...\n");
-                report_error_event(error_msg, TRUE);
+                report_startup_error(error_msg, 0);
                 Sleep(30000);
             }
 
@@ -695,7 +732,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
     }
     else
     {
-        report_windows_error("GetModuleFileName failed: ", GetLastError());
+        report_error("GetModuleFileName failed: ", GetLastError());
     }
 
     /*** main loop - run dokan client ***/
@@ -711,7 +748,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
         /* note: this will no longer occur */
         _snprintf(event_msg, sizeof(event_msg), "Fatal init error: %s",
             error_msg);        
-        report_error_event(event_msg, TRUE);
+        report_startup_error(event_msg, ret);
     }
 
     if (malloc_flag)
@@ -780,7 +817,7 @@ int main(int argc, char **argv, char **envp)
   /* initialize LDAP */
   if (PVFS_ldap_init() != 0)
   {
-      report_error_event("Fatal error: LDAP could not be initialized", TRUE);
+      report_startup_error("Fatal error: LDAP could not be initialized", 0);
       return 1;
   }
 

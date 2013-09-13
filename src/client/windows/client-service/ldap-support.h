@@ -18,7 +18,7 @@ int PVFS_ldap_init();
 
 void PVFS_ldap_cleanup();
 
-int get_ldap_credential(char *userid,
-                         PVFS_credential *credential);
+int get_ldap_credential(char *user_name,
+                        PVFS_credential *credential);
 
 #endif

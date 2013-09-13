@@ -21,11 +21,12 @@ void openssl_init();
 void openssl_cleanup();
 
 int get_proxy_cert_credential(HANDLE huser,
-                              char *userid,
+                              char *user_name,
                               PVFS_credential *credential,
                               ASN1_UTCTIME **expires);
 
-int get_user_cert_credential(char *userid,
+int get_user_cert_credential(HANDLE huser,
+                             char *user_name,
                              PVFS_credential *credential,
                              ASN1_UTCTIME **expires);
 

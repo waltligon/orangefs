@@ -21,6 +21,8 @@ void cleanup_credential(PVFS_credential *cred);
 
 int credential_in_group(PVFS_credential *cred, PVFS_gid group);
 
+int get_system_credential(PVFS_credential *credential);
+
 /* void credential_add_group(PVFS_credential *cred, PVFS_gid group); 
 
 void credential_set_timeout(PVFS_credential *cred, PVFS_time timeout);

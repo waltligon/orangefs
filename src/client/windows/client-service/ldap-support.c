@@ -27,17 +27,6 @@ struct timeval timeout = {15, 0};
 
 extern PORANGEFS_OPTIONS goptions;
 
-#define report_ldap_error(msg)    _report_ldap_error(msg, __func__)
-
-static void _report_ldap_error(char *message, char *fn_name)
-{
-    /* debug the message */
-    DbgPrint("   %s: %s\n", fn_name, message);
-
-    /* write to Event Log */
-    report_error_event(message, FALSE);
-}
-
 /* initialize LDAP SSL */
 int PVFS_ldap_init()
 {
@@ -73,8 +62,8 @@ static int check_number(char *s)
     return 1;
 }
 
-int get_ldap_credential(char *userid,
-                         PVFS_credential *credential)
+int get_ldap_credential(char *user_name,
+                        PVFS_credential *credential)
 {
     LDAP *ld;
     int version, ret = -1, bind_ret = 0;
@@ -88,15 +77,27 @@ int get_ldap_credential(char *userid,
 
     DbgPrint("   get_ldap_credential: enter\n");
 
+    if (user_name == NULL || strlen(user_name) == 0 || 
+        credential == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* if system user return root credential */
+    if (!stricmp(user_name, "SYSTEM"))
+    {
+        return get_system_credential(credential);
+    }
+
     /* connect to LDAP - this will not be encrypted if
        secure is not set */    
     ld = ldapssl_init(goptions->ldap.host, goptions->ldap.port, 
-                          goptions->ldap.secure);
+                      goptions->ldap.secure);
     if (ld == NULL)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: could not initialize "
-            "LDAP", userid);
-        report_ldap_error(error_msg);
+            "LDAP", user_name);
+        report_error(error_msg, -PVFS_ECONNREFUSED);
         goto get_ldap_credential_exit;
     }
 
@@ -120,18 +121,18 @@ int get_ldap_credential(char *userid,
     if (bind_ret != 0)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: could not bind to "
-            "LDAP server: %s (%d)", userid, ldap_err2string(bind_ret), bind_ret);
-        report_ldap_error(error_msg);
+            "LDAP server: %s (%d)", user_name, ldap_err2string(bind_ret), bind_ret);
+        report_error(error_msg, 0);
         goto get_ldap_credential_exit;
     }
     
     /* construct the filter in the form 
-       (&(objectClass={search-class})({naming-attr}={userid})) 
+       (&(objectClass={search-class})({naming-attr}={user_name})) 
        */
     _snprintf(filter, 384, "(&(objectClass=%s)(%s=%s))", 
               goptions->ldap.search_class,
               goptions->ldap.naming_attr,
-              userid);
+              user_name);
 
     /* set to read uid and gid attrs */
     attrs[0] = (char *) malloc(32);
@@ -177,9 +178,9 @@ int get_ldap_credential(char *userid,
                         else
                         {
                             _snprintf(error_msg, sizeof(error_msg), "User %s: "
-                                "LDAP attribute %s: not a number (%s)", userid,
+                                "LDAP attribute %s: not a number (%s)", user_name,
                                 attr_name, values[0]);
-                            report_ldap_error(error_msg);
+                            report_error(error_msg, 0);
                             ret = -1;
                         }
 
@@ -188,8 +189,8 @@ int get_ldap_credential(char *userid,
                     else
                     {
                         _snprintf(error_msg, sizeof(error_msg), "User %s: no "
-                            "values for LDAP attribute %s", userid, attr_name);
-                        report_ldap_error(error_msg);
+                            "values for LDAP attribute %s", user_name, attr_name);
+                        report_error(error_msg, 0);
                         ret = -1;
                     }
                    
@@ -203,8 +204,8 @@ int get_ldap_credential(char *userid,
             {
                 ldap_get_option(ld, LDAP_OPT_RESULT_CODE, &ret);
                 _snprintf(error_msg, sizeof(error_msg), "User %s: no LDAP "
-                    "entries", userid);
-                report_ldap_error(error_msg);
+                    "entries", user_name);
+                report_error(error_msg, 0);
                 ret = -1;
             }
 
@@ -213,16 +214,16 @@ int get_ldap_credential(char *userid,
         else
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: no LDAP "
-                "results", userid);
-            report_ldap_error(error_msg);
+                "results", user_name);
+            report_error(error_msg, 0);
             ret = -1;
         }
     }
     else 
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: LDAP search error: "
-            "%s (%d)", userid, ldap_err2string(ret), ret);
-        report_ldap_error(error_msg);
+            "%s (%d)", user_name, ldap_err2string(ret), ret);
+        report_error(error_msg, 0);
     }
 
     free(attrs[0]);
@@ -230,13 +231,18 @@ int get_ldap_credential(char *userid,
 
     if (ret == 0 && uid != -1 && gid != -1)
     {
-        init_credential(uid, &gid, 1, NULL, NULL, credential);
+        ret = init_credential(uid, &gid, 1, NULL, NULL, credential);
+        if (ret != 0)
+        {
+            _snprintf(error_msg, sizeof(error_msg), "User %s: credential "
+                "error: ", ret);
+        }
     }
     else if (ret == 0)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: LDAP credential "
-            "not found", userid);
-        report_ldap_error(error_msg);
+            "not found", user_name);
+        report_error(error_msg, 0);
         ret = -1;
     }
 

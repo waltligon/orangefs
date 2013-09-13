@@ -437,7 +437,7 @@ static KEYWORD_CB(key_file)
     
         options->private_key = PEM_read_PrivateKey(f, NULL, NULL, NULL);
         if (options->private_key == NULL) {
-            report_error("   key-file option:", -PVFS_ESECURITY);
+            report_error("Error loading private key: ", -PVFS_ESECURITY);
         }
 
         fclose(f);

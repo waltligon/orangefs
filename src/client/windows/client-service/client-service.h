@@ -63,9 +63,16 @@ typedef struct
 
 void DbgPrint(char *format, ...);
 
+/* TODO: remove
 BOOL report_error_event(char *message, 
                         BOOL startup);
+*/
 
-void report_error(const char *msg, int err);
+#define report_error(msg, err)            _report_error(msg, err, FALSE)
+
+/* report error through logging mechanism */
+void _report_error(const char *msg, 
+                   int err,
+                   BOOL startup);
 
 #endif

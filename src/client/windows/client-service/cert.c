@@ -51,19 +51,6 @@ void openssl_cleanup()
     ERR_remove_state(0);
 }
 
-#define report_cert_error(msg)    _report_cert_error(msg, __func__)
-
-/* certificate error reporting */
-static void _report_cert_error(char *message, char *fn_name)
-{
-    /* debug the message */
-    DbgPrint("   %s: %s\n", fn_name, message);
-
-    /* write to Event Log */
-    report_error_event(message, FALSE);
-
-}
-
 static int get_proxy_auth_ex_data_cred()
 {
     static volatile int idx = -1;
@@ -81,7 +68,7 @@ static int get_proxy_auth_ex_data_cred()
     return idx;
 }
 
-static int get_proxy_auth_ex_data_userid()
+static int get_proxy_auth_ex_data_user_name()
 {
     static volatile int idx = -1;
     if (idx < 0)
@@ -89,7 +76,7 @@ static int get_proxy_auth_ex_data_userid()
         CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
         if (idx < 0)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "userid",
+            idx = X509_STORE_CTX_get_ex_new_index(0, "user_name",
                 NULL, NULL, NULL);
         }
         CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
@@ -152,7 +139,7 @@ static int parse_credential(char *credstr, PVFS_uid *uid, PVFS_gid *gid)
 
 static int verify_callback(int ok, X509_STORE_CTX *ctx)
 {
-    char *userid;
+    char *user_name;
     X509 *xs;
     PROXY_CERT_INFO_EXTENSION *pci;
     char *credstr;
@@ -169,9 +156,9 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
         xs = ctx->current_cert;
         if (xs->ex_flags & EXFLAG_PROXY)
         {
-            /* get Windows userid for error logging */
-            userid = (char *) X509_STORE_CTX_get_ex_data(ctx, 
-                get_proxy_auth_ex_data_userid());
+            /* get Windows username for error logging */
+            user_name = (char *) X509_STORE_CTX_get_ex_data(ctx, 
+                get_proxy_auth_ex_data_user_name());
             
             /* get credential in {UID}/{GID} form from cert policy */
             pci = (PROXY_CERT_INFO_EXTENSION *) 
@@ -192,8 +179,8 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
                 {
                     _snprintf(error_msg, sizeof(error_msg), "User %s: proxy "
                         "certificate contains invalid credential policy", 
-                        userid);
-                    report_cert_error(error_msg);
+                        user_name);
+                    report_error(error_msg, -PVFS_ESECURITY);
                     ok = 0;
                 }
             }
@@ -201,8 +188,8 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
             {
                 _snprintf(error_msg, sizeof(error_msg), "User %s: proxy "
                           "certificate contains no credential policy", 
-                          userid);
-                report_cert_error(error_msg);
+                          user_name);
+                report_error(error_msg, -PVFS_ESECURITY);
                 ok = 0;
             }            
 
@@ -214,7 +201,7 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 }
 
 /* verify certificate */
-static unsigned long verify_cert(char *userid,
+static unsigned long verify_cert(char *user_name,
                                  X509 *cert, 
                                  X509 *ca_cert,
                                  STACK_OF(X509) *chain,
@@ -260,7 +247,7 @@ static unsigned long verify_cert(char *userid,
     save_verify_cb = ctx->verify_cb;
     X509_STORE_CTX_set_verify_cb(ctx, verify_callback);
     X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_cred(), credential);
-    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_userid(), userid);
+    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_user_name(), user_name);
     X509_STORE_CTX_set_flags(ctx, X509_V_FLAG_ALLOW_PROXY_CERTS);
 
     /* verify the cert */
@@ -276,9 +263,9 @@ verify_cert_exit:
     if (verify_flag && ret == OPENSSL_CERT_ERROR && ctx->error != 0)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: proxy certificate "
-            "verification error: %s", userid, 
+            "verification error: %s", user_name, 
             X509_verify_cert_error_string(ctx->error));
-        report_cert_error(error_msg);
+        report_error(error_msg, -PVFS_ESECURITY);
     }
 
     if (ctx != NULL)
@@ -309,7 +296,7 @@ static unsigned int get_profile_dir(HANDLE huser,
 
 /* retrieve OrangeFS credential from proxy cert */
 int get_proxy_cert_credential(HANDLE huser,
-                              char *userid,
+                              char *user_name,
                               PVFS_credential *credential,
                               ASN1_UTCTIME **expires)
 {
@@ -320,32 +307,38 @@ int get_proxy_cert_credential(HANDLE huser,
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain = NULL;
     int ret;
-    unsigned long err, err_flag = FALSE;
-    size_t err_size;
-    char error_msg[256], errstr[256];
+    unsigned long err_flag = FALSE;
+    char error_msg[1024];
 
     DbgPrint("   get_proxy_cert_credential: enter\n");
     
-    if (userid == NULL || credential == NULL || expires == NULL)
+    if (user_name == NULL || credential == NULL || expires == NULL)
     {
         DbgPrint("   get_proxy_cert_credential: invalid parameter\n");
         return -1;
     }
 
+    /* system user -- return root credential */
+    if (!stricmp(user_name, "SYSTEM"))
+    {
+        *expires = NULL;
+        return get_system_credential(credential);
+    }
+
     /* locate the certificates and CA */
     if (strlen(goptions->cert_dir_prefix) > 0)
     {
-        if ((strlen(goptions->cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
+        if ((strlen(goptions->cert_dir_prefix) + strlen(user_name) + 8) > MAX_PATH)
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: path to certificate "
-                "too long", userid);
-            report_cert_error(error_msg);
+                "too long", user_name);
+            report_error(error_msg, -PVFS_EOVERFLOW);
             return -1;
         }
 
-        /* cert dir is cert_dir_prefix\userid */
+        /* cert dir is cert_dir_prefix\user_name */
         strcpy(cert_dir, goptions->cert_dir_prefix);
-        strcat(cert_dir, userid);
+        strcat(cert_dir, user_name);
         strcat(cert_dir, "\\");
     }
     else
@@ -360,16 +353,16 @@ int get_proxy_cert_credential(HANDLE huser,
         else
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: could not locate "
-                "profile directory: %d", userid, ret);
-            report_cert_error(error_msg);
+                "profile directory: %d", user_name, ret);
+            report_error(error_msg, -PVFS_ENOENT);
             return ret;
         }
         
         if (strlen(cert_dir) + 7 > MAX_PATH)
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: profile directory too "
-                "long", userid);
-            report_cert_error(error_msg);
+                "long", user_name);
+            report_error(error_msg, -PVFS_EOVERFLOW);
             return -1;
         }
     }
@@ -383,8 +376,8 @@ int get_proxy_cert_credential(HANDLE huser,
     if (h_find == INVALID_HANDLE_VALUE)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: no certificates in %s", 
-            userid, cert_dir);
-        report_cert_error(error_msg);
+            user_name, cert_dir);
+        report_error(error_msg, -PVFS_ENOENT);
         ret = -1;
         goto get_proxy_cert_credential_exit;
     }
@@ -409,8 +402,8 @@ int get_proxy_cert_credential(HANDLE huser,
         if (ret != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "Error loading cert %s. See "
-                "subsequent log messages for details", cert_path);
-            report_cert_error(error_msg);
+                "below for details", cert_path);
+            report_error(error_msg, ret);
         }
     } while (ret == 0 && FindNextFile(h_find, &find_data));
 
@@ -420,8 +413,8 @@ int get_proxy_cert_credential(HANDLE huser,
     if (cert == NULL)
     {
         _snprintf(error_msg, sizeof(error_msg), "Missing or invalid %scert.0. See "
-            "subsequent log messages for details", cert_dir);
-        report_cert_error(error_msg);
+            "below for details", cert_dir);
+        report_error(error_msg, -PVFS_ESECURITY);
         ret = OPENSSL_CERT_ERROR;
     }
     
@@ -434,13 +427,13 @@ int get_proxy_cert_credential(HANDLE huser,
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: error loading CA "
             "certificate %s. See subsequent log messages for details", 
-            userid, goptions->ca_file);
-        report_cert_error(error_msg);
+            user_name, goptions->ca_file);
+        report_error(error_msg, ret);
         goto get_proxy_cert_credential_exit;
     }
 
     /* read and cache credential from certificate */
-    ret = verify_cert(userid, cert, ca_cert, chain, credential);
+    ret = verify_cert(user_name, cert, ca_cert, chain, credential);
 
     if (ret == 0)
     {        
@@ -453,20 +446,9 @@ get_proxy_cert_credential_exit:
     if (ret == OPENSSL_CERT_ERROR)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: certificate "
-            "errors:\n", userid);
-        err_size = 255 - strlen(error_msg);
-        /* use err_size for remaining buffer size */
-        while ((err = ERR_get_error()) != 0 && err_size > 0)
-        {
-            err_flag = TRUE;
-            ERR_error_string_n(err, errstr, 256);            
-            strncat(error_msg, errstr, err_size);
-            err_size = 255 - strlen(error_msg);
-            strncat(error_msg, "\n", err_size);
-            err_size = 255 - strlen(error_msg);
-        }
-        if (err_flag)
-            report_cert_error(error_msg);
+            "errors:\n", user_name);
+        report_error(error_msg, -PVFS_ESECURITY);
+        ret = -PVFS_ESECURITY;
     }
 
     /* free chain */
@@ -483,13 +465,32 @@ get_proxy_cert_credential_exit:
     return ret;
 }
 
+static int get_module_dir(char *module_dir)
+{
+    int ret;
+    char *p;
+    
+    ret = GetModuleFileName(NULL, module_dir, MAX_PATH);
+    if (ret != 0)
+    {
+        /* get directory */
+        p = strrchr(module_dir, '\\');
+        if (p)
+            *p = '\0';
+    }
+
+    return ret ? 0 : GetLastError();
+}
+
 /* retrieve OrangeFS credential from user cert */
-int get_user_cert_credential(char *userid,
+int get_user_cert_credential(HANDLE huser,
+                             char *user_name,
                              PVFS_credential *cred,
                              ASN1_UTCTIME **expires)
 {
     int ret = 0;
-    char key_file[MAX_PATH], cert_file[MAX_PATH];
+    char key_file[MAX_PATH], cert_file[MAX_PATH],
+         errmsg[1024];
     X509 *xcert = NULL;
     PVFS_certificate *cert = NULL;
     PVFS_gid group_array[1] = { PVFS_GID_MAX };
@@ -501,26 +502,92 @@ int get_user_cert_credential(char *userid,
     
     DbgPrint("   get_user_cert_credential: enter\n");
 
-    if (userid == NULL || strlen(userid) == 0 || cred == NULL ||
+    if (user_name == NULL || strlen(user_name) == 0 || cred == NULL ||
         expires == NULL)
     {
-        report_error("   get_user_cert_credential:", -PVFS_EINVAL);
+        report_error("get_user_cert_credential:", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
     /* expand the key file path */
-    ret = PINT_get_security_path(goptions->key_file, userid, key_file, MAX_PATH);
+    if (strlen(goptions->key_file) != 0)
+    {
+        ret = PINT_get_security_path(goptions->key_file, user_name, key_file, 
+                                     MAX_PATH);
+    }
+    else
+    {
+        /* use module dir as the default for the system user */
+        if (!stricmp(user_name, "SYSTEM"))
+        {
+            ret = get_module_dir(key_file);
+        }
+        else 
+        {
+            /* default: profile_dir\orangefs-cert-key.pem */
+            ret = get_profile_dir(huser, key_file);
+        }
+        if (ret == 0)
+        {
+            if (strlen(key_file) + 24 > MAX_PATH)
+            {
+                _snprintf(errmsg, sizeof(errmsg), "User %s: profile dir: ",
+                    user_name);
+                report_error(errmsg, -PVFS_EOVERFLOW);
+                return -PVFS_EOVERFLOW;
+            }
+
+            /* append filename */
+            strcat(key_file, "\\orangefs-cert-key.pem");
+        }
+    }
+
     if (ret != 0)
     {
-        report_error("   get_user_cert_credential (key file path):", ret);        
+        _snprintf(errmsg, sizeof(errmsg), "User %s: key file path: ",
+                  user_name);
+        report_error(errmsg, ret);
         return ret;
     }
 
     /* expand the cert file path */
-    ret = PINT_get_security_path(goptions->cert_dir_prefix, userid, cert_file, MAX_PATH);
+    if (strlen(goptions->cert_dir_prefix) != 0)
+    {
+        ret = PINT_get_security_path(goptions->cert_dir_prefix, user_name, cert_file, 
+                                     MAX_PATH);
+    }
+    else
+    {
+        /* use module dir as the default for the system user */
+        if (!stricmp(user_name, "SYSTEM"))
+        {            
+            ret = get_module_dir(cert_file);
+        }
+        else
+        {
+            /* default: profile_dir\orangefs-cert-key.pem */
+            ret = get_profile_dir(huser, cert_file);
+        }
+        if (ret == 0)
+        {
+            if (strlen(cert_file) + 20 > MAX_PATH)
+            {
+                _snprintf(errmsg, sizeof(errmsg), "User %s: profile dir: ",
+                    user_name);
+                report_error(errmsg, -PVFS_EOVERFLOW);
+                return -PVFS_EOVERFLOW;
+            }
+
+            /* append filename */
+            strcat(cert_file, "\\orangefs-cert.pem");
+        }
+    }
+
     if (ret != 0)
     {
-        report_error("   get_user_cert_credential (cert file path):", ret);        
+        _snprintf(errmsg, sizeof(errmsg), "User %s: cert file path: ",
+            user_name);
+        report_error(errmsg, ret);        
         return ret;
     }
 
@@ -528,7 +595,8 @@ int get_user_cert_credential(char *userid,
     ret = PINT_load_cert_from_file(cert_file, &xcert);
     if (ret != 0)
     {
-        report_error("   get_user_cert_credential (cert load):", ret);        
+        _snprintf(errmsg, sizeof(errmsg), "User %s: certificate load: ", user_name);
+        report_error(errmsg, ret);
         return ret; 
     }
 
@@ -536,7 +604,8 @@ int get_user_cert_credential(char *userid,
     ret = PINT_X509_to_cert(xcert, &cert);
     if (ret != 0)
     {
-        report_error("   get_user_cert_credential (convert cert):", ret);        
+        _snprintf(errmsg, sizeof(errmsg), "User %s: convert cert: ", user_name);
+        report_error(errmsg, ret);        
         X509_free(xcert);
         return ret;
     }
@@ -547,10 +616,20 @@ int get_user_cert_credential(char *userid,
     /* free X509 cert */
     X509_free(xcert);
 
+    DbgPrint("   get_user_cert_credential: user: %s\tkey_file: %s\tcert_file: %s\n",
+        user_name, key_file, cert_file);
+
     /* initialize the credential */
     ret = init_credential(PVFS_UID_MAX, group_array, 1, key_file, cert, cred);
+    if (ret != 0)
+    {
+        _snprintf(errmsg, sizeof(errmsg), "User %s: credential error: ", ret);
+        report_error(errmsg, ret);
+    }
 
     PINT_cleanup_cert(cert);
+
+    DbgPrint("   get_user_cert_credential: exit\n");
 
     return ret;
 }

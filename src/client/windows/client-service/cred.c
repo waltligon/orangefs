@@ -21,6 +21,18 @@
 
 extern PORANGEFS_OPTIONS goptions;
 
+/* get credential for the "SYSTEM" user */
+int get_system_credential(PVFS_credential *credential)
+{
+    int ret = 0;
+    PVFS_gid group_array[] = { 0 };
+
+    /* fill in "root" credential for client-side user mapping */
+    ret = init_credential(0, group_array, 1, NULL, NULL, credential);
+
+    return ret;
+}
+
 /* sign credential using specified PEM private key file */
 int sign_credential(const char *key_file, 
                     PVFS_credential *cred)
@@ -36,7 +48,7 @@ int sign_credential(const char *key_file,
 
     if (key_file == NULL || cred == NULL)
     {
-        report_error("   sign_credential:", -PVFS_EINVAL);
+        report_error("Credential signing error: ", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
@@ -51,7 +63,8 @@ int sign_credential(const char *key_file,
         if (fkey == NULL)
         {
             err = errno;
-            report_error("   sign_credential:", PVFS_errno_to_error(err));
+            report_error("Credential signing error (key): ", 
+                -PVFS_errno_to_error(err));
             return err;
         }
 
@@ -61,7 +74,7 @@ int sign_credential(const char *key_file,
 
         if (privkey == NULL)
         {
-            report_error("   sign_credential:", -PVFS_ESECURITY);
+            report_error("Credential signing error:", -PVFS_ESECURITY);
             return -PVFS_ESECURITY;
         }
 
@@ -72,7 +85,7 @@ int sign_credential(const char *key_file,
     cred->signature = (PVFS_signature) malloc(EVP_PKEY_size(privkey));
     if (cred->signature == NULL)
     {
-        report_error("   sign_credential:", -PVFS_ENOMEM);
+        report_error("Credential signing error: ", -PVFS_ENOMEM);
         if (key_flag)
         {
             EVP_PKEY_free(privkey);
@@ -109,7 +122,7 @@ int sign_credential(const char *key_file,
 
 sign_credential_error:
 
-    report_error("   sign_credential: signing error:", -PVFS_ESECURITY);
+    report_error("Credential signing error: ", -PVFS_ESECURITY);
     free(cred->signature);
 
 sign_credential_exit:
@@ -139,7 +152,7 @@ int init_credential(PVFS_uid uid,
 
     if (group_array == NULL || cred == NULL || num_groups == 0)
     {
-        report_error("   init_credential:", -PVFS_EINVAL);
+        report_error("Credential error:", -PVFS_EINVAL);
         return -PVFS_EINVAL;
     }
 
@@ -214,7 +227,7 @@ int init_credential(PVFS_uid uid,
         }
     }
 
-    DbgPrint("   init_credential: exit (%d)\n", ret);
+    DbgPrint("    init_credential: exit (%d)\n", ret);
 
     return ret;
 }
