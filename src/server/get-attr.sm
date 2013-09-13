@@ -1121,7 +1121,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    }
 
    /*Cleanup*/
-    free_keyval_val_buffers(s_op);
+   free_keyval_val_buffers(s_op);
 
    js_p->error_code = 0;
    return SM_ACTION_COMPLETE;
@@ -1589,7 +1589,7 @@ static PINT_sm_action getattr_create_capability(
     /* Cache the new capability */
     if (insert_flag)
     {
-        ret = PINT_capcache_insert_entry(&resp_attr->capability);
+        ret = PINT_capcache_insert(&resp_attr->capability);
         if(ret < 0)
         {
             /* issue a warning */
@@ -2265,7 +2265,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
         }            
-        s_op->val_a[DIST_NAME_KEY].buffer = NULL;
+        s_op->val_a[DIST_NAME_KEY].buffer = NULL; 
 
         if (s_op->error_a[DIST_PARAMS_KEY] == 0)
         {
@@ -2283,7 +2283,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         }
         if (s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
-           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL;
+           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; 
         }
 
         if (s_op->error_a[NUM_DFILES_KEY] == 0)

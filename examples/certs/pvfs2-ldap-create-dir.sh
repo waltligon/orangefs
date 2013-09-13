@@ -100,7 +100,7 @@ fi
 cp -p slapd.conf $conffile
 
 # locate slapd
-slapd=`which slapd`
+slapd=`which slapd 2> /dev/null`
 if [ ! $slapd ]; then
     slapd=${prefix}/libexec/slapd
     if [ ! -f $slapd ]; then
