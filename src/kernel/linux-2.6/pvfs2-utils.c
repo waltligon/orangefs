@@ -1977,12 +1977,12 @@ int pvfs2_unmount_sb(struct super_block *sb)
   NOTE: on successful cancellation, be sure to return -EINTR, as
   that's the return value the caller expects
 */
-int pvfs2_cancel_op_in_progress(unsigned long tag)
+int pvfs2_cancel_op_in_progress(uint64_t tag)
 {
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_cancel_op_in_progress called on tag %lu\n", tag);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_cancel_op_in_progress called on tag %llu\n", llu(tag));
 
     new_op = op_alloc(PVFS2_VFS_OP_CANCEL);
     if (!new_op)

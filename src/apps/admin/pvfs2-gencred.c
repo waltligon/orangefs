@@ -498,6 +498,14 @@ int main(int argc, char **argv)
     PVFS_credential credential;
     int ret = EXIT_SUCCESS;
 
+#if HAVE_GETGROUPLIST
+#   if HAVE_GETGROUPLIST_INT
+       int groups_int[PVFS_REQ_LIMIT_GROUPS];
+       int i;
+#   endif
+#endif
+
+
     memset(&opts, 0, sizeof(opts));
     ret = parse_options(argc, argv, &opts);
     if (ret != EXIT_SUCCESS)
@@ -587,6 +595,30 @@ int main(int argc, char **argv)
 #ifdef HAVE_GETGROUPLIST
 
     ngroups = sizeof(groups)/sizeof(*groups);
+
+#  if HAVE_GETGROUPLIST_INT
+    /* The returned list of groups in groups_int is a list of signed integers; however,
+     * gid_t is defined as an unsigned 32-bit integer.  So, we take steps to convert the 
+     * signed integer into a proper uint32_t type.
+     */
+    ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups_int, &ngroups);
+    if (ret == -1)
+    {
+        fprintf(stderr, "error: unable to get group list for user %s\n",
+                pwd->pw_name);
+        return ENOENT;
+    }
+    for (i=0; i<ngroups; i++)
+    {
+        if (groups_int[i] > 0xffffffff || groups_int[i] < 0)
+        {
+           fprintf(stderr,"error: unable to convert group value (%d) for user %s\n"
+                         ,groups_int[i],pwd->pw_name);
+           return ENOENT;
+        } 
+        groups[i] = (gid_t)groups_int[i];
+    }
+#  else
     ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
     if (ret == -1)
     {
@@ -594,6 +626,8 @@ int main(int argc, char **argv)
                 pwd->pw_name);
         return ENOENT;
     }
+#  endif
+
     if (groups[0] != grp->gr_gid)
     {
         assert(groups[ngroups-1] == grp->gr_gid);
