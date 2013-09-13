@@ -78,7 +78,7 @@ my $opt_security_timeout = undef;
 
 # cert-based security options
 my $opt_security_cert = undef;
-my $opt_ca_path = undef;
+my $opt_ca_file = undef;
 my $opt_user_cert_dn = undef;
 my $opt_user_cert_exp = undef;
 
@@ -282,8 +282,8 @@ sub emit_security
     # if securitykey or keystore used, use key-based options    
     $seckeyflag = defined($opt_security_key) || defined($opt_keystore);
     
-    # if securitycert or capath used, use cert-based options
-    $seccertflag = defined($opt_security_cert) || defined($opt_ca_path);
+    # if securitycert or cafile used, use cert-based options
+    $seccertflag = defined($opt_security_cert) || defined($opt_ca_file);
 
     if ($seckeyflag || $seccertflag || $opt_trusted == 1)
     {
@@ -322,11 +322,11 @@ sub emit_security
     }
     elsif ($seccertflag)
     {
-        my $capath = get_ca_path($alias);
-        die "\n*** error: no CA path specified\n*** use --capath option"
-            if (!defined($capath));
+        my $cafile = get_ca_file($alias);
+        die "\n*** error: no CA file specified\n*** use --cafile option"
+            if (!defined($cafile));
 
-        print $target "\t\tCAPath $capath\n";
+        print $target "\t\tCAFile $cafile\n";
 
         my $user_cert_dn = get_user_cert_dn($alias);
         print $target "\t\tUserCertDN $user_cert_dn\n"
@@ -496,6 +496,11 @@ sub emit_filesystem
         }
     }
     print $target "\tFileStuffing $stuffing\n";
+
+    my $meta_count = scalar(get_aliases($META_ENDPOINT));
+    print $target "\tDistrDirServersInitial 1\n";
+    print $target "\tDistrDirServersMax $meta_count\n";
+    print $target "\tDistrDirSplitSize 100\n";
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
@@ -796,7 +801,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
                                        will be  replaced in the path with each defined alias' value.
      --securitytimeout <NUM>           timeout for security operations in seconds
      --securitycert                    prompt for default cert-based security values
-     --capath      <STRING>            path to certificate authority. With --metaspec, magic value
+     --cafile      <STRING>            path to certificate authority. With --metaspec, magic value
                                        _ALIAS_ will be replaced with each defined alias' value.
      --ldaphosts   <STRING>            comma-separated list of LDAP host URIs
                                        Example: "ldap://myldap.mysite.com,ldaps://myldapssl.mysite.com"
@@ -804,7 +809,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
                                        operations. Example: "cn=admin,dc=mysite,dc=com"
      --ldapbindpassword <STRING>       Password of LDAP bind user. Literal password or "file:<path>"
      --ldapsearchmode <CN|DN>          LDAP search mode; by common name (CN) or distinguished name (DN)
-     --ldapsearchroot <STRING>         DN of LDAP container to user for certificate mapping
+     --ldapsearchroot <STRING>         DN of LDAP container to use for certificate mapping
      --ldapsearchclass <STRING>        Class name of LDAP objects to search for certificate mapping
      --ldapsearchattr <STRING>         LDAP attribute name to use for certificate mapping
      --ldapsearchscope <STRING>        LDAP search scope; 'onelevel' or 'subtree'
@@ -1649,19 +1654,19 @@ sub get_keystore
     return undef;
 }
 
-sub get_ca_path
+sub get_ca_file
 {
-    my $capath = $opt_ca_path;
+    my $cafile = $opt_ca_file;
     my $alias = shift;
 
-    # just return capath if no alias
-    return $capath
+    # just return cafile if no alias
+    return $cafile
         if (!defined($alias));
 
-    if (defined($capath))
+    if (defined($cafile))
     {
-        $capath =~ s/_ALIAS_/$alias/g;
-        return $capath;
+        $cafile =~ s/_ALIAS_/$alias/g;
+        return $cafile;
     }
     return undef;
 }
@@ -1671,7 +1676,7 @@ sub get_user_cert_dn
     my $user_cert_dn = $opt_user_cert_dn;
     my $alias = shift;
 
-    # just return capath if no alias
+    # just return user cert dn if no alias
     return $user_cert_dn
         if (!defined($alias));
 
@@ -1732,11 +1737,11 @@ sub get_security_info
                                          "[Default is ${fs_path}/etc/orangefs-keystore]: ",
                                          "${fs_path}/etc/orangefs-keystore");
     }
-    elsif (defined($opt_security_cert) || defined($opt_ca_path))
+    elsif (defined($opt_security_cert) || defined($opt_ca_file))
     {
         print $OUT "Using certificate-based security...\n\n";
 
-        $opt_ca_path = prompt_or_print($opt_ca_path,
+        $opt_ca_file = prompt_or_print($opt_ca_file,
                                        "Using CA certificate file",
                                        "Specify the Certificate Authority (CA) certificate file.",
                                        "Enter CA certificate file location " .
@@ -1882,7 +1887,7 @@ GetOptions('protocol=s' => \$opt_protocol,
     'serverkey=s'   => \$opt_server_key,
     'securitytimeout=i' => \$opt_security_timeout,
     'securitycert'  => \$opt_security_cert,
-    'capath=s'      => \$opt_ca_path,
+    'cafile=s'      => \$opt_ca_file,
     'usercertdn=s'  => \$opt_user_cert_dn,
     'usercertexp=i' => \$opt_user_cert_exp,
     'ldaphosts=s'   => \$opt_ldap_hosts,
@@ -1969,10 +1974,10 @@ die "--metaspec requires --iospec."
 # security options check
 die "--keystore requires --serverkey"
     if (defined($opt_keystore) && !defined($opt_server_key));
-die "--serverkey requires --keystore or --capath"
-    if (defined($opt_server_key) && !defined($opt_keystore) && !defined($opt_ca_path));
+die "--serverkey requires --keystore or --cafile"
+    if (defined($opt_server_key) && !defined($opt_keystore) && !defined($opt_ca_file));
 die "--capath requires --serverkey"
-    if (defined($opt_ca_path) && !defined($opt_server_key));
+    if (defined($opt_ca_file) && !defined($opt_server_key));
 die "--securitykey and --securitycert are exclusive"
     if (defined($opt_security_key) && defined($opt_security_cert));
 

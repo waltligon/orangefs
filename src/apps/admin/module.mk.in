@@ -27,8 +27,9 @@ ADMINSRC := \
 	$(DIR)/pvfs2-ln.c \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
-	$(DIR)/pvfs2-drop-caches.c \
-	$(DIR)/pvfs2-get-uid.c
+	$(DIR)/pvfs2-drop-caches.c
+#       Not currently supported
+#	$(DIR)/pvfs2-get-uid.c
 
 ifdef ENABLE_SECURITY_KEY
 	ADMINSRC += $(DIR)/pvfs2-gencred.c
