@@ -134,7 +134,7 @@ static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
-static DOTCONF_CB(get_ca_path);
+static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
 static DOTCONF_CB(enter_ldap_context);
@@ -331,7 +331,7 @@ static const configoption_t options[] =
 
     /* Path to CA certificate file in PEM format.
      */
-    {"CAPath", ARG_STR, get_ca_path, NULL,
+    {"CAFile", ARG_STR, get_ca_file, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
     /* DN used for root of generated user certificate subject DN
@@ -354,9 +354,7 @@ static const configoption_t options[] =
     {"</LDAP>", ARG_NONE, exit_ldap_context, NULL,
         CTX_LDAP, NULL},
 
-    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999"
-       TODO: make a list?
-     */
+    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999" */
     {"Hosts", ARG_STR, get_ldap_hosts, NULL,
         CTX_LDAP, "ldaps://localhost"},
 
@@ -1364,7 +1362,7 @@ int PINT_parse_config(
 #endif /* ENABLE_SECURITY */
 
 #ifdef ENABLE_SECURITY_CERT
-    if (server_flag && !config_s->ca_path)
+    if (server_flag && !config_s->ca_file)
     {
         gossip_err("Configuration file error. No CA certificate path "
                    "specified.\n");
@@ -3389,7 +3387,7 @@ DOTCONF_CB(get_security_timeout)
     return NULL;
 }
 
-DOTCONF_CB(get_ca_path)
+DOTCONF_CB(get_ca_file)
 { 
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -3399,11 +3397,11 @@ DOTCONF_CB(get_ca_path)
     {
         return NULL;
     }
-    if (config_s->ca_path)
+    if (config_s->ca_file)
     {
-        free(config_s->ca_path);
+        free(config_s->ca_file);
     }
-    config_s->ca_path = 
+    config_s->ca_file = 
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     
     return NULL;
@@ -3472,7 +3470,6 @@ DOTCONF_CB(get_ldap_hosts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    /* TODO: read as list for failover? */
     if (config_s->ldap_hosts)
     {
         free(config_s->ldap_hosts);

@@ -9,7 +9,6 @@
 #include <assert.h>
 #include <math.h>
 
-/* TODO: temp */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
