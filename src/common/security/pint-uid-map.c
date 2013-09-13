@@ -25,6 +25,10 @@
 #include "cert-util.h"
 #include "pint-ldap-map.h"
 
+#ifdef ENABLE_CERTCACHE
+#include "certcache.h"
+#endif
+
 extern X509_STORE *trust_store;
 #endif
 
@@ -93,6 +97,9 @@ int PINT_map_credential(PVFS_credential *cred,
                         PVFS_gid *group_array)
 {
     int ret = 0; 
+#ifdef ENABLE_CERTCACHE
+    struct certcache_entry_s *entry;
+#endif
 
     if (cred == NULL || uid == NULL || num_groups == NULL)
     {
@@ -124,8 +131,39 @@ int PINT_map_credential(PVFS_credential *cred,
         PINT_security_error(__func__, ret);
     }
 
+#ifdef ENABLE_CERTCACHE
+    /* check certificate cache */
+    entry = PINT_certcache_lookup_entry(&cred->certificate);
+    if (entry != NULL)
+    {
+        /* cache hit */
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: certificate cache hit (%s)!\n",
+                     __func__, entry->subject);
+        *uid = entry->uid;
+        *num_groups = entry->num_groups;
+        memcpy(group_array, entry->group_array, 
+               entry->num_groups * sizeof(PVFS_gid));
+        ret = 0;
+    }
+    else {
+        ret = PINT_ldap_map_credential(cred, uid, num_groups, group_array);
+        /* cache certificate info */
+        if (ret == 0)
+        {
+            ret = PINT_certcache_insert_entry(&cred->certificate, *uid, 
+                                              *num_groups, group_array);
+            if (ret < 0)
+            {
+                /* issue warning */
+                gossip_err("Warning: could not cache certificate\n");
+                ret = 0;
+            }
+        }
+    }
+#else
     /* backend for cert mapping is LDAP */
     ret = PINT_ldap_map_credential(cred, uid, num_groups, group_array);
+#endif  /* ENABLE_CERT_CACHE */
 
 #else
     /* return info in credential */

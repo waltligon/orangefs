@@ -21,6 +21,9 @@ SERVERSRC += $(DIR)/pint-security.c \
 ifdef ENABLE_CAPCACHE
 SERVERSRC += $(DIR)/capcache.c
 endif
+ifdef ENABLE_CERTCACHE
+SERVERSRC += $(DIR)/certcache.c
+endif
 # compile/link ldap
 MODCFLAGS_$(DIR)/pint-ldap-map.c := -DLDAP_DEPRECATED=1
 else

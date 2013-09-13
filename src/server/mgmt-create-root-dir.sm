@@ -764,6 +764,7 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    const struct server_configuration_s *config;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "mgmt-create-root-dir state: crdirent_lost_and_found_setup_msgpair\n");
@@ -788,6 +789,17 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     s_op->u.mgmt_create_root_dir.capability.handle_array =
         malloc(sizeof(PVFS_handle));
     s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
+
+    config = PINT_get_server_config();
+    s_op->u.mgmt_create_root_dir.capability.issuer = 
+        (char *) malloc(strlen(config->server_alias) + 3);
+    if (s_op->u.mgmt_create_root_dir.capability.issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(s_op->u.mgmt_create_root_dir.capability.issuer, "S:");
+    strcat(s_op->u.mgmt_create_root_dir.capability.issuer, config->server_alias);
 
     /* Need to re-sign the capability since we added a target handle. */
     ret = PINT_sign_capability(&s_op->u.mgmt_create_root_dir.capability);
