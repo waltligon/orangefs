@@ -1,7 +1,7 @@
 DIR := src/common/security
 SERVERSRC += $(DIR)/security-util.c \
-             $(DIR)/pint-uid-map.c \
-             $(DIR)/capcache.c
+             $(DIR)/pint-uid-map.c
+
 LIBSRC += $(DIR)/security-util.c \
           $(DIR)/getugroups.c \
 	  $(DIR)/cert-util.c
@@ -9,12 +9,18 @@ LIBSRC += $(DIR)/security-util.c \
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c
+ifdef ENABLE_CAPCACHE
+SERVERSRC += $(DIR)/capcache.c
+endif
 else ifdef ENABLE_SECURITY_CERT
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c \
              $(DIR)/pint-cert.c \
              $(DIR)/cert-util.c \
              $(DIR)/pint-ldap-map.c
+ifdef ENABLE_CAPCACHE
+SERVERSRC += $(DIR)/capcache.c
+endif
 # compile/link ldap
 MODCFLAGS_$(DIR)/pint-ldap-map.c := -DLDAP_DEPRECATED=1
 else

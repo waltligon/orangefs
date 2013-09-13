@@ -578,7 +578,7 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_SECURITY_INIT;
 
-    #ifdef OFS_CAPCACHE_ENABLE
+    #ifdef ENABLE_CAPCACHE
     /* initialize the capability cache */
     ret = PINT_capcache_init();
     if(ret < 0)
@@ -589,7 +589,7 @@ static int server_initialize(
     }
 
     *server_status_flag |= SERVER_CAPCACHE_INIT;
-    #endif /* OFS_CAPCACHE_ENABLE */
+    #endif /* ENABLE_CAPCACHE */
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1753,7 +1753,7 @@ static int server_shutdown(
                      "module           [ stopped ]\n");
     }
 
-    #ifdef OFS_CAPCACHE_ENABLE    
+    #ifdef ENABLE_CAPCACHE    
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
@@ -1762,7 +1762,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
                      "cache           [ stopped ]\n");
     }
-    #endif /* OFS_CAPCACHE_ENABLE */
+    #endif /* ENABLE_CAPCACHE */
 
     if (status & SERVER_ENCODER_INIT)
     {

@@ -18,6 +18,7 @@
 #include "check.h"
 #include "pint-uid-map.h"
 #include "security-util.h"
+#include "capcache.h"
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
@@ -362,7 +363,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credential *cred = NULL;
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, capcache_hit;
 
     /*
       first we translate the dspace attributes into a more convenient
@@ -485,7 +486,25 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
-    ret = PINT_verify_capability(&s_op->req->capability);
+    /*** TODO: capability cache ***/
+    /* check capability cache for non-null capabilities */
+#ifdef ENABLE_CAPCACHE
+    capcache_hit = 1;
+    if (!PINT_capability_is_null(&s_op->req->capability))
+    {        
+        capcache_hit = 
+            (PINT_capcache_lookup_entry(&s_op->req->capability) != NULL);        
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
+                 (capcache_hit) ? "hit" : "miss");
+    }
+#else
+    capcache_hit = 0;
+#endif
+
+    /* do not verify cap on cache hit */
+    ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
+
+    /* check operation permissions */
     if (ret)
     {
         ret = PINT_perm_check(s_op);
