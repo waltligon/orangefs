@@ -547,7 +547,15 @@ int create_directory(
             /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, directory);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
 
 	
         if(verbose) 
@@ -559,7 +567,15 @@ int create_directory(
             /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
             snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir -m %o %s >/dev/null 2>&1", pvfsEXELocation, mode, directory);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; /* Set to a generic return code, since errno not 
@@ -622,7 +638,15 @@ int remove_directory(
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s  >/dev/null 2>&1", pvfsEXELocation, directory);
         }
 
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; /* Save the error number */
@@ -692,7 +716,15 @@ int remove_file(
         {
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, fileName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA;
@@ -749,7 +781,15 @@ int change_mode(
             snprintf(cmd, sizeof(cmd), "%spvfs2-chmod %o %s >/dev/null 2>&1", 
                      pvfsEXELocation, mode, fileName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; 
@@ -872,7 +912,15 @@ int change_owner(
         }
     }
   
+    if(verbose)
+    {
+        printf("\nRUNNING->%s ", cmd);
+    }
     ret = system(cmd);
+    if(verbose)
+    {
+        printf("RETURNS->%d\n",ret);
+    }
     if(ret != 0)
     {
         if(use_pvfs2_lib)
@@ -1373,7 +1421,15 @@ int create_symlink(
             snprintf(cmd, sizeof(cmd), "%spvfs2-ln -s %s %s >/dev/null 2>&1", 
                      pvfsEXELocation, linkTarget, linkName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA;
