@@ -83,7 +83,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         for i in `find "$lk_src" -follow -name generated`
         do
           addThis="`echo $i | sed 's/generated.*$//'`"
-          CFLAGS="$CFLAGS -I$addThis"
+          addThisToo="`echo $i | sed 's/generated.*$/generated/'`"
+          CFLAGS="$CFLAGS -I$addThis -I$addThisToo"
         done
 
 	dnl Check for kconfig.h... at some revision levels, many
