@@ -102,22 +102,12 @@ int fs_resolve_path(const char *local_path,
                     char *fs_path,
                     size_t fs_path_max)
 {
-    /* struct PVFS_sys_mntent *mntent; */
-    /* char *trans_path, *full_path; */
     char *inptr, *outptr;
-    /* PVFS_fs_id fs_id; */
     size_t count;
 
     if (local_path == NULL || fs_path == NULL ||
         fs_path_max == 0)
         return -1;
-
-    /*
-    trans_path = (char *) malloc(strlen(local_path) + 1);
-    if (trans_path == NULL)
-    {
-        return -1;   /* TODO */
-    /* } */
 
     /* remove drive: if necessary */
     if (strlen(local_path) >= 2 && local_path[1] == ':')
@@ -136,35 +126,6 @@ int fs_resolve_path(const char *local_path,
             *outptr = *inptr;
     }
     *outptr = '\0';
-
-#if 0
-    mntent = fs_get_mntent(0);
-    
-    full_path = (char *) malloc(strlen(trans_path) + 
-                                strlen(mntent->mnt_dir) + 2);
-    if (full_path == NULL)
-    {
-        free(trans_path);
-        return -1;
-    }
-    
-    /* prepend mount directory to path */
-    strcpy(full_path, mntent->mnt_dir);
-    /* append path */
-    if (full_path[strlen(full_path)-1] != '/')
-        strcat(full_path, "/");
-    if (trans_path[0] == '/')
-        strcat(full_path, trans_path+1);
-    else
-        strcat(full_path, trans_path);
-    /* strncpy(fs_path, full_path, fs_path_max); */
-
-    /* resolve the path against PVFS */
-    ret = PVFS_util_resolve(full_path, &fs_id, fs_path, fs_path_max);
-
-    free(full_path);
-    free(trans_path);
-#endif 
 
     return 0;
 }
@@ -685,6 +646,7 @@ fs_mkdir_exit:
     return ret;
 }
 
+/* NOTE: deprecated... use fs_io2 */
 int fs_io(enum PVFS_io_type io_type,
           char *fs_path,
           void *buffer,
@@ -694,9 +656,9 @@ int fs_io(enum PVFS_io_type io_type,
           PVFS_credential *credential)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
-    PVFS_sysresp_lookup resp_lookup;
-    PVFS_object_ref object_ref;
+    PVFS_sysresp_lookup resp_lookup;    
     PVFS_Request file_req, mem_req;
+    PVFS_object_ref object_ref;
     PVFS_sysresp_io resp_io;
     int ret;
 
@@ -732,6 +694,36 @@ int fs_io(enum PVFS_io_type io_type,
     PVFS_Request_free(&mem_req);
 
 fs_io_exit:
+
+    return ret;
+}
+
+/* new IO function designed for IO cache */
+int fs_io2(enum PVFS_io_type io_type,
+           PVFS_object_ref object_ref,
+           void *buffer,
+           size_t buffer_len,
+           uint64_t offset,
+           PVFS_size *op_len,
+           PVFS_credential *credential,
+           PVFS_Request req)
+{
+    PVFS_Request file_req;    
+    PVFS_sysresp_io resp_io;
+    int ret;
+
+    if (buffer == NULL || credential == NULL || req == NULL)
+        return -PVFS_EINVAL;
+
+    file_req = PVFS_BYTE;
+    
+    ret = PVFS_sys_io(object_ref, file_req, offset, buffer, req, credential, 
+        &resp_io, io_type, NULL);
+
+    if (ret == 0 && op_len != NULL)
+    {
+        *op_len = resp_io.total_completed;
+    }
 
     return ret;
 }
@@ -910,7 +902,6 @@ char *fs_get_name(int fs_num)
 
 int fs_finalize()
 {
-    /* TODO */
     PVFS_sys_finalize();
 
     return 0;

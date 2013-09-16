@@ -24,6 +24,7 @@
 #include "config.h"
 #include "fs.h"
 #include "cert.h"
+#include "io-cache.h"
 #include "user-cache.h"
 #include "ldap-support.h"
 #include "messages.h"
@@ -56,8 +57,11 @@ DWORD WINAPI main_loop(LPVOID poptions);
 FILE *debug_log = NULL;
 
 extern struct qhash_table *user_cache;
-
 extern gen_mutex_t user_cache_mutex;
+
+extern struct qhash_table *io_cache;
+extern gen_mutex_t io_cache_mutex;
+
 PORANGEFS_OPTIONS goptions;
 
 /* externs */
@@ -488,6 +492,11 @@ void WINAPI service_main(DWORD argc, char *argv[])
     
     gen_mutex_init(&user_cache_mutex);
 
+    /* init IO cache */
+    io_cache = qhash_init(io_cache_compare, quickhash_64bit_hash, 257);
+
+    gen_mutex_init(&io_cache_mutex);
+
     /* read from config file */
     ret = get_config(options, error_msg, 512);
 
@@ -850,6 +859,11 @@ int main(int argc, char **argv, char **envp)
       
       gen_mutex_init(&user_cache_mutex);
 
+      /* init IO cache */
+      io_cache = qhash_init(io_cache_compare, quickhash_64bit_hash, 257);
+      
+      gen_mutex_init(&io_cache_mutex);
+
       /* get options from config file */
       if (get_config(options, error_msg, 512) != 0)
       {          
@@ -929,6 +943,8 @@ int main(int argc, char **argv, char **envp)
 
       gen_mutex_destroy(&user_cache_mutex);
 
+      gen_mutex_destroy(&io_cache_mutex);
+
 main_exit:
 
       if (err != 0)
@@ -937,6 +953,8 @@ main_exit:
       }
 
       qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+
+      qhash_destroy_and_finalize(io_cache, struct io_cache_entry, hash_link, free);
 
       PVFS_ldap_cleanup();
 

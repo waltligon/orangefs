@@ -121,8 +121,6 @@ int get_cache_user(char *user_name,
         /* if cache hit -- return credential */
         entry = qhash_entry(link, struct user_entry, hash_link);
         PINT_copy_credential(&(entry->credential), credential);
-        /* TODO: update timeout 
-        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT); */
         if (goptions->user_mode != USER_MODE_SERVER)
         {
             DbgPrint("   get_cache_user: hit for %s (%u:%u)\n", user_name,

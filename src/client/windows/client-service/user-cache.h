@@ -35,7 +35,7 @@ int add_cache_user(char *user_name,
              ASN1_UTCTIME *expires);
 
 int get_cache_user(char *user_name, 
-                    PVFS_credential *credential);
+                   PVFS_credential *credential);
 
 int remove_user(char *user_name);
 
