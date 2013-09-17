@@ -37,7 +37,7 @@
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
-#define USE_IO_CACHE
+/* #define USE_IO_CACHE */
 
 extern struct qlist_head user_list;
 

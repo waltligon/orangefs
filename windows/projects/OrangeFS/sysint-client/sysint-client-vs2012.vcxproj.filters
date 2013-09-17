@@ -310,10 +310,6 @@
     <CustomBuild Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
       <Filter>SM Files</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.sm">
-      <Filter>SM Files</Filter>
-    </None>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-user-cert.sm" />
   </ItemGroup>
 </Project>
