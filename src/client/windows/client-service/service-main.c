@@ -771,6 +771,8 @@ int main(int argc, char **argv, char **envp)
   int i = 0;
   PORANGEFS_OPTIONS options;
   DWORD err = 0, cmd_debug = FALSE;
+  WORD version;
+  WSADATA wsaData;
   char mount_point[256];
   char error_msg[512];
   char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
@@ -815,10 +817,24 @@ int main(int argc, char **argv, char **envp)
       }
   }
 
+
+
   /* init event log */
   if ((err = init_event_log()) != 0)
+  {
       /* since we can't log to event log, log to stderr */
       fprintf(stderr, "Could not open event log: %u\n", err);
+  }
+
+  /* init Windows Sockets -- this needs to be done in order
+     to use gethostname() if loading credentials in advance. */
+  version = MAKEWORD(2, 2);
+  err = WSAStartup(version, &wsaData);
+  if (err != 0)
+  {
+	  report_startup_error("WSAStartup (Windows Sockets) error:", err);
+	  return 1;
+  }
 
   /* initialize OpenSSL */
   openssl_init();

@@ -169,12 +169,14 @@ int init_credential(PVFS_uid uid,
     if (gethostname(cred->issuer+2, PVFS_REQ_LIMIT_ISSUER-3) == SOCKET_ERROR)
     {
         char errbuf[256];
+		int err;
 
+		err = WSAGetLastError();
         _snprintf(errbuf, sizeof(errbuf), "    init_credential (gethostname): %d", 
-            WSAGetLastError());
-        report_error(errbuf, -PVFS_EINVAL);
+            err);
+        report_error(errbuf, err);
         free(cred->issuer);
-        return ret;
+        return -PVFS_ENONET;
     }
 
     /* fill in uid/groups for non-cert modes */
@@ -182,6 +184,7 @@ int init_credential(PVFS_uid uid,
     if (!cred->group_array)
     {
         report_error("   init_credential:", -PVFS_ENOMEM);
+		free(cred->issuer);
         return -PVFS_ENOMEM;
     }
 

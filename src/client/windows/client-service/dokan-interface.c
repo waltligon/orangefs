@@ -1140,6 +1140,10 @@ PVFS_Dokan_cleanup(
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+#ifdef USE_IO_CACHE
+	io_cache_remove(DokanFileInfo->Context);
+#endif
+
     DbgPrint("Cleanup exit: %d\n", 0);
 
     return 0;
@@ -1241,7 +1245,8 @@ PVFS_Dokan_read_file(
     *ReadLength = (DWORD) len64;
 
     /* set the access time */
-    /* TODO: don't do until cleanup? */
+    /* TODO: don't do until cleanup?
+	   TODO2: not fully supported?
     if (ret == 0)
     {
         attr.mask = PVFS_ATTR_SYS_ATIME;
@@ -1250,6 +1255,7 @@ PVFS_Dokan_read_file(
         if (ret2 != 0)
             DbgPrint("   fs_setattr returned %d\n", ret2);
     }
+	*/
 
 read_file_exit:
 
