@@ -452,12 +452,12 @@ int get_cert_credential(HANDLE huser,
         goto get_cert_credential_exit;
 
     /* load CA cert */
-    ret = load_cert_from_file(goptions->ca_path, &ca_cert);
+    ret = load_cert_from_file(goptions->ca_file, &ca_cert);
     if (ret != 0)
     {
         _snprintf(error_msg, sizeof(error_msg), "User %s: error loading CA "
             "certificate %s. See subsequent log messages for details", 
-            userid, goptions->ca_path);
+            userid, goptions->ca_file);
         report_cert_error(error_msg);
         goto get_cert_credential_exit;
     }
