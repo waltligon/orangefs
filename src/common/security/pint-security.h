@@ -7,6 +7,7 @@
 #ifndef _PINT_SECURITY_H_
 #define _PINT_SECURITY_H_
 
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 
 
@@ -81,6 +82,10 @@
 
 int PINT_security_initialize(void);
 int PINT_security_finalize(void);
+
+#ifdef ENABLE_CERTCACHE
+int PINT_security_cache_ca_cert(void);
+#endif
 
 int PINT_init_capability(PVFS_capability *cap);
 int PINT_sign_capability(PVFS_capability *cap);

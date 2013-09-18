@@ -607,6 +607,13 @@ static int server_initialize(
     }
 
     *server_status_flag |= SERVER_CERTCACHE_INIT;
+
+    /* cache CA cert */
+    ret = PINT_security_cache_ca_cert();
+    if (ret != 0)
+    {
+        gossip_err("Warning: could not cache CA certificate: %d.\n", ret);
+    }
 #endif
 
     /* Initialize the bmi, flow, trove and job interfaces */
@@ -1787,7 +1794,7 @@ static int server_shutdown(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
                      "cache           [   ...   ]\n");
-        PINT_capcache_finalize();
+        PINT_certcache_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
                      "cache           [ stopped ]\n");
     }
