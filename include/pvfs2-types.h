@@ -1013,6 +1013,10 @@ enum PVFS_io_type
  */
 #define PVFS_MGMT_RESERVED 1
 
+/* Note: in a C file which uses profiling, include pvfs2-config.h before
+ * pvfs2-types.h so ENABLE_PROFILING is declared.
+ */
+#ifdef ENABLE_PROFILING
 /*
  * Structure and macros for timing things for profile-like output.
  *
@@ -1021,29 +1025,59 @@ struct profiler
 {
     struct timeval start;
     struct timeval finish;
-    uint64_t save_timing;
+    double save_timing;
 };
 
-#define INIT_PROFILER(prof_struct) prof_struct.save_timing = 0;
+#define DECLARE_PROFILER(prof_struct) \
+    struct profiler prof_struct
+
+#define DECLARE_PROFILER_EXTERN(prof_struct) \
+    extern struct profiler prof_struct
+
+#define INIT_PROFILER(prof_struct) \
+    do { \
+        prof_struct.save_timing = 0; \
+    } while (0)
 
 #define START_PROFILER(prof_struct) \
-    gettimeofday(&prof_struct.start, NULL);
+    do { \
+        gettimeofday(&prof_struct.start, NULL); \
+    } while (0)
 
 #define FINISH_PROFILER(label, prof_struct, print_timing) \
-{ \
-    double t_start, t_finish; \
-    gettimeofday(&prof_struct.finish, NULL); \
-    t_start = prof_struct.start.tv_sec + (prof_struct.start.tv_usec/1000000.0); \
-    t_finish = prof_struct.finish.tv_sec + (prof_struct.finish.tv_usec/1000000.0); \
-    prof_struct.save_timing = t_finish - t_start * 1000000.0; \
-    if (print_timing) { \
-      gossip_err("PROFILING %s: %f\n", label, t_finish - t_start); \
-    } \
-}
+    do { \
+        double t_start, t_finish; \
+        gettimeofday(&prof_struct.finish, NULL); \
+        t_start = prof_struct.start.tv_sec + \
+                  (prof_struct.start.tv_usec / 1000000.0); \
+        t_finish = prof_struct.finish.tv_sec + \
+                   (prof_struct.finish.tv_usec / 1000000.0); \
+        prof_struct.save_timing = t_finish - t_start; \
+        if (print_timing) { \
+            gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
+        } \
+    } while (0)
 
 #define PRINT_PROFILER(label, prof_struct) \
-      gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
+    do { \
+        gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
+    } while (0)
 
+#else /* ENABLE_PROFILING */
+
+#define DECLARE_PROFILER(prof_struct)
+
+#define DECLARE_PROFILER_EXTERN(prof_struct)
+
+#define INIT_PROFILER(prof_struct)
+
+#define START_PROFILER(prof_struct)
+
+#define FINISH_PROFILER(label, prof_struct, print_timing)
+
+#define PRINT_PROFILER(label, prof_struct)
+
+#endif /* ENABLE_PROFILING */
 /*
  * New types for robust security implementation.
  */
