@@ -178,6 +178,7 @@ def ltp(testing_node,output=[]):
     LTP_ARCHIVE_TYPE = ".bz2"
     LTP_ARCHIVE = "%s%s" % (LTP_ARCHIVE_VERSION,LTP_ARCHIVE_TYPE)
     LTP_URL = "http://devorange.clemson.edu/pvfs"
+    vfs_type = "usrint"
     
     rc = 0
     #make sure that the benchmarks have been installed
@@ -228,24 +229,31 @@ def ltp(testing_node,output=[]):
     
     testing_node.changeDirectory('/tmp/ltp')
     
+    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    rc = testing_node.runSingleCommandAsBatch('sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+#    if rc != 0:
+#        return rc
+    # check to see if log file is there
+    if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
+        print "Could not find ltp-pvfs-testcases.log file."
+        return 1
+
     
-    testing_node.addBatchCommand('sudo LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location))
-    rc = testing_node.runAllBatchCommands(output)
-    if rc != 0:
-        return rc
-    
-    failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log",output)
-    testing_node.changeDirectory("~")
-    
-    
+    failrc = testing_node.runSingleCommand("grep TFAIL %s/ltp-pvfs-testcases-%s.log" % (testing_node.ofs_installation_location,vfs_type),output)
+    testing_node.changeDirectory('~')
+
+  
     if failrc == 0:
         # if grep returns O, then there were failures.
+        print "LTP completed with failures"
         return 1
     else:
+        print "LTP completed successfully"
         return 0
         
     
     return rc
+
     
     
     
@@ -309,9 +317,9 @@ fdtree,
 fstest,
 fsx,
 iozone,
-#ltp,
 mkdir_usrint,
 shelltest,
 symlink_usrint,
 tail,
-usrint_cp ]
+usrint_cp,
+ltp ]

@@ -166,6 +166,11 @@ class OFSTestNetwork(object):
             # Create the node and get the instance name
             if "ubuntu" in image_name:
                 name = 'ubuntu'
+            elif "fedora" in image_name:
+                # fedora 18 = ec2-user, fedora 19 = fedora
+                
+                # fedora 18 = ec2-user, fedora 19 = fedora
+                name = 'fedora'
             else:
                 name = 'ec2-user'
             
@@ -325,6 +330,14 @@ class OFSTestNetwork(object):
         
         if rc != 0:
             return rc
+
+        for patch in ofs_patch_files:
+            
+            
+            rc = self.local_master.copyToRemoteNode(patch,build_node,patch,False)
+            if rc != 0:
+                print "Could not upload patch at %s to buildnode %s" % (patch,build_node.host_name)
+
 
         rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode)
         if rc != 0:

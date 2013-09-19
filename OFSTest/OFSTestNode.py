@@ -179,13 +179,14 @@ class OFSTestNode(object):
         # can we ssh in? We'll need the group if we can't, so let's try this first.
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user)
         
-        #print "Current group is "+self.current_group
+        print "Current group is "+self.current_group
 
         # Direct access as root not good. Need to get the actual user in
         # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
+                    
         if self.current_group.rstrip() == "":
             self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
-            #print "Current group (from root) is "+self.current_group
+            print "Current group (from root) is "+self.current_group
             if self.current_group.rstrip() == "":
                 print "Could not access node at "+self.ext_ip_address+" via ssh"
                 exit(-1)
@@ -546,6 +547,9 @@ class OFSTestNode(object):
                     sudo bash -c "echo %s > /var/lib/torque/server_name"
 
                 ''' % (self.processor_type,self.host_name,self.host_name)
+            else:
+                print "TODO: Torque for "+self.distro
+                batch_commands = ""
             #print batch_commands    
             self.addBatchCommand(batch_commands)
         
@@ -616,6 +620,9 @@ class OFSTestNode(object):
                 sudo bash -c 'echo \$logevent 255 >> /var/lib/torque/mom_priv/config' 
                 sudo /etc/init.d/munge start
                 ''' % (self.processor_type,pbsserver_name)
+            else:
+                print "TODO: Torque for "+self.distro
+                batch_commands = ""
             self.addBatchCommand(batch_commands) 
         #print batch_commands  
         self.runAllBatchCommands()
@@ -676,7 +683,8 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf libfuse2 fuse-utils libfuse-dev pkg-config< /dev/null
+                sudo apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch < /dev/null
+                sudo apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
                 # needed for Ubuntu 10.04
                 sudo apt-get install -y -q linux-image < /dev/null
                 # will fail on Ubuntu 10.04. Run separately to not break anything
@@ -708,12 +716,14 @@ class OFSTestNode(object):
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
             #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
+            sudo zypper --non-interactive patch
             
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
             sudo cp /boot/config-`uname -r` .config
             sudo make oldconfig &> /dev/null
             sudo make modules_prepare &>/dev/null
+            sudo make prepare &>/dev/null
             sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
             if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
             then
@@ -731,7 +741,7 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs 
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
@@ -1059,9 +1069,13 @@ class OFSTestNode(object):
         #print cwd
         #ls = self.runSingleCommandBacktick("ls -l")
         #print ls
-        
+        print ofs_patch_files
         for patch in ofs_patch_files:
-            self.runSingleCommand("patch -c -p1 < %s" % ofs_patch_files)
+            
+            print "Patching: patch -c -p1 < %s" % patch
+            rc = self.runSingleCommand("patch -c -p1 < %s" % patch)
+            if rc != 0:
+                print "Patch Failed!"
         
         rc = self.runSingleCommand("./prepare",output)
         if rc != 0:
@@ -1080,10 +1094,20 @@ class OFSTestNode(object):
         # various configure options
         
         if build_kmod == True:
-            configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
+            if "suse" in self.distro.lower():
+                configure_opts = "%s --with-kernel=%s/source" % (configure_opts,self.kernel_source_location)
+            else:
+                configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
         if enable_strict == True:
-            configure_opts = configure_opts+" --enable-strict"
+            # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
+            # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
+            
+            # won't work for rhel 5 based distros, gcc is too old.
+            if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
+                pass
+            else:
+                configure_opts = configure_opts+" --enable-strict"
 
         if enable_shared == True:
             configure_opts = configure_opts+" --enable-shared"

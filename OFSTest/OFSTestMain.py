@@ -63,7 +63,10 @@ class OFSTestMain(object):
             output.write("%s........................................PASS.\n" % function.__name__)
         output.close()
         
-        
+    
+    def checkOFS(self):
+        return 1
+           
     def setupOFS(self):
         
 

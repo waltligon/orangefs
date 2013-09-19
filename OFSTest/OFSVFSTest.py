@@ -114,10 +114,10 @@ def dbench(testing_node,output=[]):
     testing_node.changeDirectory(testing_node.ofs_mountpoint)
     
     
-    if "ubuntu" in testing_node.distro.lower():
-        rc = testing_node.runSingleCommand("echo \""+testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300\"",output)
-    else:
-        rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300 ",output)
+#    if "ubuntu" in testing_node.distro.lower():
+#        rc = testing_node.runSingleCommand("testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300\"",output)
+#    else:
+    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300 ",output)
        
     return rc
     
@@ -197,11 +197,13 @@ def ltp(testing_node,output=[]):
     LTP_URL = "http://devorange.clemson.edu/pvfs"
     
     rc = 0
-   
+    vfs_type = "kmod"
     # check for fuse
     tmp = []
-    testing_node.checkMount(tmp)
+    testing_node.checkMount(mountpoint=testing_node.ofs_mountpoint,output=tmp)
+    
     if "pvfs2fuse" in tmp[1]:
+        vfs_type = "fuse"
         print "LTP test cannot be run for filesystem mounted via fuse"
         return -99
     
@@ -253,22 +255,25 @@ def ltp(testing_node,output=[]):
     
     testing_node.changeDirectory('/tmp/ltp')
     
-    print 'sudo ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location)    
-    rc = testing_node.runSingleCommandAsBatch('sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location),output)
-#    if rc != 0:
+    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    rc = testing_node.runSingleCommandAsBatch('sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mountpoint,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+#   #    if rc != 0:
 #        return rc
     # check to see if log file is there
-    if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases.log ]"):
+    if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
+        print "Could not find ltp-pvfs-testcases.log file."
         return 1
 
-    failrc = testing_node.runSingleCommand("grep FAIL %s/ltp-pvfs-testcases.log" % testing_node.ofs_installation_location,output)
+    failrc = testing_node.runSingleCommand("grep TFAIL %s/ltp-pvfs-testcases-%s.log" % (testing_node.ofs_installation_location,vfs_type),output)
     testing_node.changeDirectory('~')
 
   
     if failrc == 0:
         # if grep returns O, then there were failures.
+        print "LTP completed with failures"
         return 1
     else:
+        print "LTP completed successfully"
         return 0
         
     
@@ -338,9 +343,9 @@ fdtree,
 fstest,
 fsx,
 iozone,
-#ltp,
 mkdir_vfs,
 shelltest,
 symlink_vfs,
 tail,
-vfs_cp ]
+vfs_cp,
+ltp ]

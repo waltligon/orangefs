@@ -61,6 +61,13 @@ else:
 mkdir_p(output_dir)
 os.chdir(output_dir)
 
-rc = test_driver.setupOFS()
+# if nodes exist, then check to see if OrangeFS is already installed
+rc = test_driver.checkOFS()
+
+# if orangefs is not installed, set it up
+if rc != 0:
+    rc = test_driver.setupOFS()
+    
+# Ok, now we have a good OrangeFS installation. Let's test it!    
 if rc == 0:
     test_driver.runTest()
