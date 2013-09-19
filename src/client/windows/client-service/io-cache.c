@@ -30,7 +30,10 @@ int io_cache_compare(void *key,
 
 int io_cache_add(ULONG64 context, 
                  PVFS_object_ref *object_ref,
-                 PVFS_Request req)
+                 PVFS_Request req,
+                 enum PVFS_io_type io_type,
+                 int update_flag)
+
 {
     struct qhash_head *link;
     struct io_cache_entry *entry;
@@ -56,6 +59,8 @@ int io_cache_add(ULONG64 context,
     entry->context = context;
     memcpy(&entry->object_ref, object_ref, sizeof(PVFS_object_ref));
     entry->req = req;
+    entry->io_type = io_type;
+    entry->update_flag = update_flag;
 
     /* add entry */
     gen_mutex_lock(&io_cache_mutex);
@@ -89,12 +94,15 @@ int io_cache_remove(ULONG64 context)
 
 int io_cache_get(ULONG64 context, 
                  PVFS_object_ref *object_ref, 
-                 PVFS_Request *req)
+                 PVFS_Request *req,
+                 enum PVFS_io_type *io_type,
+                 int *update_flag)
 {
     struct qhash_head *link;
     struct io_cache_entry *entry;
 
-    if (object_ref == NULL || req == NULL)
+    if (object_ref == NULL || req == NULL || io_type == NULL ||
+        update_flag == NULL)
     {
         return -PVFS_EINVAL;
     }
@@ -108,6 +116,8 @@ int io_cache_get(ULONG64 context,
         entry = qhash_entry(link, struct io_cache_entry, hash_link);
         memcpy(object_ref, &entry->object_ref, sizeof(PVFS_object_ref));
         *req = entry->req;
+        *io_type = entry->io_type;
+        *update_flag = entry->update_flag;
 
         return IO_CACHE_HIT;
     }

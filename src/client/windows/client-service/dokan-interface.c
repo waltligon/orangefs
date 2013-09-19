@@ -37,7 +37,8 @@
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
-/* #define USE_IO_CACHE */
+/* normally on; disable only for testing */
+#define USE_IO_CACHE
 
 extern struct qlist_head user_list;
 
@@ -1137,15 +1138,70 @@ PVFS_Dokan_cleanup(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+#ifdef USE_IO_CACHE
+    PVFS_object_ref object_ref;
+    PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
+    PVFS_credential credential;
+    PVFS_sys_attr attr;
+    char *fs_path = NULL;
+    int cache_ret, ret, err;
+#endif
+
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
 #ifdef USE_IO_CACHE
-	io_cache_remove(DokanFileInfo->Context);
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req,
+        &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
+    {
+        if (update_flag)
+        {
+            /* get credential */
+            err = get_credential(DokanFileInfo, &credential);
+            CRED_CHECK("Cleanup", err);
+
+            /* get file system path */
+            fs_path = get_fs_path(FileName);
+            if (fs_path == NULL)
+                return -1;
+
+            if (io_type == PVFS_IO_READ)
+            {
+                /* update access time */
+                attr.mask = PVFS_ATTR_SYS_ATIME;
+                attr.atime = time(NULL);
+            }
+            else /* PVFS_IO_WRITE */
+            {
+                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_MTIME;
+                attr.atime = attr.mtime = time(NULL);
+            }
+
+            ret = fs_setattr(fs_path, &attr, &credential);
+            if (ret != 0)
+            {
+                DbgPrint("   time operation failed: %d\n", ret);
+            }        
+
+            free(fs_path);
+
+            PINT_cleanup_credential(&credential);
+        }
+        /* remove from cache */
+	    io_cache_remove(DokanFileInfo->Context);
+    }
+    else if (cache_ret != IO_CACHE_MISS)
+    {
+        DbgPrint("   cache error: %d\n", cache_ret);
+    }
 #endif
 
     DbgPrint("Cleanup exit: %d\n", 0);
 
+    /* note result of time operation is not returned */
     return 0;
 }
 
@@ -1164,10 +1220,13 @@ PVFS_Dokan_read_file(
 #ifdef USE_IO_CACHE
     PVFS_object_ref object_ref;
     PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
+#else
+    PVFS_sys_attr attr;
 #endif
     PVFS_credential credential;
-    PVFS_sys_attr attr;
-    int ret, ret2, err;
+    int ret, cache_ret, err;
     
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1185,17 +1244,18 @@ PVFS_Dokan_read_file(
 
     /* check IO cache */
 #ifdef USE_IO_CACHE
-    ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req);
-    if (ret == IO_CACHE_HIT)
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
+                       &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
     {
         ret = fs_read2(object_ref, Buffer, BufferLength, Offset, 
-                       &len64, &credential, req);
+                        &len64, &credential, req);
 
     }
-    else if (ret != IO_CACHE_MISS)
+    else if (cache_ret != IO_CACHE_MISS)
     {
         /* error */
-        report_error("Write file: cache error: ", ret);
+        report_error("Write file: cache error: ", cache_ret);
 
         goto read_file_exit;
     }
@@ -1207,7 +1267,7 @@ PVFS_Dokan_read_file(
         return -1;
 
 #ifdef USE_IO_CACHE
-    if (ret == IO_CACHE_MISS)
+    if (cache_ret == IO_CACHE_MISS)
     {
         ret = fs_lookup(fs_path, &credential, &object_ref.handle);
         if (ret != 0)
@@ -1231,18 +1291,18 @@ PVFS_Dokan_read_file(
                        &len64, &credential, req);
         if (ret == 0)
         {
-            ret2 = io_cache_add(DokanFileInfo->Context, &object_ref, req);
-            if (ret2 != 0)
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req, 
+                                PVFS_IO_READ, 1);
+            if (cache_ret != 0)
             {
-                report_error("Read file: error adding context to IO cache: ", ret2);
+                report_error("Read file: error adding context to IO cache: ", cache_ret);
             }
         }
     }
 #else
+
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credential);
-#endif
-    *ReadLength = (DWORD) len64;
 
     /* set the access time */
     /* TODO: don't do until cleanup?
@@ -1256,6 +1316,9 @@ PVFS_Dokan_read_file(
             DbgPrint("   fs_setattr returned %d\n", ret2);
     }
 	*/
+#endif
+
+    *ReadLength = (DWORD) len64;
 
 read_file_exit:
 
@@ -1286,9 +1349,13 @@ PVFS_Dokan_write_file(
 #ifdef USE_IO_CACHE
     PVFS_object_ref object_ref;
     PVFS_Request req;
-#endif
+    enum PVFS_io_type io_type;
+    int update_flag;
+#else
     PVFS_sys_attr attr;
-    int ret, ret2, err;
+#endif
+    
+    int ret, cache_ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1299,16 +1366,17 @@ PVFS_Dokan_write_file(
 
     /* check IO cache */
 #ifdef USE_IO_CACHE
-    ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req);
-    if (ret == IO_CACHE_HIT)
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
+                             &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
     {
         ret = fs_write2(object_ref, (void *) Buffer, NumberOfBytesToWrite,
                         Offset, &len64, &credential, req);
     }
-    else if (ret != IO_CACHE_MISS)
+    else if (cache_ret != IO_CACHE_MISS)
     {
         /* error */
-        report_error("Write File: cache error: ", ret);
+        report_error("Write File: cache error: ", cache_ret);
 
         goto write_file_exit;
     }
@@ -1320,7 +1388,7 @@ PVFS_Dokan_write_file(
         return -1;
 
 #ifdef USE_IO_CACHE
-    if (ret == IO_CACHE_MISS)
+    if (cache_ret == IO_CACHE_MISS)
     {
         ret = fs_lookup(fs_path, &credential, &object_ref.handle);
         if (ret != 0)
@@ -1344,10 +1412,11 @@ PVFS_Dokan_write_file(
                         Offset, &len64, &credential, req);
         if (ret == 0)
         {
-            ret2 = io_cache_add(DokanFileInfo->Context, &object_ref, req);
-            if (ret2 != 0)
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req,
+                                     PVFS_IO_WRITE, 1);
+            if (cache_ret != 0)
             {
-                report_error("Read File: error adding context to IO cache: ", ret2);
+                report_error("Read File: error adding context to IO cache: ", cache_ret);
             }
         }
     }
@@ -1355,8 +1424,6 @@ PVFS_Dokan_write_file(
     /* perform the write operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
                    &len64, &credential);
-#endif
-    *NumberOfBytesWritten = (DWORD) len64;
 
     /* set the modify and access times */
     if (ret == 0)
@@ -1367,6 +1434,9 @@ PVFS_Dokan_write_file(
         if (ret2 != 0)
             DbgPrint("   fs_setattr returned %d\n", ret2);
     }
+#endif
+
+    *NumberOfBytesWritten = (DWORD) len64;
 
 write_file_exit:
 

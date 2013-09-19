@@ -25,6 +25,8 @@ struct io_cache_entry
     ULONG64 context;
     PVFS_object_ref object_ref;
     PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
 };
 
 int io_cache_compare(void *key,
@@ -32,12 +34,16 @@ int io_cache_compare(void *key,
 
 int io_cache_add(ULONG64 context, 
                  PVFS_object_ref *object_ref,
-                 PVFS_Request req);
+                 PVFS_Request req,
+                 enum PVFS_io_type io_type,
+                 int update_flag);
 
 int io_cache_remove(ULONG64 context);
 
 int io_cache_get(ULONG64 context, 
                  PVFS_object_ref *object_ref, 
-                 PVFS_Request *req);
+                 PVFS_Request *req,
+                 enum PVFS_io_type *io_type,
+                 int *update_flag);
 
 #endif

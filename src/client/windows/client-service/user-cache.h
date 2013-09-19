@@ -24,7 +24,7 @@ struct user_entry
     struct qhash_head hash_link;
     char user_name[256];
     PVFS_credential credential;
-    ASN1_UTCTIME *expires;
+    ASN1_UTCTIME *expires;    
 };
 
 int user_compare(void *key, 
