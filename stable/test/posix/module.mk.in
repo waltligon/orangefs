@@ -1,0 +1,26 @@
+DIR := posix
+
+SHAREDSRC += \
+	$(DIR)/crc32c.c \
+	$(DIR)/libcrc32c.c \
+	$(DIR)/sha1.c \
+	$(DIR)/sockio.c
+
+TESTSRC += \
+	$(DIR)/openg.c \
+	$(DIR)/openg-socket.c \
+	$(DIR)/readwritex.c \
+	$(DIR)/vecio_test.c \
+	$(DIR)/xio_test.c
+#	$(DIR)/getdents.c \
+#	$(DIR)/stat.c \
+
+DLLSRC += \
+	$(DIR)/libstat.c
+
+MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c $(DIR)/iox.c $(DIR)/io.c
+
+#MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
+#MODCFLAGS_$(DIR)/stat.c = -D_GNU_SOURCE
+
+

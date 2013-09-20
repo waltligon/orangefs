@@ -1,0 +1,334 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <assert.h>
+
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+#include "pint-util.h"
+#include "pint-perf-counter.h"
+
+/* there had better not be but one of these requests at a time */
+static int64_t *static_value_array = NULL;
+static int static_history_size = 0;
+static int static_key_count = 0;
+
+static int reallocate_static_arrays_if_needed(void);
+
+#define MAX_NEXT_ID 1000000000
+
+#define STATIC_TIME(i) (static_value_array[((i) * (static_key_count + 2)) \
+                                + static_key_count])
+#define STATIC_INTV(i) (static_value_array[((i) * (static_key_count + 2)) \
+                                + static_key_count + 1])
+#define STATIC_SAMP(i) (static_value_array[((i) * (static_key_count + 2))])
+
+#define SOP_PERF_SAMP(i) (s_op->resp.u.mgmt_perf_mon.perf_array[((i) \
+                                * (key_count + 2))])
+#define SOP_PERF_TIME(i) (s_op->resp.u.mgmt_perf_mon.perf_array[((i) \
+                                * (key_count + 2)) + key_count])
+#define SOP_PERF_INTV(i) (s_op->resp.u.mgmt_perf_mon.perf_array[((i) \
+                                * (key_count + 2)) + key_count + 1])
+
+%%
+
+machine pvfs2_perf_mon_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+
+    state do_work
+    {
+        run perf_mon_do_work;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run perf_mon_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** perf_mon_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action perf_mon_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->resp.u.mgmt_perf_mon.perf_array)
+        free(s_op->resp.u.mgmt_perf_mon.perf_array);
+
+    return(server_state_machine_complete(smcb));
+}
+
+/** perf_mon_do_work()
+ *
+ * gathers statistics and builds response
+ */
+static PINT_sm_action perf_mon_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+    int valid_count = 0;
+    uint32_t tmp_next_id;
+    int ret = -1;
+    uint32_t key_count = 0;
+    uint32_t sample_count = 0;
+
+#ifdef __PVFS2_DISABLE_PERF_COUNTERS__
+    gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");
+    js_p->error_code = -PVFS_ENOSYS;
+    return SM_ACTION_COMPLETE;
+#endif
+
+    /* how many keys and history intervals do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, 
+            &key_count);
+    if(ret < 0)
+    {
+        return SM_ACTION_COMPLETE;
+        return(ret);
+    }
+    
+    /* get no more counters than exist, and no more than requested */
+    if (key_count > s_op->req->u.mgmt_perf_mon.key_count)
+    {
+        key_count = s_op->req->u.mgmt_perf_mon.key_count;
+    }
+
+    /* how many keys and history intervals do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, 
+            &sample_count);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* get no more counters than exist, and no more than requested */
+    if (sample_count > s_op->req->u.mgmt_perf_mon.count)
+    {
+        sample_count = s_op->req->u.mgmt_perf_mon.count;
+    }
+
+    if (key_count < 1 || sample_count < 1)
+    {   
+        gossip_err("Error: perf mon request with key_count or sample_count less than 1.\n");
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* allocate memory to hold statistics */
+    s_op->resp.u.mgmt_perf_mon.perf_array 
+            = (int64_t *)malloc(sample_count * (key_count + 2)
+             * sizeof(int64_t));
+    if(!s_op->resp.u.mgmt_perf_mon.perf_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->resp.u.mgmt_perf_mon.perf_array, 0,
+            sample_count * (key_count + 2) * sizeof(int64_t));
+
+    /* fill in some of the response */
+    s_op->resp.u.mgmt_perf_mon.cur_time_ms = PINT_util_get_time_ms();
+    s_op->resp.u.mgmt_perf_mon.suggested_next_id 
+            = s_op->req->u.mgmt_perf_mon.next_id;
+    s_op->resp.u.mgmt_perf_mon.key_count = key_count;
+    s_op->resp.u.mgmt_perf_mon.perf_array_count =
+            (key_count + 2) * sample_count;
+
+    /* make sure we have scratch memory to use as an intermediate
+     * buffer for performance counters
+     */
+    ret = reallocate_static_arrays_if_needed();
+    if(ret < 0)
+    {
+        free(s_op->resp.u.mgmt_perf_mon.perf_array);
+        s_op->resp.u.mgmt_perf_mon.perf_array = NULL;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_perf_retrieve(PINT_server_pc,
+                        static_value_array,
+                        static_key_count,
+                        static_history_size);
+
+    /* we are filling per_array in backwards, but this is the order
+     * karma and other programs that collect data over multiple
+     * intervals expect it */
+    /* Work through start times, and find the oldest one that
+     * is new enough to satisfy next_id
+     * NOTE: we encode hi order bits of timestamp as id values.
+     * That * should be sufficient to maintain compatibility.
+     */
+    valid_count = 0;
+    for(i = 1; i < static_history_size; i++)
+    {
+        tmp_next_id = STATIC_TIME(i) % MAX_NEXT_ID;
+        /* check three conditions:
+         * 1) that this interval from the perf counter is valid (start time
+         * not zero)
+         * 2) if the interval is equal to or more recent than what was
+         * suggested by client
+         * 3) if the start time has rolled over within MAX_NEXT_ID
+         */
+        if(tmp_next_id != 0 &&
+                ((tmp_next_id >= s_op->req->u.mgmt_perf_mon.next_id) ||
+                ((s_op->req->u.mgmt_perf_mon.next_id - tmp_next_id) >
+                (MAX_NEXT_ID / 2))))
+        {
+            /* found oldest valid sample */
+            break;
+        }
+    }           
+    /* now copy newer, valid samples */
+    for(; i < static_history_size && valid_count < sample_count; i++)
+    {
+        if(STATIC_TIME(i) != 0)
+        {
+            /* valid sample */
+            memcpy(&SOP_PERF_SAMP(valid_count),
+                    &STATIC_SAMP(i),
+                    key_count * sizeof(int64_t));
+            memcpy(&SOP_PERF_TIME(valid_count),
+                    &STATIC_TIME(i),
+                    2 * sizeof(int64_t));
+            
+            valid_count++;
+        }
+    }
+    if(valid_count < sample_count)
+    {
+        /* copy sample zero - the newest sample */
+        if(STATIC_TIME(0) != 0)
+        {
+            /* valid sample */
+            memcpy(&SOP_PERF_SAMP(valid_count),
+                    &STATIC_SAMP(0),
+                    key_count * sizeof(int64_t));
+            memcpy(&SOP_PERF_TIME(valid_count),
+                    &STATIC_TIME(0),
+                    2 * sizeof(int64_t));
+            
+            valid_count++;
+        }
+    }
+    /* nextid is based on time stamp of last valid sample */
+    /* set final end time */
+    if(valid_count > 0)
+    {
+        s_op->resp.u.mgmt_perf_mon.end_time_ms = 
+                    SOP_PERF_TIME(valid_count-1) + SOP_PERF_INTV(valid_count-1);
+        s_op->resp.u.mgmt_perf_mon.suggested_next_id = 
+                    (SOP_PERF_TIME(valid_count-1) + 1) % MAX_NEXT_ID;
+    }
+    else
+    {
+        s_op->resp.u.mgmt_perf_mon.end_time_ms = 0;
+    }
+
+    js_p->error_code = 0;
+
+    return SM_ACTION_COMPLETE;
+}
+
+/** reallocate_static_arrays()
+ *
+ * allocates new arrays for temporary storage of performance counter data,
+ * freeing old memory if needed
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int reallocate_static_arrays_if_needed(void)
+{
+    unsigned int history_size;
+    unsigned int key_count;
+    int ret = -1;
+
+    /* how many keys and history intervals do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, 
+            &key_count);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* the key count shouldn't change once acquired */
+    if (static_key_count == 0)
+    {
+        static_key_count = key_count;
+    }
+    assert(key_count == static_key_count);
+
+    /* get server history size - this can change */
+    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, 
+            &history_size);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* allocate array if needed */
+    if(history_size > static_history_size)
+    {
+        if(static_value_array)
+        {
+            free(static_value_array);
+        }
+        static_value_array = (int64_t *)
+                malloc(history_size * (key_count + 2) * sizeof(int64_t));
+        if(!static_value_array)
+        {
+            return(-PVFS_ENOMEM);
+        }
+        static_history_size = history_size;
+    }
+
+
+    return(0);
+}
+
+struct PINT_server_req_params pvfs2_perf_mon_params =
+{
+    .string_name = "mgmt_perf_mon",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .state_machine = &pvfs2_perf_mon_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

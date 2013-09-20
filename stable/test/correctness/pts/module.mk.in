@@ -1,0 +1,51 @@
+DIR := correctness/pts
+
+TEST_PTS_SRC := $(DIR)/pts.c
+
+TEST_PTS_MISC := \
+	$(DIR)/create.c \
+	$(DIR)/generic-parser.c \
+	$(DIR)/pvfs-helper.c \
+	$(DIR)/test-pvfs-datatype-init.c \
+	$(DIR)/test-pvfs-datatype-contig.c \
+	$(DIR)/test-pvfs-datatype-vector.c \
+	$(DIR)/test-pvfs-datatype-hvector.c \
+	$(DIR)/test-path-lookup.c \
+	$(DIR)/test-lookup-bench.c \
+	$(DIR)/test-dir-operations.c \
+	$(DIR)/test-dir-torture.c \
+	$(DIR)/test-null-params.c \
+	$(DIR)/pvfs-restart-server.c \
+	$(DIR)/pvfs-stop-server.c \
+	$(DIR)/null-params-parser.c \
+	$(DIR)/test-invalid-files.c \
+	$(DIR)/test-uninitialized.c \
+	$(DIR)/test-finalized.c \
+	$(DIR)/test-misc.c \
+	$(DIR)/test-concurrent-meta.c \
+	$(DIR)/test-request-indexed.c \
+	$(DIR)/test-request-contiguous.c \
+	$(DIR)/test-encode-basic.c \
+	$(DIR)/test-noncontig-pattern.c \
+	$(DIR)/test-write-eof.c \
+	$(DIR)/test-vector-offset.c\
+	$(DIR)/test-vector-start-final-offset.c\
+	$(DIR)/test-contiguous-datatype.c \
+	$(DIR)/test-explicit-offset.c \
+	$(DIR)/test-request-tiled.c\
+	$(DIR)/test-mix.c \
+	$(DIR)/test-romio-noncontig-pattern2.c
+
+MPIMISCSRC += $(TEST_PTS_MISC)
+
+MPITESTSRC += $(TEST_PTS_SRC)
+
+# need client interface for all tests
+MODCFLAGS_$(DIR) = -I$(srcdir)/client/sysint
+
+#LOCALMPITESTS := $(patsubst %.c,%, $(TEST_PTS_SRC))
+#LOCALMPIOBJS := $(patsubst %.c,%.o, $(TEST_PTS_MISC))
+#$(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
+#	$(Q) "  MPILD		$@"
+#	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -o $@
+

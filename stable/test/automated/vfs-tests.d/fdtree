@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cd ${PVFS2_MOUNTPOINT} &&  ${EXTRA_TESTS}/fdtree-1.0.1/fdtree.bash -l 4 -d 5

@@ -1,0 +1,255 @@
+Notes on the BMI InfiniBand implementation
+
+Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
+
+InifiniBand programming interface
+---------------------------------
+The BMI IB implementation was developed for the API provided by Mellanox, a
+major manufacturer of IB silicon, called VAPI.  In 2006, this code was adapted
+to use the OpenIB (now OpenFabrics) API.  Both versions live in this
+directory, bmi_ib, with the VAPI functions in vapi.c and the OpenIB ones in
+openib.c.  Only the basic operations such as posting descriptors and checking
+for completion are implemented separately for each.
+
+Pete Wyckoff wrote the original PVFS2 BMI support for IB on VAPI in 2003.
+Kyle Schochenmaier ported it to the OpenIB API in 2006, at which point the
+original code was modularized and refactored to support the OpenIB port.
+
+
+Compatibility
+-------------
+Hosts running VAPI can talk to hosts running OpenIB.  Hosts of different
+architectures can communicate as well.  Byte order (endianness) and native
+word lengths are handled by BMI, and in the BMI IB devices too.  A single
+host can use either the VAPI interface or the OpenIB interface, but not
+both at the same time.
+
+
+Connection management
+---------------------
+Although there is a section in the specification for connection management, it
+is neither widely implemented nor used.  Until that becomes a bit more mature
+we use TCP to perform connection management.  At startup, an IB-using server
+will listen on the given TCP port number.  Clients connect to that, exchange
+IB hardware address info, then drop that connection and use only IB for all
+future communication.
+
+Between each pair of hosts is one connected queue pair (QP).  Send and
+receive are used, as well as RDMA write.  No atomics or RDMA read are used.
+The immediate data feature of Infiniband is not used.
+
+
+Buffer management
+-----------------
+Since BMI permits sends to occur without pre-matching receives, but
+InfiniBand does not allow this, we must manage a queue of preposted
+buffers for each possible sender.  We allocate some number of fixed
+size receive buffers per sender, and also have the same number of send
+buffers dedicated to that sender.  The receiver keeps a count of buffers
+it has processed and reposted, sending this value to the sender on top
+of its own send messages.  If the accumulated credit gets large with
+respect to the number of total buffers, an explicit credit-return message
+is sent.
+
+These eager buffers are shipped back and forth using basic SEND/RECEIVE since
+completion on the receiver is important for the protocol and there is no speed
+advantage compared to RDMA in that case.  For larger messages, a rendez-vous
+technique is used.  The sender sends an RTS header which causes the receiver
+to reply with a CTS when the matching receive is posted that specifies the
+final location of the message.  List operations are managed by the sender who
+will know the lists at both sender and receiver, as RDMA write permits only
+gather at the sender, not scatter at the receiver.  (Another implementation
+might do this with RDMA reads similarly.)
+
+IB completion queue entries have a 64-bit "id" field to store information
+which is retrievable at completion.  For outgoing SEND messages and incoming
+RECEIVE messages, this holds a pointer to the buffer head which will lead to
+the connection and some state.  For RDMA write send completions, there may
+be many outgoing RDMA write operations to satisfy scatter requirements on
+the receiver.  All but the last of these have an id of 0; the last holds a
+pointer to the send work item.
+
+
+State paths
+-----------
+Below are descriptions of how the states progress for the sender and receiver
+for the various possible message types.  Completion events are tracked
+explicitly, even though they do not tell us anything in most cases.
+
+Eager send
+----------
+    SQ_WAITING_BUFFER
+	credit?
+	alloc bh
+	post_sr
+    SQ_WAITING_EAGER_SEND_COMPLETION
+	(wait local send completion)
+	free bh
+    SQ_WAITING_USER_TEST
+	wait test
+	release sendq
+
+Eager recv, pre-post recv
+-------------------------
+    (user posts)
+	build recvq
+    RQ_WAITING_INCOMING
+	(wait recv cq event)
+	refill credits
+	copy memory to dest
+	re-post_rr
+    RQ_WAITING_USER_TEST
+	wait test
+	release recvq
+
+Eager recv, non-pre-post recv
+-----------------------------
+    (msg arrives)
+	refill credits
+	build recvq
+    RQ_EAGER_WAITING_USER_POST
+	(matching user post arrives)
+	copy memory to dest
+	re-post_rr
+    RQ_WAITING_USER_TEST
+	wait test
+	release recvq
+
+Eager send unexpected
+--------------------
+(Same as eager send but different msg header tag tells receiver
+it is unexpected.)
+
+Eager recv unexpected
+---------------------
+    (msg arrives)
+	refill credits
+	build recvq
+    RQ_EAGER_WAITING_USER_TESTUNEXPECTED
+	(user calls testunexpected)
+	scan recvq looking for this state, no tag matching
+	fill in method_unexpected_info
+	copy memory to dest
+	re-post_rr
+	release recvq entry
+
+RTS send
+--------
+    SQ_WAITING_BUFFER
+	credit?
+	alloc bh
+	post_sr mh_rts
+    SQ_WAITING_RTS_SEND_COMPLETION
+
+    (Note: alternate paths here based on adapter CQ processing:  could get
+    a message from the peer before processing our own send to the peer that
+    caused him to send something.)
+	(send cq event)
+	free bh
+    SQ_WAITING_CTS
+	(recv cq event)
+	refill credits
+	post RDMA to address given in CTS
+	repost rr used to receive cts
+
+    (Path 2)
+	(recv cq event)
+	refill credits
+	post RDMA to address given in CTS
+	repost rr used to receive cts
+    SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS
+	(send cq event)
+	free bh
+
+    SQ_WAITING_DATA_SEND_COMPLETION
+	(local send cq event for rdma write)
+    SQ_WAITING_RTS_DONE_BUFFER
+	credit?
+	alloc bh
+	post_sr mh_rts_done
+	unpin
+    SQ_WAITING_RTS_DONE_SEND_COMPLETION
+	(send cq event)
+	free bh
+    SQ_WAITING_USER_TEST
+	wait test
+	release sendq
+
+RTS recv, pre-post recv
+-----------------------
+    (user posts)
+	build recvq
+    RQ_WAITING_INCOMING
+	(recv cq event)
+	refill credit
+	re-post_rr from rts
+    RQ_RTS_WAITING_CTS_BUFFER
+	credit?
+	alloc bh local for cts
+	pin recv buffer
+	send cts
+    RQ_RTS_WAITING_CTS_SEND_COMPLETION
+	(send cq event)
+	free bh
+    RQ_RTS_WAITING_RTS_DONE
+	(wait recv cq event)
+	unpin recv buffer
+    RQ_WAITING_USER_TEST
+	(wait user test)
+	release recvq
+
+RTS recv, non-pre post
+----------------------
+    (rts arrives on network)
+	refill credit
+	build recvq
+	re-post_rr from rts
+    RQ_RTS_WAITING_USER_POST
+	(wait user post that matches)
+    RQ_RTS_WAITING_CTS_BUFFER  ... continue as in prepost case above
+
+
+Other
+-----
+All QPs are tied to a single CQ for easier polling.
+
+IB guarantees that work requests are _initiated_ in the same order they
+are placed in a given queue (send or receive).  For the receive queue, for
+any mode except RD, work requests _complete_ in the same order too.  But
+there is no correspondence between our send work requests, and receives
+that happen as initiated by the peer.
+
+
+BMI interface issues
+--------------------
+BMI expects that the request tracker handle, id, can be converted to a
+pointer to a struct method_op, so it can check validity, and get the
+pointer to the actual BMI implementation function pointers to know which
+function to call to test, etc.  But this struct method_op is quite huge
+and we need to allocate only two fields in it:  op_id and addr.  I do that
+just to keep BMI happy and ignore the rest.
+
+
+TODO Notes
+----------
+For items in *_WAITING_BUFFER, implement a waiter list so that as they
+retire you can use buffers immediately to trigger another send.
+
+Maybe have a separate completion queue distinct from sendq and recvq.
+Some lookups are O(N), like for incoming RTS and receive matching.
+
+On QP allocation failure, probe remote side of existing QPs to see if
+any have become disconnected.  Close those connections, which might
+result from a client crash.
+
+If client crashes or fails to call BMI_finalize() make sure server does
+the right thing.
+
+Points to test cancellation
+---------------------------
+Kill client at these spots to test server behavior:
+
+    1. pvfs2-ls: just after the send in BMI_ib_post_sendunexpected_list.
+    2. pvfs2-cp unix->pvfs: start of encourage_send_incoming_cts
+
+% vi: set tw=78 :

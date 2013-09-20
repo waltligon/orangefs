@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# External STONITH module for power control of PVFS2 servers
+
+case $1 in
+gethosts)
+	/usr/bin/fs-power-gethosts.pl --fs-name $fs_name
+	exit 0
+	;;
+on)
+	/usr/bin/fs-power-control.pl --fs-name $fs_name --conf-dir $fs_conf_dir --host $2 --command on
+	RETVAL=$?
+        if [ $RETVAL -ne 0 ]; then
+	  exit 1
+	fi
+	exit 0
+	;;
+off)
+	/usr/bin/fs-power-control.pl --fs-name $fs_name --conf-dir $fs_conf_dir --host $2 --command off
+	RETVAL=$?
+        if [ $RETVAL -ne 0 ]; then
+	  exit 1
+	fi
+	exit 0
+	;;
+reset)
+	/usr/bin/fs-power-control.pl --fs-name $fs_name --conf-dir $fs_conf_dir --host $2 --command reboot
+	RETVAL=$?
+        if [ $RETVAL -ne 0 ]; then
+	  exit 1
+	fi
+	exit 0
+	;;
+status)
+	/usr/bin/fs-power-monitor.pl --conf-dir $fs_conf_dir --fs-name $fs_name
+	RETVAL=$?
+        if [ $RETVAL -ne 0 ]; then
+	  exit 1
+	fi
+	exit 0
+	;;
+getconfignames)
+	echo "fs_name"
+	echo "fs_conf_dir"
+	exit 0
+	;;
+getinfo-devid)
+	echo "PVFS2 stonith device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "PVFS2 stonith device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "Power control for PVFS2 servers"
+	exit 0
+	;;
+getinfo-devurl)
+	echo "NONE"
+	exit 0
+	;;
+getinfo-xml)
+	cat << XML
+<parameters>
+<parameter name="fs_name" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+file system name
+</shortdesc>
+<longdesc lang="en">
+Name of the file system that this device is being used with
+</longdesc>
+</parameter>
+<parameter name="fs_conf_dir" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+file system configuration directory
+</shortdesc>
+<longdesc lang="en">
+Path to the shared configuration directory for the file system
+</longdesc>
+</parameter>
+</parameters>
+XML
+	exit 0
+	;;
+*)
+	exit 1
+	;;
+esac

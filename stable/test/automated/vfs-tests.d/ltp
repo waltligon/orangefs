@@ -1,0 +1,113 @@
+#!/bin/bash
+
+#default URL, in case this script is run separately
+if [ ! $URL ]
+then
+  URL=http://devorange.clemson.edu/pvfs
+fi
+
+LTPVER="20120903"
+THISDATE=`date +%F-%R`
+LTP_ARCHIVE=ltp-full-${LTPVER}.bz2
+DOWNLOAD=${URL}/${LTP_ARCHIVE}
+
+cd ${EXTRA_TESTS}
+
+# get rid of any old copies
+sudo rm -rf ltp-full-${LTPVER}
+sudo rm -f ltp-full-${LTPVER}.tgz  
+sudo rm -f ltp-full-${LTPVER}.bz2
+
+# download
+echo Downloading LTP...
+wget -q ${DOWNLOAD} > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to download ${DOWNLOAD}."
+    exit 1;
+fi
+
+tar -xvjf ${LTP_ARCHIVE} > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to untar ${DOWNLOAD}."
+    exit 1;
+fi
+
+# fix some pvfs specific problems
+cd ltp-full-${LTPVER}
+#for patch in \
+patch -p1 < ${VFS_SCRIPTS}/ltp-20120903-zoo-path.patch
+#        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
+#	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
+#      ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
+#		patch -p1 < $patch
+#done
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to apply patches to LTP."
+    exit 1;
+fi
+echo Configuring LTP...
+./configure --prefix=/opt/ltp ADD_CFLAGS="-D_GNU_SOURCE" >& /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to configure LTP."
+    exit 1;
+fi
+echo Compiling LTP...
+export CFLAGS="-g"
+make all>& /dev/null 
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to build LTP."
+    exit 1;
+fi
+
+# NOTE: this does not install anything outside of the ltp directory.  It
+# just configures the test programs so that they can be executed.  We
+# deliberately avoid running make install at the top level because that
+# _would_ install files in /opt/ltp unecessarily.
+#cd testcases
+sudo make install > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to make install LTP testcases."
+    exit 1;
+fi
+#cd ../
+
+# copy pvfs friendly test cases; we should pass all of these
+cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
+sudo cp ${VFS_SCRIPTS}/ltp-pvfs-testcases /opt/ltp/runtest/
+mkdir -p ${PVFS2_MOUNTPOINT}/ltp-tmp 
+chmod 777 ${PVFS2_MOUNTPOINT}/ltp-tmp
+umask 0
+
+# run ltp
+echo Running LTP...
+CURRENTDIR=`pwd`
+cd /opt/ltp
+sudo ./runltp -p -l ${CURRENTDIR}/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& ${CURRENTDIR}/../ltp-pvfs-testcases-$THISDATE.output
+LTPRET=${?}
+if [ "${LTPRET}" != 0 ]
+then
+    echo "Error: either failed to invoke LTP, or at least one test failed"
+fi
+cd -
+cd ..
+
+FAILCOUNT=`grep FAIL ltp-pvfs-testcases-$THISDATE.log | wc -l`
+
+if [ "${FAILCOUNT}" != 0 -o "${LTPRET}" != 0 ]
+then 
+    echo "Error: failed the following LTP test cases:"
+    grep FAIL ltp-pvfs-testcases-$THISDATE.log
+    echo "log file:                    ${EXTRA_TESTS}/ltp-pvfs-testcases-$THISDATE.log"
+    echo "record of stdout and stderr: ${EXTRA_TESTS}/ltp-pvfs-testcases-$THISDATE.output"
+    exit 1
+fi
+
+echo "Completed LTP tests."
+
+exit 0

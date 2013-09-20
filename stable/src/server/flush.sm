@@ -1,0 +1,218 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+/*
+ * if given a metafile, do a keyval flush
+ * if given a datafile, do a bstream flush
+ */
+enum
+{
+    FLUSH_KEYVAL  = 4,
+    FLUSH_BSTREAM = 5
+};
+
+void flush_init_state_machine(void);
+
+%%
+
+machine pvfs2_flush_sm
+{
+    state prelude
+    {
+	jump pvfs2_prelude_sm;
+	success => flush_check_type;
+	default => final_response;
+    }
+
+    state flush_check_type
+    {
+	run flush_check_type;
+        FLUSH_KEYVAL => kflush;
+        FLUSH_BSTREAM => bflush;
+	default => cleanup;
+    }
+
+    state kflush
+    {
+	run flush_keyval_flush;
+	default => kflush_check_error;
+    }
+
+    state kflush_check_error
+    {
+	run flush_check_error;
+	default => final_response;
+    }
+
+    state bflush
+    {
+	run flush_bstream_flush;
+	default => bflush_check_error;
+    }
+
+    state bflush_check_error
+    {
+	run flush_check_error;
+	default => final_response;
+    }
+
+    state final_response
+    {
+	jump pvfs2_final_response_sm;
+	default => cleanup;
+    }
+
+    state cleanup
+    {
+	run flush_cleanup;
+	default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action flush_check_type(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        js_p->error_code = FLUSH_KEYVAL;
+    }
+    else if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
+    {
+        js_p->error_code = FLUSH_BSTREAM;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Function: flush_keyval_flush
+ *
+ * Params:  server_op *s_op,
+ *	    job_status_s *js_p
+ *
+ * Pre: None
+ * Post: None
+ * Returns: int
+ *
+ * Synopsys: send a keyval flush request to storage
+ *
+ */
+static PINT_sm_action flush_keyval_flush(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " doing keyval flush on %llu,%d\n",
+                 llu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
+
+    ret = job_trove_keyval_flush(
+        s_op->req->u.flush.fs_id,
+        s_op->req->u.flush.handle,
+        s_op->req->u.flush.flags,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action flush_check_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char buf[64] = {0};
+    if (js_p->error_code != 0)
+    {
+        PVFS_strerror_r(js_p->error_code, buf, 64);
+
+        gossip_err("failed to flush handle %llu: %s\n",
+                   llu(s_op->req->u.flush.handle), buf);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Function: flush_bstream_flush
+ *
+ * Params:  server_op *s_op,
+ *	    job_status_s *js_p
+ *
+ * Pre: None
+ * Post: None
+ * Returns: int
+ *
+ * Synopsys: send a bstream flush request to storage
+ *
+ */
+static PINT_sm_action flush_bstream_flush(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t i;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " doing bstream flush on %llu,%d\n",
+                 llu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
+
+    ret = job_trove_bstream_flush(
+        s_op->req->u.flush.fs_id,
+        s_op->req->u.flush.handle,
+        s_op->req->u.flush.flags,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+	    
+static PINT_sm_action flush_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(flush);
+
+struct PINT_server_req_params pvfs2_flush_params =
+{
+    .string_name = "flush",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_flush,
+    .state_machine = &pvfs2_flush_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

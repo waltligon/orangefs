@@ -1,0 +1,46 @@
+
+Design and development of PVFS2 is lead by a collaboration of
+researchers from the following institutions*:
+
+Parallel Architecture Research Laboratory at
+  Clemson University 
+
+Mathematics and Computer Science Division at
+  Argonne National Laboratory
+
+
+*All named authors are associated with one of these institutions.
+Other contributors are listed in the CREDITS file.
+
+
+Active Authors (Maintainers)
+============================
+
+core design, documentation and implementation by:
+
+Robert Ross <rross@mcs.anl.gov>
+Walt Ligon <walt@parl.clemson.edu>
+Phil Carns <pcarns@parl.clemson.edu>
+Robert Latham <robl@mcs.anl.gov>
+
+
+Other Authors
+=============
+
+Neill Miller <neillm@mcs.anl.gov> (01/2003 - 01/2005)
+-- retired author, maintainer, and release manager
+
+Frank Shorter <fshorte@parl.clemson.edu>
+-- client side API development, system test harnesses
+
+Harish Ramachandran <rharish@parl.clemson.edu>
+-- initial client side API implementation
+
+Dale Whitchurch <dalew@parl.clemson.edu>
+-- initial server state machine implementation
+
+Mike Speth <mspeth@parl.clemson.edu>
+-- some PTS correctness tests
+
+Brad Settlemyer <bradles@CLEMSON.EDU>
+-- distribution framework enhancements

@@ -1,0 +1,38 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH pvfs2.conf 5 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2.conf \- information about pvfs2 server config files
+.SH DESCRIPTION
+All 
+.B pvfs2-server
+programs will consult two config files to configure themselves. The
+.I fs.conf
+config file has global settings for every server.  The
+.I server.conf 
+config file has local overrides for that server.
+
+At this time, the documentation for these files is incomplete -- it's not even
+started.  Use
+.BR pvfs2-genconfig (1) 
+to create the config files for the servers.
+
+One useful setting in the fs.conf config file is the
+.B EventLogging
+setting.  This is used to force logging of certain types of information at run
+time on the pvfs2-server.  A value of
+.B none
+indicates no debugging; a value of
+.B verbose
+will cause a significant amount of debugging information to be produced.  The various
+other options for this value can be deduced from src/common/misc/pvfs2-debug.c until
+we document them.
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-genconfig (1)

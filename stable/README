@@ -1,0 +1,36 @@
+             The Parallel Virtual File System, Version 2
+
+
+    Parallel Architecture Research Laboratory, Clemson University
+
+Mathematics and Computer Science Division, Argonne National Laboratory
+
+PVFS2 is a next generation parallel file system for Linux clusters. It
+harnesses commodity storage and network technology to provide concurrent
+access to data that is distributed across a (possibly large) collection
+of servers.  PVFS2 serves as both a testbed for parallel I/O research
+and as a freely available production-level tool for the cluster community.
+
+See the top level COPYING file for license information.
+
+NOTE: The pvfs2 kernel modules for 2.4.x and 2.6.x are released under
+the terms of the GNU General Public License.
+
+Information about building and installing PVFS2 can be found in:
+doc/pvfs2-quickstart.pdf
+doc/pvfs2-quickstart.ps
+
+Information about the current state of the project can be found in:
+doc/pvfs2-status.pdf
+doc/pvfs2-status.ps
+
+A user's manual and introduction to PVFS2 can be found in:
+doc/pvfs2-guide.pdf
+doc/pvfs2-guide.ps
+
+Documentation of interest to developers can be found in doc/design and 
+doc/coding, although it may not be in sync with the current code.
+
+Project contributions are listed in the AUTHORS and CREDITS files.
+
+-PVFS2 Development Team

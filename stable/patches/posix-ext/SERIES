@@ -1,0 +1,24 @@
+Apply the patches to a vanilla 2.6.16 kernel in the following order
+
+a) posix-extensions-cvs.patch : This implements the sys call stubs for
+   openg/openfh and the VFS hooks for file system specific implementations.
+
+b) posix-statlite.patch : This implements the sys call stubs for the statlite()
+   family of system calls and the VFS hooks for file system specific
+   implementations.
+
+c) posix-statlite-x86_64.patch : Bug fix/build fix patch for the x86-64 machine.
+
+d) posix-direntplus.patch: This implements the sys call stubs for the
+   readdir_plus() family of system calls and the corresponding VFS hooks for FS
+   specific implementations.
+
+e) posix-readwritex.patch: Implements the sys call stubs for the readx/writex
+   family of system calls and the corresponding VFS hooks for FS specific
+   implementations.
+
+f) posix-statlite-fix.patch: Bug fix for the statlite system call.
+
+g) posix-direntplus-lite.patch: Implements the syscall stubs for the
+   readdir_plus_lite() family of system calls and the corresponding VFS hooks
+   for FS specific implementations.

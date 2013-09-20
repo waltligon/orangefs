@@ -1,0 +1,33 @@
+DIR := src/apps/kernel/linux
+
+PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
+
+ifdef BUILD_KERNEL
+
+KERNAPPSRC += \
+	$(DIR)/pvfs2-client.c 
+
+# if requested, build a threaded client core
+ifeq (,@THREADED_KMOD_HELPER@)
+KERNAPPSRC += $(DIR)/pvfs2-client-core.c
+else
+KERNAPPTHRSRC += $(DIR)/pvfs2-client-core.c
+endif
+
+ifneq (,$(LINUX24_KERNEL_SRC))
+KERNAPPSRC += $(DIR)/mount.pvfs2.c
+endif
+
+# get kernel interface defines, and sysint client.h
+MODCFLAGS_$(DIR)/pvfs2-client-core.c = \
+  -I$(srcdir)/src/kernel/linux-2.6
+
+ifdef PVFS2_SEGV_BACKTRACE
+	MODCFLAGS_$(DIR)/pvfs2-client-core.c += -D__PVFS2_SEGV_BACKTRACE__
+endif
+
+# explicitly uses pthreads both threaded and not-threaded versions, even if
+# threading is turned off in the rest of libpvfs
+MODLDFLAGS_$(DIR)/pvfs2-client-core.o = -lpthread
+
+endif

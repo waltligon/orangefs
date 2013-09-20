@@ -1,0 +1,339 @@
+#!/bin/sh
+#
+#	High-Availability PVFS2 control script
+#
+# Based on Apache OCF script included in heartbeat package, authored by Alan
+# Robertson and Sun Jiang Dong.
+#
+# License:      GNU General Public License (GPL)
+#
+# PVFS2
+#
+# Description:	starts/stops PVFS2 servers.
+#
+# OCF parameters (required in cib):
+#  OCF_RESKEY_fsconfig
+#  OCF_RESKEY_port
+#  OCF_RESKEY_pidfile
+#  OCF_RESKEY_ip
+#  OCF_RESKEY_alias
+
+# example values:
+#OCF_RESKEY_fsconfig=/root/simple.conf
+#OCF_RESKEY_port=3334
+#OCF_RESKEY_pidfile=/tmp/pvfs2-server.pid
+#OCF_RESKEY_ip=virtual1
+#OCF_RESKEY_alias=virtual1
+
+VARRUN=/var/run
+
+# newer versions of heartbeat have moved the ocf-shellfuncs  file
+if [ -f /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs ] ; then
+. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+else
+. /usr/lib/heartbeat/ocf-shellfuncs
+fi
+
+#######################################################################
+#
+#	Configuration options - usually you don't need to change these
+#
+#######################################################################
+#
+PVFS2D=/usr/local/sbin/pvfs2-server
+PVFS2CHECK=/usr/local/bin/pvfs2-check-server
+
+
+#	End of Configuration options
+#######################################################################
+
+CMD=`basename $0`
+
+#	The config-file-pathname is the pathname to the configuration
+#	file for this web server.  Various appropriate defaults are
+#	assumed if no config file is specified.  If this command is
+#	invoked as *IBM*, then the default config file name is
+#	$DEFAULT_IBMCONFIG, otherwise the default config file
+#	will be $DEFAULT_NORMCONFIG.
+usage() {
+  cat <<-!
+usage: $0 action
+
+action:
+	start	start the PVFS2 server
+
+	stop	stop the PVFS2 server
+
+	status	return the status of PVFS2 server, run or down
+
+	monitor  return TRUE if the server appears to be working.
+
+	meta-data	show meta data message
+
+	validate-all	validate the instance parameters
+	!
+  exit $OCF_ERR_ARGS
+}
+
+#
+#	Check if the port is valid
+#
+CheckPort() {
+  ocf_is_decimal "$1" && [ $1 -gt 0 ]
+}
+
+#
+# return TRUE if a process with given PID is running
+#
+ProcessRunning() {
+    PVFS2PID=$1
+    # Use /proc if it looks like it's here...
+    if
+      [ -d /proc -a -d /proc/1 ]
+    then
+       [ -d /proc/$PVFS2PID ]
+    else
+      #  This assumes we're running as root...
+      kill -0 "$PVFS2PID" >/dev/null 2>&1
+    fi
+}
+
+
+silent_status() {
+  if
+    [ -f $OCF_RESKEY_pidfile  ] 
+  then
+    ProcessRunning `cat $OCF_RESKEY_pidfile`
+  else
+    : No pid file
+    false
+  fi
+}
+
+start_pvfs2() {
+   if validate_all_pvfs2; then
+      : OK
+   else
+      ocf_log err "Error parsing PVFS2 resource parameters"
+      exit $OCF_ERR_ARGS
+   fi
+
+  if
+    silent_status
+  then
+    ocf_log info "$CMD already running (pid $PVFS2PID)"
+    return $OCF_SUCCESS
+  fi
+
+  # set ulimit values
+  ulimit -n 100000 && ulimit -c unlimited
+
+  # try to create storage space (ok if it fails)
+  $PVFS2D $OCF_RESKEY_fsconfig -a $OCF_RESKEY_alias -f
+
+  # launch daemon
+  ocf_run $PVFS2D -p $OCF_RESKEY_pidfile -a $OCF_RESKEY_alias $OCF_RESKEY_fsconfig 
+  if
+    [ $? -ne 0 ]
+  then
+    ocf_log warn "pvfs2-server failed to start."
+    return $?
+  fi
+
+  # wait a little bit
+  sleep 8
+
+  # does the pidfile still exist (indicating that the server is still running?)
+  if
+    [ -a $OCF_RESKEY_pidfile ]
+  then
+    return $OCF_SUCCESS
+  else
+    ocf_log warn "pvfs2-server died after starting."
+    return $OCF_ERR_GENERIC
+  fi
+}
+
+stop_pvfs2() {
+  if
+    silent_status
+  then
+    if
+      kill $PVFS2PID
+    then
+      tries=0
+      while
+        ProcessRunning $PVFS2PID &&
+        [ $tries -lt 10 ]
+      do
+        sleep 1
+        kill $PVFS2PID >/dev/null 2>&1
+        ocf_log info "Killing pvfs2-server PID $PVFS2PID"
+        tries=`expr $tries + 1`
+      done
+    else
+      ocf_log warn "Killing pvfs2-server PID $PVFS2PID FAILED."
+    fi
+    if
+      ProcessRunning $PVFS2PID
+    then
+      sleep 1
+      kill -9 $PVFS2PID >/dev/null 2>&1
+      ocf_log warn "Killing (-9) pvfs2-server PID $PVFS2PID"
+      sleep 5
+      if
+        ProcessRunning $PVFS2PID
+      then
+        ocf_log info "$CMD still running ($PVFS2PID)."
+        false
+      else
+        ocf_log info "$CMD stopped."
+      fi
+    else
+      ocf_log info "$CMD stopped."
+    fi
+  else
+    ocf_log info "$CMD is not running."
+  fi
+}
+
+status_pvfs2() {
+  silent_status
+  rc=$?
+  if
+    [ $rc -eq 0 ]
+  then
+    ocf_log info "$CMD is running (pid $PVFS2PID)."
+    return $OCF_SUCCESS
+  else
+    ocf_log info "$CMD is stopped."
+    return $OCF_NOT_RUNNING
+  fi
+}
+
+
+monitor_pvfs2() {
+  if
+    silent_status
+  then
+    ocf_run $PVFS2CHECK -h $OCF_RESKEY_ip -f pvfs2-fs -n tcp -p $OCF_RESKEY_port
+  else
+    ocf_log info "$CMD not running"
+    return $OCF_NOT_RUNNING
+  fi
+}
+
+metadata_pvfs2(){
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="PVFS2">
+<version>1.0</version>
+
+<longdesc lang="en">
+starts/stops PVFS2 servers.
+</longdesc>
+<shortdesc lang="en">starts/stops PVFS2 servers.</shortdesc>
+
+<parameters>
+<parameter name="fsconfig" required="1">
+<longdesc lang="en">
+The full path name of file system config file.
+</longdesc>
+<shortdesc lang="en">fs config file path</shortdesc>
+</parameter>
+
+<parameter name="port" required="1">
+<longdesc lang="en">
+Port number that server will listen on.
+</longdesc>
+<shortdesc lang="en">server port number</shortdesc>
+</parameter>
+
+<parameter name="pidfile" required="1">
+<longdesc lang="en">
+The full path name of the server pid file.
+</longdesc>
+<shortdesc lang="en">server pid file</shortdesc>
+</parameter>
+
+<parameter name="ip" required="1">
+<longdesc lang="en">
+Virtual ip address that the server will run on.
+</longdesc>
+<shortdesc lang="en">virtual IP address</shortdesc>
+</parameter>
+
+<parameter name="alias" required="1">
+<longdesc lang="en">
+PVFS server alias to be passed to -a argument.
+</longdesc>
+<shortdesc lang="en">PVFS server alias</shortdesc>
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"   timeout="90" />
+<action name="stop"    timeout="100" />
+<action name="status"  timeout="30" />
+<action name="monitor" depth="0"  timeout="20" interval="10" start-delay="1m" />
+<action name="meta-data"  timeout="5" />
+<action name="validate-all"  timeout="5" />
+</actions>
+</resource-agent>
+END
+
+	exit $OCF_SUCCESS
+}
+
+validate_all_pvfs2() {
+
+# pidfile: make sure it is an absolute path
+   case $OCF_RESKEY_pidfile in
+      /*) ;;
+      *) ocf_log err "pidfile [$OCF_RESKEY_pidfile] should be an absolute path!" 
+         exit $OCF_ERR_ARGS
+         ;;
+   esac
+
+# port: just make sure it is a decimal
+  if CheckPort $OCF_RESKEY_port; then
+	: OK
+  else
+	ocf_log err "Port number $OCF_RESKEY_port is invalid!"
+	exit $OCF_ERR_ARGS
+  fi
+
+# fsconfig: make sure the file exists
+if [ ! -f $OCF_RESKEY_fsconfig ]; then
+   ocf_log err "Configuration file $OCF_RESKEY_fsconfig not found!"
+   exit $OCF_ERR_CONFIGURED
+fi
+
+# make sure we can execute server daemon
+if [ ! -x $PVFS2D ]; then
+   ocf_log err "PVFS2 daemon $PVFS2D not found or is not an executable!"
+   exit $OCF_ERR_ARGS
+fi
+
+  return $OCF_SUCCESS
+}
+
+if
+  [ $# -eq 1 ]
+then
+  COMMAND=$1
+else
+  usage
+fi
+
+case $COMMAND in
+  start)	start_pvfs2;;
+  stop)		stop_pvfs2;;
+  status)	status_pvfs2;;
+  monitor)	monitor_pvfs2;;
+  meta-data)	metadata_pvfs2;;
+  validate-all)	validate_all_pvfs2;;
+  *)		usage;;
+esac

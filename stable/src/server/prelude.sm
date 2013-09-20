@@ -1,0 +1,724 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "src/server/request-scheduler/request-scheduler.h"
+#include "trove.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
+
+/* prelude state machine:
+ * This is a nested state machine that performs initial setup 
+ * steps that are common to many server operations.
+ * - post the request to the request scheduler
+ * - check permissions
+ */
+enum {
+    PRELUDE_RUN_ACL_CHECKS = 1,
+};
+
+%%
+
+nested machine pvfs2_prelude_work_sm
+{
+    state req_sched
+    {
+        run prelude_req_sched;
+        success => getattr_if_needed;
+        default => return;
+    }
+
+    state getattr_if_needed
+    {
+        run prelude_getattr_if_needed;
+        default => perm_check;
+    }
+
+    state perm_check
+    {
+        run prelude_perm_check;
+        PRELUDE_RUN_ACL_CHECKS => check_acls_if_needed;
+        default => return;
+    }
+
+    state check_acls_if_needed
+    {
+        run prelude_check_acls_if_needed;
+        default => check_acls;
+    }
+
+    state check_acls
+    {
+        run prelude_check_acls;
+        default => return;
+    }
+}
+
+nested machine pvfs2_prelude_sm
+{
+    state setup
+    {
+        run prelude_setup;
+        default => prelude_work;
+    }
+
+    state prelude_work
+    {
+        jump pvfs2_prelude_work_sm;
+        default => return;
+    }
+}
+
+%%
+
+static PINT_sm_action prelude_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_sm:prelude_setup...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    ret = PINT_server_req_get_object_ref(
+        s_op->req, &s_op->target_fs_id, &s_op->target_handle);
+    if( ret != 0 )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+    }
+    s_op->access_type = PINT_server_req_get_access_type(s_op->req);
+    s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
+
+    /* add the user to the uid mgmt system */
+    ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
+    if (ret != 0)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "Unable to add user id to uid"
+                      "management interface\n");
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* prelude_req_sched()
+ *
+ * posts a request scheduler job
+ */
+static PINT_sm_action prelude_req_sched(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+
+    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }   
+ 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase_frame:%d\tframe_count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "(%p) %s (prelude sm) state: req_sched\n", s_op,
+        PINT_map_server_op_to_string(s_op->req->op));
+
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
+
+    ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
+                             s_op->access_type, s_op->sched_policy,
+                             smcb, 0, js_p,
+                             &(s_op->scheduled_id), server_job_context);
+
+    /* these are two different counters - one instantaneous, one cumulative */
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
+    return ret;
+}
+
+/* prelude_getattr_if_needed()
+ *
+ * reads basic attributes of target object, if there is a particular
+ * target object for the operation
+ */
+static PINT_sm_action prelude_getattr_if_needed(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t tmp_id;
+
+    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: getattr already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+
+    /* if the handle is 0, that indicates that the request does not
+     * operate on a specific handle, so there is nothing we can do
+     * here
+     */
+    if (s_op->target_handle == PVFS_HANDLE_NULL)
+    {
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* all other operations fall to this point and read basic
+     * attribute information
+     */
+    memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
+                 "for handle %llu\n", llu(s_op->target_handle));
+
+    ret = job_trove_dspace_getattr(
+        s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
+        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
+    PVFS_uid *uid, PVFS_gid *gid)
+{
+    *uid = fsconfig->exp_anon_uid;
+    *gid = fsconfig->exp_anon_gid;
+    return;
+}
+
+static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fsconfig,
+    PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    for (i = 0; i < fsconfig->all_squash_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->all_squash_hosts[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->all_squash_hosts[i],
+                fsconfig->all_squash_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsconfig,
+    PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    /* check exceptions first */
+    for (i = 0; i < fsconfig->root_squash_exceptions_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_exceptions_hosts[i],
+            fsconfig->root_squash_exceptions_netmasks[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_exceptions_hosts[i], 
+                fsconfig->root_squash_exceptions_netmasks[i]) == 1)
+        {
+            /* in the exception list, do not squash */
+            return 0;
+        }
+    }
+
+    for (i = 0; i < fsconfig->root_squash_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_hosts[i],
+            fsconfig->root_squash_netmasks[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
+                fsconfig->root_squash_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Translate_ids will return 1 if it did some uid/gid squashing, 0 otherwise */
+static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid, 
+    PVFS_uid *translated_uid, PVFS_gid *translated_gid, PVFS_BMI_addr_t client_addr)
+{
+    int exp_flags = 0;
+    struct server_configuration_s *serv_config = NULL;
+    struct filesystem_configuration_s * fsconfig = NULL;
+
+    serv_config = PINT_get_server_config();
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
+
+    if (fsconfig == NULL)
+    {
+        return 0;
+    }
+    exp_flags = fsconfig->exp_flags;
+    /* If all squash was set */
+    if (exp_flags & TROVE_EXP_ALL_SQUASH)
+    {
+        if (iterate_all_squash_wildcards(fsconfig, client_addr) == 1)
+        {
+            get_anon_ids(fsconfig, translated_uid, translated_gid);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                "Translated ids from <%u:%u> to <%u:%u>\n",
+                uid, gid, *translated_uid, *translated_gid);
+            return 1;
+        }
+    }
+    /* if only root squash was set translate uids for root alone*/
+    if (exp_flags & TROVE_EXP_ROOT_SQUASH)
+    {
+        if (uid == 0 || gid == 0)
+        {
+            if (iterate_root_squash_wildcards(fsconfig, client_addr) == 1)
+            {
+                get_anon_ids(fsconfig, translated_uid, translated_gid);
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                    "Translated ids from <%u:%u> to <%u:%u>\n",
+                    uid, gid, *translated_uid, *translated_gid);
+                return 1;
+            }
+        }
+    }
+    /* no such translation required! */
+    *translated_uid = uid;
+    *translated_gid = gid;
+    return 0;
+}
+
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    for (i = 0; i < fsconfig->ro_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->ro_hosts[i]);
+        /* Does the client address match the wildcard specification and/or */
+        /* the netmask specification?                                      */
+        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
+                fsconfig->ro_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Return zero if this operation should be allowed.
+ */
+static int permit_operation(PVFS_fs_id fsid,
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr)
+{ 
+    int exp_flags = 0; 
+    struct server_configuration_s *serv_config = NULL;
+    struct filesystem_configuration_s * fsconfig = NULL;
+
+    if (access_type == PINT_SERVER_REQ_READONLY)
+    {
+        return 0;  /* anything that doesn't modify state is okay */
+    }
+    serv_config = PINT_get_server_config();
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
+
+    if (fsconfig == NULL)
+    {
+        return 0;
+    }
+    exp_flags = fsconfig->exp_flags;
+
+    /* cheap test to see if ReadOnly was even specified in the exportoptions */
+    if (!(exp_flags & TROVE_EXP_READ_ONLY))
+    {
+        return 0;
+    }
+    /* Drat. Iterate thru the list of wildcards specified in server_configuration and see
+     * the client address matches. if yes, then we deny permission
+     */
+    if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Disallowing read-write operation on a read-only exported file-system\n");
+        return -EROFS;
+    }
+    return 0;
+}
+
+/* prelude_perm_check()
+ *
+ * this really just marks the spot where we would want to do
+ * permission checking, it will be replaced by a couple of states that
+ * actually perform this task later
+ */
+static PINT_sm_action prelude_perm_check(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *obj_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    PVFS_uid translated_uid = s_op->req->credentials.uid;
+    PVFS_gid translated_gid = s_op->req->credentials.gid;
+    int squashed_flag = 0;
+    int skip_acl_flag = 0;
+
+    /* moved gossip server debug output to end of state, so we can report
+     * resulting status value.
+     */
+
+    /*
+      first we translate the dspace attributes into a more convenient
+      server use-able format.  i.e. a PVFS_object_attr
+    */
+    ds_attr = &s_op->ds_attr;
+    obj_attr = &s_op->attr;
+    PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
+    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Set the target object attribute pointer.. used later by the acl check */
+    s_op->target_object_attr = obj_attr;
+
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: perm check already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
+    {
+        /*
+         * if we are exporting a volume readonly, disallow any operation that modifies
+         * the state of the file-system.
+         */
+        if (permit_operation(
+                s_op->target_fs_id, s_op->access_type, s_op->addr) < 0)
+        {
+            js_p->error_code = -PVFS_EROFS;
+            return SM_ACTION_COMPLETE;
+        }
+        else 
+        {
+            /* Translate the uid and gid's in case we need to do some squashing based on the export and the client address */
+            if (translate_ids(s_op->target_fs_id, s_op->req->credentials.uid, s_op->req->credentials.gid,
+                &translated_uid, &translated_gid, s_op->addr) == 1)
+            {
+                squashed_flag = 1;
+                s_op->req->credentials.uid = translated_uid;
+                s_op->req->credentials.gid = translated_gid;
+                /* in the case of a setattr, translate the ids as well right here */
+                if (s_op->req->op == PVFS_SERV_SETATTR)
+                {
+                    s_op->req->u.setattr.attr.owner = translated_uid;
+                    s_op->req->u.setattr.attr.group = translated_gid;
+                }
+                else if (s_op->req->op == PVFS_SERV_MKDIR)
+                {
+                    s_op->req->u.mkdir.attr.owner = translated_uid;
+                    s_op->req->u.mkdir.attr.group = translated_gid;
+                }
+                else if (s_op->req->op == PVFS_SERV_CREATE)
+                {
+                    s_op->req->u.create.attr.owner = translated_uid;
+                    s_op->req->u.create.attr.group = translated_gid;
+                }
+            }
+       }
+    }
+
+    /* anything else we treat as a real error */
+    if (js_p->error_code)
+    {
+        js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
+        "attr mask %d\n\t(attr_uid_valid? %s, attr_owner = "
+        "%d, credentials_uid = %d)\n\t(attr_gid_valid? %s, attr_group = "
+        "%d, credentials.gid = %d)\n",
+        PINT_map_server_op_to_string(s_op->req->op), s_op->attr.mask,
+        ((s_op->attr.mask & PVFS_ATTR_COMMON_UID) ? "yes" : "no"),
+        s_op->attr.owner, translated_uid,
+        ((s_op->attr.mask & PVFS_ATTR_COMMON_GID) ? "yes" : "no"),
+        s_op->attr.group, translated_gid);
+    
+    switch(PINT_server_req_get_perms(s_op->req))
+    {
+        case PINT_SERVER_CHECK_WRITE:
+            js_p->error_code = PINT_check_mode(
+                &(s_op->attr), translated_uid,
+                translated_gid, PINT_ACCESS_WRITABLE);
+            break;
+        case PINT_SERVER_CHECK_READ:
+            js_p->error_code = PINT_check_mode(
+                &(s_op->attr), translated_uid,
+                translated_gid, PINT_ACCESS_READABLE);
+            break;
+        case PINT_SERVER_CHECK_CRDIRENT:
+            /* must also check executable after writable */
+            js_p->error_code = PINT_check_mode(
+                &(s_op->attr), translated_uid,
+                translated_gid, PINT_ACCESS_WRITABLE);
+            if(js_p->error_code == 0)
+            {
+                js_p->error_code = PINT_check_mode(
+                    &(s_op->attr), translated_uid,
+                    translated_gid, PINT_ACCESS_EXECUTABLE);
+            }
+            break;
+        case PINT_SERVER_CHECK_ATTR:
+            /* let datafiles pass through the attr check */
+            if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
+            {
+                js_p->error_code = 0;
+            }
+            /* for now we'll assume extended attribs are treated
+             * the same as regular attribs as far as permissions
+             */
+	    else if (s_op->req->op == PVFS_SERV_GETATTR ||
+                    s_op->req->op == PVFS_SERV_GETEATTR ||
+                    s_op->req->op == PVFS_SERV_LISTEATTR)
+	    {
+		/* getting or listing attributes is always ok -- permission
+		 * is checked on the parent directory at read time
+		 */
+		js_p->error_code = 0;
+	    }
+            else /* setattr, seteattr, seteattr_list */
+            {
+                if(s_op->attr.perms == 0 && s_op->attr.objtype ==
+                    PVFS_TYPE_SYMLINK)
+                {
+                    /* if the object is of type symlink but has empty perms,
+                     * then it must be a newly created symlink object that
+                     * does not have its true attributes set yet.  Let this
+                     * operation through.
+                     */
+                    js_p->error_code = 0;
+                }
+                else if(s_op->attr.owner == translated_uid || translated_uid
+                    == 0)
+                {
+                    /* owner of file and root can always set attributes (see
+                     * iozone, which does a setattr as part of truncating a
+                     * file with permission mask set to 0
+                     */
+                    js_p->error_code = 0;
+                }
+                else
+                {
+                    /* normal setattr requires write permissions on existing
+                     * objects
+                     */
+                    js_p->error_code = PINT_check_mode(
+                        &(s_op->attr), translated_uid,
+                        translated_gid, PINT_ACCESS_WRITABLE);
+                }
+            }
+            break;
+        case PINT_SERVER_CHECK_NONE:
+            if(squashed_flag &&
+               PINT_server_req_get_access_type(s_op->req) == PINT_SERVER_REQ_MODIFY &&
+               ((s_op->req->op == PVFS_SERV_IO) ||
+                (s_op->req->op == PVFS_SERV_SMALL_IO) ||
+                (s_op->req->op == PVFS_SERV_TRUNCATE)))
+            {
+                /* special case:
+                 * If we have been squashed, deny write permission to the
+                 * file system.  At the datafile level we don't have enough
+                 * attribute information to figure out if the nobody/guest
+                 * user has permission to write or not, so we disallow all
+                 * writes to be safe.  Not perfect semantics, but better
+                 * than being too permissive.
+                 */
+                skip_acl_flag = 1;
+                js_p->error_code = -PVFS_EACCES;
+            }
+            else
+            {
+                js_p->error_code = 0;
+            }
+            break;
+        case PINT_SERVER_CHECK_INVALID:
+            js_p->error_code = -PVFS_EINVAL;
+            break;
+    }
+
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "Final permission check for \"%s\" set "
+        "error code to %d\n", PINT_map_server_op_to_string(s_op->req->op),
+        js_p->error_code);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
+	s_op,
+        PINT_map_server_op_to_string(s_op->req->op),
+	js_p->error_code);
+    /* If regular checks fail, we need to run acl checks */
+    if (js_p->error_code == -PVFS_EACCES && !skip_acl_flag)
+        js_p->error_code = PRELUDE_RUN_ACL_CHECKS;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action prelude_check_acls_if_needed(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: prelude_check_acls_if_needed\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+
+    /* If we get here with an invalid fsid and handle, we have to
+     * return -PVFS_EACCESS 
+     */
+    if (s_op->target_fs_id == PVFS_FS_ID_NULL
+        || s_op->target_handle == PVFS_HANDLE_NULL)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
+    }
+    js_p->error_code = 0;
+
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
+    s_op->key.buffer = "system.posix_acl_access";
+    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
+    s_op->val.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
+                 "for handle %llu\n", llu(s_op->target_handle));
+
+    /* Read acl keys */
+    ret = job_trove_keyval_read(
+        s_op->target_fs_id,
+        s_op->target_handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
+}
+
+static PINT_sm_action prelude_check_acls(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *obj_attr = NULL;
+    int want = 0;
+
+    /* The dspace attr must have been read at this point */
+    obj_attr = s_op->target_object_attr;
+    assert(obj_attr);
+
+    /* if we didn't find the acl attributes, then just treat it as a
+     * permission denied case.
+     */
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        goto cleanup;
+    }
+
+    /* anything else non-zero we treat as a real error */
+    if (js_p->error_code)
+    {
+        goto cleanup;
+    }
+    /* make sure that we hit here only for metafiles, dirs and symlink objects */
+    if (obj_attr->objtype != PVFS_TYPE_METAFILE
+        && obj_attr->objtype != PVFS_TYPE_DIRECTORY
+        && obj_attr->objtype != PVFS_TYPE_SYMLINK)
+    {
+        gossip_err("prelude_check_acls hit invalid object type %d\n",
+            obj_attr->objtype);
+        js_p->error_code = -PVFS_EINVAL;
+        goto cleanup;
+    }
+    switch (PINT_server_req_get_perms(s_op->req))
+    {
+        case PINT_SERVER_CHECK_WRITE:
+        default:
+            want = PVFS2_ACL_WRITE;
+            break;
+        case PINT_SERVER_CHECK_READ:
+            want = PVFS2_ACL_READ;
+            break;
+        case PINT_SERVER_CHECK_CRDIRENT:
+            want = PVFS2_ACL_WRITE | PVFS2_ACL_EXECUTE;
+            break;
+        case PINT_SERVER_CHECK_NONE:
+            want = 0;
+            break;
+        case PINT_SERVER_CHECK_INVALID:
+            js_p->error_code = -PVFS_EINVAL;
+            goto cleanup;
+    }
+    js_p->error_code = PINT_check_acls(s_op->val.buffer,
+                        s_op->val.read_sz,
+                        obj_attr, 
+                        s_op->req->credentials.uid,
+                        s_op->req->credentials.gid,
+                        want);
+cleanup:
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "Final permission check (after acls) \"%s\" set "
+        "error code to %d (want %x)\n",
+            PINT_map_server_op_to_string(s_op->req->op),
+            js_p->error_code, want);
+
+    if (s_op->val.buffer) 
+        free(s_op->val.buffer);
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

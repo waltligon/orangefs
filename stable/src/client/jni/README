@@ -1,0 +1,62 @@
+# (C) 2012 Clemson University
+# See COPYING in top-level directory.
+===============================================================================
+Documentation - OrangeFS JNI and Hadoop Extensions
+
+  Exposing OrangeFS Direct Client User Interface Calls to Java Developers 
+  through JNI.
+
+===============================================================================
+Step 1: 
+
+  JNI Only Instructions:
+
+    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
+            --enable-jni --with-jdk=<path_to_jdk>
+    make
+    sudo make install
+    make jni
+    sudo make jni_install
+
+  JNI and Hadoop Instructions:
+
+    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
+            --enable-jni --with-jdk=<path_to_jdk> \
+            --enable-hadoop --with-hadoop=<path_to_hadoop>
+    make
+    sudo make install
+
+===============================================================================
+Step 2:
+
+  *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
+    contain the path of your JNI libraries. 
+
+  ex:     
+    export LD_LIBRARY_PATH=/opt/orangefs/lib
+    export JNI_LIBRARY_PATH=/opt/orangefs/lib
+
+===============================================================================
+Step 3:
+
+  Use the .jar files in your Java applications. Be sure to include the full
+    path names of the .jar files needed by passing the -cp option to javac
+    and java.
+
+  example file Main.java:
+
+    import org.orangefs.usrint.*;
+
+    public class Main
+    {
+        public static final void main(String args[])
+        {
+            Orange fs = Orange.getInstance();
+            fs.posix.mkdir("/mnt/orangefs/test", fs.posix.f.S_IRWXU);
+        }
+    }
+
+  example of building Main.java:
+
+    javac -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main.java
+    java -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main

@@ -1,0 +1,28 @@
+pav2 
+Big changes for pav and version 2
+added to pvfs2 tree
+
+pav-0.2c * AC change ------- Modified PAV so that the variable
+COMP_NODEFILE will output the compute nodes in the login node.  I also
+added check_all_nodes.pl which will check all these nodes and generate
+node lists of good and bad nodes for ethernet and Myrinet.  I fiexed
+the Myrinet option so that this version of pav will work with both
+Jazz and Chiba for myrinet.
+
+pav-0.2b * AC change ------- Modified the -myr suffix so that it works
+with ccnXXX.mcs.anl.gov and ccnXXX.  Also added a test called
+check_all_nodes.pl that can check a machinefile list with/without
+Myrinet -Avery
+
+pav-0.2 * Second release -------- crude understanding of myrinet: will
+run pvfs over tcp-over-myrinet assuming hosts have the -myr suffix on
+their tcp names (j335 becomes j335-myr)
+
+pav-0.1 * First 'release' -------- added IONODE and COMPNODE keys to
+pav_info output
+
+cleaned up pav_lib.pl searching code, pav_lib.pl must currently be in
+same dir as binaries
+
+removed default behaviour of attempting to retry if some resoures are
+bad
