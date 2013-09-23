@@ -144,8 +144,8 @@ class OFSTestNode(object):
         # This is the location of the third party benchmarks
         self.ofs_extra_tests_location = ""
 
-        # This is the mountpoint for OrangeFS
-        self.ofs_mountpoint = ""
+        # This is the mount_point for OrangeFS
+        self.ofs_mount_point = ""
         
         # This is the OrangeFS service name. pvfs2-fs < 2.9, orangefs >= 2.9
         self.ofs_fs_name="orangefs"
@@ -1142,17 +1142,17 @@ class OFSTestNode(object):
     #
     # checkMount
     #
-    # This looks to see if a given mountpoint is mounted.
+    # This looks to see if a given mount_point is mounted.
     # return == 0 => mounted
     # return != 0 => not mounted
     #
     #-------------------------------
 
         
-    def checkMount(self,mountpoint=None,output=[]):
-        if mountpoint == None:
-            mountpoint = self.ofs_mountpoint
-        mount_check = self.runSingleCommand("mount | grep %s" % mountpoint,output)
+    def checkMount(self,mount_point=None,output=[]):
+        if mount_point == None:
+            mount_point = self.ofs_mount_point
+        mount_check = self.runSingleCommand("mount | grep %s" % mount_point,output)
         '''    
         if mount_check == 0:
             print "OrangeFS mount found: "+output[1]
@@ -1214,7 +1214,7 @@ class OFSTestNode(object):
     #
     # installOFSSource
     #
-    # This looks to see if a given mountpoint is mounted
+    # This looks to see if a given mount_point is mounted
     #
     #-------------------------------
       
@@ -1313,7 +1313,7 @@ class OFSTestNode(object):
         file.write("PVFSTCCPORT=%s\n" % self.ofs_tcp_port)
         file.write("STORAGE=$WORKINGDIR/storage\n")
         file.write("SERVERLOG=$WORKINGDIR/log\n")
-        file.write("MOUNTPOINT=%s\n" % self.ofs_mountpoint)
+        file.write("MOUNTPOINT=%s\n" % self.ofs_mount_point)
         file.write("BINDIR=$WORKINDIR/bin\n")
         file.write("RCMDPROG=ssh -i %s\n" % self.sshNodeKeyFile)
         file.write("RCPPROG=scp -i %s\n" % self.sshNodeKeyFile)
@@ -1529,14 +1529,14 @@ class OFSTestNode(object):
         #      print running
           
         #Now set up the pvfs2tab_file
-        self.ofs_mountpoint = "/tmp/mount/orangefs"
-        self.runSingleCommand("mkdir -p "+ self.ofs_mountpoint)
+        self.ofs_mount_point = "/tmp/mount/orangefs"
+        self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.host_name,self.ofs_fs_name,self.ofs_mountpoint,self.ofs_installation_location))
+        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.host_name,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
         # set the debug mask
-        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mountpoint))
+        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
        
         return 0
         
@@ -1632,11 +1632,11 @@ class OFSTestNode(object):
     #
     #-------------------------------
       
-    def mountOFSFilesystem(self,mount_fuse=False,mountpoint=None):
+    def mountOFSFilesystem(self,mount_fuse=False,mount_point=None):
         # Mounting the OFS Filesystem is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
         '''
-            echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
+            echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mount_point $PVFS2_MOUNTPOINT"
         sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
         
         
@@ -1655,24 +1655,24 @@ class OFSTestNode(object):
             return
         
         # where is this to be mounted?
-        if mountpoint != None:
-            self.ofs_mountpoint = mountpoint
-        elif self.ofs_mountpoint == "":
-            self.ofs_mountpoint = "/tmp/mount/orangefs"
+        if mount_point != None:
+            self.ofs_mount_point = mount_point
+        elif self.ofs_mount_point == "":
+            self.ofs_mount_point = "/tmp/mount/orangefs"
 
-        # create the mountpoint directory    
-        self.runSingleCommand("mkdir -p %s" % self.ofs_mountpoint)
+        # create the mount_point directory    
+        self.runSingleCommand("mkdir -p %s" % self.ofs_mount_point)
         
         # mount with fuse
         if mount_fuse == True:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
-            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mountpoint,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
         #mount with kmod
         else:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mountpoint %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint)
-            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mountpoint))
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
             self.runAllBatchCommands()
         
         print "Waiting 30 seconds for mount"            
@@ -1687,8 +1687,8 @@ class OFSTestNode(object):
     #-------------------------------
     
     def unmountOFSFilesystem(self):
-        print "Unmounting OrangeFS mounted at " + self.ofs_mountpoint
-        self.addBatchCommand("sudo umount %s" % self.ofs_mountpoint)
+        print "Unmounting OrangeFS mounted at " + self.ofs_mount_point
+        self.addBatchCommand("sudo umount %s" % self.ofs_mount_point)
         self.addBatchCommand("sleep 10")
 
     #-------------------------------

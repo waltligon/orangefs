@@ -484,8 +484,8 @@ class OFSTestNetwork(object):
         print "Checking mount"
         mount_res=client_node.runSingleCommandBacktick("mount | grep -i pvfs")
         print mount_res
-        #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mountpoint)
-        #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mountpoint)
+        #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mount_point)
+        #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mount_point)
     
     def mountOFSFilesystemAllNodes(self,mount_fuse=False):
         
@@ -498,8 +498,8 @@ class OFSTestNetwork(object):
             client_node = self.created_nodes[0]
         client_node.stopOFSClient()
         #client_node.runSingleCommand("mount")
-        #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mountpoint)
-        #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mountpoint)
+        #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mount_point)
+        #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mount_point)
 
     def stopOFSClientAllNodes(self):
         
@@ -659,7 +659,7 @@ class OFSTestNetwork(object):
             keyname = "orangefs-serverkey-%s.pem" % node.host_name
             rc = security_node.runSingleCommand("openssl genrsa -out %s 2048" % keyname,output)
             if rc != 0:
-                print "Could not create server security key for "+node.hostname
+                print "Could not create server security key for "+node.host_name
                 print output 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
@@ -693,12 +693,12 @@ class OFSTestNetwork(object):
             keyname = "pvfs2-clientkey-%s.pem" % node.host_name
             rc = security_node.runSingleCommand("openssl genrsa -out %s 1024" % keyname,output)
             if rc != 0:
-                print "Could not create client security key for "+node.hostname
+                print "Could not create client security key for "+node.host_name
                 print output 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy client security key %s for %s " % (keyname,node.hostname)
+                print "Could not copy client security key %s for %s " % (keyname,node.host_name)
                 print output 
                 return rc
 
@@ -706,6 +706,7 @@ class OFSTestNetwork(object):
         return 0
     
     def generateOFSKeystoreFile(self):
+        
         # cd /tmp/$USER/keys
         # for each server
         #   echo "S:{hostname} >> orangefs-keystore
@@ -760,7 +761,42 @@ class OFSTestNetwork(object):
 
         
         return 0
-        
+    
+    def networkOFSSettings(self,
+            ofs_installation_location,
+            db4_prefix,
+            ofs_extra_tests_location,
+            pvfs2tab_file,
+            resource_location,
+            resource_type,
+            ofs_config_file,
+            ofs_fs_name,
+            ofs_host_name_override,
+            ofs_mount_point="/tmp/mount/orangefs",
+            ):
+
+            
+        for i,node in enumerate(self.created_nodes):
+            node.ofs_installation_location = ofs_installation_location
+            node.db4_dir = db4_prefix
+            node.db4_lib = db4_prefix+"/lib"
+            node.ofs_extra_tests_location = ofs_extra_tests_location
+            node.setEnvironmentVariable("PVFS2TAB_FILE",pvfs2tab_file)
+            node.resource_location = resource_location
+            node.resource_type = resource_type
+            if resource_type == "BUILDNODE":
+                node.ofs_source_location = resource_location
+            node.ofs_conf_file = ofs_config_file
+            node.ofs_fs_name = ofs_fs_name
+            node.ofs_mount_point = ofs_mount_point
+            # set the hostname if available
+            try:
+                node.host_name = ofs_host_name_override[i]
+                node.runSingleCommandAsBatch("sudo hostname "+node.host_name)
+            except:
+                # if not, ignore the error
+                pass
+            #node.setEnvironmentVariable("LD_LIBRARY_PATH",node.db4_lib+":"+node.ofs_installation_location+":$LD_LIBRARY_PATH")
         
         
 def test_driver():

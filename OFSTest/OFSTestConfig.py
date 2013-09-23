@@ -128,12 +128,14 @@ class OFSTestConfig(object):
         self.install_opts = ""
         
         # existing config
-        self.ofs_installation_location = None
+        
         self.ofs_extra_tests_location = None
         self.ofs_pvfs2tab_file = None
         self.ofs_source_location = None
         self.ofs_config_file = None
         self.delete_existing_data = False
+        self.ofs_mount_point = "/tmp/mount/orangefs"
+        self.ofs_host_name_override = []
     
     def setConfig(self,kwargs={}):
         pass
@@ -204,6 +206,14 @@ class OFSTestConfig(object):
             #print userlist
             for user in userlist:
                 self.node_usernames.append(user)
+        
+        temp = d.get('ofs_host_name_override')
+        if temp != None:
+            
+            userlist = temp.split(" ")
+            #print userlist
+            for user in userlist:
+                self.ofs_host_name_override.append(user)
         
         # one username for all nodes
         temp = d.get('node_username')
@@ -311,11 +321,9 @@ class OFSTestConfig(object):
         
         # --with-db=
         # disabled 
-        ''' 
         temp = d.get('db4_prefix')
         if temp != None:
             self.db4_prefix = temp
-        '''
 
         # add --with-kernel option
         temp = d.get('install_ofs_client')
@@ -347,3 +355,32 @@ class OFSTestConfig(object):
             #print patchlist
             for patch in patchlist:
                 self.ofs_patch_files.append(patch)
+        
+        temp = d.get('ofs_extra_tests_location')
+        if temp != None:
+            self.ofs_extra_tests_location = temp
+        
+        temp = d.get('ofs_pvfs2tab_file')
+        if temp != None:
+            self.ofs_pvfs2tab_file = temp
+
+        temp = d.get('ofs_source_location')
+        if temp != None:
+            self.ofs_source_location = temp
+        
+        temp = d.get('ofs_config_file')
+        if temp != None:
+            self.ofs_config_file = temp
+        
+        temp = d.get('ofs_mount_point')
+        if temp != None:
+            self.ofs_mount_point = temp
+        
+        
+        
+        
+        
+        
+        
+        
+        

@@ -42,6 +42,7 @@ import OFSTestNetwork
 import time
 import sys
 import traceback
+from pprint import pprint
 
 class OFSTestMain(object):
     
@@ -62,27 +63,9 @@ class OFSTestMain(object):
         else:
             output.write("%s........................................PASS.\n" % function.__name__)
         output.close()
-        
     
-    def checkOFS(self):
-        return 1
-           
-    def setupOFS(self):
-        
-
-        filename = "OFSTestsetup.log"
-
-        
-        self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
-
-        if self.config.number_new_ec2_nodes > 0:
-            print "===========================================================" 
-            print "Creating %d new EC2/OpenStack Nodes" % self.config.number_new_ec2_nodes
-
-            #print " %d new EC2 nodes" % self.config.number_new_ec2_nodes
-            self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
-        
-
+    def initNetwork(self):
+    
         if len(self.config.node_ip_addresses) > 0:
             print "===========================================================" 
             print "Adding %d Existing Nodes to OFS cluster" % len(self.config.node_ip_addresses)
@@ -106,8 +89,69 @@ class OFSTestMain(object):
         print "Verifying hostname resolution"
         # make sure everyone can find each other
         self.ofs_network.updateEtcHosts()
+    
+    def checkOFS(self):
+        
+        # if we need to create new EC2 nodes, then OFS not setup
+        if self.config.number_new_ec2_nodes > 0:        
+            return 1;
+        
+        # initialize the network
+        self.initNetwork();
+       
+    
+        # TODO: Make this smart enough to detect if the installation is running.
+
+        
+        self.ofs_network.networkOFSSettings(
+            ofs_installation_location = self.config.install_prefix,
+            db4_prefix=self.config.db4_prefix,
+            ofs_extra_tests_location=self.config.ofs_extra_tests_location,
+            pvfs2tab_file=self.config.ofs_pvfs2tab_file,
+            resource_location=self.config.ofs_resource_location,
+            resource_type=self.config.ofs_resource_type,
+            ofs_config_file=self.config.ofs_config_file,
+            ofs_fs_name=self.config.ofs_fs_name,
+            ofs_host_name_override=self.config.ofs_host_name_override,
+            ofs_mount_point=self.config.ofs_mount_point
+            )
+        
+        '''
+        
+        print ""
+        print "==================================================================="
+        print "Start OFS Server"
+        
+        rc = self.ofs_network.startOFSServers()
+
+        print ""
+        print "==================================================================="
+        print "Start OFS Client"
+        rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
+
+        '''
+        return 0
+        
+
+    def setupOFS(self):
+        
+
+        filename = "OFSTestsetup.log"
+
+        
+        self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
+
+        if self.config.number_new_ec2_nodes > 0:
+            print "===========================================================" 
+            print "Creating %d new EC2/OpenStack Nodes" % self.config.number_new_ec2_nodes
+
+            #print " %d new EC2 nodes" % self.config.number_new_ec2_nodes
+            self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
+        
+
         
         
+        self.initNetwork()
         
     
         if self.config.using_ec2 == True:
@@ -263,6 +307,9 @@ class OFSTestMain(object):
         return 0
 
     def runTest(self):
+        
+        print "Printing dictionary of master node"
+        pprint(self.ofs_network.created_nodes[0].__dict__)
         print ""
         print "==================================================================="
         print "Run Tests"
@@ -304,9 +351,9 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
 
-            print "Cleaning up "+head_node.ofs_mountpoint
-            head_node.runSingleCommand("%s/bin/pvfs2-rm %s/*" % (head_node.ofs_installation_location,head_node.ofs_mountpoint))
-            head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+            #print "Cleaning up "+head_node.ofs_mount_point
+            #head_node.runSingleCommand("%s/bin/pvfs2-rm %s/*" % (head_node.ofs_installation_location,head_node.ofs_mount_point))
+            #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
 
         if self.config.run_vfs_tests == True:
             output = open(filename,'a+')
@@ -335,9 +382,9 @@ class OFSTestMain(object):
                     #except TypeError:
                     #    print "AttributeError running %s" % callable.__name__
                     #    pass
-                print "Cleaning up "+head_node.ofs_mountpoint
-                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
-                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+                #print "Cleaning up "+head_node.ofs_mount_point
+                #head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mount_point)
+                #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
 
             else:
                 output.write("VFS Tests (%s) could not run. Mount failed.=======================\n" % mount_type)
@@ -379,9 +426,9 @@ class OFSTestMain(object):
                     except:
                         pass
                     '''    
-                print "Cleaning up "+head_node.ofs_mountpoint
-                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
-                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+                #print "Cleaning up "+head_node.ofs_mount_point
+                #head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mount_point)
+                #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
                 
    
 
@@ -412,9 +459,9 @@ class OFSTestMain(object):
                         traceback.print_exc()
                         pass
                                                 
-                print "Cleaning up "+head_node.ofs_mountpoint
-                head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mountpoint)
-                head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mountpoint)
+                #print "Cleaning up "+head_node.ofs_mount_point
+                #head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mount_point)
+                #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
 
             else:
                 output.write("VFS Tests (%s) could not run. Mount failed.=======================\n" % mount_type)
