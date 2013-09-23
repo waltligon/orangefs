@@ -78,6 +78,15 @@ AC_DEFUN([AX_KERNEL_FEATURES],
              CFLAGS="$CFLAGS -I$lk_src_source/include/uapi"
         fi
 
+        dnl directories named "generated" under $lk_src are in paths that
+        dnl need to be searched for include files
+        for i in `find "$lk_src" -follow -name generated`
+        do
+          addThis="`echo $i | sed 's/generated.*$//'`"
+          addThisToo="`echo $i | sed 's/generated.*$/generated/'`"
+          CFLAGS="$CFLAGS -I$addThis -I$addThisToo"
+        done
+
 	dnl Check for kconfig.h... at some revision levels, many
 	dnl tests use IS_ENABLED indirectly through includes... 
 	AC_MSG_CHECKING(for kconfig.h) 
@@ -102,6 +111,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_CHECKING(for vmtruncate) 
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
 		#include <linux/fs.h>
 		#include <linux/mm.h>
 	], [
@@ -342,12 +354,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         ]
 	)
 
-	dnl kernel 3.6 (and possibly earlier) create arch/x86/include/generated/asm
-	dnl directory for files such as unistd_64.h.
-	if test -d ${lk_src}/arch/${ARCH}/include/generated ; then
-		CFLAGS="$CFLAGS -I${lk_src}/arch/${ARCH}/include/generated"
-	fi
-       
         dnl if there are two different include paths (lk_src/include and 
         dnl lk_src_source/include) add the lk_src/include path to the CFLAGS
         dnl here.
@@ -690,6 +696,21 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(no)
 	)
 	
+	dnl checking if we have a  readdir callback in file_operations
+	AC_MSG_CHECKING(for readdir member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdir = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIR_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdir callback),
+	    AC_MSG_RESULT(no)
+	    )
+
 	dnl checking if we have a readdirplus callback in file_operations
 	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
 	AC_TRY_COMPILE([

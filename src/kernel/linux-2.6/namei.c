@@ -454,7 +454,11 @@ static int pvfs2_rename(
     local_count = atomic_read(&new_dentry->d_count);
 #else
     spin_lock( &new_dentry->d_lock );
+#ifdef HAVE_DENTRY_LOCKREF_STRUCT
+    local_count = d_count(new_dentry);
+#else
     local_count = new_dentry->d_count;
+#endif
     spin_unlock( &new_dentry->d_lock );
 #endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",

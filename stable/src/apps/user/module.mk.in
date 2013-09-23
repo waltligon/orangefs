@@ -1,7 +1,0 @@
-DIR := src/apps/user
-
-USERSRC := \
-	$(DIR)/getmattr.c \
-	$(DIR)/setmattr.c
- 
-

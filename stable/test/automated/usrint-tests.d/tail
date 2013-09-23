@@ -1,3 +1,0 @@
-#!/bin/bash
-
-export ${PRELOAD} && bash shell-scripts/tail.sh

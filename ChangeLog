@@ -2,12 +2,6 @@
 OrangeFS Release ChangeLog
 -----------------------
 
-orangefs-2.8.8 (Subversion Tag v.2.8.8)
-* - Updated kernel module to work with kernel versions up to 3.10
-* - Updated pvfs2-touch to respect umask
-* - Added multi-fabric BMI support
-* - Fixed problem with FUSE readdir code
-
 Rev 10349
 
 * - Fixed bug in iocommon_open where the variable directory 
@@ -19,60 +13,6 @@ Rev 10349
 * - BMI_add_to_socket_collection and related macros were not checking
 *   for errors from epoll_ctl, some are expected but errno was not reset
 *   leaving to issues later on
-
-* - Made FUSE compile on MAC OSX 10.7.5
-* - Corrected a deadlock issue where the client-core was trying to get a 
-*   "write" semaphore at the same time the kernel was holding a "read" 
-*   semaphore while sleeping.
-* - Set PVFS2_DEFAULT_SLOT_TIMEOUT_SECS from 1800 to 900, which means that 
-*   when all the shared memory slots are busy, the process will sleep for 
-*   15 minutes (instead of 30 minutes) or until a slot becomes available.
-* - Made pvfs2-genconfig default the log file location to 
-*   /var/log/orangefs-server.log.
-* - In the OrangeFS extension to Hadoop's abstract FileSystem class,
-*   corrected scenario where an exception was being throw as a result of
-*   mkdirs failure. This error was thrown when client A checks to see if
-*   a parent directory exists, but client B successfully creates the parent
-*   directory prior to client A executing mkdirs. If mkdirs returns false,
-*   then client A should check to see if the directory actually had been
-*   created before throwing an exception.
-* - Allow mmap() calls with MAP_SHARED
-* - Fixed several Infiniband-related issues:
-*     - Fixed per connection memory leak.
-*     - Replaced asserts with error checking.
-*     - Changed error*() calls to not exit.  All calls to error*() now do
-*       error handeling.
-*     - Lowered QP timeout from 5 minutes to 17 seconds.
-* - Fixed problem in rewinddir
-* - Improved how we expose directory entries to Hadoop using
-*   java/util/ArrayList
-* - patched a problem in iocommon_lseek where dirs over 1024 entries can
-*   cause a problem - also avoided a slow loop when we can.
-* - Corrected bug related to recursive_delete when using Hadoop
-* - Added flags to javah javac and jar commands to limit the ammount of
-*   heap memory reserved for jvm. Before, running 'make' with the option
-*   '-j9' was causing multiple jvms to each acquire 1/4 of the machine's
-*   ram by default. Since 9 jvms cannot each obtain 1/4 of a machine's
-*   memory, errors were thrown. Setting a reasonable maximum heap reserved
-*   for jvm fixes this. 256MB works well for now.
-* - Added warnings for meta/data stored on a root device
-* - fix selinux issues within usrint
-* - Added shared descriptor tables, that work with fork and exec, and added
-*   some flags to the link line to improve interposition.
-* - Corrected issue with JNI layer and gcc not working well without -O0
-*   option.
-* - Significant improvements to JNI layer and Hadoop extensions.
-* - added enable option to build libofs-s.so with -Bsymbolic to force
-*   programs to call it and not another version of the libc routines.
-* - added an instance of each of two structs of pointers to methods for
-*   system calls and library calls respectively so that external code can
-*   force a call to our code.
-* - fixed bug in rename to return 0 if try to rename something to itself
-* - reworked IO locking to use the NPTL stuff
-* - added missing read of two funcs to stdio_ops
-* - changed variable named shmctl to shmctrl to avoid a name conflict
-* - fixed a problem in userint.h where a define was mis-named
-* - added error.c and error.h from glibc so they link with usrlib
 
 Rev 10182
 
@@ -91,34 +31,6 @@ Rev 10182
 *
 * Added features to gen_locks to initialize recursive and shared mutexes
 * and shared conds for use in the new usrint features.
-
-* - Incorporated patch to fix a memory corruption issue
-* - Fixed client initialization issue resulting from an uninitalized
-*   ibv_wc struct.
-* - Added a thread for the TCP accept processing for the IB connection
-*   information exchange.
-* - Fixed the RTS_DONE missing errors
-* - Updates to JNI layer. Now using NIO OutputChannel for buffered output.
-* - Added distribution options to pvfs2-genconfig.
-* - Added pvfs2-start-all.sh convenience scripts that allow an administrator
-*   (with password-less ssh configured) to start or stop the pvfs2-server
-*   on nodes listed in the pvfs2 configuration file.
-*   Run with -h or --help to see available options.
-* - added cross platform client library, windows client GUI app, and
-*   VS 2012 projects
-* - Corrected bugs in the OrangeFS extension of Hadoop's abstract
-*   FileSystem class. There were issues with mkdir and delete.
-* - Changed the way reserved range params are interpreted in pvfs2-genconfig
-* - OrangeFS client JNI require --enable-jni and --with-jdk at configure
-*   time. OrangeFS extensions to Hadoop classes require --enable-jni,
-*   --with-jdk=<path_to_jdk>, --enable-hadoop, and
-*   --with-hadoop=<path_to_hadoop>. After the 'make install' step of
-*   OrangeFS installation: run 'make jni' and 'make jni_install' to build
-*   and install the client JNI. If building Hadoop extensions as well, then
-*   just run 'make hadoop' and 'make hadoop_install'.
-* - Changed default log file names to use "orangefs".
-* - Added --disable-opt option to ./configure to disable compiler optimization
-* - Updated Hadoop/JNI Makefile to reflect latest stable version of Hadoop (1.1.2) and OrangeFS installation path described in new documentation (/opt/orangefs). Also corrected a bug where function dup3 was being defined twice.
 
 Rev 10075
 
@@ -150,37 +62,6 @@ Rev 10075
 * this.  Can still be disabled with configure.
 *
 * Made some changes to handling of locks in streams.
-
-* - Added OrangeFS Direct Client JNI layer and Hadoop related extensions.
-*   See 'src/client/jni/README' for more information.
-* - subtle bug when storing directory paths was getting garbage that later
-*   come back to hurt if just the right conditions existed. Went over all
-*   code that worked on pd->s->dpath to ensure everything wil be clean.
-* - changed nocache hint to cache hint and moved from create to open
-* - fixed problem with stat by clearing buffer before the sys call
-* - Minor changes to PINT_string_rm_extra_slashes_rts.
-* - added glob.c to libofs in case anyone needs it
-* - changed st_blocks to be size/512 as it should be leaving st_blksize alone
-* - Improved the output of pvfs2-ls when using the recursive option: 'R'.
-*   Extra slashes were appearing. Wrote a function to strip multiple slashes
-*   and optionally remove the final trailing slash.
-* - fixed problems found by Jim Kusnier
-*   iocommon_getdents clear buffer before reading dirents
-*   iocommon_getdents uses strncpy rather than memcpy
-*   iocommon_getdents always returns unknown d_type
-*   iocommon_open reworked so it is much easier to understand and less
-*        error prone
-*   reworked calls to expand_path so they get called when they should
-*        tweeked PVFS_sys_lookup to return propoer error codes
-*   fixed fcntl dup command to work correctly (not like dup2)
-* - fixed error code when xattr is not supported
-* - fixed some CPP code determining size of a pointer
-* - Modified the include directive for fuse from <fuse/fuse.h> to <fuse.h>.
-*   pkg-config will correctly identify where the include directory is
-*   located for fuse. (pkg-config --cflags fuse).
-
-
-
 
 orangefs-2.8.7 (Subversion Tag v2.8.7)
 

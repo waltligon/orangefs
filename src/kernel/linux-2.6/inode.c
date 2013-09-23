@@ -220,6 +220,10 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
             ret = vmtruncate(inode, iattr->ia_size);
 #else
             ret = inode_newsize_ok(inode, iattr->ia_size);
+            if (!ret) {
+              truncate_setsize(inode,iattr->ia_size);
+              pvfs2_truncate(inode);
+            }
 #endif
             if (ret)
                 return ret;
