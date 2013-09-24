@@ -279,7 +279,11 @@ get_new_buffer_index:
           op_release(new_op);
           return(ret);
        }
+#ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
+#else
+       ctx->pos++;
+#endif
        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
        pos++;
     }
@@ -301,7 +305,11 @@ get_new_buffer_index:
           op_release(new_op);
           return(ret);
        }
+#ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
+#else
+       ctx->pos++;
+#endif
        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->pos:%lld\n",__func__,lld(file->f_pos));
        pos++;
     }
@@ -330,7 +338,11 @@ get_new_buffer_index:
            buffer_full = 1;
            break;
         }
-        file->f_pos++;
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+       file->f_pos++;
+#else
+       ctx->pos++;
+#endif
         gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->pos:%lld\n",__func__,lld(file->f_pos));
         
         pos++;
