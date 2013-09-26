@@ -862,7 +862,9 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
     job_id_t job_id;
     int ret = 0;
+#if 0
     int i;
+#endif
 
     PVFS_handle *data_handle_array = NULL;
 #if 0

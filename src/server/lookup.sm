@@ -617,8 +617,8 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  reading distributed directory attributes from handle %llu\n",
-                 llu(handle));
+                 "  reading distributed directory attributes from handle %s\n",
+                 PVFS_OID_str(&handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
@@ -806,17 +806,17 @@ static PINT_sm_action lookup_read_directory_entry(
 
     s_op->u.lookup.dirdata_server_index =
                     PINT_find_dist_dir_bucket(
-                                   irdata_hash,
+                                    dirdata_hash,
                                     &s_op->u.lookup.attr.u.dir.dist_dir_attr,
                                     s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
                  s_op->u.lookup.dirdata_server_index);
-    gossip_debug( GOSSIP_SERVER_DEBUG, "  need to read from dirent handle = "
-        "%s, segment = %s (len=%d)\n",
-        PVFS_OID_str(s_op->u.lookup.attr.u.dir.dirdata_handles[
-                              s_op->u.lookup.dirdata_server_index]),
-        s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  need to read from dirent handle=%s, segment=%s (len=%d)\n",
+                 PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[
+                                       s_op->u.lookup.dirdata_server_index]),
+                 s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     /* find the server name of the dirdata handle */
     PINT_cached_config_get_server_name(
@@ -917,8 +917,8 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     }
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
-        "reading remote directory entry from handle %llu\n",
-        llu(msg_p->handle));
+                 "reading remote directory entry from handle %s\n",
+                 PVFS_OID_str(&msg_p->handle));
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
@@ -940,9 +940,9 @@ static int lookup_get_dirent_comp_fn(
             resp_p->u.mgmt_get_dirent.handle;
 
         gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  lookup_get_dirent_comp_fn: "
-            "got dirent handle %llu\n",
-            llu(resp_p->u.mgmt_get_dirent.handle));
+            GOSSIP_SERVER_DEBUG,
+            "  lookup_get_dirent_comp_fn: got dirent handle %s\n",
+            PVFS_OID_str(&resp_p->u.mgmt_get_dirent.handle));
     }
     return resp_p->u.mgmt_get_dirent.error;
 }

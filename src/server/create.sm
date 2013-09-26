@@ -415,7 +415,7 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
      * keyvals will be synced in later states
      */
     ret = job_trove_dspace_create_list(s_op->req->u.create.fs_id,
-                                       &data_handle_ext_array,
+                                       data_handle_array,
                                        s_op->u.create.handle_array_local,
                                        s_op->u.create.handle_array_local_count,
                                        PVFS_TYPE_DATAFILE,
