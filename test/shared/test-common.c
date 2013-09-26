@@ -100,7 +100,7 @@ int create_pvfs2tab_file(
 
 
     /* Construct unique name for pvfstab file (use the pid to make it unique) */
-    retval = snprintf(buffer, sizeof(buffer), "/usr/tmp/pvfs2tab_%d", getpid());
+    retval = snprintf(buffer, sizeof(buffer), "/tmp/pvfs2tab_%d", getpid());
     if ((retval+1) > sizeof(buffer))  /* retval does not include NULL terminator */
     {
         print_error("Internal variable \"buffer\" too short.\n"
@@ -412,7 +412,6 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
     }
-
     return(TEST_COMMON_SUCCESS);  
 }
 
@@ -476,10 +475,10 @@ int create_file(
     PVFS_fs_id fs_id;
     PVFS_credential credential;
     struct file_ref stFileRef;
-    
-    /* Remove file first */ 
-    remove_file(fileName,use_pvfs2_lib,verbose);
    
+    /* Remove the file before trying to create it */
+    printf("\tRemoving file if it exists. Any errors may be safely ignored.");
+    remove_file(fileName, use_pvfs2_lib, verbose); 
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
    
     if(use_pvfs2_lib)
@@ -556,6 +555,7 @@ int create_directory(
     if(use_pvfs2_lib)
     {
 	/* Remove the directory before creating it. */
+	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
 	if(verbose) 
         {
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, directory);
@@ -565,7 +565,15 @@ int create_directory(
             /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, directory);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
 
 	
         if(verbose) 
@@ -577,7 +585,15 @@ int create_directory(
             /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
             snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir -m %o %s >/dev/null 2>&1", pvfsEXELocation, mode, directory);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; /* Set to a generic return code, since errno not 
@@ -591,6 +607,7 @@ int create_directory(
     else
     {
 	/* A bit naive, but these test directories should be empty*/
+	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
 	ret = rmdir(directory);
 	
 	ret = mkdir(directory, mode);
@@ -639,7 +656,15 @@ int remove_directory(
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s  >/dev/null 2>&1", pvfsEXELocation, directory);
         }
 
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; /* Save the error number */
@@ -709,7 +734,15 @@ int remove_file(
         {
             snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, fileName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA;
@@ -765,7 +798,15 @@ int change_mode(
             snprintf(cmd, sizeof(cmd), "%spvfs2-chmod %o %s >/dev/null 2>&1", 
                      pvfsEXELocation, mode, fileName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA; 
@@ -888,7 +929,15 @@ int change_owner(
         }
     }
   
+    if(verbose)
+    {
+        printf("\nRUNNING->%s ", cmd);
+    }
     ret = system(cmd);
+    if(verbose)
+    {
+        printf("RETURNS->%d\n",ret);
+    }
     if(ret != 0)
     {
         if(use_pvfs2_lib)
@@ -1395,7 +1444,15 @@ int create_symlink(
             snprintf(cmd, sizeof(cmd), "%spvfs2-ln -s %s %s >/dev/null 2>&1", 
                      pvfsEXELocation, linkTarget, linkName);
         }
+        if(verbose)
+        {
+            printf("\nRUNNING->%s ", cmd);
+        }
         ret = system(cmd);
+        if(verbose)
+        {
+            printf("RETURNS->%d\n",ret);
+        }
         if(ret != 0)
         {
             ret = -ENODATA;
