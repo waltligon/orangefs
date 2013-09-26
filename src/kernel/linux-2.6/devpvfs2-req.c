@@ -42,10 +42,6 @@ gossip_err("'lsof | grep %s' (run this as root)\n",                   \
 gossip_err("  open_access_count = %d\n", open_access_count);          \
 gossip_err("*****************************************************\n")
 
-#ifdef HAVE_KERNEL_DEVICE_CLASSES
-static struct class *pvfs2_dev_class;
-#endif
-
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -66,11 +62,7 @@ static int pvfs2_devreq_open(
         ret = generic_file_open(inode, file);
         if (ret == 0)
         {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-/*             MOD_INC_USE_COUNT; */
-#else
             ret = (try_module_get(pvfs2_fs_type.owner) ? 0 : 1);
-#endif
             if (ret == 0)
             {
                 open_access_count++;
@@ -477,7 +469,6 @@ static ssize_t pvfs2_devreq_writev(
                     op_release(op);
                 }
             }
-#ifdef HAVE_AIO_VFS_SUPPORT
             else if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
                     && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
             {
@@ -538,7 +529,6 @@ static ssize_t pvfs2_devreq_writev(
                 }
                 put_op(op);
             }
-#endif
             else
             {
                 
@@ -566,7 +556,6 @@ static ssize_t pvfs2_devreq_writev(
     return total_returned_size;
 }
 
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
 /*
  * Kernels >= 2.6.19 have no writev, use this instead with SYNC_KEY.
  */
@@ -576,7 +565,6 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
 {
     return pvfs2_devreq_writev(kiocb->ki_filp, iov, count, &kiocb->ki_pos);
 }
-#endif
 
 /* Returns whether any FS are still pending remounted */
 static int mark_all_pending_mounts(void)
@@ -639,11 +627,7 @@ static int pvfs2_devreq_release(
 
     open_access_count--;
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-/*     MOD_DEC_USE_COUNT; */
-#else
     module_put(pvfs2_fs_type.owner);
-#endif
 
     unmounted = mark_all_pending_mounts();
     gossip_debug(GOSSIP_DEV_DEBUG, "PVFS2 Device Close: Filesystem(s) %s\n",
@@ -822,12 +806,7 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     return -ENOIOCTLCMD;
 }
 
-#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
 static long pvfs2_devreq_ioctl(
-#else
-static int pvfs2_devreq_ioctl(
-    struct inode *inode,
-#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     struct file *file,
     unsigned int command,
     unsigned long arg)
@@ -842,9 +821,7 @@ static int pvfs2_devreq_ioctl(
     return (int) dispatch_ioctl_command(command, arg);
 }
 
-#ifdef CONFIG_COMPAT
-
-#if defined(HAVE_COMPAT_IOCTL_HANDLER) || defined(HAVE_REGISTER_IOCTL32_CONVERSION)
+#ifdef CONFIG_COMPAT /* CONFIG_COMPAT is in .config */
 
 /*  Compat structure for the PVFS_DEV_MAP ioctl */
 struct PVFS_dev_map_desc32 
@@ -855,7 +832,9 @@ struct PVFS_dev_map_desc32
     int32_t      count;
 };
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+
+
+
 static unsigned long translate_dev_map26(
         unsigned long args, long *error)
 {
@@ -883,38 +862,7 @@ err:
     *error = -EFAULT;
     return 0;
 }
-#else
-static unsigned long translate_dev_map24(
-        unsigned long args, struct PVFS_dev_map_desc *p, long *error)
-{
-    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
-    u32 addr, size, total_size, count;
 
-    *error = 0;
-    /* get the ptr from the 32 bit user-space */
-    if (get_user(addr, &p32->ptr))
-        goto err;
-    p->ptr = compat_ptr(addr);
-    /* copy the remaining fields */
-    if (get_user(total_size, &p32->total_size))
-        goto err;
-    if (get_user(size, &p32->size))
-        goto err;
-    if (get_user(count, &p32->count))
-        goto err;
-    p->total_size = total_size;
-    p->size = size;
-    p->count = count;
-    return 0;
-err:
-    *error = -EFAULT;
-    return 0;
-}
-#endif
-
-#endif
-
-#ifdef HAVE_COMPAT_IOCTL_HANDLER
 /*
  * 32 bit user-space apps' ioctl handlers when kernel modules
  * is compiled as a 64 bit one
@@ -944,109 +892,6 @@ static long pvfs2_devreq_compat_ioctl(
     return dispatch_ioctl_command(cmd, arg);
 }
 
-#endif
-
-#ifdef HAVE_REGISTER_IOCTL32_CONVERSION
-
-#ifndef PVFS2_LINUX_KERNEL_2_4
-
-static int pvfs2_translate_dev_map(
-        unsigned int fd,
-        unsigned int cmd,
-        unsigned long arg,
-        struct   file *file)
-{
-    long ret;
-    unsigned long p;
-
-    /* Copy it as the kernel module expects it */
-    p = translate_dev_map26(arg, &ret);
-    if (ret < 0)
-    {
-        gossip_err("Could not translate dev map structure\n");
-        return ret;
-    }
-    /* p is still a user space address */
-    return sys_ioctl(fd, cmd, p);
-}
-
-#else
-
-static int pvfs2_translate_dev_map(
-        unsigned int fd,
-        unsigned int cmd,
-        unsigned long arg,
-        struct   file *file)
-{
-    long ret;
-    struct PVFS_dev_map_desc p;
-
-    translate_dev_map24(arg, &p, &ret);
-    /* p is a kernel space address */
-    return (ret ? -EIO : pvfs_bufmap_initialize(&p));
-}
-
-#endif
-
-#ifdef PVFS2_LINUX_KERNEL_2_4
-typedef int (*ioctl_fn)(unsigned int fd,
-        unsigned int cmd, unsigned long arg, struct   file *file);
-
-struct ioctl_trans {
-    unsigned int cmd;
-    ioctl_fn     handler;
-};
-#endif
-
-static struct ioctl_trans pvfs2_ioctl32_trans[] = {
-    {PVFS_DEV_GET_MAGIC,        NULL},
-    {PVFS_DEV_GET_MAX_UPSIZE,   NULL},
-    {PVFS_DEV_GET_MAX_DOWNSIZE, NULL},
-    {PVFS_DEV_MAP,              pvfs2_translate_dev_map},
-    {PVFS_DEV_REMOUNT_ALL,      NULL},
-    {PVFS_DEV_DEBUG,            NULL},
-    /* Please add stuff above this line and retain the entry below */
-    {0, },
-};
-
-/* Must be called on module load */
-static int pvfs2_ioctl32_init(void)
-{
-    int i, error;
-
-    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
-    {
-        error = register_ioctl32_conversion(
-                    pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
-        if (error) 
-            goto fail;
-        gossip_debug(GOSSIP_DEV_DEBUG, "Registered ioctl32 command %08x with handler %p\n",
-                (unsigned int) pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
-    }
-    return 0;
-fail:
-    while (--i)
-        unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
-    return error;
-}
-
-/* Must be called on module unload */
-static void pvfs2_ioctl32_cleanup(void)
-{
-    int i;
-    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
-    {
-        gossip_debug(GOSSIP_DEV_DEBUG, "Deregistered ioctl32 command %08x\n",
-               (unsigned int) pvfs2_ioctl32_trans[i].cmd);
-        unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
-    }
-}
-
-#endif /* end HAVE_REGISTER_IOCTL32_CONVERSION */
-
-#endif /* CONFIG_COMPAT */
-
-#if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
 static int pvfs2_ioctl32_init(void)
 {
     return 0;
@@ -1056,7 +901,8 @@ static void pvfs2_ioctl32_cleanup(void)
 {
     return;
 }
-#endif
+
+#endif /* CONFIG_COMPAT is in .config */
 
 /* the assigned character device major number */
 static int pvfs2_dev_major = 0;
@@ -1081,18 +927,6 @@ int pvfs2_dev_init(void)
         pvfs2_ioctl32_cleanup();
         return pvfs2_dev_major;
     }
-#ifdef HAVE_KERNEL_DEVICE_CLASSES
-    pvfs2_dev_class = class_create(THIS_MODULE, "pvfs2");
-    if (IS_ERR(pvfs2_dev_class)) {
-        pvfs2_ioctl32_cleanup();
-        unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
-        ret = PTR_ERR(pvfs2_dev_class);
-        return ret;
-    }
-    class_device_create(pvfs2_dev_class, NULL,
-                        MKDEV(pvfs2_dev_major, 0), NULL,
-                        PVFS2_REQDEVICE_NAME);
-#endif
 
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
@@ -1103,10 +937,6 @@ int pvfs2_dev_init(void)
 
 void pvfs2_dev_cleanup(void)
 {
-#ifdef HAVE_KERNEL_DEVICE_CLASSES
-    class_device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
-    class_destroy(pvfs2_dev_class);
-#endif
     unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device unregistered ***\n",
             PVFS2_REQDEVICE_NAME);
@@ -1142,36 +972,16 @@ static unsigned int pvfs2_devreq_poll(
 
 struct file_operations pvfs2_devreq_file_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    owner: THIS_MODULE,
-    read : pvfs2_devreq_read,
-    writev : pvfs2_devreq_writev,
-    open : pvfs2_devreq_open,
-    release : pvfs2_devreq_release,
-    ioctl : pvfs2_devreq_ioctl,
-    poll : pvfs2_devreq_poll
-#else
     .read = pvfs2_devreq_read,
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,
-#else
-    .writev = pvfs2_devreq_writev,
-#endif
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
-#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
     .unlocked_ioctl = pvfs2_devreq_ioctl,
-#else
-    .ioctl = pvfs2_devreq_ioctl,
-#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
 
-#ifdef CONFIG_COMPAT
-#ifdef HAVE_COMPAT_IOCTL_HANDLER
+#ifdef CONFIG_COMPAT /* CONFIG_COMPAT is in .config */
     .compat_ioctl = pvfs2_devreq_compat_ioctl,
 #endif
-#endif
     .poll = pvfs2_devreq_poll
-#endif
 };
 
 /*
