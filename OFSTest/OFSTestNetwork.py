@@ -762,6 +762,12 @@ class OFSTestNetwork(object):
         
         return 0
     
+    def findExistingOFSInstallation(self):
+        for node in self.created_nodes:
+            rc = node.findExistingOFSInstallation()
+            
+            
+    
     def networkOFSSettings(self,
             ofs_installation_location,
             db4_prefix,
@@ -772,30 +778,56 @@ class OFSTestNetwork(object):
             ofs_config_file,
             ofs_fs_name,
             ofs_host_name_override,
-            ofs_mount_point="/tmp/mount/orangefs",
+            ofs_mount_point
             ):
 
             
         for i,node in enumerate(self.created_nodes):
-            node.ofs_installation_location = ofs_installation_location
-            node.db4_dir = db4_prefix
-            node.db4_lib = db4_prefix+"/lib"
-            node.ofs_extra_tests_location = ofs_extra_tests_location
-            node.setEnvironmentVariable("PVFS2TAB_FILE",pvfs2tab_file)
+
+            # source - Must provide location
             node.resource_location = resource_location
             node.resource_type = resource_type
             if resource_type == "BUILDNODE":
                 node.ofs_source_location = resource_location
-            node.ofs_conf_file = ofs_config_file
-            node.ofs_fs_name = ofs_fs_name
-            node.ofs_mount_point = ofs_mount_point
-            # set the hostname if available
-            try:
-                node.host_name = ofs_host_name_override[i]
-                node.runSingleCommandAsBatch("sudo hostname "+node.host_name)
-            except:
-                # if not, ignore the error
-                pass
+
+            
+            
+            if ofs_installation_location != None:
+                node.ofs_installation_location = ofs_installation_location
+            
+            if db4_prefix != None:
+                #rc = node.findDB4location
+                node.db4_dir = db4_prefix
+                node.db4_lib = db4_prefix+"/lib"
+
+            # just reinstall extra tests
+            if ofs_extra_tests_location != None:
+                node.ofs_extra_tests_location = ofs_extra_tests_location
+            
+            if pvfs2tab_file != None:
+                # find PVFS2TAB_FILE--or should we?
+                node.setEnvironmentVariable("PVFS2TAB_FILE",pvfs2tab_file)
+            
+                
+            # does OFS config file need to be provided?
+            if ofs_config_file != None:
+                node.ofs_conf_file = ofs_config_file
+            
+            if ofs_fs_name != None:
+                node.ofs_fs_name = ofs_fs_name
+            
+            # Mount point. can be read from mount
+            if ofs_mount_point != None:
+                node.ofs_mount_point = ofs_mount_point
+            
+            # Hostname override. Needed to workaround an openstack problem.
+            if len(ofs_host_name_override) > 0:
+                try:
+                    node.host_name = ofs_host_name_override[i]
+                    node.runSingleCommandAsBatch("sudo hostname "+node.host_name)
+                except:
+                    # if not, ignore the error
+                    pass
             #node.setEnvironmentVariable("LD_LIBRARY_PATH",node.db4_lib+":"+node.ofs_installation_location+":$LD_LIBRARY_PATH")
         
         

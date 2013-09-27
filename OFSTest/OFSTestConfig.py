@@ -96,7 +96,7 @@ class OFSTestConfig(object):
         self.install_fuse=self.run_fuse_tests
     
         # --prefix=
-        self.install_prefix = "/opt/orangefs"
+        self.install_prefix = None
         
         # --with-db=
         self.db4_prefix = "/opt/db4"
@@ -134,7 +134,7 @@ class OFSTestConfig(object):
         self.ofs_source_location = None
         self.ofs_config_file = None
         self.delete_existing_data = False
-        self.ofs_mount_point = "/tmp/mount/orangefs"
+        self.ofs_mount_point = None
         self.ofs_host_name_override = []
     
     def setConfig(self,kwargs={}):

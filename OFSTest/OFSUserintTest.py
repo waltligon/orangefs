@@ -10,18 +10,22 @@ def append(testing_node,output=[]):
     
     test_string = ""
     for i in range(25):
-        test_string = "%s line%d\n" % (test_string,i)
+        test_string = "%s line%d \\\n" % (test_string,i)
     
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     # use bash -c to create the files. This avoids redirect confusion
     #print 'bash -c \'echo "%s" > %s\''% (test_string,local_reference)
-    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference))
+    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference),output)
+    #print output
     #print 'bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test)
-    testing_node.runSingleCommand('bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test))
+    testing_node.runSingleCommand('%s bash -c \'echo "%s" > %s\'' % (preload,test_string,append_test),output)
+    #print output
     #print 'bash -c \'echo "%s" >> %s\'' % (test_string,local_reference)
-    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference))
+    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference),output)
+    #print output
     #print 'bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test)
-    testing_node.runSingleCommand('bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test))
+    testing_node.runSingleCommand('%s bash -c \'echo "%s" >> %s\'' % (preload,test_string,append_test),output)
+    #print output
     
     
     # now diff it
@@ -35,7 +39,7 @@ def append2(testing_node,output=[]):
     
     test_string = ""
     for i in range(25):
-        test_string = "%s line%d\n" % (test_string,i)
+        test_string = "%s line%d \\\n" % (test_string,i)
     
     # use bash -c to create the files. This avoids redirect confusion
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
@@ -43,13 +47,17 @@ def append2(testing_node,output=[]):
     testing_node.runSingleCommand("%s mkdir -p %s" % (preload,pvfs2_testdir))
 
     #print 'bash -c \'echo "%s" > %s\''% (test_string,local_reference)
-    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference))
+    testing_node.runSingleCommand('bash -c \'echo "%s" > %s\'' % (test_string,local_reference),output)
+    #print output
     #print 'bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test)
-    testing_node.runSingleCommand('bash -c \'%s echo "%s" > %s\'' % (preload,test_string,append_test))
+    testing_node.runSingleCommand('%s bash -c \'echo "%s" > %s\'' % (preload,test_string,append_test),output)
+    #print output
     #print 'bash -c \'echo "%s" >> %s\'' % (test_string,local_reference)
-    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference))
+    testing_node.runSingleCommand('bash -c \'echo "%s" >> %s\'' % (test_string,local_reference),output)
+    #print output
     #print 'bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test)
-    testing_node.runSingleCommand('bash -c \'%s echo "%s" >> %s\'' % (preload,test_string,append_test))
+    testing_node.runSingleCommand('%s bash -c \'echo "%s" >> %s\'' % (preload,test_string,append_test),output)
+    #print output
     
    
     rc = testing_node.runSingleCommand("%s diff -u %s %s" % (preload, append_test, local_reference),output)
@@ -109,7 +117,7 @@ def dbench(testing_node,output=[]):
         return rc
     
     #testing_node.changeDirectory(testing_node.ofs_mount_point)
-    rc = testing_node.runSingleCommand("export %s; cd %s; %s/dbench-3.03/dbench -c client.txt 10 -t 300" %(preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
+    rc = testing_node.runSingleCommand("%s bash -c 'cd %s; %s/dbench-3.03/dbench -c client.txt 10 -t 300'" %(preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
        
     return rc
     
@@ -312,7 +320,6 @@ tests = [
 append,
 append2,
 bonnie,
-dbench,
 fdtree,
 fstest,
 fsx,
@@ -322,4 +329,5 @@ shelltest,
 symlink_usrint,
 tail,
 usrint_cp,
-ltp ]
+ltp,
+dbench ]

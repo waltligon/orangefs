@@ -1355,8 +1355,8 @@ class OFSTestNode(object):
         rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
         destinationNode.ofs_installation_location = self.ofs_installation_location
         destinationNode.ofs_branch =self.ofs_branch
-	# TODO: Copy ofs_conf_file, don't just link
-        rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destinationNode, self.ofs_conf_file, True)
+        # TODO: Copy ofs_conf_file, don't just link
+        #rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destinationNode, self.ofs_conf_file, True)
         destinationNode.ofs_conf_file =self.ofs_conf_file
         return rc
        
@@ -1815,6 +1815,63 @@ class OFSTestNode(object):
         
         return 0
 
+    def findExistingOFSInstallation(self):
+        # to find OrangeFS server, first finr the pvfs2-server file
+        #ps -ef | grep -v grep| grep pvfs2-server | awk {'print $8'}
+        output = []
+        pvfs2_server = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$8'}")
+        
+        # We have <OFS installation>/sbin/pvfs2_server. Get what we want.
+        (self.ofs_installation_location,sbin) = os.path.split(os.path.dirname(pvfs2_server))
+        
+        # to find OrangeFS conf file
+        #ps -ef | grep -v grep| grep pvfs2-server | awk {'print $11'}
+        self.ofs_conf_file = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$11'}")
+        
+        # to find url
+        
+        rc = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$13'}",output)
+        #print output
+        alias = output[1].rstrip()
+        
+        rc = self.runSingleCommandBacktick("grep %s %s | grep tcp: | awk {'print \$3'}" % (alias,self.ofs_conf_file),output )
+        #print output
+        url_base = output[1].rstrip()
+        
+        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk {'print \$2'}" % self.ofs_conf_file)
+        
+        # to find mount point
+        # should be better than this.
+
+
+        rc = self.runSingleCommand("mount | grep pvfs2 | awk { 'print \$2'}",output)
+        if rc != 0:
+            print "OrangeFS mount point not detected. Trying /tmp/mount/orangefs."
+            self.ofs_mount_point = "/tmp/mount/orangefs"
+        else: 
+            self.ofs_mount_point = output[1].rstrip()
+        
+        # to find PVFS2TAB_FILE
+        print "Looking for PVFS2TAB_FILE"
+        rc = self.runSingleCommand("grep -l -r '%s/%s\s%s' %s 2> /dev/null" %(url_base,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location),output)
+        if rc != 0:
+            rc = self.runSingleCommand("grep -l -r '%s/%s\s%s' /etc 2> /dev/null" % (url_base,self.ofs_fs_name,self.ofs_mount_point),output)
+        
+        
+        #if rc != 0:
+        #    rc = self.runSingleCommand("grep -l -r '%s/%s\s%s' / 2> /dev/null" % (url_base,self.ofs_fs_name,self.ofs_mount_point),output)
+
+        
+        if rc == 0:
+            print output
+            self.setEnvironmentVariable("PVFS2TAB_FILE",output[1].rstrip())
+        
+        # to find source
+        # find the directory
+        #find / -name pvfs2-config.h.in -print 2> /dev/null
+        # grep directory/configure 
+        # grep -r 'prefix = /home/ec2-user/orangefs' /home/ec2-user/stable/Makefile
+        
 
     
 #===================================================================================================

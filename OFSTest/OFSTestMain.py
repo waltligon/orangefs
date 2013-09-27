@@ -101,6 +101,9 @@ class OFSTestMain(object):
        
     
         # TODO: Make this smart enough to detect if the installation is running.
+        self.ofs_network.findExistingOFSInstallation()
+        print "Printing detected dictionary of master node"
+        pprint(self.ofs_network.created_nodes[0].__dict__)
 
         
         self.ofs_network.networkOFSSettings(
