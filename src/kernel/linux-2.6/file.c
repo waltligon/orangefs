@@ -28,11 +28,6 @@ enum io_type {
 
 struct rw_options;
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
-    size_t *count, loff_t *ppos);
-#endif
-
 static ssize_t wait_for_cached_io(struct rw_options *old_rw, 
                                   struct iovec *vec, 
                                   int nr_segs, 
@@ -49,6 +44,8 @@ static ssize_t wait_for_iox(struct rw_options *rw,
                             struct xtvec *xtvec,
                             unsigned long xtnr_segs,
                             size_t total_size);
+
+/* RESET_FILE_POS is a configure option: --enable-reset-file-pos */
 #ifdef RESET_FILE_POS  
 static ssize_t do_readv_writev_wrapper( struct rw_options *rw);
 #endif
@@ -60,11 +57,6 @@ do {                                              \
   spin_unlock(&op->lock);                         \
   wake_up_interruptible(&op->io_completion_waitq);\
 } while(0)
-
-#ifndef HAVE_COMBINED_AIO_AND_VECTOR
-/* <2.6.19 called it this instead */
-#define do_sync_read generic_file_read
-#endif
 
 /** Called when a process requests to open a file.
  */
@@ -305,8 +297,6 @@ static int postcopy_buffers(int buffer_index, struct rw_options *rw,
     return ret;
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
-
 /* Copy from page-cache to application address space 
  * @rw - operation context, contains information about the I/O operation
  *       and holds the pointers to the page-cache page array from which
@@ -431,8 +421,6 @@ static int copy_from_pagecache(struct rw_options *rw,
     kfree(copied_iovec);
     return 0;
 }
-
-#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
 
 /*
  * Post and wait for the I/O upcall to finish
@@ -764,13 +752,7 @@ static long bound_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ss
     return max_nr_iovecs;
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
-
-#ifdef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
-#define pg_ref_count(pg) atomic_read(&(pg)->count)
-#else
 #define pg_ref_count(pg) atomic_read(&(pg)->_count)
-#endif
 
 /*
  * Cleaning up pages in the cache involves dropping the reference count
@@ -838,23 +820,8 @@ static int pvfs2_readpages_fill_cb(void *_data, struct page *page)
     return 0;
 }
 
-
-#if defined(HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT)
-#define lock_mapping_tree(mapping) spin_lock(&mapping->page_lock)
-#define unlock_mapping_tree(mapping) spin_unlock(&mapping->page_lock)
-#elif defined(HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT)
-#define lock_mapping_tree(mapping) read_lock(&mapping->tree_lock)
-#define unlock_mapping_tree(mapping) read_unlock(&mapping->tree_lock)
-#elif defined(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT)
 #define lock_mapping_tree(mapping) spin_lock(&mapping->tree_lock)
 #define unlock_mapping_tree(mapping) spin_unlock(&mapping->tree_lock)
-#elif defined(HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT)
-#define lock_mapping_tree(mapping) spin_lock(&mapping->priv_lock)
-#define unlock_mapping_tree(mapping) spin_unlock(&mapping->priv_lock)
-#else
-#define lock_mapping_tree(mapping) read_lock_irq(&mapping->tree_lock)
-#define unlock_mapping_tree(mapping) read_unlock_irq(&mapping->tree_lock)
-#endif
 
 /* A debugging function to check the contents of a
  *  mapping's address space/radix tree
@@ -1252,7 +1219,6 @@ cleanup:
     cleanup_cache_pages(rw.dest.pages.nr_pages, &rw, err);
     return err == 0 ? total_actual_io : err;
 }
-#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
 
 /*
  * Common entry point for read/write/readv/writev
@@ -1343,11 +1309,7 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         /* perform generic linux kernel tests for sanity of write 
          * arguments 
          */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        ret = pvfs2_precheck_file_write(file, inode, &count, offset);
-#else
         ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
-#endif
         if (ret != 0)
         {
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
@@ -1433,6 +1395,7 @@ static ssize_t do_readv_writev(struct rw_options *rw)
                                   , llu(pvfs2_inode->refn.handle)
                                   , new_nr_segs, seg_count);
 
+/* PVFS2_KERNEL_DEBUG is a CFLAGS define. */
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
     {
@@ -1456,21 +1419,6 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
-#ifndef PVFS2_LINUX_KERNEL_2_4
-        /* caching is not working properly. removing functionality for now.  Becky Ligon. */
-        /* caching REQUIRES the user's buffer to be a multiple of 4096; the code breaks if */
-        /* it is not!                                                                      */
-
-        /* if a file is immutable, stage its I/O 
-         * through the cache */
-        //if (IS_IMMUTABLE(rw->inode)) {
-            /* Stage the I/O through the kernel's pagecache */
-        //    ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
-        //}
-        //else 
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
-        //{
-            /* push the I/O directly through to storage */
 
         gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): size of each_count(%d)\n"
                                       ,__func__
@@ -1619,6 +1567,7 @@ ssize_t pvfs2_file_read(
     rw.readahead_size = 0;
     g_pvfs2_stats.reads++;
 
+/* RESET_FILE_POS is a configure option: --enable-reset-file-pos */
 #ifdef RESET_FILE_POS
     return do_readv_writev_wrapper(&rw);
 #else
@@ -1661,67 +1610,6 @@ static ssize_t pvfs2_file_write(
     return do_readv_writev(&rw);
 #endif
 }
-
-/* compat code, < 2.6.19 */
-#ifndef HAVE_COMBINED_AIO_AND_VECTOR
-/** Reads data to several contiguous user buffers (an iovec) from a file at a
- * specified offset.
- */
-static ssize_t pvfs2_file_readv(
-    struct file *file,
-    const struct iovec *iov,
-    unsigned long nr_segs,
-    loff_t *offset)
-{
-    struct rw_options rw;
-
-    memset(&rw, 0, sizeof(rw));
-    rw.async = 0;
-    rw.type = IO_READV;
-    rw.copy_dest_type = COPY_DEST_ADDRESSES;
-    rw.copy_to_user_addresses = 1;
-    rw.fnstr = __FUNCTION__;
-    rw.inode = file->f_dentry->d_inode;
-    rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.file  = file;
-    rw.dest.address.iov = (struct iovec *) iov;
-    rw.dest.address.nr_segs = nr_segs;
-    rw.off.io.offset = offset;
-    rw.readahead_size = 0;
-    g_pvfs2_stats.reads++;
-    return do_readv_writev(&rw);
-}
-
-/** Write data from a several contiguous user buffers (an iovec) into a file at
- * a specified offset.
- */
-static ssize_t pvfs2_file_writev(
-    struct file *file,
-    const struct iovec *iov,
-    unsigned long nr_segs,
-    loff_t *offset)
-{
-    struct rw_options rw;
-
-    memset(&rw, 0, sizeof(rw));
-    rw.async = 0;
-    rw.type = IO_WRITEV;
-    rw.copy_dest_type = COPY_DEST_ADDRESSES;
-    rw.readahead_size = 0;
-    rw.copy_to_user_addresses = 1;
-    rw.fnstr = __FUNCTION__;
-    rw.file = file;
-    rw.inode = file->f_dentry->d_inode;
-    rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = (struct iovec *) iov;
-    rw.dest.address.nr_segs = nr_segs;
-    rw.off.io.offset = offset;
-
-    g_pvfs2_stats.writes++;
-    return do_readv_writev(&rw);
-}
-#endif
-
 
 /* Construct a trailer of <file offsets, length pairs> in a buffer that we
  * pass in as an upcall trailer to client-core. This is used by clientcore
@@ -2204,6 +2092,7 @@ static ssize_t do_readx_writex(struct rw_options *rw)
         /* We dont have to free up anything */
         to_free = 0;
     }
+/* PVFS2_KERNEL_DEBUG is a CFLAGS define. */
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs_mem; seg++)
     {
@@ -2284,14 +2173,12 @@ out:
     return ret;
 }
 
-#ifndef HAVE_READX_FILE_OPERATIONS
 static ssize_t pvfs2_file_readx(
     struct file *file,
     const struct iovec *iov,
     unsigned long nr_segs,
     const struct xtvec *xtvec,
     unsigned long xtnr_segs) __attribute__((unused));
-#endif
 static ssize_t pvfs2_file_readx(
     struct file *file,
     const struct iovec *iov,
@@ -2318,14 +2205,12 @@ static ssize_t pvfs2_file_readx(
     return do_readx_writex(&rw);
 }
 
-#ifndef HAVE_WRITEX_FILE_OPERATIONS
 static ssize_t pvfs2_file_writex(
     struct file *file,
     const struct iovec *iov,
     unsigned long nr_segs,
     const struct xtvec *xtvec,
     unsigned long xtnr_segs) __attribute__((unused));
-#endif
 static ssize_t pvfs2_file_writex(
     struct file *file,
     const struct iovec *iov,
@@ -2352,7 +2237,6 @@ static ssize_t pvfs2_file_writex(
     return do_readx_writex(&rw);
 }
 
-#ifdef HAVE_AIO_VFS_SUPPORT
 /*
  * NOTES on the aio implementation.
  * Conceivably, we could just make use of the
@@ -2509,9 +2393,6 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
     else
     {
         pvfs2_kernel_op_t *op = NULL;
-#ifdef AIO_PUT_REQ_RETURNS_INT
-        int ret;
-#endif
         /*
          * Do some sanity checks
          */
@@ -2527,9 +2408,6 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                     "pvfs2_kernel_op structure!\n");
             return -EINVAL;
         }
-#ifdef HAVE_KIOCBSETCANCELLED
-        kiocbSetCancelled(iocb);
-#endif
         get_op(op);
         /*
          * This will essentially remove it from 
@@ -2647,16 +2525,8 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * to manually decrement ki_users field!
          * before calling aio_put_req().
          */
-#ifdef KI_USERS_ATOMIC
         atomic_dec(&iocb->ki_users);
-#else
-        iocb->ki_users--;
-#endif
-#ifdef AIO_PUT_REQ_RETURNS_INT
-        ret = aio_put_req(iocb);
-#else
         aio_put_req(iocb);
-#endif
         /* x is itself deallocated by the destructor */
         return 0;
     }
@@ -2719,11 +2589,7 @@ fill_default_kiocb(pvfs2_kiocb *x,
     x->offset = offset;
     x->bytes_copied = 0;
     x->needs_cleanup = 1;
-#ifdef HAVE_KIOCB_SET_CANCEL_FN
     kiocb_set_cancel_fn(iocb, aio_cancel);
-#else
-    iocb->ki_cancel = aio_cancel;
-#endif
     /* Allocate a private pointer to store the
      * iovector since the caller could pass in a
      * local variable for the iovector.
@@ -2817,6 +2683,7 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     if (!rw->async)
     {
 
+/* RESET_FILE_POS is a configure option: --enable-reset-file-pos */
 #ifdef RESET_FILE_POS
         error = do_readv_writev_wrapper(rw);
 #else
@@ -2835,11 +2702,7 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     {
         int ret;
         /* perform generic tests for sanity of write arguments */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        ret = pvfs2_precheck_file_write(filp, inode, &count, offset);
-#else
         ret = generic_write_checks(filp, offset, &count, S_ISBLK(inode->i_mode));
-#endif
         if (ret != 0)
         {
             gossip_err("%s: failed generic "
@@ -3091,32 +2954,10 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     return pvfs2_file_aio_write_iovec(iocb, &iov, 1, offset);
 }
 #endif
-#endif  /* HAVE_AIO_VFS_SUPPORT */
 
 /** Perform a miscellaneous operation on a file.
  */
-
-#ifdef HAVE_NO_FS_IOC_FLAGS
-#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
 long pvfs2_ioctl(
-#else
-int pvfs2_ioctl(
-        struct inode *inode,
-#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
-        struct file *file,
-        unsigned int cmd,
-        unsigned long arg)
-{
-    return -ENOTTY;
-}
-#else
-
-#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
-long pvfs2_ioctl(
-#else
-int pvfs2_ioctl(
-    struct inode *inode,
-#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     struct file *file,
     unsigned int cmd,
     unsigned long arg)
@@ -3133,19 +2974,11 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val)
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                , 0
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                );
+        ret = pvfs2_xattr_get_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val),
+                                      0);
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -3182,25 +3015,16 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val), 
-                0
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                , 0                                      
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                );
+        ret = pvfs2_xattr_set_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val), 
+                                      0,
+                                      0);
     }
 
     return ret;
 }
-#endif
 
 /** Memory map a region of a file.
  */
@@ -3222,19 +3046,12 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     vma->vm_flags |= VM_SEQ_READ;
     vma->vm_flags &= ~VM_RAND_READ;
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    vma->vm_flags &= ~VM_MAYWRITE;
-    return generic_file_mmap(file, vma);
-#else
     /* backing_dev_info isn't present on 2.4.x */
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
     return generic_file_mmap(file, vma);
-#endif
 }
 
-#ifndef HAVE_MAPPING_NRPAGES_MACRO
 #define mapping_nrpages(idata) (idata)->nrpages
-#endif
 
 /** Called to notify the module that there are no more references to
  *  this file (i.e. no processes have it open).
@@ -3272,13 +3089,8 @@ int pvfs2_file_release(
 /** Push all data for a specific file onto permanent storage.
  */
 int pvfs2_fsync(struct file *file,
-#ifdef HAVE_FSYNC_LOFF_T_PARAMS
                 loff_t start,
                 loff_t end,
-#endif
-#ifdef HAVE_FSYNC_DENTRY_PARAM
-                struct dentry *dentry,
-#endif
                 int datasync)
 {
     int ret = -EINVAL;
@@ -3286,11 +3098,7 @@ int pvfs2_fsync(struct file *file,
     pvfs2_kernel_op_t *new_op = NULL;
 
     /* required call */
-#ifdef HAVE_FSYNC_LOFF_T_PARAMS
     filemap_write_and_wait_range(file->f_mapping, start, end);
-#else
-    filemap_write_and_wait(file->f_mapping);
-#endif
 
     new_op = op_alloc(PVFS2_VFS_OP_FSYNC);
     if (!new_op)
@@ -3355,163 +3163,6 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
     return generic_file_llseek(file, offset, origin);
 }
 
-/*
- * Apache uses the sendfile system call to stuff page-sized file data to 
- * a socket. Unfortunately, the generic_sendfile function exported by
- * the kernel uses the page-cache and does I/O in pagesize granularities
- * and this leads to undesirable consistency problems not to mention performance
- * limitations.
- * Consequently, we chose to override the default callback by bypassing the page-cache.
- * Although, we could read larger than page-sized buffers from the file,
- * the actor routine does not know how to handle > 1 page buffer at a time.
- * So we still end up breaking things down. darn...
- */
-#ifdef HAVE_SENDFILE_VFS_SUPPORT
-
-static void do_bypass_page_cache_read(struct file *filp, loff_t *ppos, 
-        read_descriptor_t *desc, read_actor_t actor)
-{
-    struct inode *inode = NULL;
-    struct address_space *mapping = NULL;
-    struct page *uncached_page = NULL;
-    unsigned long kaddr = 0;
-    unsigned long offset;
-    loff_t isize;
-    unsigned long begin_index, end_index;
-    long prev_index;
-    int to_free = 0;
-
-    mapping = filp->f_mapping;
-    inode   = mapping->host;
-    /* offset in file in terms of page_cache_size */
-    begin_index = *ppos >> PAGE_CACHE_SHIFT; 
-    offset = *ppos & ~PAGE_CACHE_MASK;
-
-    isize = pvfs2_i_size_read(inode);
-    if (!isize)
-    {
-        return;
-    }
-    end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
-    prev_index = -1;
-    /* copy page-sized units at a time using the actor routine */
-    for (;;)
-    {
-        unsigned long nr, ret, error;
-
-        /* Are we reading beyond what exists */
-        if (begin_index > end_index)
-        {
-            break;
-        }
-        /* issue a file-system read call to fill this buffer which is in kernel space */
-        if (prev_index != begin_index)
-        {
-            loff_t file_offset;
-            file_offset = (begin_index << PAGE_CACHE_SHIFT);
-            /* Allocate a page, but don't add it to the pagecache proper */
-            kaddr = __get_free_page(mapping_gfp_mask(mapping));
-            if (kaddr == 0UL)
-            {
-                desc->error = -ENOMEM;
-                break;
-            }
-            to_free = 1;
-            uncached_page = virt_to_page(kaddr);
-            gossip_debug(GOSSIP_FILE_DEBUG, "begin_index = %lu offset = %lu file_offset = %ld\n",
-                    (unsigned long) begin_index, (unsigned long) offset, (unsigned long)file_offset);
-
-            error = pvfs2_inode_read(inode, (void *) kaddr, PAGE_CACHE_SIZE, &file_offset, 0, 0);
-            prev_index = begin_index;
-        }
-        else {
-            error = 0;
-        }
-        /*
-         * In the unlikely event of an error, bail out 
-         */
-        if (unlikely(error < 0))
-        {
-            desc->error = error;
-            break;
-        }
-        /* nr is the maximum amount of bytes to be copied from this page */
-        nr = PAGE_CACHE_SIZE;
-        if (begin_index >= end_index)
-        {
-            if (begin_index > end_index)
-            {
-                break;
-            }
-            /* Adjust the number of bytes on the last page */
-            nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
-            /* Do we have fewer valid bytes in the file than what was requested? */
-            if (nr <= offset)
-            {
-                break;
-            }
-        }
-        nr = nr - offset;
-
-        ret = actor(desc, uncached_page, offset, nr);
-        gossip_debug(GOSSIP_FILE_DEBUG, "actor with offset %lu nr %lu return %lu desc->count %lu\n", 
-                (unsigned long) offset, (unsigned long) nr, (unsigned long) ret, (unsigned long) desc->count);
-
-        offset += ret;
-        begin_index += (offset >> PAGE_CACHE_SHIFT);
-        offset &= ~PAGE_CACHE_MASK;
-        if (to_free == 1)
-        {
-            free_page(kaddr);
-            to_free = 0;
-        }
-        if (ret == nr && desc->count)
-            continue;
-        break;
-    }
-    if (to_free == 1)
-    {
-        free_page(kaddr);
-        to_free = 0;
-    }
-    *ppos = (begin_index << PAGE_CACHE_SHIFT) + offset;
-    file_accessed(filp);
-    return;
-}
-
-static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
-        size_t count, read_actor_t actor, void *target)
-{
-    int error;
-    read_descriptor_t desc;
-
-    desc.written = 0;
-    desc.count = count;
-#ifdef HAVE_ARG_IN_READ_DESCRIPTOR_T
-    desc.arg.data = target;
-#else
-    desc.buf = target;
-#endif
-    desc.error = 0;
-
-    /*
-     * Revalidate the inode so that i_size_read will 
-     * return the appropriate size 
-     */
-    if ((error = pvfs2_inode_getattr(filp->f_mapping->host, PVFS_ATTR_SYS_SIZE)) < 0)
-    {
-        return error;
-    }
-
-    /* Do a blocking read from the file and invoke the actor appropriately */
-    do_bypass_page_cache_read(filp, ppos, &desc, actor);
-    if (desc.written)
-        return desc.written;
-    return desc.error;
-}
-
-#endif
-
 int pvfs2_lock(struct file *f, int flags, struct file_lock *lock)
 {
     return -ENOSYS;
@@ -3520,167 +3171,21 @@ int pvfs2_lock(struct file *f, int flags, struct file_lock *lock)
 /** PVFS2 implementation of VFS file operations */
 struct file_operations pvfs2_file_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    llseek : pvfs2_file_llseek,
-    read : pvfs2_file_read,
-    write : pvfs2_file_write,
-    readv : pvfs2_file_readv,
-    writev : pvfs2_file_writev,
-    ioctl : pvfs2_ioctl,
-    mmap : pvfs2_file_mmap,
-    open : pvfs2_file_open,
-    release : pvfs2_file_release,
-    fsync : pvfs2_fsync
-#else
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
-    /* for >= 2.6.19 */
-#ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read_iovec,
     .aio_write = pvfs2_file_aio_write_iovec,
-#endif
     .lock = pvfs2_lock,
-#else
-    .readv = pvfs2_file_readv,
-    .writev = pvfs2_file_writev,
-#  ifdef HAVE_AIO_VFS_SUPPORT
-    .aio_read = pvfs2_file_aio_read,
-    .aio_write = pvfs2_file_aio_write,
-#  endif
-#endif
-#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
     .unlocked_ioctl = pvfs2_ioctl,
-#else
-    .ioctl = pvfs2_ioctl,
-#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
     .fsync = pvfs2_fsync,
-#ifdef HAVE_SENDFILE_VFS_SUPPORT
-    .sendfile = pvfs2_sendfile,
-#endif
-#ifdef HAVE_READX_FILE_OPERATIONS
-    .readx = pvfs2_file_readx,
-#endif
-#ifdef HAVE_WRITEX_FILE_OPERATIONS
-    .writex = pvfs2_file_writex,
-#endif
     .lock = pvfs2_lock,
-#endif
 };
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-/*
- * pvfs2_precheck_file_write():
- * Check the conditions on a file descriptor prior to beginning a write
- * on it.  Contains the common precheck code for both buffered and direct
- * IO.
- *
- * NOTE: this function is a modified version of precheck_file_write() from
- * 2.4.x.  precheck_file_write() is not exported so we are forced to
- * duplicate it here.
- */
-static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
-    size_t *count, loff_t *ppos)
-{
-    ssize_t       err;
-    unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
-    loff_t        pos = *ppos;
-    
-    err = -EINVAL;
-    if (pos < 0)
-        goto out;
-
-    err = file->f_error;
-    if (err) {
-        file->f_error = 0;
-        goto out;
-    }
-
-    /* FIXME: this is for backwards compatibility with 2.4 */
-    if (!S_ISBLK(inode->i_mode) && (file->f_flags & O_APPEND))
-        *ppos = pos = inode->i_size;
-
-    /*
-     * Check whether we've reached the file size limit.
-     */
-    err = -EFBIG;
-    
-    if (!S_ISBLK(inode->i_mode) && limit != RLIM_INFINITY) {
-        if (pos >= limit) {
-            send_sig(SIGXFSZ, current, 0);
-            goto out;
-        }
-        if (pos > 0xFFFFFFFFULL || *count > limit - (u32)pos) {
-            /* send_sig(SIGXFSZ, current, 0); */
-            *count = limit - (u32)pos;
-        }
-    }
-
-    /*
-     *    LFS rule 
-     */
-    if ( pos + *count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
-        if (pos >= MAX_NON_LFS) {
-            send_sig(SIGXFSZ, current, 0);
-            goto out;
-        }
-        if (*count > MAX_NON_LFS - (u32)pos) {
-            /* send_sig(SIGXFSZ, current, 0); */
-            *count = MAX_NON_LFS - (u32)pos;
-        }
-    }
-
-    /*
-     *    Are we about to exceed the fs block limit ?
-     *
-     *    If we have written data it becomes a short write
-     *    If we have exceeded without writing data we send
-     *    a signal and give them an EFBIG.
-     *
-     *    Linus frestrict idea will clean these up nicely..
-     */
-     
-    if (!S_ISBLK(inode->i_mode)) {
-        if (pos >= inode->i_sb->s_maxbytes)
-        {
-            if (*count || pos > inode->i_sb->s_maxbytes) {
-                send_sig(SIGXFSZ, current, 0);
-                err = -EFBIG;
-                goto out;
-            }
-            /* zero-length writes at ->s_maxbytes are OK */
-        }
-
-        if (pos + *count > inode->i_sb->s_maxbytes)
-            *count = inode->i_sb->s_maxbytes - pos;
-    } else {
-        if (is_read_only(inode->i_rdev)) {
-            err = -EPERM;
-            gossip_err("Operation not permitted on read only file system\n");
-            goto out;
-        }
-        if (pos >= inode->i_size) {
-            if (*count || pos > inode->i_size) {
-                err = -ENOSPC;
-                goto out;
-            }
-        }
-
-        if (pos + *count > inode->i_size)
-            *count = inode->i_size - pos;
-    }
-
-    err = 0;
-out:
-    return err;
-}
-#endif
-
-
+/* RESET_FILE_POS is a configure option: --enable-reset-file-pos */
 #ifdef RESET_FILE_POS
 /* This function wrapper imposes the rule that the user's
  * request was either entirely fulfilled or it wasn't.  If it wasn't,

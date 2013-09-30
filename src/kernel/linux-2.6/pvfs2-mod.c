@@ -11,6 +11,7 @@
 #include "pvfs2-proc.h"
 #include "pvfs2-internal.h"
 
+/* PVFS2_VERSION is a ./configure define */
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
@@ -68,30 +69,11 @@ MODULE_PARM_DESC(slot_timeout_secs, "Slot timeout in seconds");
 MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
 MODULE_PARM_DESC(fake_mmap_shared, "perform mmap with MAP_SHARED flag as if called with MAP_PRIVATE");
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-/*
-  for 2.4.x nfs exporting, we need to add fsid=# to the /etc/exports
-  file rather than using the FS_REQUIRES_DEV flag
-*/
-DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
-
-MODULE_PARM(hash_table_size, "i");
-MODULE_PARM(module_parm_debug_mask, "i");
-MODULE_PARM(op_timeout_secs, "i");
-MODULE_PARM(slot_timeout_secs, "i");
-MODULE_PARM(fake_mmap_shared, "i");
-
-#else /* !PVFS2_LINUX_KERNEL_2_4 */
-
 struct file_system_type pvfs2_fs_type =
 {
     .name = "pvfs2",
 /* only define mount if the kernel no longer supports get_sb */
-#ifdef HAVE_FSTYPE_MOUNT_ONLY
     .mount = pvfs2_mount,
-#else
-    .get_sb = pvfs2_get_sb,
-#endif /* HAVE_FSTYPE_MOUNT_ONLY */
     .kill_sb = pvfs2_kill_sb,
     .owner = THIS_MODULE,
 /*
@@ -108,8 +90,6 @@ module_param(module_parm_debug_mask, uint, 0);
 module_param(op_timeout_secs, int, 0);
 module_param(slot_timeout_secs, int, 0);
 module_param(fake_mmap_shared, int, 0);
-
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /* synchronizes the request device file */
 struct semaphore devreq_semaphore;
@@ -129,11 +109,7 @@ struct qhash_table *htable_ops_in_progress = NULL;
 LIST_HEAD(pvfs2_request_list);
 
 /* used to protect the above pvfs2_request_list */
-#ifdef HAVE_SPIN_LOCK_UNLOCKED
-spinlock_t pvfs2_request_list_lock = SPIN_LOCK_UNLOCKED;
-#else 
 DEFINE_SPINLOCK(pvfs2_request_list_lock);
-#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 /* used for incoming request notification */
 DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
@@ -213,11 +189,9 @@ static int __init pvfs2_init(void)
        }
     }/*end for*/
 
-#ifdef HAVE_BDI_INIT
     ret = bdi_init(&pvfs2_backing_dev_info);
     if(ret)
         return(ret);
-#endif
 
     if(op_timeout_secs < 0)
     {
@@ -289,9 +263,7 @@ cleanup_req:
 cleanup_op:
     op_cache_finalize();
 err:
-#ifdef HAVE_BDI_INIT
     bdi_destroy(&pvfs2_backing_dev_info);
-#endif
     return ret;
 }
 
@@ -340,9 +312,7 @@ static void __exit pvfs2_exit(void)
 
     qhash_finalize(htable_ops_in_progress);
     
-#ifdef HAVE_BDI_INIT
     bdi_destroy(&pvfs2_backing_dev_info);
-#endif
 
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }

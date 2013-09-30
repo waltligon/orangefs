@@ -19,13 +19,8 @@ int pvfs2_gen_credentials(
     if (credentials)
     {
         memset(credentials, 0, sizeof(PVFS_credentials));
-#ifdef HAVE_CURRENT_FSUID
         credentials->uid = current_fsuid();
         credentials->gid = current_fsgid();
-#else
-        credentials->uid = current->fsuid;
-        credentials->gid = current->fsgid;
-#endif
 
         ret = 0;
     }
@@ -156,9 +151,6 @@ int copy_attributes_to_inode(
           changing the inode->i_blkbits to something other than
           PAGE_CACHE_SHIFT breaks mmap/execution as we depend on that.
         */
-#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
-        inode->i_blksize = pvfs_bufmap_size_query();
-#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         gossip_debug(GOSSIP_UTILS_DEBUG, "attrs->mask = %x (objtype = %s)\n", 
                 attrs->mask, 
@@ -177,14 +169,7 @@ int copy_attributes_to_inode(
                     (inode_size + (4096 - (inode_size % 4096)));
 
                 pvfs2_lock_inode(inode);
-#ifdef PVFS2_LINUX_KERNEL_2_4
-#if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
                 inode->i_bytes = inode_size;
-#endif
-#else
-                /* this is always ok for 2.6.x */
-                inode->i_bytes = inode_size;
-#endif
                 inode->i_blocks = (unsigned long)(rounded_up_size / 512);
                 pvfs2_unlock_inode(inode);
 
@@ -204,14 +189,7 @@ int copy_attributes_to_inode(
         else
         {
             pvfs2_lock_inode(inode);
-#ifdef PVFS2_LINUX_KERNEL_2_4
-#if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
             inode->i_bytes = PAGE_CACHE_SIZE;
-#endif
-#else
-            /* always ok for 2.6.x */
-            inode->i_bytes = PAGE_CACHE_SIZE;
-#endif
             inode->i_blocks = (unsigned long)(PAGE_CACHE_SIZE / 512);
             pvfs2_unlock_inode(inode);
 
@@ -220,18 +198,13 @@ int copy_attributes_to_inode(
 
         inode->i_uid = attrs->owner;
         inode->i_gid = attrs->group;
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        inode->i_atime = (time_t)attrs->atime;
-        inode->i_mtime = (time_t)attrs->mtime;
-        inode->i_ctime = (time_t)attrs->ctime;
-#else
         inode->i_atime.tv_sec = (time_t)attrs->atime;
         inode->i_mtime.tv_sec = (time_t)attrs->mtime;
         inode->i_ctime.tv_sec = (time_t)attrs->ctime;
         inode->i_atime.tv_nsec = 0;
         inode->i_mtime.tv_nsec = 0;
         inode->i_ctime.tv_nsec = 0;
-#endif
+
         if (attrs->perms & PVFS_O_EXECUTE)
             perm_mode |= S_IXOTH;
         if (attrs->perms & PVFS_O_WRITE)

@@ -14,10 +14,14 @@
 #include <linux/proc_fs.h>
 #include "pvfs2-proc.h"
 
+/* PVFS2_VERSION is set in ./configure */
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
 
+/* CONFIG_SYSCTL is set in .config - most of this source file is inside
+   this ifdef...
+ */
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 
@@ -53,29 +57,12 @@ struct pvfs2_param_extra
  * into the proper debug value and then send a request to update the
  * debug mask if client or update the local debug mask if kernel.
 */
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-static int pvfs2_proc_debug_mask_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp,
-    loff_t          *ppos)
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_proc_debug_mask_handler(
     ctl_table       *ctl,
     int             write,
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
-#else
-static int pvfs2_proc_debug_mask_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp)
-#endif
 {
   int ret=0;
   pvfs2_kernel_op_t *new_op = NULL;
@@ -83,14 +70,7 @@ static int pvfs2_proc_debug_mask_handler(
   gossip_debug(GOSSIP_PROC_DEBUG,"Executing pvfs2_proc_debug_mask_handler...\n");
 
   /* use generic proc string handling function to retrieve/set string. */
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-        ret = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
-        ret = proc_dostring(ctl, write, buffer, lenp, ppos);
-#else
-        ret = proc_dostring(ctl, write, filp, buffer, lenp);
-#endif
-
+  ret = proc_dostring(ctl, write, buffer, lenp, ppos);
   if (ret != 0)
   {
      return(ret);
@@ -163,29 +143,11 @@ static int pvfs2_proc_debug_mask_handler(
  * generic proc file handler for getting and setting various tunable
  * pvfs2-client parameters
  */
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp,
-    loff_t          *ppos)
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
-static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
-    int             write,
-    void            *buffer,
-    size_t          *lenp,
-    loff_t          *ppos)
-#else
-static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp)
-#endif
+static int pvfs2_param_proc_handler(ctl_table *ctl,
+                                    int write,
+                                    void *buffer,
+                                    size_t *lenp,
+                                    loff_t *ppos)
 {       
     pvfs2_kernel_op_t *new_op = NULL;
     struct pvfs2_param_extra* extra = ctl->extra1;
@@ -208,13 +170,7 @@ static int pvfs2_param_proc_handler(
     if(write)
     {
         /* use generic proc handling function to retrive value to set */
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-        ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
-#else
-        ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp);
-#endif
         if(ret != 0)
         {
             op_release(new_op);
@@ -241,53 +197,26 @@ static int pvfs2_param_proc_handler(
         /* use generic proc handling function to output value */
         val = (int)new_op->downcall.resp.param.value;
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-        ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
-#else
-        ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp);
-#endif
     }
 
     op_release(new_op);
     return(ret);
 }
 
-#if defined(HAVE_PROC_HANDLER_FILE_ARG)
-static int pvfs2_pc_proc_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp,
-    loff_t          *ppos)
-#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
-#else
-static int pvfs2_pc_proc_handler(
-    ctl_table       *ctl,
-    int             write,
-    struct file     *filp,
-    void            *buffer,
-    size_t          *lenp)
-#endif
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int ret;
     int pos = 0;
     int to_copy = 0;
     int* pc_type = ctl->extra1;
-#if defined(HAVE_PROC_HANDLER_PPOS_ARG) || defined(HAVE_PROC_HANDLER_FILE_ARG)
     loff_t *offset = ppos;
-#else
-    loff_t *offset = &filp->f_pos;
-#endif
 
     if(write)
     {
@@ -431,29 +360,11 @@ static struct pvfs2_param_extra perf_reset_extra = {
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
 
-/*
- * Modern kernels (up to 2.6.33) prefer to number the controls themselves.
- */
-#ifdef CTL_UNNUMBERED
-#define UNNUMBERED_OR_VAL(x) ((x==CTL_NONE) ? CTL_NONE : CTL_UNNUMBERED)
-#else
 #define UNNUMBERED_OR_VAL(x) x
-#endif
 
-/*
- * API change in 2.6.33 removes .ctl_name and .strategy from ctl_table
- */
-#ifdef HAVE_CTL_NAME
-#define CTL_NAME(c_name)        .ctl_name = UNNUMBERED_OR_VAL(c_name),
-#else
 #define CTL_NAME(c_name)
-#endif /* HAVE_CTL_NAME */
 
-#ifdef HAVE_CTL_STRATEGY
-#define CTL_STATEGY(c_strategy) .strategy = (c_strategy),
-#else
 #define CTL_STRATEGY(strat)     
-#endif /* HAVE_CTL_STRATEGY */
 
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
@@ -777,14 +688,11 @@ static ctl_table fs_table[] = {
 
 void pvfs2_proc_initialize(void)
 {
+/* CONFIG_SYSCTL is set in .config */
 #ifdef CONFIG_SYSCTL
     if (!fs_table_header)
     {
-#ifdef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
-        fs_table_header = register_sysctl_table(fs_table, 0);
-#else
         fs_table_header = register_sysctl_table(fs_table);
-#endif
     }
 #endif
 
@@ -793,6 +701,7 @@ void pvfs2_proc_initialize(void)
 
 void pvfs2_proc_finalize(void)
 {
+/* CONFIG_SYSCTL is set in .config */
 #ifdef CONFIG_SYSCTL
     if(fs_table_header) 
     {

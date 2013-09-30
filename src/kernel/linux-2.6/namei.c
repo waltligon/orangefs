@@ -15,26 +15,10 @@
 
 /** Get a newly allocated inode to go with a negative dentry.
  */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_create(struct inode *dir,
-                        struct dentry *dentry,
-                        int mode)
-#elif defined(PVFS_KMOD_CREATE_TAKES_NAMEIDATA)
-static int pvfs2_create(struct inode *dir,
-                        struct dentry *dentry,
-#ifdef PVFS_KMOD_CREATE_USES_UMODE_T
-                        umode_t mode,
-#else
-                        int mode,
-#endif
-                        struct nameidata *nd)
-#else
 static int pvfs2_create(struct inode *dir,
                         struct dentry *dentry,
                         umode_t mode,
                         bool exclusive)
-                        /* PVFS could use to indicate exclusive open */
-#endif
 {
     int ret = -EINVAL;
     struct inode *inode = NULL;
@@ -66,18 +50,9 @@ static int pvfs2_create(struct inode *dir,
 /** Attempt to resolve an object name (dentry->d_name), parent handle, and
  *  fsid into a handle for the object.
  */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-static struct dentry *pvfs2_lookup(struct inode *dir,
-                                   struct dentry *dentry)
-#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
-static struct dentry *pvfs2_lookup(struct inode *dir,
-                                   struct dentry *dentry,
-                                   struct nameidata *nd)
-#else
 static struct dentry *pvfs2_lookup(struct inode *dir,
                                    struct dentry *dentry,
                                    unsigned int flags)
-#endif
 {
     int ret = -EINVAL;
     struct inode *inode = NULL;
@@ -107,21 +82,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 	return ERR_PTR(-ENOMEM);
     }
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
-    /*
-      if we're at a symlink, should we follow it? never attempt to
-      follow negative dentries
-    */
-    new_op->upcall.req.lookup.sym_follow =
-         ((nd &&
-           (nd->flags & LOOKUP_FOLLOW) &&
-           (dentry->d_inode != NULL)) ?
-          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
-#else
     new_op->upcall.req.lookup.sym_follow = flags & LOOKUP_FOLLOW;
-#endif
 
     if (dir)
     {
@@ -137,12 +98,10 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
         }
         else
         {
-#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
             gossip_lerr("Critical error: i_ino cannot be relied on "
                         "when using iget5/iget4\n");
             op_release(new_op);
             return ERR_PTR(-EINVAL);
-#endif
             new_op->upcall.req.lookup.parent_refn.handle =
                             get_handle_from_ino(dir);
             new_op->upcall.req.lookup.parent_refn.fs_id =
@@ -207,11 +166,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
              * potential future lookup of this cached negative dentry can
              * be properly revalidated.
              */
-#ifdef HAVE_D_SET_D_OP
             d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-            dentry->d_op = &pvfs2_dentry_operations;
-#endif
             d_add(dentry, inode);
 
             op_release(new_op);
@@ -234,11 +189,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                      (int)atomic_read(&inode->i_count));
 
         /* update dentry/inode pair into dcache */
-#ifdef HAVE_D_SET_D_OP
         d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-        dentry->d_op = &pvfs2_dentry_operations;
-#endif
 
         res = pvfs2_d_splice_alias(dentry, inode);
 
@@ -246,19 +197,11 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                      (int)atomic_read(&inode->i_count));
         if (res)
         {
-#ifdef HAVE_D_SET_D_OP
             d_set_d_op(res, &pvfs2_dentry_operations);
-#else
-            res->d_op = &pvfs2_dentry_operations;
-#endif
         }
 
         op_release(new_op);
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        return NULL;
-#else
         return res;
-#endif
     }
     else if (inode && is_bad_inode(inode))
     {
@@ -329,23 +272,11 @@ static int pvfs2_link(
  * reasonable error code (the kernel will return a misleading EPERM
  * otherwise).  PVFS2 does not support special files such as fifos or devices.
  */
-#ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_mknod(
     struct inode *dir,
     struct dentry *dentry,
-    int mode,
-    int rdev)
-#else
-static int pvfs2_mknod(
-    struct inode *dir,
-    struct dentry *dentry,
-#ifdef PVFS_KMOD_MKNOD_USES_UMODE_T
     umode_t mode,
-#else
-    int mode,
-#endif
     dev_t rdev)
-#endif
 {
     return(-EOPNOTSUPP);
 }
@@ -379,11 +310,7 @@ static int pvfs2_symlink(
 static int pvfs2_mkdir(
     struct inode *dir,
     struct dentry *dentry,
-#ifdef PVFS_KMOD_MKDIR_USES_UMODE_T
     umode_t mode)
-#else
-    int mode)
-#endif
 {
     int ret = -EINVAL;
     struct inode *inode = NULL;
@@ -450,17 +377,9 @@ static int pvfs2_rename(
     struct super_block *sb = NULL;
 
 
-#ifdef HAVE_DENTRY_D_COUNT_ATOMIC
-    local_count = atomic_read(&new_dentry->d_count);
-#else
     spin_lock( &new_dentry->d_lock );
-#ifdef HAVE_DENTRY_LOCKREF_STRUCT
     local_count = d_count(new_dentry);
-#else
-    local_count = new_dentry->d_count;
-#endif
     spin_unlock( &new_dentry->d_lock );
-#endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",
                 old_dentry->d_parent->d_name.name, old_dentry->d_name.name,
                 new_dentry->d_parent->d_name.name, new_dentry->d_name.name,
@@ -572,25 +491,6 @@ static int pvfs2_rename(
 /** PVFS2 implementation of VFS inode operations for directories */
 struct inode_operations pvfs2_dir_inode_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    create : pvfs2_create,
-    lookup : pvfs2_lookup,
-    link : pvfs2_link,
-    unlink : pvfs2_unlink,
-    symlink : pvfs2_symlink,
-    mkdir : pvfs2_mkdir,
-    rmdir : pvfs2_rmdir,
-    mknod : pvfs2_mknod,
-    rename : pvfs2_rename,
-    setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate,
-#ifdef HAVE_XATTR
-    getxattr: pvfs2_getxattr,
-    setxattr: pvfs2_setxattr,
-    removexattr: pvfs2_removexattr,
-    listxattr: pvfs2_listxattr,
-#endif
-#else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
     .link = pvfs2_link,
@@ -602,19 +502,16 @@ struct inode_operations pvfs2_dir_inode_operations =
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
-#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
     .getxattr = generic_getxattr,
     .setxattr = generic_setxattr,
     .removexattr = generic_removexattr,
-#else
-    .setxattr = pvfs2_setxattr,
-    .getxattr = pvfs2_getxattr,
-    .removexattr = pvfs2_removexattr,
 #endif
     .listxattr = pvfs2_listxattr,
-#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
-#endif
 #endif
 };
 

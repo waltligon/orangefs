@@ -8,28 +8,16 @@
 #include "pvfs2-internal.h"
 
 /* A list of all allocated pvfs2 inode objects */
-#ifdef HAVE_SPIN_LOCK_UNLOCKED
-static spinlock_t pvfs2_inode_list_lock = SPIN_LOCK_UNLOCKED;
-#else
 static DEFINE_SPINLOCK(pvfs2_inode_list_lock);
-#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 static LIST_HEAD(pvfs2_inode_list);
 
 /* tags assigned to kernel upcall operations */
 static uint64_t next_tag_value;
-#ifdef HAVE_SPIN_LOCK_UNLOCKED
-static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
-#else
 static DEFINE_SPINLOCK(next_tag_value_lock);
-#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 /* the pvfs2 memory caches */
 
-#ifdef HAVE_STRUCT_KMEM_CACHE
 typedef struct kmem_cache pvfs2_kmem_cache_t;
-#else
-typedef kmem_cache_t pvfs2_kmem_cache_t;
-#endif
 
 /* a cache for pvfs2 upcall/downcall operations */
 static pvfs2_kmem_cache_t *op_cache = NULL;
@@ -37,31 +25,22 @@ static pvfs2_kmem_cache_t *op_cache = NULL;
 static pvfs2_kmem_cache_t *dev_req_cache = NULL;
 /* a cache for pvfs2-inode objects (i.e. pvfs2 inode private data) */
 static pvfs2_kmem_cache_t *pvfs2_inode_cache = NULL;
-#ifdef HAVE_AIO_VFS_SUPPORT
 /* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
 static pvfs2_kmem_cache_t *pvfs2_kiocb_cache = NULL;
-#endif
 
-#ifdef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
-#define pvfs_kmem_cache_destroy kmem_cache_destroy
-#else
-/* recent kernels do not return a value */
 static int pvfs_kmem_cache_destroy(void *x)
 {
     kmem_cache_destroy(x);
     return 0;
 }
-#endif
 
 int op_cache_initialize(void)
 {
-    op_cache = kmem_cache_create(
-        "pvfs2_op_cache", sizeof(pvfs2_kernel_op_t),
-        0, PVFS2_CACHE_CREATE_FLAGS, NULL
-#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
-        , NULL
-#endif
-        );
+    op_cache = kmem_cache_create("pvfs2_op_cache", 
+                                 sizeof(pvfs2_kernel_op_t),
+                                 0, 
+                                 PVFS2_CACHE_CREATE_FLAGS, 
+                                 NULL);
 
     if (!op_cache)
     {
@@ -213,13 +192,11 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 
 int dev_req_cache_initialize(void)
 {
-    dev_req_cache = kmem_cache_create(
-        "pvfs2_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
-        PVFS2_CACHE_CREATE_FLAGS, NULL
-#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
-        , NULL
-#endif
-        );
+    dev_req_cache = kmem_cache_create("pvfs2_devreqcache",
+                                      MAX_ALIGNED_DEV_REQ_DOWNSIZE,
+                                      0,
+                                      PVFS2_CACHE_CREATE_FLAGS,
+                                      NULL);
 
     if (!dev_req_cache)
     {
@@ -268,25 +245,13 @@ void dev_req_release(void *buffer)
     return;
 }
 
-static void pvfs2_inode_cache_ctor(
-#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
-    void *req
-#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
-    struct kmem_cache *cachep,
-    void *req
-#else
-    void *req,
-    pvfs2_kmem_cache_t * cachep,
-    unsigned long flags
-#endif
-)
+static void pvfs2_inode_cache_ctor(void *req)
 {
     pvfs2_inode_t *pvfs2_inode = req;
 
     ClearInitFlag(pvfs2_inode);
     pvfs2_inode_initialize(pvfs2_inode);
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
     /*
        inode_init_once is from 2.6.x's inode.c; it's normally run
        when an inode is allocated by the system's inode slab
@@ -296,7 +261,6 @@ static void pvfs2_inode_cache_ctor(
     */
     inode_init_once(&pvfs2_inode->vfs_inode);
     pvfs2_inode->vfs_inode.i_version = 1;
-#endif
     /* Initialize the reader/writer semaphore */
     init_rwsem(&pvfs2_inode->xattr_sem);
 }
@@ -319,13 +283,11 @@ static inline void del_from_pinode_list(pvfs2_inode_t *pvfs2_inode)
 
 int pvfs2_inode_cache_initialize(void)
 {
-    pvfs2_inode_cache = kmem_cache_create(
-        "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
-        PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor
-#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
-        , NULL
-#endif
-        );
+    pvfs2_inode_cache = kmem_cache_create("pvfs2_inode_cache",
+                                          sizeof(pvfs2_inode_t),
+                                          0,
+                                          PVFS2_CACHE_CREATE_FLAGS,
+                                          pvfs2_inode_cache_ctor);
 
     if (!pvfs2_inode_cache)
     {
@@ -393,17 +355,13 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
     }
 }
 
-#ifdef HAVE_AIO_VFS_SUPPORT
-
 int kiocb_cache_initialize(void)
 {
-    pvfs2_kiocb_cache = kmem_cache_create(
-        "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
-        PVFS2_CACHE_CREATE_FLAGS, NULL
-#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
-        , NULL
-#endif
-        );
+    pvfs2_kiocb_cache = kmem_cache_create("pvfs2_kiocbcache",
+                                          sizeof(pvfs2_kiocb),
+                                          0,
+                                          PVFS2_CACHE_CREATE_FLAGS,
+                                          NULL);
 
     if (!pvfs2_kiocb_cache)
     {
@@ -450,8 +408,6 @@ void kiocb_release(pvfs2_kiocb *x)
         gossip_err("kiocb_release: kmem_cache_free NULL pointer!\n");
     }
 }
-
-#endif
 
 /*
  * Local variables:

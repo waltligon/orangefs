@@ -74,7 +74,6 @@ static int pvfs2_readpage(
     return read_one_page(page);
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_readpages(
     struct file *file,
     struct address_space *mapping,
@@ -104,41 +103,20 @@ static int pvfs2_readpages(
     return 0;
 }
 
-#ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
-static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
-#else
-#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
 static void pvfs2_invalidatepage(struct page *page, 
                                  unsigned int offset,
                                  unsigned int length)
-#else
-static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
-#endif
-#endif
 {
-#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %u)\n", page, offset);
-#else
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
-                "(offset is %lu)\n", page, offset);
-#endif
 
     ClearPageUptodate(page);
     ClearPageMappedToDisk(page);
-#ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
-    return 0;
-#else
     return;
-#endif
 
 }
 
-#ifdef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
-static int pvfs2_releasepage(struct page *page, int foo)
-#else
 static int pvfs2_releasepage(struct page *page, gfp_t foo)
-#endif
 {
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_releasepage called on page %p\n", page);
     return 0;
@@ -146,30 +124,18 @@ static int pvfs2_releasepage(struct page *page, gfp_t foo)
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-#ifdef HAVE_BACKING_DEV_INFO_NAME
     .name = "pvfs2",
-#endif
     .ra_pages = 0,
-#ifdef HAVE_BDI_MEMORY_BACKED
-    /* old interface, up through 2.6.11 */
-    .memory_backed = 1 /* does not contribute to dirty memory */
-#else
     .capabilities = BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
-#endif
 };
-#endif /* !PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of address space operations */
 struct address_space_operations pvfs2_address_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    readpage : pvfs2_readpage
-#else
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
     .invalidatepage = pvfs2_invalidatepage,
     .releasepage = pvfs2_releasepage
-#endif
 };
 
 /** Change size of an object referenced by inode
@@ -210,21 +176,14 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     if (ret == 0)
     {
 
-#ifdef HAVE_INODE_SETATTR
-        ret = inode_setattr(inode, iattr);
-#else
         if ((iattr->ia_valid & ATTR_SIZE) &&
            iattr->ia_size != i_size_read(inode)) 
         {
-#ifdef HAVE_VMTRUNCATE
-            ret = vmtruncate(inode, iattr->ia_size);
-#else
             ret = inode_newsize_ok(inode, iattr->ia_size);
             if (!ret) {
               truncate_setsize(inode,iattr->ia_size);
               pvfs2_truncate(inode);
             }
-#endif
             if (ret)
                 return ret;
         }
@@ -232,14 +191,15 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         setattr_copy(inode, iattr);
         mark_inode_dirty(inode);
         ret = 0;
-#endif /* HAVE_INODE_SETATTR */
     
         gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
         if (ret == 0)
         {
             ret = pvfs2_inode_setattr(inode, iattr);
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
             if (!ret && (iattr->ia_valid & ATTR_MODE))
             {
                 /* change mod on a file that has ACLs */
@@ -252,30 +212,6 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     return ret;
 }
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-/** Linux 2.4 only equivalent of getattr
- */
-int pvfs2_revalidate(struct dentry *dentry)
-{
-    int ret = 0;
-    struct inode *inode = (dentry ? dentry->d_inode : NULL);
-
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_revalidate: called on %s\n", dentry->d_name.name);
-
-    /*
-     * A revalidate expects that all fields of the inode would be refreshed
-     * So we have no choice but to refresh all attributes.
-     */
-    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
-    if (ret)
-    {
-        /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
-        pvfs2_make_bad_inode(inode);
-    }
-    return ret;
-}
-#else
 /** Obtain attributes of an object given a dentry
  */
 int pvfs2_getattr(
@@ -294,18 +230,14 @@ int pvfs2_getattr(
      * parsed by the VFS layer.  Propigate them to our internal sb structure so
      * that we can handle lazy time updates properly.
      */
-#ifdef HAVE_MNT_NOATIME
     if(mnt->mnt_flags && MNT_NOATIME) 
     { 
         inode->i_sb->s_flags |= MS_NOATIME; 
     } 
-#endif
-#ifdef HAVE_MNT_NODIRATIME
     if(mnt->mnt_flags && MNT_NODIRATIME) 
     { 
         inode->i_sb->s_flags |= MS_NODIRATIME; 
     } 
-#endif
 
     /*
      * Similar to the above comment, a getattr also expects that all fields/attributes
@@ -329,101 +261,24 @@ int pvfs2_getattr(
     return ret;
 }
 
-#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
-
-uint32_t convert_to_pvfs2_mask(unsigned long lite_mask)
-{
-    uint32_t mask = 0;
-
-    if (SLITE_SIZET(lite_mask))
-        mask |= PVFS_ATTR_SYS_SIZE;
-    if (SLITE_ATIME(lite_mask))
-        mask |= PVFS_ATTR_SYS_ATIME;
-    if (SLITE_MTIME(lite_mask))
-        mask |= PVFS_ATTR_SYS_MTIME;
-    if (SLITE_CTIME(lite_mask))
-        mask |= PVFS_ATTR_SYS_CTIME;
-    return mask;
-}
-
-int pvfs2_getattr_lite(
-    struct vfsmount *mnt,
-    struct dentry *dentry,
-    struct kstat_lite *kstat_lite)
-{
-    int ret = -ENOENT;
-    struct inode *inode = dentry->d_inode;
-    uint32_t mask;
-
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr_lite: called on %s\n", dentry->d_name.name);
-
-    /*
-     * ->getattr_lite needs to refresh only certain fields 
-     * of the inode and that is indicated by the lite_mask
-     * field of kstat_lite structure. 
-     */
-    mask = convert_to_pvfs2_mask(kstat_lite->lite_mask);
-    ret = pvfs2_inode_getattr(inode, mask);
-    if (ret == 0)
-    {
-        generic_fillattr_lite(inode, kstat_lite);
-    }
-    else
-    {
-        /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
-        pvfs2_make_bad_inode(inode);
-    }
-    return ret;
-}
-#endif
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
-
 /** PVFS2 implementation of VFS inode operations for files */
 struct inode_operations pvfs2_file_inode_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    truncate : pvfs2_truncate,
-    setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate,
-#ifdef HAVE_XATTR
-    setxattr : pvfs2_setxattr, 
-    getxattr : pvfs2_getxattr,
-    removexattr: pvfs2_removexattr,
-    listxattr: pvfs2_listxattr,
-#endif
-#else
-#ifdef HAVE_VMTRUNCATE
-    .truncate = pvfs2_truncate,
-#endif
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
-#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
-    .getattr_lite = pvfs2_getattr_lite,
-#endif
-#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
     .setxattr = generic_setxattr,
     .getxattr = generic_getxattr,
     .removexattr = generic_removexattr,
-#else
-    .setxattr = pvfs2_setxattr,
-    .getxattr = pvfs2_getxattr,
-    .removexattr = pvfs2_removexattr,
 #endif
     .listxattr = pvfs2_listxattr,
-#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
-# if defined(PVFS_KMOD_HAVE_GET_ACL)
     .get_acl = pvfs2_get_acl,
-# endif
-#endif
-#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
-    .fill_handle = pvfs2_fill_handle,
-#endif
 #endif
 };
-
-#if defined(HAVE_IGET5_LOCKED) || defined (HAVE_IGET4_LOCKED)
 
 /*
  * Given a PVFS2 object identifier (fsid, handle), convert it into a ino_t type
@@ -458,13 +313,8 @@ int pvfs2_set_inode(struct inode *inode, void *data)
     return 0;
 }
 
-#ifdef HAVE_IGET5_LOCKED
 static int
 pvfs2_test_inode(struct inode *inode, void *data)
-#elif defined(HAVE_IGET4_LOCKED)
-static int 
-pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
-#endif
 {
     /* callbacks to determine if handles match */
     PVFS_object_ref *ref = (PVFS_object_ref *) data;
@@ -473,7 +323,6 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
     pvfs2_inode = PVFS2_I(inode);
     return (pvfs2_inode->refn.handle == ref->handle && pvfs2_inode->refn.fs_id == ref->fs_id);
 }
-#endif
 
 /*
  * Front-end to lookup the inode-cache maintained by the VFS using the PVFS2
@@ -497,48 +346,20 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
     struct inode *inode = NULL;
     unsigned long hash;
 
-#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
     hash = pvfs2_handle_hash(ref);
-#if defined(HAVE_IGET5_LOCKED)
     inode = iget5_locked(sb, hash, pvfs2_test_inode, pvfs2_set_inode, ref);
-#elif defined(HAVE_IGET4_LOCKED)
-    inode = iget4_locked(sb, hash, pvfs2_test_inode, ref);
-#endif
-#else
-    hash = (unsigned long) ref->handle;
-#ifdef HAVE_IGET_LOCKED
-    inode = iget_locked(sb, hash);
-#else
-    /* iget() internally issues a call to read_inode() */
-    inode = iget(sb, hash);
-#endif
-#endif
     if (!keep_locked)
     {
-#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
         if (inode && (inode->i_state & I_NEW))
         {
             inode->i_ino = hash; /* needed for stat etc */
-            /* iget4_locked and iget_locked dont invoke the set_inode callback.
-             * So we work around that by stashing the pvfs object reference
-             * in the inode specific private part for 2.4 kernels and invoking
-             * the setcallback explicitly for 2.6 kernels.
-             */
-#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
             if (PVFS2_I(inode)) {
                 pvfs2_set_inode(inode, ref);
             } 
-            else {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-                inode->u.generic_ip = (void *) ref;
-#endif
-            }
-#endif
             /* issue a call to read the inode */
             pvfs2_read_inode(inode);
             unlock_new_inode(inode);
         }
-#endif
     }
     gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
                  ref->handle, ref->fs_id, hash, inode->i_ino);
@@ -605,27 +426,17 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
-#ifdef HAVE_CURRENT_FSUID
         inode->i_uid = current_fsuid();
         inode->i_gid = current_fsgid();
-#else
-        inode->i_uid = current->fsuid;
-        inode->i_gid = current->fsgid;
-#endif
         inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
         inode->i_size = PAGE_CACHE_SIZE;
-#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
-        inode->i_blksize = PAGE_CACHE_SIZE;
-#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         inode->i_blocks = 0;
         inode->i_rdev = dev;
         inode->i_bdev = NULL;
         inode->i_cdev = NULL;
         inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-#endif
 
 	gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: inode %p allocated\n  "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
@@ -636,9 +447,6 @@ struct inode *pvfs2_get_custom_inode_common(
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 
-#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
-            inode->i_blksize = pvfs_bufmap_size_query();
-#endif
             inode->i_blkbits = PAGE_CACHE_SHIFT;
         }
         else if ((mode & S_IFMT) == S_IFLNK)
@@ -659,7 +467,8 @@ struct inode *pvfs2_get_custom_inode_common(
 	    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: unsupported mode\n");
             goto error;
 	}
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+/* CONFIG_FS_POSIX_ACL is in .config */
+#if defined(CONFIG_FS_POSIX_ACL)
         gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
                 llu(get_handle_from_ino(inode)));
         /* Initialize the ACLs of the new inode */
