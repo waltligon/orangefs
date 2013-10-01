@@ -2,7 +2,9 @@
 #define CACHE_INTERNAL_H
 
 #include <string.h>
+#ifndef WIN32
 #include <pthread.h>
+#endif
 #include "ncac-interface.h"
 #include "ncac-list.h"
 #include "radix.h"
@@ -325,16 +327,27 @@ del_page_from_lru(struct cache_stack *cache_stack, struct extent *page)
 
 #if defined(DEBUG) 
 
+#ifdef WIN32
+#define DPRINT(fmt, args, ...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__ ); fprintf(stderr, fmt, __VA_ARGS__); fprintf(stderr, "\n"); }
+#else
 #define DPRINT(fmt, args...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__ ); fprintf(stderr, fmt, ## args); fprintf(stderr, "\n"); }
+#endif
 
 #else
 
+#ifdef WIN32
+#define DPRINT(fmt, args, ...)
+#else
 #define DPRINT(fmt, args...)
+#endif
 
 #endif
 
-
+#ifdef WIN32
+#define NCAC_error(fmt, args, ...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); fprintf(stderr, fmt, __VA_ARGS__); fprintf(stderr, "\n");}
+#else
 #define NCAC_error(fmt, args...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); fprintf(stderr, fmt, ## args); fprintf(stderr, "\n");}
+#endif
 
 /* gets defined in internal.c.  This needs a declaration so
  * that tests can call it without warnings.
