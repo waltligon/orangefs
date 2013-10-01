@@ -63,11 +63,7 @@ int service_operation(
     DECLARE_WAITQUEUE(wait_entry, current);
 
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    op->upcall.tgid = -1;
-#else
     op->upcall.tgid = current->tgid;
-#endif
     op->upcall.pid = current->pid;
 
 
