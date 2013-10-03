@@ -148,12 +148,12 @@ AC_ARG_ENABLE(strict,
 [  --enable-strict         Turn on strict debugging with gcc],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+    CFLAGS="$CFLAGS -g -O0 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
 fi
 ],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -O2"
+    CFLAGS="$CFLAGS -g -O0"
 fi
 ])
 
