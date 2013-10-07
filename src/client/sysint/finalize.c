@@ -29,7 +29,9 @@ extern job_context_id pint_client_sm_context;
 
 extern PINT_smcb *g_smcb;
 
+#ifdef WIN32
 extern int pvfs_sys_init_flag;
+#endif
 
 /* PVFS_finalize
  *
@@ -92,7 +94,9 @@ int PVFS_sys_finalize()
 
     PINT_client_state_machine_release(g_smcb);
 
+#ifdef WIN32
     pvfs_sys_init_flag = 0;
+#endif
 
     finiflag = 1;
     

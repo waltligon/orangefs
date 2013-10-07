@@ -43,7 +43,9 @@ PINT_event_id PINT_client_sys_event_id;
 int pint_client_pid;
 
 /* set to one when init is done */
+#ifdef WIN32
 int pvfs_sys_init_flag = 0;
+#endif 
 
 typedef enum
 {
@@ -80,6 +82,9 @@ typedef enum
  */
 int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
+#ifndef WIN32
+    static int pvfs_sys_init_flag = 0; /* set to one when init is done */
+#endif
     static int pvfs_sys_init_in_progress = 0;
     static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
 
@@ -377,7 +382,9 @@ error_exit:
 
 local_exit:
 
+#ifdef WIN32
     pvfs_sys_init_in_progress = 0;
+#endif
 
     gen_mutex_unlock(&init_mutex);
 
