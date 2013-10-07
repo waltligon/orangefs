@@ -462,8 +462,8 @@ class OFSTestNode(object):
     def updateNode(self):
         #print "Distro is " + self.distro
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.addBatchCommand("sudo apt-get -y update")
-            self.addBatchCommand("sudo apt-get -y dist-upgrade < /dev/zero")
+            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y update")
+            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade < /dev/zero")
         elif "suse" in self.distro.lower():
             self.addBatchCommand("sudo zypper --non-interactive update")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
@@ -490,7 +490,7 @@ class OFSTestNode(object):
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
                 sudo bash -c "echo %s > /etc/torque/server_name"
                 sudo bash -c "echo %s > /var/spool/torque/server_name"
             ''' % (self.host_name,self.host_name)
@@ -563,7 +563,7 @@ class OFSTestNode(object):
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo apt-get install -y -q torque-client torque-mom < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom < /dev/null 
                 sudo bash -c 'echo \$pbsserver %s > /var/spool/torque/mom_priv/config' 
                 sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config' 
             ''' % pbsserver_name
@@ -681,15 +681,15 @@ class OFSTestNode(object):
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
-                sudo apt-get update > /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch < /dev/null
-                sudo apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
                 # needed for Ubuntu 10.04
-                sudo apt-get install -y -q linux-image < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
                 # will fail on Ubuntu 10.04. Run separately to not break anything
-                sudo apt-get install -y -q fuse < /dev/null
-                #sudo apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse < /dev/null
+                #sudo DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
                 sudo apt-get clean
 
                 #prepare source
@@ -1551,7 +1551,7 @@ class OFSTestNode(object):
         
         # if it's still alive, use kill -9
         
-    #============================================================================
+    #============================================================================ 
     #
     # OFSClientFunctions
     #
