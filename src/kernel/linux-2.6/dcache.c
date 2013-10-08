@@ -181,6 +181,11 @@ static int pvfs2_d_delete (const struct dentry * dentry)
 static int pvfs2_d_revalidate(struct dentry *dentry,
                               unsigned int flags)
 {
+    if (flags & LOOKUP_RCU)
+    {
+        return -ECHILD;
+    }
+
     if ((flags & LOOKUP_FOLLOW) &&
         (!(flags & LOOKUP_CREATE)))
     {
