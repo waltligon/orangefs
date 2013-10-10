@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -u
 
 #from OFSTest import *
 
@@ -52,7 +52,7 @@ if config_file != None:
         #ugly python hack
         test_driver.setConfig(kwargs={"filename":config_file})
         
-        test_driver.printConfig()
+        #test_driver.printConfig()
         #print "done"
     except ValueError:
         print "File %s could not be read or invalid format." % config_file
@@ -63,7 +63,7 @@ else:
     test_driver = OFSTestMain.OFSTestMain(OFSTestConfig.OFSTestConfig())
 
 test_driver.config.setConfigFromDict(d=argd)
-test_driver.printConfig()
+#test_driver.printConfig()
 
 #exit()
 mkdir_p(output_dir)
