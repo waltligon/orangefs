@@ -140,6 +140,37 @@ class OFSTestConfig(object):
     def setConfig(self,kwargs={}):
         pass
     
+    def addConfig(self,str_args=[]):
+        
+        # this method taks an array of strings and converts them into a dictionary
+        d = {}
+
+        
+        for line in str_args:
+            #print line
+            # ignore comments
+            if line.lstrip() == "" or (line.lstrip())[0] == '#':
+                continue
+            else:
+                (key,delim, val) = line.rstrip().partition("=")
+                
+                # translate the boolean values
+                if val.lower() == "true":
+                    d[key] = True
+                elif val.lower() == "false":
+                    d[key] = False
+                else:
+                    try:
+                        # do we have an int? 
+                        d[key] = int(val)
+                    except ValueError:
+                        # guess not. Must be a string.
+                        d[key] = val
+
+        
+        self.setConfigFromDict(d)
+        
+    
     def printDict(self):
         print self.__dict__
     

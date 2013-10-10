@@ -23,8 +23,8 @@ config_file = None
 output_dir = "."
 #print sys.argv
 optlist, args = getopt.getopt(sys.argv[1:], 'hf:d:c:')
-print optlist
-print args
+#print optlist
+#print args
 
 for o, a  in optlist:
 
@@ -37,7 +37,7 @@ for o, a  in optlist:
 		exit()
 
 # Convert arguments to a dictionary
-argd = dict([my_arg.split('=') for my_arg in args])
+#argd = dict([my_arg.split('=') for my_arg in args])
 
 #print "Output dir is %s, config file is %s" % (output_dir,config_file)
 print "==================================================================="
@@ -62,8 +62,9 @@ if config_file != None:
 else:
     test_driver = OFSTestMain.OFSTestMain(OFSTestConfig.OFSTestConfig())
 
-test_driver.config.setConfigFromDict(d=argd)
-#test_driver.printConfig()
+#Add additional configuration options from command line
+test_driver.config.addConfig(args)
+test_driver.printConfig()
 
 #exit()
 mkdir_p(output_dir)
