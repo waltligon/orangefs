@@ -171,6 +171,10 @@ class OFSEC2ConnectionManager(object):
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
         for i in instances:
+		# try:
+		# get existing external ip
+		# except:
+		# create one
             #print "Creating ip"
             address = self.ec2_connection.allocate_address(domain)
             print "Associating ext IP %s to %s with int IP %s" % (address.public_ip,i.id,i.ip_address)

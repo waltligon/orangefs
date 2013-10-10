@@ -11,8 +11,8 @@ class OFSTestConfigBuildbot(OFSTestConfig):
     def setConfig(self,kwargs={}):
 
         self.setConfigFromDict(kwargs)
+'''    
     
-    '''
         temp = None
         
         temp = kwargs.get('log_file')
@@ -74,5 +74,6 @@ class OFSTestConfigBuildbot(OFSTestConfig):
         temp = kwargs.get('pvfs2genconfig_opts')
         if temp != None:
             self.pvfs2genconfig_opts = temp
-    '''    
         
+        
+'''
