@@ -65,7 +65,7 @@ else:
 test_driver.config.setConfigFromDict(d=argd)
 test_driver.printConfig()
 
-exit()
+#exit()
 mkdir_p(output_dir)
 os.chdir(output_dir)
 
