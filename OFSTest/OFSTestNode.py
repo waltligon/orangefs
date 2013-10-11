@@ -1083,6 +1083,16 @@ class OFSTestNode(object):
             print output
             return rc
         
+        #sanity check for OFS prefix
+        rc = self.runSingleCommand("mkdir -p "+ofs_prefix)
+        if rc != 0:
+            print "Could not create directory "+ofs_prefix
+            ofs_prefix = "/home/%s/orangefs" % self.current_user
+            print "Using default %s" % ofs_prefix
+        else:
+            self.runSingleCommand("rmdir "+ofs_prefix)
+            
+        
         # get the kernel version if it has been updated
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         
