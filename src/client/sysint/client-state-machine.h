@@ -634,7 +634,7 @@ typedef struct
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input/output parameter */
     int32_t          dirent_limit;  /* input parameter */
-    int32_t      dirdata_index;      /* input parameter */
+    int32_t          dirdata_index; /* input parameter */
 } PINT_sm_readdir_state;
 
 typedef struct PINT_client_sm
@@ -675,6 +675,7 @@ typedef struct PINT_client_sm
     PVFS_object_ref parent_ref;
 
     PVFS_credential *cred_p;
+    PVFS_capability parent_capability;
 
     union
     {

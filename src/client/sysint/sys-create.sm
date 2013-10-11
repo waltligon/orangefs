@@ -608,8 +608,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_CRDIRENT_FILL(
                 msg_p->req,
                 sm_p->getattr.attr.capability,
-                sm_p->u.create.object_name,
                 *sm_p->cred_p,
+                sm_p->u.create.object_name,
                 sm_p->parent_ref.fs_id,
                 sm_p->parent_ref.handle,
                 sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
@@ -660,7 +660,7 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
         PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 
@@ -839,8 +839,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     for (tmp_i = 0; tmp_i < attr->u.dir.dist_dir_attr.num_servers; tmp_i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "                           dirdata_handle[%d] = %llu\n",
-                     tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
+                     "                           dirdata_handle[%d] = %s\n",
+                     tmp_i, PVFS_OID_str(&attr->u.dir.dirdata_handles[tmp_i]));
     }
 
     /* may just use sm_p->getattr.attr.u.dir...

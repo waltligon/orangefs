@@ -965,8 +965,9 @@ struct PVFS_servreq_mkdir
     PVFS_SID parent_sid;          /* back pointer primary sid */
     PVFS_object_attr attr;        /* initial attributes */
     PVFS_credential credential;   /* user credential */
+    PVFS_sys_layout layout;
 };
-endecode_fields_7_struct(
+endecode_fields_8_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     int32_t, num_dirent_files,
@@ -974,6 +975,7 @@ endecode_fields_7_struct(
     PVFS_handle, parent,
     PVFS_SID, parent_sid,
     PVFS_credential, credential,
+    PVFS_sys_layout, layout,
     PVFS_object_attr, attr);
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
@@ -987,6 +989,7 @@ endecode_fields_7_struct(
                                 __parent,                  \
                                 __parent_sid,              \
                                 __num_dirent_files,        \
+                                __layout,                  \
                                 __attr,                    \
                                 __hints)                   \
 do {                                                       \
@@ -1000,6 +1003,7 @@ do {                                                       \
     (__req).u.mkdir.parent = __parent;                     \
     (__req).u.mkdir.parent_sid = __parent_sid;             \
     (__req).u.mkdir.num_dirent_files = __num_dirent_files; \
+    (__req).u.mkdir.layout = __layout;                     \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;                \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\

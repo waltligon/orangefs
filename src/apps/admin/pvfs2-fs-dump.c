@@ -643,8 +643,8 @@ void verify_dirdatahandles(PVFS_fs_id cur_fs,
         ret = handlelist_find_handle(dh_handles[i], &server_idx);
         if (ret != 0)
         {
-            printf("Dirdata Handle %llu appears to be missing; "
-                   "skipping!\n", llu(dh_handles[i]));
+            printf("Dirdata Handle %s appears to be missing; "
+                   "skipping!\n", PVFS_OID_str(&dh_handles[i]));
             continue;
         }
 
@@ -1030,8 +1030,8 @@ static void print_entry(char *name,
                        server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
-                printf("\tH%llu [shape = ellipse, fillcolor = violet, style = filled, label =\"%llu (%d)\"];\n",
-                       llu(handle), llu(handle), server_idx);
+                printf("\tH%s [shape = ellipse, fillcolor = violet, style = filled, label =\"%s (%d)\"];\n",
+                       PVFS_OID_str(&handle), PVFS_OID_str(&handle), server_idx);
 		break;
 	    case PVFS_TYPE_SYMLINK:
 		break;
@@ -1050,8 +1050,8 @@ static void print_entry(char *name,
 		       server_idx);
 		break;
             case PVFS_TYPE_DIRDATA:
-                printf("  handle = %llu, type = %s, server = %d\n",
-                       llu(handle),
+                printf("  handle = %s, type = %s, server = %d\n",
+                       PVFS_OID_str(&handle),
                        get_type_str(objtype),
                        server_idx);
                 break;

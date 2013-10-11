@@ -231,7 +231,8 @@ int PINT_rcache_get_cached_index(
     int status;
 
     gossip_debug(GOSSIP_RCACHE_DEBUG, 
-                 "rcache: get_cached_entry(): [fs_id=%d,handle=%llu,token=%llu]\n",ref->fs_id, llu(ref->handle),llu(token));
+                 "rcache: get_cached_entry(): [fs_id=%d,handle=%s,token=%llu]\n",
+                 ref->fs_id, PVFS_OID_str(&ref->handle),llu(token));
   
     entry_key.ref.handle = ref->handle;
     entry_key.ref.fs_id = ref->fs_id;
@@ -244,8 +245,8 @@ int PINT_rcache_get_cached_index(
     if(ret < 0 || status != 0)
     {
         gossip_debug(GOSSIP_RCACHE_DEBUG, 
-                "rcache: miss: [fs_id=%d,handle=%llu,token=%llu]\n",
-                ref->fs_id, llu(ref->handle),llu(token));
+                "rcache: miss: [fs_id=%d,handle=%s,token=%llu]\n",
+                ref->fs_id, PVFS_OID_str(&ref->handle),llu(token));
         PINT_perf_count(rcache_pc, PERF_RCACHE_MISSES, 1, PINT_PERF_ADD);
         gen_mutex_unlock(&rcache_mutex);
         /* Return -PVFS_ENOENT if the entry has expired */
@@ -272,16 +273,17 @@ int PINT_rcache_get_cached_index(
 /**
  * Invalidates a cache entry (if present)
  */
-void PINT_rcache_invalidate(
-    const PVFS_object_ref* ref,
-    const PVFS_ds_position token)
+void PINT_rcache_invalidate(const PVFS_object_ref *ref,
+                            const PVFS_ds_position token)
 {
     int ret = -1;
     struct PINT_tcache_entry* tmp_entry;
     struct rcache_key entry_key;
     int tmp_status;
   
-    gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: invalidate(): handle=%llu, token=%llu\n", llu(ref->handle), llu(token));
+    gossip_debug(GOSSIP_RCACHE_DEBUG,
+                 "rcache: invalidate(): handle=%s, token=%llu\n",
+                 PVFS_OID_str(&ref->handle), llu(token));
   
     gen_mutex_lock(&rcache_mutex);
   
@@ -297,12 +299,16 @@ void PINT_rcache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(rcache, tmp_entry);
-        PINT_perf_count(rcache_pc, PERF_RCACHE_DELETIONS, 1,
+        PINT_perf_count(rcache_pc,
+                        PERF_RCACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
     }
 
-    PINT_perf_count(rcache_pc, PERF_RCACHE_NUM_ENTRIES,
-                    rcache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(rcache_pc,
+                    PERF_RCACHE_NUM_ENTRIES,
+                    rcache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&rcache_mutex);
     return;
@@ -351,17 +357,20 @@ assert(enabled == 1);
     }
 #endif
     
-    gossip_debug(GOSSIP_RCACHE_DEBUG, "rcache: insert(): handle=%llu, token=%llu\n", llu(ref->handle), llu(token));
+    gossip_debug(GOSSIP_RCACHE_DEBUG,
+                 "rcache: insert(): handle=%s, token=%llu\n",
+                 PVFS_OID_str(&ref->handle), llu(token));
   
     /* the token cannot be the kickstart value */
-    if(!ref->handle || token == PVFS_ITERATE_START)
+    if(!PVFS_OID_cmp(&ref->handle, &PVFS_HANDLE_NULL) ||
+       token == PVFS_ITERATE_START)
     {
         return(-PVFS_EINVAL);
     }
   
     /* create new payload with updated information */
     tmp_payload = (struct rcache_payload*) 
-                        calloc(1,sizeof(struct rcache_payload));
+                        calloc(1, sizeof(struct rcache_payload));
     if(tmp_payload == NULL)
     {
         return(-PVFS_ENOMEM);
@@ -453,13 +462,13 @@ static int rcache_compare_key_entry(void* key, struct qhash_head* link)
     tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
     assert(tmp_entry);
 
-    tmp_payload = (struct rcache_payload*)tmp_entry->payload;
+    tmp_payload = (struct rcache_payload *)tmp_entry->payload;
      /* If the following aren't equal, we know we don't have a match
      *   - ref.handle 
      *   - ref.fs_id
      *   - token
      */
-    if( real_key->ref.handle  != tmp_payload->ref.handle ||
+    if( !PVFS_OID_cmp(&real_key->ref.handle, &tmp_payload->ref.handle) ||
         real_key->ref.fs_id   != tmp_payload->ref.fs_id  ||
         real_key->token != tmp_payload->token )
     {
@@ -491,13 +500,21 @@ do { \
  * hash function for character pointers
  *
  * returns hash index 
+ *
+ * This is a little odd for OIDs - we hash the OID to get a 64bit
+ * value that is then hashed again.  Should be fine, AFAIK but
+ * maybe is a little slow.  If that turns out to be the case we
+ * can investigate something better.
  */
 static int rcache_hash_key(void* key, int table_size)
 {
+    uint64_t handle_hash;
     struct rcache_key* key_entry = (struct rcache_key*) key;
 
-    uint32_t a = (uint32_t)(key_entry->ref.handle >> 32);
-    uint32_t b = (uint32_t)(key_entry->ref.handle & 0x00000000FFFFFFFF);
+    handle_hash = PVFS_OID_hash64(&key_entry->ref.handle);
+
+    uint32_t a = (uint32_t)(handle_hash >> 32);
+    uint32_t b = (uint32_t)(handle_hash & 0x00000000FFFFFFFF);
     uint32_t c = (uint32_t)(key_entry->token);
 
     mix(a,b,c);

@@ -151,7 +151,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             dest->u.dir.dirent_count = src->u.dir.dirent_count;
         }
-        if (src->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+        if (src->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
             PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr, src->u.dir.dist_dir_attr);
 
@@ -159,7 +159,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 sizeof(PVFS_dist_dir_bitmap_basetype);
             if (dist_dir_bitmap_size)
             {
-                if ((dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) &&
+                if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
                     dest->u.dir.dist_dir_attr.num_servers > 0)
                 {
                     if (dest->u.dir.dist_dir_bitmap)
@@ -186,7 +186,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
             if (dirent_handles_array_size)
             {
-                if ((dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) &&
+                if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
                     dest->u.dir.dist_dir_attr.num_servers > 0)
                 {
                     if (dest->u.dir.dirdata_handles)
@@ -492,7 +492,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.dir.hint.dist_params = NULL;
                 }
             }
-            if (attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+            if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
             {   
                 if (attr->u.dir.dist_dir_bitmap)
                 {   

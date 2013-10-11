@@ -12,6 +12,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-types.h"
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -159,7 +160,7 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
-    sm_p->u.readdir.readdir_resp = resp;
+    sm_p->readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
 
     /*
@@ -167,7 +168,7 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
      */
     server_config = PINT_get_server_config_struct(ref.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
-    sm_p->u.readdir.meta_sid_count = cur_fs->metadata_replication_factor;
+    sm_p->readdir.meta_sid_count = cur_fs->metadata_replication_factor;
     PINT_put_server_config_struct(server_config);
 
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -177,16 +178,16 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
                   &ref.handle);
 
     /* point the sm dirent array and outcount to the readdir response field */
-    sm_p->readdir.dirent_array = &resp->dirent_array;
-    sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
-    sm_p->readdir.sid_array = &resp->sid_array;
-    sm_p->readdir.sid_count = &resp->sid_count;
-    sm_p->readdir.token = &resp->token;
-    sm_p->readdir.directory_version = &resp->directory_version;
+    sm_p->readdir_state.dirent_array = &resp->dirent_array;
+    sm_p->readdir_state.dirent_outcount = &resp->pvfs_dirent_outcount;
+    sm_p->readdir_state.sid_array = &resp->sid_array;
+    sm_p->readdir_state.sid_count = &resp->sid_count;
+    sm_p->readdir_state.token = &resp->token;
+    sm_p->readdir_state.directory_version = &resp->directory_version;
 
-    sm_p->readdir.pos_token = sm_p->u.readdir.pos_token = token;
-    sm_p->readdir.dirent_limit = sm_p->u.readdir.dirent_limit =
-                                 pvfs_dirent_incount;
+    sm_p->readdir_state.pos_token = sm_p->readdir.pos_token = token;
+    sm_p->readdir_state.dirent_limit = sm_p->readdir.dirent_limit =
+                                                     pvfs_dirent_incount;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
                  "%s on fs %d\n", PVFS_OID_str(&ref.handle), ref.fs_id);
@@ -271,7 +272,7 @@ static int readdir_msg_comp_fn(void *v_p,
         sm_p->readdir_state.pos_token = resp_p->u.readdir.token;
         sm_p->readdir.pos_token = resp_p->u.readdir.token;
         *(sm_p->readdir_state.directory_version) =
-            resp_p->u.readdir.directory_version;
+                         resp_p->u.readdir.directory_version;
         sm_p->readdir_state.dirdata_index = sm_p->readdir.dirdata_index;
 
         gossip_debug(GOSSIP_READDIR_DEBUG, 
@@ -312,15 +313,15 @@ static int readdir_msg_comp_fn(void *v_p,
     *(sm_p->readdir_state.dirent_outcount) +=
                         resp_p->u.readdir.dirent_count;
 
-    if (*sm_p->readdir.sid_count > 0)
+    if (*sm_p->readdir_state.sid_count > 0)
     {
-        int sid_array_len = (sizeof(PVFS_SID) * *sm_p->readdir.sid_count);
+        int sid_array_len = (sizeof(PVFS_SID) * *sm_p->readdir_state.sid_count);
 
         /* this dirent_array MUST be freed by caller */
-        *sm_p->readdir.sid_array = (PVFS_SID *)malloc(sid_array_len);
-        assert(*sm_p->readdir.sid_array);
+        *sm_p->readdir_state.sid_array = (PVFS_SID *)malloc(sid_array_len);
+        assert(*sm_p->readdir_state.sid_array);
 
-        memcpy(*sm_p->readdir.sid_array,
+        memcpy(*sm_p->readdir_state.sid_array,
                resp_p->u.readdir.sid_array,
                sid_array_len);
     }
@@ -422,8 +423,8 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
         }
         gossip_debug(GOSSIP_READDIR_DEBUG,
                 "*** get cached index from rcache, "
-                "[handle %llu, token %llu, dirdata_index %d]\n",
-                llu(sm_p->object_ref.handle),
+                "[handle %s, token %llu, dirdata_index %d]\n",
+                PVFS_OID_str(&sm_p->object_ref.handle),
                 llu(sm_p->readdir_state.pos_token),
                 dirdata_index);
     }
@@ -440,7 +441,7 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                PVFS_ATTR_DIR_ALL | PVFS_ATTR_CAPABILITY |
-                                      PVFS_ATTR_DISTDIR_ATTR,
+                                                   PVFS_ATTR_DISTDIR_ATTR,
                                PVFS_TYPE_DIRECTORY,
                                0);
     
@@ -655,9 +656,9 @@ static PINT_sm_action readdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         gossip_debug(
                 GOSSIP_READDIR_DEBUG,
                 "readdir: posting dirdata readdir[%d]  "
-                "%llu|%llu(#%d)|%d | token is %llu | limit is %d\n",
-                i, PVFS_OID_str(sm_p->object_ref.handle),
-                PVFS_OID_str(sm_p->getattr.attr.u.dir.dirdata_handles[
+                "%s|%s(#%d)|%d | token is %llu | limit is %d\n",
+                i, PVFS_OID_str(&sm_p->object_ref.handle),
+                PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                               tmp_dirdata_index_array[i]]),
                 (tmp_dirdata_index_array[i]),
                 sm_p->object_ref.fs_id,
@@ -737,11 +738,12 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
     {
         /* insert all handles into the ncache while we have them */
         tmp_ref.fs_id = sm_p->object_ref.fs_id;
-        tmp_ref.sid_count = sm_p->u.readdir.meta_sid_count;
+        tmp_ref.sid_count = sm_p->readdir.meta_sid_count;
         for(i = 0; i < *(sm_p->readdir_state.dirent_outcount); i++)
         {
             tmp_ref.handle = (*(sm_p->readdir_state.dirent_array))[i].handle;
-            tmp_ref.sid_array = sm_p->readdir.sid_array[i * tmp_ref.sid_count];
+            tmp_ref.sid_array = sm_p->readdir_state.sid_array[
+                                                      i * tmp_ref.sid_count];
             PINT_ncache_update(
                 (const char *) (*(sm_p->readdir_state.dirent_array))[i].d_name,
                 (const PVFS_object_ref *) &(tmp_ref),
@@ -760,8 +762,8 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
 
             gossip_debug(GOSSIP_READDIR_DEBUG, 
                     "*** insert entry into rcache, "
-                    "[handle %llu, token %llu, dirdata_index %d]\n",
-                    llu(sm_p->object_ref.handle),
+                    "[handle %s, token %llu, dirdata_index %d]\n",
+                    PVFS_OID_str(&sm_p->object_ref.handle),
                     llu(*(sm_p->readdir_state.token)),
                     sm_p->readdir.dirdata_index);
         }

@@ -210,7 +210,7 @@ static PINT_sm_action mgmt_remove_dirent_init(struct PINT_smcb *smcb,
         sm_p->getattr,
         sm_p->parent_ref,
         PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
-            PVFS_ATTR_CAPABILITY | PVFS_ATTR_DIR_DISTDIR_ATTR, 
+            PVFS_ATTR_CAPABILITY | PVFS_ATTR_DISTDIR_ATTR, 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -288,30 +288,6 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mgmt_remove_dirent_cleanup(struct PINT_smcb *smcb,
-                                                 job_status_s *js_p)
-{
-    PINT_smcb *smcb = v_p;
-#ifdef WIN32
-    PINT_client_sm *sm_p =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-#else
-    PINT_client_sm *sm_p __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-#endif
-    assert(resp_p->op == PVFS_SERV_MGMT_REMOVE_DIRENT);
-
-    if (resp_p->status == 0)
-    {
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG,
-            "  mgmt_remove_dirent_comp_fn: dirent %s under %llu,%d "
-            "removed\n", sm_p->u.mgmt_remove_dirent.entry,
-            llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
-    }
-    return resp_p->status;
-}
-
 static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {           
@@ -331,7 +307,7 @@ static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
                 sm_p->getattr,
                 sm_p->parent_ref,
                 PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 

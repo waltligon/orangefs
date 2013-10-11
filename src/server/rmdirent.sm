@@ -101,8 +101,8 @@ machine pvfs2_rmdirent_sm
 
 %%
 
-static PINT_sm_action rmdirent_get_dirdata_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {       
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -110,8 +110,8 @@ static PINT_sm_action rmdirent_get_dirdata_attr(
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for dirdata handle %llu\n",
-                 OVS_OID_str(s_op->req->u.rmdirent.dirent_handle));         
+                 "for dirdata handle %s\n",
+                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle));         
 
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
                                    s_op->req->u.rmdirent.dirent_handle,
@@ -156,9 +156,9 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dist_dir_attr (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.rmdirent.fs_id,
-                 PVFS_OID_str(s_op->req->u.rmdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -200,10 +200,10 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-            "rmdirent: get dist-dir-attr for dirdata handle %llu "
+            "rmdirent: get dist-dir-attr for dirdata handle %s "
             "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            llu(s_op->req->u.rmdirent.dirent_handle),
+            PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
             attr_p->u.dir.dist_dir_attr.tree_height,
             attr_p->u.dir.dist_dir_attr.num_servers,
             attr_p->u.dir.dist_dir_attr.bitmap_size,
@@ -223,7 +223,7 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     }
 
     /* set up attr->mask */
-    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     /* set up key and value structures for reading dirdata bitmap */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -242,9 +242,9 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dirdata bitmap (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.rmdirent.fs_id,
-                 PVFS_OID_str(s_op->req->u.rmdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -252,9 +252,10 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
                                 s_op->req->u.rmdirent.dirent_handle,
                                 &s_op->key,
                                 &s_op->val,
-                                NULL,
+                                0,    /* flags */
+                                NULL, /* vtag */
                                 smcb,
-                                0,
+                                0,    /* status_user_tag */
                                 js_p,
                                 &j_id,
                                 server_job_context,
@@ -278,7 +279,6 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     job_id_t j_id;
     TROVE_ds_flags flags;
     int i;
-    unsigned char *c;
     PVFS_object_attr *attr_p;
     
     attr_p = &s_op->attr;
@@ -287,7 +287,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG, "rmdirent: dist_dir_bitmap as:\n");
     for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
-        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        unsigned char *c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);

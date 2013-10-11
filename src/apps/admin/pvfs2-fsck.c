@@ -634,8 +634,8 @@ int match_dirdata(struct handlelist *hl,
 
         if ((!in_main_list) && (!in_alt_list))
         {
-            printf("# dirdata handle %llu missing from list\n",
-                   llu(dh_handles[i]));
+            printf("# dirdata handle %s missing from list\n",
+                   PVFS_OID_str(&dh_handles[i]));
             /* if possible, rebuild the dirdata handle. */
             /* otherwise delete dirdata, return error to get
              * directory and dirent removed.
@@ -648,7 +648,8 @@ int match_dirdata(struct handlelist *hl,
 
     for (i = 0; i < dh_count; i++)
     {
-        if (dh_handles[i] != PVFS_HANDLE_NULL) {
+        if (PVFS_OID_cmp(&dh_handles[i], &PVFS_HANDLE_NULL))
+        {
             /* TODO: THIS IS A HACK; NEED BETTER WAY TO REMOVE FROM
              * ONE OF TWO LISTS...
              */
@@ -659,7 +660,8 @@ int match_dirdata(struct handlelist *hl,
                                          dh_handles[i],
                                          server_idx);
             }
-            else {
+            else
+            {
                 handlelist_remove_handle(alt_hl,
                                          dh_handles[i],
                                          server_idx);
@@ -986,7 +988,8 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 		break;
 	    case PVFS_TYPE_DIRECTORY:
 		/* add to directory list */
-		printf("# looking for dirdata array for %llu.\n", llu(handle));
+		printf("# looking for dirdata array for %s.\n",
+                       PVFS_OID_str(&handle));
 
                 descend(cur_fs,
                         hl_all,
@@ -1252,6 +1255,7 @@ int create_dirent(PVFS_object_ref dir_ref,
                   PVFS_credential *creds)
 {
     int ret;
+    PVFS_SID *sid_array = NULL; /* V3 FIX THIS!! */
 
     printf("* %s creating new reference to %s (%s) in %s.\n",
            fsck_opts->destructive ? "" : "not",
@@ -1261,7 +1265,12 @@ int create_dirent(PVFS_object_ref dir_ref,
 
     if (fsck_opts->destructive)
     {
-        ret = PVFS_mgmt_create_dirent(dir_ref, name, handle, creds, NULL);
+        ret = PVFS_mgmt_create_dirent(dir_ref,
+                                      name,
+                                      handle,
+                                      sid_array, /* V3 FIX THIS!!! */
+                                      creds,
+                                      NULL);
         if (ret != 0)
         {
             PVFS_perror("PVFS_mgmt_create_dirent", ret);

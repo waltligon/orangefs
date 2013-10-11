@@ -956,7 +956,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
                     decode_free(req->u.setattr.attr.u.meta.dfile_array);
                 if (req->u.setattr.attr.mask
-                        & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                        & PVFS_ATTR_DISTDIR_ATTR)
                 {
                     if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
                     {
@@ -1113,7 +1113,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
                     if (resp->u.getattr.attr.mask
-                         & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                         & PVFS_ATTR_DISTDIR_ATTR)
                     {
                        decode_free
                         (resp->u.getattr.attr.u.dir.dist_dir_bitmap);

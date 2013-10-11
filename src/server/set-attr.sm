@@ -332,7 +332,7 @@ static PINT_sm_action setattr_verify_attribs(
                     "need to send to dirdata objects.\n");
             js_p->error_code = STATE_DIRECTORY;
         }
-        if((req_a_p->mask & PVFS_ATTR_DIR_DISTDIR_ATTR))
+        if((req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG,
                     "  It's changing dist dir attrs\n.");
@@ -373,7 +373,7 @@ static PINT_sm_action setattr_verify_attribs(
             a_p->u.dir.dist_dir_attr.num_servers, req_a_p->u.dir.dist_dir_attr.num_servers);
 
         /* copy the distributed directory attributes before writing this object */
-        if (req_a_p->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+        if (req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
             PINT_dist_dir_attr_copyto(a_p->u.dir.dist_dir_attr,
                                       req_a_p->u.dir.dist_dir_attr);
@@ -408,7 +408,7 @@ static PINT_sm_action setattr_verify_attribs(
             memcpy(a_p->u.dir.dirdata_handles, req_a_p->u.dir.dirdata_handles,
                 a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
 
-            a_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+            a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRDATA;
         }
         else
@@ -678,7 +678,7 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     js_p->error_code = 0;
 
     /* if we don't need to write the distr_dir struct, skip it */
-    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_DIR_DISTDIR_ATTR))
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping distr dir struct write\n");
@@ -871,7 +871,7 @@ static PINT_sm_action setattr_get_dirdata_handles(
     }
 
     /* set up attr->mask */
-    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
 
     /* set up key and value structures for reading dirdata handles */

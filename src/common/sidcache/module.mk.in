@@ -2,7 +2,8 @@ DIR := src/common/sidcache
 
 CSRC := \
         $(DIR)/policyeval.c \
-        $(DIR)/sidcache.c
+        $(DIR)/sidcache.c \
+        $(DIR)/pvfs-sid.c 
 
 CLIENT_PYCGEN := \
         $(DIR)/example2.c

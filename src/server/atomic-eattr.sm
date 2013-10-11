@@ -491,9 +491,9 @@ static int atomiceattr_verify_eattribs(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                 "  ext attr list write to handle %llu refers to a %s\n\t"
+                 "  ext attr list write to handle %s refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 llu(s_op->req->u.atomiceattr.handle),
+                 PVFS_OID_str(&s_op->req->u.atomiceattr.handle),
                  PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
@@ -563,30 +563,28 @@ static int atomiceattr_setobj_eattribs(
     PVFS_ds_flags trove_flags = 0;
     job_id_t j_id;
 
-    gossip_debug(
-        GOSSIP_SETEATTR_DEBUG,
-        "  writing keylist [%llu,%d,len %d flags %d]\n",
-        llu(s_op->req->u.atomiceattr.handle),
-        s_op->req->u.atomiceattr.fs_id,
-        s_op->req->u.atomiceattr.nkey, s_op->req->u.atomiceattr.flags);
+    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                 "  writing keylist [%s,%d,len %d flags %d]\n",
+                 PVFS_OID_str(&s_op->req->u.atomiceattr.handle),
+                 s_op->req->u.atomiceattr.fs_id,
+                 s_op->req->u.atomiceattr.nkey, s_op->req->u.atomiceattr.flags);
 
     trove_flags |= TROVE_ONLYOVERWRITE;
     trove_flags |= TROVE_SYNC;
 
-    ret = job_trove_keyval_write_list(
-        s_op->req->u.atomiceattr.fs_id,
-        s_op->req->u.atomiceattr.handle,
-        s_op->req->u.atomiceattr.key,
-        s_op->req->u.atomiceattr.val,
-        s_op->req->u.atomiceattr.nkey,
-        trove_flags,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    ret = job_trove_keyval_write_list(s_op->req->u.atomiceattr.fs_id,
+                                      s_op->req->u.atomiceattr.handle,
+                                      s_op->req->u.atomiceattr.key,
+                                      s_op->req->u.atomiceattr.val,
+                                      s_op->req->u.atomiceattr.nkey,
+                                      trove_flags,
+                                      NULL,
+                                      smcb,
+                                      0,
+                                      js_p,
+                                      &j_id,
+                                      server_job_context,
+                                      s_op->req->hints);
 
     return ret;
 }

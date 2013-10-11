@@ -196,8 +196,7 @@ int iocommon_lookup_absolute(const char *abs_path,
         /* looking up the mountpoint, the PVFS root dir */
         /* which is known and stored in configuration */
         ref->fs_id = Ppath->fs_id;
-        rc = PINT_cached_config_get_root_handle(Ppath->fs_id,
-                                                &ref->handle);
+        rc = PINT_cached_config_get_root_ref(Ppath->fs_id, ref);
         /* return rc; */
         goto cleanup;
     }

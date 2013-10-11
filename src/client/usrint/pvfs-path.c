@@ -80,7 +80,7 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
     Ppath->pvfs_path = NULL;
     Ppath->filename = NULL;
     Ppath->fs_id = PVFS_FS_ID_NULL;
-    Ppath->handle = 0;
+    Ppath->handle = PVFS_HANDLE_NULL;
     memset(link_path, 0, PVFS_PATH_MAX + 1);
     /* as we expand the path we will be resolving and looking up
      * each segment, each segment is considered qualified as we
@@ -134,7 +134,7 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
             Ppath->pvfs_path = NULL;
             Ppath->filename = NULL;
             Ppath->fs_id = PVFS_FS_ID_NULL;
-            Ppath->handle = 0;
+            Ppath->handle = PVFS_HANDLE_NULL;
             continue;
         }   
         /* Safely copy the next pathname component. */
@@ -297,7 +297,7 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                 Ppath->pvfs_path = NULL;
                 Ppath->filename = NULL;
                 Ppath->fs_id = PVFS_FS_ID_NULL;
-                Ppath->handle = 0;
+                Ppath->handle = PVFS_HANDLE_NULL;
             }
             else
             {

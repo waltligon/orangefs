@@ -94,7 +94,8 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
     int j;
     TROVE_ds_flags keyval_flags;
 
-    assert(s_op->req->u.mgmt_split_dirent.dest_dirent_handle);
+    assert(PVFS_OID_cmp(&s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
+                        &PVFS_HANDLE_NULL));
 
     js_p->error_code = 0;
 
@@ -132,21 +133,22 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
         if (! s_op->req->u.mgmt_split_dirent.undo)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
-                     "for %s (handle = %llu) to dirdata dspace %llu\n",
-                     s_op->req->u.mgmt_split_dirent.entry_names[j],
-                     llu(s_op->req->u.mgmt_split_dirent.entry_handles[j]),
-                     llu(s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
+                "for %s (handle = %s) to dirdata dspace %s\n",
+                s_op->req->u.mgmt_split_dirent.entry_names[j],
+                PVFS_OID_str(&s_op->req->u.mgmt_split_dirent.entry_handles[j]),
+                PVFS_OID_str(&s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
         }
         else
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "  deleting directory entry "
-                     "(handle = %llu) from dirdata dspace %llu\n",
-                     llu(s_op->req->u.mgmt_split_dirent.entry_handles[j]),
-                     llu(s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
+                "(handle = %s) from dirdata dspace %s\n",
+                PVFS_OID_str(&s_op->req->u.mgmt_split_dirent.entry_handles[j]),
+                PVFS_OID_str(&s_op->req->u.mgmt_split_dirent.dest_dirent_handle));
         }
 
         s_op->key_a[j].buffer = s_op->req->u.mgmt_split_dirent.entry_names[j];
-        s_op->key_a[j].buffer_sz = strlen(s_op->req->u.mgmt_split_dirent.entry_names[j]) + 1;
+        s_op->key_a[j].buffer_sz =
+                    strlen(s_op->req->u.mgmt_split_dirent.entry_names[j]) + 1;
 
         s_op->val_a[j].buffer = &s_op->req->u.mgmt_split_dirent.entry_handles[j];
         s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);

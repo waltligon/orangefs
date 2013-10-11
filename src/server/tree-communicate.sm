@@ -270,30 +270,33 @@ static PINT_sm_action tree_communicate_partition_handles(
             switch (operation)
             {
             case PVFS_SERV_TREE_SETATTR:
-                PVFS_sys_attr dummy_sys_attr;
+                {
+                    PVFS_sys_attr dummy_sys_attr;
+                 
+                    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
                 
-                memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
-                
-                PINT_SERVREQ_SETATTR_FILL(
-                        *req,
-                        s_op->req->capability,
-                        s_op->req->u.tree_setattr.credential,
-                        fs_id,
-                        s_op->u.tree_communicate.handle_array_local[0],
-                        this_req->u.tree_setattr.objtype,
-                        dummy_sys_attr,
-                        0,
-                        s_op->req->hints);
+                    PINT_SERVREQ_SETATTR_FILL(
+                                   *req,
+                                   s_op->req->capability,
+                                   s_op->req->u.tree_setattr.credential,
+                                   fs_id,
+                                   s_op->u.tree_communicate.handle_array_local[0],
+                                   0,    /* V3 sid count */
+                                   NULL, /* V3 sid array */
+                                   this_req->u.tree_setattr.objtype,
+                                   dummy_sys_attr,
+                                   0,
+                                   s_op->req->hints);
                     
-                /* copy to req->u.setattr.attr because of calling
-                 * pvfs2_set_attr_work_sm next
-                 */
-                PINT_copy_object_attr(&req->u.setattr.attr,
-                        &this_req->u.tree_setattr.attr);
-                req->u.setattr.attr.objtype = 
-                        this_req->u.tree_setattr.objtype;
-                req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
-                
+                    /* copy to req->u.setattr.attr because of calling
+                    * pvfs2_set_attr_work_sm next
+                    */
+                    PINT_copy_object_attr(&req->u.setattr.attr,
+                                          &this_req->u.tree_setattr.attr);
+                    req->u.setattr.attr.objtype = 
+                                          this_req->u.tree_setattr.objtype;
+                    req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
+                }
                 break;
             
             case PVFS_SERV_TREE_REMOVE:
@@ -429,16 +432,18 @@ static PINT_sm_action tree_communicate_partition_handles(
             {
             case PVFS_SERV_TREE_SETATTR:
                 PINT_SERVREQ_TREE_SETATTR_FILL(
-                        msg_p->req,
-                        s_op->req->capability,
-                        this_req->u.tree_setattr.credential,
-                        fs_id,
-                        this_req->u.tree_setattr.objtype,
-                        this_req->u.tree_setattr.attr,
-                        num_data_files_for_this_server,
-                        &s_op->u.tree_communicate.handle_array_remote[
-                                            i * num_files_per_server],
-                        s_op->req->hints);
+                                msg_p->req,
+                                s_op->req->capability,
+                                this_req->u.tree_setattr.credential,
+                                fs_id,
+                                this_req->u.tree_setattr.objtype,
+                                this_req->u.tree_setattr.attr,
+                                num_data_files_for_this_server,
+                                &s_op->u.tree_communicate.handle_array_remote[
+                                                    i * num_files_per_server],
+                                0,    /* V3 sid count */
+                                NULL, /* V3 sid array */
+                                s_op->req->hints);
 
                 msg_p->comp_fn = NULL;
                 msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
@@ -453,8 +458,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[
                                         i * num_files_per_server],
-                        s_op->u.tree_communicate.sid_count, /* FIXME */
-                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        s_op->u.tree_communicate.sid_count, /* V3 FIXME */
+                        s_op->u.tree_communicate.sid_array, /* V3 FIXME */
                         s_op->req->hints);
 
                 msg_p->comp_fn = NULL;
@@ -549,7 +554,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -558,14 +563,14 @@ static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
 
     return (tree_communicate_partition_handles(
                                 smcb,
-                                js_p, s_op->req->u.tree_setattr.num_servers,
+                                js_p,
+                                s_op->req->u.tree_setattr.num_servers,
                                 s_op->req->u.tree_setattr.fs_id,
                                 PVFS_SERV_TREE_SETATTR,
                                 s_op->req->u.tree_setattr.handle_array));
 }
 
-static int tree_setattr_work_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int tree_setattr_work_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* get frame from bottom of stack */
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -577,7 +582,8 @@ static int tree_setattr_work_cleanup(
     for (i = 0; i < s_op->num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-        if (task_id == REMOTE_OPERATION) {
+        if (task_id == REMOTE_OPERATION)
+        {
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
         }
         free(old_frame);
@@ -586,14 +592,13 @@ static int tree_setattr_work_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static int tree_setattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int tree_setattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
 }
 
-static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb, job_status_s *js_p)
->>>>>>> .merge-right.r9977
+static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -608,8 +613,7 @@ static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb, job_status_s *js
                                        s_op->req->u.tree_remove.handle_array));
 }
 
-static int tree_remove_work_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int tree_remove_work_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* get frame from bottom of stack */
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -967,9 +971,9 @@ static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
    return(server_state_machine_complete(smcb));
 }
 
-static inline int PINT_get_object_ref_tree_remove(struct PVFS_server_req *req,
-                                                  PVFS_fs_id *fs_id,
-                                                  PVFS_handle *handle)
+static inline int PINT_get_object_ref_tree_setattr(struct PVFS_server_req *req,
+                                                   PVFS_fs_id *fs_id,
+                                                   PVFS_handle *handle)
 {   
     *fs_id = req->u.tree_setattr.fs_id;
     *handle = req->u.tree_setattr.handle_array[0];

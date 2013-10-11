@@ -72,7 +72,8 @@ machine pvfs2_mgmt_get_dirent_sm
 %%
 
 static PINT_sm_action mgmt_get_dirent_get_dist_dir_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                               struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -93,17 +94,24 @@ static PINT_sm_action mgmt_get_dirent_get_dist_dir_attr(
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dist_dir_attr (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.mgmt_get_dirent.fs_id, llu(s_op->req->u.mgmt_get_dirent.handle),
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.mgmt_get_dirent.fs_id,
+                 PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.mgmt_get_dirent.fs_id, s_op->req->u.mgmt_get_dirent.handle,
-        &s_op->key, &s_op->val,
-        0,
-        NULL, smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->req->u.mgmt_get_dirent.fs_id,
+                                s_op->req->u.mgmt_get_dirent.handle,
+                                &s_op->key,
+                                &s_op->val,
+                                0,
+                                NULL,
+                                smcb,
+                                0,
+                                js_p,
+                                &j_id,
+                                server_job_context,
+                                s_op->req->hints);
 
     return ret;
 }
@@ -121,7 +129,9 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "mgmt_get_dirent: no DIST_DIR_ATTR key present in "
+                     "dirdata handle!!\n");
         attr_p->u.dir.dist_dir_bitmap = NULL;
         attr_p->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
@@ -130,16 +140,16 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
     assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "mgmt_get_dirent: get dist-dir-attr for dirdata handle %llu "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
-            llu(s_op->req->u.mgmt_get_dirent.handle),
-            attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
-            attr_p->u.dir.dist_dir_attr.bitmap_size,
-            attr_p->u.dir.dist_dir_attr.split_size,
-            attr_p->u.dir.dist_dir_attr.server_no,
-            attr_p->u.dir.dist_dir_attr.branch_level);
+                 "mgmt_get_dirent: get dist-dir-attr for dirdata handle %s "
+                 "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                 "split_size=%d, server_no=%d and branch_level=%d\n",
+                 PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
+                 attr_p->u.dir.dist_dir_attr.tree_height,
+                 attr_p->u.dir.dist_dir_attr.num_servers,
+                 attr_p->u.dir.dist_dir_attr.bitmap_size,
+                 attr_p->u.dir.dist_dir_attr.split_size,
+                 attr_p->u.dir.dist_dir_attr.server_no,
+                 attr_p->u.dir.dist_dir_attr.branch_level);
 
     /* allocate space for dirdata bitmap */
     attr_p->u.dir.dirdata_handles = NULL; 
@@ -153,7 +163,7 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
     }
 
     /* set up attr->mask */
-    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     /* set up key and value structures for reading dirdata bitmap */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -164,25 +174,31 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
     }
 
     s_op->val.buffer = attr_p->u.dir.dist_dir_bitmap;
-    s_op->val.buffer_sz = 
-        attr_p->u.dir.dist_dir_attr.bitmap_size *
-        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val.buffer_sz = attr_p->u.dir.dist_dir_attr.bitmap_size *
+                          sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
 
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dirdata bitmap (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.mgmt_get_dirent.fs_id, llu(s_op->req->u.mgmt_get_dirent.handle),
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.mgmt_get_dirent.fs_id,
+                 PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.mgmt_get_dirent.fs_id, s_op->req->u.mgmt_get_dirent.handle,
-        &s_op->key, &s_op->val,
-        0,
-        NULL, smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->req->u.mgmt_get_dirent.fs_id,
+                                s_op->req->u.mgmt_get_dirent.handle,
+                                &s_op->key,
+                                &s_op->val,
+                                0,
+                                NULL,
+                                smcb,
+                                0,
+                                js_p,
+                                &j_id,
+                                server_job_context,
+                                s_op->req->hints);
 
     return ret;
 }
@@ -221,22 +237,24 @@ static int mgmt_get_dirent(
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(s_op->req->u.mgmt_get_dirent.entry);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: encrypt dirent %s into hash value %llu.\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "mgmt_get_dirent: encrypt dirent %s into hash value %llu.\n",
             s_op->req->u.mgmt_get_dirent.entry,
             llu(dirdata_hash));
 
-    dirdata_server_index = 
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &attr_p->u.dir.dist_dir_attr,
-            attr_p->u.dir.dist_dir_bitmap);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+    dirdata_server_index = PINT_find_dist_dir_bucket(
+                                              dirdata_hash,
+                                              &attr_p->u.dir.dist_dir_attr,
+                                              attr_p->u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "mgmt_get_dirent: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
-    if(dirdata_server_index != 
-            attr_p->u.dir.dist_dir_attr.server_no)
+    if(dirdata_server_index != attr_p->u.dir.dist_dir_attr.server_no)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "mgmt_get_dirent: error: WRONG dirdata object for the dirent! Returning error.\n");
+                "mgmt_get_dirent: error: WRONG dirdata object "
+                "for the dirent! Returning error.\n");
 
         /* return an error to tell the client to try again */
         js_p->error_code = -PVFS_EAGAIN;
@@ -255,40 +273,42 @@ static int mgmt_get_dirent(
     s_op->val.buffer = &s_op->u.mgmt_get_dirent.handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG,
-        "  reading dirent handle (coll_id = %d, handle = %llu\n\t"
-        "key = %s (%d), val_buf = %p (%d))\n",
-        s_op->req->u.mgmt_get_dirent.fs_id,
-        llu(s_op->req->u.mgmt_get_dirent.handle),
-        (char *)s_op->key.buffer, s_op->key.buffer_sz,
-        s_op->val.buffer, s_op->val.buffer_sz);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  reading dirent handle (coll_id = %d, handle = %s\n\t"
+                 "key = %s (%d), val_buf = %p (%d))\n",
+                 s_op->req->u.mgmt_get_dirent.fs_id,
+                 PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
+                 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+                 s_op->val.buffer, s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.mgmt_get_dirent.fs_id,
-        s_op->req->u.mgmt_get_dirent.handle,
-        &s_op->key, &s_op->val, 
-        TROVE_KEYVAL_DIRECTORY_ENTRY, 
-        NULL, smcb, 0, js_p, &j_id,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->req->u.mgmt_get_dirent.fs_id,
+                                s_op->req->u.mgmt_get_dirent.handle,
+                                &s_op->key,
+                                &s_op->val, 
+                                TROVE_KEYVAL_DIRECTORY_ENTRY, 
+                                NULL,
+                                smcb,
+                                0,
+                                js_p,
+                                &j_id,
+                                server_job_context,
+                                s_op->req->hints);
 
     return ret;
 }
 
-static PINT_sm_action mgmt_get_dirent_setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     s_op->resp.u.mgmt_get_dirent.error = js_p->error_code;
     if (js_p->error_code == 0)
     {
-        s_op->resp.u.mgmt_get_dirent.handle =
-            s_op->u.mgmt_get_dirent.handle;
+        s_op->resp.u.mgmt_get_dirent.handle = s_op->u.mgmt_get_dirent.handle;
 
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  Found dirent handle %llu\n",
-            llu(s_op->u.mgmt_get_dirent.handle));
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  Found dirent handle %s\n",
+                     PVFS_OID_str(&s_op->u.mgmt_get_dirent.handle));
     }
     else
     {
@@ -301,8 +321,8 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mgmt_get_dirent_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirent_cleanup(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 

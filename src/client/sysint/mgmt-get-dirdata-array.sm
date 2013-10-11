@@ -97,7 +97,7 @@ PVFS_error PVFS_imgmt_get_dirdata_array(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         ref,
-        PVFS_ATTR_DIR_DISTDIR_ATTR,
+        PVFS_ATTR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY, 
         0);
 
@@ -164,7 +164,7 @@ static PINT_sm_action mgmt_get_dirdata_array_cleanup(
     {
         attr = &sm_p->getattr.attr;
         assert(attr);
-        assert(attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR);
+        assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
         assert(attr->u.dir.dist_dir_attr.num_servers > 0);
 
         /* copy out going parameters */

@@ -223,7 +223,7 @@ static PINT_sm_action mgmt_create_dirent_init(struct PINT_smcb *smcb,
                                sm_p->parent_ref,
                                PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
                                PVFS_ATTR_CAPABILITY |
-                                        PVFS_ATTR_DIR_DISTDIR_ATTR, 
+                                        PVFS_ATTR_DISTDIR_ATTR, 
                                PVFS_TYPE_DIRECTORY,
                                0);
 
@@ -324,7 +324,7 @@ static PINT_sm_action mgmt_create_dirent_retry_or_fail(struct PINT_smcb *smcb,
                 sm_p->getattr,
                 sm_p->parent_ref,
                 PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
-                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
                 

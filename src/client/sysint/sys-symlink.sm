@@ -293,35 +293,6 @@ PVFS_error PVFS_sys_symlink(char *entry_name,
 /* COMPLETION FUNCTIONS */
 /****************************************************************/
 
-static PINT_sm_action symlink_init(struct PINT_smcb *smcb,
-                                   job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 1;
-    job_id_t tmp_id;
-
-    assert((js_p->error_code == 0) ||
-           (js_p->error_code == SYMLINK_RETRY));
-
-    if (js_p->error_code == SYMLINK_RETRY)
-    {
-        js_p->error_code = 0;
-
-        ret = job_req_sched_post_timer(
-            sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
-            pint_client_sm_context);
-    }
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_CAPABILITY|PVFS_ATTR_DIR_DISTDIR_ATTR,
-        PVFS_TYPE_DIRECTORY,
-        0);
-
-    return ret;
-}
-
 static int symlink_create_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
@@ -410,7 +381,7 @@ static PINT_sm_action symlink_init(struct PINT_smcb *smcb,
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
                                PVFS_ATTR_COMMON_ALL | PVFS_ATTR_CAPABILITY,
-                               PVFS_TYPE_DIRECTORY,
+                                                      PVFS_TYPE_DIRECTORY,
                                0);
 
     return ret;
@@ -524,8 +495,9 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: dirdata_handle: %llu\n",
-        llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: dirdata_handle: %s\n",
+        PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
+                                                dirdata_server_index]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -537,18 +509,20 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.sym.link_name,
                                sm_p->parent_ref.fs_id,
                                sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+                               sm_p->getattr.attr.u.dir.dirdata_handles[
+                                                        dirdata_server_index],
                                sm_p->parent_ref.sid_count,
                                sm_p->parent_ref.sid_array,
-                               sm_p->object_ref.NEWhandle,
-                               sm_p->object_ref.NEWsid_array,
+                               sm_p->object_ref.handle,    /* new handle */
+                               sm_p->object_ref.sid_array, /* new sid array */
                                sm_p->hints);
+
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
-    /* SHOULD BE THIS? */
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+    /* V3 SHOULD BE THIS? */
+    /*  sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index], */
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->parent_ref.sid_array;

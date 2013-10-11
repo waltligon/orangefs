@@ -65,13 +65,21 @@ struct dbpf_keyval_db_entry_0_1_5
 /*
  * Prototypes
  */
+static DB *dbpf_db_open(char *,
+                        DB_ENV *,
+                        int *,
+                        int (*compare_fn) (DB *,
+                                           const DBT *,
+                                           const DBT *),
+                                           uint32_t) __attribute__((unused));
+
 #if 0
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
-				     const char* data_path,
-				     const char* meta_path);
+                                     const char* data_path,
+                                     const char* meta_path);
 static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
-				     const char* data_path,
-				     const char* meta_path);
+                                     const char* data_path,
+                                     const char* meta_path);
 static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
                                      const char* data_path,
                                      const char* meta_path);
@@ -88,8 +96,8 @@ struct migration_s
     int minor;
     int incremental;
     int (*migrate)(TROVE_coll_id coll_id,
-		 const char* data_path,
-		 const char* meta_path);
+                   const char* data_path,
+                   const char* meta_path);
 };
 
 /* format: major, minor, incremental, function to migrate.
@@ -148,8 +156,8 @@ int trove_get_version (TROVE_coll_id coll_id,
                                     context_id, &op_id);
     if (ret < 0)
     {
-        gossip_err("trove_collection_geteattr failed: ret=%d coll=%d \
-context=%lld op=%lld\n",
+        gossip_err("trove_collection_geteattr failed: ret=%d coll=%d "
+                   "context=%lld op=%lld\n",
                    ret, coll_id, llu(context_id), llu(op_id));
         goto complete;
     }
@@ -174,8 +182,8 @@ complete:
         if (rc < 0)
         {
             ret = rc;
-            gossip_err("trove_context_close failed: ret=%d coll=%d \
-context=%lld\n",
+            gossip_err("trove_context_close failed: ret=%d coll=%d "
+                       "context=%lld\n",
                        ret, coll_id, llu(context_id));
         }
     }
@@ -194,7 +202,9 @@ context=%lld\n",
  * \return 0 on success, non-zero otherwise
  */
 int trove_put_version (TROVE_coll_id coll_id,
-                       int major, int minor, int incremental)
+                       int major,
+                       int minor,
+                       int incremental)
 {
     TROVE_context_id context_id = PVFS_CONTEXT_NULL;
     TROVE_op_id      op_id;
@@ -221,20 +231,30 @@ int trove_put_version (TROVE_coll_id coll_id,
         goto complete;
     }
 
-    ret = trove_collection_geteattr(coll_id, &key, &data, 0, NULL,
-                                    context_id, &op_id);
+    ret = trove_collection_geteattr(coll_id,
+                                    &key,
+                                    &data,
+                                    0,
+                                    NULL,
+                                    context_id,
+                                    &op_id);
     if (ret < 0)
     {
-        gossip_err("trove_collection_geteattr failed: ret=%d coll=%d \
-context=%lld op=%lld\n",
+        gossip_err("trove_collection_geteattr failed: ret=%d coll=%d "
+                   "context=%lld op=%lld\n",
                    ret, coll_id, llu(context_id), llu(op_id));
         goto complete;
     }
 
     TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, count, state, complete);
 
-    ret = snprintf (version, sizeof(version), "%d.%d.%d",
-                    major, minor, incremental);
+    ret = snprintf (version,
+                    sizeof(version),
+                    "%d.%d.%d",
+                    major,
+                    minor,
+                    incremental);
+
     if ((ret < 0) || (ret >= 32))
     {
         gossip_err("snprintf failed: ret=%d errno=%d version=%s\n",
@@ -245,12 +265,17 @@ context=%lld op=%lld\n",
 
     /* set the size to a correct value, not 32 */
     data.buffer_sz = strlen(data.buffer);
-    ret = trove_collection_seteattr(coll_id, &key, &data, 0, NULL,
-                                    context_id, &op_id);
+    ret = trove_collection_seteattr(coll_id,
+                                    &key,
+                                    &data,
+                                    0,
+                                    NULL,
+                                    context_id,
+                                    &op_id);
     if (ret < 0)
     {
-        gossip_err("trove_collection_seteattr failed: ret=%d coll=%d \
-context=%lld op=%lld\n",
+        gossip_err("trove_collection_seteattr failed: ret=%d coll=%d "
+                   "context=%lld op=%lld\n",
                    ret, coll_id, llu(context_id), llu(op_id));
         goto complete;
     }
@@ -264,8 +289,8 @@ complete:
         if (rc < 0)
         {
             ret = rc;
-            gossip_err("trove_context_close failed: ret=%d coll=%d \
-context=%lld\n",
+            gossip_err("trove_context_close failed: ret=%d coll=%d "
+                       "context=%lld\n",
                        ret, coll_id, llu(context_id));
         }
     }
@@ -292,8 +317,9 @@ static double wtime(void)
  * Iterate over all collections and migrate each one.
  * \return 0 on success, non-zero on failure
  */
-int trove_migrate (TROVE_method_id method_id, const char* data_path,
-		   const char* meta_path)
+int trove_migrate (TROVE_method_id method_id,
+                   const char* data_path,
+                   const char* meta_path)
 {
     TROVE_ds_position pos;
     TROVE_coll_id     coll_id;
@@ -323,7 +349,7 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
         gossip_err("malloc failed: errno=%d\n", errno);
         goto complete;
     }
-    memset(name.buffer,0,PATH_MAX);
+    memset(name.buffer, 0, PATH_MAX);
 
     while (count > 0)
     {
@@ -338,14 +364,15 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
                                        &op_id);
         if (ret < 0)
         {
-            gossip_err("trove_collection_iterate failed: \
-ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
+            gossip_err("trove_collection_iterate failed: "
+                       "ret=%d method=%d pos=%lld name=%p "
+                       "coll=%d count=%d op=%lld\n",
                        ret, method_id, llu(pos), &name,
                        coll_id, count, llu(op_id));
             goto complete;
         }
 
-        for (i=0; i<count; i++)
+        for (i = 0; i < count; i++)
         {
             ret = trove_get_version(coll_id, &major, &minor, &incremental);
             if (ret < 0)
@@ -356,6 +383,7 @@ ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
             }
 
             migrated = 0;
+
             for (migrate_p = &(migration_table[0]);
                  migrate_p->migrate != NULL;
                  migrate_p++)
@@ -371,11 +399,12 @@ ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
                     ret = migrate_p->migrate(coll_id, data_path, meta_path);
                     if (ret < 0)
                     {
-                        gossip_err("migrate failed: \
-ret=%d coll=%d metadir=%s datadir=%s major=%d minor=%d incremental=%d\n",
+                        gossip_err("migrate failed: "
+                                   "ret=%d coll=%d metadir=%s datadir=%s "
+                                   "major=%d minor=%d incremental=%d\n",
                                    ret, coll_id, meta_path, data_path,
-				   migrate_p->major, migrate_p->minor, 
-				   migrate_p->incremental);
+                                   migrate_p->major, migrate_p->minor, 
+                                   migrate_p->incremental);
                         goto complete;
                     }
                     gossip_err("Trove Migration Complete: Ver=%d.%d.%d\n",
@@ -388,9 +417,12 @@ ret=%d coll=%d metadir=%s datadir=%s major=%d minor=%d incremental=%d\n",
 
             if (migrated)
             {
-                ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d",
-                             &major, &minor, &incremental);
-                if (ret !=3)
+                ret = sscanf(TROVE_DBPF_VERSION_VALUE,
+                             "%d.%d.%d",
+                             &major,
+                             &minor,
+                             &incremental);
+                if (ret != 3)
                 {
                     gossip_err("sscanf failed: ret=%d\n", ret);
                     goto complete;
@@ -399,8 +431,8 @@ ret=%d coll=%d metadir=%s datadir=%s major=%d minor=%d incremental=%d\n",
                 ret = trove_put_version (coll_id, major, minor, incremental);
                 if (ret < 0)
                 {
-                    gossip_err("trove_put_version failed: ret=%d coll=%d \
-ver=%d.%d.%d\n",
+                    gossip_err("trove_put_version failed: ret=%d coll=%d "
+                               "ver=%d.%d.%d\n",
                                ret, coll_id, major, minor, incremental);
                     goto complete;
                 }
@@ -438,8 +470,8 @@ complete:
  * \return 0 on success, non-zero on failure
  */
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, 
-				     const char* data_path,
-				     const char* meta_path)
+                     const char* data_path,
+                     const char* meta_path)
 {
     TROVE_context_id  context_id = PVFS_CONTEXT_NULL;
     TROVE_ds_position pos;
@@ -753,8 +785,8 @@ context=%lld\n",
  * \return 0 on success, non-zero on failure
  */
 static int migrate_collection_0_1_4 (TROVE_coll_id coll_id, 
-				     const char* data_path,
-				     const char* meta_path)
+                     const char* data_path,
+                     const char* meta_path)
 {
     int ret=0, i=0, server_count=0, server_type=0, count=0, pool_key_len=0;
     const char *host;
@@ -939,10 +971,13 @@ complete:
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(
-    char *dbname, DB_ENV *envp, int *error_p,
-    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2),
-    uint32_t flags)
+static DB *dbpf_db_open(char *dbname,
+                        DB_ENV *envp,
+                        int *error_p,
+                        int (*compare_fn) (DB *db,
+                                           const DBT *dbt1,
+                                           const DBT *dbt2),
+                                           uint32_t flags)
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
@@ -990,23 +1025,23 @@ static DB *dbpf_db_open(
  *
  */
 static int write_distdir_keyvals_0_1_5 (
-	TROVE_coll_id coll_id, 
-	TROVE_context_id context_id,
-	DBT key, 
-	DBT val,
-	TROVE_ds_attributes_s *dir_ds_attr_p)
+    TROVE_coll_id coll_id, 
+    TROVE_context_id context_id,
+    DBT key, 
+    DBT val,
+    TROVE_ds_attributes_s *dir_ds_attr_p)
 {
-    PVFS_handle		    dir_handle, dirdata_handle;
+    PVFS_handle            dir_handle, dirdata_handle;
     TROVE_ds_attributes_s   dirdata_ds_attr;
     struct dbpf_keyval_db_entry_0_1_5 *k;
-    TROVE_ds_state	    state;
-    TROVE_op_id		    op_id;
-    int			    count, keyval_count;
-    int			    ret;
+    TROVE_ds_state        state;
+    TROVE_op_id            op_id;
+    int                count, keyval_count;
+    int                ret;
 
-    TROVE_keyval_s	    *key_a = NULL, *val_a = NULL;
-    PVFS_dist_dir_attr	    meta_dist_dir_attr;
-    PVFS_dist_dir_attr	    dirdata_dist_dir_attr;
+    TROVE_keyval_s        *key_a = NULL, *val_a = NULL;
+    PVFS_dist_dir_attr        meta_dist_dir_attr;
+    PVFS_dist_dir_attr        dirdata_dist_dir_attr;
     PVFS_dist_dir_bitmap    dist_dir_bitmap = NULL;
 
     k = key.data;
@@ -1018,19 +1053,19 @@ static int write_distdir_keyvals_0_1_5 (
     dirdata_ds_attr.type = PVFS_TYPE_DIRDATA;
 
     ret = trove_dspace_setattr(
-	    coll_id, dirdata_handle, &dirdata_ds_attr, TROVE_SYNC, NULL,
-	    context_id, &op_id, NULL);
+        coll_id, dirdata_handle, &dirdata_ds_attr, TROVE_SYNC, NULL,
+        context_id, &op_id, NULL);
     if (ret < 0)
     {
-	gossip_err("trove_dspace_setattr failed: \
-		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
-		ret, coll_id, llu(dirdata_handle), 
-		llu(context_id), llu(op_id));
-	goto complete;
+    gossip_err("trove_dspace_setattr failed: \
+        ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+        ret, coll_id, llu(dirdata_handle), 
+        llu(context_id), llu(op_id));
+    goto complete;
     }
 
     TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
-	    count, state, complete);
+        count, state, complete);
 
 
     /* write distdir keyvals to both dir_handle and dirdata_handle */
@@ -1039,7 +1074,7 @@ static int write_distdir_keyvals_0_1_5 (
      * num_servers=1 (will ask for more dirdata handles when split)
      * both have server_no=0, where metadata is never used */
     ret = PINT_init_dist_dir_state(&meta_dist_dir_attr,
-	    &dist_dir_bitmap, 1, 0, 1);
+        &dist_dir_bitmap, 1, 0, 1);
     assert(ret == 0);
     PINT_dist_dir_attr_copyto(dirdata_dist_dir_attr, meta_dist_dir_attr);
 
@@ -1047,18 +1082,18 @@ static int write_distdir_keyvals_0_1_5 (
     key_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
     if(!key_a)
     {
-	gossip_err("keyval space create failed.\n");
-	ret = -1;
-	goto complete;
+    gossip_err("keyval space create failed.\n");
+    ret = -1;
+    goto complete;
     }
     memset(key_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
 
     val_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
     if(!val_a)
     {
-	gossip_err("keyval space create failed.\n");
-	ret = -1;
-	goto complete;
+    gossip_err("keyval space create failed.\n");
+    ret = -1;
+    goto complete;
     }
     memset(val_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
 
@@ -1068,14 +1103,14 @@ static int write_distdir_keyvals_0_1_5 (
 
     val_a[0].buffer = &meta_dist_dir_attr;
     val_a[0].buffer_sz =
-	sizeof(meta_dist_dir_attr);
+    sizeof(meta_dist_dir_attr);
 
     key_a[1].buffer = DIST_DIRDATA_BITMAP_KEYSTR;
     key_a[1].buffer_sz = DIST_DIRDATA_BITMAP_KEYLEN;
 
     val_a[1].buffer_sz =
-	meta_dist_dir_attr.bitmap_size *  /* bitmap_size = 1 */
-	sizeof(PVFS_dist_dir_bitmap_basetype);
+    meta_dist_dir_attr.bitmap_size *  /* bitmap_size = 1 */
+    sizeof(PVFS_dist_dir_bitmap_basetype);
     val_a[1].buffer = dist_dir_bitmap;
 
     key_a[2].buffer = DIST_DIRDATA_HANDLES_KEYSTR;
@@ -1083,60 +1118,60 @@ static int write_distdir_keyvals_0_1_5 (
 
     val_a[2].buffer = &dirdata_handle; /* only one dirdata server */
     val_a[2].buffer_sz = meta_dist_dir_attr.num_servers * 
-	sizeof(dirdata_handle);
+    sizeof(dirdata_handle);
 
     /* write to directory meta handle keyval space */
     ret = trove_keyval_write_list(
-	    coll_id, dir_handle, key_a, val_a, keyval_count,
-	    TROVE_SYNC, 0, NULL,
-	    context_id, &op_id, NULL);
+        coll_id, dir_handle, key_a, val_a, keyval_count,
+        TROVE_SYNC, 0, NULL,
+        context_id, &op_id, NULL);
     if (ret < 0)
     {
-	gossip_err("trove_keyval_write_list failed: \
-		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
-		ret, coll_id, llu(dir_handle), 
-		llu(context_id), llu(op_id));
-	goto complete;
+    gossip_err("trove_keyval_write_list failed: \
+        ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+        ret, coll_id, llu(dir_handle), 
+        llu(context_id), llu(op_id));
+    goto complete;
     }
 
     TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
-	    count, state, complete);
+        count, state, complete);
 
     /* adjust dist_dir_attr val_a */
     val_a[0].buffer = &dirdata_dist_dir_attr;
 
     /* write to dirdata handle keyval space */
     ret = trove_keyval_write_list(
-	    coll_id, dirdata_handle, key_a, val_a, keyval_count,
-	    TROVE_SYNC, 0, NULL,
-	    context_id, &op_id, NULL);
+        coll_id, dirdata_handle, key_a, val_a, keyval_count,
+        TROVE_SYNC, 0, NULL,
+        context_id, &op_id, NULL);
     if (ret < 0)
     {
-	gossip_err("trove_keyval_write_list failed: \
-		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
-		ret, coll_id, llu(dirdata_handle), 
-		llu(context_id), llu(op_id));
-	goto complete;
+    gossip_err("trove_keyval_write_list failed: \
+        ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+        ret, coll_id, llu(dirdata_handle), 
+        llu(context_id), llu(op_id));
+    goto complete;
     }
 
     TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
-	    count, state, complete);
+        count, state, complete);
 
 complete:
 
     if (dist_dir_bitmap)
     {
-	free(dist_dir_bitmap);
+    free(dist_dir_bitmap);
     }
 
     if(key_a)
     {
-	free(key_a);
+    free(key_a);
     }
 
     if(val_a)
     {
-	free(val_a);
+    free(val_a);
     }
 
     return ret;
@@ -1157,8 +1192,8 @@ complete:
  * \return 0 on success, non-zero on failure
  */
 static int migrate_collection_0_1_5 (TROVE_coll_id coll_id, 
-				     const char* data_path,
-				     const char* meta_path)
+                     const char* data_path,
+                     const char* meta_path)
 {
 
     TROVE_context_id  context_id = PVFS_CONTEXT_NULL;
@@ -1170,11 +1205,11 @@ static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
     int               ret, ret_db;
 
     struct dbpf_collection  *coll_p = NULL;
-    char	    keyval_db_name[PATH_MAX];
-    char	    old_keyval_db_name[PATH_MAX];
-    DB		    *db_p = NULL;
-    DBT		    key, data;
-    DBC		    *dbc_p = NULL;
+    char        keyval_db_name[PATH_MAX];
+    char        old_keyval_db_name[PATH_MAX];
+    DB            *db_p = NULL;
+    DBT            key, data;
+    DBC            *dbc_p = NULL;
     struct dbpf_keyval_db_entry_0_1_5 *k;
     TROVE_keyval_s  t_key, t_val;
 
@@ -1187,9 +1222,9 @@ static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
     ret = access(old_keyval_db_name, F_OK);
     if(ret == 0)
     {
-	gossip_err("Error: %s already exist, please make sure the migration from "
-		"1.5.0 has not been performed!\n", old_keyval_db_name);
-	return -1;
+    gossip_err("Error: %s already exist, please make sure the migration from "
+        "1.5.0 has not been performed!\n", old_keyval_db_name);
+    return -1;
     }
 
     /* close keyval db */
@@ -1211,9 +1246,9 @@ static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
     ret = rename(keyval_db_name, old_keyval_db_name);
     if(ret < 0)
     {
-	gossip_err("%s: error when renaming keyval db.\n", 
-		__func__);
-	return ret;
+    gossip_err("%s: error when renaming keyval db.\n", 
+        __func__);
+    return ret;
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "Creating new keyval db.\n ");
@@ -1225,7 +1260,7 @@ static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
     }
     
     if ((ret = db_open(db_p, keyval_db_name, TROVE_DB_CREATE_FLAGS, 
-		    TROVE_DB_MODE)) != 0)
+            TROVE_DB_MODE)) != 0)
     {
         db_p->err(db_p, ret, "%s", keyval_db_name);
         db_close(db_p);
@@ -1327,105 +1362,105 @@ static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
         if (ret_db != DB_NOTFOUND && ret_db != 0)
         {
             gossip_err("Error: dbc_p->c_get: %s.\n", db_strerror(ret_db));
-	    ret = -1;
-	    goto complete;
+        ret = -1;
+        goto complete;
         }
         if(ret_db == 0)
         {
-	    PVFS_handle cur_handle;
+        PVFS_handle cur_handle;
             PVFS_ds_flags trove_flags = TROVE_SYNC;
 
-	    count_r++;
+        count_r++;
 
-	    gossip_debug(GOSSIP_TROVE_DEBUG, 
-		    " *** start processing #%d record.\n ", count_r);
+        gossip_debug(GOSSIP_TROVE_DEBUG, 
+            " *** start processing #%d record.\n ", count_r);
 
-	    k = key.data;
-	    cur_handle = k->handle;
+        k = key.data;
+        cur_handle = k->handle;
 
-	    if( key.size == 8 ) 
-	    {
-		/* the count record, no insertion */
-		continue;
-	    }
+        if( key.size == 8 ) 
+        {
+        /* the count record, no insertion */
+        continue;
+        }
 
-	    /* get attributes to determine type */
-	    ret = trove_dspace_getattr(coll_id,
-		    cur_handle,
-		    &ds_attr,
-		    0,
-		    NULL,
-		    context_id,
-		    &getattr_op_id,
-		    PVFS_HINT_NULL); 
-	    if (ret < 0)
-	    {
-		gossip_err("trove_dspace_getattr failed: \
-			ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
-			ret, coll_id, llu(cur_handle), 
-			llu(context_id), llu(getattr_op_id));
-		goto complete;
-	    }
+        /* get attributes to determine type */
+        ret = trove_dspace_getattr(coll_id,
+            cur_handle,
+            &ds_attr,
+            0,
+            NULL,
+            context_id,
+            &getattr_op_id,
+            PVFS_HINT_NULL); 
+        if (ret < 0)
+        {
+        gossip_err("trove_dspace_getattr failed: \
+            ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+            ret, coll_id, llu(cur_handle), 
+            llu(context_id), llu(getattr_op_id));
+        goto complete;
+        }
 
-	    TROVE_DSPACE_WAIT(ret, coll_id, getattr_op_id, context_id, \
-		    op_count, state, complete);
+        TROVE_DSPACE_WAIT(ret, coll_id, getattr_op_id, context_id, \
+            op_count, state, complete);
 
-	    switch(ds_attr.type)
-	    {
-		case PVFS_TYPE_DIRDATA:
-		    trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
-		    trove_flags |= TROVE_NOOVERWRITE;
-		    trove_flags |= TROVE_KEYVAL_DIRECTORY_ENTRY;
-		    break;
-		case PVFS_TYPE_INTERNAL:
-		    trove_flags |= TROVE_BINARY_KEY;
-		    trove_flags |= TROVE_NOOVERWRITE;
-		    trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
-		    break;
-		case PVFS_TYPE_DIRECTORY:
-		    if(strncmp(k->key, DIRECTORY_ENTRY_KEYSTR,
-			DIRECTORY_ENTRY_KEYLEN) == 0)
-		    {
-			/* directory entry record, 
-			   insert distributed directory structure instead */
-			ret = write_distdir_keyvals_0_1_5(coll_id,
-				context_id, key, data, &ds_attr);
-			if(ret < 0)
-			{
-			    goto complete;
-			}
+        switch(ds_attr.type)
+        {
+        case PVFS_TYPE_DIRDATA:
+            trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+            trove_flags |= TROVE_NOOVERWRITE;
+            trove_flags |= TROVE_KEYVAL_DIRECTORY_ENTRY;
+            break;
+        case PVFS_TYPE_INTERNAL:
+            trove_flags |= TROVE_BINARY_KEY;
+            trove_flags |= TROVE_NOOVERWRITE;
+            trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            if(strncmp(k->key, DIRECTORY_ENTRY_KEYSTR,
+            DIRECTORY_ENTRY_KEYLEN) == 0)
+            {
+            /* directory entry record, 
+               insert distributed directory structure instead */
+            ret = write_distdir_keyvals_0_1_5(coll_id,
+                context_id, key, data, &ds_attr);
+            if(ret < 0)
+            {
+                goto complete;
+            }
 
-			continue;
-		    }
-		default:
-		    /* other types ? */
-		    break;
-	    }
+            continue;
+            }
+        default:
+            /* other types ? */
+            break;
+        }
 
-	    /* init t_key and t_val */
+        /* init t_key and t_val */
             memset(&t_key, 0, sizeof(t_key));
             memset(&t_val, 0, sizeof(t_val));
-	    t_key.buffer = k->key;
-	    t_key.buffer_sz = key.size - 8; /* excluding the handle */
-	    t_val.buffer = data.data;
-	    t_val.buffer_sz = data.size;
+            t_key.buffer = k->key;
+            t_key.buffer_sz = key.size - 8; /* excluding the handle */
+            t_val.buffer = data.data;
+            t_val.buffer_sz = data.size;
 
             /* write out new keyval pair */
             state = 0;
             ret = trove_keyval_write(
                 coll_id, cur_handle, &t_key, &t_val, trove_flags, 0, NULL,
                 context_id, &keyval_op_id, NULL);
-	    if (ret < 0)
-	    {
-		gossip_err("trove_keyval_write failed: \
-			ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
-			ret, coll_id, llu(cur_handle), 
-			llu(context_id), llu(keyval_op_id));
-		goto complete;
-	    }
+        if (ret < 0)
+        {
+        gossip_err("trove_keyval_write failed: \
+            ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+            ret, coll_id, llu(cur_handle), 
+            llu(context_id), llu(keyval_op_id));
+        goto complete;
+        }
 
-	    TROVE_DSPACE_WAIT(ret, coll_id, keyval_op_id, context_id, \
-		    op_count, state, complete);
+        TROVE_DSPACE_WAIT(ret, coll_id, keyval_op_id, context_id, \
+            op_count, state, complete);
 
         }
     }while(ret_db != DB_NOTFOUND);
@@ -1452,22 +1487,22 @@ context=%lld\n",
 
     if(dbc_p != NULL)
     {
-	dbc_p->c_close(dbc_p);
+        dbc_p->c_close(dbc_p);
     }
 
     if(db_p != NULL)
     {
-	db_p->close(db_p, 0);
+        db_p->close(db_p, 0);
     }
 
     if(data.data != NULL)
     {
-	free(data.data);
+        free(data.data);
     }
 
     if(key.data != NULL)
     {
-	free(key.data);
+        free(key.data);
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s:exit.\n ", __func__);

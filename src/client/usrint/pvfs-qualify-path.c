@@ -67,8 +67,8 @@ char *PVFS_qualify_path(const char *path)
     CLEAR_LOOKEDUP(Ppath);
     Ppath->pvfs_path = NULL;
     Ppath->filename = NULL;
-    Ppath->fs_id = 0;
-    Ppath->handle = 0;
+    Ppath->fs_id = PVFS_FS_ID_NULL;
+    Ppath->handle = PVFS_HANDLE_NULL;
     /* now qualify the path */
     memset(npath, 0, PVFS_PATH_MAX + 1);
     if(*opath != '/')

@@ -274,8 +274,8 @@ machine pvfs2_remove_sm
  * retrive object attributes earlier
  *
  */
-static PINT_sm_action remove_check_object_type(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_check_object_type(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
@@ -291,9 +291,8 @@ static PINT_sm_action remove_check_object_type(
     {
         js_p->error_code = STATE_TYPE_DIRDATA;
 
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  type is dirdata; checking "
-            "dirent_count before removing dirdata itself.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is dirdata; checking "
+                     "dirent_count before removing dirdata itself.\n");
         return SM_ACTION_COMPLETE;
     }
 
@@ -313,8 +312,8 @@ static PINT_sm_action remove_check_object_type(
  * Note: errors from the previous state are redirected elsewhere, so
  * we know that we have metadata if we make it here.
  */
-static PINT_sm_action remove_verify_object_metadata(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_verify_object_metadata(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p;
@@ -335,16 +334,15 @@ static PINT_sm_action remove_verify_object_metadata(
     {
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
-	gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  type is directory; removing "
-            "dirdata object before removing directory itself.\n");
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  type is directory; removing "
+                     "dirdata object before removing directory itself.\n");
     }
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_get_dirent_count(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_get_dirent_count(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -356,23 +354,22 @@ static PINT_sm_action remove_get_dirent_count(
     }
     js_p->error_code = 0;
 
-    gossip_debug(
-            GOSSIP_SERVER_DEBUG,
-            "remove: getting dirdata dirent_count...\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "remove: getting dirdata dirent_count...\n");
 
-    ret = job_trove_keyval_iterate_keys(
-        s_op->req->u.remove.fs_id,
-        s_op->req->u.remove.handle, /* it's a dirdata handle */
-        PVFS_ITERATE_START,
-        &s_op->u.remove.key,
-        1,
-        TROVE_KEYVAL_DIRECTORY_ENTRY,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_iterate_keys(s_op->req->u.remove.fs_id,
+                                        /* it's a dirdata handle */
+                                        s_op->req->u.remove.handle,
+                                        PVFS_ITERATE_START,
+                                        &s_op->u.remove.key,
+                                        1,
+                                        TROVE_KEYVAL_DIRECTORY_ENTRY,
+                                        NULL,
+                                        smcb,
+                                        0,
+                                        js_p,
+                                        &tmp_id,
+                                        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -381,12 +378,11 @@ static PINT_sm_action remove_check_dirdata_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+                    PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(
-            GOSSIP_SERVER_DEBUG,
-            "remove: dirdata returning error_code = %d, count = %d\n",
-            js_p->error_code, js_p->count);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "remove: dirdata returning error_code = %d, count = %d\n",
+                 js_p->error_code, js_p->count);
 
     if (js_p->error_code == 0)
     {
@@ -411,8 +407,8 @@ static PINT_sm_action remove_check_dirdata_entries(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_dirdata_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_dirdata_init(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {       
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
@@ -427,8 +423,8 @@ static PINT_sm_action remove_dirdata_init(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_get_dist_dir_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_get_dist_dir_attr(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -449,9 +445,9 @@ static PINT_sm_action remove_get_dist_dir_attr(
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dist_dir_attr (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.remove.fs_id,
-                 PVFS_OID_str(s_op->req->u.remove.handle),
+                 PVFS_OID_str(&s_op->req->u.remove.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -473,7 +469,8 @@ static PINT_sm_action remove_get_dist_dir_attr(
 
 
 static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -484,7 +481,9 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "remove: no DIST_DIR_ATTR key present in directory meta handle!!\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "remove: no DIST_DIR_ATTR key present in "
+                     "directory meta handle!!\n");
         attr_p->u.dir.dist_dir_bitmap = NULL;
         attr_p->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
@@ -493,33 +492,32 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
     assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "remove: get dist-dir-attr for dir meta handle %llu "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
-            llu(s_op->u.remove.handle),
-            attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
-            attr_p->u.dir.dist_dir_attr.bitmap_size,
-            attr_p->u.dir.dist_dir_attr.split_size,
-            attr_p->u.dir.dist_dir_attr.server_no,
-            attr_p->u.dir.dist_dir_attr.branch_level);
+                 "remove: get dist-dir-attr for dir meta handle %s "
+                 "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                 "split_size=%d, server_no=%d and branch_level=%d\n",
+                 PVFS_OID_str(&s_op->u.remove.handle),
+                 attr_p->u.dir.dist_dir_attr.tree_height,
+                 attr_p->u.dir.dist_dir_attr.num_servers,
+                 attr_p->u.dir.dist_dir_attr.bitmap_size,
+                 attr_p->u.dir.dist_dir_attr.split_size,
+                 attr_p->u.dir.dist_dir_attr.server_no,
+                 attr_p->u.dir.dist_dir_attr.branch_level);
 
     /* allocate space for dirdata handles */
     attr_p->u.dir.dist_dir_bitmap = 
-        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype));
+                malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
+                            sizeof(PVFS_dist_dir_bitmap_basetype));
     attr_p->u.dir.dirdata_handles = 
-        malloc(attr_p->u.dir.dist_dir_attr.num_servers *
-                sizeof(PVFS_handle));
-    if(!attr_p->u.dir.dirdata_handles || 
-            !attr_p->u.dir.dist_dir_bitmap)
+                malloc(attr_p->u.dir.dist_dir_attr.num_servers *
+                         sizeof(PVFS_handle));
+    if(!attr_p->u.dir.dirdata_handles || !attr_p->u.dir.dist_dir_bitmap)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* set up attr->mask */
-    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     /* will read bitmap and dirdata handles in keyval */
     int keyval_count = 2;
@@ -536,42 +534,49 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
     memset(s_op->error_a, 0, sizeof(PVFS_error) * keyval_count);
 
-
     /* set up key and value structures for reading dirdata handles */
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[0].buffer = attr_p->u.dir.dirdata_handles;
     s_op->val_a[0].buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
-                sizeof(PVFS_handle);
+                    sizeof(PVFS_handle);
 
     /* !!! set bitmap keyval field */
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[1].buffer_sz =
-        attr_p->u.dir.dist_dir_attr.bitmap_size * 
-        sizeof(PVFS_dist_dir_bitmap_basetype);
+                    attr_p->u.dir.dist_dir_attr.bitmap_size * 
+                    sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->val_a[1].buffer = attr_p->u.dir.dist_dir_bitmap;
 
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "remove: trying to read dirdata handles (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d)) and dirdata bitmap ( "
-                 "key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.remove.fs_id, llu(s_op->req->u.remove.handle),
+                 "handle = %s, key = %s (%d), val_buf = %p (%d)) and "
+                 "dirdata bitmap (key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.remove.fs_id,
+                 PVFS_OID_str(&s_op->req->u.remove.handle),
 		 (char *)s_op->key_a[0].buffer, s_op->key_a[0].buffer_sz,
 		 s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz,
 		 (char *)s_op->key_a[1].buffer, s_op->key_a[1].buffer_sz,
 		 s_op->val_a[1].buffer, s_op->val_a[1].buffer_sz);
 
-    ret = job_trove_keyval_read_list(
-        s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
-        s_op->key_a, s_op->val_a, s_op->error_a,
-        keyval_count,
-        0,
-        NULL, smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read_list(s_op->req->u.remove.fs_id,
+                                     s_op->req->u.remove.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     keyval_count,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &j_id,
+                                     server_job_context,
+                                     s_op->req->hints);
 
     return ret;
 }
@@ -579,7 +584,8 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
 
 static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -595,35 +601,32 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
 
 
     /* gossip bitmap */
-    unsigned char *c;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "remove: dist_dir_bitmap as:\n");
-    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
-            i >= 0 ; i--)
+    gossip_debug(GOSSIP_SERVER_DEBUG, "remove: dist_dir_bitmap as:\n");
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
-        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        unsigned char *c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                " i=%d : %02x %02x %02x %02x\n",
-                i, c[3], c[2], c[1], c[0]);
+                     " i=%d : %02x %02x %02x %02x\n",
+                     i, c[3], c[2], c[1], c[0]);
     }
     gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
 
     /* gossip dirdata handles */
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "\t remove: dirdata handles array of directory %llu.\n",
-            llu(s_op->req->u.remove.handle));
+                 "\t remove: dirdata handles array of directory %s.\n",
+                 PVFS_OID_str(&s_op->req->u.remove.handle));
 
     for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "\t\tdirdata server %d: %llu.\n",
-                i, llu(attr_p->u.dir.dirdata_handles[i]));
+                     "\t\tdirdata server %d: %s.\n",
+                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
     }
 
 
     /* initialize msgpair array */
     ret = PINT_msgpairarray_init(&s_op->msgarray_op, 
-            attr_p->u.dir.dist_dir_attr.num_servers);
+                                 attr_p->u.dir.dist_dir_attr.num_servers);
     if(ret != 0)
     {
         js_p->error_code = ret;
@@ -637,18 +640,18 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
     {
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "remove: posting dirdata getattr[%d] (%lld,%d)\n",
-                     i, llu(attr_p->u.dir.dirdata_handles[i]),
+                     "remove: posting dirdata getattr[%d] (%s,%d)\n",
+                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]),
                      s_op->req->u.remove.fs_id);
 
-        PINT_SERVREQ_GETATTR_FILL(
-            msg_p->req,
-            null_cap,
-            s_op->req->u.remove.credential,
-            s_op->req->u.remove.fs_id,
-            attr_p->u.dir.dirdata_handles[i],
-            PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in dirent_count */
-            s_op->req->hints);
+        PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+                                  null_cap,
+                                  s_op->req->u.remove.credential,
+                                  s_op->req->u.remove.fs_id,
+                                  attr_p->u.dir.dirdata_handles[i],
+                                  /* only interested in dirent_count */
+                                  PVFS_ATTR_DIR_DIRENT_COUNT,
+                                  s_op->req->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = s_op->req->u.remove.fs_id;
@@ -656,8 +659,9 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = remove_get_dirent_count_comp_fn;
 
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               msg_p->handle,
+                                               msg_p->fs_id);
 
         if (ret)
         {
@@ -677,10 +681,8 @@ static int remove_get_dirent_count_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
  
-    gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  remove_get_dirent_count_comp_fn: "
-            "response from dirdata[%d].\n",
-            index);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  remove_get_dirent_count_comp_fn: "
+                 "response from dirdata[%d].\n", index);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -691,14 +693,13 @@ static int remove_get_dirent_count_comp_fn(
 
     if (resp_p->u.getattr.attr.u.dir.dirent_count == 0)
     {
-        gossip_debug(
-                GOSSIP_SERVER_DEBUG, "  dirent_count = 0. returning 0.\n ");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  dirent_count = 0. returning 0.\n ");
         return 0;
     }
 
-    gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  dirent_count = %llu. returning -PVFS_ENOTEMPTY.\n ",
-            llu(resp_p->u.getattr.attr.u.dir.dirent_count));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  dirent_count = %llu. returning -PVFS_ENOTEMPTY.\n ",
+                 llu(resp_p->u.getattr.attr.u.dir.dirent_count));
 
     return -PVFS_ENOTEMPTY;
 }
@@ -706,7 +707,8 @@ static int remove_get_dirent_count_comp_fn(
 
 
 static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                          struct PINT_smcb *smcb,
+                                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -721,8 +723,7 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
 
     /* initialize rebuild array */
     s_op->u.remove.rebuild_dirdata_index_array_remote = 
-        malloc(sizeof(int) * 
-                attr_p->u.dir.dist_dir_attr.num_servers);
+                malloc(sizeof(int) * attr_p->u.dir.dist_dir_attr.num_servers);
     if(!s_op->u.remove.rebuild_dirdata_index_array_remote )
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -733,7 +734,7 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
     PINT_msgpairarray_destroy(&s_op->msgarray_op);
     /* initialize msgpair array */
     ret = PINT_msgpairarray_init(&s_op->msgarray_op, 
-            attr_p->u.dir.dist_dir_attr.num_servers);
+                                 attr_p->u.dir.dist_dir_attr.num_servers);
     if(ret != 0)
     {
         js_p->error_code = ret;
@@ -745,17 +746,18 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
     {
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "remove: posting dirdata handles remove[%d] (%lld,%d)\n",
-                     i, llu(attr_p->u.dir.dirdata_handles[i]),
+                     "remove: posting dirdata handles remove[%d] (%s,%d)\n",
+                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]),
                      s_op->req->u.remove.fs_id);
 
-        PINT_SERVREQ_REMOVE_FILL(
-            msg_p->req,
-            s_op->req->capability,
-            s_op->req->u.remove.credential,
-            s_op->req->u.remove.fs_id,
-            attr_p->u.dir.dirdata_handles[i],
-            s_op->req->hints);
+        PINT_SERVREQ_REMOVE_FILL(msg_p->req,
+                                 s_op->req->capability,
+                                 s_op->req->u.remove.credential,
+                                 s_op->req->u.remove.fs_id,
+                                 attr_p->u.dir.dirdata_handles[i],
+                                 0,    /* V3 sid count */
+                                 NULL, /* V3 sid array */
+                                 s_op->req->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = s_op->req->u.remove.fs_id;
@@ -763,8 +765,9 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = remove_remove_dirdata_handles_comp_fn;
 
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               msg_p->handle,
+                                               msg_p->fs_id);
 
         if (ret)
         {
@@ -776,12 +779,12 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     return SM_ACTION_COMPLETE;
-
 }
 
 
-static int remove_remove_dirdata_handles_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
+static int remove_remove_dirdata_handles_comp_fn(void *v_p,
+                                                 struct PVFS_server_resp *resp_p,
+                                                 int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
@@ -805,7 +808,8 @@ static int remove_remove_dirdata_handles_comp_fn(
         }
         else
         {
-            s_op->u.remove.rebuild_dirdata_index_array_remote[s_op->u.remove.num_rebuild_dirdata_remote] = index;
+            s_op->u.remove.rebuild_dirdata_index_array_remote[
+                        s_op->u.remove.num_rebuild_dirdata_remote] = index;
             ++s_op->u.remove.num_rebuild_dirdata_remote;
         }
     }
@@ -821,13 +825,16 @@ static int remove_remove_dirdata_handles_comp_fn(
 
 
 static PINT_sm_action remove_rebuild_dirdata_handle_local(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
-    PVFS_handle_extent_array extent_array;
+    PVFS_handle *handle_array = NULL; /* V3 who assigns this? */
+#if 0
     server_configuration_s *user_opts = get_server_config_struct();
+#endif
 
     /* save error_code */
     gossip_debug(
@@ -844,43 +851,49 @@ static PINT_sm_action remove_rebuild_dirdata_handle_local(
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug( GOSSIP_SERVER_DEBUG, 
-            "  remove_rebuild_dirdata: rebuilding local dirdata handle! \n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+                 "  remove_rebuild_dirdata: rebuilding local dirdata handle! \n");
 
-    ret = PINT_config_get_meta_handle_extent_array(
-        user_opts, s_op->req->u.remove.fs_id, &extent_array);
+/* V3 no extents or pools inn V3 */
+#if 0
+    ret = PINT_config_get_meta_handle_extent_array(user_opts,
+                                                   s_op->req->u.remove.fs_id,
+                                                   &extent_array);
     assert(ret == 0);
     assert(extent_array.extent_count > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " local dirdata handle(s) will "
-                 "be in starting hrange[0] %llu-%llu\n",
-                 llu(extent_array.extent_array[0].first),
-                 llu(extent_array.extent_array[0].last));
+                 "be in starting hrange[0] %s-%s\n",
+                 PVFS_OID_str(extent_array.extent_array[0].first),
+                 PVFS_OID_str(extent_array.extent_array[0].last));
+#endif
 
-    ret = job_trove_dspace_create_list(
-        s_op->req->u.remove.fs_id,
-        &extent_array,
-        &s_op->u.remove.handle_local,
-        1, /* dirdata_count_local = 1 */
-        PVFS_TYPE_DIRDATA, 
-        NULL,
-        TROVE_SYNC,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context, 
-        s_op->req->hints);
+    ret = job_trove_dspace_create_list(s_op->req->u.remove.fs_id,
+                                       handle_array,
+                                       &s_op->u.remove.handle_local,
+                                       1, /* dirdata_count_local = 1 */
+                                       PVFS_TYPE_DIRDATA, 
+                                       NULL,
+                                       TROVE_SYNC,
+                                       smcb,
+                                       0,
+                                       js_p,
+                                       &tmp_id,
+                                       server_job_context, 
+                                       s_op->req->hints);
 
     return(ret);
 }
 
-
+/* V3 probably remove this state */
 static PINT_sm_action remove_rebuild_dirdata_handle_remote(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                     struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+#if 0
     job_id_t j_id;
+#endif
     int ret = -PVFS_ENOMEM, i;
     char **io_servers_remote = NULL;
     char *string_buffer = NULL;
@@ -888,27 +901,25 @@ static PINT_sm_action remove_rebuild_dirdata_handle_remote(
     if(s_op->u.remove.need_rebuild_dirdata_local)
     {
         gossip_debug(
-                GOSSIP_SERVER_DEBUG, "  rebuilt local dirdata handle (%llu)\n",
-                llu(s_op->u.remove.handle_local));
+                GOSSIP_SERVER_DEBUG, "  rebuilt local dirdata handle (%s)\n",
+                PVFS_OID_str(&s_op->u.remove.handle_local));
     }
 
     if(s_op->u.remove.num_rebuild_dirdata_remote == 0)
     {
-        gossip_debug(
-                GOSSIP_SERVER_DEBUG, "  No need to rebuild remote dirdata handle! "
-                "move to write keyval !\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "  No need to rebuild remote dirdata handle! "
+                     "move to write keyval !\n");
         return SM_ACTION_COMPLETE;
     }
 
     /* allocate space */
-    io_servers_remote =
-        malloc( sizeof(char*) *
-                s_op->u.remove.num_rebuild_dirdata_remote);
+    io_servers_remote = malloc( sizeof(char*) *
+                          s_op->u.remove.num_rebuild_dirdata_remote);
     string_buffer = malloc(sizeof(char) * 1024 * 
-                s_op->u.remove.num_rebuild_dirdata_remote);
-    s_op->u.remove.handle_array_remote =
-        malloc( sizeof(PVFS_handle) *
-                s_op->u.remove.num_rebuild_dirdata_remote);
+                          s_op->u.remove.num_rebuild_dirdata_remote);
+    s_op->u.remove.handle_array_remote = malloc( sizeof(PVFS_handle) *
+                          s_op->u.remove.num_rebuild_dirdata_remote);
     if(!io_servers_remote || !string_buffer ||
             !s_op->u.remove.handle_array_remote)
     {
@@ -920,29 +931,34 @@ static PINT_sm_action remove_rebuild_dirdata_handle_remote(
     for(i = 0; i < s_op->u.remove.num_rebuild_dirdata_remote; i++)
     {
         io_servers_remote[i] = string_buffer + i * 1024;
-        PINT_cached_config_get_server_name(io_servers_remote[i], 1024, 
-                s_op->attr.u.dir.dirdata_handles[s_op->u.remove.rebuild_dirdata_index_array_remote[i]], 
+        PINT_cached_config_get_server_name(
+                io_servers_remote[i],
+                1024, 
+                s_op->attr.u.dir.dirdata_handles[
+                           s_op->u.remove.rebuild_dirdata_index_array_remote[i]], 
                 s_op->req->u.remove.fs_id);
     }
 
     /* request remote dirdata handles */
-    gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  rebuilding local %d remote dirdata handles! \n",
-            s_op->u.remove.num_rebuild_dirdata_remote);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  rebuilding local %d remote dirdata handles! \n",
+                 s_op->u.remove.num_rebuild_dirdata_remote);
 
-    ret = job_precreate_pool_get_handles(
-        s_op->req->u.remove.fs_id,
-        s_op->u.remove.num_rebuild_dirdata_remote,
-        PVFS_TYPE_DIRDATA,
-        (const char **)io_servers_remote, 
-        s_op->u.remove.handle_array_remote,
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    /* V3 this function going away */
+#if 0
+    ret = job_precreate_pool_get_handles(s_op->req->u.remove.fs_id,
+                                        s_op->u.remove.num_rebuild_dirdata_remote,
+                                        PVFS_TYPE_DIRDATA,
+                                        (const char **)io_servers_remote, 
+                                        s_op->u.remove.handle_array_remote,
+                                        0,
+                                        smcb,
+                                        0,
+                                        js_p,
+                                        &j_id,
+                                        server_job_context,
+                                        s_op->req->hints);
+#endif
 
     free(string_buffer);
     free(io_servers_remote);
@@ -951,36 +967,38 @@ static PINT_sm_action remove_rebuild_dirdata_handle_remote(
 }
 
 
-static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
+                                                         struct PINT_smcb *smcb,
+                                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr attr;
     int ret,i;
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  remove_rebuild_remote_dirdata_keyval_setup_msgpair: \n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "  remove_rebuild_remote_dirdata_keyval_setup_msgpair: \n");
 
     if(!s_op->u.remove.need_rebuild_dirdata_local && 
             (s_op->u.remove.num_rebuild_dirdata_remote == 0))
     {
-        gossip_debug(
-                GOSSIP_SERVER_DEBUG, "  no dirdata handles got rebuilt! "
-                "no need to write keyval.  "
-                "move to dirdata cleanup !\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  no dirdata handles got rebuilt! "
+                     "no need to write keyval.  "
+                     "move to dirdata cleanup !\n");
         js_p->error_code = REBUILD_DONE;
         return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "\t remove_rebuild: ORIGINAL dirdata handles array of directory %llu.\n",
-            llu(s_op->req->u.remove.handle));
+                 "\t remove_rebuild: ORIGINAL dirdata "
+                 "handles array of directory %s.\n",
+                 PVFS_OID_str(&s_op->req->u.remove.handle));
 
     for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "\t\tdirdata server [%d]: %llu.\n",
-                i, llu(s_op->attr.u.dir.dirdata_handles[i]));
+                     "\t\tdirdata server [%d]: %s.\n",
+                     i, PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[i]));
     }
 
     /* fill in rebuilt dirdata handles */
@@ -991,19 +1009,21 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
 
     for(i = 0; i < s_op->u.remove.num_rebuild_dirdata_remote; i++)
     {
-        s_op->attr.u.dir.dirdata_handles[s_op->u.remove.rebuild_dirdata_index_array_remote[i]] = 
-            s_op->u.remove.handle_array_remote[i];
+        s_op->attr.u.dir.dirdata_handles[
+                        s_op->u.remove.rebuild_dirdata_index_array_remote[i]] = 
+                s_op->u.remove.handle_array_remote[i];
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "\t remove_rebuild: REBUILT dirdata handles array of directory %llu.\n",
-            llu(s_op->req->u.remove.handle));
+                 "\t remove_rebuild: REBUILT dirdata handles "
+                 "array of directory %s.\n",
+                 PVFS_OID_str(&s_op->req->u.remove.handle));
 
     for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "\t\tdirdata server [%d]: %llu.\n",
-                i, llu(s_op->attr.u.dir.dirdata_handles[i]));
+                     "\t\tdirdata server [%d]: %s.\n",
+                     i, PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[i]));
     }
 
     /* start sending distdir attrs */
@@ -1013,32 +1033,32 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
     memcpy(&attr, &s_op->attr, sizeof(attr));
     attr.objtype = PVFS_TYPE_DIRDATA;
     attr.mask = PVFS_ATTR_COMMON_ALL;
-    attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG,
-        "remove_rebuild: SENDING attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu ]\n",
-        attr.owner, attr.group, attr.perms,
-        attr.objtype, llu(attr.atime),
-        llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "remove_rebuild: SENDING attrs: [owner = %d, group = %d\n\t"
+                 "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+                 "ctime = %llu ]\n",
+                 attr.owner, attr.group, attr.perms,
+                 attr.objtype, llu(attr.atime),
+                 llu((PINT_util_mkversion_time(attr.mtime))), llu(attr.ctime));
 
     /* msgpair_init already does cleanup */
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.remove.fs_id);
 
-    PINT_SERVREQ_TREE_SETATTR_FILL(
-        msg_p->req,
-        s_op->req->capability,
-        s_op->req->u.remove.credential,
-        s_op->req->u.remove.fs_id,
-        PVFS_TYPE_DIRDATA,
-        attr,
-        s_op->attr.u.dir.dist_dir_attr.num_servers,
-        s_op->attr.u.dir.dirdata_handles,
-        s_op->req->hints);
+    PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
+                                   s_op->req->capability,
+                                   s_op->req->u.remove.credential,
+                                   s_op->req->u.remove.fs_id,
+                                   PVFS_TYPE_DIRDATA,
+                                   attr,
+                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dirdata_handles,
+                                   0,    /* V3 sid count */
+                                   NULL, /* V3 sid array */
+                                   s_op->req->hints);
 
     msg_p->fs_id = s_op->req->u.remove.fs_id;
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
@@ -1061,14 +1081,16 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
 }
 
 
-static PINT_sm_action remove_rebuild_done(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_rebuild_done(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action remove_rebuild_write_dirdata_keyval(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_ENOMEM;
@@ -1091,17 +1113,24 @@ static PINT_sm_action remove_rebuild_write_dirdata_keyval(
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to write dirdata handles (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.remove.fs_id, llu(s_op->req->u.remove.handle),
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.remove.fs_id,
+                 PVFS_OID_str(&s_op->req->u.remove.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_write(
-        s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
-        &s_op->key, &s_op->val,
-        0,
-        NULL, smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_write(s_op->req->u.remove.fs_id,
+                                 s_op->req->u.remove.handle,
+                                 &s_op->key,
+                                 &s_op->val,
+                                 0,
+                                 NULL,
+                                 smcb,
+                                 0,
+                                 js_p,
+                                 &j_id,
+                                 server_job_context,
+                                 s_op->req->hints);
 
     return ret;
 
@@ -1109,7 +1138,8 @@ static PINT_sm_action remove_rebuild_write_dirdata_keyval(
 
 
 static PINT_sm_action remove_remove_dirdata_handles_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1154,8 +1184,8 @@ static PINT_sm_action remove_remove_dirdata_handles_cleanup(
  * Remove the dspace using the handle from the incoming request
  * (which was verified in previous states).
  */
-static PINT_sm_action remove_remove_dspace(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_remove_dspace(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -1165,11 +1195,15 @@ static PINT_sm_action remove_remove_dspace(
                  PVFS_OID_str(&s_op->req->u.remove.handle),
                  s_op->req->u.remove.fs_id);
 
-    ret = job_trove_dspace_remove(
-        s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
-        TROVE_SYNC,
-        smcb, 0, js_p,
-        &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
+                                  s_op->req->u.remove.handle,
+                                  TROVE_SYNC,
+                                  smcb,
+                                  0,
+                                  js_p,
+                                  &j_id,
+                                  server_job_context,
+                                  s_op->req->hints);
 
     return ret;
 }
@@ -1180,8 +1214,7 @@ static PINT_sm_action remove_remove_dspace(
  * Free all memory associated with this request and return 0, indicating
  * we're done processing.
  */
-static PINT_sm_action remove_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action remove_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 

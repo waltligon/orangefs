@@ -51,6 +51,7 @@ static const PVFS_OID PVFS_HANDLE_NULL = PVFS_HANDLE_NULL_INIT;
 static const PVFS_OID PVFS_HANDLE_HIGH = {{255,255,255,255,255,
                                            255,255,255,255,255,
                                            255,255,255,255,255,255}};
+static const PVFS_SID PVFS_SID_NULL = PVFS_HANDLE_NULL_INIT;
 
     
 /* UUID Variant definitions */

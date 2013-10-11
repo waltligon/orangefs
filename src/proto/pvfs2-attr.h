@@ -57,9 +57,10 @@
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
 #define PVFS_ATTR_DIR_HINT                  (1 << 20)
-#define PVFS_ATTR_DIR_DISTDIR_ATTR         (1 << 21)
 #define PVFS_ATTR_DIR_ALL \
-(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | PVFS_ATTR_DIR_DISTDIR_ATTR)
+(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
+
+#define PVFS_ATTR_DISTDIR_ATTR         (1 << 21)
 
 /* internal attribute mask for capability objects */
 #define PVFS_ATTR_CAPABILITY               (1 << 22)
@@ -332,7 +333,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
+        ((x)->mask & PVFS_ATTR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -367,7 +368,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
+        ((x)->mask & PVFS_ATTR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)

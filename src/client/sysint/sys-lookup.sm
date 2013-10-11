@@ -1214,7 +1214,9 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_handle_absolute_link\n");
 
+#if 0
     memset(&root_refn, 0, sizeof(root_refn));
+#endif
 
     js_p->error_code = 0;
 
@@ -1241,6 +1243,11 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 #if 0
+
+    /* These 3 blocks are old code I've kepe until we are sure it
+     * is not needed - delete all 3 once this is shown to be working well
+     * WBL
+     */
     sm_p->u.lookup.current_context++;
 
     /*

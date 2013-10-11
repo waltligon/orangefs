@@ -215,8 +215,8 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
              cap->num_handles > 0 ? PVFS_OID_str(&cap->handle_array[0]) : 0LL);
     for (i = 1; i < cap->num_handles; i++)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "\thandle %d: %llu\n",
-                     i+1, llu(cap->handle_array[i]));
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "\thandle %d: %s\n",
+                     i+1, PVFS_OID_str(&cap->handle_array[i]));
     }
 }
 
