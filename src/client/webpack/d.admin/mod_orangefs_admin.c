@@ -779,6 +779,7 @@ static int handler(request_rec *r)
         rc = PVFS_util_gen_credential(
              apr_table_get(r->subprocess_env, "AUTHENTICATE_UIDNUMBER"),
              apr_table_get(r->subprocess_env, "AUTHENTICATE_GIDNUMBER"),
+             0,
              apr_pstrcat(r->pool, certpath, "/", r->user, "-key.pem"),
              apr_pstrcat(r->pool, certpath, "/", r->user, "-cert.pem"),
              &req.cred);
