@@ -1417,8 +1417,10 @@ class OFSTestNode(object):
         if security == None:
             pass
         elif security.lower() == "key":
+            print "Configuring key based security"
             security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
         elif security.lower() == "cert":
+            print "Certificate based security not yet supported by OFSTest."
             pass
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
