@@ -125,7 +125,7 @@ class OFSTestConfig(object):
         
         
         # --enable-fuse
-        self.install_fuse=self.run_fuse_tests
+        self.install_fuse=False
             
         # --prefix=
         self.install_prefix = None
@@ -134,10 +134,10 @@ class OFSTestConfig(object):
         self.db4_prefix = "/opt/db4"
 
         # add --with-kernel option
-        self.install_OFS_client = self.ofs_build_kmod
+        self.install_OFS_client = True
 
         # add --enable=shared
-        self.install_shared = self.run_usrint_tests
+        self.install_shared = False
         
         # --enable-strict
         self.enable_strict = True
