@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "pvfs2-sysint.h"
+#include "pvfs2-internal.h"
 #include "str-utils.h"
 #include "gossip.h"
 #include "pvfs2-util.h"

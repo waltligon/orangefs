@@ -14,12 +14,12 @@
 #include <unistd.h>
 #endif
 
+#include "trove.h"
 #include "gossip.h"
 #include "quicklist.h"
 #include "src/io/flow/flowproto-support.h"
 #include "gen-locks.h"
 #include "bmi.h"
-#include "trove.h"
 #include "thread-mgr.h"
 #include "pint-perf-counter.h"
 #include "pvfs2-internal.h"
@@ -135,6 +135,8 @@ static int cancel_pending_trove(
 typedef void (*bmi_recv_callback)(void *, PVFS_size, PVFS_error);
 typedef void (*trove_write_callback)(void *, PVFS_error);
 
+
+#ifdef __PVFS2_TROVE_SUPPORT__
 static void flow_bmi_recv(struct fp_queue_item* q_item,
                           bmi_recv_callback recv_callback);
 static void forwarding_bmi_recv_callback_fn(void *user_ptr,
@@ -143,26 +145,28 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
 static void server_bmi_recv_callback_fn(void *user_ptr,
                                         PVFS_size actual_size,
                                         PVFS_error error_code);
-static int flow_process_request( struct fp_queue_item* q_item );
 static void flow_trove_write(struct fp_queue_item* q_item,
                              PVFS_size actual_size,
                              trove_write_callback write_callback);
 static void server_trove_write_callback_fn(void *user_ptr,
                                                PVFS_error error_code);
-static TROVE_context_id global_trove_context = -1;
-static void forwarding_trove_write_callback_fn(void *user_ptr,
-                                               PVFS_error error_code);
-int forwarding_is_flow_complete(struct fp_private_data* flow_data);
 static void forwarding_bmi_send_callback_fn(void *user_ptr,
 					    PVFS_size actual_size,
 					    PVFS_error error_code);
-static void handle_forwarding_io_error(PVFS_error error_code,
-                                      struct fp_queue_item* q_item,
-                                      struct fp_private_data* flow_data);
 static inline void server_write_flow_post_init(flow_descriptor *flow_d,
                                                struct fp_private_data *flow_data);
 static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
 					     struct fp_private_data* flow_data);
+static TROVE_context_id global_trove_context = -1;
+static void forwarding_trove_write_callback_fn(void *user_ptr,
+                                               PVFS_error error_code);
+static int flow_process_request( struct fp_queue_item* q_item );
+static int forwarding_is_flow_complete(struct fp_private_data* flow_data);
+static void handle_forwarding_io_error(PVFS_error error_code,
+                                      struct fp_queue_item* q_item,
+                                      struct fp_private_data* flow_data);
+#endif /* PVFS2_TROVE_SUPPORT */
+
 
 
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -2397,6 +2401,7 @@ static int get_data_sync_mode(TROVE_coll_id coll_id)
 }
 #endif
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 static inline void server_write_flow_post_init(flow_descriptor *flow_d,
                                                struct fp_private_data *flow_data)
 {
@@ -2451,10 +2456,12 @@ static inline void server_write_flow_post_init(flow_descriptor *flow_d,
 
     return;
 }/*end server_write_flow_post_init*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
 
 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 static void flow_bmi_recv(struct fp_queue_item* q_item,
                           bmi_recv_callback recv_callback)
 {
@@ -2548,9 +2555,10 @@ static void flow_bmi_recv(struct fp_queue_item* q_item,
         gossip_lerr("ERROR: Zero size request processed!!??\n");
     }
 } /*end flow_bmi_recv*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
 
-
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* server_bmi_recv_callback_fn()
  *
  * Callback invoked when a BMI recv operation completes
@@ -2607,9 +2615,10 @@ static void server_bmi_recv_callback_fn(void *user_ptr,
      */  
    return;
 }/*end server_bmi_recv_callback_fn*/
+#endif
 
 
-
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Performs a trove write on data for a forwarding flow
  *
@@ -2714,7 +2723,10 @@ static void flow_trove_write(struct fp_queue_item* q_item,
 
 } /*end flow_trove_write*/
 
+#endif
 
+
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Callback invoked upon completion of a trove write operation
  */
@@ -2875,13 +2887,14 @@ static void forwarding_trove_write_callback_fn(void *user_ptr,
   
     return;
 }/*end forwarding_trove_write_callback_fn*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
-
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Marks the forwarding flow as complete when finished
  * Return 1 when the flow is complete, otherwise returns 0
  */
-int forwarding_is_flow_complete(struct fp_private_data* flow_data)
+static int forwarding_is_flow_complete(struct fp_private_data* flow_data)
 {
     int is_flow_complete = 0;
     int i;
@@ -2938,9 +2951,11 @@ int forwarding_is_flow_complete(struct fp_private_data* flow_data)
 
     return is_flow_complete;
 }/*end forwarding_is_flow_complete*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* forwarding_bmi_recv_callback_fn()
  *
  * Callback invoked when a BMI recv operation completes
@@ -3123,9 +3138,11 @@ static void forwarding_bmi_recv_callback_fn(void *user_ptr,
     }
    return; 
 }/*end forwarding_bmi_recv_callback_fn*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Perform a process request for a q_item
  *
@@ -3205,8 +3222,9 @@ static int flow_process_request( struct fp_queue_item* q_item )
 
     return bytes_processed;
 }/*end flow_process_request*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
-
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Callback invoked upon completion of a BMI send operation
  */
@@ -3320,8 +3338,9 @@ static void forwarding_bmi_send_callback_fn(void *user_ptr,
 
     return;
 }/*end forwarding_bmi_send_callback_fn*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
-
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Callback invoked upon completion of a trove write operation
  */
@@ -3432,8 +3451,10 @@ static void server_trove_write_callback_fn(void *user_ptr,
     }/*end if*/
     return;
 }/*end server_trove_write_callback_fn*/
+#endif
 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* handle_forwarding_io_error()
  * 
  */
@@ -3517,7 +3538,10 @@ static void handle_forwarding_io_error(PVFS_error error_code,
 
     return;
 }/*end handle_forwarding_io_error*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
+
+#ifdef __PVFS2_TROVE_SUPPORT__
 /**
  * Perform initialization steps before this forwarding flow can be posted
  */
@@ -3586,6 +3610,7 @@ static inline void forwarding_flow_post_init(flow_descriptor* flow_d,
 
     return;
 }/*end forwarding_flow_post_init*/
+#endif /* PVFS2_TROVE_SUPPORT */
 
 
 

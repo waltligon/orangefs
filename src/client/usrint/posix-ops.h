@@ -18,12 +18,19 @@
 /** struct of pointers to methods for posix system calls */
 typedef struct posix_ops_s
 {   
+    /* this is not posix but is useful for debugging */
+    int (*snprintf)(char *str, int size, const char *format, ...);
+    /* begin posix system calls */
     int (*open)(const char *path, int flags, ...);
     int (*open64)(const char *path, int flags, ...);
     int (*openat)(int dirfd, const char *path, int flags, ...);
     int (*openat64)(int dirfd, const char *path, int flags, ...);
+#if 0
     int (*creat)(const char *path, mode_t mode, ...);
     int (*creat64)(const char *path, mode_t mode, ...);
+#endif
+    int (*creat)(const char *path, mode_t mode);
+    int (*creat64)(const char *path, mode_t mode);
     int (*unlink)(const char *path);
     int (*unlinkat)(int dirfd, const char *path, int flags);
     int (*rename)(const char *oldpath, const char *newpath);
@@ -39,6 +46,7 @@ typedef struct posix_ops_s
     ssize_t (*pwrite64)( int fd, const void *buf, size_t count, off64_t offset);
     off_t (*lseek)(int fd, off_t offset, int whence);
     off64_t (*lseek64)(int fd, off64_t offset, int whence);
+    void (*perror)(const char *s);
     int (*truncate)(const char *path, off_t length);
     int (*truncate64)(const char *path, off64_t length);
     int (*ftruncate)(int fd, off_t length);
@@ -59,6 +67,7 @@ typedef struct posix_ops_s
     int (*futimes)(int fd, const struct timeval times[2]);
     int (*dup)(int oldfd);
     int (*dup2)(int oldfd, int newfd);
+    int (*dup3)(int oldfd, int newfd, int flags);
     int (*chown)(const char *path, uid_t owner, gid_t group);
     int (*fchown)(int fd, uid_t owner, gid_t group);
     int (*fchownat)(int fd, const char *path, uid_t owner, gid_t group, int flag);
@@ -147,14 +156,6 @@ typedef struct posix_ops_s
     int (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                     struct sockaddr *addr, socklen_t *alen);
     int (*recvmsg)(int sockfd, struct msghdr *msg, int flags);
-    /* int (*select)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
-                  struct timeval *timeout); */
-    /* void (*FD_CLR)(int fd, fd_set *set); */
-    /* void (*FD_ISSET)(int fd, fd_set *set); */
-    /* void (*FD_SET)(int fd, fd_set *set); */
-    /* void (*FD_ZERO)(fd_set *set); */
-    /* int (*pselect)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
-                   const struct timeval *timeout, const sigset_t *sigmask); */
     int (*send)(int sockfd, const void *buf, size_t len, int flags);
     int (*sendto)(int sockfd, const void *buf, size_t len, int flags,
                   const struct sockaddr *addr, socklen_t alen);
@@ -162,6 +163,16 @@ typedef struct posix_ops_s
     int (*shutdown)(int sockfd, int how);
     int (*socketpair)(int d, int type, int prtocol, int sv[2]);
     int (*pipe)(int filedes[2]);
+
+    /* selinux operations */
+    int (*getfscreatecon)(security_context_t *con);
+    int (*getfilecon)(const char *path, security_context_t *con);
+    int (*lgetfilecon)(const char *path, security_context_t *con);
+    int (*fgetfilecon)(int fd, security_context_t *con);
+    int (*setfscreatecon)(security_context_t con);
+    int (*setfilecon)(const char *path, security_context_t con);
+    int (*lsetfilecon)(const char *path, security_context_t con);
+    int (*fsetfilecon)(int fd, security_context_t con);
 } posix_ops;
 
 #ifdef BITDEFS
@@ -179,12 +190,12 @@ extern posix_ops pvfs_ops;
 
 typedef struct pvfs_mmap_s
 {
-    void *mst;
-    size_t mlen;
-    int mprot;
-    int mflags;
-    int mfd;
-    off_t moff;
+    void *mst;              /**< start of mmap region */
+    size_t mlen;            /**< length of mmap region */
+    int mprot;              /**< protection of mmap region */
+    int mflags;             /**< flags of mmap region */
+    int mfd;                /**< file descriptor of mmap region */
+    off_t moff;             /**< offset of mmap region */
     struct qlist_head link;
 } *pvfs_mmap_t;
 
@@ -193,10 +204,11 @@ typedef struct pvfs_mmap_s
 typedef struct pvfs_descriptor_status_s
 {
     gen_mutex_t lock;         /**< protect struct from mult threads */
-    int dup_cnt;              /**< number of table slots with this des */
+    int dup_cnt;              /**< number of desc using this stat */
     posix_ops *fsops;         /**< syscalls to use for this file */
     PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
     int flags;                /**< the open flags used for this file */
+    int clrflags;             /**< modes that must be cleared on close */
     int mode;                 /**< stat mode of the file - may be volatile */
     off64_t file_pointer;     /**< offset from the beginning of the file */
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
@@ -204,6 +216,14 @@ typedef struct pvfs_descriptor_status_s
     struct file_ent_s *fent; /**< reference to cached objects */            
                               /**< set to NULL if not caching this file */
 } pvfs_descriptor_status;
+
+/* bit flags used only in pvfs_descriptor_status clrflags */
+enum
+{
+    O_CLEAR_NONE = 0,
+    O_CLEAR_READ = 1,
+    O_CLEAR_WRITE = 2
+};
 
 /* these are unique among descriptors */
 typedef struct pvfs_descriptor_s
@@ -213,6 +233,7 @@ typedef struct pvfs_descriptor_s
     int fd;                   /**< file number in PVFS descriptor_table */
     int true_fd;              /**< the true file number depending on FS */
     int fdflags;              /**< POSIX file descriptor flags */
+    int shared_status;        /**< status shared with another desc or process */
     pvfs_descriptor_status *s;
 } pvfs_descriptor;
 

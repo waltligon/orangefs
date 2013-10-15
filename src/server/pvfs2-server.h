@@ -156,7 +156,8 @@ typedef enum
     SERVER_UID_MGMT_INIT       = (1 << 19), 
     SERVER_SECURITY_INIT       = (1 << 20),
     SERVER_CAPCACHE_INIT       = (1 << 21),
-    SERVER_CERTCACHE_INIT      = (1 << 22)
+    SERVER_CREDCACHE_INIT      = (1 << 22),
+    SERVER_CERTCACHE_INIT      = (1 << 23)
 } PINT_server_status_flag;
 
 typedef enum

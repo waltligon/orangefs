@@ -9,6 +9,8 @@
 #ifndef __JOB_H
 #define __JOB_H
 
+#include "pvfs2-internal.h"
+
 #ifdef WIN32
 #include "wincommon.h"
 #else

@@ -8,10 +8,11 @@
 #ifndef __TCACHE_H
 #define __TCACHE_H
 
+#include "pvfs2-internal.h"
 #ifndef WIN32
-#include <sys/time.h>
+# include <sys/time.h>
 #else
-#include "wincommon.h"
+# include "wincommon.h"
 #endif
 #include "pvfs2-types.h"
 #include "quicklist.h"
@@ -107,7 +108,7 @@ struct PINT_tcache
     unsigned int num_entries;   /**< current number of entries in tcache */
     unsigned int hard_limit;    /**< hard limit on number of entries */
     unsigned int soft_limit;    /**< soft limit on number of entries */
-    unsigned int reclaim_percentage;    /**< what percentage to reclaim at soft limit */
+    unsigned int reclaim_percentage; /**< what percentage to reclaim at soft limit */
     enum PINT_tcache_replace_algorithms replacement_algorithm; /**< what algorithm to use to find entry to replace */
     unsigned int enable;        /**< is the cache enabled? */
 

@@ -7,6 +7,7 @@
 #ifndef __PINT_PERF_COUNTER_H
 #define __PINT_PERF_COUNTER_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gen-locks.h"

@@ -121,7 +121,7 @@ static ssize_t pvfs2_devreq_read(
             /* Check if this op's fsid is known and needs remounting */
             if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+                gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %llu %s\n", llu(op->tag), get_opname_string(op));
                 continue;
             }
             /* op does not belong to any particular fsid or already 
@@ -154,7 +154,7 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
+        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %llu %s\n", llu(cur_op->tag), get_opname_string(cur_op));
         if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
             if (cur_op->op_linger == 1)

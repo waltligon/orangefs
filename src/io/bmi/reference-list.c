@@ -16,6 +16,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "reference-list.h"
 #include "gossip.h"
 #include "id-generator.h"

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "pvfs2-internal.h"
 #include "internal.h"
 #include "state.h"
 #include "flags.h"

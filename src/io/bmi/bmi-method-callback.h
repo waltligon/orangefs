@@ -7,6 +7,7 @@
 #ifndef __BMI_METHOD_CALLBACK_H
 #define __BMI_METHOD_CALLBACK_H
 
+#include "pvfs2-internal.h"
 #include "bmi-method-support.h"
 
 BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map);

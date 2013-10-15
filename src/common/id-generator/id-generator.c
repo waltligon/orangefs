@@ -14,6 +14,7 @@
 #include "id-generator.h"
 #include "quickhash.h"
 #include "gen-locks.h"
+#include "pvfs2-internal.h"
 
 #define DEFAULT_ID_GEN_SAFE_TABLE_SIZE 997
 

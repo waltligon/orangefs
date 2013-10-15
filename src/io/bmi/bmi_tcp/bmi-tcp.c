@@ -6,6 +6,8 @@
 
 /* TCP/IP implementation of a BMI method */
 
+#include "pvfs2-internal.h"
+
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,9 +21,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "pint-mem.h"
+/* #include "pint-mem.h" obsolete */
 
-#include "pvfs2-config.h"
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
@@ -665,12 +666,15 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 void *BMI_tcp_memalloc(bmi_size_t size,
 		       enum bmi_op_type send_recv)
 {
+    void *ptr;
     /* we really don't care what flags the caller uses, TCP/IP has no
      * preferences about how the memory should be configured.
      */
 
-/*    return (calloc(1,(size_t) size)); */
-    return PINT_mem_aligned_alloc(size, 4096);
+    /* return (calloc(1,(size_t) size)); */
+    /* return PINT_mem_aligned_alloc(size, 4096); */
+    posix_memalign(&ptr, 4096, size);
+    return ptr;
 }
 
 
@@ -684,7 +688,8 @@ int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv)
 {
-    PINT_mem_aligned_free(buffer);
+    /*PINT_mem_aligned_free(buffer);*/
+    free(buffer);
     return (0);
 }
 
@@ -2267,6 +2272,8 @@ static int enqueue_operation(op_list_p target_list,
     struct tcp_addr* tcp_addr_data = NULL;
     int i;
 
+    gossip_lerr("Entering enqueue_operation...\n");
+
     /* allocate the operation structure */
     new_method_op = alloc_tcp_method_op();
     if (!new_method_op)
@@ -2676,6 +2683,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
                             list_count, 0, 0, id, BMI_TCP_INPROGRESS,
                             bogus_header, user_ptr, 0,
                             expected_size, context_id, eid);
+    gossip_lerr("%s:Returned from enqueue_operation...\n",__func__);
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
     /* TODO: figure out why this causes deadlocks; observable in 2

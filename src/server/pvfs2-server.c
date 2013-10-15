@@ -46,11 +46,15 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
 #ifdef ENABLE_CAPCACHE
 #include "capcache.h"
+#endif
+#ifdef ENABLE_CREDCACHE
+#include "credcache.h"
 #endif
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
@@ -200,6 +204,9 @@ int main(int argc, char **argv)
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
+
+    /* Set up out malloc wrapper by grabbing pointers to glibc malloc */
+    init_glibc_malloc();
 
     /* Enable the gossip interface to send out stderr and set an
      * initial debug mask so that we can output errors at startup.
@@ -596,6 +603,19 @@ static int server_initialize(
     *server_status_flag |= SERVER_CAPCACHE_INIT;
 #endif /* ENABLE_CAPCACHE */
 
+#ifdef ENABLE_CREDCACHE
+    /* initialize the credential cache */
+    ret = PINT_credcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize credential cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CREDCACHE_INIT;
+#endif
+
 #ifdef ENABLE_CERTCACHE
     /* initialize the certificate cache */
     ret = PINT_certcache_init();
@@ -900,7 +920,8 @@ static int server_initialize_subsystems(
             break;
         }
 
-        ret = PINT_cached_config_handle_load_mapping(cur_fs);
+        ret = PINT_cached_config_handle_load_mapping(cur_fs,
+                &server_config);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
@@ -2022,7 +2043,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if(argc < optind)
+    if(argc <= optind)
     {
         gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;

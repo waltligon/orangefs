@@ -11,6 +11,8 @@
 #ifndef __FLOW_H
 #define __FLOW_H
 
+#include "pvfs2-internal.h"
+
 #include "gen-locks.h"
 #include "quicklist.h"
 #include "pvfs2-types.h"

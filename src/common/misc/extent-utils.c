@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 #include <ctype.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "str-utils.h"
 #include "extent-utils.h"

@@ -600,6 +600,18 @@
 /* sub version number */
 #define PVFS2_VERSION_SUB 0
 
+/* Should we have malloc zero freed memory */
+#define PVFS_MALLOC_FREE_ZERO 0
+
+/* Should we have malloc check a magic number. */
+#define PVFS_MALLOC_MAGIC 0
+
+/* Should we redefine malloc. */
+#define PVFS_MALLOC_REDEF 0
+
+/* Should we have malloc zero new memory. */
+#define PVFS_MALLOC_ZERO 0
+
 /* Should we build user interface acl routines. */
 /* #undef PVFS_HAVE_ACL_INCLUDES */
 

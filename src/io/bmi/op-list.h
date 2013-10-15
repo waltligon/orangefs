@@ -13,6 +13,7 @@
 #ifndef __OP_LIST_H
 #define __OP_LIST_H
 
+#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "bmi-types.h"
 #include "bmi-method-support.h"

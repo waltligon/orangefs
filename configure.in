@@ -68,25 +68,36 @@ AC_CHECK_HEADER([stdint.h],
         [AC_DEFINE(HAVE_STDINT_H, 1, Define if stdint.h exists)])
 AC_CHECK_HEADER([stdlib.h],
         [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+AC_CHECK_HEADER([stdio.h],
+        [AC_DEFINE(HAVE_STDIO_H, 1, Define if stdio.h exists)])
+AC_CHECK_HEADER([fcntl.h],
+        [AC_DEFINE(HAVE_FCNTL_H, 1, Define if fcntl.h exists)])
+AC_CHECK_HEADER([utime.h],
+        [AC_DEFINE(HAVE_UTIME_H, 1, Define if utime.h exists)])
+AC_CHECK_HEADER([string.h],
+        [AC_DEFINE(HAVE_STRING_H, 1, Define if string.h exists)])
 AC_CHECK_HEADER([strings.h],
         [AC_DEFINE(HAVE_STRINGS_H, 1, Define if strings.h exists)])
-AC_CHECK_HEADER([stdlib.h],
-        [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+AC_CHECK_HEADER([assert.h],
+        [AC_DEFINE(HAVE_ASSERT_H, 1, Define if assert.h exists)])
+AC_CHECK_HEADER([libgen.h],
+        [AC_DEFINE(HAVE_LIBGEN_H, 1, Define if libgen.h exists)])
+AC_CHECK_HEADER([dirent.h],
+        [AC_DEFINE(HAVE_DIRENT_H, 1, Define if dirent.h exists)])
+AC_CHECK_HEADER([time.h],
+        [AC_DEFINE(HAVE_TIME_H, 1, Define if time.h exists)])
+AC_CHECK_HEADER([dlfcn.h],
+        [AC_DEFINE(HAVE_DLFCN_H, 1, Define if dlfcn.h exists)])
 
 AC_CHECK_HEADER([linux/types.h],
         [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
 AC_CHECK_HEADER([linux/malloc.h],
         [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
 
-dnl Kernel Headers checked in maint/config/kernel.m4
-dnl AC_CHECK_HEADERS([linux/compat.h])
-dnl AC_CHECK_HEADERS([linux/exportfs.h])
-dnl AC_CHECK_HEADERS([linux/ioctl32.h])
-dnl AC_CHECK_HEADERS([linux/mount.h])
-dnl AC_CHECK_HEADERS([linux/posix_acl.h])
-dnl AC_CHECK_HEADERS([linux/posix_acl_xattr.h])
-dnl AC_CHECK_HEADERS([linux/syscalls.h])
-dnl AC_CHECK_HEADERS([linux/xattr_acl.h])
+AC_CHECK_HEADER([selinux/selinux.h],
+        [AC_DEFINE(HAVE_SELINUX_H, 1, Define if selinux/selinux.h exists)])
+
+dnl Kernel Headers checked in maint/kernel.m4
 
 AC_CHECK_HEADER([sys/vfs.h],
 		[AC_DEFINE(HAVE_SYS_VFS_H, 1, Define if sys/vfs.h exists)])
@@ -102,6 +113,14 @@ AC_CHECK_HEADER([sys/sendfile.h],
         [AC_DEFINE(HAVE_SYS_SENDFILE_H, 1, Define if sys/sendfile.h exists)])
 AC_CHECK_HEADER([sys/xattr.h],
         [AC_DEFINE(HAVE_SYS_XATTR_H, 1, Define if sys/xattr.h exists)])
+AC_CHECK_HEADER([sys/statvfs.h],
+        [AC_DEFINE(HAVE_SYS_STATVFS_H, 1, Define if sys/statvfs.h exists)])
+AC_CHECK_HEADER([sys/uio.h],
+        [AC_DEFINE(HAVE_SYS_UIO_H, 1, Define if sys/uio.h exists)])
+AC_CHECK_HEADER([sys/mman.h],
+        [AC_DEFINE(HAVE_SYS_MMAN_H, 1, Define if sys/mman.h exists)])
+AC_CHECK_HEADER([sys/time.h],
+        [AC_DEFINE(HAVE_SYS_TIME_H, 1, Define if sys/time.h exists)])
 
 AC_CHECK_HEADER([arpa/inet.h],
         [AC_DEFINE(HAVE_ARPA_INET_H, 1, Define if arpa/inet.h exists)])
@@ -277,7 +296,7 @@ AC_SUBST(ENABLE_SECURITY_CERT)
 
 dnl check for Capability Cache
 AC_ARG_ENABLE(capcache,
-[  --disable-capcache   Disable server capability cache],
+[  --disable-capcache      Disables server capability cache],
 [if test "x$enableval" = "xyes" ; then
     ENABLE_CAPCACHE=1
     AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
@@ -293,9 +312,27 @@ fi]
 )
 AC_SUBST(ENABLE_CAPCACHE)
 
+dnl check for Credential Cache
+AC_ARG_ENABLE(credcache,
+[  --disable-credcache     Disables server credential cache],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_CREDCACHE=1
+    AC_DEFINE(ENABLE_CREDCACHE, 1, Define if credential cache is enabled)
+else
+    ENABLE_CREDCACHE=
+fi],
+[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
+    ENABLE_CREDCACHE=1
+    AC_DEFINE(ENABLE_CREDCACHE, 1, Define if credential cache is enabled)
+else
+    ENABLE_CREDCACHE=
+fi]
+)
+AC_SUBST(ENABLE_CREDCACHE)
+
 dnl check for Certificate Cache
 AC_ARG_ENABLE(certcache,
-[  --disable-certcache  Disable server certificate cache],
+[  --disable-certcache     Disables server certificate cache],
 [if test "x$enableval" = "xyes" ; then
     ENABLE_CERTCACHE=1
     AC_DEFINE(ENABLE_CERTCACHE, 1, Define if certificate cache is enabled)
@@ -321,11 +358,17 @@ if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) 
     AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
 fi
 
-dnl Capability cache only valid in security mode
+dnl Capability cache only valid in security modes
 if test "x$ENABLE_CAPCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([capability cache can only be used in key- or certificate-based security mode])
 fi
 
+dnl Credential cache only valid in security modes
+if test "x$ENABLE_CREDCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
+    AC_MSG_ERROR([credential cache can only be used in key- or certificate-based security mode])
+fi
+
+dnl Certificate cache only valid in certificate-based security mode
 if test "x$ENABLE_CERTCACHE" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([certificate cache can only be used in certificate-based security mode])
 fi
@@ -340,7 +383,7 @@ fi
 
 dnl enable profiling
 AC_ARG_ENABLE(profiling,
-[  --enable-profiling  Enable simple profiling],
+[  --enable-profiling      Enables simple profiling],
 [if test "x$enableval" = "xyes" ; then
     ENABLE_PROFILING=1
     AC_DEFINE(ENABLE_PROFILING, 1, Define if profiling is enabled)
@@ -675,6 +718,8 @@ dnl
 dnl Enables the kernel module to build if the appropriate
 dnl linux-2.6.x path is specified
 dnl Make sure this is a usable kernel source tree too.
+dnl version.h moved with kernel 3.7, so check for it in the 
+dnl new place too.
 dnl
 AC_ARG_WITH(kernel,
 [  --with-kernel=srcpath   Build pvfs2 kernel module against 2.6.x src],
@@ -684,7 +729,7 @@ AC_ARG_WITH(kernel,
     if ! test -d $withval ; then
            AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
     fi
-    if ! test -r $withval/include/linux/version.h ; then
+    if ! test -r $withval/include/linux/version.h && ! test -r $withval/include/generated/uapi/linux/version.h; then
        AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
 
@@ -865,6 +910,7 @@ if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
     CFLAGS="$CFLAGS -g $CC_OPT"
 fi
 
+
 dnl Options that are not yet working
 dnl --------------------------------
 dnl AC_ARG_ENABLE(profiling,
@@ -952,8 +998,9 @@ AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
-[  --enable-shared         Build shared client library],
-[build_shared=$enableval], [build_shared=no])
+    [  --enable-shared         Build shared client library],
+    [build_shared=$enableval],
+    [build_shared=no])
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static
@@ -962,26 +1009,73 @@ if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
     AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
 fi
 
+dnl shared or static client library
+AC_ARG_ENABLE(threaded,
+    [  --disable-threaded      Do not build threaded client library],
+    [if "x$THREADED_KMOD_HELPER = xyes" ; then
+         build_threaded=yes
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
+     else
+         build_threaded=$enableval
+     fi
+    ],
+    [build_threaded=yes])
+AC_SUBST(build_threaded)
+
 dnl Method to disable build of user interface libraries
 BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
-[  --disable-usrint        Do not build posix and stdio user libraries],
-[if test "x$enableval" = "xyes" ; then
-   AC_DEFINE(PVFS_USRINT_BUILD, 1,
-      [Should we build user interface libraries.])
-   BUILD_USRINT=1
-else
-   AC_DEFINE(PVFS_USRINT_BUILD, 0,
-      [Should we build user interface libraries.])
+   [  --disable-usrint        Do not build posix and stdio user libraries],
+   [if test "x$enableval" = "xyes" ; then
+       AC_DEFINE(PVFS_USRINT_BUILD, 1,
+                 [Should we build user interface libraries.])
+       BUILD_USRINT=1
+    else
+       AC_DEFINE(PVFS_USRINT_BUILD, 0,
+                 [Should we build user interface libraries.])
+    fi
+    build_usrint=$enableval
+   ],
+   [AC_DEFINE(PVFS_USRINT_BUILD, 1,
+              [Should we build user interface libraries.])
+    build_usrint=yes
+    BUILD_USRINT=1
+   ])
+AC_SUBST(build_usrint)
+
+if test "x$build_usrint" = "xyes"; then
+	dnl check if -lrt is required by usrint
+	AX_CHECK_LIB_NEEDS_LIBRT
 fi
-AC_SUBST(BUILD_USRINT)],
-[AC_DEFINE(PVFS_USRINT_BUILD, 1,
-    [Should we build user interface libraries.])
-BUILD_USRINT=1
-AC_SUBST(BUILDUSRINT)])
  
-USRINT_KMOUNT=
+dnl libofs is ALWAYS symbolic, others should never be
+dnl
+dnl Method to enable symbolic user interface libraries
+dnl BUILD_SYMBOLIC=
+dnl AC_ARG_ENABLE(symbolic,
+dnl    [  --enable-symbolic  Build library to force programs to use libofs.so],
+dnl    [if test "x$enableval" = "xyes" ; then
+dnl       if test "x$build_usrint" = "xyes" -a "x$build_shared" = "xyes" ; then
+dnl          AC_DEFINE(PVFS_USRINT_SYMBOLIC, 1,
+dnl                [Build library to force programs to use libofs.so.])
+dnl          BUILD_SYMBOLIC=1
+dnl       else
+dnl          AC_MSG_ERROR([Must build usrint and shared to build symbolic library.])
+dnl       fi
+dnl    else
+dnl       AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
+dnl                 [Build library to force programs to use libofs.so.])
+dnl    fi
+dnl    build_symbolic=$enableval
+dnl    ],
+dnl    [AC_DEFINE(PVFS_USRINT_SYMBOLIC, 0,
+dnl               [Build library to force programs to use libofs.so.])
+dnl     build_symbolic=no
+dnl    ])
+dnl AC_SUBST(build_symbolic)
+ 
 dnl Method to enable user interface kmod support
+USRINT_KMOUNT=
 AC_ARG_ENABLE(usrint-kmount,
 [  --enable-usrint-kmount  Assume FS is mounted via kernel],
 [if test "x$enableval" = "xyes" ; then
@@ -1017,6 +1111,91 @@ else
    AC_DEFINE(PVFS_USRINT_CWD, 1,
       [Should we enable user interface CWD support.])
 fi])
+
+dnl Method to disable usrint redefining stdin stdout stderr as PVFS streams
+AC_ARG_ENABLE(stdio-redefstream,
+[  --disable-stdio-redefstream    Do not redefine stdin stdout stderr as PVFS streams],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 1,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+else
+   AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 0,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+fi],
+[AC_DEFINE(PVFS_STDIO_REDEFSTREAM, 1,
+      [Should we redefine stdin stdout stderr as PVFS streams.])
+])
+
+dnl Method to disable redefining malloc
+AC_ARG_ENABLE(malloc-redef,
+[  --disable-malloc-redef  Do not redefine malloc],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_REDEF, 1,
+      [Should we redefine malloc.])
+   MALLOC_REDEF=1
+else
+   AC_DEFINE(PVFS_MALLOC_REDEF, 0,
+      [Should we redefine malloc.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_REDEF, 1,
+      [Should we redefine malloc.])
+MALLOC_REDEF=1
+])
+
+dnl Method to disable malloc checking a magic number
+AC_ARG_ENABLE(malloc-magic,
+[  --disable-malloc-magic  Do not have malloc check a magic number],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_MAGIC, 1,
+      [Should we have malloc check a magic number.])
+else AC_DEFINE(PVFS_MALLOC_MAGIC, 0,
+      [Should we have malloc check a magic number.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_MAGIC, 1,
+      [Should we have malloc check a magic number.])
+])
+
+dnl Method to disable malloc zeroing new memory
+AC_ARG_ENABLE(malloc-zero,
+[  --disable-malloc-zero   Do not have malloc zero new memory],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_ZERO, 1,
+      [Should we have malloc zero new memory.])
+else AC_DEFINE(PVFS_MALLOC_ZERO, 0,
+      [Should we have malloc zero new memory.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_ZERO, 1,
+      [Should we have malloc zero new memory.])
+])
+
+dnl Method to disable malloc zeroing freed memory
+AC_ARG_ENABLE(malloc-free-zero,
+[  --disable-malloc-free-zero    Do not have malloc zero freed memory],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 1,
+      [Should we have malloc zero freed memory.])
+else AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 0,
+      [Should we have malloc zero freed memory.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_FREE_ZERO, 1,
+      [Should we have malloc zero freed memory.])
+])
+
+dnl Check for O_CLOEXEC flag in open()
+AC_MSG_CHECKING([for O_CLOEXEC flag in open()])
+AC_TRY_COMPILE(
+    [
+     	#include <fcntl.h>
+    ], 
+    [
+    	int flags;
+        flags = O_CLOEXEC;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_O_CLOEXEC, 1, Define if open() has O_CLOEXEC flag)
+    ,
+    AC_MSG_RESULT(no)
+)
 
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
@@ -1055,8 +1234,7 @@ AC_ARG_WITH(
     [  --with-jdk=<path>       Enable support for JAVA and JNI.],
     [
         dnl Check for jni.h
-        AC_CHECK_HEADER(
-            [$withval/include/jni.h],
+        AC_CHECK_FILE($withval/include/jni.h,
             [
                 AC_DEFINE(HAVE_JNI_H, 1, Define if jni.h exists at the path given with --with-jdk)
                 JAVA_HOME=$withval
@@ -1093,12 +1271,12 @@ AC_ARG_ENABLE(
 )
 AC_SUBST(BUILD_JNI)
 
-HADOOP_DIR=
+HADOOP_PREFIX=
 AC_ARG_WITH(
     hadoop,
     [  --with-hadoop=<path>    Enables support for OrangeFS extensions of Hadoop classes.],
     [
-        HADOOP_DIR=$withval;
+        HADOOP_PREFIX=$withval;
         corepath=`ls $withval/hadoop-core*`
         AC_CHECK_FILE($corepath,
             [],
@@ -1109,7 +1287,7 @@ AC_ARG_WITH(
     ],
     [   with_hadoop=no]
 )
-AC_SUBST(HADOOP_DIR)
+AC_SUBST(HADOOP_PREFIX)
 
 dnl Method to enable OrangeFS extensions to Hadoop classes.
 BUILD_HADOOP=
@@ -1117,7 +1295,7 @@ AC_ARG_ENABLE(
     hadoop,
     [  --enable-hadoop         Enables OrangeFS extenions of Hadoop classes. Requires --enable-jni --with-jdk and --with-hadoop.],
     [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP_DIR" = "x"; then
+            if test "x$HADOOP_PREFIX" = "x"; then
                 AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --with-hadoop=path.)
             fi
             if test "$BUILD_JNI" != "1"; then
@@ -1203,7 +1381,7 @@ AC_SUBST(INTELC)
 AC_SUBST(GNUC)
 
 AC_ARG_WITH(efence,
-[  --with-efence=<path>    Use electric fence for malloc debugging],
+[  --with-efence=<path>    Use electric fence for malloc debugging.],
        if test "x$withval" != "xyes" ; then
               LDFLAGS="${LDFLAGS} -L$withval"
        fi
@@ -1215,7 +1393,7 @@ dnl is not in the usual location.  It is common to install the header
 dnl in a subdirectory, so look for that too.  Leave the include path
 dnl in CPPFLAGS if it is not a standard header.
 AC_ARG_WITH(valgrind,
-[  --with-valgrind[=<path>]  Use valgrind annotations for debugging], [
+[  --with-valgrind[=<path>]  Use valgrind annotations for debugging.], [
     found=no
     save_cppflags="$CPPFLAGS"
     AC_MSG_CHECKING(for valgrind.h usability)
@@ -1266,7 +1444,9 @@ case "$host_os" in
     *darwin*)
 	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
     	TARGET_OS_DARWIN=1
+        CFLAGS="$CFLAGS -D__DARWIN__"
 	AC_SUBST(TARGET_OS_DARWIN)
+        AC_SUBST(CFLAGS)
     ;;
     *linux*)
 	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)
@@ -1567,15 +1747,42 @@ fi
 ],
 )
 
+dnl Do we have strerror_r?
+AC_MSG_CHECKING([for strerror_r])
+AC_TRY_COMPILE(
+    [
+	  #include <string.h>
+    ],
+    [
+      int errnum, buflen;
+      char *buf;
+      strerror_r(errnum, buf, buflen);
+    ],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_STRERROR_R, 1, Define if have strerror_r)
+      AC_DEFINE(HAVE_DECL_STRERROR_R, 1, Define if have strerror_r)
+    ]
+    ,
+    AC_MSG_RESULT(no)
+)
+
 dnl Which form of strerror?
 AC_MSG_CHECKING([for GNU-style strerror_r])
 AC_TRY_COMPILE(
     [
-	#include <string.h>
-	extern char *strerror_r();
-    ], [],
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
+	  #include <string.h>
+    ],
+    [
+      int errnum, buflen;
+      char *buf, *ret;
+      ret = strerror_r(errnum, buf, buflen);
+    ],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
+      AC_DEFINE(STRERROR_R_CHAR_P, 1, Define if strerror_r return char ptr)
+    ]
     ,
     AC_MSG_RESULT(no)
 )
@@ -1636,6 +1843,7 @@ src/io/dev/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
+src/client/jni/module.mk
 src/client/sysint/module.mk
 src/client/usrint/module.mk
 src/kernel/linux-2.6/Makefile
@@ -1738,6 +1946,12 @@ else
    AC_MSG_RESULT([PVFS2 server capability cache enabled             :  no])
 fi
 
+if test "x$ENABLE_CREDCACHE" = "x1"; then
+   AC_MSG_RESULT([PVFS2 server credential cache enabled             : yes])
+else
+   AC_MSG_RESULT([PVFS2 server credential cache enabled             :  no])
+fi
+
 if test "x$ENABLE_CERTCACHE" = "x1"; then
    AC_MSG_RESULT([PVFS2 server certificate cache enabled            : yes])
 else
@@ -1774,10 +1988,22 @@ else
    AC_MSG_RESULT([PVFS2 user interface libraries will be built      :  no])
 fi
 
+if test "x$BUILD_SYMBOLIC" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 symbolic libraries will be built            : yes])
+else
+   AC_MSG_RESULT([PVFS2 symbolic libraries will be built            :  no])
+fi
+
 if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
+fi
+
+if test "x$MALLOC_REDEF" = "x1" ; then
+   AC_MSG_RESULT([Malloc will be redefined                          : yes])
+else
+   AC_MSG_RESULT([Malloc will be redefined                          :  no])
 fi
 
 if test "x$BUILD_JNI" = "x1" ; then

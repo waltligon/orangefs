@@ -3,158 +3,130 @@
  *
  * See COPYING in top-level directory.
  */
-
 package org.apache.hadoop.fs.ofs;
 
-import java.io.IOException;
-import org.orangefs.usrint.*;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Seekable;
-import org.apache.hadoop.fs.PositionedReadable;
 import java.io.Closeable;
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.PositionedReadable;
+import org.apache.hadoop.fs.Seekable;
+import org.orangefs.usrint.OrangeFileSystemInputStream;
 
-public class OrangeFileSystemFSInputStream 
-        extends OrangeFileSystemInputStream 
+public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
         implements Closeable, Seekable, PositionedReadable {
-
     private FileSystem.Statistics statistics;
+    public static final Log OFSLOG = LogFactory
+            .getLog(OrangeFileSystemFSInputStream.class);
 
-    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemFSInputStream.class);
-
-    /* Constructor Passes Params to Parent Class and initializes stats */
-    public OrangeFileSystemFSInputStream(
-            String path,
-            int bufferSize,
+    /*
+     * Constructor passes parameters to parent class and initializes statistics
+     */
+    public OrangeFileSystemFSInputStream(String path, int bufferSize,
             FileSystem.Statistics statistics) throws IOException {
-        /* Initialize Parent Class Using Params */
         super(path, bufferSize);
-        displayMethodInfo(true, false);
         this.statistics = statistics;
     }
 
+    /* *** This method declared abstract in FSInputStream *** */
+    @Override
+    public long getPos() throws IOException {
+        return super.tell();
+    }
+
     /* Override parent class implementation to include FileSystem.Statistics */
+    @Override
     public synchronized int read() throws IOException {
-        displayMethodInfo(true, false);
         int ret = super.read();
-        if(ret != -1 && statistics != null) {
-            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: int ret = " + ret + " >>>>>");
+        if (ret != -1 && statistics != null) {
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: int ret = "
+                    + ret + " >>>>>");
             statistics.incrementBytesRead(1);
         }
-        if(statistics == null) {
-            OFSLOG.debug("couldn't increment statistics: statistics is null!");
+        if (statistics == null) {
+            OFSLOG.warn("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }
 
     /* Override parent class implementation to include FileSystem.Statistics */
+    @Override
     public synchronized int read(byte[] b) throws IOException {
-        displayMethodInfo(true, false);
         int ret = super.read(b);
-        if(ret > 0 && statistics != null) {
+        if (ret > 0 && statistics != null) {
             statistics.incrementBytesRead(ret);
-            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: byte[] ret = " + ret + " >>>>>");
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: byte[] ret = "
+                    + ret + " >>>>>");
         }
-        if(statistics == null) {
-            OFSLOG.debug("couldn't increment statistics: statistics is null!");
+        if (statistics == null) {
+            OFSLOG.warn("couldn't increment statistics: statistics is null!");
         }
-
         return ret;
     }
 
     /* Override parent class implementation to include FileSystem.Statistics */
+    @Override
     public synchronized int read(byte[] b, int off, int len) throws IOException {
-        displayMethodInfo(true, false);
         int ret = super.read(b, off, len);
-        if(ret > 0 && statistics != null) {
-            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: off ret = " + ret + " >>>>>");
+        if (ret > 0 && statistics != null) {
+            OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: off ret = "
+                    + ret + " >>>>>");
             statistics.incrementBytesRead(ret);
         }
-        if(statistics == null) {
+        if (statistics == null) {
             OFSLOG.debug("couldn't increment statistics: statistics is null!");
         }
         return ret;
     }
 
-    /* *** This method declared abstract in FSInputStream *** */
-    public long getPos() throws IOException {
-        displayMethodInfo(true, false);
-        if(filePtr == 0) {
-            throw new IOException("Invalid filePtr");
-        }
-        long rc = orange.stdio.ftell(filePtr);
-        if(rc < 0) {
-            throw new IOException("getPos failed on file: " + path);
-        }
-        return rc;
-    }
-
-    /* *** This method declared abstract in FSInputStream *** */
-    public synchronized void seek(long pos) throws IOException {
-        displayMethodInfo(true, false);
-        int rc = 0;
-        if(filePtr == 0) {
-            throw new IOException("Invalid filePtr");
-        }
-        if((rc = orange.stdio.fseek(filePtr, pos, sf.SEEK_SET)) != 0) {
-            throw new IOException("seek failed on file: " + path + 
-                "\nlong pos = " + pos + "\nrc = " + rc);
-        }
-    }
-
-    /* *** This method declared abstract in FSInputStream *** */
-    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
-        displayMethodInfo(true, false);
-        return false;
-    }
-
     /* This method has an implementation in abstract class FSInputStream */
-    public int read(long position,
-                byte[] buffer,
-                int offset,
-                int length)
+    @Override
+    public int read(long position, byte[] buffer, int offset, int length)
             throws IOException {
-        displayMethodInfo(true, false);
-        /* TODO */
+        long oldPos = getPos();
         seek(position);
-        return read(buffer, offset, length);
-    }
-
-    /* This method has an implementation in abstract class FSInputStreama */
-    public void readFully(long position,
-                      byte[] buffer)
-               throws IOException {
-        displayMethodInfo(true, false);
-        /* TODO */
-        seek(position);
-        read(buffer);
+        int ret = read(buffer, offset, length);
+        seek(oldPos);
+        return ret;
     }
 
     /* This method has an implementation in abstract class FSInputStream */
-    public void readFully(long position,
-                      byte[] buffer,
-                      int offset,
-                      int length)
-               throws IOException {
-        displayMethodInfo(true, false);
-        /* TODO */
+    @Override
+    public void readFully(long position, byte[] buffer) throws IOException {
+        long oldPos = getPos();
         seek(position);
-        read(buffer, offset, length);
+        int ret = read(buffer);
+        if (ret < buffer.length) {
+            throw new IOException("readFully read < buffer.length bytes.");
+        }
+        seek(oldPos);
     }
 
-    public void displayMethodInfo(boolean showName, boolean showStack) {
-        if(showName || showStack) {
-            String methodName =
-                Thread.currentThread().getStackTrace()[2].getMethodName();
-            if(showName) {
-                OFSLOG.debug("method=[" + methodName + "]");
-                
-            }
-            if(showStack) {
-                //System.out.print("\t");
-                //Thread.currentThread().dumpStack();
-            }
+    /* This method has an implementation in abstract class FSInputStream */
+    @Override
+    public void readFully(long position, byte[] buffer, int offset, int length)
+            throws IOException {
+        long oldPos = getPos();
+        seek(position);
+        int ret = read(buffer, offset, length);
+        if (ret < length) {
+            throw new IOException("readFully read < buffer.length bytes.");
         }
+        seek(oldPos);
+    }
+
+    /* *** This method declared abstract in FSInputStream *** */
+    @Override
+    public synchronized void seek(long pos) throws IOException {
+        super.seek(pos);
+    }
+
+    /* *** This method declared abstract in FSInputStream *** */
+    @Override
+    public synchronized boolean seekToNewSource(long targetPos)
+            throws IOException {
+        return false;
     }
 }
