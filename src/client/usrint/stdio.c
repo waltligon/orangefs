@@ -1008,14 +1008,6 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rsz / size; /* num items written */
 }
 
-/**
- * __fread_chk
- */
-size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
-{
-    return fread(ptr, size, nmemb, stream);
-}
-
 /*
  * fread implements the same buffer scheme as in fwrite
  */
@@ -1048,11 +1040,11 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 /**
- * __fread_unlocked_chk
+ * __fread_chk
  */
-size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    return fread_unlocked(ptr, size, nmemb, stream);
+    return fread(ptr, size, nmemb, stream);
 }
 
 size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -1192,6 +1184,14 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 /**
+ * __fread_unlocked_chk
+ */
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread_unlocked(ptr, size, nmemb, stream);
+}
+
+/**
  * fcloseall closes all open streams
  */
 int fcloseall(void)
@@ -1300,24 +1300,6 @@ int fclose(FILE *stream)
         free(stream);
     }
     return rc;
-}
-
-/**
- * fseek wrapper
- */
-int fseek(FILE *stream, long offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
-}
-
-int fseeko(FILE *stream, off_t offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
-}
-
-int fseeko64(FILE *stream, off64_t offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
 }
 
 /** This is the main code for seeking on a stream
@@ -1462,6 +1444,24 @@ exitout:
 }
 
 /**
+ * fseek wrapper
+ */
+int fseek(FILE *stream, long offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+int fseeko(FILE *stream, off_t offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+int fseeko64(FILE *stream, off64_t offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+/**
  * fsetpos wrapper
  */
 int fsetpos(FILE *stream, const fpos_t *pos)
@@ -1559,40 +1559,6 @@ int fgetpos64(FILE *stream, fpos64_t *pos)
     return 0;
 }
 
-/** forces a write back of potentially dirty buffer
- * 
- *  we don't have a dirty flag, so if user seeks
- *  ahead within the buffer then does a flush
- *  we will do an uncessary write
- */
-int fflush(FILE *stream)
-{
-    int rc = 0;
-
-    PVFS_INIT(init_stdio);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fflush(stream);
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-#if !PVFS_STDIO_ON_LIBC_STREAMS
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fflush(stream);
-        }
-#endif
-        errno = EINVAL;
-        return -1;
-    }
-    lock_stream(stream);
-    rc = fflush_unlocked(stream);
-    unlock_stream(stream);
-    return rc;
-}
-
 int fflush_unlocked(FILE *stream)
 {
     int rc;
@@ -1650,6 +1616,87 @@ int fflush_unlocked(FILE *stream)
     return 0;
 }
 
+/** forces a write back of potentially dirty buffer
+ * 
+ *  we don't have a dirty flag, so if user seeks
+ *  ahead within the buffer then does a flush
+ *  we will do an uncessary write
+ */
+int fflush(FILE *stream)
+{
+    int rc = 0;
+
+    PVFS_INIT(init_stdio);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fflush(stream);
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fflush(stream);
+        }
+#endif
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fflush_unlocked(stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+int fputc_unlocked(int c, FILE *stream)
+{
+    int rc GCC_UNUSED;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputc_unlocked(c, stream);
+    }
+#endif
+    rc = fwrite_unlocked(&c, 1, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return c;
+}
+
+int fputs_unlocked(const char *s, FILE *stream)
+{
+    size_t len;
+    int rc;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs_unlocked %s %p\n", s, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputs_unlocked(s, stream);
+    }
+#endif
+    if (!s)
+    {
+        errno = EINVAL;
+        return EOF;
+    }
+    len = strlen(s);
+    rc = fwrite_unlocked(s, len, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return rc;
+}
+
 /*
  * fputc wrapper
  */
@@ -1677,83 +1724,6 @@ int fputc(int c, FILE *stream)
     lock_stream(stream);
     rc = fputc_unlocked(c, stream);
     unlock_stream(stream);
-    return rc;
-}
-
-int fputc_unlocked(int c, FILE *stream)
-{
-    int rc GCC_UNUSED;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputc_unlocked(c, stream);
-    }
-#endif
-    rc = fwrite_unlocked(&c, 1, 1, stream);
-    if (ferror(stream))
-    {
-        return EOF;
-    }
-    return c;
-}
-
-/**
- * fputs writes up to a null char
- */
-int fputs(const char *s, FILE *stream)
-{
-    int rc = 0;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs %s %p\n", s, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputs(s, stream);
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fputs(s, stream);
-        }
-        errno = EINVAL;
-        return -1;
-    }
-    lock_stream(stream);
-    rc = fputs_unlocked(s, stream);
-    unlock_stream(stream);
-    return rc;
-}
-
-int fputs_unlocked(const char *s, FILE *stream)
-{
-    size_t len;
-    int rc;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs_unlocked %s %p\n", s, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputs_unlocked(s, stream);
-    }
-#endif
-    if (!s)
-    {
-        errno = EINVAL;
-        return EOF;
-    }
-    len = strlen(s);
-    rc = fwrite_unlocked(s, len, 1, stream);
-    if (ferror(stream))
-    {
-        return EOF;
-    }
     return rc;
 }
 
@@ -1791,6 +1761,36 @@ int putchar(int c)
 int putchar_unlocked(int c)
 {
     return fputc_unlocked(c, stdout);
+}
+
+/**
+ * fputs writes up to a null char
+ */
+int fputs(const char *s, FILE *stream)
+{
+    int rc = 0;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs %s %p\n", s, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputs(s, stream);
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fputs(s, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fputs_unlocked(s, stream);
+    unlock_stream(stream);
+    return rc;
 }
 
 /**
@@ -1838,56 +1838,6 @@ int putw(int wd, FILE *stream)
     return rc;
 }
 
-/**
- * __fgets_chk
- */
-char *__fgets_chk(char *s, size_t size, int n, FILE *stream)
-{
-    return fgets(s, size, stream);
-}
-
-/**
- * fgets reads up to size or a newline
- */
-char *fgets(char *s, int size, FILE *stream)
-{
-    char *rc = NULL;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets %p %d %p\n", s, size, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        rc = stdio_ops.fgets(s, size, stream);
-        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", s);
-        return rc;
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fgets(s, size, stream);
-        }
-        errno = EINVAL;
-        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns NULL\n");
-        return NULL;
-    }
-    lock_stream(stream);
-    rc = fgets_unlocked(s, size, stream);
-    unlock_stream(stream);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
-    return rc;
-}
-
-/**
- * __fgets_unlocked_chk
- */
-char *__fgets_unlocked_chk(char *s, size_t size, int n, FILE *stream)
-{
-    return fgets_unlocked(s, size, stream);
-}
-
 char *fgets_unlocked(char *s, int size, FILE *stream)
 {
     char c, *p;
@@ -1932,6 +1882,56 @@ char *fgets_unlocked(char *s, int size, FILE *stream)
     *p = 0; /* add null terminating char */
     gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns %s\n", s);
     return s;
+}
+
+/**
+ * fgets reads up to size or a newline
+ */
+char *fgets(char *s, int size, FILE *stream)
+{
+    char *rc = NULL;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets %p %d %p\n", s, size, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        rc = stdio_ops.fgets(s, size, stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", s);
+        return rc;
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fgets(s, size, stream);
+        }
+        errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns NULL\n");
+        return NULL;
+    }
+    lock_stream(stream);
+    rc = fgets_unlocked(s, size, stream);
+    unlock_stream(stream);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
+    return rc;
+}
+
+/**
+ * __fgets_chk
+ */
+char *__fgets_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets(s, size, stream);
+}
+
+/**
+ * __fgets_unlocked_chk
+ */
+char *__fgets_unlocked_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets_unlocked(s, size, stream);
 }
 
 /**
@@ -2051,14 +2051,6 @@ int getw(FILE *stream)
 }
 
 /**
- * __gets_check
- */
-char *__gets_chk(char *s, size_t n)
-{
-    return gets(s);
-}
-
-/**
  * gets
  */
 char *gets(char *s)
@@ -2094,6 +2086,14 @@ char *gets(char *s)
 }
 
 /**
+ * __gets_check
+ */
+char *__gets_chk(char *s, size_t n)
+{
+    return gets(s);
+}
+
+/**
  * getline
  *
  * WARNING!!! These potentially allocate memory which is freed by the
@@ -2101,16 +2101,6 @@ char *gets(char *s)
  * malloc and free.  Note PVFS defines its own versions of these as
  * well, and this must be carefully handled.
  */
-ssize_t getline(char **lnptr, size_t *n, FILE *stream)
-{
-    return __getdelim(lnptr, n, '\n', stream);
-}
-
-ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
-{
-    return __getdelim(lnptr, n, delim, stream);
-}
-
 ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
 {
     int i = 0;
@@ -2161,6 +2151,16 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     }
     *p = 0; /* null termintor */
     return i;
+}
+
+ssize_t getline(char **lnptr, size_t *n, FILE *stream)
+{
+    return __getdelim(lnptr, n, '\n', stream);
+}
+
+ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
+{
+    return __getdelim(lnptr, n, delim, stream);
 }
 
 /**
@@ -2231,14 +2231,6 @@ int dprintf(int fd, const char *format, ...)
 }
 
 /**
- * __vdprintf_chk wrapper
- */
-int __vdprintf_chk(int fd, int flag, const char *format, va_list ap)
-{
-    return vdprintf(fd, format, ap); /* this is in libc */
-}
-
-/**
  * vdprintf 
  */
 int vdprintf(int fd, const char *format, va_list ap)
@@ -2260,6 +2252,14 @@ int vdprintf(int fd, const char *format, va_list ap)
         clean_free(buf); /* allocated by libc in vasprintf */
     }
     return rc;
+}
+
+/**
+ * __vdprintf_chk wrapper
+ */
+int __vdprintf_chk(int fd, int flag, const char *format, va_list ap)
+{
+    return vdprintf(fd, format, ap); /* this is in libc */
 }
 
 /**
@@ -2487,11 +2487,6 @@ int feof (FILE *stream)
     return rc;
 }
 
-int _IO_feof_unlocked (_IO_FILE *stream)
-{
-    return feof_unlocked((FILE *)stream);
-}
-
 int feof_unlocked (FILE *stream)
 {
     int rc = 0;
@@ -2519,6 +2514,11 @@ int feof_unlocked (FILE *stream)
     rc = ISFLAGSET(stream, _IO_EOF_SEEN);
     gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked returns %d\n", rc);
     return rc;
+}
+
+int _IO_feof_unlocked (_IO_FILE *stream)
+{
+    return feof_unlocked((FILE *)stream);
 }
 
 /**
@@ -2555,11 +2555,6 @@ int ferror (FILE *stream)
     return rc;
 }
 
-int _IO_ferror_unlocked (_IO_FILE *stream)
-{
-    return ferror_unlocked((FILE *)stream);
-}
-
 int ferror_unlocked (FILE *stream)
 {
 #if !PVFS_STDIO_REDEFSTREAM
@@ -2588,6 +2583,11 @@ int ferror_unlocked (FILE *stream)
     }
     gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
     return ISFLAGSET(stream, _IO_ERR_SEEN);
+}
+
+int _IO_ferror_unlocked (_IO_FILE *stream)
+{
+    return ferror_unlocked((FILE *)stream);
 }
 
 /**
@@ -2655,30 +2655,6 @@ int remove (const char *path)
     if (S_ISDIR(buf.st_mode))
         return rmdir (path);
     return unlink (path);
-}
-
-/**
- *  setbuf wrapper
- */
-void setbuf (FILE *stream, char *buf)
-{
-    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
-}
-
-/**
- *  setbuffer wrapper
- */
-void setbuffer (FILE *stream, char *buf, size_t size)
-{
-    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
-}
-
-/**
- *  setlinbuf wrapper
- */
-void setlinebuf (FILE *stream)
-{
-    setvbuf(stream, (char *)NULL, _IOLBF, 0);
 }
 
 /**
@@ -2751,6 +2727,30 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
      */
     unlock_stream(stream);
     return 0;
+}
+
+/**
+ *  setbuf wrapper
+ */
+void setbuf (FILE *stream, char *buf)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
+}
+
+/**
+ *  setbuffer wrapper
+ */
+void setbuffer (FILE *stream, char *buf, size_t size)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
+}
+
+/**
+ *  setlinbuf wrapper
+ */
+void setlinebuf (FILE *stream)
+{
+    setvbuf(stream, (char *)NULL, _IOLBF, 0);
 }
 
 /**
