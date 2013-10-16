@@ -627,6 +627,7 @@ struct PINT_client_mgmt_get_user_cert_sm
     unsigned char *enc_key;
     PVFS_certificate *cert;
     PVFS_security_key *privkey;
+    uint32_t exp;
 };
 #endif
 

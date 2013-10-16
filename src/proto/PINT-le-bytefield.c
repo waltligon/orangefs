@@ -341,6 +341,7 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_user_cert.userid = tmp_name;
                 req.u.mgmt_get_user_cert.enc_pwd = tmp_name;
                 req.u.mgmt_get_user_cert.enc_pwd_size = 0;
+                req.u.mgmt_get_user_cert.exp = 0;
                 reqsize = extra_size_PVFS_servreq_mgmt_get_user_cert;
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert;
                 break;

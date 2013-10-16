@@ -2422,6 +2422,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     char *enc_pwd;
     PVFS_size enc_key_size;
     char *enc_key;
+    uint32_t exp;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2434,6 +2435,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     encode_PVFS_size(pptr, &(x)->enc_key_size); \
     memcpy((*pptr), (char *) (x)->enc_key, (x)->enc_key_size); \
     (*pptr) += (x)->enc_key_size; \
+    encode_uint32_t(pptr, &(x)->exp); \
 } while (0)
 
 #define decode_PVFS_servreq_mgmt_get_user_cert(pptr,x) do { \
@@ -2445,6 +2447,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     decode_PVFS_size(pptr, &(x)->enc_key_size); \
     (x)->enc_key = (*pptr); \
     (*pptr) += (x)->enc_key_size; \
+    decode_uint32_t(pptr, &(x)->exp); \
 } while (0)
 #endif
 
@@ -2459,7 +2462,8 @@ struct PVFS_servreq_mgmt_get_user_cert
                                              __pwdsize,      \
                                              __pwd,          \
                                              __keysize,      \
-                                             __key)          \
+                                             __key,          \
+                                             __exp)          \
 do {                                                         \
     memset(&(__req), 0, sizeof(__req));                      \
     (__req).op = PVFS_SERV_MGMT_GET_USER_CERT;               \
@@ -2472,6 +2476,7 @@ do {                                                         \
     (__req).u.mgmt_get_user_cert.enc_key_size = (__keysize); \
     (__req).u.mgmt_get_user_cert.enc_key =                   \
         (char *) (__key);                                    \
+    (__req).u.mgmt_get_user_cert.exp     = (__exp);          \
 } while (0)
 
 struct PVFS_servresp_mgmt_get_user_cert

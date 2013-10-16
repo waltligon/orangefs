@@ -376,7 +376,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
  * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     if (cred == NULL)
     {

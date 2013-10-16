@@ -1,0 +1,185 @@
+
+Todo:
+-------------------------------
+automatically find pvfs2-config if orangefs is installed in /opt/orangefs
+
+
+overriding CFLAGS in apache:
+
+env CFLAGS="-g -O0 $CFLAGS" ./configure --prefix=/usr/local/dav --enable-so --enable-dav --enable-dbd --with-included-apr
+
+overriding CFLAGS in dav_orangefs:
+
+env CFLAGS="-g -O0 $CFLAGS" ./configure --with-apache=/usr/local/dav --with-orangefs=/orange/install
+
+
+using gprof...
+
+env CFLAGS="-pg -DGPROF -DNO_USE_SIGACTION -g -O0 $CFLAGS"  ./configure --with-apache=/usr/local/dav --with-orangefs=/o2.8.5/install
+
+
+/usr/share/libtool/libltdl     <-------   libtool project, good example
+
+$ libtool --mode=compile gcc -I/usr/local/dasl2214/include -DVERSION=\"1.0\" -DPROVIDER_NAME=\"orangefs\" -c mod_dav_orangefs.c
+
+$ libtool --mode=link gcc -o libmod_dav_orangefs.la mod_dav_orangefs.lo
+
+# /usr/local/dasl2214/bin/apxs -i -a -n dav_orangefs libmod_dav_orangefs.la
+
+--------------------------------
+
+
+AC_INIT([orangefs_webpack],[2.8.6],[hubcap@omnibond.com])
+
+AM_INIT_AUTOMAKE
+
+AM_PROG_LIBTOOL
+
+AC_CONFIG_MACRO_DIR([m4])
+
+# set up --with-apxs, --with-apr-1-config, --with-pvfs2-config,
+# --with-apache-include-dir and --with-libxml-include-dir
+
+AC_ARG_WITH([apxs],
+  AS_HELP_STRING([--with-apxs=/FULL/PATH/apxs],
+                 [path to apxs (or apxs2)  executable]))
+
+AC_ARG_WITH([apr_1_config],
+  AS_HELP_STRING([--with-apr-1-config=/FULL/PATH/apr-1-config],
+                 [path to apr-1-config executable]))
+
+AC_ARG_WITH([pvfs2_config],
+  AS_HELP_STRING([--with-pvfs2-config=/FULL/PATH/pvfs2-config],
+                 [path to pvfs2-config executable]))
+
+AC_ARG_WITH([xml2_config],
+  AS_HELP_STRING([--with-xml2-config=/FULL/PATH/xml2-config],
+                 [path to xml2-config executable]))
+
+AC_ARG_WITH([apache_include_dir],
+  AS_HELP_STRING([--with-apache-include-dir=DIR],
+                 [DIR where apache include files are found]))
+
+# list of places to search for apxs and apr-1-config and pvfs2-config
+USUAL_SUSPECTS=\
+"/usr/bin/
+/usr/sbin/
+/usr/local/bin/
+/usr/local/sbin/
+/usr/local/apache2/bin/"
+
+ORANGE_APXS="no"
+ORANGE_APR_1_CONFIG="no"
+ORANGE_PVFS2_CONFIG="no"
+ORANGE_XML2_CONFIG="no"
+
+for candidate in $USUAL_SUSPECTS
+do
+  AS_IF([test -x $candidate"apxs"], [ORANGE_APXS=$candidate"apxs"],
+        [test -x $candidate"apxs2"], [ORANGE_APXS=$candidate"apxs2"])
+  AS_IF([test -x $candidate"apr-1-config"], 
+        [ORANGE_APR_1_CONFIG=$candidate"apr-1-config"])
+  AS_IF([test -x $candidate"pvfs2-config"], 
+        [ORANGE_PVFS2_CONFIG=$candidate"pvfs2-config"])
+  AS_IF([test -x $candidate"xml2-config"], 
+        [ORANGE_XML2_CONFIG=$candidate"xml2-config"])
+done
+
+AS_IF([test -x "/usr/include/httpd"], 
+        [ORANGE_APACHE_INCLUDE_DIR="/usr/include/httpd"],
+      [test -x "/usr/local/apache2/include"], 
+        [ORANGE_APACHE_INCLUDE_DIR="/usr/local/apache2/include"],
+      [ORANGE_APACHE_INCLUDE_DIR="no"]) 
+
+if test "x$with_apxs" != "x" ; then
+  ORANGE_APXS=$with_apxs
+fi
+
+if test "$ORANGE_APXS" = "no"; then
+  AC_MSG_ERROR([*** Use --with-apxs=/full/path/to/apxs. ])
+else
+  AC_MSG_NOTICE([ using: $ORANGE_APXS ])
+fi
+
+if test "x$with_apr_1_config" != "x" ; then
+  ORANGE_APR_1_CONFIG=$with_apr_1_config
+fi
+
+if test "$ORANGE_APR_1_CONFIG" = "no"; then
+  AC_MSG_ERROR([*** Use --with-apr-1-config=/full/path/to/apr-1-config. ])
+else
+  AC_MSG_NOTICE([ using: $ORANGE_APR_1_CONFIG ])
+fi
+
+if test "x$with_pvfs2_config" != "x" ; then
+  ORANGE_PVFS2_CONFIG=$with_pvfs2_config
+fi
+
+if test "$ORANGE_PVFS2_CONFIG" = "no"; then
+  AC_MSG_ERROR([*** Use --with-pvfs2-config=/full/path/to/pvfs2-config. ])
+else
+  AC_MSG_NOTICE([ using: $ORANGE_PVFS2_CONFIG ])
+fi
+
+if test "x$with_xml2_config" != "x" ; then
+  ORANGE_XML2_CONFIG=$with_xml2_config
+fi
+
+if test "$ORANGE_XML2_CONFIG" = "no"; then
+  AC_MSG_WARN([*** Cannot find xml2-config, which is needed by s3.])
+  AC_MSG_WARN([*** If you have xml2-config, but it was not found, ])
+  AC_MSG_WARN([*** use --with-xml2-config=/full/path/to/xml2-config ])
+else
+  AC_MSG_NOTICE([ using: $ORANGE_XML2_CONFIG ])
+fi
+
+if test "x$with_apache_include_dir" != "x" ; then
+  ORANGE_APACHE_INCLUDE_DIR=$with_apache_include_dir
+fi
+
+if test "$ORANGE_APACHE_INCLUDE_DIR" = "no"; then
+  AC_MSG_ERROR([*** Use --with-apache-include-dir=/full/path/to/apache-include-dir. ])
+else
+  AC_MSG_NOTICE([ using: $ORANGE_APACHE_INCLUDE_DIR ])
+fi
+
+AC_SUBST(ORANGE_APXS)
+AC_SUBST(ORANGE_APR_1_CONFIG)
+AC_SUBST(ORANGE_PVFS2_CONFIG)
+AC_SUBST(ORANGE_XML2_CONFIG)
+AC_SUBST(ORANGE_APACHE_INCLUDE_DIR)
+
+--------------------------------
+
+touch configure.ac
+autoscan
+cp configure.scan configure.ac
+vi configure.ac
+libtoolize
+aclocal
+autoheader
+touch NEWS README AUTHORS ChangeLog
+automake -a
+autoconf
+./configure --with-apache=/usr/local/dasl2214 --with-orangefs=/home/hubcap/d.pvfs/install
+
+------------ new more better cheatsheet rules --------------------
+
+touch configure.ac
+autoscan
+cp configure.scan configure.ac
+sed -i 's/^AC_INIT.*$/AC_INIT([orangefs_webpack],[2.8.7],[hubcap@omnibond.com])/' configure.ac
+sed -i '/^AC_OUTPUT$/d' configure.ac
+cat configure.additional >> configure.ac
+echo AC_OUTPUT >> configure.ac
+libtoolize
+aclocal
+autoheader
+touch NEWS README AUTHORS ChangeLog
+automake -a
+autoconf
+./configure --with-apxs=/usr/local/dav/bin/apxs \
+            --with-apr-1-config=/usr/local/dav/bin/apr-1-config \
+            --with-pvfs2-config=/opt/orangefs/install/bin/pvfs2-config \
+            --with-apache-include-dir=/usr/local/dav/include
+

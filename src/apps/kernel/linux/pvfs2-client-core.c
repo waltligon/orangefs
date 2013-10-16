@@ -118,6 +118,7 @@ typedef struct
     int dev_buffer_size_set;
     char *events;
     char *keypath;
+    char *certpath;
 } options_t;
 
 /*
@@ -4075,6 +4076,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"child",0,0,0},
         {"events",1,0,0},
         {"keypath",1,0,0},
+        {"certpath",1,0,0},
         {0,0,0,0}
     };
 
@@ -4297,6 +4299,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("keypath", cur_option) == 0)
                 {
                     opts->keypath = optarg;
+                }
+                else if (strcmp("certpath", cur_option) == 0)
+                {
+                    opts->certpath = optarg;
                 }
                 break;
             case 'h':
@@ -4853,6 +4859,7 @@ static PVFS_credential *generate_credential(
         group,
         timeout,
         s_opts.keypath,
+        s_opts.certpath,
         credential);
     if (ret < 0)
     {
