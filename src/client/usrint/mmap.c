@@ -148,8 +148,8 @@ int pvfs_msync(void *start, size_t length, int flags)
     }
     qlist_for_each_entry_safe(mapl, temp, &maplist, link)
     {
-        if (mapl->mst <= start &&
-            ((u_char *)mapl->mst + mapl->mlen) >= ((u_char *)start + length))
+        if ((u_char *)mapl->mst <= (u_char *)start &&
+            (u_char *)mapl->mst + mapl->mlen >= (u_char *)start + length)
         {
             break;
         }

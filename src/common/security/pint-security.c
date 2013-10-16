@@ -109,6 +109,11 @@ int PINT_security_initialize(void)
 {
     const struct server_configuration_s *config = PINT_get_server_config();
     int ret;
+#ifdef ENABLE_SECURITY_KEY
+    PINT_llist_p l;
+    host_alias_s *host_alias;
+    char buf[HOST_NAME_MAX+2];
+#endif
 
     gen_mutex_lock(&security_init_mutex);
     if (security_init_status)
@@ -170,6 +175,26 @@ int PINT_security_initialize(void)
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
+
+    l = config->host_aliases;
+    if (!PINT_llist_empty(l))
+        do {
+            if (PINT_llist_empty(l))
+                break;
+            host_alias = PINT_llist_head(l);
+            snprintf(buf, HOST_NAME_MAX+2, "S:%s",
+                     host_alias->host_alias);
+            if (SECURITY_lookup_pubkey(buf) == NULL) {
+                gossip_err("Could not find public key for alias "
+                           "'%s'\n", buf);
+                SECURITY_hash_finalize();
+                EVP_cleanup();
+                ERR_free_strings();
+                cleanup_threading();
+                gen_mutex_unlock(&security_init_mutex);
+                return -PVFS_EIO;
+            }
+        } while ((l = PINT_llist_next(l)));
 
 #elif ENABLE_SECURITY_CERT
 
@@ -1183,6 +1208,13 @@ static int load_public_keys(const char *path)
             }
         }
         buf[ptr] = '\0';
+
+        if (buf[1] != ':' || (buf[0] != 'C' && buf[0] != 'S')) {
+            gossip_err("Error loading keystore: Issuer must start with "
+                       "'C:' or 'C:' but is '%s'\n", buf);
+            fclose(keyfile);
+            return -1;
+        }
 
         do
         {

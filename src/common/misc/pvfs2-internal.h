@@ -73,7 +73,7 @@
 
 /* This should be included everywhere in the code */
 #include "pint-malloc.h" 
-#endif /* __KERNEL__ */
+#endif /* not __KERNEL__ */
 
 /* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
  * to print out a PVFS_handle, which is typedefed to a uint64_t.  On
@@ -116,10 +116,12 @@
 #  define llu(x) (x)
 #  define lld(x) (x)
 #  define SCANF_lld "%lld"
+#  define SCANF_lld_type long
 #elif SIZEOF_LONG_INT == 8
 #  define llu(x) (unsigned long long)(x)
 #  define lld(x) (long long)(x)
 #  define SCANF_lld "%ld"
+#  define SCANF_lld_type long
 #else
 #  error Unexpected sizeof(long int)
 #endif

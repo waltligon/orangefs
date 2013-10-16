@@ -80,7 +80,19 @@ static int init_flag = 0;
 struct stdio_ops_s stdio_ops;
 static FILE open_files = {._chain = NULL};
 
-/* this is defined in openfile-util.h because it is used openfile-util.c
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...);
+int __printf_chk (int flag, const char *format, ...);
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap);
+int __vprintf_chk (int flag, const char *format, va_list ap);
+int __dprintf_chk (int fd, int flag, const char *fmt, ...);
+int __vdprintf_chk (int fd, int flag, const char *fmt, va_list ap);
+char *__gets_chk (char *str, size_t n);
+char *__fgets_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+char *__fgets_unlocked_chk (char *s, size_t size, int n, FILE *stream);
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+/* this is defined in openfile-util.g because it is used openfile-util.c
  * _P_IO_MAGIC     0xF0BD0000
  */
 
@@ -244,7 +256,7 @@ FILE *stderr = &pvfs_stderr_stream;
 #endif
 #endif
 
-/* this is gets called all over the place to make sure initialization is
+/* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
  * real init function - which in theory was done before main
  */
@@ -270,6 +282,10 @@ static inline void lock_init_stream(FILE *stream)
     if (!stream->_lock)
     {
         stream->_lock = (_PVFS_lock_t *)malloc(sizeof(_PVFS_lock_t));
+        if (!stream->_lock)
+        {
+            return;
+        }
         ZEROMEM(stream->_lock, sizeof(_PVFS_lock_t));
     }
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
@@ -508,6 +524,7 @@ static int init_stream (FILE *stream, int flags, int bufsize)
         {
             return -1;
         }
+        ZEROMEM(stream->_IO_buf_base, bufsize);
     }
     stream->_IO_buf_end      = stream->_IO_buf_base + bufsize;
     stream->_IO_read_base    = stream->_IO_buf_base;
@@ -560,7 +577,7 @@ FILE *fdopen(int fd, const char *mode)
         errno = ENOMEM;
         return NULL; 
     }
-    /* memset(newfile, 0, sizeof(FILE)); - handled by PINT_malloc */
+    ZEROMEM(newfile, sizeof(FILE));
 
     /* initize lock for this stream */
     /* SETFLAG(newfile, _IO_USER_LOCK); */
@@ -1022,6 +1039,14 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rc;
 }
 
+/**
+ * __fread_chk
+ */
+size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread(ptr, size, nmemb, stream);
+}
+
 size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     int rsz, rsz_buf, rsz_extra;
@@ -1159,6 +1184,14 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 /**
+ * __fread_unlocked_chk
+ */
+size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    return fread_unlocked(ptr, size, nmemb, stream);
+}
+
+/**
  * fcloseall closes all open streams
  */
 int fcloseall(void)
@@ -1267,24 +1300,6 @@ int fclose(FILE *stream)
         free(stream);
     }
     return rc;
-}
-
-/**
- * fseek wrapper
- */
-int fseek(FILE *stream, long offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
-}
-
-int fseeko(FILE *stream, off_t offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
-}
-
-int fseeko64(FILE *stream, off64_t offset, int whence)
-{
-    return fseek64(stream, (off64_t)offset, whence);
 }
 
 /** This is the main code for seeking on a stream
@@ -1429,6 +1444,24 @@ exitout:
 }
 
 /**
+ * fseek wrapper
+ */
+int fseek(FILE *stream, long offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+int fseeko(FILE *stream, off_t offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+int fseeko64(FILE *stream, off64_t offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+/**
  * fsetpos wrapper
  */
 int fsetpos(FILE *stream, const fpos_t *pos)
@@ -1526,40 +1559,6 @@ int fgetpos64(FILE *stream, fpos64_t *pos)
     return 0;
 }
 
-/** forces a write back of potentially dirty buffer
- * 
- *  we don't have a dirty flag, so if user seeks
- *  ahead within the buffer then does a flush
- *  we will do an uncessary write
- */
-int fflush(FILE *stream)
-{
-    int rc = 0;
-
-    PVFS_INIT(init_stdio);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fflush(stream);
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-#if !PVFS_STDIO_ON_LIBC_STREAMS
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fflush(stream);
-        }
-#endif
-        errno = EINVAL;
-        return -1;
-    }
-    lock_stream(stream);
-    rc = fflush_unlocked(stream);
-    unlock_stream(stream);
-    return rc;
-}
-
 int fflush_unlocked(FILE *stream)
 {
     int rc;
@@ -1617,6 +1616,87 @@ int fflush_unlocked(FILE *stream)
     return 0;
 }
 
+/** forces a write back of potentially dirty buffer
+ * 
+ *  we don't have a dirty flag, so if user seeks
+ *  ahead within the buffer then does a flush
+ *  we will do an uncessary write
+ */
+int fflush(FILE *stream)
+{
+    int rc = 0;
+
+    PVFS_INIT(init_stdio);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fflush(stream);
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fflush(stream);
+        }
+#endif
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fflush_unlocked(stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+int fputc_unlocked(int c, FILE *stream)
+{
+    int rc GCC_UNUSED;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputc_unlocked(c, stream);
+    }
+#endif
+    rc = fwrite_unlocked(&c, 1, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return c;
+}
+
+int fputs_unlocked(const char *s, FILE *stream)
+{
+    size_t len;
+    int rc;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs_unlocked %s %p\n", s, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputs_unlocked(s, stream);
+    }
+#endif
+    if (!s)
+    {
+        errno = EINVAL;
+        return EOF;
+    }
+    len = strlen(s);
+    rc = fwrite_unlocked(s, len, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return rc;
+}
+
 /*
  * fputc wrapper
  */
@@ -1644,83 +1724,6 @@ int fputc(int c, FILE *stream)
     lock_stream(stream);
     rc = fputc_unlocked(c, stream);
     unlock_stream(stream);
-    return rc;
-}
-
-int fputc_unlocked(int c, FILE *stream)
-{
-    int rc GCC_UNUSED;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputc_unlocked(c, stream);
-    }
-#endif
-    rc = fwrite_unlocked(&c, 1, 1, stream);
-    if (ferror(stream))
-    {
-        return EOF;
-    }
-    return c;
-}
-
-/**
- * fputs writes up to a null char
- */
-int fputs(const char *s, FILE *stream)
-{
-    int rc = 0;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs %s %p\n", s, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputs(s, stream);
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fputs(s, stream);
-        }
-        errno = EINVAL;
-        return -1;
-    }
-    lock_stream(stream);
-    rc = fputs_unlocked(s, stream);
-    unlock_stream(stream);
-    return rc;
-}
-
-int fputs_unlocked(const char *s, FILE *stream)
-{
-    size_t len;
-    int rc;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs_unlocked %s %p\n", s, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        return stdio_ops.fputs_unlocked(s, stream);
-    }
-#endif
-    if (!s)
-    {
-        errno = EINVAL;
-        return EOF;
-    }
-    len = strlen(s);
-    rc = fwrite_unlocked(s, len, 1, stream);
-    if (ferror(stream))
-    {
-        return EOF;
-    }
     return rc;
 }
 
@@ -1758,6 +1761,36 @@ int putchar(int c)
 int putchar_unlocked(int c)
 {
     return fputc_unlocked(c, stdout);
+}
+
+/**
+ * fputs writes up to a null char
+ */
+int fputs(const char *s, FILE *stream)
+{
+    int rc = 0;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs %s %p\n", s, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.fputs(s, stream);
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fputs(s, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fputs_unlocked(s, stream);
+    unlock_stream(stream);
+    return rc;
 }
 
 /**
@@ -1805,40 +1838,6 @@ int putw(int wd, FILE *stream)
     return rc;
 }
 
-/**
- * fgets reads up to size or a newline
- */
-char *fgets(char *s, int size, FILE *stream)
-{
-    char *rc = NULL;
-
-    PVFS_INIT(init_stdio);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets %p %d %p\n", s, size, stream);
-#if !PVFS_STDIO_REDEFSTREAM
-    if (stream == stdin || stream == stdout || stream == stderr)
-    {
-        rc = stdio_ops.fgets(s, size, stream);
-        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", s);
-        return rc;
-    }
-#endif
-    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
-    {
-        if (stream && ISMAGICSET(stream, _IO_MAGIC))
-        {
-            return stdio_ops.fgets(s, size, stream);
-        }
-        errno = EINVAL;
-        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns NULL\n");
-        return NULL;
-    }
-    lock_stream(stream);
-    rc = fgets_unlocked(s, size, stream);
-    unlock_stream(stream);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
-    return rc;
-}
-
 char *fgets_unlocked(char *s, int size, FILE *stream)
 {
     char c, *p;
@@ -1883,6 +1882,56 @@ char *fgets_unlocked(char *s, int size, FILE *stream)
     *p = 0; /* add null terminating char */
     gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns %s\n", s);
     return s;
+}
+
+/**
+ * fgets reads up to size or a newline
+ */
+char *fgets(char *s, int size, FILE *stream)
+{
+    char *rc = NULL;
+
+    PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets %p %d %p\n", s, size, stream);
+#if !PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        rc = stdio_ops.fgets(s, size, stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", s);
+        return rc;
+    }
+#endif
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.fgets(s, size, stream);
+        }
+        errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns NULL\n");
+        return NULL;
+    }
+    lock_stream(stream);
+    rc = fgets_unlocked(s, size, stream);
+    unlock_stream(stream);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
+    return rc;
+}
+
+/**
+ * __fgets_chk
+ */
+char *__fgets_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets(s, size, stream);
+}
+
+/**
+ * __fgets_unlocked_chk
+ */
+char *__fgets_unlocked_chk(char *s, size_t size, int n, FILE *stream)
+{
+    return fgets_unlocked(s, size, stream);
 }
 
 /**
@@ -2037,6 +2086,14 @@ char *gets(char *s)
 }
 
 /**
+ * __gets_check
+ */
+char *__gets_chk(char *s, size_t n)
+{
+    return gets(s);
+}
+
+/**
  * getline
  *
  * WARNING!!! These potentially allocate memory which is freed by the
@@ -2044,16 +2101,6 @@ char *gets(char *s)
  * malloc and free.  Note PVFS defines its own versions of these as
  * well, and this must be carefully handled.
  */
-ssize_t getline(char **lnptr, size_t *n, FILE *stream)
-{
-    return __getdelim(lnptr, n, '\n', stream);
-}
-
-ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
-{
-    return __getdelim(lnptr, n, delim, stream);
-}
-
 ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
 {
     int i = 0;
@@ -2081,6 +2128,7 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
         {
             return -1;
         }
+        ZEROMEM(*lnptr, *n);
     }
     p = *lnptr;
     do {
@@ -2103,6 +2151,16 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     }
     *p = 0; /* null termintor */
     return i;
+}
+
+ssize_t getline(char **lnptr, size_t *n, FILE *stream)
+{
+    return __getdelim(lnptr, n, '\n', stream);
+}
+
+ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
+{
+    return __getdelim(lnptr, n, delim, stream);
 }
 
 /**
@@ -2140,8 +2198,23 @@ int ungetc(int c, FILE *stream)
  */
 #if 0
 sprintf, snprintf, vsprintf, vsnprintf, asprintf, vasprintfm
-sscanf, vsscanf
+sscanf, vsscanf, asprintf, vasprintf
 #endif
+
+
+/**
+ * __dprintf_chk wrapper
+ */
+int __dprintf_chk(int fd, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vdprintf(fd, format, ap);
+    va_end(ap);
+    return len;
+}
 
 /**
  * dprintf wrapper
@@ -2182,6 +2255,14 @@ int vdprintf(int fd, const char *format, va_list ap)
 }
 
 /**
+ * __vdprintf_chk wrapper
+ */
+int __vdprintf_chk(int fd, int flag, const char *format, va_list ap)
+{
+    return vdprintf(fd, format, ap); /* this is in libc */
+}
+
+/**
  * vfprintf using a var arg list
  */
 int vfprintf(FILE *stream, const char *format, va_list ap)
@@ -2212,8 +2293,43 @@ int vfprintf(FILE *stream, const char *format, va_list ap)
     return rc;
 }
 
+/** These functions are wrappers in case glibc's headers have rewritten
+ * the calls
+ */
+int __fprintf_chk (FILE *stream, int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stream, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __printf_chk (int flag, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stdout, format, ap);
+    va_end(ap);
+    return len;
+}
+
+int __vfprintf_chk (FILE *stream, int flag, const char *format, va_list ap)
+{
+    return vfprintf(stream, format, ap);
+}
+
+int __vprintf_chk (int flag, const char *format, va_list ap)
+{
+    return vfprintf(stdout, format, ap);
+}
+
 /**
- * fprintf wrapper
+ * vfprintf wrapper
  */
 int vprintf(const char *format, va_list ap)
 {
@@ -2371,11 +2487,6 @@ int feof (FILE *stream)
     return rc;
 }
 
-int _IO_feof_unlocked (_IO_FILE *stream)
-{
-    return feof_unlocked((FILE *)stream);
-}
-
 int feof_unlocked (FILE *stream)
 {
     int rc = 0;
@@ -2403,6 +2514,11 @@ int feof_unlocked (FILE *stream)
     rc = ISFLAGSET(stream, _IO_EOF_SEEN);
     gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked returns %d\n", rc);
     return rc;
+}
+
+int _IO_feof_unlocked (_IO_FILE *stream)
+{
+    return feof_unlocked((FILE *)stream);
 }
 
 /**
@@ -2439,11 +2555,6 @@ int ferror (FILE *stream)
     return rc;
 }
 
-int _IO_ferror_unlocked (_IO_FILE *stream)
-{
-    return ferror_unlocked((FILE *)stream);
-}
-
 int ferror_unlocked (FILE *stream)
 {
 #if !PVFS_STDIO_REDEFSTREAM
@@ -2472,6 +2583,11 @@ int ferror_unlocked (FILE *stream)
     }
     gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
     return ISFLAGSET(stream, _IO_ERR_SEEN);
+}
+
+int _IO_ferror_unlocked (_IO_FILE *stream)
+{
+    return ferror_unlocked((FILE *)stream);
 }
 
 /**
@@ -2539,30 +2655,6 @@ int remove (const char *path)
     if (S_ISDIR(buf.st_mode))
         return rmdir (path);
     return unlink (path);
-}
-
-/**
- *  setbuf wrapper
- */
-void setbuf (FILE *stream, char *buf)
-{
-    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
-}
-
-/**
- *  setbuffer wrapper
- */
-void setbuffer (FILE *stream, char *buf, size_t size)
-{
-    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
-}
-
-/**
- *  setlinbuf wrapper
- */
-void setlinebuf (FILE *stream)
-{
-    setvbuf(stream, (char *)NULL, _IOLBF, 0);
 }
 
 /**
@@ -2635,6 +2727,30 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
      */
     unlock_stream(stream);
     return 0;
+}
+
+/**
+ *  setbuf wrapper
+ */
+void setbuf (FILE *stream, char *buf)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
+}
+
+/**
+ *  setbuffer wrapper
+ */
+void setbuffer (FILE *stream, char *buf, size_t size)
+{
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
+}
+
+/**
+ *  setlinbuf wrapper
+ */
+void setlinebuf (FILE *stream)
+{
+    setvbuf(stream, (char *)NULL, _IOLBF, 0);
 }
 
 /**
@@ -2762,7 +2878,7 @@ DIR *fdopendir (int fd)
     {
         return NULL;
     }
-    memset(dstr, 0, sizeof(DIR));
+    ZEROMEM(dstr, sizeof(DIR));
     SETMAGIC(dstr, DIRSTREAM_MAGIC);
     dstr->fileno = fd;
     dstr->buf_base = (char *)malloc(DIRBUFSIZE);
@@ -2772,6 +2888,7 @@ DIR *fdopendir (int fd)
         free(dstr);
         return NULL;
     }
+    ZEROMEM(dstr->buf_base, DIRBUFSIZE);
     dstr->buf_end = dstr->buf_base + DIRBUFSIZE;
     dstr->buf_act = dstr->buf_base;
     dstr->buf_ptr = dstr->buf_base;
@@ -2983,6 +3100,7 @@ int scandir (const char *dir,
     {
         return -1;
     }
+    ZEROMEM(*namelist, asz * sizeof(struct dirent *));
     /* loop through the dirents */
     for(i = 0, de = readdir(dp); de; i++, de = readdir(dp))
     {
@@ -3060,6 +3178,7 @@ int scandir64 (const char *dir,
     {
         return -1;
     }
+    ZEROMEM(*namelist, asz * sizeof(struct dirent *));
     /* loop through the dirents */
     for(i = 0, de = readdir64(dp); de; i++, de = readdir64(dp))
     {

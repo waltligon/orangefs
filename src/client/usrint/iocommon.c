@@ -899,7 +899,6 @@ pvfs_descriptor *iocommon_open(const char *path,
     int orig_errno = errno;
     int follow_links = 0;
     int cache_flag = 1;
-    int clrflags = 0;
     int length = 0;
     void *value = NULL;
     char *directory = NULL;
@@ -1174,21 +1173,6 @@ pvfs_descriptor *iocommon_open(const char *path,
     goto errorout;
 
 createfile:
-    /* if we are creating the file need to make sure access requested is
-     * available, and that we restore the original mode on close
-     */
-    if ((flags & O_RDONLY || flags & O_RDWR) && !(mode & S_IRUSR))
-    {
-        mode |= S_IRUSR;
-        clrflags |= O_CLEAR_READ;
-    }
-
-    if ((flags & O_WRONLY || flags & O_RDWR) && !(mode & S_IWUSR))
-    {
-        mode |= S_IWUSR;
-        clrflags |= O_CLEAR_WRITE;
-    }
-
     /* Now create the file relative to the directory */
     errno = orig_errno;
     errno = 0;
@@ -1206,19 +1190,6 @@ createfile:
     {
         goto errorout;
     }
-    /* clear previous edits if we are not creating */
-    if (flags & O_CLEAR_READ)
-    {
-        mode &= ~S_IRUSR;
-        clrflags &= ~O_CLEAR_READ;
-    }
-
-    if (flags &O_CLEAR_WRITE)
-    {
-        mode &= ~S_IWUSR;
-        clrflags &= ~O_CLEAR_WRITE;
-    }
-
     /* 
      * The file exists so must have been
      * created by a different process
@@ -1275,8 +1246,7 @@ finish:
         rc = -1;
         goto errorout;
     }
-    pd->s->flags = flags;       /* open flags */
-    pd->s->clrflags = clrflags; /* modes to clear on close */
+    pd->s->flags = flags;           /* open flags */
     pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
 
     /* Get the file's type information from its attributes */

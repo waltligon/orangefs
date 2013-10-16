@@ -153,7 +153,7 @@ fi
 ],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -O2"
+    CFLAGS="$CFLAGS -g -O0"
 fi
 ])
 
