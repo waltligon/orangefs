@@ -82,41 +82,11 @@ static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials, 
 	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
-static size_t generic_read(file_object *src, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
-static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials);
 static void make_attribs(PVFS_sys_attr *attr,
-                         PVFS_credentials *credentials, 
+                         PVFS_credential *credentials, 
                          int nr_datafiles, int mode);
-
-static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
-{
-    int ret = 0, i = 0;
-    static int modes[9] =
-    {
-        S_IXOTH, S_IWOTH, S_IROTH,
-        S_IXGRP, S_IWGRP, S_IRGRP,
-        S_IXUSR, S_IWUSR, S_IRUSR
-    };
-    static int pvfs2_modes[9] =
-    {
-        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
-        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
-        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
-    };
-
-    for(i = 0; i < 9; i++)
-    {
-        if (perms & pvfs2_modes[i])
-        {
-            ret |= modes[i];
-        }
-    }
-    return ret;
-}
 
 int main (int argc, char ** argv)
 {
@@ -206,7 +176,6 @@ int main (int argc, char ** argv)
     ret = 0;
 
 main_out:
-/*    generic_cleanup(NULL, &dest, &credentials); */
     PVFS_sys_finalize();
     free(user_opts);
     free(buffer);
@@ -359,39 +328,6 @@ static void print_timings( double time, int64_t total)
 {
     printf("Wrote %lld bytes in %f seconds. %f MB/seconds\n",
             lld(total), time, (total/time)/(1024*1024));
-}
-
-/* read 'count' bytes from a (unix or pvfs2) file 'src', placing the result in
- * 'buffer' */
-static size_t generic_read(file_object *src, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials)
-{
-    PVFS_Request mem_req, file_req;
-    PVFS_sysresp_io resp_io;
-    int ret;
-
-    if(src->fs_type == UNIX_FILE)
-	return (read(src->u.ufs.fd, buffer, count));
-    else
-    {
-	file_req = PVFS_BYTE;
-	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
-	if (ret < 0)
-	{
-	    fprintf(stderr, "Error: PVFS_Request_contiguous failure\n");
-	    return (ret);
-	}
-	ret = PVFS_sys_read(src->u.pvfs2.ref, file_req, offset,
-		buffer, mem_req, credentials, &resp_io, hints);
-	if (ret == 0)
-	{
-            PVFS_Request_free(&mem_req);
-	    return (resp_io.total_completed);
-	} 
-	else 
-	    PVFS_perror("PVFS_sys_read", ret);
-    }
-    return (ret);
 }
 
 /* write 'count' bytes from 'buffer' into (unix or pvfs2) file 'dest' */
@@ -692,47 +628,11 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
     return 0;
 }
 
-static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials)
-{
-    /* preserve permissions doing a pvfs2 => unix copy */
-    if ((src->fs_type == PVFS2_FILE) &&
-        ((dest->fs_type == UNIX_FILE) && (dest->u.ufs.fd != -1)))
-    {
-        fchmod(dest->u.ufs.fd,
-               convert_pvfs2_perms_to_mode(src->u.pvfs2.perms));
-    }
-
-    /* preserve permissions doing a unix => unix copy */
-    if ((src->fs_type == UNIX_FILE) &&
-        ((dest->fs_type == UNIX_FILE) && (dest->u.ufs.fd != -1)))
-    {
-        fchmod(dest->u.ufs.fd, src->u.ufs.mode);
-    }
-
-    /* preserve permissions doing a pvfs2 => pvfs2 copy */
-    if ((src->fs_type == PVFS2_FILE) && (dest->fs_type == PVFS2_FILE))
-    {
-        PVFS_sys_setattr(dest->u.pvfs2.ref, src->u.pvfs2.attr, credentials, hints);
-    }
-
-    if ((src->fs_type == UNIX_FILE) && (src->u.ufs.fd != -1))
-    {
-        close(src->u.ufs.fd);
-    }
-
-    if ((dest->fs_type == UNIX_FILE) && (dest->u.ufs.fd != -1))
-    {
-        close(dest->u.ufs.fd);
-    }
-    return 0;
-}
-
-void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
+void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
                   int nr_datafiles, int mode)
 {
-    attr->owner = credentials->uid; 
-    attr->group = credentials->gid;
+    attr->owner = credentials->userid; 
+    attr->group = credentials->group_array[0];
     attr->perms = PVFS_util_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;
