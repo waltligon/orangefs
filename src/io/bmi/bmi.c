@@ -1571,7 +1571,56 @@ int BMI_get_info(BMI_addr_t addr,
             return ret;
         }
         break;
+    case BMI_TRANSPORT_METHODS_STRING:
+        {
+            /*
+             * [OUT] inout_parameter : contains comma-separated list of transport
+             *                         protocols, memory allocated here and must
+             *                         be free'd by the caller.
+             * @return               : total number of transport protocols
+             *                         supported by bmi.
+             */
+            
+            int kmstring_length = 0;
+            int kmc = sizeof(static_methods) / sizeof(static_methods[0]) - 1;
+            int i = 0;
+            char **stringptr = (char **) &(*(char*) inout_parameter);
 
+            /* Check if there are any transport protocol supported, else return */
+            if (kmc <= 0)
+            {
+                return 0;
+            }
+            
+            /* Find out the length the output string will be. */
+            for (i = 0; i < kmc; ++i)
+            {
+                kmstring_length += strlen(static_methods[i]->method_name)
+                    - strlen("bmi_") + sizeof(",");
+            }
+
+            /* +1 for null character */
+            (*stringptr) = malloc(kmstring_length + 1);
+
+            if ((*stringptr) == NULL)
+            {
+                return bmi_errno_to_pvfs(-ENOMEM);
+            }
+
+            memset((*stringptr), 0, kmstring_length);
+            
+            /* The transport protocol's names begins with bmi_, offset the
+             * method name when concatenating.
+             */
+            for (i = 0; i < kmc; ++i)
+            {
+                strcat((*stringptr), static_methods[i]->method_name + strlen("bmi_"));
+                strcat((*stringptr), ",");
+            }
+
+            return kmc;
+        }
+        break;
     default:
         return (bmi_errno_to_pvfs(-ENOSYS));
     }

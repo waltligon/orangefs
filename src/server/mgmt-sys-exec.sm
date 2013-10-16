@@ -76,6 +76,7 @@ static PINT_sm_action mgmt_sys_exec_do_work(
 	int32_t pid;
 	struct timeval oldest;
 
+    printf("exec %s %s", s_op->req->u.mgmt_sys_exec.path, s_op->req->u.mgmt_sys_exec.command);
     // Launch the process on separate thread
     /*
 	pid = fork();
