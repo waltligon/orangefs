@@ -80,10 +80,10 @@ static void usage(int argc, char** argv);
 static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials, 
+static int generic_open(file_object *obj, PVFS_credential *credentials, 
 	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
 static size_t generic_write(file_object *dest, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
+	int64_t offset, size_t count, PVFS_credential *credentials);
 static void make_attribs(PVFS_sys_attr *attr,
                          PVFS_credential *credentials, 
                          int nr_datafiles, int mode);
@@ -96,7 +96,7 @@ int main (int argc, char ** argv)
     file_object src, dest;
     void* buffer = NULL;
     int64_t ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -118,7 +118,12 @@ int main (int argc, char ** argv)
 
     resolve_filename(&dest,  user_opts->destfile );
 
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential", ret);
+        goto main_out;
+    }   
 
     ret = generic_open(&dest, &credentials, user_opts->num_datafiles, user_opts->strip_size,
                        NULL, OPEN_DEST);
@@ -332,7 +337,7 @@ static void print_timings( double time, int64_t total)
 
 /* write 'count' bytes from 'buffer' into (unix or pvfs2) file 'dest' */
 static size_t generic_write(file_object *dest, char *buffer, 
-    int64_t offset, size_t count, PVFS_credentials *credentials)
+    int64_t offset, size_t count, PVFS_credential *credentials)
 {
     PVFS_Request mem_req, file_req;
     PVFS_sysresp_io resp_io;
@@ -395,7 +400,7 @@ static int resolve_filename(file_object *obj, char *filename)
  *    new file with the basename of srcname in the specified directory 
  */
 
-static int generic_open(file_object *obj, PVFS_credentials *credentials,
+static int generic_open(file_object *obj, PVFS_credential *credentials,
                         int nr_datafiles, PVFS_size strip_size, 
                         char *srcname, int open_type)
 {
@@ -596,10 +601,13 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    {
                 memset(&stat_buf, 0, sizeof(struct stat));
 
-                /* preserve permissions doing a unix => pvfs2 copy */
-                stat(srcname, &stat_buf);
+                /* There is no "source" file from which to copy permissions,
+                   so just set them to the specific values we want. */
+                /* stat(srcname, &stat_buf); */
+		/* make_attribs(&(obj->u.pvfs2.attr), credentials, nr_datafiles,
+                 *           (int)stat_buf.st_mode);*/
 		make_attribs(&(obj->u.pvfs2.attr), credentials, nr_datafiles,
-                             (int)stat_buf.st_mode);
+                             S_IFREG|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
                 if (strip_size > 0) {
                     new_dist = PVFS_sys_dist_lookup("simple_stripe");
                     ret = PVFS_sys_dist_setparam(new_dist, "strip_size", &strip_size);
