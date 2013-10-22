@@ -534,7 +534,7 @@ endif
 #
 ifdef BUILD_HADOOP
 # Directory Containing PVFS2/Hadoop related .java files
-HADOOP_ORGDIR := $(JNI_DIR)/org/apache/hadoop/fs/ofs
+HADOOP_ORGDIR := $(JNI_DIR)/org/orangefs/hadoop/fs/ofs
 # Path to Hadoop Directory containing hadoop-core-*.jar
 HADOOP_PREFIX := @HADOOP_PREFIX@
 # Path to Hadoop's core Jar
@@ -1036,7 +1036,7 @@ $(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
 
 $(OFS_HADOOP_JAR): $(HADOOPCLS)
 	$(Q) "  JAR		$@"
-	$(E)$(JAR) cf $@ -C src/client/jni org/apache/hadoop/fs/ofs
+	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/hadoop/fs/ofs
 endif # BUILD_HADOOP
 
 ifdef BUILD_JNI
