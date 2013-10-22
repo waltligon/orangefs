@@ -17,7 +17,7 @@ policy create_file_meta_1(int num_servers, int copies) for create_file_meta
     sets num_servers spread rack
     {
         select 1 where
-            (metamedia == ssd && datamedia == disk || space >= 75);
+            ((metamedia == ssd && datamedia == disk) || space >= 75);
         select others where
             (metamedia == disk);
     }
@@ -30,7 +30,7 @@ policy create_file_data(int num_servers, int copies) for create_file_data
     sets num_servers spread rack
     {
         select 1 where
-            (metamedia == ssd && datamedia == disk || space >= 75);
+            ((metamedia == ssd && datamedia == disk) || space >= 75);
         select others where
             (metamedia == disk);
     }

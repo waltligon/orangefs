@@ -16,8 +16,8 @@ dnl
 dnl PVFS2 versioning information.  
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
-PVFS2_VERSION_MAJOR=2
-PVFS2_VERSION_MINOR=9
+PVFS2_VERSION_MAJOR=3
+PVFS2_VERSION_MINOR=0
 PVFS2_VERSION_SUB=0
 #PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
@@ -33,6 +33,7 @@ AC_SUBST(PVFS2_VERSION_MAJOR)
 AC_SUBST(PVFS2_VERSION_MINOR)
 AC_SUBST(PVFS2_VERSION_SUB)
 #AC_SUBST(PVFS2_VERSION_RELEASE)
+
 
 dnl BMI_ONLY_TAG
 
@@ -163,6 +164,29 @@ fi
 AC_SUBST(BUILD_CC)
 AC_SUBST(BUILD_CFLAGS)
 AC_SUBST(BUILD_LDFLAGS)
+
+dnl check for a modern version of GNU make
+AC_MSG_CHECKING([for required GNU make >= 3.80 ])
+mgnu=`make -v | awk '{printf $1; exit 0}'`;
+mver=`make -v | awk '{printf $3; exit 0}'`;
+mvermaj=`expr substr ${mver} 1 1`;
+mvermin=`expr substr ${mver} 3 2`;
+gtest=`expr ${mgnu} = GNU`;
+vtest=`expr ${mvermaj} \> 3 \| \( ${mvermaj} = 3 \& ${mvermin} \>= 80 \)`;
+#echo mg=${mgnu}
+#echo mv=${mver}
+#echo mvj=${mvermaj}
+#echo mvn=${mvermin}
+#echo gt=${gtest}
+#echo vt=${vtest}
+if test $gtest -eq "0" ; then
+    AC_MSG_ERROR("GNU make version 3.80 or later required - Not GNU");
+fi;
+if test $vtest -eq "0" ; then
+    AC_MSG_ERROR("GNU make version 3.80 or later required - Old version");
+fi;
+AC_MSG_RESULT(yes);
+unset -v mgnu mver mvermaj mvermin gtest vtest;
 
 #
 # Threading options.

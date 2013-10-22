@@ -8,6 +8,10 @@ CSRC := \
 CLIENT_PYCGEN := \
         $(DIR)/example2.c
 
+PYCGEN_AUX += \
+        $(DIR)/example2.2.c \
+        $(DIR)/example2.h
+
 PYCGEN += $(CLIENT_PYCGEN)
 
 LIBSRC += $(CSRC) $(CLIENT_PYCGEN)

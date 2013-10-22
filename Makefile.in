@@ -527,6 +527,8 @@ MISCSRC :=
 SMCGEN :=
 # c files generated from policy files
 PYCGEN :=
+# other files generated from policy files
+PYCGEN_AUX :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
 
@@ -1149,6 +1151,7 @@ clean::
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) \
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
+                $(PYCGEN) $(PYCGEN_AUX) \
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
@@ -1203,7 +1206,7 @@ distclean: cleaner docsclean
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
-	rm -f $(PYCGEN)
+	rm -f $(PYCGEN) $(PYCGEN_AUX)
 endif
 
 # this is where we include all of our automatic dependencies.
@@ -1218,7 +1221,7 @@ endif
 nodep:; @:
 
 # default rule for generating dependency files
-%.d: %.c
+%.d: %.c | $(PYCGEN)
 	$(Q) "  DEP		$@"
 	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
 
