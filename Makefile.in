@@ -527,6 +527,8 @@ MISCSRC :=
 SMCGEN :=
 # c files generated from policy files
 PYCGEN :=
+# other files generated from policy files
+PYCGEN_AUX :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
 
@@ -1149,6 +1151,7 @@ clean::
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) \
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
+                $(PYCGEN) $(PYCGEN_AUX) \
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE

@@ -117,6 +117,10 @@ void gen_save_attr_name(char *name)
             "const DBT *pdata, DBT *skey)\n{\n    "
             "return SID_get_attr (pri, pkey, pdata, skey, SID_attr_%s);\n}\n\n",
             name, name);
+    /* generate prototype for extractor function */
+    fprintf(header, "int SID_get_%s (DB *pri, const DBT *pkey, "
+            "const DBT *pdata, DBT *skey);\n",
+            name);
 }
 
 void gen_begin_enum_decl()
