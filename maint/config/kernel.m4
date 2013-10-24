@@ -69,7 +69,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
         dnl After the "UAPI header file split" in linux-3.9.7, the
         dnl uapi header file locations need to be added to CFLAGS.
-        if test -n "${ARCH}" -a  
+        if test -n "${ARCH}" &&  
            test -d $lk_src_source/arch/${ARCH}/include/uapi; then
              CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include/uapi"
              CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include/generated/uapi"
