@@ -1852,7 +1852,8 @@ doc/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
-examples/pvfs2-server.rc
+examples/orangefs-server
+examples/orangefs-client
 doc/doxygen/pvfs2-doxygen.conf
 )
 
