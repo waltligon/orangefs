@@ -683,7 +683,7 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuuid1 uuid uuid-dev < /dev/null
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
                 # needed for Ubuntu 10.04
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
@@ -716,7 +716,7 @@ class OFSTestNode(object):
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
             #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
-            sudo zypper --non-interactive patch
+            sudo zypper --non-interactive patch libuuid1 uuid-devel
             
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
@@ -741,7 +741,7 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid uuid uuid-devel
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
