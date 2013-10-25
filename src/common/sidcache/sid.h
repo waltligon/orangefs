@@ -10,8 +10,8 @@
 #include "pvfs-sid.h"
 
 extern int SID_initialize(void);
-extern int SID_load(void);
-extern int SID_save(char *path);
+extern int SID_load(const char *path);
+extern int SID_save(const char *path);
 extern int SID_finalize(void);
 
 #endif /* SID_H */

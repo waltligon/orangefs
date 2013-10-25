@@ -8,11 +8,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "pvfs3-handle.h"
 #include "sidcache.h"
+#if 0
 #include "server-config-mgr.h"
+#endif
 
 /* Length of string representation of PVFS_SID */
 /* #define SID_STR_LEN (37) in sidcache.h */
@@ -33,6 +36,10 @@ static int *attr_positions;
  */
 static int attrs_in_file;
 static int valid_attrs_in_file;
+
+/* Global Number of records (SIDs) in the cache
+ */
+static int sids_in_cache = 0;
 
 
 /* Global database variables */
@@ -131,9 +138,9 @@ void SID_cacheval_init(SID_cacheval_t **cacheval)
  * This function marshalls the data for the SID_cacheval_t to store in the 
  * sidcache
 */
-void SID_cacheval_pack(SID_cacheval_t *cacheval, DBT *data)
+void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *data)
 {
-    data->data = cacheval;
+    data->data = (SID_cacheval_t *)cacheval;
     data->size = (sizeof(int) * SID_NUM_ATTR) +
                  sizeof(BMI_addr) +
                  strlen(cacheval->url) +
@@ -151,9 +158,9 @@ void SID_cacheval_pack(SID_cacheval_t *cacheval, DBT *data)
  * Returns 0 on success, otherwise -1 is returned
  */
 int SID_cacheval_alloc(SID_cacheval_t **cacheval,
-                              int sid_attributes[],
-                              BMI_addr sid_bmi,
-                              char *sid_url)
+                       int sid_attributes[],
+                       BMI_addr sid_bmi,
+                       char *sid_url)
 {
     if(!sid_url)
     {
@@ -400,7 +407,7 @@ int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
         attr_pos_index = 0;
 
         /* Getting the bmi address */
-        fscanf(inpfile, "%d", &tmp_bmi);
+        fscanf(inpfile, SCANF_lld, &tmp_bmi);
 
         /* Getting the url */
         fscanf(inpfile, "%s", tmp_url);
@@ -458,8 +465,8 @@ int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
  * Returns 0 on success, otherwise returns error code
 */
 int SID_cache_add_server(DB **dbp,
-                         PVFS_SID *sid_server,
-                         SID_cacheval_t *cacheval,
+                         const PVFS_SID *sid_server,
+                         const SID_cacheval_t *cacheval,
                          int *num_db_records)
 {
     int ret = 0;          /* Function return value */
@@ -475,7 +482,7 @@ int SID_cache_add_server(DB **dbp,
 
     SID_zero_dbt(&key, &data, NULL);
 
-    key.data = sid_server;
+    key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
 
     /* Marshalling the data of the SID_cacheval_t struct */
@@ -520,7 +527,7 @@ int SID_cache_add_server(DB **dbp,
  * Caller is expected to free the cacheval via SID_cacheval_free
  */
 int SID_cache_lookup_server(DB **dbp,
-                            PVFS_SID *sid_server,
+                            const PVFS_SID *sid_server,
                             SID_cacheval_t **cacheval)
 {
     int ret = 0;
@@ -528,7 +535,7 @@ int SID_cache_lookup_server(DB **dbp,
 
     SID_zero_dbt(&key, &data, NULL);
 
-    key.data = sid_server;
+    key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
    
     ret = (*dbp)->get(*dbp,  /* Primary database pointer */
@@ -553,12 +560,12 @@ int SID_cache_lookup_server(DB **dbp,
 /** HELPER - SID_LOOKUP and assign bmi_addr
  *
  * This function searches for a sid in the sid cache, retrieves the struct,
- * malloc's the char * passed in, and copies the bmi address of the retrieved
+ * malloc's the char * passed in, and copies the bmi URI address of the retrieved
  * struct into that char *.
  *
  * Caller is expected to free the bmi_addr memory
  */
-int SID_cache_lookup_bmi(DB **dbp, PVFS_SID *search_sid, char **bmi_addr)
+int SID_cache_lookup_bmi(DB **dbp, const PVFS_SID *search_sid, char **bmi_url)
 {
     SID_cacheval_t *temp;
     int ret;
@@ -574,10 +581,10 @@ int SID_cache_lookup_bmi(DB **dbp, PVFS_SID *search_sid, char **bmi_addr)
     }
 
     /* Malloc the outgoing BMI address char * to be size of retrieved one */
-    *bmi_addr = malloc(strlen(temp->url) + 1);
+    *bmi_url = malloc(strlen(temp->url) + 1);
 
     /* Copy retrieved BMI address to outgoing one */
-    strcpy(*bmi_addr, temp->url);
+    strcpy(*bmi_url, temp->url);
 
     /* Free any malloc'ed memory other than the outgoing BMI address */
     free(temp);
@@ -595,7 +602,7 @@ int SID_cache_lookup_bmi(DB **dbp, PVFS_SID *search_sid, char **bmi_addr)
  * Returns 0 on success, otherwise returns error code
  */
 int SID_cache_update_server(DB **dbp,
-                            PVFS_SID *sid_server,
+                            const PVFS_SID *sid_server,
                             SID_cacheval_t *new_attrs)
 {
     int ret = 0;                   /* Function return value */
@@ -660,7 +667,7 @@ int SID_cache_update_server(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  */
 int SID_cache_update_attrs(DB **dbp,
-                           PVFS_SID *sid_server,
+                           const PVFS_SID *sid_server,
                            int new_attr[])
 {
     int ret = 0;
@@ -733,7 +740,9 @@ int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_bmi(DB **dbp, PVFS_SID *sid_server, BMI_addr new_bmi_addr)
+int SID_cache_update_bmi(DB **dbp,
+                         const PVFS_SID *sid_server,
+                         BMI_addr new_bmi_addr)
 {
     int ret = 0;
     SID_cacheval_t *sid_attrs;
@@ -793,7 +802,7 @@ int SID_cache_copy_bmi(SID_cacheval_t *current_attrs, BMI_addr new_bmi_addr)
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_url(DB **dbp, PVFS_SID *sid_server, char *new_url)
+int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
 {
     int ret = 0;
     int tmp_attrs[SID_NUM_ATTR];
@@ -905,7 +914,7 @@ int SID_cache_copy_url(SID_cacheval_t **current_attrs, char *new_url)
   * Returns 0 on success, otherwise returns an error code 
   */
 int SID_cache_delete_server(DB **dbp,
-                            PVFS_SID *sid_server,
+                            const PVFS_SID *sid_server,
                             int *db_records)
 {
     int ret = 0; /* Function return value */
@@ -917,7 +926,7 @@ int SID_cache_delete_server(DB **dbp,
     /* Setting the values of DBT key to point to the sid to 
      * delete from the sid cache 
      */
-    key.data = sid_server;
+    key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
 
     ret = (*dbp)->del(*dbp, /* Primary database (sid cache) pointer */
@@ -1053,7 +1062,7 @@ int SID_cache_store(DB **dbp, const char *file_name, int db_records)
              */
             attr_pos_index = 0;
 
-            fprintf(outpfile, "%d ", tmp_sid_attrs->bmi_addr);
+            fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
             fprintf(outpfile, "%s ", tmp_sid_attrs->url);
             fprintf(outpfile, "%s\n", tmp_sid_str);
  
@@ -1104,7 +1113,7 @@ int SID_cache_store(DB **dbp, const char *file_name, int db_records)
                 fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
             }
 
-            fprintf(outpfile, "%d ", tmp_sid_attrs->bmi_addr);
+            fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
             fprintf(outpfile, "%s ", tmp_sid_attrs->url);
             fprintf(outpfile, "%s\n", tmp_sid_str);
  
@@ -1706,23 +1715,31 @@ errorout:
 /* called to load the contents of the SID cache from a file
  * so we do not have to discover everything
  */
-int SID_load(void)
+int SID_load(const char *path)
 {
     int ret = -1;
-    int records_imported = 0;
     char *filename = NULL;
-    struct server_configuration_s *srv_conf;
-    int fnlen;
+//    struct server_configuration_s *srv_conf;
+//    int fnlen;
     struct stat sbuf;
     PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
 
-    /* figure out the path to the cached data file */
-    srv_conf = PINT_server_config_mgr_get_config(fsid);
-    fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
-    filename = (char *)malloc(fnlen + 1);
-    strncpy(filename, srv_conf->meta_path, fnlen + 1);
-    strncat(filename, "/SIDcache", fnlen + 1);
-    PINT_server_config_mgr_put_config(srv_conf);
+    if (!path)
+    {
+#if 0
+        /* figure out the path to the cached data file */
+        srv_conf = PINT_server_config_mgr_get_config(fsid);
+        fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
+        filename = (char *)malloc(fnlen + 1);
+        strncpy(filename, srv_conf->meta_path, fnlen + 1);
+        strncat(filename, "/SIDcache", fnlen + 1);
+        PINT_server_config_mgr_put_config(srv_conf);
+#endif
+    }
+    else
+    {
+        filename = (char *)path;
+    }
 
     /* check if file exists */
     ret = stat(filename, &sbuf);
@@ -1738,7 +1755,7 @@ int SID_load(void)
     }
 
     /* load cache from file */
-    ret = SID_cache_load(&SID_db, filename, &records_imported);
+    ret = SID_cache_load(&SID_db, filename, &sids_in_cache);
     if (ret < 0)
     {
         /* something failed, close up the database */
@@ -1755,17 +1772,17 @@ errorout:
  * so we can reload at some future startup and not have to discover
  * everything
  */
-int SID_save(char *path)
+int SID_save(const char *path)
 {
     int ret = -1;
-    int records_exported = 0;
     char *filename = NULL;
-    struct server_configuration_s *srv_conf;
-    int fnlen;
+//    struct server_configuration_s *srv_conf;
+//    int fnlen;
     PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
 
     if (!path)
     {
+#if 0
         /* figure out the path to the cached data file */
         srv_conf = PINT_server_config_mgr_get_config(fsid);
         fnlen = strlen(srv_conf->meta_path) + strlen("/SIDcache");
@@ -1773,19 +1790,36 @@ int SID_save(char *path)
         strncpy(filename, srv_conf->meta_path, fnlen + 1);
         strncat(filename, "/SIDcache", fnlen + 1);
         PINT_server_config_mgr_put_config(srv_conf);
+#endif
     }
     else
     {
-        filename = path;
+        filename = (char *)path;
     }
 
     /* dump cache to the file */
-    ret = SID_cache_store(&SID_db, filename, records_exported);
+    ret = SID_cache_store(&SID_db, filename, sids_in_cache);
     if (ret < 0)
     {
         return ret;
     }
 
+    return ret;
+}
+
+int SID_add(const PVFS_SID *sid, const char *url)
+{
+    SID_cacheval_t cval;
+    /* load up the cval */
+    int ret = 0;
+    ret = SID_cache_add_server(&SID_db, sid, &cval, &sids_in_cache);
+    return ret;
+}
+
+int SID_delete(const PVFS_SID *sid)
+{
+    int ret = 0;
+    ret = SID_cache_delete_server(&SID_db, sid, &sids_in_cache);
     return ret;
 }
 
@@ -1796,12 +1830,14 @@ int SID_finalize(void)
 {
     int ret = -1;
 
+#if 0
     /* save cache contents to a file */
     ret = SID_save(NULL);
     if (ret < 0)
     {
         return ret;
     }
+#endif
 
     /* close cursors */
     ret = SID_close_dbcs(SID_attr_cursor);

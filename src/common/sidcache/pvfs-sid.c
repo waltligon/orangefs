@@ -16,6 +16,7 @@
 #include "quicklist.h"
 #include "sidcache.h"
 #include "policyeval.h"
+#include "bmi.h"
 
 enum {
     PVFS_OBJ_META,
@@ -129,11 +130,37 @@ errorout:
 /**
  * Look up the SID provided and return the matching BMI address
  */
-int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, PVFS_SID *sid)
+int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 {
+    int ret;
+    SID_cacheval_t *temp_cacheval;
+
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    return 0;
+    ret = SID_cache_lookup_server(&SID_db, sid, &temp_cacheval);
+    if (ret != 0)
+    {
+        return ret;
+    }
+    if (temp_cacheval->bmi_addr == 0);
+    {
+#if 0
+        /* enter url into BMI to get BMI addr */
+        ret = BMI_addr_lookup(&temp_cacheval->bmi_addr, temp_cacheval->url);
+        if (ret != 0)
+        {
+            return ret;
+        }
+        ret = SID_cache_update_server(&SID_db, sid, temp_cacheval);
+        if (ret != 0)
+        {
+            return ret;
+        }
+#endif
+    }
+    *bmi_addr = temp_cacheval->bmi_addr;
+    free(temp_cacheval);
+    return ret;
 }
 
 

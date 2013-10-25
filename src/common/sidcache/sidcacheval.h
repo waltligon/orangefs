@@ -9,7 +9,7 @@
 
 #include "policy.h"
 
-typedef int BMI_addr;
+typedef int64_t BMI_addr; /* equivalent to PVFS_BMI_adddr_t */
 
 typedef struct SID_cacheval_s
 {
