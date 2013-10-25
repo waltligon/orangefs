@@ -24,6 +24,8 @@ help()
     printf "%-${SP}s%s\n" "  -p, --prefix <prefix_path>" "prefix path set during configure step"
     printf "%-${SP}s%s\n" "" "    (or /usr/local if you didn't specify)"
     printf "%-${SP}s%s\n" "  -s, --server_options <options_string>" "String of options to pass to pvfs2-server"
+    printf "%-${SP}s%s\n" "  -v, --server_env <env_var_string>"     "String of space separated environment"
+    printf "%-${SP}s%s\n" "" "    variables defined for the pvfs2-server."
 }
 
 # optionally set by options
@@ -33,9 +35,10 @@ MNT=                                    #Ex: '/mnt/orangefs'
 SSH_OPTIONS=                            #Ex: '-t another_host ssh'
 PREFIX_PATH=                            #Ex: '/opt/orangefs'
 PVFS2_SERVER_OPTIONS=                   #Ex: '-f' or '-r'
+PVFS2_SERVER_ENV=                       #Ex: 'LD_LIBRARY_PATH=/opt/orangefs:/opt/db4 PVFS2TAB_FILE=/opt/orangefs/pvfs2tab'
 
 # Execute getopt
-ARGS=`getopt -o "c:e:hm:o:p:s:" -l "conf:,exclusions:,help,mnt:,options:,prefix:,server_options:" -n "$0" -- "$@"`
+ARGS=`getopt -o "c:e:hm:o:p:s:v:" -l "conf:,exclusions:,help,mnt:,options:,prefix:,server_options:server_env:" -n "$0" -- "$@"`
 
 # Check if getopt returned an error b/c of bad arguments
 if [ $? -ne 0 ]; then
@@ -96,6 +99,12 @@ while [ $# -ne 0 ]; do
         fi
         shift 2;;
 
+        -v|--server_env)
+        if [ -n "$2" ]; then
+            PVFS2_SERVER_ENV=$2
+        fi
+        shift 2;;
+
         --)
         shift
     esac
@@ -122,7 +131,8 @@ SPACING=$[`echo "$SERVERS" | wc -L`+4]
 PVFS2_SERVER=$PREFIX_PATH/sbin/pvfs2-server
 # Start Servers
 for SERVER in $SERVERS; do
-    OUTPUT=`ssh $SSH_OPTIONS $SERVER $PVFS2_SERVER $PVFS2_SERVER_OPTIONS $PVFS_CONF_FILE 2>&1`
+    echo "starting pvfs2-server with: ssh $SSH_OPTIONS $SERVER $PVFS2_SERVER_ENV $PVFS2_SERVER $PVFS2_SERVER_OPTIONS $PVFS_CONF_FILE"
+    OUTPUT=`ssh $SSH_OPTIONS $SERVER $PVFS2_SERVER_ENV $PVFS2_SERVER $PVFS2_SERVER_OPTIONS $PVFS_CONF_FILE 2>&1`
     printf "%-${SPACING}s%s\n" "$SERVER:" "$OUTPUT"
 done
 
