@@ -1,0 +1,1 @@
+tcp-mx://node1-mx:3334/orangefs,tcp-ib://node1-ib:3334/orangsfs,tcp-eth://node1:3334/orangefs /mnt/pvfs2 pvfs2 defaults,noauto 0 0

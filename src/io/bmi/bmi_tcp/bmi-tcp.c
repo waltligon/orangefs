@@ -2063,6 +2063,13 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map)
  * operations that use the address.  If the
  * dealloc_flag is set, the memory used by the address will be
  * deallocated as well.
+ * This function can be called with a 0 dealloc_flag, which can cause
+ * bmi_method_addr_forget_callback to put it on the forget list, causing
+ * it to be called again this time with a 1 dealloc_flag.  In the mean
+ * time the socket gets set to -1 by tcp_shutdown_addr which is cause
+ * for an error from BMI_socket_collection_remove.  Thus I have added
+ * the check for a valid socket.  Other causes of invalid sockets might
+ * be masked.
  *
  * no return value
  */
@@ -2070,13 +2077,16 @@ void tcp_forget_addr(bmi_method_addr_p map,
 		     int dealloc_flag,
 		     int error_code)
 {
+    /* this assumes map is NOT NULL, I can only assume that is
+     * guaranteed by the caller
+     */
     struct tcp_addr* tcp_addr_data = map->method_data;
     BMI_addr_t bmi_addr = tcp_addr_data->bmi_addr;
     int tmp_outcount;
     bmi_method_addr_p tmp_addr;
     int tmp_status;
 
-    if (tcp_socket_collection_p)
+    if (tcp_socket_collection_p && tcp_addr_data->socket >= 0)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
 	/* perform a test to force the socket collection to act on the remove
