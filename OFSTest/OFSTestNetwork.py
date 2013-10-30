@@ -382,7 +382,13 @@ class OFSTestNetwork(object):
         return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
         
     def copyOFSToNodeList(self,destination_list=None):
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
+    def copyMpich2ToNodeList(self,destination_list=None):
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyMpich2InstallationToNode,destination_list=destination_list)
+
+
+    def copyResourceToNodeList(self,node_function,destination_list=None):
         # This is a multi-threaded recursive copy routine.
         # Function copies OrangeFS from list[0] to list[len/2]
         # Then it partitions the list into two parts and copies again
@@ -404,7 +410,8 @@ class OFSTestNetwork(object):
         
         #copy from list[0] to list[list_length/2]
         print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
-        rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        rc = node_function(destination_list[0],destination_list[length/2])
         
         
         # Todo: Throw an exception if the copy fails.
@@ -424,7 +431,7 @@ class OFSTestNetwork(object):
                     list = self.queue.get()
                     
                     #print "Copying %r" % list
-                    self.manager.copyOFSToNodeList(list)
+                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list)
                     
                         
                     #signals to queue job is done

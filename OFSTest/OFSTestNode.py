@@ -160,6 +160,8 @@ class OFSTestNode(object):
         self.db4_dir = "/opt/db4"
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.ofs_conf_file = None
+        
+        self.mpich2_installation_location = ""
          
 
     #==========================================================================
@@ -1370,6 +1372,10 @@ class OFSTestNode(object):
         destinationNode.ofs_conf_file =self.ofs_conf_file
         return rc
        
+    def copyMpich2InstallationToNode(self,destinationNode):
+        rc = self.copyToRemoteNode(self.mpich2_installation_location+"/", destinationNode, self.mpich2_installation_location, True)
+        destination_node.mpich2_installation_location = self.mpich2_installation_location
+        return rc
     #-------------------------------
     #
     # configureOFSServer
@@ -1783,7 +1789,7 @@ class OFSTestNode(object):
         #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
         self.runSingleCommand("mkdir -p "+location)
         tempdir = self.current_directory
-        self.changeDirectory(location)
+        self.changeDirectory("/home/%s" % self.current_user)
         self.runSingleCommand("rm -rf mpich2-*.tar.gz")
         #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
@@ -1792,42 +1798,46 @@ class OFSTestNode(object):
             print "Could not download mpich from %s." % url
             self.changeDirectory(tempdir)
             return rc
-        self.runSingleCommand("rm -rf mpich2-snap-*")
-        #tar xzf mpich2-latest.tar.gz
+
         self.runSingleCommand("tar xzf mpich2-1.5.tar.gz")
-        self.runSingleCommand("mv mpich2-1.5 mpich2-snapshot")
-        
-        self.runSingleCommand("mkdir -p %s/mpich2-snapshot/build" % location)
-        self.changeDirectory(location+"mpich2-snapshot/build")
+        self.changeDirectory("/home/%s/mpich2-1.5" % self.current_user)
         
         configure = '''
-        ../configure -q --prefix=%s/soft/mpich2 \
+        ../configure -q --prefix=%s \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
 		--with-pvfs2=%s \
 		--enable-g=dbg --without-mpe \
-		--disable-f77 --disable-fc >mpich2config-%s.log
-        ''' % (self.ofs_extra_tests_location,self.ofs_installation_location,self.ofs_branch)
+		--disable-f77 --disable-fc >mpich2config.log
+        ''' % (location,self.ofs_installation_location)
         
-        wd = self.runSingleCommandBacktick("pwd")
-        print wd
-        print configure
+        #wd = self.runSingleCommandBacktick("pwd")
+        #print wd
+        #print configure
         rc = self.runSingleCommand(configure)
         if rc != 0:
             print "Configure of MPICH failed. rc=%d" % rc
             self.changeDirectory(tempdir)
             return rc
         
-        rc = self.runSingleCommand("make > mpich2make-%s.log 2> /dev/null" % self.ofs_branch)
+        rc = self.runSingleCommand("make > mpich2make.log")
         if rc != 0:
             print "Make of MPICH failed."
             self.changeDirectory(tempdir)
             return rc
 
-        rc = self.runSingleCommand("make install > mpich2install-${CVSTAG} 2> /dev/null" % self.ofs_branch)
+        rc = self.runSingleCommand("make install > mpich2install.log")
         if rc != 0:
             print "Install of MPICH failed."
             self.changeDirectory(tempdir)
             return rc
+        
+        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
+        if rc != 0:
+            print "Install of MPICH failed."
+            self.changeDirectory(tempdir)
+            return rc
+        
+        self.mpich2_installation_location = location 
         
         return 0
 
