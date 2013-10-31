@@ -411,7 +411,7 @@ class OFSTestNetwork(object):
         #copy from list[0] to list[list_length/2]
         print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
         #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
-        rc = node_function(destination_list[0],destination_list[length/2])
+        rc = node_function(destination_list[0],destination_list[list_length/2])
         
         
         # Todo: Throw an exception if the copy fails.
