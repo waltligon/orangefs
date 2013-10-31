@@ -587,42 +587,39 @@ class OFSTestNetwork(object):
         for node in self.created_nodes:
             pav_conf = node.generatePAVConf()
             self.local_master.copyToRemoteNode("/tmp/pav.conf", node, pav_conf)
+            
+    # makePBSScript
+    # This turns a command into a pbs script
+    def makePBSScript(self,command):
     
-    def makePBSScript(self):
-        '''
-        #!/bin/sh
+        script = '''#!/bin/bash
         #PBS -l walltime=0:10:0
-        #PBS -l nodes=8
+        #PBS -l nodes=%d
         #PBS -j oe
         #PBS -q shared
+        nprocs=%d
 
-        nprocs=4
+        PATH=%s:/bin:$PATH
 
-        $CLUSTER_DIR/pav/pav_start -c $PAV_CONFIG -n \$nprocs >/dev/null
+        mpdboot --file=/home/%s/mpd.hosts --totalnum=%d
 
-        eval \$( $CLUSTER_DIR/pav/pav_info -c $PAV_CONFIG)
-        export PVFS2TAB_FILE
-
-        PATH=${CLUSTER_DIR}/mpich2/bin:\${PATH}
-        mpdboot --file=\${WORKINGDIR}/compnodes --totalnum=\$nprocs
-
-        mpiexec -np \$nprocs $@
+        mpiexec -np %d %s
         mpdallexit
-        $CLUSTER_DIR/pav/pav_stop -c $PAV_CONFIG >/dev/null" '''
+        ''' % (length(self.created_nodes),length(self.created_nodes),self.created_nodes[0].mpich2_installation_location,self.created_nodes[0].current_user,length(self.created_nodes),length(self.created_nodes),command)
         
-    def blockPBSUntilDone(self):
+        print script
+        return script
 
-        '''
-        while true ; do 
-            qstat -i $1 >/dev/null 2>&1 
-            if [ $? -eq 0 ] ; then
-                sleep 60
-                continue
-            else
-                break
-            fi	
-        done
-        '''
+    
+        
+    def blockPBSUntilDone(self,jobid):
+        
+        rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+
+        while rc == 0:
+            time.sleep(60)
+            rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+            
     
     def setupMPIEnvironment(self,headnode=None):
         

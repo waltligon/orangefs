@@ -1374,7 +1374,7 @@ class OFSTestNode(object):
        
     def copyMpich2InstallationToNode(self,destinationNode):
         rc = self.copyToRemoteNode(self.mpich2_installation_location+"/", destinationNode, self.mpich2_installation_location, True)
-        destination_node.mpich2_installation_location = self.mpich2_installation_location
+        destinationNode.mpich2_installation_location = self.mpich2_installation_location
         return rc
     #-------------------------------
     #
@@ -1799,11 +1799,14 @@ class OFSTestNode(object):
             self.changeDirectory(tempdir)
             return rc
 
+        output = []
         self.runSingleCommand("tar xzf mpich2-1.5.tar.gz")
         self.changeDirectory("/home/%s/mpich2-1.5" % self.current_user)
+        self.runSingleCommand("ls -l",output)
+        print output
         
         configure = '''
-        ../configure -q --prefix=%s \
+        ./configure -q --prefix=%s \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
 		--with-pvfs2=%s \
 		--enable-g=dbg --without-mpe \
@@ -1814,10 +1817,10 @@ class OFSTestNode(object):
         #print wd
         #print configure
         
-        output = []
+
         
         rc = self.runSingleCommand(configure,output)
-        print output
+        
         if rc != 0:
             print "Configure of MPICH failed. rc=%d" % rc
             print output
@@ -1848,6 +1851,14 @@ class OFSTestNode(object):
         self.mpich2_installation_location = location 
         
         return 0
+    
+
+
+
+
+        
+        
+
 
     def findExistingOFSInstallation(self):
         # to find OrangeFS server, first finr the pvfs2-server file
