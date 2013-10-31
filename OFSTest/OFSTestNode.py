@@ -1813,27 +1813,35 @@ class OFSTestNode(object):
         #wd = self.runSingleCommandBacktick("pwd")
         #print wd
         #print configure
-        rc = self.runSingleCommand(configure)
+        
+        output = []
+        
+        rc = self.runSingleCommand(configure,output)
+        print output
         if rc != 0:
             print "Configure of MPICH failed. rc=%d" % rc
+            print output
             self.changeDirectory(tempdir)
             return rc
         
         rc = self.runSingleCommand("make > mpich2make.log")
         if rc != 0:
             print "Make of MPICH failed."
+            print output
             self.changeDirectory(tempdir)
             return rc
 
         rc = self.runSingleCommand("make install > mpich2install.log")
         if rc != 0:
             print "Install of MPICH failed."
+            print output
             self.changeDirectory(tempdir)
             return rc
         
         rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
         if rc != 0:
             print "Install of MPICH failed."
+            print output
             self.changeDirectory(tempdir)
             return rc
         

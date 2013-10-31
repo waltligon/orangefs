@@ -305,7 +305,7 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         print "Copy mpich2 to nodes"
-        self.ofs_network.copyMpich2toNodeList()
+        self.ofs_network.copyMpich2ToNodeList()
         print ""
         print "==================================================================="
         
