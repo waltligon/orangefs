@@ -162,6 +162,7 @@ class OFSTestNode(object):
         self.ofs_conf_file = None
         
         self.mpich2_installation_location = ""
+        self.mpich2_source_location = ""
          
 
     #==========================================================================
