@@ -1374,7 +1374,9 @@ class OFSTestNode(object):
        
     def copyMpich2InstallationToNode(self,destinationNode):
         rc = self.copyToRemoteNode(self.mpich2_installation_location+"/", destinationNode, self.mpich2_installation_location, True)
+        rc = self.copyToRemoteNode(self.mpich2_source_location+"/", destinationNode, self.mpich2_source_location, True)
         destinationNode.mpich2_installation_location = self.mpich2_installation_location
+        destinationNode.mpich2_source_location = self.mpich2_source_location
         return rc
     #-------------------------------
     #
@@ -1783,7 +1785,8 @@ class OFSTestNode(object):
         if location == None:
             location = "/home/%s/mpich2" % self.current_user
             
-        url = "http://devorange.clemson.edu/pvfs/mpich2-1.5.tar.gz"
+        url = "http://devorange.clemson.edu/pvfs/mpich-3.0.4.tar.gz"
+        url = "wget"
         # just to make debugging less painful
         #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
         #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
@@ -1801,15 +1804,17 @@ class OFSTestNode(object):
 
         output = []
         self.runSingleCommand("tar xzf mpich2-1.5.tar.gz")
-        self.changeDirectory("/home/%s/mpich2-1.5" % self.current_user)
-        self.runSingleCommand("ls -l",output)
-        print output
+        
+        self.mpich2_source_location = "/home/%s/mpich2-1.5" % self.current_user 
+        self.changeDirectory(self.mpich2_source_location)
+        #self.runSingleCommand("ls -l",output)
+        #print output
         
         configure = '''
         ./configure -q --prefix=%s \
 		--enable-romio --with-file-system=pvfs2 \
 		--with-pvfs2=%s \
-		--enable-g=dbg --without-mpe \
+		--enable-g=dbg \
 		--disable-f77 --disable-fc >mpich2config.log
         ''' % (location,self.ofs_installation_location)
         
@@ -1818,7 +1823,7 @@ class OFSTestNode(object):
         #print configure
         
 
-        
+        print "Configuring MPICH"
         rc = self.runSingleCommand(configure,output)
         
         if rc != 0:
@@ -1827,6 +1832,7 @@ class OFSTestNode(object):
             self.changeDirectory(tempdir)
             return rc
         
+        print "Building MPICH"
         rc = self.runSingleCommand("make > mpich2make.log")
         if rc != 0:
             print "Make of MPICH failed."
@@ -1834,6 +1840,7 @@ class OFSTestNode(object):
             self.changeDirectory(tempdir)
             return rc
 
+        print "Installing MPICH"
         rc = self.runSingleCommand("make install > mpich2install.log")
         if rc != 0:
             print "Install of MPICH failed."
@@ -1841,6 +1848,7 @@ class OFSTestNode(object):
             self.changeDirectory(tempdir)
             return rc
         
+        print "Checking MPICH install"
         rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
         if rc != 0:
             print "Install of MPICH failed."
