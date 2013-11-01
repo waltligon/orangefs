@@ -1807,7 +1807,7 @@ class OFSTestNode(object):
         
         configure = '''
         ./configure -q --prefix=%s \
-		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
+		--enable-romio --with-file-system=pvfs2 \
 		--with-pvfs2=%s \
 		--enable-g=dbg --without-mpe \
 		--disable-f77 --disable-fc >mpich2config.log
