@@ -160,6 +160,9 @@ class OFSTestNode(object):
         self.db4_dir = "/opt/db4"
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.ofs_conf_file = None
+        
+        self.mpich2_installation_location = ""
+        self.mpich2_source_location = ""
          
 
     #==========================================================================
@@ -683,7 +686,7 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
                 # needed for Ubuntu 10.04
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
@@ -716,7 +719,7 @@ class OFSTestNode(object):
             batch_commands = '''
             # prereqs should be installed as part of the image. Thanx SuseStudio!
             #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
-            sudo zypper --non-interactive patch
+            sudo zypper --non-interactive patch libuuid1 uuid-devel
             
 
             cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
@@ -741,7 +744,7 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
@@ -1083,6 +1086,16 @@ class OFSTestNode(object):
             print output
             return rc
         
+        #sanity check for OFS prefix
+        rc = self.runSingleCommand("mkdir -p "+ofs_prefix)
+        if rc != 0:
+            print "Could not create directory "+ofs_prefix
+            ofs_prefix = "/home/%s/orangefs" % self.current_user
+            print "Using default %s" % ofs_prefix
+        else:
+            self.runSingleCommand("rmdir "+ofs_prefix)
+            
+        
         # get the kernel version if it has been updated
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
         
@@ -1360,6 +1373,12 @@ class OFSTestNode(object):
         destinationNode.ofs_conf_file =self.ofs_conf_file
         return rc
        
+    def copyMpich2InstallationToNode(self,destinationNode):
+        rc = self.copyToRemoteNode(self.mpich2_installation_location+"/", destinationNode, self.mpich2_installation_location, True)
+        rc = self.copyToRemoteNode(self.mpich2_source_location+"/", destinationNode, self.mpich2_source_location, True)
+        destinationNode.mpich2_installation_location = self.mpich2_installation_location
+        destinationNode.mpich2_source_location = self.mpich2_source_location
+        return rc
     #-------------------------------
     #
     # configureOFSServer
@@ -1407,8 +1426,10 @@ class OFSTestNode(object):
         if security == None:
             pass
         elif security.lower() == "key":
+            print "Configuring key based security"
             security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
         elif security.lower() == "cert":
+            print "Certificate based security not yet supported by OFSTest."
             pass
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
@@ -1436,6 +1457,10 @@ class OFSTestNode(object):
                 self.ofs_conf_file = self.ofs_installation_location+"/etc/orangefs.conf"
             else:
                 self.ofs_conf_file = ofs_conf_file
+        
+        # Now set the fs name
+        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk {'print \$2'}" % self.ofs_conf_file)
+        
         return rc
         
     #-------------------------------
@@ -1760,15 +1785,18 @@ class OFSTestNode(object):
     def installMpich2(self,location=None):
         if location == None:
             location = "/home/%s/mpich2" % self.current_user
+        
+        mpich_version = "mpich-3.0.4"
             
-        url = "http://devorange.clemson.edu/pvfs/mpich2-1.5.tar.gz"
+        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
+        url = "wget"
         # just to make debugging less painful
         #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
         #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
         self.runSingleCommand("mkdir -p "+location)
         tempdir = self.current_directory
-        self.changeDirectory(location)
-        self.runSingleCommand("rm -rf mpich2-*.tar.gz")
+        self.changeDirectory("/home/%s" % self.current_user)
+        
         #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
         #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
@@ -1776,44 +1804,72 @@ class OFSTestNode(object):
             print "Could not download mpich from %s." % url
             self.changeDirectory(tempdir)
             return rc
-        self.runSingleCommand("rm -rf mpich2-snap-*")
-        #tar xzf mpich2-latest.tar.gz
-        self.runSingleCommand("tar xzf mpich2-1.5.tar.gz")
-        self.runSingleCommand("mv mpich2-1.5 mpich2-snapshot")
+
+        output = []
+        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
         
-        self.runSingleCommand("mkdir -p %s/mpich2-snapshot/build" % location)
-        self.changeDirectory(location+"mpich2-snapshot/build")
+        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
+        self.changeDirectory(self.mpich2_source_location)
+        #self.runSingleCommand("ls -l",output)
+        #print output
         
         configure = '''
-        ../configure -q --prefix=%s/soft/mpich2 \
-		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
+        ./configure -q --prefix=%s \
+		--enable-romio --with-file-system=pvfs2 \
 		--with-pvfs2=%s \
-		--enable-g=dbg --without-mpe \
-		--disable-f77 --disable-fc >mpich2config-%s.log
-        ''' % (self.ofs_extra_tests_location,self.ofs_installation_location,self.ofs_branch)
+		--enable-g=dbg \
+		--disable-f77 --disable-fc >mpich2config.log
+        ''' % (location,self.ofs_installation_location)
         
-        wd = self.runSingleCommandBacktick("pwd")
-        print wd
-        print configure
-        rc = self.runSingleCommand(configure)
+        #wd = self.runSingleCommandBacktick("pwd")
+        #print wd
+        #print configure
+        
+
+        print "Configuring MPICH"
+        rc = self.runSingleCommand(configure,output)
+        
         if rc != 0:
             print "Configure of MPICH failed. rc=%d" % rc
+            print output
             self.changeDirectory(tempdir)
             return rc
         
-        rc = self.runSingleCommand("make > mpich2make-%s.log 2> /dev/null" % self.ofs_branch)
+        print "Building MPICH"
+        rc = self.runSingleCommand("make > mpich2make.log")
         if rc != 0:
             print "Make of MPICH failed."
+            print output
             self.changeDirectory(tempdir)
             return rc
 
-        rc = self.runSingleCommand("make install > mpich2install-${CVSTAG} 2> /dev/null" % self.ofs_branch)
+        print "Installing MPICH"
+        rc = self.runSingleCommand("make install > mpich2install.log")
         if rc != 0:
             print "Install of MPICH failed."
+            print output
             self.changeDirectory(tempdir)
             return rc
         
+        print "Checking MPICH install"
+        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
+        if rc != 0:
+            print "Install of MPICH failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        self.mpich2_installation_location = location 
+        
         return 0
+    
+
+
+
+
+        
+        
+
 
     def findExistingOFSInstallation(self):
         # to find OrangeFS server, first finr the pvfs2-server file

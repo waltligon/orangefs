@@ -22,18 +22,22 @@ def mkdir_p(path):
 config_file = None
 output_dir = "."
 #print sys.argv
-optlist, args = getopt.getopt(sys.argv[1:], 'hf:d:')
+optlist, args = getopt.getopt(sys.argv[1:], 'hf:d:c:')
 #print optlist
+#print args
 
 for o, a  in optlist:
-	if o == "-d":
-		output_dir = a
-	if o == "-f":
-		config_file = a
+
+    if o == "-d":
+        output_dir = a
+    if o == "-f":
+        config_file = a
 	if o == "-h":
-		print "start_test -f <path to config file> -d <output directory>"
+		print "start_test -f <path to config file> -d <output directory> config1=value1 config2=value2...configN=valueN"
 		exit()
 
+# Convert arguments to a dictionary
+#argd = dict([my_arg.split('=') for my_arg in args])
 
 #print "Output dir is %s, config file is %s" % (output_dir,config_file)
 print "==================================================================="
@@ -47,17 +51,22 @@ if config_file != None:
         #print "setting config"
         #ugly python hack
         test_driver.setConfig(kwargs={"filename":config_file})
+        
         #test_driver.printConfig()
         #print "done"
     except ValueError:
         print "File %s could not be read or invalid format." % config_file
-        test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
-        test_driver.setConfig()
+        #test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
+        #test_driver.setConfig()
+        exit(-1)
 else:
-    test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
-    test_driver.setConfig()
+    test_driver = OFSTestMain.OFSTestMain(OFSTestConfig.OFSTestConfig())
 
+#Add additional configuration options from command line
+test_driver.config.addConfig(args)
+test_driver.printConfig()
 
+#exit()
 mkdir_p(output_dir)
 os.chdir(output_dir)
 

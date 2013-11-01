@@ -22,24 +22,38 @@
 
 class OFSTestConfig(object):
     
+    #------------------------------------------------------------------
+    #
+    # setup variables
+    #
+    #
+    # These variables control the configuration of OFSTest. OFSTest can 
+    # setup an instance of OrangeFS on any real or virtual cluster with 
+    # passwordless ssh access for one user and passwordless sudo access for
+    # that user. 
+    #
+    #------------------------------------------------------------------
+    
+    
     def __init__(self):
         
-        #------------------------------
-        #
-        # setup variables
-        #
-        #------------------------------
-        
+    
         # name of output logfile
         self.log_file = "OFSTest.log"
         
+        #------------------------------
+        #
+        # node control/ec2 variables
+        #
+        #------------------------------
+       
         # are we using OpenStack/EC2
         self.using_ec2 = False
         
         # Location of the ec2rc.sh file
         self.ec2rc_sh = ""
         
-        # path of ssh key used to acce
+        # path of ssh key used to access all nodes
         self.ssh_key_filepath = ""
         
         # list of differing keypaths if applicable
@@ -64,6 +78,12 @@ class OFSTestConfig(object):
         # Should the nodes be deleted after testing?
         self.ec2_delete_after_test = False
         
+        # EC2 domain
+        self.ec2_domain=None
+        
+        # Associate external ip address with EC2 nodes.
+        self.ec2_associate_ip=False
+        
         # list of node ip addresses. If a private network is used, this is the
         # Internal network.
         self.node_ip_addresses = []
@@ -72,29 +92,41 @@ class OFSTestConfig(object):
         # if node_ip_addresses is accessible, this need not be set.
         self.node_ext_ip_addresses = []
         
+        # single username to access all nodes
+        self.node_username = "ec2-user"
+        
+        # usernames for login of individual nodes, if necessary
         self.node_usernames = []
+        
+        # no longer needed
+        self.ofs_fs_name=None
+        
+        #------------------------------
+        #
+        # OrangeFS configuration
+        #
+        #------------------------------
+        
+        # location of OrangeFS source
         self.ofs_resource_location = ""
+        
+        # What package is the OrangeFS source? SVN, TAR, Local Dir, Node? 
         self.ofs_resource_type = ""
-        self.configure_opts = ""
+        
+        
+        # Additional options for pvfs2genconfig to generate Orangefs.conf file
         self.pvfs2genconfig_opts = ""
-        self.run_sysint_tests = False
-        self.run_usrint_tests = False
-        self.run_vfs_tests = False
-        self.run_fuse_tests = False
-        self.run_mpi_tests = False
-        self.ofs_fs_name="pvfs2-fs"
-        self.ofs_build_kmod = True
-        self.ofs_compile_debug = True
         
-        self.ec2_domain=None
-        self.ec2_associate_ip=False
+        #------------------------------
+        #
+        # build options
+        #
+        #------------------------------
         
-        
-        #configure options
         
         # --enable-fuse
-        self.install_fuse=self.run_fuse_tests
-    
+        self.install_fuse=False
+            
         # --prefix=
         self.install_prefix = None
         
@@ -102,10 +134,10 @@ class OFSTestConfig(object):
         self.db4_prefix = "/opt/db4"
 
         # add --with-kernel option
-        self.install_OFS_client = self.ofs_build_kmod
+        self.install_OFS_client = True
 
         # add --enable=shared
-        self.install_shared = self.run_usrint_tests
+        self.install_shared = False
         
         # --enable-strict
         self.enable_strict = True
@@ -113,35 +145,172 @@ class OFSTestConfig(object):
         # disable security. Options are "Key" and "Cert"
         self.ofs_security_mode = None
         
+        # build the kernel module?
+        self.ofs_build_kmod = True
+        
+        # compile with -g debugging option?
+        self.ofs_compile_debug = True
+
+        # list of patches to patch OrangeFS source
         self.ofs_patch_files=[]
         
+        # username of svn user. Allows checkout instead of export
         self.svn_username = None
-        #self.svn_password = None
+
+        # Additional options for configure
+        self.configure_opts = ""
+
+        #------------------------------
+        #
+        # installation options
+        #
+        #------------------------------
         
         
-        # install options
+        # Mount the filesystem after setup
         self.mount_OFS_after_setup = True
-        self.ofs_mount_as_fuse = self.install_fuse
+        
+        # Mount filesystem using the fuse module instead of kernel module.
+        self.ofs_mount_as_fuse = False
+        
+        # Install OrangeFS tests
         self.install_tests = True
+        
+        # Install and start the OrangeFS server software
         self.install_OFS_server = True
+        
+        # Install MPI software, including Torque
         self.install_MPI = False
+        
+        # Additional installation option
         self.install_opts = ""
         
-        # existing config
         
+        #------------------------------
+        #
+        # existing installation options
+        #
+        #------------------------------
+        
+        
+        # location of suite of testing benchmarks
         self.ofs_extra_tests_location = None
+        
+        # location of PVFS2TAB_FILE. Mountpoint will be read from file
         self.ofs_pvfs2tab_file = None
+        
+        # location of orangefs on the main node
         self.ofs_source_location = None
+        
+        #Location of OrangeFS.conf file
         self.ofs_config_file = None
+        
+        # Delete data on OrangeFS partition
         self.delete_existing_data = False
+        
+        # OrangeFS mount point
         self.ofs_mount_point = None
+        
+        # Override the hostname given by hostname command. Will force the
+        # hostname to be the value provided. Needed to workaround
+        # a bug on some ec2 setups.
         self.ofs_host_name_override = []
+        
+        
+        #------------------------------
+        #
+        # Test Flags
+        #
+        #------------------------------
+        
+        self.run_sysint_tests = False
+        self.run_usrint_tests = False
+        self.run_vfs_tests = False
+        self.run_fuse_tests = False
+        self.run_mpi_tests = False
+        
+        
+    
+    #------------------------------------------------------------------
+    #
+    # setConfig
+    #
+    #
+    # A universal method for setting the initial configuration. Overridden
+    # in subclasses
+    #
+    #------------------------------------------------------------------
+
     
     def setConfig(self,kwargs={}):
         pass
+        
+    #------------------------------------------------------------------
+    #
+    # addConfig
+    #
+    #
+    # This method can "override" existing values as specified in str_args
+    # str_args are an array of variable=value strings.
+    #
+    #------------------------------------------------------------------
+
+    
+    def addConfig(self,str_args=[]):
+        
+        # this method taks an array of strings and converts them into a dictionary
+        d = {}
+
+        
+        for line in str_args:
+            #print line
+            # ignore comments
+            if line.lstrip() == "" or (line.lstrip())[0] == '#':
+                continue
+            else:
+                (key,delim, val) = line.rstrip().partition("=")
+                
+                # translate the boolean values
+                if val.lower() == "true":
+                    d[key] = True
+                elif val.lower() == "false":
+                    d[key] = False
+                else:
+                    try:
+                        # do we have an int? 
+                        d[key] = int(val)
+                    except ValueError:
+                        # guess not. Must be a string.
+                        d[key] = val
+
+        
+        self.setConfigFromDict(d)
+        
+    #------------------------------------------------------------------
+    #
+    # printDict
+    #
+    #
+    # This prints all the setup variables. Used for debugging.
+    #
+    #------------------------------------------------------------------
+
     
     def printDict(self):
         print self.__dict__
+
+
+    #------------------------------------------------------------------
+    #
+    # setConfigFromDict
+    #
+    #
+    # This method takes a formatted dictionary d and converts the values
+    # into the variables of this class.
+    #
+    #------------------------------------------------------------------
+    
+    
     
     def setConfigFromDict(self,d={}):
         

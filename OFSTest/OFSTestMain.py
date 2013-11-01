@@ -169,17 +169,7 @@ class OFSTestMain(object):
             print "Installing Required Software"
             self.ofs_network.installRequiredSoftware()
 
-            #Skip Torque install until mpi finished
-            print ""
-            print "==================================================================="
-            print "Installing Torque" 
-            self.ofs_network.installTorque()
 
-            print ""
-            print "==================================================================="
-
-            print "Check Torque"
-            self.ofs_network.checkTorque()
 
             
 
@@ -292,13 +282,35 @@ class OFSTestMain(object):
 
         
         #Mpich depends on pvfs2 and must be installed afterwards 
+                    #Skip Torque install until mpi finished
         '''
+        print ""
+        print "==================================================================="
+        print "Installing Torque" 
+        self.ofs_network.installTorque()
+
+        print ""
+        print "==================================================================="
+
+        print "Check Torque"
+        self.ofs_network.checkTorque()
+        
         print ""
         print "==================================================================="
         print "Install mpich2"
         self.ofs_network.installMpich2()
         print ""
         print "==================================================================="
+        
+        
+        print ""
+        print "==================================================================="
+        print "Copy mpich2 to nodes"
+        self.ofs_network.copyMpich2ToNodeList()
+        print ""
+        print "==================================================================="
+        
+        
         print "Setup MPI Environment"
         self.ofs_network.setupMPIEnvironment()
         print ""

@@ -382,7 +382,13 @@ class OFSTestNetwork(object):
         return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
         
     def copyOFSToNodeList(self,destination_list=None):
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
+    def copyMpich2ToNodeList(self,destination_list=None):
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyMpich2InstallationToNode,destination_list=destination_list)
+
+
+    def copyResourceToNodeList(self,node_function,destination_list=None):
         # This is a multi-threaded recursive copy routine.
         # Function copies OrangeFS from list[0] to list[len/2]
         # Then it partitions the list into two parts and copies again
@@ -404,7 +410,8 @@ class OFSTestNetwork(object):
         
         #copy from list[0] to list[list_length/2]
         print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
-        rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
+        rc = node_function(destination_list[0],destination_list[list_length/2])
         
         
         # Todo: Throw an exception if the copy fails.
@@ -424,7 +431,7 @@ class OFSTestNetwork(object):
                     list = self.queue.get()
                     
                     #print "Copying %r" % list
-                    self.manager.copyOFSToNodeList(list)
+                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list)
                     
                         
                     #signals to queue job is done
@@ -580,42 +587,39 @@ class OFSTestNetwork(object):
         for node in self.created_nodes:
             pav_conf = node.generatePAVConf()
             self.local_master.copyToRemoteNode("/tmp/pav.conf", node, pav_conf)
+            
+    # makePBSScript
+    # This turns a command into a pbs script
+    def makePBSScript(self,command):
     
-    def makePBSScript(self):
-        '''
-        #!/bin/sh
+        script = '''#!/bin/bash
         #PBS -l walltime=0:10:0
-        #PBS -l nodes=8
+        #PBS -l nodes=%d
         #PBS -j oe
         #PBS -q shared
+        nprocs=%d
 
-        nprocs=4
+        PATH=%s:/bin:$PATH
 
-        $CLUSTER_DIR/pav/pav_start -c $PAV_CONFIG -n \$nprocs >/dev/null
+        mpdboot --file=/home/%s/mpd.hosts --totalnum=%d
 
-        eval \$( $CLUSTER_DIR/pav/pav_info -c $PAV_CONFIG)
-        export PVFS2TAB_FILE
-
-        PATH=${CLUSTER_DIR}/mpich2/bin:\${PATH}
-        mpdboot --file=\${WORKINGDIR}/compnodes --totalnum=\$nprocs
-
-        mpiexec -np \$nprocs $@
+        mpiexec -np %d %s
         mpdallexit
-        $CLUSTER_DIR/pav/pav_stop -c $PAV_CONFIG >/dev/null" '''
+        ''' % (length(self.created_nodes),length(self.created_nodes),self.created_nodes[0].mpich2_installation_location,self.created_nodes[0].current_user,length(self.created_nodes),length(self.created_nodes),command)
         
-    def blockPBSUntilDone(self):
+        print script
+        return script
 
-        '''
-        while true ; do 
-            qstat -i $1 >/dev/null 2>&1 
-            if [ $? -eq 0 ] ; then
-                sleep 60
-                continue
-            else
-                break
-            fi	
-        done
-        '''
+    
+        
+    def blockPBSUntilDone(self,jobid):
+        
+        rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+
+        while rc == 0:
+            time.sleep(60)
+            rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+            
     
     def setupMPIEnvironment(self,headnode=None):
         
