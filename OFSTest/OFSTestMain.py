@@ -283,6 +283,7 @@ class OFSTestMain(object):
         
         #Mpich depends on pvfs2 and must be installed afterwards 
                     #Skip Torque install until mpi finished
+        '''
         print ""
         print "==================================================================="
         print "Installing Torque" 
@@ -309,7 +310,7 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         
-        '''
+        
         print "Setup MPI Environment"
         self.ofs_network.setupMPIEnvironment()
         print ""

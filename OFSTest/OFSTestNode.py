@@ -1785,8 +1785,10 @@ class OFSTestNode(object):
     def installMpich2(self,location=None):
         if location == None:
             location = "/home/%s/mpich2" % self.current_user
+        
+        mpich_version = "mpich-3.0.4"
             
-        url = "http://devorange.clemson.edu/pvfs/mpich-3.0.4.tar.gz"
+        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
         url = "wget"
         # just to make debugging less painful
         #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
@@ -1794,7 +1796,7 @@ class OFSTestNode(object):
         self.runSingleCommand("mkdir -p "+location)
         tempdir = self.current_directory
         self.changeDirectory("/home/%s" % self.current_user)
-        self.runSingleCommand("rm -rf mpich2-*.tar.gz")
+        
         #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
         #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
@@ -1804,9 +1806,9 @@ class OFSTestNode(object):
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf mpich2-1.5.tar.gz")
+        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
         
-        self.mpich2_source_location = "/home/%s/mpich2-1.5" % self.current_user 
+        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
         self.changeDirectory(self.mpich2_source_location)
         #self.runSingleCommand("ls -l",output)
         #print output
