@@ -13,6 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs3-handle.h"
 #include "sidcacheval.h"
+#include "policyeval.h"
 #include "sid.h"
 
 /* these are defines just to temporarily allow compile */
@@ -102,9 +103,7 @@ extern void SID_cacheval_unpack(SID_cacheval_t **the_sids_attrs, DBT *data);
  * 
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_load(DB **dbp,
-                          const char *file_name, 
-                          int *db_records);
+extern int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records);
 
 /*
  * This function dumps the contents of the sid cache in ASCII to the file
@@ -112,9 +111,10 @@ extern int SID_cache_load(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_store(DB **dbp,
-                           const char *file_name,
-                           int db_records);
+extern int SID_cache_store(DBC *cursorp,
+                           FILE *outpfile,
+                           int db_records,
+                           SID_server_list_t *sid_list);
 
 /*
  * This function stores the sid into the sid cache

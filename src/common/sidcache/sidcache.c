@@ -25,18 +25,6 @@
  */
 DBT bulk_next_key;
 
-/* Global attribute positions in the input file used for making
- * and array of the positions 
- */
-static int *attr_positions;
-
-/* Global number of attributes in the input file and if any of the
- * attributes are invalid the valid_attrs_in_file is updated to 
- * reflect only the valid attributes 
- */
-static int attrs_in_file;
-static int valid_attrs_in_file;
-
 /* Global Number of records (SIDs) in the cache
  */
 static int sids_in_cache = 0;
@@ -55,7 +43,10 @@ DB_TXN *SID_txn;                    /* Main transaction variable */
 /* <========================= STATIC FUNCTIONS ============================> */
 static int SID_initialize_secondary_dbs(DB *secondary_dbs[]);
 static int SID_initialize_database_cursors(DBC *db_cursors[]);
-static int SID_cache_parse_header(FILE *inpfile, int *records_in_file);
+static int SID_cache_parse_header(FILE *inpfile,
+                                  int *records_in_file,
+                                  int *attrs_in_file,
+                                  int **attr_positions);
 
 /* <====================== INITIALIZATION FUNCTIONS =======================> */
 
@@ -131,6 +122,7 @@ void SID_cacheval_init(SID_cacheval_t **cacheval)
 {
     memset((*cacheval)->attr, -1, (sizeof(int) * SID_NUM_ATTR));
     memset(&((*cacheval)->bmi_addr), -1, sizeof(BMI_addr));
+    (*cacheval)->url[0] = 0;
 }
 
 /** HELPER - assigns DBT for cacheval
@@ -208,18 +200,24 @@ void SID_cacheval_unpack(SID_cacheval_t **cacheval, DBT *data)
 /** HELPER for SID_LOAD
  *
  * This function parses the first two lines in the input file and gets
- * the number of attributes per sid, number of sids, and the string representations
- * of the int attributes for the sids. It gets the attributes that each sid has
+ * the number of attributes per sid, number of sids,
+ * and the string representations of the int attributes for the sids.
+ * It gets the attributes that each sid has
  * parsing the strings representations of the attributes.
  * This function also sets the attr_positions array to make sure that the
  * attributes in the input file go into their correct positions in the
- * SID_cacheval_t attrs array
+ * SID_cacheval_t attrs array.
  *
  * Returns 0 on success, otherwise returns an error code
- * The attr_position array is malloced inside of this file and is freed
- * inside the close_dbs_env function
+ * The attr_position array is malloced inside of this function and is freed
+ * inside the SID_load function which calls this one.
+ *
+ * fmemopen may be used to read from a message buffer.
  */
-static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
+static int SID_cache_parse_header(FILE *inpfile,
+                                  int *records_in_file,
+                                  int *attrs_in_file,
+                                  int **attr_positions)
 {
     int i = 0, j = 0;             /* Loop index variables */
     char **attrs_strings;         /* Strings of the attributes in the file */
@@ -237,22 +235,16 @@ static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
     
     /* Getting the total number of attributes from the file */
     fscanf(inpfile, "%s", tmp_buff);
-    fscanf(inpfile, "%d", &attrs_in_file);
-    if(attrs_in_file > SID_NUM_ATTR || attrs_in_file < 1)
+    fscanf(inpfile, "%d", attrs_in_file);
+    if(*attrs_in_file > SID_NUM_ATTR || *attrs_in_file < 1)
     {
         gossip_err("The number of attributes in the input file "
                    "was not within the proper range\n");
         gossip_err("The contents of the database will not be read "
                    "from the inputfile\n");
-        valid_attrs_in_file = 0;
         return(-1);
     }
     
-    /* Setting the total number of valid attributes in the file to the current
-     * number of attributes in the file
-     */
-    valid_attrs_in_file = attrs_in_file;
-
     /* Getting the number of sids in from the file */
     fscanf(inpfile, "%s", tmp_buff);
     fscanf(inpfile, "%d", records_in_file);
@@ -269,17 +261,17 @@ static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
     /* Mallocing space to hold the name of the attributes in the file 
      * and initializing the attributes string array 
      */
-    attrs_strings = (char **)malloc(sizeof(char *) * attrs_in_file);
-    memset(attrs_strings, '\0', sizeof(char *) * attrs_in_file);
+    attrs_strings = (char **)malloc(sizeof(char *) * *attrs_in_file);
+    memset(attrs_strings, '\0', sizeof(char *) * *attrs_in_file);
 
     /* Mallocing space to hold the positions of the attributes in the file for
      * the cacheval_t attribute arrays and initializing the position array 
      */
-    attr_positions = (int *)malloc(sizeof(int) * attrs_in_file);
-    memset(attr_positions, 0, (sizeof(int) * attrs_in_file));
+    *attr_positions = (int *)malloc(sizeof(int) * *attrs_in_file);
+    memset(*attr_positions, 0, (sizeof(int) * *attrs_in_file));
     
     /* Getting the attribute strings from the input file */
-    for(i = 0; i < attrs_in_file; i++)
+    for(i = 0; i < *attrs_in_file; i++)
     {
         fscanf(inpfile, "%s", tmp_buff);
         attrs_strings[i] = (char *)malloc(sizeof(char) *
@@ -290,13 +282,13 @@ static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
     /* Getting the correct positions from the input file for the
      * attributes in the SID_cacheval_t attrs array 
      */
-    for(i = 0; i < attrs_in_file; i++)
+    for(i = 0; i < *attrs_in_file; i++)
     {
         for(j = 0; j < SID_NUM_ATTR; j++)
         {
             if(!strcmp(attrs_strings[i], SID_attr_map[j]))
             {
-                attr_positions[i] = j;
+                (*attr_positions)[i] = j;
                 break;
             }
         }
@@ -309,13 +301,12 @@ static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
                          "Attribute: %s is an invalid attribute, "
                          "and it will not be added\n",
                          attrs_strings[i]);
-            attr_positions[i] = -1;
-            valid_attrs_in_file--;
+            (*attr_positions)[i] = -1;
         }
     }
 
     /* Freeing the dynamically allocated memory */
-    for(i = 0; i < attrs_in_file; i++)
+    for(i = 0; i < *attrs_in_file; i++)
     {
         free(attrs_strings[i]);
     }
@@ -334,13 +325,14 @@ static int SID_cache_parse_header(FILE *inpfile, int *records_in_file)
  * The number of sids in the file is returned through the
  * parameter db_records.
  */
-int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
+int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
 {
     int ret = 0;                      /* Function return value */
     int i = 0, j = 0;                 /* Loop index variables */
-    FILE *inpfile = NULL;             /* file ptr for input file */
+    int *attr_positions = NULL;
     int attr_pos_index = 0;           /* Index of the attribute from the */
                                       /*   file in the SID_cacheval_t attrs */
+    int attrs_in_file = 0;            /* Number of attrs in input file */
     int records_in_file = 0;          /* Total number of sids in input file */
     int sid_attributes[SID_NUM_ATTR]; /* Temporary attribute array to hold */
                                       /*   the attributes from the input file */
@@ -357,18 +349,11 @@ int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
                                       /*   PVFS_SID from the tmp_SID_str */
     SID_cacheval_t *current_sid_cacheval; /* Sid's attributes from the input file */
 
-    /* Opening input file */
-    inpfile = fopen(file_name, "r");
-    if(!inpfile)
-    {
-        gossip_err("Could not open the file %s in "
-                   "SID_load_cache_from_file\n",
-                   file_name);
-        return(-1);
-    }
-
     /* Getting the attributes from the input file */
-    ret = SID_cache_parse_header(inpfile, &records_in_file);
+    ret = SID_cache_parse_header(inpfile,
+                                 &records_in_file,
+                                 &attrs_in_file,
+                                 &attr_positions);
     if(ret)
     {
         fclose(inpfile);
@@ -453,8 +438,9 @@ int SID_cache_load(DB **dbp, const char *file_name, int *num_db_records)
 
         SID_cacheval_free(&current_sid_cacheval);
     }
+
+    free(attr_positions);
    
-    fclose(inpfile);
     return(ret);
 }
 
@@ -470,7 +456,7 @@ int SID_cache_add_server(DB **dbp,
                          int *num_db_records)
 {
     int ret = 0;          /* Function return value */
-    DBT key, data;        /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
+    DBT key, value;        /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
 
     if(PVFS_SID_is_null(sid_server))
     {
@@ -480,20 +466,20 @@ int SID_cache_add_server(DB **dbp,
         return(-1);
     }
 
-    SID_zero_dbt(&key, &data, NULL);
+    SID_zero_dbt(&key, &value, NULL);
 
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
 
     /* Marshalling the data of the SID_cacheval_t struct */
     /* to store it in the primary db */
-    SID_cacheval_pack(cacheval, &data);
+    SID_cacheval_pack(cacheval, &value);
 
     /* Placing the data into the database */
     ret = (*dbp)->put(*dbp,            /* Primary database pointer */
                       NULL,            /* Transaction pointer */
                       &key,            /* PVFS_SID */
-                      &data,           /* Data is marshalled SID_cacheval_t */
+                      &value,          /* Data is marshalled SID_cacheval_t */
                       DB_NOOVERWRITE); /* Do not allow for overwrites because */
                                        /* this is the primary database */
     /* with DB_NOOVERWRITE does this return an error on a dup? */
@@ -955,16 +941,16 @@ int SID_cache_delete_server(DB **dbp,
  * specified through the outpfile parameter parameter
  *
  * Returns 0 on success, otherwise returns error code
+ *
+ * Use open_memstream to write to a message buffer
  */
-int SID_cache_store(DB **dbp, const char *file_name, int db_records)
+int SID_cache_store(DBC *cursorp,
+                    FILE *outpfile,
+                    int db_records,
+                    SID_server_list_t *sid_list)
 {
     int ret = 0;                   /* Function return value */
     int i = 0;                     /* Loop index variable */
-    FILE *outpfile;                /* file ptr for output file */
-    int attr_pos_index = 0;        /* Index of the attribute from the */
-                                   /*     file in the SID_cacheval_t attrs */
-    DBC *cursorp;                  /* Database cursor used to iterate */
-                                   /*     over contents of the database */
     DBT key, data;          	   /* Database variables */
     char *ATTRS = "ATTRS: ";       /* Tag for the number of attributes on */
                                    /*     the first line of dump file */
@@ -976,163 +962,78 @@ int SID_cache_store(DB **dbp, const char *file_name, int db_records)
                                    /*     the database */
     SID_cacheval_t *tmp_sid_attrs; /* Temporary SID_cacheval_t struct to */
                                    /*     hold contents of database */
+    PVFS_SID sid_buffer;           /* Temporary SID */
+    uint32_t db_flags;
 
-    /* Opening the file to dump the contents of the database to */
-    outpfile = fopen(file_name, "w");
-    if(!outpfile)
-    {
-        gossip_err("Error opening dump file in SID_dump_sid_cache function\n");
-        return(-1);
-    }
-
-
-    /* Creating a cursor to iterate over the database contents */
-    ret = (*dbp)->cursor(*dbp,     /* Primary database pointer */
-                         NULL,     /* Transaction handle */
-                         &cursorp, /* Database cursor that is created */
-                         0);       /* Cursor create flags */
-
-    if(ret)
-    {
-        gossip_err("Error occured when trying to create cursor in \
-                    SID_dump_sid_cache function: %s",
-                    db_strerror(ret));
-        return(ret);
-    }
-
-    /* Checking to make sure that there is at lease */
-    /* one valid attributes in the file */
-    if(valid_attrs_in_file)
-    {
-        /* Writing the number of attributes in the */
-        /* cache to the dump file's first line */
-        fprintf(outpfile, "%s", ATTRS);
-        fprintf(outpfile, "%d\t", valid_attrs_in_file);
-
-        /* Writing the number of sids in the cache */
-        /* to the dump file's first line */
-        fprintf(outpfile, "%s", SIDS);
-        fprintf(outpfile, "%d\n", db_records);
-	
-        /* Writing the string representation of the */
-        /* attributes in the sid cache to
-           the dump file's second line */
-        for(i = 0; i < attrs_in_file; i++)
-        {
-            if(attr_positions[attr_pos_index] != -1)
-            {
-                fprintf(outpfile,
-                        "%s ",
-                        SID_attr_map[attr_positions[attr_pos_index]]);
-            }
-            attr_pos_index++;
-        }
-        /* Resetting the attribute position index */
-        /* to 0 so the next SID_cacheval_t will have */
-        /* its attributes in the correct positions in the attrs array */
-        attr_pos_index = 0;
-        fprintf(outpfile, "%c", '\n');
-
-        /* Initializing the database variables */
-        SID_zero_dbt(&key, &data, NULL);
-
-        /* Iterating over the database to get the sids */
-        while(cursorp->get(cursorp, &key, &data, DB_NEXT) == 0)
-        {
-            SID_cacheval_unpack(&tmp_sid_attrs, &data);
-        
-            PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
-            PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
-
-            /* Writing the sids and their attributes to the dump file */
-            for(i = 0; i < attrs_in_file; i++)
-            {
-                if(attr_positions[attr_pos_index] != -1)
-                {
-                    fprintf(outpfile,
-                            "%d ",
-                           tmp_sid_attrs->attr[attr_positions[attr_pos_index]]);
-                }
-                attr_pos_index++;
-            }
-            /* Resetting the attribute position index
-             * to 0 so the next SID_cacheval_t
-             * will have its attributes in the correct
-             * positions in the attrs array
-             */
-            attr_pos_index = 0;
-
-            fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
-            fprintf(outpfile, "%s ", tmp_sid_attrs->url);
-            fprintf(outpfile, "%s\n", tmp_sid_str);
- 
-            SID_cacheval_free(&tmp_sid_attrs);
-        }
-    }
-    /* If there was not single valid attribute in the input file, then all
-     * attributes will be written out to the dump file 
+    /* Writing the number of attributes in
+     * the cache to the dump file's first line 
      */
+    fprintf(outpfile, "%s", ATTRS);
+    fprintf(outpfile, "%d\t", SID_NUM_ATTR);
+
+    /* Writing the number of sids in the cache
+     * to the dump file's first line 
+     */
+    fprintf(outpfile, "%s", SIDS);
+    fprintf(outpfile, "%d\n", db_records);
+    
+    /* Writing the string representation of
+     * the attributes in the sid cache to
+     * the dump file's second line 
+     */
+    for(i = 0; i < SID_NUM_ATTR; i++)
+    {
+       fprintf(outpfile, "%s ", SID_attr_map[i]);
+    }
+    fprintf(outpfile, "%c", '\n');
+
+    /* Initializing the database variables */
+    SID_zero_dbt(&key, &data, NULL);
+
+    /* this routine can either output a whole db or a list of SIDs
+     */
+    if (sid_list)
+    {
+        db_flags = DB_SET;
+        key.data = &sid_buffer;
+        key.size = sizeof(PVFS_SID);
+        SID_pop_query_list(sid_list, &sid_buffer, NULL, NULL, 0);
+    }
     else
     {
-        /* Writing the number of attributes in
-         * the cache to the dump file's first line 
-         */
-        fprintf(outpfile, "%s", ATTRS);
-        fprintf(outpfile, "%d\t", SID_NUM_ATTR);
+        db_flags = DB_NEXT;
+    }
 
-        /* Writing the number of sids in the cache
-         * to the dump file's first line 
-         */
-        fprintf(outpfile, "%s", SIDS);
-        fprintf(outpfile, "%d\n", db_records);
+    /* Iterating over the database to get the sids */
+    while(cursorp->get(cursorp, &key, &data, db_flags) == 0)
+    {
+        SID_cacheval_unpack(&tmp_sid_attrs, &data);
     
-        /* Writing the string representation of
-         * the attributes in the sid cache to
-         * the dump file's second line 
-         */
+        PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
+        PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
+
+        /* Writing the sids and their attributes to the dump file */
         for(i = 0; i < SID_NUM_ATTR; i++)
         {
-           fprintf(outpfile, "%s ", SID_attr_map[i]);
+            fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
         }
-        fprintf(outpfile, "%c", '\n');
 
-        /* Initializing the database variables */
-        SID_zero_dbt(&key, &data, NULL);
-
-        /* Iterating over the database to get the sids */
-        while(cursorp->get(cursorp, &key, &data, DB_NEXT) == 0)
-        {
-            SID_cacheval_unpack(&tmp_sid_attrs, &data);
-        
-            PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
-            PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
-
-            /* Writing the sids and their attributes to the dump file */
-            for(i = 0; i < SID_NUM_ATTR; i++)
-            {
-                fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
-            }
-
-            fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
-            fprintf(outpfile, "%s ", tmp_sid_attrs->url);
-            fprintf(outpfile, "%s\n", tmp_sid_str);
+        fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
+        fprintf(outpfile, "%s ", tmp_sid_attrs->url);
+        fprintf(outpfile, "%s\n", tmp_sid_str);
  
-            SID_cacheval_free(&tmp_sid_attrs);
+        SID_cacheval_free(&tmp_sid_attrs);
+
+        if (sid_list)
+        {
+            if (qlist_empty(&sid_list->link))
+            {
+                break;
+            }
+            SID_pop_query_list(sid_list, &sid_buffer, NULL, NULL, 0);
         }
     }
 
-    ret = cursorp->close(cursorp);
-    if(ret)
-    {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                     "Error closing cursor in SID_cache_store "
-                     "function: %s\n",
-                     db_strerror(ret));
-        return(ret);
-    }
-
-    fclose(outpfile);
-    
     return(ret);
 }
 
@@ -1643,14 +1544,6 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
         return(ret);
     }
 
-    /* Freeing the attr_position array which is used for loading and
-     * dumping the contents of the sid cache 
-     */
-    if(attr_positions != NULL)
-    {
-        free(attr_positions);
-    }
-
     return(ret);
 }
 
@@ -1719,6 +1612,7 @@ int SID_load(const char *path)
 {
     int ret = -1;
     char *filename = NULL;
+    FILE *inpfile = NULL;
 //    struct server_configuration_s *srv_conf;
 //    int fnlen;
     struct stat sbuf;
@@ -1754,8 +1648,18 @@ int SID_load(const char *path)
         goto errorout;
     }
 
+    /* Opening input file */
+    inpfile = fopen(filename, "r");
+    if(!inpfile)
+    {
+        gossip_err("Could not open the file %s in "
+                   "SID_load_cache_from_file\n",
+                   filename);
+        return(-1);
+    }
+
     /* load cache from file */
-    ret = SID_cache_load(&SID_db, filename, &sids_in_cache);
+    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
     if (ret < 0)
     {
         /* something failed, close up the database */
@@ -1764,7 +1668,26 @@ int SID_load(const char *path)
         goto errorout;
     }
 
+    fclose(inpfile);
+
 errorout:
+    return ret;
+}
+
+int SID_loadbuffer(const char *buffer, int size)
+{
+    int ret = 0;
+    FILE *inpfile = NULL;
+
+    /* Opening the file to dump the contents of the database to */
+    inpfile = fmemopen((void *)buffer, size, "r");
+    if(!inpfile)
+    {
+        gossip_err("Error opening dump buffer in SID_loadbuffer function\n");
+        return(-1);
+    }
+    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
+    fclose(inpfile);
     return ret;
 }
 
@@ -1776,6 +1699,8 @@ int SID_save(const char *path)
 {
     int ret = -1;
     char *filename = NULL;
+    FILE *outpfile = NULL;
+    DBC *cursorp = NULL;
 //    struct server_configuration_s *srv_conf;
 //    int fnlen;
     PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
@@ -1797,22 +1722,113 @@ int SID_save(const char *path)
         filename = (char *)path;
     }
 
-    /* dump cache to the file */
-    ret = SID_cache_store(&SID_db, filename, sids_in_cache);
-    if (ret < 0)
+    /* Opening the file to dump the contents of the database to */
+    outpfile = fopen(filename, "w");
+    if(!outpfile)
     {
-        return ret;
+        gossip_err("Error opening dump file in SID_save function\n");
+        return(-1);
     }
 
+    /* Creating a cursor to iterate over the database contents */
+    ret = (SID_db)->cursor(SID_db,   /* Primary database pointer */
+                           NULL,     /* Transaction handle */
+                           &cursorp, /* Database cursor that is created */
+                           0);       /* Cursor create flags */
+
+    if(ret)
+    {
+        gossip_err("Error occured when trying to create cursor in \
+                    SID_save function: %s",
+                    db_strerror(ret));
+        goto errorout;
+    }
+
+    /* dump cache to the file */
+    ret = SID_cache_store(cursorp, outpfile, sids_in_cache, NULL);
+
+errorout:
+
+    if (cursorp)
+    {
+        ret = cursorp->close(cursorp);
+        if(ret)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error closing cursor in SID_save "
+                         "function: %s\n",
+                         db_strerror(ret));
+        }
+    }
+    fclose(outpfile);
     return ret;
 }
 
-int SID_add(const PVFS_SID *sid, const char *url)
+int SID_savelist(char *buffer, int size, SID_server_list_t *slist)
 {
-    SID_cacheval_t cval;
-    /* load up the cval */
+    int ret = -1;
+    FILE *outpfile = NULL;
+    DBC *cursorp = NULL;
+
+    /* Opening the file to dump the contents of the database to */
+    outpfile = fmemopen(buffer, size, "w");
+    if(!outpfile)
+    {
+        gossip_err("Error opening dump buffer in SID_savelist function\n");
+        return(-1);
+    }
+
+    /* Creating a cursor to iterate over the database contents */
+    ret = (SID_db)->cursor(SID_db,   /* Primary database pointer */
+                           NULL,     /* Transaction handle */
+                           &cursorp, /* Database cursor that is created */
+                           0);       /* Cursor create flags */
+
+    if(ret)
+    {
+        gossip_err("Error occured when trying to create cursor in \
+                    SID_savelist function: %s",
+                    db_strerror(ret));
+        goto errorout;
+    }
+
+    /* dump cache to the file */
+    ret = SID_cache_store(cursorp, outpfile, size, slist);
+
+errorout:
+
+    if (cursorp)
+    {
+        ret = cursorp->close(cursorp);
+        if(ret)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error closing cursor in SID_savelist "
+                         "function: %s\n",
+                         db_strerror(ret));
+            return(ret);
+        }
+    }
+    fclose(outpfile);
+    return ret;
+}
+
+int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
+{
     int ret = 0;
-    ret = SID_cache_add_server(&SID_db, sid, &cval, &sids_in_cache);
+    SID_cacheval_t *cval;
+
+    cval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) + strlen(url) + 1);
+    if(!cval)
+    {
+        return -1;
+    }
+    /* load up the cval */
+    memset(&cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
+    cval->bmi_addr = bmi_addr;
+    strcpy(cval->url, url);
+    ret = SID_cache_add_server(&SID_db, sid, cval, &sids_in_cache);
+    free(cval);
     return ret;
 }
 

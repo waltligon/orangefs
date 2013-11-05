@@ -98,6 +98,14 @@ int SID_add_query_list(SID_server_list_t *sid_list,
                        DBT *key,
                        DBT *value);
 
+int SID_add_server_list(SID_server_list_t *sid_list, const PVFS_SID *sid);
+
+int SID_pop_query_list(SID_server_list_t *sid_list,
+                       PVFS_SID *sid,
+                       PVFS_BMI_addr_t *addr,
+                       char *url,
+                       int url_size);
+
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
                        int *copies,

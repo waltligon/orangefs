@@ -11,7 +11,13 @@
 
 extern int SID_initialize(void);
 extern int SID_load(const char *path);
+extern int SID_loadbuffer(const char *buffer, int size);
 extern int SID_save(const char *path);
+extern int SID_savelist(char *buffer, int size, SID_server_list_t *slist);
+extern int SID_add(const PVFS_SID *sid,
+                   PVFS_BMI_addr_t bmi_addr,
+                   const char *url);
+extern int SID_delete(const PVFS_SID *sid);
 extern int SID_finalize(void);
 
 #endif /* SID_H */
