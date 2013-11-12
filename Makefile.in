@@ -1521,9 +1521,6 @@ ifdef BUILD_SERVER
     endif
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
-        ifeq ($(UID),0)
-		chmod ug+s ${bindir}/pvfs2-gencred
-        endif
     endif
 endif
 	# create etc dir under install dir

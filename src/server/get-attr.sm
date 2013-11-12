@@ -1467,6 +1467,12 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
+#ifdef ENABLE_SECURITY_CERT
+    /* no capabilities for unsigned credential; some operations
+       still allowed */
+    if (!IS_UNSIGNED_CRED(&s_op->u.getattr.credential))
+    {
+#endif
     /* generate permissions mask based on uid and (optional) ACLs */
     ret = PINT_get_capabilities(acl_buf,
                                 acl_size,
@@ -1481,6 +1487,9 @@ static PINT_sm_action getattr_create_capability(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#ifdef ENABLE_SECURITY_CERT
+    } /* if */
+#endif
     
     resp_attr->capability.fsid = s_op->u.getattr.fs_id;
 

@@ -834,6 +834,18 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
+#ifdef ENABLE_SECURITY_CERT
+    /* check if this is an unsigned credential... in this case 
+       it will be verified, but it does not provide any rights other 
+       than basic ops like statfs */
+    if (IS_UNSIGNED_CRED(cred))
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsigned credential from %s "
+                     "received\n", cred->issuer);
+        return 1;
+    }
+#endif
+
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));
 

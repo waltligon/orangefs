@@ -236,6 +236,15 @@ static int create_credential(const struct passwd *pwd,
     if (f == NULL)
     {
         int err = errno;
+
+        /* If no certificate is available, a credential with no
+           certificate will be created. This credential will allow 
+           basic file system ops such as statfs. */
+        if (err == ENOENT)
+        {
+            return EXIT_SUCCESS;
+        }
+        
         perror(certpath);
         return err;
     }
@@ -304,10 +313,21 @@ static int sign_credential(PVFS_credential *cred,
     EVP_MD_CTX mdctx;
     int ret;
 
+    /* set timeout */
+    cred->timeout = (PVFS_time)(time(NULL) + timeout);
+
     keyfile = fopen(keypath, "rb");
     if (keyfile == NULL)
     {
         int err = errno;
+#ifdef ENABLE_SECURITY_CERT
+        /* In certficate mode, an unsigned credential may be used 
+           if there is no key. It allows basic ops like statfs. */
+        if (err == ENOENT)
+        {
+            return EXIT_SUCCESS;
+        }
+#endif
         perror(keypath);
         return err;
     }
@@ -335,8 +355,7 @@ static int sign_credential(PVFS_credential *cred,
         ERR_print_errors_fp(stderr);
         return ENODATA;
     }
-
-    cred->timeout = (PVFS_time)(time(NULL) + timeout);
+    
     cred->signature = malloc(EVP_PKEY_size(privkey));
     if (cred->signature == NULL)
     {
@@ -433,58 +452,78 @@ int allowed(const struct passwd *pwd, const struct group *grp)
 
     /* Pass root through. */
     if (uid == 0 && gid == 0)
+    {
         return 0;
+    }
 
     /* Parse users out of the service user file if root owns it. */
     if (stat(filepath, &st) == 0)
-        if (st.st_uid == 0) {
-            if ((fd = open(filepath, O_RDONLY)) == -1) {
+    {
+        if (st.st_uid == 0)
+        {
+            if ((fd = open(filepath, O_RDONLY)) == -1)
+            {
                 return 1;
             }
             offset = 0;
-            while (1) {
-                if ((len = read(fd, buf+offset, 128-offset)) < 0) {
+            while (1)
+            {
+                if ((len = read(fd, buf+offset, 128-offset)) < 0)
+                {
                     close(fd);
                     return 1;
                 }
                 if (len == 0)
+                {
                     break;
+                }
                 buf[offset+len] = 0;
                 s = buf;
                 user = 0;
-                while (puser = user, user = strsep(&s, " \t\n")) {
+                while (puser = user, user = strsep(&s, " \t\n"))
+                {
                     if (*user == 0)
+                    {
                         continue;
+                    }
                     /* A user name has been parsed. */
                     if (s != 0) {
                         /* Call getpwnam_r to avoid trouble with
                            previous call to getpwnam. */
                         pwd2 = &pwd_buf;
                         if (getpwnam_r(user, &pwd_buf, pwd_data_buf,
-                                       128, &pwd2) != 0) {
+                                       128, &pwd2) != 0)
+                        {
                             fprintf(stderr, "error: with getpwnam_r\n");
                             abort();
                         }
                         /* User does not exist. */
                         if (pwd2 == 0)
+                        {
                             continue;
-                        if (pwd2->pw_uid == uid) {
+                        }
+                        if (pwd2->pw_uid == uid)
+                        {
                             close(fd);
                             return 0;
                         }
                     }
                 }
-                if (s == 0) {
+                if (s == 0)
+                {
                     strcpy(buf, puser);
                     offset = strlen(puser);
                 }
             }
             close(fd);
         }
-
+    }
     /* Pass this user through. */
     if (pwd->pw_uid == uid && grp->gr_gid == gid)
+    {
         return 0;
+    }
+
     return 1;
 }
 
@@ -586,7 +625,8 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
-    if (allowed(pwd, grp) != 0) {
+    if (allowed(pwd, grp) != 0)
+    {
         fprintf(stderr, "error: cannot generate a credential for user "
                 "%s and group %s\n", pwd->pw_name, grp->gr_name);
         return EPERM;
@@ -596,7 +636,7 @@ int main(int argc, char **argv)
 
     ngroups = sizeof(groups)/sizeof(*groups);
 
-#  if HAVE_GETGROUPLIST_INT
+#if HAVE_GETGROUPLIST_INT
     /* The returned list of groups in groups_int is a list of signed integers; however,
      * gid_t is defined as an unsigned 32-bit integer.  So, we take steps to convert the 
      * signed integer into a proper uint32_t type.
@@ -618,7 +658,7 @@ int main(int argc, char **argv)
         } 
         groups[i] = (gid_t)groups_int[i];
     }
-#  else
+#else
     ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
     if (ret == -1)
     {
@@ -626,7 +666,7 @@ int main(int argc, char **argv)
                 pwd->pw_name);
         return ENOENT;
     }
-#  endif
+#endif
 
     if (groups[0] != grp->gr_gid)
     {
@@ -657,7 +697,9 @@ int main(int argc, char **argv)
 #endif
                             &credential);
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
+    }
 
 #ifdef ENABLE_SECURITY_CERT
     if (opts.keypath == NULL)
@@ -670,12 +712,15 @@ int main(int argc, char **argv)
                           PVFS2_DEFAULT_CREDENTIAL_TIMEOUT), (opts.keypath ?
                           opts.keypath : PVFS2_DEFAULT_CREDENTIAL_KEYPATH));
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
+    }
 
     ret = write_credential(&credential, pwd);
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
-
+    }
 main_exit:
 
     free(credential.issuer);
