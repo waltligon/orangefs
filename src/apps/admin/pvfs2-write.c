@@ -84,8 +84,6 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
 static size_t generic_write(file_object *dest, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
-static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials);
 static void make_attribs(PVFS_sys_attr *attr,
                          PVFS_credentials *credentials, 
                          int nr_datafiles, int mode);
@@ -178,7 +176,6 @@ int main (int argc, char ** argv)
     ret = 0;
 
 main_out:
-/*    generic_cleanup(NULL, &dest, &credentials); */
     PVFS_sys_finalize();
     free(user_opts);
     free(buffer);
