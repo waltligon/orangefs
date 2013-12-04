@@ -238,7 +238,11 @@ struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
 #ifdef PVFS_USE_OLD_ACL_FORMAT
         acl = pvfs2_acl_decode(value, ret);
 #else
+#ifdef HAVE_POSIX_ACL_USER_NAMESPACE
+        acl = posix_acl_from_xattr(&init_user_ns, value, ret);
+#else
         acl = posix_acl_from_xattr(value, ret);
+#endif
 #endif
     }
     else if (ret == -ENODATA || ret == -ENOSYS)
@@ -353,7 +357,14 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
         {
             return (int) PTR_ERR(value);
         }
+#ifdef HAVE_POSIX_ACL_USER_NAMESPACE
+        size = posix_acl_to_xattr(&init_user_ns, 
+                                  acl, 
+                                  value, 
+                                  PVFS_MAX_XATTR_VALUELEN);
+#else
         size = posix_acl_to_xattr(acl, value, PVFS_MAX_XATTR_VALUELEN);
+#endif
         if (size < 0)
         {
             error = size;
@@ -407,7 +418,11 @@ static int pvfs2_xattr_get_acl(struct inode *inode,
         error = -ENODATA;
         goto out;
     }
+#ifdef HAVE_POSIX_ACL_USER_NAMESPACE
+    error = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
+#else
     error = posix_acl_to_xattr(acl, buffer, size);
+#endif
     posix_acl_release(acl);
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl: posix_acl_to_xattr "
                  "returned %d\n", error);
@@ -501,7 +516,11 @@ static int pvfs2_xattr_set_acl(struct inode *inode,
     }
     if (value) 
     {
+#ifdef HAVE_POSIX_ACL_USER_NAMESPACE
+        acl = posix_acl_from_xattr(&init_user_ns, value, size);
+#else
         acl = posix_acl_from_xattr(value, size);
+#endif
         if (IS_ERR(acl))
         {
             error = PTR_ERR(acl);
