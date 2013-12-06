@@ -472,6 +472,34 @@ PVFS_error PVFS_mgmt_get_user_cert(
     PVFS_security_key *privkey,
     uint32_t exp);
 
+PVFS_error PVFS_imgmt_proc_start(
+    PVFS_fs_id fs_id,
+    char *process,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses,
+    PVFS_mgmt_op_id *op_id);
+PVFS_error PVFS_mgmt_proc_start(
+    PVFS_fs_id fs_id,
+    char *process,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses);
+
+PVFS_error PVFS_imgmt_proc_stop(
+    PVFS_fs_id fs_id,
+    uint32_t pid,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses,
+    PVFS_mgmt_op_id *op_id);
+PVFS_error PVFS_mgmt_proc_stop(
+    PVFS_fs_id fs_id,
+    uint32_t pid,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses);
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

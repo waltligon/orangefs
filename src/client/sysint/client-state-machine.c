@@ -381,7 +381,9 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm}
+    {&pvfs2_client_mgmt_get_dirdata_array_sm},
+    {&pvfs2_client_mgmt_proc_start_sm},
+    {&pvfs2_client_mgmt_proc_stop_sm}
 #ifdef ENABLE_SECURITY_CERT
     ,{&pvfs2_client_mgmt_get_user_cert_sm}
 #endif
@@ -1225,6 +1227,8 @@ const char *PINT_client_get_name_str(int op_type)
 #ifdef ENABLE_SECURITY_CERT
         { PVFS_MGMT_GET_USER_CERT, "PVFS_MGMT_GET_USER_CERT" },
 #endif
+        { PVFS_MGMT_PROC_START, "PVFS_MGMT_PROC_START" },
+        { PVFS_MGMT_PROC_STOP, "PVFS_MGMT_PROC_STOP" },
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_ATOMICEATTR, "PVFS_SYS_ATOMICEATTR" },

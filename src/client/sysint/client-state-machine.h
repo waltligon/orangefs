@@ -631,6 +631,24 @@ struct PINT_client_mgmt_get_user_cert_sm
 };
 #endif
 
+struct PINT_client_mgmt_proc_start_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t addr_count;
+    PVFS_id_gen_t *addr_array;
+    char *process;
+    int *statuses;
+};
+
+struct PINT_client_mgmt_proc_stop_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t pid;
+    uint32_t addr_count;
+    PVFS_id_gen_t *addr_array;
+    int *statuses;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -715,6 +733,8 @@ typedef struct PINT_client_sm
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
         struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
+        struct PINT_client_mgmt_proc_start_sm mgmt_proc_start;
+        struct PINT_client_mgmt_proc_stop_sm mgmt_proc_stop;
 #ifdef ENABLE_SECURITY_CERT
         struct PINT_client_mgmt_get_user_cert_sm mgmt_get_user_cert;
 #endif
@@ -816,8 +836,10 @@ enum
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
+    PVFS_MGMT_PROC_START           = 83,
+    PVFS_MGMT_PROC_STOP            = 84,
 #ifdef ENABLE_SECURITY_CERT
-    PVFS_MGMT_GET_USER_CERT        = 83,
+    PVFS_MGMT_GET_USER_CERT        = 85,
 #endif
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
@@ -830,7 +852,7 @@ enum
 #ifdef ENABLE_SECURITY_CERT
 #define PVFS_OP_MGMT_MAXVALID 84
 #else
-#define PVFS_OP_MGMT_MAXVALID 83
+#define PVFS_OP_MGMT_MAXVALID 85
 #endif
 #define PVFS_OP_MGMT_MAXVAL 199
 
@@ -937,6 +959,8 @@ extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_uid_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_array_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_proc_start_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_proc_stop_sm;
 #ifdef ENABLE_SECURITY_CERT
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_user_cert_sm;
 #endif

@@ -97,6 +97,8 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GETATTR = 49,
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+    PVFS_SERV_MGMT_PROC_START = 52,
+    PVFS_SERV_MGMT_PROC_STOP = 53,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -197,6 +199,9 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
+/* max number of process statuses to return in a single request */
+#define PVFS_REQ_LIMIT_STATUSES 1024
+
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -2520,6 +2525,64 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
 
+/* proc_start *****************************************/
+/* - request the server to start a background process */
+
+struct PVFS_servreq_mgmt_proc_start
+{
+    char *process;
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_proc_start,
+    string, process);
+
+#define PINT_SERVREQ_MGMT_PROC_START_FILL(__req,   \
+                                          __cap,   \
+                                          __process)\
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_PROC_START;                  \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_proc_start.process = (__process);         \
+} while (0)
+
+struct PVFS_servresp_mgmt_proc_start
+{
+    int32_t status;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_proc_start,
+    int32_t, status);
+
+/* proc_stop *****************************************/
+/* - request the server to stop a background process */
+
+struct PVFS_servreq_mgmt_proc_stop
+{
+    int32_t pid;
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_proc_stop,
+    int32_t, pid);
+
+#define PINT_SERVREQ_MGMT_PROC_STOP_FILL(__req,   \
+                                         __cap,   \
+                                         __pid)   \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_PROC_STOP;                   \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_proc_stop.pid = (__pid);                  \
+} while (0)
+
+struct PVFS_servresp_mgmt_proc_stop
+{
+    int32_t status;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_proc_stop,
+    int32_t, status);
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2574,6 +2637,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+        struct PVFS_servreq_mgmt_proc_start mgmt_proc_start;
+        struct PVFS_servreq_mgmt_proc_stop mgmt_proc_stop;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2637,6 +2702,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+        struct PVFS_servresp_mgmt_proc_start mgmt_proc_start;
+        struct PVFS_servresp_mgmt_proc_stop mgmt_proc_stop;
     } u;
 };
 endecode_fields_2_struct(
