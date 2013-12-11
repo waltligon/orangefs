@@ -89,6 +89,13 @@ class OFSTestMain(object):
         print "Verifying hostname resolution"
         # make sure everyone can find each other
         self.ofs_network.updateEtcHosts()
+        
+        print "===========================================================" 
+        print "Enabling Passwordless SSH access"
+        
+        self.ofs_network.enablePasswordlessSSH()
+        
+
     
     def checkOFS(self):
         
@@ -170,10 +177,23 @@ class OFSTestMain(object):
             self.ofs_network.installRequiredSoftware()
 
 
+        '''
+        print ""
+        print "==================================================================="
+        print "Exporting and mounting test nfs directories"
+        
+        nfs_dir = "/home/%s/nfsdir" % self.ofs_network.created_nodes[0].current_user
+        rc = self.ofs_network.created_nodes[0].runSingleCommand("mkdir -p %s" % nfs_dir)
+        
+        self.ofs_network.exportNFSDirectory(directory=nfs_dir,nfs_server_list=[self.ofs_network.created_nodes[0]])
+        nfs_share = "%s:%s" % (self.ofs_network.created_nodes[0].ip_address,nfs_dir)
+        nfs_mountpoint = "/opt/nfsmount"
+        self.ofs_network.mountNFSDirectory(nfs_share=nfs_share,mountpoint=nfs_mountpoint,options="bg,intr,noac,nfsvers=3")
+        
+        for node in self.ofs_network.created_nodes:
+            node.runSingleCommand("mount -t nfs")
 
-            
-
-            
+        '''    
 
         print ""
         print "==================================================================="
@@ -279,11 +299,15 @@ class OFSTestMain(object):
 
         
 
-
         
         #Mpich depends on pvfs2 and must be installed afterwards 
                     #Skip Torque install until mpi finished
-        '''
+        print ""
+        print "==================================================================="
+        print "Install OpenMPI"
+        self.ofs_network.installOpenMPI()
+        
+        
         print ""
         print "==================================================================="
         print "Installing Torque" 
@@ -295,6 +319,7 @@ class OFSTestMain(object):
         print "Check Torque"
         self.ofs_network.checkTorque()
         
+        '''
         print ""
         print "==================================================================="
         print "Install mpich2"
@@ -406,6 +431,9 @@ class OFSTestMain(object):
                     
                 output.close()
 
+        #print "Running MPI tests. What the hell..."
+        #print "cd %s/ompi/mca/io/romio/test/ && ./runtests -fname=pvfs2:%s/openmpitest | tee openmpitest.log" % (head_node.openmpi_source_location,head_node.ofs_mount_point)
+        #head_node.runSingleCommand("cd %s/ompi/mca/io/romio/test/ && ./runtests -fname=pvfs2:%s/openmpitest | tee openmpitest.log" % (head_node.openmpi_source_location,head_node.ofs_mount_point))
 
         if self.config.run_usrint_tests == True:
             # stop the client and remove the kernel module before running usrint tests
@@ -484,7 +512,7 @@ class OFSTestMain(object):
                 output.close()
         
         
-            
+        
 
         if self.config.ec2_delete_after_test == True:
             print ""

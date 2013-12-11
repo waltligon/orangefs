@@ -163,7 +163,10 @@ class OFSTestNode(object):
         
         self.mpich2_installation_location = ""
         self.mpich2_source_location = ""
-         
+        
+        self.openmpi_installation_location = ""
+        self.openmpi_source_location = ""
+        self.openmpi_version = ""  
 
     #==========================================================================
     # 
@@ -670,6 +673,9 @@ class OFSTestNode(object):
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
 
 
+    
+
+
     #-------------------------------
     #
     # installRequiredSoftware
@@ -686,8 +692,9 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server < /dev/null
                 # needed for Ubuntu 10.04
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
                 # will fail on Ubuntu 10.04. Run separately to not break anything
@@ -710,6 +717,14 @@ class OFSTestNode(object):
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
+                sudo rm -rf /opt
+                sudo ln -s /mnt /opt
+                sudo chmod -R a+w /mnt
+                sudo service cups stop
+                sudo service sendmail stop
+                sudo service portmap restart
+                sudo service nfs-kernel-server restart
+                
 
             '''
             self.addBatchCommand(batch_commands)
@@ -735,6 +750,10 @@ class OFSTestNode(object):
             sudo modprobe -v fuse
             sudo chmod a+x /bin/fusermount
             sudo chmod a+r /etc/fuse.conf
+            #sudo mkdir -p /opt
+            sudo rm -rf /opt
+            sudo ln -s /mnt /opt
+            sudo chmod -R a+w /opt
 
 
 
@@ -744,10 +763,21 @@ class OFSTestNode(object):
             
             batch_commands = '''
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel db4-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
+                sudo yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl 
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
+                #sudo mkdir -p /opt
+                #link to use additional space in /mnt drive
+                sudo rm -rf /opt
+                sudo ln -s /mnt /opt
+                sudo chmod -R a+w /mnt
+                sudo chmod -R a+w /opt
+                sudo service cups stop
+                sudo service sendmail stop
+                sudo service rpcbind start
+                sudo service nfs restart
 
             '''
             self.addBatchCommand(batch_commands)
@@ -766,7 +796,7 @@ class OFSTestNode(object):
             echo "Building Berkeley DB 4.8.30..."
             make &> db4make.out
             echo "Installing Berkeley DB 4.8.30 to %s..."
-            sudo make install &> db4install.out
+            make install &> db4install.out
         fi
         exit
         exit
@@ -1818,7 +1848,7 @@ class OFSTestNode(object):
 		--enable-romio --with-file-system=pvfs2 \
 		--with-pvfs2=%s \
 		--enable-g=dbg \
-		--disable-f77 --disable-fc >mpich2config.log
+		 >mpich2config.log
         ''' % (location,self.ofs_installation_location)
         
         #wd = self.runSingleCommandBacktick("pwd")
@@ -1864,7 +1894,107 @@ class OFSTestNode(object):
         return 0
     
 
+    def installOpenMPI(self,install_location=None,build_location=None):
+        
+        
+        if install_location == None:
+            install_location = "/opt/mpi"
+        
+        if build_location == None:
+            build_location = install_location
+        
+        self.openmpi_version = "openmpi-1.6.5"
+        url_base = "http://devorange.clemson.edu/pvfs/"
+        url = url_base+self.openmpi_version+"-omnibond.tar.gz"
 
+        patch_name = "openmpi.patch"
+        patch_url = url_base+patch_name
+        
+        self.runSingleCommand("mkdir -p "+build_location)
+        tempdir = self.current_directory
+        self.changeDirectory(build_location)
+        
+        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+        rc = self.runSingleCommand("wget --quiet %s" % url)
+        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
+        if rc != 0:
+            print "Could not download %s from %s." % (self.openmpi_version,url)
+            self.changeDirectory(tempdir)
+            return rc
+
+        output = []
+        self.runSingleCommand("tar xzf %s-omnibond.tar.gz"% self.openmpi_version)
+        
+        self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
+        self.changeDirectory(self.openmpi_source_location)
+        rc = self.runSingleCommand("wget --quiet %s" % patch_url)
+
+
+        # using pre-patched version. No longer needed.
+        '''
+        print "Patching %s" %self.openmpi_version
+        rc = self.runSingleCommand("patch -p0 < %s" % patch_name,output)
+        
+        
+        if rc != 0:
+            print "Patching %s failed. rc=%d" % (self.openmpi_version,rc)
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IReadContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
+        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IWriteContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
+        '''
+        #self.runSingleCommand("ls -l",output)
+        #print output
+        
+        configure = './configure --prefix %s/openmpi --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
+        
+        #wd = self.runSingleCommandBacktick("pwd")
+        #print wd
+        #print configure
+        
+
+        print "Configuring %s" % self.openmpi_version
+        rc = self.runSingleCommand(configure,output)
+        
+        if rc != 0:
+            print "Configure of %s failed. rc=%d" % (self.openmpi_version,rc)
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        print "Making %s" % self.openmpi_version
+        rc = self.runSingleCommand("make > openmpimake.log")
+        if rc != 0:
+            print "Make of %s failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+
+        print "Installing %s" % self.openmpi_version
+        rc = self.runSingleCommand("make install > openmpiinstall.log")
+        if rc != 0:
+            print "Install of %s failed." % self.openmpi_version
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        #print "Checking MPICH install" % openmpi_version
+        #rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
+        #if rc != 0:
+        #    print "Install of MPICH failed."
+        #    print output
+        #    self.changeDirectory(tempdir)
+        #    return rc
+        
+        self.openmpi_installation_location = install_location+"/openmpi"
+        
+        
+        return 0
+    
+        
+    
 
 
         
@@ -1929,6 +2059,49 @@ class OFSTestNode(object):
         # grep -r 'prefix = /home/ec2-user/orangefs' /home/ec2-user/stable/Makefile
         
 
+    def exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):
+        if options == None:
+            options = "rw,sync,no_root_squash,no_subtree_check"
+        if network == None:
+            network = self.ip_address
+        if netmask == None:
+            netmask = 24
+        
+        
+        self.runSingleCommand("mkdir -p %s" % directory_name)
+        commands = '''
+        sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+        #sudo service cups stop
+        #sudo service sendmail stop
+        #sudo service rpcbind restart
+        #sudo service nfs restart
+        sudo exportfs -a
+        ''' % (directory_name,self.ip_address,netmask,options)
+        
+        self.runSingleCommandAsBatch(commands)
+        time.sleep(30)
+        
+        return "%s:%s" % (self.ip_address,directory_name)
+        
+        
+    def mountNFSDirectory(self,nfs_share,mountpoint,options=""):
+        self.changeDirectory("/home/%s" % self.current_user)
+        self.runSingleCommand("mkdir -p %s" % mountpoint)
+        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mountpoint)
+        print commands
+        self.runSingleCommandAsBatch(commands)
+        output = []
+        rc = self.runSingleCommand("mount -t nfs | grep %s" % nfs_share,output)
+        count = 0
+        while rc != 0 and count < 10 :
+            time.sleep(15)
+            self.runSingleCommandAsBatch(commands)
+            rc = self.runSingleCommand("mount -t nfs | grep %s" % nfs_share,output)
+            print output
+            count = count + 1
+        return 0
+        
+        
     
 #===================================================================================================
 # Unit test script begins here

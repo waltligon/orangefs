@@ -29,7 +29,8 @@ class OFSTestNetwork(object):
         print "==================================================================="
         print "Checking Local machine"
         self.local_master = OFSTestLocalNode.OFSTestLocalNode()
-        
+        self.mpi_nfs_directory = ""
+        self.openmpi_version = ""
 
         #self.created_nodes['127.0.0.1']=self.local_master
     
@@ -209,6 +210,27 @@ class OFSTestNetwork(object):
 
         for node in node_list:
             self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
+        
+        
+        
+        
+
+    def enablePasswordlessSSH(self,node_list=None):
+        
+        if node_list == None:
+            node_list = self.created_nodes
+
+      
+        
+        for src_node in node_list:
+            for dest_node in node_list:
+                print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.host_name,dest_node.host_name,dest_node.ip_address,dest_node.ext_ip_address)
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.host_name,src_node.current_user))
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ext_ip_address,src_node.current_user))
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ip_address,src_node.current_user))
+                
+
+
 
 
     def terminateEC2Node(self,remote_node):
@@ -274,6 +296,8 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.created_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
+    
+    
 
     def buildOFSFromSource(self,
         resource_type,
@@ -455,6 +479,8 @@ class OFSTestNetwork(object):
            
            #wait on the queue until everything has been processed     
         queue.join()
+    
+    
           
     def stopOFSServers(self,node_list=None):
         if node_list == None:
@@ -833,7 +859,94 @@ class OFSTestNetwork(object):
                     # if not, ignore the error
                     pass
             #node.setEnvironmentVariable("LD_LIBRARY_PATH",node.db4_lib+":"+node.ofs_installation_location+":$LD_LIBRARY_PATH")
+
+    def exportNFSDirectory(self,directory,nfs_server_list=None,options=None,network=None,netmask=None):
+        if nfs_server_list == None:
+            nfs_server_list = self.created_nodes
         
+        for nfs_server in nfs_server_list:
+            rc = nfs_server.exportNFSDirectory(directory,options,network,netmask)
+
+    
+    def mountNFSDirectory(self,nfs_share,mountpoint,options="",nfs_client_list=None):
+        
+        if nfs_client_list == None:
+            nfs_client_list = self.created_nodes
+    
+        fail = 0
+        
+        for nfs_client in nfs_client_list:
+            rc = nfs_client.mountNFSDirectory(nfs_share,mountpoint,options)
+            if rc != 0:
+                print "Mounting %s at %s with options %s on %s failed with RC=%d" %(nfs_share,mountpoint,options,nfs_client.ip_address,rc)
+                fail = fail+1
+            
+        
+        return fail
+
+    def installOpenMPI(self,mpi_nfs_directory=None,build_node=None,mpi_local_directory=None):
+        if build_node == None:
+            build_node = self.created_nodes[0]
+        
+        
+        # the nfs directory is where all nodes will access MPI
+        if mpi_nfs_directory == None:
+            self.mpi_nfs_directory = "/opt/mpi"
+      
+        if mpi_local_directory == None:
+            mpi_local_directory = "/home/%s/mpi" % build_node.current_user
+        
+        # export the nfs directory to all nodes.
+        nfs_share = build_node.exportNFSDirectory(directory_name=mpi_local_directory)
+        
+        # wait for NFS servers to come up
+        time.sleep(30)
+        
+        # mount the local directory as an NFS directory on all nodes.
+        rc = self.mountNFSDirectory(nfs_share=nfs_share,mountpoint=self.mpi_nfs_directory,options="bg,intr,noac,nfsvers=3")
+        
+        # build mpi in the build location, but install it to the nfs directory
+        rc = build_node.installOpenMPI(install_location=self.mpi_nfs_directory,build_location=mpi_local_directory)
+    
+        
+        
+        
+        # how many slots per node do we need?
+
+        # Testing requires np=4
+        MAX_SLOTS = 4
+        number_nodes = len(self.created_nodes)
+    
+        # number of slots needed is total/nodes.
+        slots = (MAX_SLOTS / number_nodes) 
+        
+        # if this doesn't divide evenly, add an extra slot per node. Works well enough.
+        if (MAX_SLOTS % number_nodes) != 0:
+            slots = slots+1
+        
+        self.openmpi_version = build_node.openmpi_version
+        # create openmpihosts file
+        build_node.changeDirectory(self.mpi_nfs_directory)
+        print 'grep -v localhost /etc/hosts | awk \'{print $2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
+        build_node.runSingleCommand('grep -v localhost /etc/hosts | awk \'{print $2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory))
+        
+        # update runtest to use openmpihosts file
+        print 'sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version)
+        build_node.runSingleCommand('sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version))
+        build_node.runSingleCommand('chmod a+x %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,build_node.openmpi_version))
+        # update bashrc     
+        for node in self.created_nodes:
+            #node.openmpi_installation_location = self.mpi_nfs_directory
+            # have we already done this?
+            #done = node.runSingleCommand("grep -v %s /home/%s/.bashrc" % (node.openmpi_installation_location,node.current_user))
+            #done = 0
+            #if done == 0:
+            print "echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user)
+            node.runSingleCommand("echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user))
+            node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/openmpi/lib:%s/lib:%s/lib:\$LD_LIBRARY_PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.db4_dir,node.current_user))
+            node.runSingleCommand("echo 'export PVFS2TABFILE=%s/etc/orangefstab' >> /home/%s/.bashrc" % (node.ofs_installation_location,node.current_user))
+        
+        return rc
         
 def test_driver():
     my_node_manager = OFSTestNetwork()

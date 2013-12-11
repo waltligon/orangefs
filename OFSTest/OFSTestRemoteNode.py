@@ -236,15 +236,24 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         #print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         # copy the file from the local node to the current node
         self.sshLocalKeyFile=local_node.getRemoteKeyFile(self.ext_ip_address)
-        rc = local_node.copyToRemoteNode(self.sshLocalKeyFile,self,'~/.ofstestkeys/',False)
+        rc = local_node.copyToRemoteNode(self.sshLocalKeyFile,self,'~/.ssh/',False)
+        keybasename = os.path.basename(self.sshLocalKeyFile)
         
         if rc != 0:
             print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
             return rc
-        else:
-            #set the ssh key file to the uploaded location.
-            self.sshNodeKeyFile = "/home/%s/.ofstestkeys/%s" % (self.current_user,os.path.basename(self.sshLocalKeyFile))
-            return 0
+ 
+       #set the ssh key file to the uploaded location.
+        self.sshNodeKeyFile = "/home/%s/.ssh/%s" % (self.current_user,keybasename)
+        
+        #symlink to id_rsa
+        
+        #self.runSingleCommand("bash -c 'cat %s >> /home/%s/.ssh/authorized_keys'" % (self.sshNodeKeyFile,self.current_user))
+        print "ln -s %s /home/%s/.ssh/id_rsa" % (self.sshNodeKeyFile,self.current_user)
+        self.runSingleCommand("ln -s %s /home/%s/.ssh/id_rsa" % (self.sshNodeKeyFile,self.current_user))
+    
+
+        return 0
       
     def uploadRemoteKeyFromLocal(self,local_node,remote_address):
         # This function uploads a key for a remote node and adds it to the table
@@ -252,15 +261,19 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         #print "uploading key %s from local to %s" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
         remote_key = local_node.getRemoteKeyFile(remote_address)
         #copy it
-        rc = local_node.copyToRemoteNode(remote_key,self,'~/.ofstestkeys/',False)
+        rc = local_node.copyToRemoteNode(remote_key,self,'~/.ssh/',False)
         #add it to the keytable
         if rc != 0:
             print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
             return rc
         else:
             #set the ssh key file to the uploaded location.
-            self.keytable[remote_address] = "/home/%s/.ofstestkeys/%s" % (self.current_user,os.path.basename(remote_key))
-            return 0
+            self.keytable[remote_address] = "/home/%s/.ssh/%s" % (self.current_user,os.path.basename(remote_key))
+        
+        
+        
+        return 0
+        
         
         
         #============================================================================
