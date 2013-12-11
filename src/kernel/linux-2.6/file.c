@@ -2531,7 +2531,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
     else
     {
         pvfs2_kernel_op_t *op = NULL;
+#ifdef AIO_PUT_REQ_RETURNS_INT
         int ret;
+#endif
         /*
          * Do some sanity checks
          */
@@ -2547,7 +2549,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                     "pvfs2_kernel_op structure!\n");
             return -EINVAL;
         }
+#ifdef HAVE_KIOCBSETCANCELLED
         kiocbSetCancelled(iocb);
+#endif
         get_op(op);
         /*
          * This will essentially remove it from 
@@ -2665,8 +2669,16 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * to manually decrement ki_users field!
          * before calling aio_put_req().
          */
+#ifdef KI_USERS_ATOMIC
+        atomic_dec(&iocb->ki_users);
+#else
         iocb->ki_users--;
+#endif
+#ifdef AIO_PUT_REQ_RETURNS_INT
         ret = aio_put_req(iocb);
+#else
+        aio_put_req(iocb);
+#endif
         /* x is itself deallocated by the destructor */
         return 0;
     }
@@ -2729,7 +2741,11 @@ fill_default_kiocb(pvfs2_kiocb *x,
     x->offset = offset;
     x->bytes_copied = 0;
     x->needs_cleanup = 1;
+#ifdef HAVE_KIOCB_SET_CANCEL_FN
+    kiocb_set_cancel_fn(iocb, aio_cancel);
+#else
     iocb->ki_cancel = aio_cancel;
+#endif
     /* Allocate a private pointer to store the
      * iovector since the caller could pass in a
      * local variable for the iovector.
