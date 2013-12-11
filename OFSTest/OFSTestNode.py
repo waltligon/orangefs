@@ -722,7 +722,7 @@ class OFSTestNode(object):
                 sudo chmod -R a+w /mnt
                 sudo service cups stop
                 sudo service sendmail stop
-                sudo service portmap restart
+                sudo service rpcbind restart
                 sudo service nfs-kernel-server restart
                 
 
