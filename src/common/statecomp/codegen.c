@@ -50,7 +50,7 @@ void gen_machine(char *machine_name)
                 machine_name);
 
     /* dump forward declarations of all the states */
-    for (s=states; s; s=s->next)
+    for (s = states; s; s = s->next)
     {
         if(s->action == ACTION_RUN || s->action == ACTION_PJMP)
             gen_runfunc_decl(s->function_or_machine);
@@ -74,7 +74,7 @@ void gen_machine(char *machine_name)
     fprintf(out_file, "};\n\n");
 
     /* generate all output */
-    for (s=states; s; s=s->next) {
+    for (s = states; s; s = s->next) {
         gen_state_start(s->name, machine_name);
         gen_state_action(s->action, s->function_or_machine, s->name);
         if(s->action == ACTION_PJMP)
@@ -84,7 +84,7 @@ void gen_machine(char *machine_name)
             /* if there are tasks (the action must be a pjmp) so we output
              * stuff for the tasks
              */
-            for (task=s->task; task; task=task->next)
+            for (task = s->task; task; task = task->next)
             {
                 gen_return_code(task->return_code);
                 gen_next_state(TRANS_PJMP, task->task_name);
@@ -93,7 +93,7 @@ void gen_machine(char *machine_name)
 
         gen_trtbl(s->name);
 
-        for (t=s->transition; t; t=t->next) {
+        for (t = s->transition; t; t = t->next) {
             gen_return_code(t->return_code);
             gen_next_state(t->type, t->next_state);
         }
@@ -101,10 +101,10 @@ void gen_machine(char *machine_name)
     }
 
     /* purge for next machine */
-    for (s=states; s; s=snext) {
+    for (s = states; s; s = snext) {
         if(s->task)
         {
-            for (task=s->task; task; task=tasknext)
+            for (task = s->task; task; task = tasknext)
             {
                 tasknext = task->next;
                 free(task->return_code);
@@ -112,7 +112,7 @@ void gen_machine(char *machine_name)
             }
         }
 
-        for (t=s->transition; t; t=tnext) {
+        for (t = s->transition; t; t = tnext) {
             tnext = t->next;
             free(t->return_code);
             free(t);
@@ -246,42 +246,54 @@ void gen_state_action(enum state_action action,
 #ifdef WIN32
             fprintf(out_file, "\t SM_RUN ,  /* flag */\n");
             fprintf(out_file, "\t { %s } ,  /* action.func */\n", run_func);
-            fprintf(out_file,"\t NULL ,  /* pjtbl */\n");
-            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+            fprintf(out_file, "\t NULL ,  /* pjtbl */\n");
+            fprintf(out_file, "\t ST_%s_trtbl  /* trtbl */", state_name);
 #else
             fprintf(out_file, "\t .flag = SM_RUN ,\n");
             fprintf(out_file, "\t .action.func = %s ,\n", run_func);
-            fprintf(out_file,"\t .pjtbl = NULL ,\n");
-            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+            fprintf(out_file, "\t .pjtbl = NULL ,\n");
+            fprintf(out_file, "\t .trtbl = ST_%s_trtbl ", state_name);
 #endif
             break;
         case ACTION_PJMP:
 #ifdef WIN32
             fprintf(out_file, "\t SM_PJMP ,  /* flag */\n");
             fprintf(out_file, "\t { &%s },  /* action.func */\n", run_func);
-            fprintf(out_file,"\t ST_%s_pjtbl ,  /* pjtbl */\n", state_name);
-            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+            fprintf(out_file, "\t ST_%s_pjtbl ,  /* pjtbl */\n", state_name);
+            fprintf(out_file, "\t ST_%s_trtbl  /* trtbl */", state_name);
 
 #else
             fprintf(out_file, "\t .flag = SM_PJMP ,\n");
             fprintf(out_file, "\t .action.func = &%s ,\n", run_func);
-            fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
-            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+            fprintf(out_file, "\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
+            fprintf(out_file, "\t .trtbl = ST_%s_trtbl ", state_name);
 #endif
             break;
         case ACTION_JUMP:
 #ifdef WIN32
             fprintf(out_file, "\t SM_JUMP ,  /* flag */\n");
             fprintf(out_file, "\t { &%s }, /* action.nested */\n", run_func);
-            fprintf(out_file,"\t NULL ,  /* pjtbl */\n");
-            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+            fprintf(out_file, "\t NULL ,  /* pjtbl */\n");
+            fprintf(out_file, "\t ST_%s_trtbl  /* trtbl */", state_name);
 #else
             fprintf(out_file, "\t .flag = SM_JUMP ,\n");
             fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
-            fprintf(out_file,"\t .pjtbl = NULL ,\n");
-            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+            fprintf(out_file, "\t .pjtbl = NULL ,\n");
+            fprintf(out_file, "\t .trtbl = ST_%s_trtbl ", state_name);
 #endif
             break;
+        case ACTION_SWITCH:
+#ifdef WIN32
+            fprintf(out_file, "\t SM_SWITCH ,  /* flag */\n");
+            fprintf(out_file, "\t { NULL }, /* action.nested */\n", run_func);
+            fprintf(out_file, "\t NULL ,  /* pjtbl */\n");
+            fprintf(out_file, "\t ST_%s_trtbl  /* trtbl */", state_name);
+#else
+            fprintf(out_file, "\t .flag = SM_SWITCH ,\n");
+            fprintf(out_file, "\t .action.nested = NULL ,\n", run_func);
+            fprintf(out_file, "\t .pjtbl = NULL ,\n");
+            fprintf(out_file, "\t .trtbl = ST_%s_trtbl ", state_name);
+#endif
     }
     /* generate the end of the state struct with refs to jump tbls */
 }

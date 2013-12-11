@@ -7,7 +7,6 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
-#include "pvfs2-internal.h"
 #include "job.h"
 #include "quicklist.h"
 
@@ -48,7 +47,8 @@ enum PINT_state_code {
     SM_JUMP   = 6,
     SM_TERM   = 7,
     SM_PJMP   = 8,
-    SM_RUN     = 9
+    SM_RUN    = 9,
+    SM_SWITCH = 10
 };
 
 /*define msgpairarray parameters for server-to-server requests*/

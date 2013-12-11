@@ -67,6 +67,7 @@ extern int yylex(void);
 %token <i> RUN
 %token <i> PJMP
 %token <i> JUMP
+%token <i> SWITCH
 %token <i> STATE_RETURN
 %token <i> STATE_TERMINATE
 %token <i> SUCCESS
@@ -130,6 +131,11 @@ state_action	  : RUN identifier SEMICOLON
 		    {
 			cur_state->action = ACTION_PJMP;
 			cur_state->function_or_machine = $2;
+		    }
+		  | SWITCH SEMICOLON
+		    {
+			 cur_state->action = ACTION_SWITCH;
+			 cur_state->function_or_machine = NULL;
 		    }
 		  ;
 
