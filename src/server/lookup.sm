@@ -780,7 +780,7 @@ static PINT_sm_action lookup_read_directory_entry(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_dist_dir_hash_type dirdata_hash;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_t *config = get_server_config_struct();
     char dirdata_server_name[1024];
 
     /* find the segment that we should look up in the directory */
@@ -819,6 +819,8 @@ static PINT_sm_action lookup_read_directory_entry(
                  s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     /* find the server name of the dirdata handle */
+    /* V3 we now compare each SID again the local SID to decide this */
+#if 0
     PINT_cached_config_get_server_name(
             dirdata_server_name,
             1024,
@@ -827,6 +829,11 @@ static PINT_sm_action lookup_read_directory_entry(
             s_op->req->u.lookup_path.fs_id);
 
     if ( !strcmp(dirdata_server_name, config->host_id) )
+#endif
+
+    if (PINT_cacged_config_server_local(
+                s_op->u.lookup.attr.u.dir.dirdata_sids[
+                        s_op->u.lookup.dirdata_sid_index]))
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: local server !!!\n");
         js_p->error_code = LOCAL_DIRENT;
@@ -906,9 +913,11 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_get_dirent_comp_fn;
 
+#if 0
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
+#endif
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");

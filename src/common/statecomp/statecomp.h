@@ -22,7 +22,8 @@ enum state_action
 {
     ACTION_RUN,
     ACTION_JUMP,
-    ACTION_PJMP
+    ACTION_PJMP,
+    ACTION_SWITCH
 };
 
 struct task {

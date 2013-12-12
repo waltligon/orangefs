@@ -28,18 +28,25 @@ int PINT_cached_config_initialize(void);
 
 int PINT_cached_config_finalize(void);
 
+#if 0
 int PINT_cached_config_handle_load_mapping(
     struct filesystem_configuration_s *fs);
+#endif
 
 int PINT_cached_config_map_alias(
     const char *alias,
     PVFS_BMI_addr_t *addr);
 
+#if 0
 int PINT_cached_config_get_server(
     PVFS_fs_id fsid,
     const char* host,
     PVFS_ds_type type,
     PVFS_handle_extent_array *ext_array);
+#endif
+
+int PINT_Cached_config_server_local(
+    PVFS_SID sid);
 
 int PINT_cached_config_get_next_meta(
     PVFS_fs_id fsid,
@@ -74,10 +81,12 @@ int PINT_cached_config_count_servers(
     int server_type,
     int *count);
 
+#if 0
 int PINT_cached_config_map_to_server(
     PVFS_BMI_addr_t *server_addr,
     PVFS_handle handle,
     PVFS_fs_id fs_id);
+#endif
 
 int PINT_cached_config_map_servers(
     PVFS_fs_id fsid,
@@ -100,6 +109,7 @@ int PINT_cached_config_get_num_io(
     PVFS_fs_id fsid,
     int *num_io);
 
+#if 0
 int PINT_cached_config_get_server_name(
     char *server_name,
     int max_server_name_len,
@@ -110,6 +120,7 @@ int PINT_cached_config_get_server_handle_count(
     const char *server_addr_str,
     PVFS_fs_id fs_id,
     uint64_t *handle_count);
+#endif
 
 int PINT_cached_config_check_type(
     PVFS_fs_id fsid,

@@ -61,7 +61,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {   
     int ret = -PVFS_EINVAL;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_t *user_opts = PINT_get_server_config();
         
     ret = PINT_init_capability(capability);
     if (ret < 0)

@@ -518,7 +518,8 @@ static PINT_sm_action readdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                  "readdir_msg_setup_msgpair\n");
         
     /* calculate dirent_count fetch distribution */
-    tmp_dirent_limit_needed = sm_p->readdir_state.dirent_limit - *(sm_p->readdir_state.dirent_outcount); 
+    tmp_dirent_limit_needed = sm_p->readdir_state.dirent_limit -
+                              *(sm_p->readdir_state.dirent_outcount); 
         
     /* allocate space */
     sm_p->readdir.num_dirdata_needed = 0;

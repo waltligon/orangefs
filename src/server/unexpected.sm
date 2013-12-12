@@ -93,7 +93,9 @@ static PINT_sm_action unexpected_map(
          * put something here to make it exit for the
          * moment.  -Phil
          */
-        PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_map: server_post_unexpected_recv() returned an error: ",ret);
+        PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_map: "
+                           "server_post_unexpected_recv() returned an error: ",
+                           ret);
     }
 
     /* restart as new request state machine */

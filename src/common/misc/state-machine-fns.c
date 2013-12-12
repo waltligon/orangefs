@@ -332,11 +332,22 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         /* To do nested states, we check to see if the next state is
         * a nested state machine, and if so we push the return state
         * onto a stack */
-        while (smcb->current_state->flag == SM_JUMP)
+        while (smcb->current_state->flag == SM_JUMP |
+               smcb->current_state->flag == SM_SWITCH)
         {
 	    PINT_push_state(smcb, smcb->current_state);
-	    smcb->current_state =
-                    smcb->current_state->action.nested->first_state;
+            if (smcb->current_state->flag == SM_JUMP)
+            {
+	        smcb->current_state =
+                        smcb->current_state->action.nested->first_state;
+            }
+            else /* state flag == SM_SWITCH */
+            {
+                if (!PINT_state_machine_locate(smcb);)
+                {
+                    return -1;
+                }
+            }
         }
         /* runs state_action and returns the return code */
         ret = PINT_state_machine_invoke(smcb, r);

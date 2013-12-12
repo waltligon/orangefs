@@ -1036,10 +1036,14 @@ static PINT_sm_action crdirent_send_server_attrs(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
+    /* V3 */
+#if 0
     ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                            msg_p->handle,
                                            msg_p->fs_id);
+#endif
 
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");
@@ -1104,11 +1108,16 @@ static PINT_sm_action crdirent_update_metahandle_attrs(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
 
     /* Determine whether the metadata handle is on the local server. */
+    /* V3 */
+#if 0
     PINT_cached_config_get_server_name(server_name,
                                        1024,
                                        s_op->u.crdirent.parent_handle,
                                        s_op->u.crdirent.fs_id);
     if (! strcmp(server_config->host_id, server_name))
+#endif
+
+    if (PINT_cacged_config_server_local(s_op->u.crdirent.parent_sid[0]))
     {
         /* local */
         attr_p = &s_op->attr;

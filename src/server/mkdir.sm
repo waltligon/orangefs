@@ -223,7 +223,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
-    server_configuration_s *user_opts = get_server_config_struct();
+    server_configuration_t *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
     int i;
@@ -500,8 +500,8 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                    attr,
                                    s_op->attr.u.dir.dist_dir_attr.num_servers,
                                    s_op->attr.u.dir.dirdata_handles,
-                                   0,    /* V3 sid count */
-                                   NULL, /* V3 sid array */
+                                   s_op->attr.u.dir.dist_dir_attr.num_copies,
+                                   s_op->attr.u.dir.dirdata_sids,
                                    NULL);
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
@@ -509,10 +509,14 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
+    /* V3 */
+#if 0
     ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                            msg_p->handle,
                                            msg_p->fs_id);
+#endif
 
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");

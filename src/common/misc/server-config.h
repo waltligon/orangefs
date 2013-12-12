@@ -33,30 +33,34 @@ enum
     CTX_LDAP             = (1 << 14),
 };
 
-typedef struct phys_server_desc
+typedef struct phys_server_desc_s
 {
     PVFS_BMI_addr_t addr;
     char *addr_string;
     int server_type;
-} phys_server_desc_s;
+} phys_server_desc_t;
 
 typedef struct host_alias_s
 {
-    char *host_alias;  /* this is a traditional host name */
+    char *host_alias;     /* this is a traditional host name */
+    char *host_sid_text;  /* this is a SID in text format */
+    PVFS_SID host_sid;       /* this is a SID in binary format */
     char *bmi_address;
-} host_alias_s;
+} host_alias_t;
 
 typedef struct prime_server_s
 {
     char *host_sid_text;  /* this is a SID in text format */
     char *bmi_address;
-} prime_server_s;
+} prime_server_t;
 
 typedef struct root_server_s
 {
     char *host_sid_text;  /* this is a SID in text format */
-} root_server_s;
+} root_server_t;
 
+/* V3 obsolete */
+#if 0
 typedef struct host_handle_mapping_s
 {
     struct host_alias_s *alias_mapping;
@@ -70,6 +74,7 @@ typedef struct host_handle_mapping_s
      */
     PVFS_handle_extent_array handle_extent_array;
 } host_handle_mapping_s;
+#endif
 
 /* NOTE NOTE NOTE
  * Any changes made here should also be made to the function
@@ -84,16 +89,22 @@ typedef struct filesystem_configuration_s
     /* root object and servers for this FS */
     PVFS_handle  root_handle;
     int root_sid_count;
-    PVFS_SID *root_sid_array;
+    PVFS_SID *root_sid_array; /* array of binary SIDs */
 
+    /* ptrs are type root_server_t */
+    PINT_llist *root_servers; /* list of text SIDs */
+
+    /* ptrs are type prime_server_t */
+    PINT_llist *prime_servers; /* list of text SIDs */
+
+/* V3 obsolete */
+#if 0
     /* ptrs are type host_handle_mapping_s */
     PINT_llist *meta_handle_ranges;
 
     /* ptrs are type host_handle_mapping_s */
     PINT_llist *data_handle_ranges;
-
-    /* ptrs are type root_server_s */
-    PINT_llist *root_servers;
+#endif
 
     /* FS level defaults - some can be overridden */
     int default_num_dfiles;             /* num defiles for each file */
@@ -152,14 +163,14 @@ typedef struct filesystem_configuration_s
     int32_t directio_timeout;
 
     int32_t split_mem_limit;
-} filesystem_configuration_s;
+} filesystem_configuration_t;
 
 typedef struct distribution_param_configuration_s
 {
     char* name;
     int64_t value;  /* Temporarily hard code to 64bit type */
 
-} distribution_param_configuration;
+} distribution_param_configuration_t;
 
 /* Config struct to hold overloaded distribution defaults */
 typedef struct distribution_configuration_s
@@ -167,7 +178,7 @@ typedef struct distribution_configuration_s
     char* name;
     PINT_llist* param_list;
 
-} distribution_configuration;
+} distribution_configuration_t;
 
 typedef struct server_configuration_s
 {
@@ -217,14 +228,14 @@ typedef struct server_configuration_s
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
 #endif /* USE_TRUSTED */
     int  configuration_context;
-    PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
-    PINT_llist *prime_servers;      /* ptrs are type prime_server_s     */
+    PINT_llist *host_aliases;       /* ptrs are type host_alias_t       */
+    PINT_llist *prime_servers;      /* ptrs are type prime_server_t     */
     PINT_llist *file_systems;       /* ptrs are type
-                                       filesystem_configuration_s       */
-    distribution_configuration default_dist_config;  /* distribution conf */
+                                       filesystem_configuration_t       */
+    distribution_configuration_t default_dist_config;  /* distribution conf */
     int db_cache_size_bytes;        /* cache size to use in berkeley db
                                        if zero, use defaults */
-    char * db_cache_type;
+    char *db_cache_type;
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 
                                      * operations 
@@ -255,7 +266,7 @@ typedef struct server_configuration_s
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;
-} server_configuration_s;
+} server_configuration_t;
 
 int PINT_parse_config(
     struct server_configuration_s *config_s,
@@ -290,6 +301,8 @@ char *PINT_config_get_host_alias_ptr(
     struct server_configuration_s *config_s,
     char *bmi_address);
 
+/* V3 obsolete */
+#if 0
 char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
@@ -306,6 +319,7 @@ char *PINT_config_get_data_handle_range_str(
 char *PINT_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
+#endif
 
 int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s);
@@ -326,9 +340,12 @@ PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name);
 
+/* V3 obsolete */
+#if 0
 struct host_handle_mapping_s *PINT_get_handle_mapping(
     PINT_llist *list,
     char *alias);
+#endif
 
 PINT_llist *PINT_config_get_filesystems(
     struct server_configuration_s *config_s);

@@ -348,6 +348,7 @@ struct PINT_server_lookup_op
     PVFS_object_attr attr;
 
     int dirdata_server_index;
+    int dirdata_sid_index;
 };
 
 struct PINT_server_readdir_op
@@ -370,11 +371,15 @@ struct PINT_server_crdirent_op
     PVFS_capability capability;
     char *name;
     PVFS_handle new_handle;
+    PVFS_SID *new_sid;
     PVFS_handle parent_handle;
+    PVFS_SID *parent_sid;
     PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
+    PVFS_SID *dirent_sid;
     PVFS_size dirent_count;
+    PVFS_size sid_count;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;

@@ -862,12 +862,15 @@ static int server_initialize_subsystems(
             break;
         }
 
+        /* V3 no longer map handles */
+#if 0
         ret = PINT_cached_config_handle_load_mapping(cur_fs);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
         }
+#endif
 
         /*
          * set storage hints if any.  if any of these fail, we
@@ -1276,6 +1279,11 @@ static int server_check_if_root_directory_created( void )
             break;
         }
 
+        /* V3 we now need to compare our SID against the list of SIDS
+         * that hold a root object - rather than look at handle ranges
+         * and server names to decide this
+         */
+#if 0
         /*
            check if root handle is in our handle range for this fs.
            if it is, we're responsible for creating it on disk when
@@ -1285,6 +1293,7 @@ static int server_check_if_root_directory_created( void )
 
         ret = PINT_cached_config_get_server_name( handle_server,
                 BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+#endif
         if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
         {
             /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
@@ -2202,7 +2211,10 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
-    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
+    /* Remove s_op from posted_sop_list and move it to the 
+     * inprogress_sop_list.  This appears to already have
+     * been done in unexpected_map() in the unexpected SM.
+     */
     qlist_del(&s_op->next);
     qlist_add_tail(&s_op->next, &inprogress_sop_list);
 

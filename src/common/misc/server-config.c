@@ -23,6 +23,7 @@
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
 #include "pvfs2.h"
+#include "sid.h"
 #include "job.h"
 #include "trove.h"
 #include "gossip.h"
@@ -164,7 +165,7 @@ static int is_populated_filesystem_configuration(
 static int is_valid_filesystem_configuration(
                     struct server_configuration_s *config_s,
                     struct filesystem_configuration_s *fs);
-static host_alias_s *find_host_alias_ptr_by_alias(
+static host_alias_t *find_host_alias_ptr_by_alias(
                     struct server_configuration_s *config_s,
                     char *alias,
                     int *index);
@@ -393,28 +394,19 @@ static const configoption_t options[] =
      * allows us to reference individual servers by an alias instead of their
      * full HostID.  The format of the Alias option is:
      *
-     * Alias {alias string} {bmi address}
+     * Alias {Alias} (SID} {bmi address}
      *
      * As an example:
      *
-     * Alias mynode1 tcp://hostname1.clustername1.domainname:12345
+     * Alias mynode1 12345678-90ab-cdef-1234-567890abcdef tcp://hostname1.clustername1.domainname:12345
      *
      * Note: beginning with V3 Aliases specify a SID rather than a
      * BMI_addr. SIDs are UUIDs (36 character string representing
      * a 16 byte array plus 4 separators).  SID to BMI_addr mapping
      * is handled by the SID cache, and typically loaded from a distinct
      * text file and then updated online.
-     *
-     * example:
-     *
-     * Alias mynode1 12345678-90ab-4cde-8f12-34567890abcd
      */
     {"Alias", ARG_LIST, get_alias_list, NULL, CTX_ALIASES, NULL},
-
-    /* Defines the server alias for the server specific options that
-     * are to be set within the ServerOptions context.
-     */
-    {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
 
     /* This groups the Server specific options.
      *
@@ -452,6 +444,11 @@ static const configoption_t options[] =
     {"</ServerOptions>",ARG_NONE,exit_server_options_context,NULL,
         CTX_SERVER_OPTIONS,NULL},
 
+    /* Defines the server alias for the server specific options that
+     * are to be set within the ServerOptions context.
+     */
+    {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
+
     /* Open a context for specifying prime servers for SID mgmt
      *
      */
@@ -467,14 +464,10 @@ static const configoption_t options[] =
     /* Specifies the SID and BMI address of a Prime Server that is
      * used to manage SID mappings.
      *
-     * Format is PrimeServer {SID} {BMI_addr}
-     *
-     * Where {SID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-     *
-     * {BMI_addr} is <protocol>://<address>:<port_number>
+     * Format is PrimeServer {Alias}
      *
      */
-    {"PrimeServer", ARG_LIST, get_primesrv, NULL,
+    {"PrimeServer", ARG_STR, get_primesrv, NULL,
             CTX_PRIMESERVERS, NULL},
 
     /* This groups options specific to a filesystem.  A pvfs2 server may manage
@@ -548,9 +541,7 @@ static const configoption_t options[] =
     /* Specifies the SID of a server that holds a copy of the
      * filesystem root object.  The format is:
      *
-     * RootServer {SID}
-     *
-     * Where {SID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     * RootServer {Alias}
      *
      */
     {"RootServer", ARG_STR, get_rootsrv, NULL,
@@ -2702,7 +2693,7 @@ DOTCONF_CB(get_rootsrv)
     }
 
     /* malloc new server */
-    root_server = (root_server_s *)malloc(sizeof(root_server_s));
+    root_server = (root_server_t *)malloc(sizeof(root_server_t));
 
     /* fill in new server */
     /* just leaving the SID in text for now */
@@ -2820,11 +2811,11 @@ DOTCONF_CB(get_filesystem_collid)
     return NULL;
 }
 
-static int compare_aliases(void * vkey,
-                           void * valias2)
+static int compare_aliases(void* vkey,
+                           void* valias2)
 {
     char * hostaliaskey1 = (char *)vkey;
-    host_alias_s * alias2 = (host_alias_s *)valias2;
+    host_alias_t * alias2 = (host_alias_t *)valias2;
     
     return strcmp(hostaliaskey1, alias2->host_alias);
 }
@@ -2852,20 +2843,21 @@ DOTCONF_CB(get_alias_list)
         return "Error: alias already defined";
     }
 
-    cur_alias = (host_alias_s *)malloc(sizeof(host_alias_s));
+    cur_alias = (host_alias_t *)malloc(sizeof(host_alias_t));
     cur_alias->host_alias = strdup(cmd->data.list[0]);
+    cur_alias->host_sid_text = strdup(cmd->data.list[1]);
 
-    cur_alias->bmi_address = (char *)calloc(1, 2048);
+    cur_alias->bmi_address = (char *)calloc(1, PVFS_MAX_SERVER_ADDR_LIST);
     ptr = cur_alias->bmi_address;
-    for (i = 1; i < cmd->arg_count; i++)
+    for (i = 2; i < cmd->arg_count; i++)
     {
-        strncat(ptr, cmd->data.list[i], 2048 - len);
-         len += strlen(cmd->data.list[i]);
+        strncat(ptr, cmd->data.list[i], PVFS_MAX_SERVER_ADDR_LIST - len);
+        len += strlen(cmd->data.list[i]);
         if (i + 1 < cmd->arg_count)
         {
-            strncat(ptr, ",", 2048 - len);
+            strncat(ptr, ",", PVFS_MAX_SERVER_ADDR_LIST - len);
         }
-         len++;
+        len++;
     }
 
     if (!config_s->host_aliases)
@@ -2873,7 +2865,12 @@ DOTCONF_CB(get_alias_list)
         config_s->host_aliases = PINT_llist_new();
     }
     
+    /* add to config list of aliases */
     PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
+
+    /* add to SID cache */
+    PVFS_SID_str2bin(cur_alias->host_sid_text, &cur_alias->host_sid);
+    SID_add(&cur_alias->host_sid, 0, cur_alias->bmi_address);
     return NULL;
 }
 
@@ -2893,7 +2890,7 @@ DOTCONF_CB(get_primesrv)
     }
 
     /* malloc new server */
-    prime_server = (prime_server_s *)malloc(sizeof(prime_server_s));
+    prime_server = (prime_server_t *)malloc(sizeof(prime_server_t));
 
     /* fill in new server */
     prime_server->host_sid_text = strdup(cmd->data.list[0]);
@@ -2902,15 +2899,15 @@ DOTCONF_CB(get_primesrv)
     /* could also check for dups */
     /* could allow a direct SID instead of alias */
 
-    prime_server->bmi_address = (char *)calloc(1, 2048);
+    prime_server->bmi_address = (char *)calloc(1, PVFS_MAX_SERVER_ADDR_LIST);
     ptr = prime_server->bmi_address;
     for (i = 1; i < cmd->arg_count; i++)
     {
-	strncat(ptr, cmd->data.list[i], 2048 - len);
+	strncat(ptr, cmd->data.list[i], PVFS_MAX_SERVER_ADDR_LIST - len);
  	len += strlen(cmd->data.list[i]);
         if (i + 1 < cmd->arg_count)
         {
-            strncat(ptr, ",", 2048 - len);
+            strncat(ptr, ",", PVFS_MAX_SERVER_ADDR_LIST - len);
         }
  	len++;
     }
@@ -2929,8 +2926,8 @@ DOTCONF_CB(get_param)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    distribution_param_configuration* param =
-            malloc(sizeof(distribution_param_configuration));
+    distribution_param_configuration_t *param =
+            malloc(sizeof(distribution_param_configuration_t));
 
     if (NULL != param)
     {
@@ -2946,8 +2943,8 @@ DOTCONF_CB(get_value)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    distribution_param_configuration* param;
-    param = (distribution_param_configuration*)PINT_llist_tail(
+    distribution_param_configuration_t *param;
+    param = (distribution_param_configuration_t *)PINT_llist_tail(
             config_s->default_dist_config.param_list);
     if (NULL != param)
     {
@@ -3914,7 +3911,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
 }
 
 
-static host_alias_s *find_host_alias_ptr_by_alias(
+static host_alias_t *find_host_alias_ptr_by_alias(
         struct server_configuration_s *config_s,
         char *alias,
         int *index)
@@ -4542,7 +4539,7 @@ int PINT_config_pvfs2_mkspace(
     PINT_llist *cur = NULL;
     /* V3 obsolete - no more handle ranges */
     char *cur_meta_handle_range = NULL, *cur_data_handle_range = NULL;
-    filesystem_configuration_s *cur_fs = NULL;
+    filesystem_configuration_t *cur_fs = NULL;
 
     if (config)
     {
@@ -4608,7 +4605,7 @@ int PINT_config_pvfs2_rmspace(struct server_configuration_s *config)
     int ret = 1;
     int remove_collection_only = 0;
     PINT_llist *cur = NULL;
-    filesystem_configuration_s *cur_fs = NULL;
+    filesystem_configuration_t *cur_fs = NULL;
 
     if (config)
     {

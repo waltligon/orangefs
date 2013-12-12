@@ -14,7 +14,7 @@
  * Perform initialization tasks for distributions
  *   - register the default distributions
  */
-int PINT_dist_initialize(server_configuration_s* server_config);
+int PINT_dist_initialize(server_configuration_t *server_config);
 
 /**
  * Perform cleanup actions before exiting
@@ -27,7 +27,7 @@ void PINT_dist_finalize(void);
  * Returns the number of dfiles suggested by hint parameter if non-zero
  * else returns the number of servers requested
  */
-int PINT_dist_default_get_num_dfiles(void* params,
+int PINT_dist_default_get_num_dfiles(void *params,
                                      uint32_t num_servers_requested,
                                      uint32_t num_dfiles_requested);
 
@@ -39,8 +39,8 @@ int PINT_dist_default_get_num_dfiles(void* params,
  * implementation may not work correctly with complex structs or pointer
  * values.
  */
-int PINT_dist_default_set_param(const char* dist_name, void* params,
-                                const char* param_name, void* value);
+int PINT_dist_default_set_param(const char *dist_name, void* params,
+                                const char *param_name, void* value);
 
 /**
  * Register the parameter offset.
@@ -48,8 +48,8 @@ int PINT_dist_default_set_param(const char* dist_name, void* params,
  * Use PINT_dist_register_param to avoid having to determine the offset
  * and field size.
  */
-int PINT_dist_register_param_offset(const char* dist_name,
-                             const char* param_name,
+int PINT_dist_register_param_offset(const char *dist_name,
+                             const char *param_name,
                              size_t offset,
                              size_t field_size);
 
@@ -58,8 +58,8 @@ int PINT_dist_register_param_offset(const char* dist_name,
  *
  * Just helper to make register/unregister look complete
  */
-int PINT_dist_unregister_param_offset(const char* dist_name,
-                            const char* param_name);
+int PINT_dist_unregister_param_offset(const char *dist_name,
+                            const char *param_name);
 
 /**
  * Wrapper macro to make adding parameter fields easy.
