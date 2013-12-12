@@ -283,12 +283,12 @@ void gen_state_action(enum state_action action,
         case ACTION_SWITCH:
 #ifdef WIN32
             fprintf(out_file, "\t SM_SWITCH ,  /* flag */\n");
-            fprintf(out_file, "\t { NULL }, /* action.nested */\n", run_func);
+            fprintf(out_file, "\t { NULL }, /* action.nested */\n");
             fprintf(out_file, "\t NULL ,  /* pjtbl */\n");
             fprintf(out_file, "\t ST_%s_trtbl  /* trtbl */", state_name);
 #else
             fprintf(out_file, "\t .flag = SM_SWITCH ,\n");
-            fprintf(out_file, "\t .action.nested = NULL ,\n", run_func);
+            fprintf(out_file, "\t .action.nested = NULL ,\n");
             fprintf(out_file, "\t .pjtbl = NULL ,\n");
             fprintf(out_file, "\t .trtbl = ST_%s_trtbl ", state_name);
 #endif
