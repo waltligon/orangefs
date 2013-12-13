@@ -498,8 +498,20 @@ class OFSTestNode(object):
                 echo "Installing TORQUE from apt-get"
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
                 sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name"
-            ''' % (self.host_name,self.host_name)
+                sudo bash -c "echo %s > /var/spool/torque/server_name
+                
+                sudo qmgr -c "set server scheduling=true"
+                sudo qmgr -c "create queue orangefs_q queue_type=execution"
+                sudo qmgr -c "set queue orangefs_q started=true"
+                sudo qmgr -c "set queue orangefs_q enabled=true"
+                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
+                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
+                sudo qmgr -c "set server default_queue=orangefs_q"
+                sudo qmgr -c "set server operators += %s@%s"
+                sudo qmgr -c "set server managers += %s@%s"
+                
+                "
+            ''' % (self.host_name,self.host_name,self.current_user,self.host_name,self.current_user,self.host_name)
             self.addBatchCommand(batch_commands)
 
         elif "suse" in self.distro.lower():
@@ -569,10 +581,12 @@ class OFSTestNode(object):
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom  < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libtorque2 libtorque2-dev  < /dev/null 
                 sudo bash -c 'echo \$pbsserver %s > /var/spool/torque/mom_priv/config' 
-                sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config' 
-            ''' % pbsserver_name
+                sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config'
+                sudo bash -c 'echo %s > /etc/torque/server_name' 
+            ''' % (pbsserver_name,pbsserver_name)
 
             self.addBatchCommand(batch_commands)
 
@@ -594,7 +608,8 @@ class OFSTestNode(object):
             cd -
             sudo bash -c 'echo $pbsserver %s > /var/spool/torque/mom_priv/config'
             sudo bash -c 'echo $logevent 255 >> /var/spool/torque/mom_priv/config' 
-            ''' % pbsserver_name
+            sudo bash -c 'echo %s > /etc/torque/server_name' 
+            ''' % (pbsserver_name,pbsserver_name)
             self.addBatchCommand(batch_commands)
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
@@ -610,7 +625,8 @@ class OFSTestNode(object):
                 sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
                 sudo bash -c 'echo \$pbsserver %s > /var/lib/torque/mom_priv/config' 
                 sudo bash -c 'echo \$logevent 255 >> /var/lib/torque/mom_priv/config' 
-                ''' % (self.processor_type,pbsserver_name)
+                sudo bash -c 'echo %s > /etc/torque/server_name' 
+                ''' % (self.processor_type,pbsserver_name,pbsserver_name)
             elif "5." in self.distro:
                 batch_commands = '''
                
@@ -624,8 +640,9 @@ class OFSTestNode(object):
                 sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
                 sudo bash -c 'echo \$pbsserver %s > /var/lib/torque/mom_priv/config' 
                 sudo bash -c 'echo \$logevent 255 >> /var/lib/torque/mom_priv/config' 
+                sudo bash -c 'echo %s > /etc/torque/server_name' 
                 sudo /etc/init.d/munge start
-                ''' % (self.processor_type,pbsserver_name)
+                ''' % (self.processor_type,pbsserver_name,pbsserver_name)
             else:
                 print "TODO: Torque for "+self.distro
                 batch_commands = ""

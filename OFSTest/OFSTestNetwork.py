@@ -927,8 +927,8 @@ class OFSTestNetwork(object):
         self.openmpi_version = build_node.openmpi_version
         # create openmpihosts file
         build_node.changeDirectory(self.mpi_nfs_directory)
-        print 'grep -v localhost /etc/hosts | awk \'{print $2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
-        build_node.runSingleCommand('grep -v localhost /etc/hosts | awk \'{print $2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory))
+        print 'grep -v localhost /etc/hosts | awk \'{print \$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
+        build_node.runSingleCommand('grep -v localhost /etc/hosts | awk \'{print \$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory))
         
         # update runtest to use openmpihosts file
         print 'sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version)
@@ -944,7 +944,7 @@ class OFSTestNetwork(object):
             print "echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user)
             node.runSingleCommand("echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user))
             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/openmpi/lib:%s/lib:%s/lib:\$LD_LIBRARY_PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.db4_dir,node.current_user))
-            node.runSingleCommand("echo 'export PVFS2TABFILE=%s/etc/orangefstab' >> /home/%s/.bashrc" % (node.ofs_installation_location,node.current_user))
+            node.runSingleCommand("echo 'export PVFS2TAB_FILE=%s/etc/orangefstab' >> /home/%s/.bashrc" % (node.ofs_installation_location,node.current_user))
         
         return rc
         
