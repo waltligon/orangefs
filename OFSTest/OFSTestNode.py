@@ -741,6 +741,13 @@ class OFSTestNode(object):
                 sudo service sendmail stop
                 sudo service rpcbind restart
                 sudo service nfs-kernel-server restart
+
+                # install Sun Java6 for hadoop
+                sudo add-apt-repository ppa:webupd8team/java < /dev/null
+                sudo apt-get update 
+                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'
+                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-get install oracle-java6-installer < /dev/null
                 
 
             '''
