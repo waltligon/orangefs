@@ -167,6 +167,8 @@ class OFSTestNode(object):
         self.openmpi_installation_location = ""
         self.openmpi_source_location = ""
         self.openmpi_version = ""  
+        
+        self.hadoop_version = "hadoop-1.2.1"
 
     #==========================================================================
     # 
@@ -822,9 +824,16 @@ class OFSTestNode(object):
             echo "Installing Berkeley DB 4.8.30 to %s..."
             make install &> db4install.out
         fi
+        
+        if [ ! -d /opt/%s ]
+        then
+            cd /opt
+            wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz
+            tar -zxf %s.tar.gz
+        fi
         exit
         exit
-        ''' % (self.db4_dir,self.db4_dir,self.db4_dir)
+        ''' % (self.db4_dir,self.db4_dir,self.db4_dir,self.hadoop_version,self.hadoop_version,self.hadoop_version,self.hadoop_version)
         
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
