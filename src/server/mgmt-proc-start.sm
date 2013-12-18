@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <sys/wait.h>
 
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
@@ -36,11 +37,15 @@ machine pvfs2_mgmt_proc_start_sm
 
 %%
 
+extern int monfd;
+
 static PINT_sm_action mgmt_proc_start_do_work(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    s_op->resp.u.mgmt_proc_start.status = system(s_op->req->u.mgmt_proc_start.process);
+    s_op->resp.u.mgmt_proc_start.status = 0;
+    write(monfd, s_op->req->u.mgmt_proc_start.process, strlen(s_op->req->u.mgmt_proc_start.process));
+    write(monfd, "\n", 1);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

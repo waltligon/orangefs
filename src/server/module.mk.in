@@ -79,5 +79,7 @@ ifdef PVFS2_SEGV_BACKTRACE
 	MODCFLAGS_$(DIR)/pvfs2-server.c := -D__PVFS2_SEGV_BACKTRACE__
 endif
 
+	MONITORSRC = src/server/pvfs2-monitor.c
+
 endif
 

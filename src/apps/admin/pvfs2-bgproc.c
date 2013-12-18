@@ -78,13 +78,14 @@ int main(int argc, char *argv[])
         }
     }
     for (i = 0; i < addr_count; i++) {
-        if (statuses[i] == 0) {
-            printf("%d %s success!\n", i,
-                   PVFS_mgmt_map_addr(fs_id, addr_array[i], NULL));
+        if (statuses[i] >= 0) {
+            printf("%d %s success! %d\n", i,
+                   PVFS_mgmt_map_addr(fs_id, addr_array[i], NULL),
+                   statuses[i]);
         } else {
             printf("%d %s failure! %d %s\n", i,
                    PVFS_mgmt_map_addr(fs_id, addr_array[i], NULL),
-                   statuses[i], strerror(statuses[i]));
+                   statuses[i], strerror(-statuses[i]));
         }
     }
 

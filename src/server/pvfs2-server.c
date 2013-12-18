@@ -186,6 +186,9 @@ static int precreate_pool_count(
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
+int monfd;
+int startmonitor(void);
+
 
 struct server_configuration_s *PINT_get_server_config(void)
 {
@@ -290,6 +293,12 @@ int main(int argc, char **argv)
         gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space created. Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
         return(0);
+    }
+
+    monfd = startmonitor();
+    if (monfd == 0) {
+        gossip_err("Could not initialize pvfs2-monitor.\n");
+        return(1);
     }
 
     server_job_id_array = (job_id_t *)
@@ -3084,6 +3093,36 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     }
 
     return(0);
+}
+
+int startmonitor(void)
+{
+    int pipefds[2];
+    int r, i;
+    r = pipe(pipefds);
+    if (r == -1)
+        return 0;
+    r = fork();
+    if (r == -1) {
+        close(pipefds[0]);
+        close(pipefds[1]);
+        return 0;
+    } else if (r == 0) {
+        /* Close all fds except the pipe. */
+        close(0);
+        close(1);
+        close(2);
+        close(pipefds[1]);
+        if (dup2(pipefds[0], 0)) {
+            fprintf(stderr, "Could not duplicate fd: %s.\n",
+                    strerror(errno));
+        }
+        for (i = 3; i < sysconf(_SC_OPEN_MAX); i++)
+            close(i);
+        execlp(SBINDIR "/pvfs2-monitor", "pvfs2-monitor", NULL);
+        exit(1);
+    }
+    return pipefds[1];
 }
 
 /*

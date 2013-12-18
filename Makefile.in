@@ -262,8 +262,8 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
-  # make bindir and sysconfdir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+  # make bindir, sbindir, and sysconfdir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"' -DSBINDIR='"$(sbindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
@@ -595,6 +595,8 @@ LIBBMISRC :=
 endif
 # SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
 SERVERBINSRC :=
+# MONITORSRC is souce code for the pvfs2 monitor
+MONITORSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -636,6 +638,7 @@ ifdef BUILD_SERVER
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
+MONITOR := src/server/pvfs2-monitor
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
@@ -773,6 +776,7 @@ ifdef BUILD_SERVER
     # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
     SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
     SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
+    MONITOROBJS := $(patsubst %.c,%.o, $(filter %.c,$(MONITORSRC)))
 endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
@@ -870,7 +874,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(MONITOR) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -931,6 +935,10 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 
 # rule for building the pvfs2 server
 $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
+	$(Q) "  LD		$@"
+	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
+
+$(MONITOR): $(MONITOROBJS)
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
@@ -1522,6 +1530,7 @@ ifdef BUILD_SERVER
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
     endif
+	install -m 755 $(MONITOR) $(sbindir)/pvfs2-monitor
 endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)
