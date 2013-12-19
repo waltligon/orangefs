@@ -157,6 +157,9 @@ class OFSTestConfig(object):
         # username of svn user. Allows checkout instead of export
         self.svn_username = None
 
+        # enable OrangeFS hadoop support
+        self.install_hadoop = False
+
         # Additional options for configure
         self.configure_opts = ""
 
@@ -228,6 +231,7 @@ class OFSTestConfig(object):
         self.run_vfs_tests = False
         self.run_fuse_tests = False
         self.run_mpi_tests = False
+        self.run_hadoop_tests = False
         
         
     
@@ -421,6 +425,10 @@ class OFSTestConfig(object):
         temp = d.get('run_usrint_tests')
         if temp != None:
             self.run_usrint_tests = temp
+        
+        temp = d.get('run_hadoop_tests')
+        if temp != None:
+            self.run_hadoop_tests = temp
             
         temp = d.get('ofs_fs_name')
         if temp != None:
@@ -477,6 +485,10 @@ class OFSTestConfig(object):
         temp = d.get('install_MPI')
         if temp != None:
             self.install_MPI = temp
+        
+        temp = d.get('install_hadoop')
+        if temp != None:
+            self.install_hadoop = temp
             
                 # --enable-fuse
         temp = d.get('install_fuse')

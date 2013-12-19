@@ -206,6 +206,7 @@ class OFSTestMain(object):
         enable_strict=self.config.enable_strict,
         enable_fuse=self.config.install_fuse,
         enable_shared=self.config.install_shared,
+        enable_hadoop=self.config.install_hadoop,
         ofs_prefix=self.config.install_prefix,
         db4_prefix=self.config.db4_prefix,
         ofs_patch_files=self.config.ofs_patch_files,
@@ -319,6 +320,13 @@ class OFSTestMain(object):
         print "Check Torque"
         self.ofs_network.checkTorque()
         
+        
+        print ""
+        print "==================================================================="
+
+        print "Setup Hadoop"
+        self.ofs_network.setupHadoop()
+        
         '''
         print ""
         print "==================================================================="
@@ -359,9 +367,7 @@ class OFSTestMain(object):
         
         filename = self.config.log_file
         
-        import OFSSysintTest
-        import OFSVFSTest
-        import OFSUserintTest
+
 
         rc = 0
 
@@ -377,6 +383,8 @@ class OFSTestMain(object):
 
 
         if self.config.run_sysint_tests == True:
+            import OFSSysintTest
+        
             output = open(filename,'a+')
             output.write("Sysint Tests ==================================================\n")
             output.close()
@@ -396,6 +404,8 @@ class OFSTestMain(object):
             #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
 
         if self.config.run_vfs_tests == True:
+            import OFSVFSTest
+        
             output = open(filename,'a+')
             mount_type = "kmod"
             head_node.unmountOFSFilesystem()
@@ -438,6 +448,8 @@ class OFSTestMain(object):
         if self.config.run_usrint_tests == True:
             # stop the client and remove the kernel module before running usrint tests
             #if self.config.ofs_mount_fuse == True:
+            import OFSUserintTest
+        
             if False == True:
                 output = open(filename,'a+')
                 output.write("Usrint Tests not compatible with fuse=====================================\n")
@@ -479,6 +491,7 @@ class OFSTestMain(object):
 
         
         if self.config.run_fuse_tests == True:
+            import OFSVFSTest
             output = open(filename,'a+')
             head_node.stopOFSClient()
             head_node.mountOFSFilesystem(mount_fuse=True)
@@ -512,6 +525,31 @@ class OFSTestMain(object):
                 output.close()
         
         
+                
+        if self.config.run_hadoop_tests == True:
+            import OFSHadoopTest
+            output = open(filename,'a+')
+            head_node.stopOFSClient()
+
+            output.write("Hadoop Tests ==================================================\n")
+                
+            output.close()
+            
+            
+
+            for callable in OFSHadoopTest.tests:
+                try:
+                    rc = head_node.runOFSTest("hadoop", callable)
+                    self.writeOutput(filename,callable,rc)
+                except:
+                    print "Unexpected error:", sys.exc_info()[0]
+                    traceback.print_exc()
+                    pass
+                                            
+            #print "Cleaning up "+head_node.ofs_mount_point
+            #head_node.runSingleCommand("rm -rf %s/*" % head_node.ofs_mount_point)
+            #head_node.runSingleCommand("mkdir -p %s" % head_node.ofs_mount_point)
+
         
 
         if self.config.ec2_delete_after_test == True:

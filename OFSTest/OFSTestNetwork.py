@@ -223,7 +223,12 @@ class OFSTestNetwork(object):
       
         
         for src_node in node_list:
+            # passwordless access to localhost
+            src_node.runSingleCommand("/usr/bin/ssh-keyscan localhost >> /home/%s/.ssh/known_hosts" % src_node.current_user)
+            src_node.runSingleCommand("/usr/bin/ssh-keyscan 127.0.0.1 >> /home/%s/.ssh/known_hosts" % src_node.current_user)
+            
             for dest_node in node_list:
+                # passwordless access to all other nodes
                 print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.host_name,dest_node.host_name,dest_node.ip_address,dest_node.ext_ip_address)
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.host_name,src_node.current_user))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ext_ip_address,src_node.current_user))
@@ -308,6 +313,7 @@ class OFSTestNetwork(object):
         enable_strict=False,
         enable_fuse=False,
         enable_shared=False,
+        enable_hadoop=False,
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
         security_mode=None,
@@ -363,7 +369,7 @@ class OFSTestNetwork(object):
                 print "Could not upload patch at %s to buildnode %s" % (patch,build_node.host_name)
 
 
-        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode)
+        rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode,enable_hadoop=enable_hadoop)
         if rc != 0:
             return rc
         
@@ -948,6 +954,54 @@ class OFSTestNetwork(object):
         
         return rc
         
+        
+    def setupHadoop(self,hadoop_nodes=None,master_node=None):
+        if hadoop_nodes == None:
+            hadoop_nodes = self.created_nodes
+        
+        if master_node == None:
+            master_node = hadoop_nodes[0]
+        
+        # remove list of slaves. We will be rebuilding it.
+        master_node.runSingleCommand("rm %s/conf/slaves" % master_node.hadoop_location)
+
+        for node in hadoop_nodes:
+            
+            # setup hadoop-env.sh
+            node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
+            node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
+            node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
+            node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/ofs_hadoop.jar:\$JNI_LIBRARY_PATH/ofs_jni.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
+            # copy templates to node
+            master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destinationNode=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            
+            # update mapred-site.xml
+            node.runSingleCommand("sed -i s/__NODE001__/%s/ %s/conf/mapred-site.xml" % (master_node.host_name,node.hadoop_location))
+            
+            # update core-site.xml
+            node.runSingleCommand("sed -i s,__MNT_LOCATION__,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
+
+            # point slave node to master
+            node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.host_name,node.hadoop_location))
+            
+            # notify master of new slave
+            master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.host_name,master_node.hadoop_location))
+            
+        output = []
+        master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location,output)
+        print output
+        time.sleep(20)
+        rc = master_node.runSingleCommand("%s/bin/hadoop dfs -ls /" % master_node.hadoop_location,output)
+        if rc != 0:
+            print "========Hadoop dfs -ls output==========="
+            print output
+        else:
+            print "Hadoop setup successfully"
+            master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
+            
+        return rc
+        
+    
 def test_driver():
     my_node_manager = OFSTestNetwork()
     my_node_manager.addEC2Connection("ec2-cred/ec2rc.sh","Buildbot","/home/jburton/buildbot.pem")

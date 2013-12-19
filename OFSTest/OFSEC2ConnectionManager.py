@@ -148,7 +148,8 @@ class OFSEC2ConnectionManager(object):
         
         
         print "Creating %d new %s %s instances." % (number_nodes,type,image_system)
-        reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=type) 
+        orangefs_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
+        reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=type,subnet_id=orangefs_subnet) 
         
         print "Waiting 60 seconds for all instances to start."
         time.sleep(60)
@@ -171,15 +172,14 @@ class OFSEC2ConnectionManager(object):
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
         for i in instances:
-		# try:
-		# get existing external ip
-		# except:
-		# create one
-            #print "Creating ip"
+            print i.__dict__
+
             address = self.ec2_connection.allocate_address(domain)
             print "Associating ext IP %s to %s with int IP %s" % (address.public_ip,i.id,i.ip_address)
             self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
             external_addresses.append(address.public_ip)
+        
+            
             
         print "Waiting 30 seconds for external networking"
         time.sleep(30)

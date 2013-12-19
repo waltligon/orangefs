@@ -169,6 +169,8 @@ class OFSTestNode(object):
         self.openmpi_version = ""  
         
         self.hadoop_version = "hadoop-1.2.1"
+        self.hadoop_location = "/opt/"+self.hadoop_version
+        self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
 
     #==========================================================================
     # 
@@ -749,7 +751,7 @@ class OFSTestNode(object):
                 sudo apt-get update 
                 sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'
                 sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-get install oracle-java6-installer < /dev/null
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer < /dev/null
                 
 
             '''
@@ -780,6 +782,8 @@ class OFSTestNode(object):
             sudo rm -rf /opt
             sudo ln -s /mnt /opt
             sudo chmod -R a+w /opt
+            
+            #### Todo Install Java 6! #####
 
 
 
@@ -804,6 +808,8 @@ class OFSTestNode(object):
                 sudo service sendmail stop
                 sudo service rpcbind start
                 sudo service nfs restart
+                
+                #### Todo Install Java 6! #####
 
             '''
             self.addBatchCommand(batch_commands)
@@ -825,19 +831,19 @@ class OFSTestNode(object):
             make install &> db4install.out
         fi
         
-        if [ ! -d /opt/%s ]
-        then
-            cd /opt
-            wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz
-            tar -zxf %s.tar.gz
-        fi
+
         exit
-        exit
-        ''' % (self.db4_dir,self.db4_dir,self.db4_dir,self.hadoop_version,self.hadoop_version,self.hadoop_version,self.hadoop_version)
-        
+        ''' % (self.db4_dir,self.db4_dir,self.db4_dir) 
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
         self.runAllBatchCommands()
+        output = []
+        self.changeDirectory("/opt")
+        self.runSingleCommand("wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+        print output
+        self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+
+        
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
 
     #-------------------------------
@@ -1119,6 +1125,7 @@ class OFSTestNode(object):
         enable_strict=False,
         enable_fuse=False,
         enable_shared=False,
+        enable_hadoop=False,
         ofs_prefix="/opt/orangefs",
         db4_prefix="/opt/db4",
         security_mode=None,
@@ -1185,12 +1192,18 @@ class OFSTestNode(object):
             else:
                 configure_opts = configure_opts+" --enable-strict"
 
+        if enable_hadoop == True:
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
+            enable_shared = True
+
+
         if enable_shared == True:
             configure_opts = configure_opts+" --enable-shared"
 
         if enable_fuse == True:
             configure_opts = configure_opts+" --enable-fuse"
         
+
         
         if security_mode == None:
             # no security mode, ignore
@@ -1621,6 +1634,7 @@ class OFSTestNode(object):
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.host_name,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommandAsBatch("sudo ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
         # set the debug mask
@@ -2106,8 +2120,9 @@ class OFSTestNode(object):
         sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
         #sudo service cups stop
         #sudo service sendmail stop
-        #sudo service rpcbind restart
-        #sudo service nfs restart
+        sudo service rpcbind restart
+        sudo service nfs restart
+        sudo service nfs-kernel-server restart
         sudo exportfs -a
         ''' % (directory_name,self.ip_address,netmask,options)
         
