@@ -2926,8 +2926,8 @@ DOTCONF_CB(get_param)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    distribution_param_configuration_t *param =
-            malloc(sizeof(distribution_param_configuration_t));
+    distribution_param_config_t *param =
+            malloc(sizeof(distribution_param_config_t));
 
     if (NULL != param)
     {
@@ -2943,8 +2943,8 @@ DOTCONF_CB(get_value)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    distribution_param_configuration_t *param;
-    param = (distribution_param_configuration_t *)PINT_llist_tail(
+    distribution_param_config_t *param;
+    param = (distribution_param_config_t *)PINT_llist_tail(
             config_s->default_dist_config.param_list);
     if (NULL != param)
     {

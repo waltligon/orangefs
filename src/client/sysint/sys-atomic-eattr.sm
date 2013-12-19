@@ -25,13 +25,13 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-eattr.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
-static int atomic_eattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+static int atomic_eattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int i);
 
 %%
 
@@ -67,21 +67,20 @@ machine pvfs2_client_atomic_eattr_sm
 %%
 
 
-/* 
+/** Non-blocking call to atomically read/write a list of attributes
  * NOTE: The flags are currently not implemented
  */
-PVFS_error PVFS_isys_atomiceattr_list(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        int32_t nkey,
-        PVFS_ds_keyval *key_array,
-        PVFS_ds_keyval *val_array,
-        PVFS_sysresp_geteattr *resp_p,
-        int32_t flags,
-        PVFS_sys_op_id *op_id,
-        int32_t opcode,
-        PVFS_hint hints,
-        void *user_ptr)
+PVFS_error PVFS_isys_atomiceattr_list(PVFS_object_ref ref,
+                                      const PVFS_credential *credential,
+                                      int32_t nkey,
+                                      PVFS_ds_keyval *key_array,
+                                      PVFS_ds_keyval *val_array,
+                                      PVFS_sysresp_geteattr *resp_p,
+                                      int32_t flags,
+                                      PVFS_sys_op_id *op_id,
+                                      int32_t opcode,
+                                      PVFS_hint hints,
+                                      void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -115,17 +114,20 @@ PVFS_error PVFS_isys_atomiceattr_list(
     } /*end if*/
 
     if (!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL) ||
-       (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
+       (ref.fs_id == PVFS_FS_ID_NULL) ||
+       (resp_p == NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_ATOMICEATTR,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_ATOMICEATTR,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -144,35 +146,43 @@ PVFS_error PVFS_isys_atomiceattr_list(
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    PINT_SM_GETATTR_STATE_FILL(
-                               sm_p->getattr,
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                PVFS_ATTR_CAPABILITY,
                                PVFS_TYPE_NONE,
                                0);
 
-    return PINT_client_state_machine_post(
-            smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
-PVFS_error PVFS_sys_atomiceattr_list(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        int32_t nkey,
-        PVFS_ds_keyval *key_array,
-        PVFS_ds_keyval *val_array,
-        PVFS_sysresp_geteattr *resp_p,
-        int32_t flags,
-        int32_t opcode,
-        PVFS_hint hints)
+/** Atomically read/write a list of attributes
+ */
+PVFS_error PVFS_sys_atomiceattr_list(PVFS_object_ref ref,
+                                     const PVFS_credential *credential,
+                                     int32_t nkey,
+                                     PVFS_ds_keyval *key_array,
+                                     PVFS_ds_keyval *val_array,
+                                     PVFS_sysresp_geteattr *resp_p,
+                                     int32_t flags,
+                                     int32_t opcode,
+                                     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_atomiceattr entered\n");
 
-    ret = PVFS_isys_atomiceattr_list(ref, credential, nkey, key_array,
-                    val_array, resp_p, flags, &op_id, opcode, hints, NULL);
+    ret = PVFS_isys_atomiceattr_list(ref,
+                                     credential,
+                                     nkey,
+                                     key_array,
+                                     val_array,
+                                     resp_p,
+                                     flags,
+                                     &op_id,
+                                     opcode,
+                                     hints,
+                                     NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_atomiceattr call", ret);
@@ -192,27 +202,35 @@ PVFS_error PVFS_sys_atomiceattr_list(
     return error;
 }
 
-PVFS_error PVFS_sys_atomiceattr(
-        PVFS_object_ref ref,
-        const PVFS_credential *credential,
-        PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p,
-        PVFS_ds_keyval *response,
-        int32_t flags,
-        int32_t opcode,
-        PVFS_hint hints)
+/** Atomically read/write an attribute
+ */
+PVFS_error PVFS_sys_atomiceattr(PVFS_object_ref ref,
+                                const PVFS_credential *credential,
+                                PVFS_ds_keyval *key_p,
+                                PVFS_ds_keyval *val_p,
+                                PVFS_ds_keyval *response,
+                                int32_t flags,
+                                int32_t opcode,
+                                PVFS_hint hints)
 {
     PVFS_sysresp_geteattr resp_p;
     PVFS_error tmp_err;
     resp_p.val_array = response;
     resp_p.err_array = &tmp_err;
-    return PVFS_sys_atomiceattr_list(ref, credential, 1, key_p, val_p,
-                                  &resp_p, flags, opcode, hints);
+    return PVFS_sys_atomiceattr_list(ref,
+                                     credential,
+                                     1,
+                                     key_p,
+                                     val_p,
+                                     &resp_p,
+                                     flags,
+                                     opcode,
+                                     hints);
 }
 
 
-static PINT_sm_action atomic_eattr_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action atomic_eattr_setup_msgpair(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -235,27 +253,34 @@ static PINT_sm_action atomic_eattr_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_ATOMICEATTR_FILL(
-            msg_p->req,
-            sm_p->getattr.attr.capability,
-            sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            sm_p->u.atomiceattr.flags,
-            sm_p->u.atomiceattr.nkey,
-            sm_p->u.atomiceattr.key_array,
-            sm_p->u.atomiceattr.val_array,
-            sm_p->u.atomiceattr.size_array,
-            sm_p->u.atomiceattr.opcode,
-            sm_p->hints
-            );
+    PINT_SERVREQ_ATOMICEATTR_FILL(msg_p->req,
+                                   sm_p->getattr.attr.capability,
+                                   sm_p->object_ref.fs_id,
+                                   sm_p->object_ref.handle,
+                                   sm_p->u.atomiceattr.flags,
+                                   sm_p->u.atomiceattr.nkey,
+                                   sm_p->u.atomiceattr.key_array,
+                                   sm_p->u.atomiceattr.val_array,
+                                   sm_p->u.atomiceattr.size_array,
+                                   sm_p->u.atomiceattr.opcode,
+                                   sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
+    msg_p->sid_count = sm_p->object_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->object_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = atomic_eattr_comp_fn;
 
+#if 0
     ret = PINT_cached_config_map_to_server(
             &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+#endif
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     if (ret)
     {
@@ -267,8 +292,8 @@ static PINT_sm_action atomic_eattr_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action atomic_eattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action atomic_eattr_cleanup(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
@@ -286,10 +311,9 @@ static PINT_sm_action atomic_eattr_cleanup(
 /*
  * NOTE: Using GOSSIP_GETEATTR_DEBUG for debugging
  */
-static int atomic_eattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
+static int atomic_eattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int i)
 {
     int j = 0;
     int ret = 0;
@@ -367,8 +391,8 @@ static int atomic_eattr_comp_fn(
 
                 /* seems ok - decode the eattrs we know about */
                 decode_ret = PINT_eattr_decode(
-                    &sm_p->u.atomiceattr.key_array[k],
-                    &sm_p->u.atomiceattr.resp_p->val_array[k]);
+                        &sm_p->u.atomiceattr.key_array[k],
+                        &sm_p->u.atomiceattr.resp_p->val_array[k]);
                 if(decode_ret != 0)
                 {
                     gossip_debug(GOSSIP_GETATTR_DEBUG, 

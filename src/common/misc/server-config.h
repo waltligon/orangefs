@@ -165,23 +165,24 @@ typedef struct filesystem_configuration_s
     int32_t split_mem_limit;
 } filesystem_configuration_t;
 
-typedef struct distribution_param_configuration_s
+typedef struct distribution_param_config_s
 {
-    char* name;
+    char *name;
     int64_t value;  /* Temporarily hard code to 64bit type */
 
-} distribution_param_configuration_t;
+} distribution_param_config_t;
 
 /* Config struct to hold overloaded distribution defaults */
-typedef struct distribution_configuration_s
+typedef struct distribution_config_s
 {
     char* name;
-    PINT_llist* param_list;
+    PINT_llist *param_list;
 
-} distribution_configuration_t;
+} distribution_config_t;
 
 typedef struct server_configuration_s
 {
+    PVFS_SID host_sid;              /* SID of this server */
     char *host_id;                  /* bmi_address of this server */
     int host_index;
     char *server_alias;             /* the command line server-alias parameter */
@@ -232,7 +233,7 @@ typedef struct server_configuration_s
     PINT_llist *prime_servers;      /* ptrs are type prime_server_t     */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_t       */
-    distribution_configuration_t default_dist_config;  /* distribution conf */
+    distribution_config_t default_dist_config;  /* distribution conf */
     int db_cache_size_bytes;        /* cache size to use in berkeley db
                                        if zero, use defaults */
     char *db_cache_type;
@@ -357,10 +358,11 @@ int PINT_config_trim_filesystems_except(
 int PINT_config_get_fs_key(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id,
-    char ** key,
-    int * length);
+    char **key,
+    int *length);
 
-struct server_configuration_s *PINT_get_server_config(void);
+/* defined in src/server/pvfs2-server.c only valid in server code */
+struct server_configuration_s *get_server_config_struct(void);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);

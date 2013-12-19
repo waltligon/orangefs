@@ -17,6 +17,7 @@
 #include "pint-cached-config.h"
 #include "client-state-machine.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 

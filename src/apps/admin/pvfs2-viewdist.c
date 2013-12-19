@@ -131,8 +131,11 @@ static int generic_dist(file_object *obj, PVFS_credential *creds,
  * is allocated internally in this function.
  * callers job is to free up all the memory
  */
-static int generic_server_location(file_object *obj, PVFS_credential *creds,
-        char **servers, PVFS_handle *handles, int *nservers)
+static int generic_server_location(file_object *obj,
+                                   PVFS_credential *creds,
+                                   char **servers,
+                                   PVFS_handle *handles,
+                                   int *nservers)
 {
     char *buffer = (char *) malloc(4096);
     int ret, num_dfiles, count;
@@ -160,7 +163,10 @@ static int generic_server_location(file_object *obj, PVFS_credential *creds,
         val.buffer = buffer;
         val.buffer_sz = 4096;
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref,
-                creds, &key, &val, NULL)) < 0)
+                                     creds,
+                                     &key,
+                                     &val,
+                                     NULL)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -175,7 +181,8 @@ static int generic_server_location(file_object *obj, PVFS_credential *creds,
     count = num_dfiles < *nservers ? num_dfiles : *nservers;
     for (ret = 0; ret < count; ret++)
     {
-        PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
+        PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer +
+                                            ret * sizeof(PVFS_handle));
         servers[ret] = (char *) calloc(1, PVFS_MAX_SERVER_ADDR_LEN);
         handles[ret] = *ptr;
         if (servers[ret] == NULL)
@@ -183,9 +190,18 @@ static int generic_server_location(file_object *obj, PVFS_credential *creds,
             break;
         }
         /* ignore any errors */
-        PINT_cached_config_get_server_name(
-                servers[ret], PVFS_MAX_SERVER_ADDR_LEN,
-                *ptr, fsid);
+/* V3 handles no longer map to servers, the SIDs can be read with a
+ * getattr same as the handles - these should be translatable into
+ * server names or aliases or something - doesn't exist at this time so
+ * we need to fix this up later.  Also, there will be multiple SIDs per
+ * handle, so we need to decide how this program will deal with that.
+ */
+#if 0
+        PINT_cached_config_get_server_name(servers[ret],
+                                           PVFS_MAX_SERVER_ADDR_LEN,
+                                           *ptr,
+                                           fsid);
+#endif
     }
     if (ret != count)
     {
@@ -265,9 +281,13 @@ int main(int argc, char ** argv)
     printf("dist_params:\n%s\n", dist->methods->params_string(dist->params));
     PINT_dist_free(dist);
 
-
-    ret = PINT_cached_config_get_server_name(metadataserver, 256,
-        src.u.pvfs2.ref.handle, src.u.pvfs2.ref.fs_id);
+    /* V3 see comment above about handles, SIDs and server names */
+#if 0
+    ret = PINT_cached_config_get_server_name(metadataserver,
+                                             256,
+                                             src.u.pvfs2.ref.handle,
+                                             src.u.pvfs2.ref.fs_id);
+#endif
     if( ret != 0)
     {
         fprintf(stderr, "Error, could not get metadataserver name\n");
@@ -278,8 +298,11 @@ int main(int argc, char ** argv)
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
-        printf("Datafile %d - %s, handle: %s (%s.bstream)\n", i, servers[i],
-            PVFS_OID_str(&handles[i]), PVFS_OID_str(&handles[i]));
+        printf("Datafile %d - %s, handle: %s (%s.bstream)\n",
+               i,
+               servers[i],
+               PVFS_OID_str(&handles[i]),
+               PVFS_OID_str(&handles[i]));
         free(servers[i]);
     }
 main_out:

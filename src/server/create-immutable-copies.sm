@@ -20,6 +20,7 @@
 #include "pvfs2-dist-basic.h"
 #include "pvfs2-mirror.h"
 #include "security-util.h"
+#include "sid.h"
 
 /*Global Variables*/
 

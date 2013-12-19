@@ -793,13 +793,22 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
                                   sm_p->hints);
 
         /* fill in msgpair structure components */
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
         msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
+        msg_p->sid_count = sm_p->u.rename.parent_refns[i].sid_count;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = sm_p->u.rename.parent_refns[i].sid_array;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = rename_parent_getattr_comp_fn;
 
+/* V3 */
+#if 0
         ret = PINT_cached_config_map_to_server(
             &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+#endif
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
         if (ret)
         {

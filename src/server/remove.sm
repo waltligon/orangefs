@@ -17,6 +17,7 @@
 #include "security-util.h"
 #include "pint-cached-config.h"
 #include "pint-util.h"
+#include "sid.h"
 
 /* Implementation notes
  *
@@ -659,10 +660,14 @@ static PINT_sm_action remove_get_dirent_count_setup_msgpair_array(
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = remove_get_dirent_count_comp_fn;
 
+        /* V3 */
+#if 0
         ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                                msg_p->handle,
                                                msg_p->fs_id);
-
+#endif
+        /* V3 sid array index isn't right */
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -765,10 +770,15 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = remove_remove_dirdata_handles_comp_fn;
 
+        /* V3 */
+#if 0
         ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                                msg_p->handle,
                                                msg_p->fs_id);
+#endif
 
+        /* V3 sid array needs check */
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -931,12 +941,19 @@ static PINT_sm_action remove_rebuild_dirdata_handle_remote(
     for(i = 0; i < s_op->u.remove.num_rebuild_dirdata_remote; i++)
     {
         io_servers_remote[i] = string_buffer + i * 1024;
+        /* V3 not sure what this is for - we really don't want to mess
+         * with server names, server SIDs are much better, so depending
+         * on what this is being used for we should just build a list of
+         * SIDs
+         */
+#if 0
         PINT_cached_config_get_server_name(
                 io_servers_remote[i],
                 1024, 
                 s_op->attr.u.dir.dirdata_handles[
                            s_op->u.remove.rebuild_dirdata_index_array_remote[i]], 
                 s_op->req->u.remove.fs_id);
+#endif
     }
 
     /* request remote dirdata handles */
@@ -1065,9 +1082,13 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
+    /* V3 */
+#if 0
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+#endif
 
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");

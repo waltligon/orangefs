@@ -21,6 +21,7 @@
 #include "pvfs2-dist-basic.h"
 #include "dist-dir-utils.h"
 #include "pint-uid-map.h"
+#include "sid.h"
 
 %%
 

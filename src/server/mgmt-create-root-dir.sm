@@ -21,6 +21,7 @@
 #include "security-util.h"
 #include "server-config.h"
 #include "dist-dir-utils.h"
+#include "sid.h"
 #ifdef ENABLE_SECURITY_CERT
 #include "cert-util.h"
 #endif
@@ -38,122 +39,122 @@ enum
 
 static char *lost_and_found_string = "lost+found";
 
-static int mkdir_lost_and_found_comp_fn(
+static int mkdir_lost_found_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
-static int crdirent_lost_and_found_comp_fn(
+static int crdirent_lost_found_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
-static int delete_lost_and_found_handle_comp_fn(
+static int delete_lost_found_handle_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
 
 %%
 
-machine pvfs2_mgmt_create_root_dir_sm
+machine pvfs2_mgmt_create_root_sm
 {
     state check_for_request
     {
-        run mgmt_create_root_dir_check_for_request;
+        run mgmt_create_root_check_for_request;
         NO_REQ => create_dist_dir_struct; 
         default => cleanup_noreq;    
     }
 
     state create_dist_dir_struct
     {
-        run mgmt_create_root_dir_create_dist_dir_struct;
+        run mgmt_create_root_create_dist_dir_struct;
         success => request_remote_dirdata_dspace;
         default => cleanup_noreq;
     }
 
     state request_remote_dirdata_dspace
     {
-        run mgmt_create_root_dir_request_remote_dirdata_dspace;
+        run mgmt_create_root_request_remote_dirdata_dspace;
         success => create_local_dirdata_dspace;
         default => cleanup_noreq;
     }
 
     state create_local_dirdata_dspace
     {
-        run mgmt_create_root_dir_create_local_dirdata_dspace;
-        success => fill_handles_to_dist_dir_struct;
+        run mgmt_create_root_create_local_dirdata_dspace;
+        success => fill_handles_dist_dir_struct;
         default => cleanup_noreq;
     }
 
-    state fill_handles_to_dist_dir_struct
+    state fill_handles_dist_dir_struct
     {
-        run mgmt_create_root_dir_fill_handles_to_dist_dir_struct;
-        default => remote_dirdata_attr_and_keyval_setup_msgpair;
+        run mgmt_create_root_fill_handles_dist_dir_struct;
+        default => remote_dirdata_keyval_setup_msgpair;
     }
 
-    state remote_dirdata_attr_and_keyval_setup_msgpair
+    state remote_dirdata_keyval_setup_msgpair
     {
-        run mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair;
-        success => remote_dirdata_attr_and_keyval_xfer_msgpair;
+        run mgmt_create_root_remote_dirdata_keyval_setup_msgpair;
+        success => remote_dirdata_keyval_xfer_msgpair;
         default => cleanup_noreq;
     }
 
-    state remote_dirdata_attr_and_keyval_xfer_msgpair
+    state remote_dirdata_keyval_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => write_keyval_to_meta_handle;
+        success => write_keyval_meta_handle;
         default => cleanup_noreq;
     }
     
-    state write_keyval_to_meta_handle
+    state write_keyval_meta_handle
     {
-        run mgmt_create_root_dir_write_keyval_to_meta_handle;
-        success => write_keyval_to_dirdata_handle;
+        run mgmt_create_root_write_keyval_meta_handle;
+        success => write_keyval_dirdata_handle;
         default => cleanup_noreq;
     }
 
-    state write_keyval_to_dirdata_handle
+    state write_keyval_dirdata_handle
     {
-        run mgmt_create_root_dir_write_keyval_to_dirdata_handle;
-        success => mkdir_lost_and_found_setup_msgpair;
+        run mgmt_create_root_write_keyval_dirdata_handle;
+        success => mkdir_lost_found_setup_msgpair;
         default => cleanup_noreq;
     }
 
-    state mkdir_lost_and_found_setup_msgpair
+    state mkdir_lost_found_setup_msgpair
     {
-        run mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair;
-        success => mkdir_lost_and_found_msg_xfer_msgpair;
+        run mgmt_create_root_mkdir_lost_found_setup_msgpair;
+        success => mkdir_lost_found_msg_xfer_msgpair;
         default => cleanup_noreq;
 
     }
 
-    state mkdir_lost_and_found_msg_xfer_msgpair
+    state mkdir_lost_found_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => crdirent_lost_and_found_setup_msgpair;
+        success => crdirent_lost_found_setup_msgpair;
         default => cleanup_noreq;
     }
 
-    state crdirent_lost_and_found_setup_msgpair
+    state crdirent_lost_found_setup_msgpair
     {
-        run mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair;
-        success => crdirent_lost_and_found_xfer_msgpair;
+        run mgmt_create_root_crdirent_lost_found_setup_msgpair;
+        success => crdirent_lost_found_xfer_msgpair;
         default => cleanup_noreq;
     }
 
-    state crdirent_lost_and_found_xfer_msgpair
+    state crdirent_lost_found_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         success => cleanup_noreq;
-        default => delete_lost_and_found_handle_setup_msgpair;
+        default => delete_lost_found_handle_setup_msgpair;
     }
 
-    state delete_lost_and_found_handle_setup_msgpair
+    state delete_lost_found_handle_setup_msgpair
     {
-        run mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair;
-        success => delete_lost_and_found_handle_xfer_msgpair;
+        run mgmt_create_root_delete_lost_found_handle_setup_msgpair;
+        success => delete_lost_found_handle_xfer_msgpair;
         default => cleanup_noreq;
     }
 
-    state delete_lost_and_found_handle_xfer_msgpair
+    state delete_lost_found_handle_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         default => cleanup_noreq;
@@ -161,7 +162,7 @@ machine pvfs2_mgmt_create_root_dir_sm
 
     state cleanup_noreq
     {
-        run mgmt_create_root_dir_cleanup_noreq;
+        run mgmt_create_root_cleanup_noreq;
         default => terminate;
     }
 }
@@ -169,7 +170,7 @@ machine pvfs2_mgmt_create_root_dir_sm
 %%
 
 /*
- * Function: mgmt_create_root_dir_check_for_request
+ * Function: mgmt_create_root_check_for_request
  * Params:   server_op *b,
  *           job_status_s *js_p
  *
@@ -178,7 +179,7 @@ machine pvfs2_mgmt_create_root_dir_sm
  * Synopsis: Check if this state machine came about from a request or 
  *           from a noreq() state machine (on server startup).
  */
-static PINT_sm_action mgmt_create_root_dir_check_for_request( 
+static PINT_sm_action mgmt_create_root_check_for_request( 
     struct PINT_smcb *smcb, 
     job_status_s *js_p)
 {
@@ -265,7 +266,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 
 /* init dist_dir_struct in s_op->attr.u.dir and 
  * s_op->u.mgmt_create_root_dir */
-static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
+static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -362,7 +363,7 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
 }
 
 
-static PINT_sm_action mgmt_create_root_dir_request_remote_dirdata_dspace(
+static PINT_sm_action mgmt_create_root_request_remote_dirdata_dspace(
                                                       struct PINT_smcb *smcb,
                                                       job_status_s *js_p)
 {
@@ -402,7 +403,7 @@ return SM_ACTION_COMPLETE;
 
 
 
-static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
+static PINT_sm_action mgmt_create_root_create_local_dirdata_dspace(
                                                      struct PINT_smcb *smcb,
                                                      job_status_s *js_p)
 {
@@ -460,7 +461,7 @@ static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
 
 
 
-static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
+static PINT_sm_action mgmt_create_root_fill_handles_dist_dir_struct(
                                                         struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
@@ -500,7 +501,7 @@ static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
 }
 
 /* Seriously??? */
-static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -567,9 +568,15 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+    /* V3 */
+#if 0
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                           msg_p->handle,
+                                           msg_p->fs_id);
+#endif
 
+    /* V3 sid array needs checking */
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");
@@ -581,7 +588,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
+static PINT_sm_action mgmt_create_root_write_keyval_meta_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -658,7 +665,7 @@ static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
     return ret;
 }
 
-static PINT_sm_action mgmt_create_root_dir_write_keyval_to_dirdata_handle(
+static PINT_sm_action mgmt_create_root_write_keyval_dirdata_handle(
                                                         struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
@@ -696,7 +703,7 @@ static PINT_sm_action mgmt_create_root_dir_write_keyval_to_dirdata_handle(
     return ret;
 }
 
-static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
+static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
                                                          struct PINT_smcb *smcb,
                                                          job_status_s *js_p)
 {
@@ -754,20 +761,20 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
     msg_p->fs_id = s_op->target_fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    msg_p->comp_fn = mkdir_lost_and_found_comp_fn;
+    msg_p->comp_fn = mkdir_lost_found_comp_fn;
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_lost_and_found_comp_fn(void *v_p,
+static int mkdir_lost_found_comp_fn(void *v_p,
                                         struct PVFS_server_resp *resp_p,
                                         int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     
-    gossip_debug(GOSSIP_SERVER_DEBUG, "mkdir_lost_and_found_comp_fn\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mkdir_lost_found_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_MKDIR);
 
@@ -789,7 +796,7 @@ static int mkdir_lost_and_found_comp_fn(void *v_p,
 
 
 
-static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair(
+static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -800,7 +807,7 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "mgmt-create-root-dir state: "
-                 "crdirent_lost_and_found_setup_msgpair\n");
+                 "crdirent_lost_found_setup_msgpair\n");
 
     js_p->error_code = 0;
     
@@ -868,11 +875,15 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     /* send to dirdata server */
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    msg_p->comp_fn = crdirent_lost_and_found_comp_fn;
+    msg_p->comp_fn = crdirent_lost_found_comp_fn;
 
+/* V3 SID_get_addr needs proper arguments */
+#if 0
     ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                            msg_p->handle,
                                            s_op->target_fs_id);
+#endif
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     if (ret)
     {
@@ -884,7 +895,7 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     return SM_ACTION_COMPLETE;
 }
 
-static int crdirent_lost_and_found_comp_fn(void *v_p,
+static int crdirent_lost_found_comp_fn(void *v_p,
                                            struct PVFS_server_resp *resp_p,
                                            int index)
 {
@@ -896,7 +907,7 @@ static int crdirent_lost_and_found_comp_fn(void *v_p,
 
 
 
-static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair(
+static PINT_sm_action mgmt_create_root_delete_lost_found_handle_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -905,17 +916,21 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: "
-                 "delete_lost_and_found_handle_setup_msgpair_array\n");
+                 "delete_lost_found_handle_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
 
+/* V3 SID_get_addr needs proper arguments */
+#if 0
     ret = PINT_cached_config_map_to_server(
                            &metafile_server_addr, 
-                           s_op->u.mgmt_create_root_dir.lost_and_found_handle,
+                           s_op->u.mgmt_create_root_dir.lost_found_handle,
                            s_op->target_fs_id);
+#endif
+    ret = PVFS_SID_get_addr(&metafile_server_addr, &msg_p->sid_array[0]);
 
     if (ret)
     {
@@ -936,7 +951,7 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     msg_p->fs_id = s_op->target_fs_id;
     msg_p->handle = s_op->u.mgmt_create_root_dir.lost_and_found_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    msg_p->comp_fn = delete_lost_and_found_handle_comp_fn;
+    msg_p->comp_fn = delete_lost_found_handle_comp_fn;
     msg_p->svr_addr = metafile_server_addr;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " Preparing to remove "
@@ -948,11 +963,11 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
 }
 
 
-static int delete_lost_and_found_handle_comp_fn(void *v_p,
+static int delete_lost_found_handle_comp_fn(void *v_p,
                                        struct PVFS_server_resp *resp_p,
                                        int index)
 {
-    gossip_debug(GOSSIP_SERVER_DEBUG, "delete_lost_and_found_handle_comp_fn\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "delete_lost_found_handle_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
     return resp_p->status;
@@ -961,7 +976,7 @@ static int delete_lost_and_found_handle_comp_fn(void *v_p,
 
 
 /*
- * Function: mgmt_create_root_dir_cleanup_noreq
+ * Function: mgmt_create_root_cleanup_noreq
  *
  * Params:   server_op *b,
  *           job_status_s *js_p
@@ -971,7 +986,7 @@ static int delete_lost_and_found_handle_comp_fn(void *v_p,
  * Synopsis: free memory and return
  *
  */
-static PINT_sm_action mgmt_create_root_dir_cleanup_noreq(struct PINT_smcb *smcb, 
+static PINT_sm_action mgmt_create_root_cleanup_noreq(struct PINT_smcb *smcb, 
                                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1026,7 +1041,7 @@ struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params =
     .perm = perm_mgmt_create_root_dir,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
-    .state_machine = &pvfs2_mgmt_create_root_dir_sm
+    .state_machine = &pvfs2_mgmt_create_root_sm
 };
 
 /*

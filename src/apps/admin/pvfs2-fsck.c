@@ -412,6 +412,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
         for (i=0; i < server_count; i++)
         {
             total_count_array[i] += hcount_array[i];
+            /* V3 handles are no longer mapped to servers */
+#if 0
             for (j=0; j < hcount_array[i]; j++)
             {
                 PVFS_BMI_addr_t tmp_addr;
@@ -425,6 +427,7 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
                     return NULL;
                 }
             }
+#endif
 
             handlelist_add_handles(hl,
                                    handle_matrix[i],
@@ -495,13 +498,13 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
             return NULL;
         }
 
-        for (i=0; i < server_count; i++)
+        for (i = 0; i < server_count; i++)
         {
             /* remove any reserved handles from the handlelist.  These will
              * not show up in normal objects when we walk the file system
              * tree.
              */
-            for (j=0; j < hcount_array[i]; j++)
+            for (j = 0; j < hcount_array[i]; j++)
             {
                 /* we don't know the server index.  Reserved handles can be
                  * reported by any server; not just the server that actually
@@ -514,7 +517,7 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 
         /* find out if any servers have more handles to dump */
         more_flag = 0;
-        for (i=0; i < server_count; i++)
+        for (i = 0; i < server_count; i++)
         {
             if (position_array[i] != PVFS_ITERATE_END)
             {

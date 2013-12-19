@@ -128,7 +128,7 @@ int PINT_security_initialize(void)
         return ret;
     }
 
-    config = PINT_get_server_config();
+    config = get_server_config_struct();
 
     /* check for server private key */
     if (config->serverkey_path == NULL)
@@ -359,7 +359,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     assert(security_privkey);
 
-    config = PINT_get_server_config();
+    config = get_server_config_struct();
     assert(config->security_timeout);
 
     cap->issuer = malloc(strlen(config->server_alias) + 3);
@@ -449,7 +449,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {
     int ret = -PVFS_EINVAL;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_s *user_opts = get_server_config_struct();
 
     ret = PINT_init_capability(capability);
     if (ret < 0)
@@ -676,7 +676,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     
     assert(security_privkey);
     
-    config = PINT_get_server_config();
+    config = get_server_config_struct();
     assert(config->server_alias);
     
     cred->issuer = malloc(strlen(config->server_alias) + 3);

@@ -79,7 +79,7 @@ int PINT_ldap_initialize(void)
 {
     char *passwd = NULL;
     int version, ret;
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = get_server_config_struct();
 
     /* lock the mutex */
     gen_mutex_lock(&ldap_mutex);
@@ -283,7 +283,7 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
                              uint32_t *num_groups,
                              PVFS_gid *group_array)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = get_server_config_struct();
     X509 *xcert = NULL;
     X509_NAME *xsubject;
     char subject[512], *base = NULL, name[256],

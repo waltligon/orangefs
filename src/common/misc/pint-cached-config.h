@@ -45,8 +45,8 @@ int PINT_cached_config_get_server(
     PVFS_handle_extent_array *ext_array);
 #endif
 
-int PINT_Cached_config_server_local(
-    PVFS_SID sid);
+int PINT_cached_config_server_local(
+    const PVFS_SID *sid);
 
 int PINT_cached_config_get_next_meta(
     PVFS_fs_id fsid,

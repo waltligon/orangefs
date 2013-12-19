@@ -167,11 +167,17 @@ static int generate_shm_key_hint(int* server_index);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
-/* this appears to be deprecated and should probably be removed */
+/* V3 */
+/* this appears to be deprecated and should probably be removed
+ * another version of this is get_server_config_struct defined in this
+ * same file.
+ */
+#if 0
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -486,9 +492,8 @@ static void remove_pidfile(void)
  * - allocating and posting the initial unexpected message jobs
  * - setting up signal handlers
  */
-static int server_initialize(
-    PINT_server_status_flag *server_status_flag,
-    job_status_s *job_status_structs)
+static int server_initialize(PINT_server_status_flag *server_status_flag,
+                             job_status_s *job_status_structs)
 {
     int ret = 0, i = 0; 
     FILE *dummy;
@@ -692,7 +697,7 @@ static int server_setup_process_environment(int background)
  * - initialize precreate pool
  */
 static int server_initialize_subsystems(
-    PINT_server_status_flag *server_status_flag)
+                PINT_server_status_flag *server_status_flag)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;

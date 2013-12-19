@@ -341,13 +341,13 @@ static int destroy_partition_handles(int *svr_count,
 }
 
 /* V3 This function will need to re-written to deal with SIDs
- * currently is runs through a list of handles to see which servers
+ * currently it runs through a list of handles to see which servers
  * are involved and creates server specific handle lists as well as
  * a list of all server addresses involved.  The handles are read with
- * a regular readdir.  In V3 each handle will have a list orf SIDs so it
- * would be easy enough to take each SID, bit it is unclear how failover
+ * a regular readdir.  In V3 each handle will have a list of SIDs so it
+ * would be easy enough to take each SID, but it is unclear how failover
  * will work given that handles exist on multiple SIDs and if one SID
- * fails we can'be be sure the list of objects it had are on another
+ * fails we can't be sure the list of objects it had are on another
  * given SID.
  */
 
@@ -362,6 +362,7 @@ static int create_partition_handles(PVFS_fs_id fsid,
     int i, err = 0;
     PVFS_BMI_addr_t tmp_svr_addr;
 
+    memset(&tmp_svr_addr, 0, sizeof(PVFS_BMI_addr_t));
     *svr_count = 0;
     *svr_addr_array = NULL;
     *per_server_handle_count = NULL;
@@ -370,10 +371,15 @@ static int create_partition_handles(PVFS_fs_id fsid,
     do {
         for (i = 0; i < input_handle_count; i++) 
         {
-            int ret;
+            int ret = 0;
+/* V3 removing for compile - this func probably needs a complete
+ * re-write
+ */
+#if 0
             ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
                                              input_handle_array[i].handle,
                                              fsid);
+#endif
             if (ret)
             {
                 gossip_err("Failed to map server address\n");
@@ -419,10 +425,13 @@ static int create_partition_handles(PVFS_fs_id fsid,
         for (i = 0; i < input_handle_count; i++) 
         {
             int svr_index = 0;
-            int ret;
+            int ret = 0;
+/* V3 removed for compile - needs totaly rewrite */
+#if 0
             ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
                                              input_handle_array[i].handle,
                                              fsid);
+#endif
 
             if( ret != 0 )
             {
