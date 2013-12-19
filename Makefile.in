@@ -938,9 +938,9 @@ $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
-$(MONITOR): $(MONITOROBJS)
+$(MONITOR): $(MONITOROBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
+	$(E)$(LD) $(MONITOROBJS) -o $@ $(LDFLAGS) $(LIBS) -lofs
 
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c

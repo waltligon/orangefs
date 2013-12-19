@@ -13,6 +13,7 @@
 
 int main(int argc, char *argv[])
 {
+    const PVFS_util_tab *tab;
     int ret;
     PVFS_fs_id fs_id;
     char path[PVFS_PATH_MAX];
@@ -27,7 +28,18 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    ret = PVFS_util_resolve("/pvfsmnt", &fs_id, path, PVFS_PATH_MAX);
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (tab == NULL) {
+        fprintf(stderr, "Could not parse pvfstab.\n");
+        return 1;
+    }
+
+    if (tab->mntent_count == 0) {
+        fprintf(stderr, "There are no filesystems in the pvfstab.\n");
+        return 1;
+    }
+
+    ret = PVFS_util_resolve(tab->mntent_array[0].mnt_dir, &fs_id, path, PVFS_PATH_MAX);
     if (ret < 0) {
         PVFS_perror("PVFS_util_resolve", ret);
         return 1;
