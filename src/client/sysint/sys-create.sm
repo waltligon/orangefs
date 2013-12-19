@@ -29,6 +29,7 @@
 #include "pvfs2-dist-varstrip.h"
 #include "sid.h"
 #include "dist-dir-utils.h"
+#include "server-config.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -209,6 +210,7 @@ PVFS_error PVFS_isys_create(char *object_name,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
+
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -262,7 +264,7 @@ PVFS_error PVFS_isys_create(char *object_name,
         {
             sm_p->u.create.layout.server_list.count = layout->server_list.count;
             sm_p->u.create.layout.server_list.servers =
-                malloc(layout->server_list.count * sizeof(PVFS_BMI_addr_t));
+                    malloc(layout->server_list.count * sizeof(PVFS_BMI_addr_t));
             if(!sm_p->u.create.layout.server_list.servers)
             {
                 return -PVFS_ENOMEM;
@@ -298,8 +300,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     else
     {
         /* Get the default distribution */
-        sm_p->u.create.dist =
-                        get_default_distribution(sm_p->parent_ref.fs_id);
+        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
         {
             PINT_smcb_free(smcb);
@@ -307,13 +308,11 @@ PVFS_error PVFS_isys_create(char *object_name,
         }
     }
 
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file %s under %s, %d\n",
-        object_name, PVFS_OID_str(&parent_ref.handle), parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating file %s under %s, %d\n",
+                 object_name, PVFS_OID_str(&parent_ref.handle),
+                 parent_ref.fs_id);
 
-    ret = PINT_client_state_machine_post(smcb,
-                                         op_id,
-                                         user_ptr);
+    ret = PINT_client_state_machine_post(smcb, op_id, user_ptr);
     return ret;
 }
 
@@ -473,7 +472,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                         0,
                                         js_p,
                                         &tmp_id,
-            pint_client_sm_context);
+                                        pint_client_sm_context);
     }    
 
    return SM_ACTION_COMPLETE;
@@ -519,8 +518,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
-            "PVFS_isys_create() selected meta server: %s\n", 
-            PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
+                     "PVFS_isys_create() selected meta server: %s\n", 
+                     PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
     }
 
     /* note - should we allocated the OIDs and SIDs for the data files
@@ -583,16 +582,18 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: encrypt dirent %s into hash value %llu.\n",                         
-            sm_p->u.create.object_name,
-            llu(dirdata_hash));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create: encrypt dirent %s into hash value %llu.\n", 
+                 sm_p->u.create.object_name,
+                 llu(dirdata_hash));
 
     dirdata_server_index = 
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
-            dirdata_server_index);
+            PINT_find_dist_dir_bucket(dirdata_hash,
+                   &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                   sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
+                 dirdata_server_index);
         
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: %s: posting crdirent req: parent handle: %s, "
@@ -650,19 +651,20 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "create: received -PVFS_EAGAIN, "
+                     "will retry getattr and crdirent.\n");
 
         /* setup getattr */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
 
-        PINT_SM_GETATTR_STATE_FILL(
-                sm_p->getattr,
-                sm_p->object_ref,
-                PVFS_ATTR_DISTDIR_ATTR,
-                PVFS_TYPE_DIRECTORY,
-                0);
+        PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                                   sm_p->object_ref,
+                                   PVFS_ATTR_DISTDIR_ATTR,
+                                   PVFS_TYPE_DIRECTORY,
+                                   0);
 
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
@@ -1037,10 +1039,10 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
  * configuration if possible.  If the server config does not specify a
  * default distribution, simple_stripe will be used.
  */
-static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
+static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
 {
-    server_configuration_s* server_config = NULL;
-    PINT_dist* dist = NULL;
+    server_configuration_t *server_config = NULL;
+    PINT_dist *dist = NULL;
 
     /* Retrieve the server configuration (with mutex) */
     server_config = PINT_get_server_config_struct(fs_id);
@@ -1060,7 +1062,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
             while (iter)
             {
                 int rc;
-                distribution_param_configuration* param =PINT_llist_head(iter);
+                distribution_param_config_t *param = PINT_llist_head(iter);
 
                 /* If we are at the list end, break
                    else, set the distribution parameter to the given value */

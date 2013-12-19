@@ -425,10 +425,17 @@ int PVFS_mgmt_get_config(
     int fs_buf_size,
     const PVFS_credential *credential);
 
+/* V3 */
+#if 0
 PVFS_error PVFS_mgmt_map_handle(
     PVFS_fs_id fs_id,
     PVFS_handle handle,
     PVFS_BMI_addr_t *addr);
+#endif
+
+PVFS_error PVFS_mgmt_get_addr(
+    PVFS_BMI_addr_t *addr,
+    PVFS_SID *sid);
 
 PVFS_error PVFS_imgmt_get_uid_list(
     PVFS_fs_id fs_id,

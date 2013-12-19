@@ -191,7 +191,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int server_type;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_t *config = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
     PVFS_BMI_addr_t myaddr;
     PVFS_sys_layout *layout;
@@ -338,7 +338,7 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
     job_id_t tmp_id;
 /*    PVFS_handle_extent_array data_handle_ext_array; */
     PVFS_handle *data_handle_array;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_t *config = get_server_config_struct();
     int i;
     int tmp_index = 0;
 
@@ -562,7 +562,7 @@ static PINT_sm_action setup_local_datafile_handles(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
     int tmp_index = 0;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_t *config = get_server_config_struct();
 
     if(s_op->resp.u.create.stuffed)
     {
@@ -595,7 +595,7 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     job_id_t j_id;
     int i;
     int tmp_index = 0;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_t *config = get_server_config_struct();
     char* tmpbuf;
 
     if(s_op->u.create.handle_array_remote_count)

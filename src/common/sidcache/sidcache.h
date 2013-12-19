@@ -13,6 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs3-handle.h"
 #include "sidcacheval.h"
+#include "policyeval.h"
 #include "sid.h"
 
 /* these are defines just to temporarily allow compile */
@@ -72,9 +73,9 @@ extern void SID_cacheval_init(SID_cacheval_t **cacheval_t);
  * Returns 0 on success, otherwise -1 is returned
  */
 extern int SID_cacheval_alloc(SID_cacheval_t **cacheval_t,
-                       int sid_attributes[], 
-                       BMI_addr sid_bmi,
-                       char *sid_url);
+                              int sid_attributes[], 
+                              BMI_addr sid_bmi,
+                              char *sid_url);
 
 /*
  * This function clean up a SID_cacheval_t struct by freeing the dynamically
@@ -86,7 +87,7 @@ extern void SID_cacheval_free(SID_cacheval_t **cacheval_t);
  * This function packs up the data for the SID_cacheval_t to store in the
  * sid cache
  */
-extern void SID_cacheval_pack(SID_cacheval_t *the_sids_attrs, DBT *data);
+extern void SID_cacheval_pack(const SID_cacheval_t *the_sids_attrs, DBT *data);
 
 /*
  * This function unpacks the data recieved from the database, mallocs the 
@@ -102,9 +103,7 @@ extern void SID_cacheval_unpack(SID_cacheval_t **the_sids_attrs, DBT *data);
  * 
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_load(DB **dbp,
-                   const char *file_name, 
-                   int *db_records);
+extern int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records);
 
 /*
  * This function dumps the contents of the sid cache in ASCII to the file
@@ -112,9 +111,10 @@ extern int SID_cache_load(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_store(DB **dbp,
-                    const char *file_name,
-                    int db_records);
+extern int SID_cache_store(DBC *cursorp,
+                           FILE *outpfile,
+                           int db_records,
+                           SID_server_list_t *sid_list);
 
 /*
  * This function stores the sid into the sid cache
@@ -122,9 +122,9 @@ extern int SID_cache_store(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_cache_add_server(DB **dbp,
-                         PVFS_SID *sid_server,
-                         SID_cacheval_t *cacheval_t, 
-                         int *db_records);
+                                const PVFS_SID *sid_server,
+                                const SID_cacheval_t *cacheval_t, 
+                                int *db_records);
 
 /*
  * This function searches for a sid in the sid cache. The sid  value
@@ -135,8 +135,8 @@ extern int SID_cache_add_server(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_cache_lookup_server(DB **dbp,
-                            PVFS_SID *sid_server,
-                            SID_cacheval_t **cacheval_t);
+                                   const PVFS_SID *sid_server,
+                                   SID_cacheval_t **cacheval_t);
 
 /*
  * This function searches for a sid in the sid cache, retrieves the struct,
@@ -144,8 +144,8 @@ extern int SID_cache_lookup_server(DB **dbp,
  * struct into that char *.
  */
 extern int SID_cache_lookup_bmi(DB **dbp,
-                         PVFS_SID *search_sid,
-                         char **bmi_addr);
+                                const PVFS_SID *search_sid,
+                                char **bmi_addr);
 
 /*
  * This function updates the sid in the sid cache to all the new values 
@@ -156,8 +156,8 @@ extern int SID_cache_lookup_bmi(DB **dbp,
  * Returns 0 on success, otherwise returns an error 
  */
 extern int SID_cache_update_server(DB **dbp,
-                            PVFS_SID *sid_server,
-                            SID_cacheval_t *new_attrs);
+                                   const PVFS_SID *sid_server,
+                                   SID_cacheval_t *new_attrs);
 
 /*
  * This function updates the attributes for a sid in the database if a sid
@@ -166,11 +166,11 @@ extern int SID_cache_update_server(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_cache_update_attrs(DB **dbp,
-                           PVFS_SID *sid_server,
-                           int new_attr[]);
+                                  const PVFS_SID *sid_server,
+                                  int new_attr[]);
 
 extern int SID_cache_copy_attrs(SID_cacheval_t *current_sid_attrs, 
-                         int new_attr[]);
+                                int new_attr[]);
 
 /*
  * This function updates the bmi address for a sid in the database if a sid
@@ -179,11 +179,11 @@ extern int SID_cache_copy_attrs(SID_cacheval_t *current_sid_attrs,
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_cache_update_bmi(DB **dbp,
-                         PVFS_SID *sid_server,
-                         BMI_addr new_bmi_addr);
+                                const PVFS_SID *sid_server,
+                                BMI_addr new_bmi_addr);
 
 extern int SID_cache_copy_bmi(SID_cacheval_t *current_sid_attrs, 
-                       BMI_addr new_bmi_addr);
+                              BMI_addr new_bmi_addr);
 
 /*
  * This function updates the url address for a sid in the database if a sid
@@ -192,11 +192,11 @@ extern int SID_cache_copy_bmi(SID_cacheval_t *current_sid_attrs,
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_cache_update_url(DB **dbp,
-                         PVFS_SID *sid_server,
-                         char *new_url);
+                                const PVFS_SID *sid_server,
+                                char *new_url);
 
 extern int SID_cache_copy_url(SID_cacheval_t **current_sid_attrs, 
-                       char *new_url);
+                              char *new_url);
 
 /*
  * This function deletes a record from the sid cache if a sid with a matching
@@ -205,8 +205,8 @@ extern int SID_cache_copy_url(SID_cacheval_t **current_sid_attrs,
  * Returns 0 on success, otherwise returns an error code 
  */
 extern int SID_cache_delete_server(DB **dbp,
-                            PVFS_SID *sid_server,
-                            int *db_records);
+                                   const PVFS_SID *sid_server,
+                                   int *db_records);
 
 /*
  * This function retrieves entries from a primary database and stores them into a
@@ -224,10 +224,10 @@ extern int SID_cache_delete_server(DB **dbp,
  * bulk_next_key global variable.
  */
 extern int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb,
-                                     int size_of_retrieve_mb, 
-                                     DB *dbp,
-                                     DBC **dbcursorp,
-                                     DBT *output);
+                                            int size_of_retrieve_mb, 
+                                            DB *dbp,
+                                            DBC **dbcursorp,
+                                            DBT *output);
 
 /*
  * This function inserts entries from the input bulk buffer DBT
@@ -286,9 +286,9 @@ extern int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
-                                  DB *dbp,
-                                  DB *secondary_dbs[], 
-                                  int (* secdbs_callback_functions[])(
+                                         DB *dbp,
+                                         DB *secondary_dbs[], 
+                                         int (* secdbs_callback_functions[])(
                                                      DB *pri,
                                                      const DBT *pkey,
                                                      const DBT *pdata,

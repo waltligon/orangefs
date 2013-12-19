@@ -348,6 +348,7 @@ struct PINT_server_lookup_op
     PVFS_object_attr attr;
 
     int dirdata_server_index;
+    int dirdata_sid_index;
 };
 
 struct PINT_server_readdir_op
@@ -370,11 +371,15 @@ struct PINT_server_crdirent_op
     PVFS_capability capability;
     char *name;
     PVFS_handle new_handle;
+    PVFS_SID *new_sid;
     PVFS_handle parent_handle;
+    PVFS_SID *parent_sid;
     PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
+    PVFS_SID *dirent_sid;
     PVFS_size dirent_count;
+    PVFS_size sid_count;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
@@ -589,7 +594,6 @@ struct PINT_server_mgmt_get_dirent_op
     PVFS_handle handle;
 };
 
-
 struct PINT_server_mgmt_create_root_dir_op
 {
     PVFS_handle lost_and_found_handle;
@@ -708,6 +712,7 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
+/* V3 call to server_local needs a propoer argument */
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                      \
                                              __s_op,                      \
                                              __handle,                    \
@@ -716,9 +721,11 @@ typedef struct PINT_server_op
                                              __req,                       \
                                              __task_id)                   \
     do {                                                                  \
+/* \
       char server_name[1024];                                             \
       struct server_configuration_s *server_config =                      \
                                     get_server_config_struct();           \
+*/ \
       __s_op = malloc(sizeof(struct PINT_server_op));                     \
       if(!__s_op)                                                         \
       {                                                                   \
@@ -727,6 +734,7 @@ typedef struct PINT_server_op
       memset(__s_op, 0, sizeof(struct PINT_server_op));                   \
       __s_op->req = &__s_op->decoded.stub_dec.req;                        \
       PINT_sm_push_frame(__smcb, __task_id, __s_op);                      \
+/* \
       if (__location != LOCAL_OPERATION &&                                \
           __location != REMOTE_OPERATION &&                               \
           PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL))                   \
@@ -736,10 +744,14 @@ typedef struct PINT_server_op
                                              __handle,                    \
                                              __fs_id);                    \
       }                                                                   \
+*/ \
       if (__location != REMOTE_OPERATION &&                               \
          (__location == LOCAL_OPERATION ||                                \
          (PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL) &&                 \
+/* \
          !strcmp(server_config->host_id, server_name))))                  \
+*/ \
+         !PINT_cached_config_server_local(&PVFS_SID_NULL))))              \
       {                                                                   \
           __location = LOCAL_OPERATION;                                   \
           __req = __s_op->req;                                            \
@@ -831,6 +843,11 @@ struct PINT_server_req_entry
 
 extern struct PINT_server_req_entry PINT_server_req_table[];
 
+/* Exported Prototypes */
+
+/* This declareation is in src/common/misc/server-config.h */
+/* struct server_configuration_s *get_server_config_struct(void); */
+
 int PINT_server_req_get_object_ref(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
 int PINT_server_req_get_credential(
@@ -910,9 +927,6 @@ extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
-
-/* Exported Prototypes */
-struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

@@ -17,6 +17,7 @@
 #include "pint-cached-config.h"
 #include "client-state-machine.h"
 #include "security-util.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -362,53 +363,57 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
 
     /*setup msgpairarray to initiate PVFS_SERV_IO write request for the       */
     /*destination handles.                                                    */
-    for (i=0; i < reqmir_p->dst_count; i++)
+    for (i = 0; i < reqmir_p->dst_count; i++)
     {
-       PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
+        PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
-       msg_p->fs_id = reqmir_p->fs_id;
-       msg_p->handle = reqmir_p->dst_handle[i];
-       msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-       msg_p->comp_fn = write_comp_fn;    
+        msg_p->fs_id = reqmir_p->fs_id;
+        msg_p->handle = reqmir_p->dst_handle[i];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = write_comp_fn;    
 
-       /*determine the BMI svr address for the destination handle*/
-       ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                              msg_p->handle,
-                                              msg_p->fs_id );
-       if (ret)
-       {
-           gossip_lerr("Failed to map address\n");
-           js_p->error_code = ret;
-           return SM_ACTION_COMPLETE;
-       }
+        /*determine the BMI svr address for the destination handle*/
+#if 0
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               msg_p->handle,
+                                               msg_p->fs_id );
+#endif
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
-       /*save the svr_addr for later use*/
-       jobs[i].svr_addr = msg_p->svr_addr;
+        if (ret)
+        {
+            gossip_lerr("Failed to map address\n");
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        /*save the svr_addr for later use*/
+        jobs[i].svr_addr = msg_p->svr_addr;
 
 
-       /*setup the server PVFS_SERV_IO write request itself*/
-       gossip_debug(GOSSIP_MIRROR_DEBUG, "\treqmir_p->bsize:%d.\n",
-                    reqmir_p->bsize);
-       PINT_SERVREQ_IO_FILL( msg_p->req,
-                             capability,
-                             reqmir_p->fs_id,
-                             reqmir_p->dst_handle[i],
-                             PVFS_IO_WRITE,
-                             reqmir_p->flow_type,
-                             0,
-                             1,
-                             reqmir_p->dist,
-                             myFileReq,
-                             myFileReqOffset,
-                             reqmir_p->bsize,
-                             NULL );
+        /*setup the server PVFS_SERV_IO write request itself*/
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\treqmir_p->bsize:%d.\n",
+                     reqmir_p->bsize);
+        PINT_SERVREQ_IO_FILL( msg_p->req,
+                              capability,
+                              reqmir_p->fs_id,
+                              reqmir_p->dst_handle[i],
+                              PVFS_IO_WRITE,
+                              reqmir_p->flow_type,
+                              0,
+                              1,
+                              reqmir_p->dist,
+                              myFileReq,
+                              myFileReqOffset,
+                              reqmir_p->bsize,
+                              NULL );
     }/*end for*/
 
     PINT_sm_push_frame(smcb,0,msgarray_op);
   
     return SM_ACTION_COMPLETE;
 
-}/*end action setup_write_request*/
+}/* end action setup_write_request */
 
 
 static PINT_sm_action cleanup_msgpairarray( struct PINT_smcb *smcb,

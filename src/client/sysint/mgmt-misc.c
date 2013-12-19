@@ -22,6 +22,7 @@
 #include "pint-util.h"
 #include "server-config.h"
 #include "client-state-machine.h"
+#include "sid.h"
 
 /** Maps a given opaque server address back to a string address.  Also
  *  fills in server type.
@@ -35,11 +36,22 @@ const char *PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
     return PINT_cached_config_map_addr(fs_id, addr, server_type);
 }
 
+/* V3 this is replaced */
+#if 0
 PVFS_error PVFS_mgmt_map_handle(PVFS_fs_id fs_id,
                                 PVFS_handle handle,
                                 PVFS_BMI_addr_t *addr)
 {
     return PINT_cached_config_map_to_server(addr, handle, fs_id);
+}
+#endif
+
+/** Mgmt interface call to get BMI addr from a SID
+ */
+PVFS_error PVFS_mgmt_get_addr(PVFS_BMI_addr_t *addr, PVFS_SID *sid)
+{
+    /* return PVFS_error? */
+    return PVFS_SID_get_addr(addr, sid);
 }
 
 /** Obtains file system statistics from all servers in a given

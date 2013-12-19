@@ -188,6 +188,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                                  s_min_handle_recycle_timeout_in_sec);
                 }
 
+                /* V3 no longer relevant */
+#if 0
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
@@ -200,6 +202,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                     gen_mutex_unlock(&s_server_config_mgr_mutex);
                     return ret;
                 }
+#endif
             }
         }
         gen_mutex_unlock(&s_server_config_mgr_mutex);
@@ -336,16 +339,16 @@ int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
 }
 
 struct server_configuration_s *__PINT_server_config_mgr_get_config(
-                PVFS_fs_id fs_id)
+                                                        PVFS_fs_id fs_id)
 {
-    struct server_configuration_s *ret = NULL;
+    struct server_configuration_s *ret_config = NULL;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
 
     if (SC_MGR_INITIALIZED())
     {
         gen_mutex_lock(&s_server_config_mgr_mutex);
-        SC_MGR_ASSERT_OK(ret);
+        SC_MGR_ASSERT_OK(ret_config);
 
         hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
         if (hash_link)
@@ -358,17 +361,17 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: LOCKING config "
                 "object %p with fs_id %d\n", config, fs_id);
 #endif
-            ret = config->server_config;
+            ret_config = config->server_config;
         }
-        /* if we find a match, then old onto the mutex and let the caller 
+        /* if we find a match, then hold onto the mutex and let the caller 
          * release it in a put_config call
          */
-        if(!ret)
+        if(!ret_config)
         {
             gen_mutex_unlock(&s_server_config_mgr_mutex);
         }
     }
-    return ret;
+    return ret_config;
 }
 
 void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s)

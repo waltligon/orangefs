@@ -32,6 +32,7 @@
 #include "pvfs2-internal.h"
 #include "extent-utils.h"
 #include "security-util.h"
+#include "sid.h"
 
 #define	MAX_PARTITIONS	2
 
@@ -184,8 +185,11 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions, num_files_per_server;
     int i;
+    /* V3 */
+#if 0
     char server_name[1024];
     struct server_configuration_s *server_config = get_server_config_struct();
+#endif
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
     PVFS_capability null_cap;
@@ -215,11 +219,18 @@ static PINT_sm_action tree_communicate_partition_handles(
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
     {
+        /* V3 trying to avoid using server names - rather than SIDs */
+#if 0
         PINT_cached_config_get_server_name(server_name,
                                            1024,
                                            handle_array[i],
                                            fs_id);
         if (! strcmp(server_config->host_id, server_name))
+#endif
+        /* V3 argument here needs to be worked out */
+        if (PINT_cached_config_server_local( &PVFS_SID_NULL /*
+                &s_op->u.tree_communicate.attr.u.dir.dirdata_sids[
+                        s_op->u.tree_communicate.dirdata_sid_index]*/))
         {
             /* this one is local */
             gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -262,10 +273,12 @@ static PINT_sm_action tree_communicate_partition_handles(
                                js_p->error_code,
                                req,
                                LOCAL_OPERATION);
-
+/* V3 duplicate */
+#if 0
             PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
                 s_op->u.tree_communicate.handle_array_local[i],
                 fs_id, js_p->error_code, req, LOCAL_OPERATION);
+#endif
 
             switch (operation)
             {
@@ -538,11 +551,13 @@ static PINT_sm_action tree_communicate_partition_handles(
                                                 ,__func__);
                 msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
             }
-#endif
 
             ret = PINT_cached_config_map_to_server(&msg_p->svr_addr
                                                   ,msg_p->handle
                                                   ,msg_p->fs_id);
+#endif
+            /* V3 need to adjust sid array index */
+            ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
             if (ret)
             {
                 gossip_err("Failed to map server address\n");

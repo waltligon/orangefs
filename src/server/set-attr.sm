@@ -20,6 +20,7 @@
 #include "pint-uid-map.h"
 #include "pint-cached-config.h"
 #include "dist-dir-utils.h"
+#include "sid.h"
 
 enum
 {
@@ -487,7 +488,8 @@ static PINT_sm_action setattr_setobj_attribs(
     }
     /* 
      * Remember that mtime is versioned on disk! so convert it here..
-     * It is better to do it here than change the PVFS_object_attr_overwrite_setable
+     * It is better to do it here than change the
+     * PVFS_object_attr_overwrite_setable
      * macro, since there are many more users of it, I think.
      */
      if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
@@ -504,9 +506,12 @@ static PINT_sm_action setattr_setobj_attribs(
      */
     if(dspace_a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-        if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
+        if (dspace_a_p->perms != 0 &&
+            ((a_p->mask & PVFS_ATTR_COMMON_PERM) &&
+            (dspace_a_p->perms != a_p->perms)))
         {
-            gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
+            gossip_debug(GOSSIP_SETATTR_DEBUG,
+                        "Cannot change perms of symlink: Permission denied\n");
             js_p->error_code = -PVFS_EPERM;
             return SM_ACTION_COMPLETE;
         }
@@ -965,9 +970,13 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
+    /* V3 */
+#if 0
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+#endif
 
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");

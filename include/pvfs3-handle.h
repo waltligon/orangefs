@@ -54,19 +54,22 @@ static const PVFS_OID PVFS_HANDLE_HIGH = {{255,255,255,255,255,
 static const PVFS_SID PVFS_SID_NULL = PVFS_HANDLE_NULL_INIT;
 
     
-/* UUID Variant definitions */
+/* OID Variant definitions */
 #define PVFS_OID_variant_ncs UUID_VARIANT_NCS    /*0*/
 #define PVFS_OID_variant_dce UUID_VARIANT_DCE    /*1*/
 #define PVFS_OID_variant_microsoft UUID_VARIANT_MICROSOFT  /*2*/
 #define PVFS_OID_variant_other UUID_VARIANT_OTHER  /*3*/
 
-/* UUID Type definitions */
+/* OID Type definitions */
 #define PVFS_OID_type_dce_time UUID_TYPE_DCE_TIME   /*1*/
 #define PVFS_OID_type_dce_random UUID_TYPE_DCE_RANDOM /*4*/
 
-/* Allow UUID constants to be defined */
+/* Allow OID constants to be defined */
+#ifdef __GNUC__
 #define PVFS_OID_DEFINE(name,u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15) \
-UUID_DEFINE(name,u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15)
+    static const PVFS_OID name __attribute__ ((unused)) = {u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15}
+#else
+#endif
 
 /** PVFS_OIDs are uuids in a PVFS wrapper.  They are used for object handles
  * but should always be used via this wrapper to allow future migration
@@ -142,19 +145,22 @@ static __inline__ uint64_t PVFS_OID_hash64(const PVFS_OID *oid)
 #define PVFS_OID_encode(d,s) PVFS_OID_cpy(((PVFS_OID *)d),(s))
 #define PVFS_OID_decode(d,s) PVFS_OID_cpy((d),((PVFS_OID *)s))
 
-/* UUID Variant definitions */
+/* SID Variant definitions */
 #define PVFS_SID_variant_ncs UUID_VARIANT_NCS    /*0*/
 #define PVFS_SID_variant_dce UUID_VARIANT_DCE    /*1*/
 #define PVFS_SID_variant_microsoft UUID_VARIANT_MICROSOFT  /*2*/
 #define PVFS_SID_variant_other UUID_VARIANT_OTHER  /*3*/
 
-/* UUID Type definitions */
+/* SID Type definitions */
 #define PVFS_SID_type_dce_time UUID_TYPE_DCE_TIME   /*1*/
 #define PVFS_SID_type_dce_random UUID_TYPE_DCE_RANDOM /*4*/
 
-/* Allow UUID constants to be defined */
+/* Allow SID constants to be defined */
+#ifdef __GNUC__
 #define PVFS_SID_DEFINE(name,u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15) \
-UUID_DEFINE(name,u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15)
+    static const PVFS_SID name __attribute__ ((unused)) = {u0,u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15}
+#else
+#endif
 
 /** PVFS_OIDs are uuids in a PVFS wrapper.  They are used for object handles
  * but should always be used via this wrapper to allow future migration

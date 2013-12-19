@@ -53,6 +53,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    int server_count,
 			    PVFS_credential *creds,
 			    struct options *opts_p);
+
 int descend(PVFS_fs_id cur_fs,
 	    PVFS_object_ref pref,
 	    PVFS_credential *creds,
@@ -82,6 +83,7 @@ static void print_root_entry(PVFS_handle handle,
 			     int server_idx,
 			     int dot_fmt,
 			     char *fontname);
+
 static void print_entry(char *name,
 			PVFS_handle handle,
 			PVFS_handle parent_handle,
@@ -93,10 +95,13 @@ static void print_entry(char *name,
 
 
 /* handlelist functions and globals */
-static void handlelist_initialize(unsigned long *handle_counts, int server_count);
+static void handlelist_initialize(unsigned long *handle_counts,
+                                  int server_count);
+
 static void handlelist_add_handles(PVFS_handle *handles,
 				   unsigned long handle_count,
 				   int server_idx);
+
 static void handlelist_finished_adding_handles(void);
 static int handlelist_find_handle(PVFS_handle handle, int *server_idx_p);
 static void handlelist_remove_handle(PVFS_handle handle, int server_idx);
@@ -137,7 +142,9 @@ int main(int argc, char **argv)
 
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
-        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+                            &cur_fs,
+                            pvfs_path,
+                            PVFS_NAME_MAX);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_resolve", ret);
@@ -153,8 +160,8 @@ int main(int argc, char **argv)
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-	&server_count);
+	                          PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+	                          &server_count);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -163,15 +170,16 @@ int main(int argc, char **argv)
 
     /* build a list of servers to talk to */
     addr_array = (PVFS_BMI_addr_t *)
-	malloc(server_count * sizeof(PVFS_BMI_addr_t));
+	            malloc(server_count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-	addr_array, &server_count);
+	                             PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+	                             addr_array,
+                                     &server_count);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array", ret);
@@ -202,7 +210,8 @@ int main(int argc, char **argv)
 				&param_value,
 				addr_array,
 				server_count,
-				NULL, NULL);
+				NULL,
+                                NULL);
 	return(-1);
     }
 
@@ -232,14 +241,14 @@ int main(int argc, char **argv)
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-    PVFS_mgmt_setparam_list(
-	cur_fs,
-	&creds,
-	PVFS_SERV_PARAM_MODE,
-	&param_value,
-	addr_array,
-	server_count,
-	NULL, NULL);
+    PVFS_mgmt_setparam_list(cur_fs,
+	                    &creds,
+	                    PVFS_SERV_PARAM_MODE,
+	                    &param_value,
+	                    addr_array,
+	                    server_count,
+	                    NULL,
+                            NULL);
 
     PVFS_sys_finalize();
 
@@ -252,7 +261,10 @@ int build_handlelist(PVFS_fs_id cur_fs,
 		     PVFS_credential *creds)
 {
     int ret, i, more_flag;
+    /* V3 */
+#if 0
     unsigned long j;
+#endif
     PVFS_handle **handle_matrix;
     int  *hcount_array;
     unsigned long *handle_count_array;
@@ -265,7 +277,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
-	malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
+	            malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
     if (stat_array == NULL)
     {
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -276,7 +288,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				&param_value,
 				addr_array,
 				server_count,
-				NULL, NULL);
+				NULL,
+                                NULL);
 	return -1;
     }
 
@@ -285,8 +298,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				stat_array,
 				addr_array,
 				server_count,
-				NULL /* details */
-                , NULL);
+				NULL, /* details */
+                                NULL);
     if (ret != 0)
     {
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -298,7 +311,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
                                 &param_value,
 				addr_array,
 				server_count,
-				NULL, NULL);
+				NULL,
+                                NULL);
 	return -1;
     }
 
@@ -311,7 +325,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
     }
     for (i=0; i < server_count; i++)
     {
-	handle_matrix[i] = (PVFS_handle *) calloc(HANDLE_BATCH, sizeof(PVFS_handle));
+	handle_matrix[i] = (PVFS_handle *) calloc(HANDLE_BATCH,
+                                                  sizeof(PVFS_handle));
 	if (handle_matrix[i] == NULL)
 	{
 	    perror("malloc");
@@ -320,20 +335,23 @@ int build_handlelist(PVFS_fs_id cur_fs,
     }
 
     /* allocate some arrays to keep up with state */
-    handle_count_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
+    handle_count_array = (unsigned long *) calloc(server_count,
+                                                  sizeof(unsigned long));
     if (handle_count_array == NULL)
     {
 	perror("malloc");
 	return -1;
     }
-    position_array = (PVFS_ds_position *) calloc(server_count, sizeof(PVFS_ds_position));
+    position_array = (PVFS_ds_position *) calloc(server_count,
+                                                 sizeof(PVFS_ds_position));
     if (position_array == NULL)
     {
 	perror("malloc");
 	return -1;
     }
     /* total_count_array */
-    total_count_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
+    total_count_array = (unsigned long *) calloc(server_count,
+                                                 sizeof(unsigned long));
     if (total_count_array == NULL)
     {
         perror("malloc");
@@ -349,7 +367,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 
     for (i=0; i < server_count; i++) {
 	handle_count_array[i] = stat_array[i].handles_total_count -
-	    stat_array[i].handles_available_count;
+	                stat_array[i].handles_available_count;
         total_count_array[i] = 0;
     }
 
@@ -374,8 +392,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 					     addr_array,
 					     server_count,
                                              0,
-					     NULL /* details */,
-                                             NULL /* hints */);
+					     NULL,  /* details */
+                                             NULL); /* hints */
 	if (ret < 0)
 	{
             param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -387,26 +405,33 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				    &param_value,
 				    addr_array,
 				    server_count,
-				    NULL, NULL);
+				    NULL,
+                                    NULL);
 	    return -1;
 	}
 
 	for (i=0; i < server_count; i++)
 	{
             total_count_array[i] += hcount_array[i];
+            /* V3 handles no longer map to one server */
+#if 0
 	    for (j = 0; j < hcount_array[i]; j++)
 	    {
                 PVFS_BMI_addr_t tmp_addr;
 		/* verify that handles are
 		 * within valid ranges for the given server here.
 		 */
-                ret = PINT_cached_config_map_to_server(&tmp_addr, handle_matrix[i][j], cur_fs);
+                ret = PINT_cached_config_map_to_server(&tmp_addr,
+                                                       handle_matrix[i][j],
+                                                       cur_fs);
                 if (ret || tmp_addr != addr_array[i])
                 {
-                    fprintf(stderr, "Ugh! handle does not seem to be owned by the server!\n");
+                    fprintf(stderr, "Ugh! handle does not seem "
+                                    "to be owned by the server!\n");
                     return -1;
                 }
 	    }
+#endif
 
 	    handlelist_add_handles(handle_matrix[i],
 				   hcount_array[i],
@@ -430,8 +455,9 @@ int build_handlelist(PVFS_fs_id cur_fs,
         unsigned long used_handles = handle_count_array[i];
         if (total_count_array[i] != used_handles)
         {
-            fprintf(stderr, "Ugh! Server %d, Received %ld total handles instead of %ld\n",
-                    i, total_count_array[i], used_handles);
+            fprintf(stderr, "Ugh! Server %d, Received %ld "
+                            "total handles instead of %ld\n",
+                            i, total_count_array[i], used_handles);
             return -1;
         }
 	free(handle_matrix[i]);
@@ -463,15 +489,21 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 
     PVFS_util_refresh_credential(creds);
 
-    PVFS_sys_lookup(cur_fs, "/", creds,
-                    &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+    PVFS_sys_lookup(cur_fs,
+                    "/",
+                    creds,
+                    &lookup_resp,
+                    PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                    NULL);
+
     /* lookup_resp.pinode_refn.handle gets root handle */
     pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
 		     creds,
-		     &getattr_resp, NULL);
+		     &getattr_resp,
+                     NULL);
 
     if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -494,10 +526,10 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 		     opts_p->fontname);
 
     verify_dirdatahandles(cur_fs,
-            pref,
-            getattr_resp.attr.dirdata_count,
-            creds,
-            opts_p);
+                          pref,
+                          getattr_resp.attr.dirdata_count,
+                          creds,
+                          opts_p);
 
     descend(cur_fs, pref, creds, opts_p);
 
@@ -525,10 +557,11 @@ int descend(PVFS_fs_id cur_fs,
         
         memset(&readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(pref,
-                         (!token ? PVFS_READDIR_START : token),
-                         count,
-                         creds,
-                         &readdir_resp, NULL);
+                               (!token ? PVFS_READDIR_START : token),
+                               count,
+                               creds,
+                               &readdir_resp,
+                               NULL);
 
         for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
         {
@@ -545,9 +578,10 @@ int descend(PVFS_fs_id cur_fs,
             entry_ref.fs_id  = cur_fs;
 
             if ((ret = PVFS_sys_getattr(entry_ref,
-                             PVFS_ATTR_SYS_ALL_NOHINT,
-                             creds,
-                             &getattr_resp, NULL)) != 0)
+                                        PVFS_ATTR_SYS_ALL_NOHINT,
+                                        creds,
+                                        &getattr_resp,
+                                        NULL)) != 0)
             {
                 printf("Could not get attributes of handle %s [%d]\n",
                         PVFS_OID_str(&cur_handle), ret);
@@ -616,10 +650,10 @@ int descend(PVFS_fs_id cur_fs,
  * verifies that they exist, and removes them from the handlelist.
  */
 void verify_dirdatahandles(PVFS_fs_id cur_fs,
-                      PVFS_object_ref mf_ref,
-                      int dh_count,
-                      PVFS_credential *creds,
-                      struct options *opts_p)
+                           PVFS_object_ref mf_ref,
+                           int dh_count,
+                           PVFS_credential *creds,
+                           struct options *opts_p)
 {
     int ret, i, server_idx;
     PVFS_handle *dh_handles;
@@ -741,7 +775,9 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
                          PVFS_ATTR_SYS_TYPE,
-                         creds, &getattr_resp, NULL);
+                         creds,
+                         &getattr_resp,
+                         NULL);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;
@@ -757,13 +793,21 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
             else if(!dot_fmt)
             {
                 if(getattr_resp.attr.objtype == PVFS_TYPE_INTERNAL)
+                {
                     fmt_string = "\t%s: %s (server internal use)\n";
+                }
                 else if(getattr_resp.attr.objtype == PVFS_TYPE_DATAFILE)
+                {
                     fmt_string = "\t%s: %s (datafile, probably preallocated)\n";
+                }
                 else if(getattr_resp.attr.objtype == PVFS_TYPE_METAFILE)
+                {
                     fmt_string = "\t%s: %s (metafile, probably preallocated)\n";
+                }
                 else
+                {
                     fmt_string = "\t%s: %s (unknown)\n";
+                }
 
                 printf(fmt_string,
                        PVFS_mgmt_map_addr(cur_fs,
@@ -910,7 +954,8 @@ static int handlelist_return_handle(PVFS_handle *handle_p, int *server_idx_p)
 
     for (i = 0; i < handlelist_server_count; i++)
     {
-	if (handlelist_used[i] > 0) {
+	if (handlelist_used[i] > 0)
+        {
 	    *handle_p = handlelist_list[i][handlelist_used[i]-1];
 	    handlelist_used[i]--;
 	    *server_idx_p = i;
@@ -1156,15 +1201,13 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-dv] [-m fs_mount_point]\n",
-	argv[0]);
+    fprintf(stderr, "Usage  : %s [-dv] [-m fs_mount_point]\n", argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
     fprintf(stderr, "  -d              output in format suitable for dot\n");
     fprintf(stderr, "    -k            when used with -d, prints key\n");
     fprintf(stderr, "    -f <font>     when used with -d, specifies a font name (e.g. Helvetica)\n");
     fprintf(stderr, "  -v              print version and exit\n");
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
-	argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
     return;
 }
 

@@ -20,7 +20,6 @@
 #include "pint-security.h"
 #include "security-util.h"
 
-
 int PINT_security_initialize(void)
 {
     return 0;
@@ -42,7 +41,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 {
     const struct server_configuration_s *config;
 
-    config = PINT_get_server_config();
+    config = get_server_config_struct();
     assert(config->server_alias);
 
     cap->issuer = strdup(config->server_alias);
@@ -61,7 +60,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {   
     int ret = -PVFS_EINVAL;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_t *user_opts = get_server_config_struct();
         
     ret = PINT_init_capability(capability);
     if (ret < 0)
@@ -119,7 +118,7 @@ int PINT_sign_credential(PVFS_credential *cred)
 {
     const struct server_configuration_s *config;
 
-    config = PINT_get_server_config();
+    config = get_server_config_struct();
     assert(config->server_alias);
     
     cred->issuer = strdup(config->server_alias);

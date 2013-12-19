@@ -1582,8 +1582,13 @@ static int PINT_handle_wrangler_remove_handle(
     PVFS_BMI_addr_t server_addr;
     int found = 0;
 
+    memset(&server_addr, 0, sizeof(PVFS_BMI_addr_t));
+
     /* find which server the handle is on */
+/* This will need a rewrite for SIDs, removing this for compile */
+#if 0
     ret = PINT_cached_config_map_to_server(&server_addr, *handle, *cur_fs);
+#endif
     if(ret < 0)
     {
         PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);

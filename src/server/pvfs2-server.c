@@ -167,11 +167,17 @@ static int generate_shm_key_hint(int* server_index);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
-/* this appears to be deprecated and should probably be removed */
+/* V3 */
+/* this appears to be deprecated and should probably be removed
+ * another version of this is get_server_config_struct defined in this
+ * same file.
+ */
+#if 0
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -486,9 +492,8 @@ static void remove_pidfile(void)
  * - allocating and posting the initial unexpected message jobs
  * - setting up signal handlers
  */
-static int server_initialize(
-    PINT_server_status_flag *server_status_flag,
-    job_status_s *job_status_structs)
+static int server_initialize(PINT_server_status_flag *server_status_flag,
+                             job_status_s *job_status_structs)
 {
     int ret = 0, i = 0; 
     FILE *dummy;
@@ -692,7 +697,7 @@ static int server_setup_process_environment(int background)
  * - initialize precreate pool
  */
 static int server_initialize_subsystems(
-    PINT_server_status_flag *server_status_flag)
+                PINT_server_status_flag *server_status_flag)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -862,12 +867,15 @@ static int server_initialize_subsystems(
             break;
         }
 
+        /* V3 no longer map handles */
+#if 0
         ret = PINT_cached_config_handle_load_mapping(cur_fs);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
         }
+#endif
 
         /*
          * set storage hints if any.  if any of these fail, we
@@ -1276,6 +1284,11 @@ static int server_check_if_root_directory_created( void )
             break;
         }
 
+        /* V3 we now need to compare our SID against the list of SIDS
+         * that hold a root object - rather than look at handle ranges
+         * and server names to decide this
+         */
+#if 0
         /*
            check if root handle is in our handle range for this fs.
            if it is, we're responsible for creating it on disk when
@@ -1285,6 +1298,7 @@ static int server_check_if_root_directory_created( void )
 
         ret = PINT_cached_config_get_server_name( handle_server,
                 BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+#endif
         if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
         {
             /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
@@ -2202,7 +2216,10 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
-    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
+    /* Remove s_op from posted_sop_list and move it to the 
+     * inprogress_sop_list.  This appears to already have
+     * been done in unexpected_map() in the unexpected SM.
+     */
     qlist_del(&s_op->next);
     qlist_add_tail(&s_op->next, &inprogress_sop_list);
 

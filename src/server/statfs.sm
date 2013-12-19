@@ -60,10 +60,13 @@ static PINT_sm_action statfs_do_statfs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
+    /* V3 */
+#if 0
     struct server_configuration_s *user_opts = get_server_config_struct();
+#endif
 
     /* first try to gather handle statistics */
-/* NEXT */
+/* V3 */
 #if 0
     ret = trove_handle_get_statistics(
         s_op->req->u.statfs.fs_id,
@@ -77,6 +80,8 @@ static PINT_sm_action statfs_do_statfs(
     }
 
     /* find out how many total handles this server controls */
+    /* V3 nolonger have assigned handles - remove from resp */
+#if 0
     ret = PINT_cached_config_get_server_handle_count(
         user_opts->host_id, s_op->req->u.statfs.fs_id,
         &s_op->resp.u.statfs.stat.handles_total_count);
@@ -85,6 +90,7 @@ static PINT_sm_action statfs_do_statfs(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#endif
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);

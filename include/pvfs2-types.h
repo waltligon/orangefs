@@ -509,13 +509,15 @@ typedef struct
 } PVFS_object_ref;
 
 /* max length of BMI style URI's for identifying servers */
-#define PVFS_MAX_SERVER_ADDR_LEN 256
+#define PVFS_MAX_SERVER_ADDR_LEN  256
+/* max length of a list of BMI style URI's for identifying servers */
+#define PVFS_MAX_SERVER_ADDR_LIST 2048
 /* max length of PVFS filename */
-#define PVFS_NAME_MAX            256
+#define PVFS_NAME_MAX             256
 /* max len of individual path element */
-#define PVFS_SEGMENT_MAX         PVFS_NAME_MAX
+#define PVFS_SEGMENT_MAX          PVFS_NAME_MAX
 /* max len of an entire path */
-#define PVFS_PATH_MAX            4096
+#define PVFS_PATH_MAX             4096
 
 /* max extended attribute name len as imposed by the VFS and exploited for the
  * upcall request types.
@@ -559,11 +561,14 @@ typedef struct {
         /* global info */
         int32_t tree_height; /* ceil(log2(num_servers)) */
         int32_t num_servers; /* total number of servers */
-        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype stored under the key DIST_DIR_BITMAP */
-        int32_t split_size; /* maximum number of entries before a split */
+        int32_t num_copies;  /* number of copies of each bucket */
+        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype */
+                             /* stored under the key DIST_DIR_BITMAP */
+        int32_t split_size;  /* maximum number of entries before a split */
 
         /* local info */
-        int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
+        int32_t server_no; /* 0 to num_servers-1, indicates */
+                           /* which server is running this code */
         int32_t branch_level; /* level of branching on this server */
 } PVFS_dist_dir_attr;
 endecode_fields_6(

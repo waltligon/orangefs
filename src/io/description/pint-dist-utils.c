@@ -21,8 +21,8 @@ extern PINT_dist twod_stripe_dist;
 /* Struct for determining how to set a distribution parameter by name */
 typedef struct PINT_dist_param_offset_s
 {
-    char* dist_name;
-    char* param_name;
+    char *dist_name;
+    char *param_name;
     size_t offset;
     size_t size;
 } PINT_dist_param_offset;
@@ -36,10 +36,10 @@ static int PINT_dist_param_table_alloc_inc = 10;
 /* Return a pointer to the dist param offset for this parameter, or null
  *  if none exists
  */
-static PINT_dist_param_offset* PINT_get_param_offset(const char* dist_name,
-                                                     const char* param_name)
+static PINT_dist_param_offset* PINT_get_param_offset(const char *dist_name,
+                                                     const char *param_name)
 {
-    PINT_dist_param_offset* dpo = 0;
+    PINT_dist_param_offset *dpo = 0;
     if (0 != PINT_dist_param_table)
     {
         int i;
@@ -57,7 +57,7 @@ static PINT_dist_param_offset* PINT_get_param_offset(const char* dist_name,
 }
 
 /* PINT_dist_initialize implementation */
-int PINT_dist_initialize(server_configuration_s* server_config)
+int PINT_dist_initialize(server_configuration_t *server_config)
 {
     int ret = 0;
     
@@ -91,7 +91,7 @@ void PINT_dist_finalize(void)
 }
 
 /*  PINT_dist_default_get_num_dfiles implementation */
-int PINT_dist_default_get_num_dfiles(void* params,
+int PINT_dist_default_get_num_dfiles(void *params,
                                      uint32_t num_servers_requested,
                                      uint32_t num_dfiles_requested)
 {
@@ -108,11 +108,11 @@ int PINT_dist_default_get_num_dfiles(void* params,
 }
 
 /*  PINT_dist_default_set_param implementation */
-int PINT_dist_default_set_param(const char* dist_name, void* params,
-                                const char* param_name, void* value)
+int PINT_dist_default_set_param(const char *dist_name, void* params,
+                                const char *param_name, void* value)
 {
     int rc = 0;
-    PINT_dist_param_offset* offset_data;
+    PINT_dist_param_offset *offset_data;
     offset_data = PINT_get_param_offset(dist_name, param_name);
     if (0 != offset_data)
     {
@@ -126,8 +126,8 @@ int PINT_dist_default_set_param(const char* dist_name, void* params,
     return rc;
 }
 
-int PINT_dist_register_param_offset(const char* dist_name,
-                                    const char* param_name,
+int PINT_dist_register_param_offset(const char *dist_name,
+                                    const char *param_name,
                                     size_t offset,
                                     size_t field_size)
 {
@@ -136,7 +136,7 @@ int PINT_dist_register_param_offset(const char* dist_name,
     /* Increase the size of the param table if its full */
     if (PINT_dist_param_table_entries >= PINT_dist_param_table_size)
     {
-        PINT_dist_param_offset* buf;
+        PINT_dist_param_offset *buf;
         int new_table_size = PINT_dist_param_table_size +
             PINT_dist_param_table_alloc_inc;
 

@@ -113,14 +113,18 @@ int SID_first_record(SID_policy_t *policy,
 
     /* random select the first one */
     if ((ret = SID_join_count(*join_curs, &num_rec)) != 0)
+    {
         goto err;
+    }
     first = rand() % num_rec;
     /* must reset the join after a count */
     SID_do_join(policy, join_curs);
     for (i = 0; i < first; i++)
     {
         if ((ret = (*join_curs)->get(*join_curs, key, value, 0)) != 0)
+        {
             goto err;
+        }
     }
     first_cursor_end = 0;
     return 0;
@@ -128,6 +132,11 @@ int SID_first_record(SID_policy_t *policy,
 err:
     return -1;
 }
+
+/*
+ * A policy defines a set of viable SIDs for a given purpose, then we
+ * select from those SIDs using a layout much as we did in V2
+ */
 
 int SID_next_record(SID_policy_t *policy,
                     DBC **join_curs,
@@ -171,6 +180,13 @@ err:
     return -1;
 }
 
+/*
+ * Map is a bit mask used to keep up with which SIDs have been selected by
+ * a query.  SID_clear_selected initializes the bit mask (including
+ * mallocing it) SID_is_selected checks to see if a bit is set, and
+ * SID_select sets a bit
+ */
+
 static unsigned char *map = NULL;
 static int map_size = 0;
 
@@ -202,7 +218,7 @@ int SID_is_selected(int value)
 {
     int slot = value >> 3;
     int bit = value & 0x07;
-    if (!map || map_size <= 0 || value < 0)
+    if (!map || map_size <= 0 || value < 0 || value > map_size)
     {
         return 0;
     }
@@ -217,7 +233,7 @@ void SID_select(int value)
 {
     int slot = value >> 3;
     int bit = value & 0x07;
-    if (!map || map_size <= 0 || value < 0)
+    if (!map || map_size <= 0 || value < 0 || value > map_size)
     {
         return;
     }
@@ -260,6 +276,7 @@ int SID_add_query_list(SID_server_list_t *sid_list,
     }
     INIT_QLIST_HEAD(&new->link);
     qlist_add_tail(&new->link, (struct qlist_head *)sid_list);
+
     memcpy(&new->server_sid, key->data, sizeof(PVFS_SID));
     /* do we need this? we have nowhere to put it at the moment */
     new->server_addr = ((SID_cacheval_t *)value->data)->bmi_addr;
@@ -273,6 +290,75 @@ int SID_add_query_list(SID_server_list_t *sid_list,
     }
     memcpy(new->server_url, ((SID_cacheval_t *)value->data)->url, url_len);
     /* end of do we need this? */
+    return 0;
+}
+
+int SID_add_server_list(SID_server_list_t *sid_list, const PVFS_SID *sid)
+{
+    int ret;
+    SID_server_list_t *new;
+    SID_cacheval_t *temp_cacheval;
+    int url_len;
+
+    ret = SID_cache_lookup_server(&SID_db, sid, &temp_cacheval);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    new = (SID_server_list_t *)malloc(sizeof(SID_server_list_t));
+    if (!new)
+    {
+        return -1; /* ENOMEM should be set */
+    }
+    INIT_QLIST_HEAD(&new->link);
+    qlist_add_tail(&new->link, &sid_list->link);
+
+    new->server_sid = *sid;
+    /* do we need this? we have nowhere to put it at the moment */
+    new->server_addr = temp_cacheval->bmi_addr;
+    url_len = strlen(temp_cacheval->url) + 1;
+    new->server_url = (char *)malloc(url_len);
+    if (!new->server_url)
+    {
+        qlist_del(&new->link);
+        free(new);
+        return -1; /* ENOMEM should be set */
+    }
+    memcpy(new->server_url, temp_cacheval->url, url_len);
+    /* end of do we need this? */
+    free(temp_cacheval);
+    return 0;
+}
+
+int SID_pop_query_list(SID_server_list_t *sid_list,
+                       PVFS_SID *sid,
+                       PVFS_BMI_addr_t *addr,
+                       char *url,
+                       int url_size)
+{
+    struct qlist_head *item = NULL;
+    SID_server_list_t *server = NULL;
+    item = qlist_pop(&sid_list->link);
+    if (!item)
+    {
+        return -1;
+    }
+    server = qlist_entry(item, SID_server_list_t, link);
+    if (sid)
+    {
+        *sid = server->server_sid;
+    }
+    if (addr)
+    {
+        *addr = server->server_addr;
+    }
+    if (url)
+    {
+        strncpy(url, server->server_url, url_size);
+        url[url_size] = 0;
+    }
+    free(server);
     return 0;
 }
 
@@ -353,6 +439,10 @@ int SID_select_servers(SID_policy_t *policy,
                 SID_next_record(policy, &join_curs, DBkey, DBval);
             }
         }
+    }
+    if (join_curs)
+    {
+        join_curs->close(join_curs);
     }
     return 0;
 }

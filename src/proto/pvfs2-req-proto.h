@@ -497,7 +497,7 @@ struct PVFS_servreq_tree_setattr
     uint32_t num_servers;       /* # of servers to send setattr msg */
     PVFS_handle *handle_array;  /* handles indicating where to send msgs */
     uint32_t sid_count;         /* reflexive */
-    PVFS_handle *sid_array;     /* reflexive */
+    PVFS_SID *sid_array;        /* reflexive */
 };
 endecode_fields_3a1a_struct(
     PVFS_servreq_tree_setattr,

@@ -230,6 +230,7 @@ struct PVFS_directory_attr_s
     PVFS_dist_dir_attr dist_dir_attr;
     PVFS_dist_dir_bitmap dist_dir_bitmap; 
     PVFS_handle *dirdata_handles;
+    PVFS_SID *dirdata_sids;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
@@ -240,11 +241,14 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
     encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
-    for (index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+    for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
         encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     encode_skip4(pptr,);\
-    for (index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
         encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers * \
+                    (x)->dist_dir_attr.num_copies; index_i++)\
+        encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 
 #define decode_PVFS_directory_attr(pptr, x) do { \
@@ -254,13 +258,18 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
     (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size * \
         sizeof(PVFS_dist_dir_bitmap_basetype));\
-    for(index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)\
         decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     decode_skip4(pptr,);\
     (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
         sizeof(*(x)->dirdata_handles));\
-    for(index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
         decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
+    (x)->dirdata_sids = decode_malloc((x)->dist_dir_attr.num_servers * \
+                                      (x)->dist_dir_attr.num_copies * \
+                                      sizeof(*(x)->dirdata_handles));\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+        decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 
 #endif
