@@ -1,324 +1,286 @@
-/*
- * Copyright 2013 Omnibond Systems LLC.
- * See COPYING in top-level directory.
- */
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <sys/types.h>
+#include <poll.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <poll.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
-#include "pvfs2.h"
-#include "pvfs2-util.h"
+#include "pvfs2-types.h"
 
-struct process {
+struct proc {
     int fd;
+    pid_t pid;
     char *cmdline;
-    int pid;
-    FILE *out;
+    FILE *log;
+    struct proc *next;
 };
 
-char *mntpt;
+struct proclist {
+    int nprocs;
+    struct proc *procs;
+};
 
-void child_status(int signal)
+void proclist_init(struct proclist *pl);
+void proclist_add(struct proclist *pl, struct proc *newproc);
+struct proc *proclist_findfd(struct proclist *pl, int fd);
+struct proc *proclist_findpid(struct proclist *pl, int fd);
+void proclist_remove(struct proclist *pl, struct proc *oldproc);
+void proclist_fillpollfds(struct proclist *pl, struct pollfd *pfds, int events);
+
+void child_status(int signal);
+int setup_child_status(void);
+int startproc(void);
+void endproc(int fd);
+void copytolog(struct proc *proc, char *buf, int buflen);
+
+void proclist_init(struct proclist *pl)
 {
-    int pid, status;
-    pid = waitpid(0, &status, 0);
-    if (WIFEXITED(status)) {
-        printf("%d exited %d\n", pid, WEXITSTATUS(status));
-    } else if (WIFSIGNALED(status)) {
-        printf("%d terminated %d\n", pid, WTERMSIG(status));
-    }
+    pl->nprocs = 0;
+    pl->procs = NULL;
 }
 
-int add_proc(struct process **procs, int *nprocs, int fd, char *cmdline,
-             int pid)
+void proclist_add(struct proclist *pl, struct proc *newproc)
 {
-    struct process *proc;
-    char buf[PVFS_PATH_MAX];
-    if (*procs == NULL) {
-        *nprocs = 1;
-        *procs = malloc(sizeof(struct process));
-        if (*procs == NULL)
-            return 1;
-        proc = *procs;
+    struct proc *proc;
+    /* Make sure the linked list is not contaminated. */
+    newproc->next = NULL;
+    pl->nprocs++;
+    if (pl->procs) {
+        proc = pl->procs;
+        while (proc->next)
+            proc = proc->next;
+        proc->next = newproc;
     } else {
-        *nprocs += 1;
-        *procs = realloc(*procs, sizeof(struct process)*(*nprocs));
-        if (*procs == NULL && errno == ENOMEM)
-            return 1;
-        proc = *procs+(*nprocs-1);
+        pl->procs = newproc;
     }
-    proc->fd = fd;
-    proc->cmdline = strdup(cmdline);
-    proc->pid = pid;
-    snprintf(buf, PVFS_PATH_MAX, "%s/log.%d", mntpt, proc->pid);
-    proc->out = fopen(buf, "w+");
-    if (proc->out == NULL) {
-        *nprocs -= 1;
-        *procs = realloc(*procs, sizeof(struct process)*(*nprocs));
-        return 1;
-    }
-    return 0;
 }
 
-struct process *find_proc(struct process *procs, int nprocs, int fd)
+struct proc *proclist_findfd(struct proclist *pl, int fd)
 {
-    int i;
-    for (i = 0; i < nprocs; i++) {
-        if (procs[i].fd == fd)
-            return procs+i;
+    struct proc *proc = pl->procs;
+    while (proc) {
+        if (proc->fd == fd)
+            return proc;
+        proc = proc->next;
     }
     return NULL;
 }
 
-int del_proc(struct process **procs, int *nprocs, int fd)
+struct proc *proclist_findpid(struct proclist *pl, pid_t pid)
 {
-    int i, j = -1;
-    for (i = 0; i < *nprocs; i++){
-        if ((*procs)[i].fd == fd) {
-            free((*procs)[i].cmdline);
-            fclose((*procs)[i].out);
-            j = i+1;
-            break;
+    struct proc *proc = pl->procs;
+    while (proc) {
+        if (proc->pid == pid)
+            return proc;
+        proc = proc->next;
+    }
+    return NULL;
+}
+
+void proclist_remove(struct proclist *pl, struct proc *oldproc)
+{
+    struct proc *prevproc, *proc;
+    /* Should the first item be removed. */
+    if (pl->procs == oldproc) {
+        pl->procs = oldproc->next;
+        pl->nprocs--;
+        return;
+    }
+    /* Delete the appropriate item. */
+    prevproc = pl->procs;
+    proc = pl->procs->next;
+    while (proc) {
+        if (proc == oldproc) {
+            prevproc->next = oldproc->next;
+            pl->nprocs--;
+            return;
         }
+        prevproc = proc;
+        proc = proc->next;
     }
-    if (j == -1)
-        return 1;
-    for (; j <= *nprocs; j++)
-        memcpy(*procs+j-1, *procs+j, sizeof(struct process));
-    *procs = realloc(*procs, sizeof(struct process)*(*nprocs-1));
-    if (*procs == NULL && errno == ENOMEM)
-        return 1; 
-    *nprocs -= 1;
-    return 0;
 }
 
-int add_fd(struct pollfd **fds, int *nfds, int fd)
+void proclist_fillpollfds(struct proclist *pl, struct pollfd *pfds, int events)
 {
-    if (*fds == NULL) {
-        *nfds = 1;
-        *fds = malloc(sizeof(struct pollfd));
-        if (*fds == NULL)
-            return 1;
-        (*fds)[0].fd = fd;
-        (*fds)[0].events = POLLIN;
-    } else {
-        *nfds += 1;
-        *fds = realloc(*fds, sizeof(struct pollfd)*(*nfds));
-        if (*fds == NULL && errno == ENOMEM)
-            return 1;
-        (*fds)[*nfds-1].fd = fd;
-        (*fds)[*nfds-1].events = POLLIN;
+    int i = 0;
+    struct proc *proc = pl->procs;
+    while (i < pl->nprocs) {
+        pfds[i].fd = proc->fd;
+        pfds[i].events = events;
+        i++;
+        proc = proc->next;
     }
-    return 0;
 }
 
-int del_fd(struct pollfd **fds, int *nfds, int fd)
+struct proclist pl;
+
+void child_status(int signal)
 {
-    int i, j = -1;
-    for (i = 0; i < *nfds; i++){
-        if ((*fds)[i].fd == fd) {
-            j = i+1;
-            break;
-        }
+    pid_t pid;
+    int status;
+    struct proc *proc;
+    pid = waitpid(0, &status, 0);
+    if (pid == -1) {
+        perror("Could not waitpid");
+        return;
     }
-    if (j == -1)
-        return 1;
-    for (; j <= *nfds; j++)
-        memcpy(*fds+j-1, *fds+j, sizeof(struct pollfd));
-    *fds = realloc(*fds, sizeof(struct pollfd)*(*nfds-1));
-    if (*fds == NULL && errno == ENOMEM)
-        return 1; 
-    *nfds -= 1;
-    return 0;
+    proc = proclist_findpid(&pl, pid);
+    if (proc == NULL)
+        return;
+    printf("status change on %d %s\n", proc->pid, proc->cmdline);
 }
 
-int startproc(char *arg, int *pid)
+int setup_child_status(void)
 {
-    int r, i;
+    struct sigaction act;
+    act.sa_handler = child_status;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    return sigaction(SIGCHLD, &act, NULL);
+}
+
+int startproc(void)
+{
+    char buf[1024];
+    int r;
     int pipefds[2];
-    /* Start process. */
-    r = pipe(pipefds);
-    if (r == -1) {
-        return 0;
+    struct proc *proc;
+    /* Read program command line. */
+    if (fgets(buf, 1024, stdin) == NULL) {
+        if (feof(stdin))
+            return 1;
+        return 2;
+    }
+    *(strrchr(buf, '\n')) = 0;
+    if (pipe(pipefds)) {
+        return 2;
     }
     r = fork();
     if (r == -1) {
-        close(pipefds[0]);
-        close(pipefds[1]);
-        return 0;
+        return 2;
     } else if (r == 0) {
-        /* Close all fds except the pipe. */
+        /* Setup standard I/O and exec. */
+        close(pipefds[0]);
         close(0);
         close(1);
         close(2);
-        close(pipefds[0]);
-        if (dup2(pipefds[1], 1) || dup2(pipefds[1], 2)) {
-            fprintf(stderr, "Could not duplicate fd: %s.\n",
-                    strerror(errno));
-        }
-        for (i = 3; i < sysconf(_SC_OPEN_MAX); i++)
-            close(i);
-        execlp("sh", "sh", "-c", arg, NULL);
-        exit(1);
+        dup2(pipefds[1], 1);
+        dup2(pipefds[1], 2);
+        close(pipefds[1]);
+        execlp("sh", "sh", "-c", buf, NULL);
+    } else {
+        char logname[PATH_MAX];
+        /* Success. */
+        close(pipefds[1]);
+        proc = malloc(sizeof(struct proc));
+        /* Or not. This could leak memory, but there are probably other
+         * problems if malloc is returning NULL. */
+        if (proc == NULL)
+            return 2;
+        proc->fd = pipefds[0];
+        proc->pid = r;
+        proc->cmdline = strdup(buf);
+        /* XXX: Get the correct path... */
+        snprintf(logname, PVFS_PATH_MAX, "/pvfsmnt/proc.%d", proc->pid);
+        proc->log = fopen(logname, "w");
+        if (proc->log == NULL)
+            return 2;
+        proclist_add(&pl, proc);
     }
-    *pid = r;
-    close(pipefds[1]);
-    return pipefds[0];
+    return 0;
 }
 
-void writetable(struct process *procs, int nprocs)
+void endproc(int fd)
 {
-    int i;
-    FILE *f;
-    char buf[PVFS_PATH_MAX];
-    strncpy(buf, mntpt, PVFS_PATH_MAX);
-    strncat(buf, "/proctable", PVFS_PATH_MAX);
-    f = fopen(buf, "w+");
-    for (i = 0; i < nprocs; i++) {
-        fprintf(f, "%d %d %s\n", procs[i].fd, procs[i].pid, procs[i].cmdline);
-    }
-    fclose(f);
+    struct proc *proc;
+    proc = proclist_findfd(&pl, fd);
+    free(proc->cmdline);
+    fflush(proc->log);
+    fclose(proc->log);
+    proclist_remove(&pl, proc);;
+}
+
+void copytolog(struct proc *proc, char *buf, int buflen)
+{
+    printf("log one '%c'\n", *buf);
+    fwrite(buf, buflen, 1, proc->log);
+    fflush(proc->log);
 }
 
 int main(void)
 {
-    const PVFS_util_tab *tab;
-    int i;
-    struct sigaction act;
-    char buf[1024];
-    int buflen;
-    int r;
-    struct pollfd *fds = NULL;
-    int nfds = 0;
-    struct process *procs = NULL;
-    int nprocs = 0;
-    int pid;
-    struct process *proc;
+    struct pollfd *pfds;
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (tab == NULL) {
-        fprintf(stderr, "Could not parse pvfstab.\n");
+    if (setup_child_status()) {
+        perror("Could not setup signal handler");
         return 1;
     }
 
-    if (tab->mntent_count == 0) {
-        fprintf(stderr, "There are no filesystems in the pvfstab.\n");
-        return 1;
-    }
-    mntpt = tab->mntent_array[0].mnt_dir;
+    proclist_init(&pl);
 
-    /* Setup signal handler. */
-    act.sa_handler = child_status;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGCHLD, &act, NULL)) {
-        fprintf(stderr, "Could not setup SIGCHLD handler.\n");
-        return 1;
-    }
+    while (1) {
+        int r, i;
+        /* Generate list of fds to poll. */
+        pfds = malloc(sizeof(struct pollfd)*(pl.nprocs+1));
+        proclist_fillpollfds(&pl, pfds+1, POLLIN);
+        pfds[0].fd = 0;
+        pfds[0].events = POLLIN;
 
-    if (add_fd(&fds, &nfds, 0)) {
-        fprintf(stderr, "Could not add fd.\n");
-        return 1;
-    }
-
-    /* Main read loop. */
-    while (nfds) {
-        writetable(procs, nprocs);
-        if (poll(fds, nfds, -2) == -1) {
-            if (errno == EAGAIN)
-                continue;
-            break;
-        }
-        /* Check for program to start. */
-        if (fds[0].revents & POLLIN) {
-            /* Read input. */
-            if (fgets(buf, 1024, stdin) == NULL) {
-                if (ferror(stdin) && errno != EAGAIN) {
-                    clearerr(stdin);
-                    continue;
-                } else {
-                    if (ferror(stdin)) {
-                        fprintf(stderr, "Could not read: %s.\n",
-                                strerror(errno));
-                        return 1;
-                    } else {
-                        break;
-                    }
-                }
-            }
-            /* Start process. */
-            *(strrchr(buf, '\n')) = 0;
-            r = startproc(buf, &pid);
-            if (r == 0) {
-                fprintf(stderr, "Could not start process: %s.\n",
-                        strerror(errno));
+        /* Poll. Be careful of delivered signals. */
+        r = poll(pfds, pl.nprocs+1, -1);
+        if (r == -1) {
+            if (errno == EINTR) {
+                free(pfds);
                 continue;
             }
-            /* Add the fd to the table. */
-            if (add_fd(&fds, &nfds, r)) {
-                fprintf(stderr, "Could not add fd.\n");
-                return 1;
-            }
-            if (add_proc(&procs, &nprocs, r, buf, pid)) {
-                del_fd(&fds, &nfds, r);
-                fprintf(stderr, "Could not add process.\n");
-                return 1;
-            }
-            continue;
+            perror("poll: ");
+            return 1;
         }
-        /* If the input is closed, stay open until all children have died. */
-        if (fds[0].revents & POLLHUP) {
-            if (del_fd(&fds, &nfds, 0)) {
-                fprintf(stderr, "Could not delete fd.\n");
-                return 1;
-            }
-            continue;
+
+        /* Handle conditions on the first fd (standard input) specially.
+         * Stop if it should close. */
+        if (pfds[0].revents & POLLNVAL) {
+            return 0;
+        } else if (pfds[0].revents & POLLIN) {
+            r = startproc();
+            if (r == 1)
+                return 0;
+            else if (r)
+                perror("Could not start process");
         }
-        /* Check other fds for input. */
-        for (i = 1; i < nfds; i++) {
-            if (fds[i].revents & POLLIN) {
-                r = read(fds[i].fd, buf, 1024);
+
+        /* Handle conditions on the other fds, which are connected to
+         * processes we are monitoring. */
+        for (i = 1; i < pl.nprocs+1; i++) {
+            char buf[1024];
+            struct proc *proc;
+            /* Remove the process if there are errors. Copy the data to a log
+             * file otherwise. */
+            if (pfds[i].revents & POLLNVAL) {
+                endproc(pfds[i].fd);
+            } else if (pfds[i].revents & POLLIN) {
+                r = read(pfds[i].fd, buf, 1024);
                 if (r == -1) {
-                    if (errno == EAGAIN)
-                        continue;
-                    fprintf(stderr, "Could not read: %s.\n",
-                            strerror(errno));
-                    close(fds[i].fd);
+                    if (errno != EINTR)
+                        perror("Cannot read from pipe");
+                } else if (r == 0) {
+                    close(pfds[i].fd);
+                    endproc(pfds[i].fd);
                 } else {
-                    /* Record output. */
-                    buflen = r;
-                    proc = find_proc(procs, nprocs, fds[i].fd);
-                    if (proc != NULL) {
-                        while (r != -1 && buflen > 0) {
-                            r = fwrite(buf, buflen, 1, proc->out);
-                            if (r != -1)
-                                buflen -= r;
-                        }
-                    }
+                    proc = proclist_findfd(&pl, pfds[i].fd);
+                    copytolog(proc, buf, r);
                 }
-            }
-            if (fds[i].revents & POLLHUP) {
-                /* Remove from list. */
-                if (del_proc(&procs, &nprocs, fds[i].fd)) {
-                    fprintf(stderr, "Could not delete process.\n");
-                    return 1;
-                }
-                if (del_fd(&fds, &nfds, fds[i].fd)) {
-                    fprintf(stderr, "Could not delete fd.\n");
-                    return 1;
-                }
-                continue;
             }
         }
+
+        /* A new pollfd table will be allocated each time. This is inefficient,
+         * but the intent is that this is not used for high-speed operations. */
+        free(pfds);
     }
     return 0;
 }
