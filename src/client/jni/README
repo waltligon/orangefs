@@ -1,7 +1,7 @@
 # (C) 2012 Clemson University
 # See COPYING in top-level directory.
 ===============================================================================
-Documentation - OrangeFS JNI and Hadoop Extensions
+Brief Documentation - OrangeFS JNI and Hadoop Client
 
   Exposing OrangeFS Direct Client User Interface Calls to Java Developers 
   through JNI.
@@ -11,20 +11,21 @@ Step 1:
 
   JNI Only Instructions:
 
-    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
+    ./configure --prefix=/opt/orangefs --enable-shared \
             --enable-jni --with-jdk=<path_to_jdk>
     make
     sudo make install
-    make jni
-    sudo make jni_install
 
   JNI and Hadoop Instructions:
 
-    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
+    ./configure --prefix=/opt/orangefs --enable-shared \
             --enable-jni --with-jdk=<path_to_jdk> \
-            --enable-hadoop --with-hadoop=<path_to_hadoop>
+            --enable-hadoop --with-hadoop=<path_to_hadoop_src>
     make
     sudo make install
+
+  For comprehensive documentation on using Hadoop with OrangeFS, please see:
+    http://www.omnibond.com/orangefs/docs/v_2_8_8/index.htm#Hadoop_Client.htm
 
 ===============================================================================
 Step 2:
