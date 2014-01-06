@@ -1478,8 +1478,6 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all.sh $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all.sh $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
 endif
@@ -1494,6 +1492,8 @@ endif
 	done
 
 	install -d $(sbindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all $(sbindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all $(sbindir)
 
 ifdef BUILD_HADOOP
 	install -m 755 $(OFS_HADOOP_JAR) $(libdir)
