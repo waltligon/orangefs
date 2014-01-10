@@ -42,7 +42,15 @@ static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
                 (char *)dentry->d_name.name, pvfs2_inode->link_target);
 
-    return ERR_PTR(vfs_follow_link(nd, pvfs2_inode->link_target));
+   /* we used to use vfs_follow_link here, instead of nd_set_link.
+    * vfs_follow_link is not just deprecated, it is
+    * gone now. Whenever the follow_link in inode_operations returns
+    * void, nd_set_link should be available, so now we'll just call
+    * nd_set_link and return NULL...
+    */
+    nd_set_link(nd, pvfs2_inode->link_target);
+    return NULL;
+
 }
 #endif
 
