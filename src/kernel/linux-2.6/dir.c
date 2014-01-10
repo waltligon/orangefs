@@ -135,11 +135,21 @@ static int pvfs2_readdir(
     char *current_entry = NULL;
     long bytes_decoded;
 
+#ifdef HAVE_READDIR_FILE_OPERATIONS
     gossip_ldebug(GOSSIP_DIR_DEBUG,
         "%s: file->f_pos:%lld, token = %llu\n",
         __func__,lld(file->f_pos), llu(*ptoken));
+#else
+    gossip_ldebug(GOSSIP_DIR_DEBUG,
+        "%s: ctx->pos:%lld, token = %llu\n",
+        __func__,lld(ctx->pos), llu(*ptoken));
+#endif
 
+#ifdef HAVE_READDIR_FILE_OPERATIONS
     pos = (PVFS_ds_position)file->f_pos;
+#else
+    pos = (PVFS_ds_position) ctx->pos;
+#endif
 
     /* are we done? */
     if (pos == PVFS_READDIR_END)
@@ -190,7 +200,7 @@ static int pvfs2_readdir(
 
     /* NOTE:
      * the position we send to the readdir upcall is out of
-     * sync with file->f_pos since:
+     * sync with file->f_pos (or ctx->pos) since:
      * 1. pvfs2 doesn't include the "." and ".." entries that are added below.  
      * 2. the introduction of distributed directory logic makes token no
      *    longer be related to f_pos and pos. Instead an independent variable
@@ -287,19 +297,28 @@ get_new_buffer_index:
        }
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
+       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
 #else
        ctx->pos++;
+       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
 #endif
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
        pos++;
     }
 
     if (pos == 1)
     {
        ino = get_parent_ino_from_dentry(dentry);
-       gossip_debug(GOSSIP_DIR_DEBUG,"%s: calling filldir of \"..\" with pos = %llu\n"
-                                    ,__func__
-                                    ,llu(pos));
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+       gossip_debug(GOSSIP_DIR_DEBUG,
+                    "%s: calling filldir of \"..\" with pos = %llu\n",
+                    __func,
+                    llu(pos));
+#else
+       gossip_debug(GOSSIP_DIR_DEBUG,
+                    "%s: calling dir_emit of \"..\" with pos = %llu\n",
+                    __func__,
+                    llu(pos));
+#endif
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        if ( (ret=filldir(dirent,"..",2,pos,ino,DT_DIR)) < 0)
 #else
@@ -312,10 +331,11 @@ get_new_buffer_index:
        }
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
+       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
 #else
        ctx->pos++;
+       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
 #endif
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->pos:%lld\n",__func__,lld(file->f_pos));
        pos++;
     }
 
@@ -345,10 +365,11 @@ get_new_buffer_index:
         }
 #ifdef HAVE_READDIR_FILE_OPERATIONS
         file->f_pos++;
+        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
 #else
-       ctx->pos++;
+        ctx->pos++;
+        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
 #endif
-        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->pos:%lld\n",__func__,lld(file->f_pos));
         
         pos++;
     }
@@ -366,37 +387,66 @@ get_new_buffer_index:
         {
           /* If PVFS hit end of directory, then there is no
            * way to do math on the token that it returned.
-           * Instead we go by the f_pos but back up to account for
+           * Instead we go by f_pos (or ctx->pos) but back up to account for
            * the artificial . and .. entries.  The fact that
            * "token_set" is non zero indicates that we are on
            * the first iteration of getdents(). 
            */
+#ifdef HAVE_READDIR_FILE_OPERATIONS
            file->f_pos -= 3;
+#else
+           ctx->pos -= 3;
+#endif
         }
         else
         {
-            /* this means a filldir call failed */
+            /* this means a filldir (or dir_emit) call failed */
             /* !!! need to set back to previous pos, no middle value allowed */
             pos -= (i - 1);
+#ifdef HAVE_READDIR_FILE_OPERATIONS
             file->f_pos -= (i - 1);
+#else
+            ctx->pos -= (i - 1);
+#endif
         }
+#ifdef HAVE_READDIR_FILE_OPERATIONS
         gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  "
                                        "Setting f_pos to: %lld\n"
                                       , lld(file->f_pos));
+#else
+        gossip_debug(GOSSIP_DIR_DEBUG, "at least one dir_emit call failed.  "
+                                       "Setting ctx->pos to: %lld\n"
+                                      , lld(ctx->pos));
+#endif
     }
             
     /* did we hit the end of the directory? */
     if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
     {
+#ifdef HAVE_READDIR_FILE_OPERATIONS
        gossip_debug(GOSSIP_DIR_DEBUG,
                     "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
        file->f_pos = PVFS_READDIR_END;
+#else
+       gossip_debug(GOSSIP_DIR_DEBUG,
+          "End of dir detected; setting ctx->pos to PVFS_READDIR_END.\n");
+       ctx->pos = PVFS_READDIR_END;
+#endif
     }
 
-    gossip_debug(GOSSIP_DIR_DEBUG,"pos = %llu, token = %llu, file->f_pos should have been %lld\n",
-                                  llu(pos),
-                                  llu(*ptoken),
-                                  lld(file->f_pos));
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+    gossip_debug(GOSSIP_DIR_DEBUG,
+                "pos = %llu, token = %llu, file->f_pos should have been %lld\n",
+                llu(pos),
+                llu(*ptoken),
+                lld(file->f_pos));
+#else
+    gossip_debug(GOSSIP_DIR_DEBUG,
+                 "pos = %llu, token = %llu, ctx->pos should have been %lld\n",
+                 llu(pos),
+                 llu(*ptoken),
+                 lld(ctx->pos));
+#endif
 
     if (ret == 0)
     {
