@@ -48,6 +48,8 @@ batch_count = 0
 
 class OFSTestNode(object):
     
+    node_number = 0
+    
       # initialize node. We don't have much info for the base class.
     def __init__(self):
         
@@ -170,7 +172,11 @@ class OFSTestNode(object):
         
         self.hadoop_version = "hadoop-1.2.1"
         self.hadoop_location = "/opt/"+self.hadoop_version
-        self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
+        self.jdk6_location = "/usr/java/default"
+        
+        
+        self.node_number = OFSTestNode.node_number
+        OFSTestNode.node_number += 1
 
     #==========================================================================
     # 
@@ -187,6 +193,11 @@ class OFSTestNode(object):
         #print "Getting current node information"
         
         # can we ssh in? We'll need the group if we can't, so let's try this first.
+        output = []
+        self.runSingleCommand("ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,output)
+        print output
+        
+        
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user)
         
         print "Current group is "+self.current_group
@@ -195,8 +206,9 @@ class OFSTestNode(object):
         # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
                     
         if self.current_group.rstrip() == "":
-            self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,remote_user="root")
-            print "Current group (from root) is "+self.current_group
+            self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {\'print \\$4\'}" % self.current_user,remote_user="root")
+
+            print "Current group for %s (from root) is %s" % (self.current_user,self.current_group)
             if self.current_group.rstrip() == "":
                 print "Could not access node at "+self.ext_ip_address+" via ssh"
                 exit(-1)
@@ -216,16 +228,7 @@ class OFSTestNode(object):
                 print "Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group)
                 exit(rc)
             
-        # get the hostname
-        self.host_name = self.runSingleCommandBacktick("hostname")
-        
-        # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
-        if len(self.host_name) > 15:
-            short_host_name = self.host_name[:15]
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_host_name)
-            self.runSingleCommandAsBatch("sudo hostname %s" % short_host_name)
-            print "Truncating hostname %s to %s" % (self.host_name,short_host_name)
-            self.host_name = self.host_name[:15]
+
 
         # get kernel version and processor type
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
@@ -253,10 +256,33 @@ class OFSTestNode(object):
         # Mac OS X 
         elif self.runSingleCommandBacktick('find /etc -name "SuSE-release" 2> /dev/null').rstrip() == "/etc/SuSE-release":
             self.distro = self.runSingleCommandBacktick("head -n 1 /etc/SuSE-release").rstrip()
+
+            
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
             #print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
-        
+
+        # get the hostname
+        self.host_name = self.runSingleCommandBacktick("hostname")
+
+        # SuSE distros require a hostname kludge to get it to work. Otherwise all instances will be set to the same hostname
+        # That's a better solution than what Openstack gives us. So why not? 
+        if self.is_ec2 == True:
+            suse_host = "ofsnode-%d" % self.node_number
+            print "Renaming %s based node to %s" % (self.distro,suse_host)
+            self.runSingleCommandAsBatch("sudo hostname %s" % suse_host)
+            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
+            self.host_name = suse_host
+            
+        # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
+        elif len(self.host_name) > 15 and self.is_ec2 == True:
+            short_host_name = self.host_name[:15]
+            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_host_name)
+            self.runSingleCommandAsBatch("sudo hostname %s" % short_host_name)
+            print "Truncating hostname %s to %s" % (self.host_name,short_host_name)
+            self.host_name = self.host_name[:15]
+        elif self.is_ec2 == False:
+            print "Not an EC2 Node!"
         
         # print out node information
         print "Node: %s %s %s %s" % (self.host_name,self.distro,self.kernel_version,self.processor_type)
@@ -474,18 +500,22 @@ class OFSTestNode(object):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y update")
             self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade < /dev/zero")
+            self.addBatchCommand("sudo /sbin/reboot ")
         elif "suse" in self.distro.lower():
             self.addBatchCommand("sudo zypper --non-interactive update")
+            self.addBatchCommand("sudo /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             self.addBatchCommand("sudo yum update --disableexcludes=main -y")
             # Uninstall the old kernel
             self.addBatchCommand("sudo rpm -e kernel-`uname -r`")
             #Update grub from current kernel to installed kernel
             self.addBatchCommand('sudo perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
+            self.addBatchCommand("sudo /sbin/reboot ")
         
         self.runAllBatchCommands()
-        print "Node "+self.host_name+" at "+self.ip_address+" updated. Rebooting."
-        self.runSingleCommandAsBatch("sudo /sbin/reboot")
+        print "Node "+self.host_name+" at "+self.ip_address+" updated."
+        
+        print "Node "+self.host_name+" at "+self.ip_address+" Rebooting."
     
     #-------------------------------
     #
@@ -521,21 +551,28 @@ class OFSTestNode(object):
         elif "suse" in self.distro.lower():
             
             
-            print "TODO: Torque for "+self.distro
-            return
+            #print "TODO: Torque for "+self.distro
+            #return
+            # Torque should already have been installed via SuSE studio
 
             batch_commands = '''
+                sudo bash -c "echo %s > /etc/torque/server_name"
+                sudo bash -c "echo %s > /var/spool/torque/server_name
+                
+                sudo qmgr -c "set server scheduling=true"
+                sudo qmgr -c "create queue orangefs_q queue_type=execution"
+                sudo qmgr -c "set queue orangefs_q started=true"
+                sudo qmgr -c "set queue orangefs_q enabled=true"
+                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
+                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
+                sudo qmgr -c "set server default_queue=orangefs_q"
+                sudo qmgr -c "set server operators += %s@%s"
+                sudo qmgr -c "set server managers += %s@%s"
+                
+                "
+            ''' % (self.host_name,self.host_name,self.current_user,self.host_name,self.current_user,self.host_name)
             
 
-            echo "Installing TORQUE from devorange: "
-            echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
-            wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
-            #cd  devorange.clemson.edu/pvfs/openSUSE-12.2/RPMS/x86_64
-            ls *.rpm
-            sudo rpm -e libtorque2
-            sudo rpm -ivh *.rpm
-            cd -
-            '''
             self.addBatchCommand(batch_commands)
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
@@ -596,23 +633,16 @@ class OFSTestNode(object):
 
         elif "suse" in self.distro.lower():
             # this needs to be fixed
-            print "TODO: Torque for "+self.distro
-            return
+            #print "TODO: Torque for "+self.distro
+            #return
 
+            # RPMS should have already been installed via SuSE studio
             batch_commands = '''
-            
+                sudo bash -c 'echo \$pbsserver %s > /var/spool/torque/mom_priv/config' 
+                sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config'
+                sudo bash -c 'echo %s > /etc/torque/server_name' 
+           
 
-            echo "Installing TORQUE from devorange: "
-            echo "wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/"
-            wget -r -np -nd http://devorange.clemson.edu/pvfs/${SYSTEM}/RPMS/${ARCH}/
-            #cd  devorange.clemson.edu/pvfs/openSUSE-12.2/RPMS/x86_64
-            ls *.rpm
-            sudo rpm -e libtorque2
-            sudo rpm -ivh *.rpm
-            cd -
-            sudo bash -c 'echo $pbsserver %s > /var/spool/torque/mom_priv/config'
-            sudo bash -c 'echo $logevent 255 >> /var/spool/torque/mom_priv/config' 
-            sudo bash -c 'echo %s > /etc/torque/server_name' 
             ''' % (pbsserver_name,pbsserver_name)
             self.addBatchCommand(batch_commands)
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
@@ -665,16 +695,29 @@ class OFSTestNode(object):
 
     def restartTorqueServer(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.runSingleCommandAsBatch("sudo /etc/init.d/torque-server restart")
-            self.runSingleCommandAsBatch("sudo /etc/init.d/torque-scheduler restart")
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            self.runSingleCommandAsBatch("sudo /etc/init.d/munge stop")
-            self.runSingleCommandAsBatch("sudo /etc/init.d/munge start")            
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_server stop")
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_server start")
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_sched stop")
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_sched start")
+            batch_commands = '''
+            sudo /etc/init.d/torque-server restart
+            sudo /etc/init.d/torque-scheduler restart
+            '''
             
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+            batch_commands = '''
+            sudo /etc/init.d/munge stop
+            sudo /etc/init.d/munge start
+            sudo /etc/init.d/pbs_server stop
+            sudo /etc/init.d/pbs_server start
+            sudo /etc/init.d/pbs_sched stop
+            sudo /etc/init.d/pbs_sched start
+            '''
+        elif "suse" in self.distro.lower():
+            batch_commands = '''
+            sudo /etc/init.d/pbs_server stop
+            sudo /etc/init.d/pbs_server start
+            sudo /etc/init.d/pbs_sched stop
+            sudo /etc/init.d/pbs_sched start
+            '''
+        self.addBatchCommand(batch_commands)
+        self.runAllBatchCommands()
 
         
     #-------------------------------
@@ -689,7 +732,7 @@ class OFSTestNode(object):
     def restartTorqueMom(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsBatch("sudo /etc/init.d/torque-mom restart")
-        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+        elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower() or "suse" in self.distro.lower():
               
             self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
 
@@ -711,6 +754,7 @@ class OFSTestNode(object):
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
+                sudo bash -c 'echo 0 > /selinux/enforce'
                 sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
@@ -746,7 +790,7 @@ class OFSTestNode(object):
                 sudo service rpcbind restart
                 sudo service nfs-kernel-server restart
 
-                # install Sun Java6 for hadoop
+                # install Sun Java6 for hadoop via webupd8
                 sudo add-apt-repository ppa:webupd8team/java < /dev/null
                 sudo apt-get update 
                 sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'
@@ -757,9 +801,14 @@ class OFSTestNode(object):
             '''
             self.addBatchCommand(batch_commands)
             
+            # ubuntu installs java to a different location than RHEL and SuSE 
+            self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
+            
             
         elif "suse" in self.distro.lower():
             batch_commands = '''
+            sudo bash -c 'echo 0 > /selinux/enforce'
+            sudo /sbin/SuSEfirewall2 off
             # prereqs should be installed as part of the image. Thanx SuseStudio!
             #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
             sudo zypper --non-interactive patch libuuid1 uuid-devel
@@ -782,16 +831,25 @@ class OFSTestNode(object):
             sudo rm -rf /opt
             sudo ln -s /mnt /opt
             sudo chmod -R a+w /opt
+            cd /tmp
+            #### Install Java 6 #####
+            wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
+            yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
             
-            #### Todo Install Java 6! #####
-
-
+            # start rpcbind to work around a bug in OpenSuse
+            sudo /sbin/rpcbind
+            
 
             '''
             self.addBatchCommand(batch_commands)
+            
+            # RPM installs to default location
+            self.jdk6_location = "/usr/java/default"
+            
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             batch_commands = '''
+                sudo bash -c 'echo 0 > /selinux/enforce'
                 echo "Installing prereqs via yum..."
                 sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
                 sudo yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl 
@@ -809,10 +867,19 @@ class OFSTestNode(object):
                 sudo service rpcbind start
                 sudo service nfs restart
                 
-                #### Todo Install Java 6! #####
+                # install java 6
+                cd /tmp
+                wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
+                yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
+            
+                
+
 
             '''
             self.addBatchCommand(batch_commands)
+            
+            # RPM installs to default location
+            self.jdk6_location = "/usr/java/default"
 
         # db4 is built from scratch for all systems to have a consistant version.
         batch_commands = '''
@@ -840,7 +907,7 @@ class OFSTestNode(object):
         output = []
         self.changeDirectory("/opt")
         self.runSingleCommand("wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
-        print output
+        #print output
         self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
 
         
@@ -2116,15 +2183,27 @@ class OFSTestNode(object):
         
         
         self.runSingleCommand("mkdir -p %s" % directory_name)
-        commands = '''
-        sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
-        #sudo service cups stop
-        #sudo service sendmail stop
-        sudo service rpcbind restart
-        sudo service nfs restart
-        sudo service nfs-kernel-server restart
-        sudo exportfs -a
-        ''' % (directory_name,self.ip_address,netmask,options)
+        if "suse" in self.distro.lower():
+            commands = '''
+            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            sudo /sbin/rpcbind 
+            sleep 3
+            sudo /etc/init.d/nfs restart
+            sudo /etc/init.d/nfsserver restart
+            sudo exportfs -a
+            ''' % (directory_name,self.ip_address,netmask,options)
+        else:
+            commands = '''
+            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            #sudo service cups stop
+            #sudo service sendmail stop
+            sudo service rpcbind restart
+            sudo service nfs restart
+            sudo service nfs-kernel-server restart
+            sudo exportfs -a
+            ''' % (directory_name,self.ip_address,netmask,options)
+        
+        
         
         self.runSingleCommandAsBatch(commands)
         time.sleep(30)
@@ -2139,12 +2218,12 @@ class OFSTestNode(object):
         print commands
         self.runSingleCommandAsBatch(commands)
         output = []
-        rc = self.runSingleCommand("mount -t nfs | grep %s" % nfs_share,output)
+        rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
         count = 0
         while rc != 0 and count < 10 :
             time.sleep(15)
             self.runSingleCommandAsBatch(commands)
-            rc = self.runSingleCommand("mount -t nfs | grep %s" % nfs_share,output)
+            rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
             print output
             count = count + 1
         return 0

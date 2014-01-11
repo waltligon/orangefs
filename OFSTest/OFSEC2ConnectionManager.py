@@ -181,8 +181,8 @@ class OFSEC2ConnectionManager(object):
         
             
             
-        print "Waiting 30 seconds for external networking"
-        time.sleep(30)
+        print "Waiting 60 seconds for external networking"
+        time.sleep(60)
         return external_addresses
     
 
