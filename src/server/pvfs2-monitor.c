@@ -10,7 +10,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include "pvfs2-types.h"
+#include "pvfs2.h"
+
+static char *mntdir;
+static FILE *proctable;
 
 struct proc {
     int fd;
@@ -33,7 +36,8 @@ void proclist_remove(struct proclist *pl, struct proc *oldproc);
 void proclist_fillpollfds(struct proclist *pl, struct pollfd *pfds, int events);
 
 void child_status(int signal);
-int setup_child_status(void);
+void reopen_log(int signal);
+int setup_signals(void);
 int startproc(void);
 void endproc(int fd);
 void copytolog(struct proc *proc, char *buf, int buflen);
@@ -132,16 +136,31 @@ void child_status(int signal)
     proc = proclist_findpid(&pl, pid);
     if (proc == NULL)
         return;
-    printf("status change on %d %s\n", proc->pid, proc->cmdline);
+    endproc(proc->fd);
 }
 
-int setup_child_status(void)
+void reopen_log(int signal)
+{
+    char tablename[PVFS_PATH_MAX];
+    snprintf(tablename, PVFS_PATH_MAX, "%s/proctable", mntdir);
+    proctable = fopen(tablename, "a");
+    if (proctable == NULL) {
+        exit(1);
+    }
+}
+
+int setup_signals(void)
 {
     struct sigaction act;
     act.sa_handler = child_status;
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
-    return sigaction(SIGCHLD, &act, NULL);
+    if (sigaction(SIGCHLD, &act, NULL) == -1)
+        return -1;
+    act.sa_handler = reopen_log;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    return sigaction(SIGHUP, &act, NULL);
 }
 
 int startproc(void)
@@ -185,11 +204,12 @@ int startproc(void)
         proc->fd = pipefds[0];
         proc->pid = r;
         proc->cmdline = strdup(buf);
-        /* XXX: Get the correct path... */
-        snprintf(logname, PVFS_PATH_MAX, "/pvfsmnt/proc.%d", proc->pid);
+        snprintf(logname, PVFS_PATH_MAX, "%s/proc.%d", mntdir, proc->pid);
         proc->log = fopen(logname, "w");
         if (proc->log == NULL)
             return 2;
+        fprintf(proctable, "S %d %s\n", proc->pid, proc->cmdline);
+        fflush(proctable);
         proclist_add(&pl, proc);
     }
     return 0;
@@ -199,6 +219,8 @@ void endproc(int fd)
 {
     struct proc *proc;
     proc = proclist_findfd(&pl, fd);
+    fprintf(proctable, "E %d %s\n", proc->pid, proc->cmdline);
+    fflush(proctable);
     free(proc->cmdline);
     fflush(proc->log);
     fclose(proc->log);
@@ -207,16 +229,48 @@ void endproc(int fd)
 
 void copytolog(struct proc *proc, char *buf, int buflen)
 {
-    printf("log one '%c'\n", *buf);
     fwrite(buf, buflen, 1, proc->log);
     fflush(proc->log);
 }
 
 int main(void)
 {
+    int ret;
     struct pollfd *pfds;
+    const PVFS_util_tab *tab;
+    char tablename[PATH_MAX];
 
-    if (setup_child_status()) {
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    if (ret < 0) {
+        PVFS_perror("PVFS_sys_initialize", ret);
+        return 1;
+    }
+
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (tab == NULL) {
+        fprintf(stderr, "Failed to parse pvfstab.\n");
+        return 1;
+    }
+
+    if (tab->mntent_count < 1) {
+        fprintf(stderr, "pvfstab does not contain any filesystems.\n");
+        return 1;
+    }
+
+    mntdir = strdup(tab->mntent_array[0].mnt_dir);
+    if (mntdir == NULL) {
+        perror("Could not set mount directory");
+        return 1;
+    }
+
+    snprintf(tablename, PVFS_PATH_MAX, "%s/proctable", mntdir);
+    proctable = fopen(tablename, "a");
+    if (proctable == NULL) {
+        perror("Could not open process table");
+        return 1;
+    }
+
+    if (setup_signals()) {
         perror("Could not setup signal handler");
         return 1;
     }
