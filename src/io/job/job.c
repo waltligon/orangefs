@@ -1429,7 +1429,7 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1522,7 +1522,7 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1609,7 +1609,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 {
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1688,7 +1688,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1775,7 +1775,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1861,7 +1861,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1948,7 +1948,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void *user_ptr_internal;
+    void *user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2033,7 +2033,7 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
 {
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2115,7 +2115,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 {
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2189,7 +2189,7 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2278,7 +2278,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2364,7 +2364,7 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2453,7 +2453,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2537,7 +2537,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2642,7 +2642,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2751,7 +2751,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2843,7 +2843,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2932,7 +2932,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3022,7 +3022,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3114,7 +3114,7 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3202,7 +3202,7 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3288,7 +3288,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3370,7 +3370,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3487,7 +3487,7 @@ int job_trove_fs_create(char *collname,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3581,7 +3581,7 @@ int job_trove_fs_lookup(char *collname,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3661,7 +3661,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3742,7 +3742,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -3822,7 +3822,7 @@ int job_trove_fs_deleattr(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void* user_ptr_internal __attribute__ ((unused));
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr

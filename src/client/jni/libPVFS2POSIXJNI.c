@@ -102,10 +102,6 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
     if (!cls)
     {
         JNI_ERROR("invalid class: %s\n", cls_name);
-        if (ptr)
-        {
-            free((void *) ptr);
-        }
         return -1;
     }
     int fid_index = 0;
@@ -116,10 +112,6 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
         if (!fids[fid_index])
         {
             JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            if (ptr)
-            {
-                free((void *) ptr);
-            }
             return -1;
         }
     }
@@ -161,9 +153,6 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
     ar1 = (*env)->GetObjectField(env, *inst, fids[11]);
     (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
 
-    /* Free the space allocated for the stat struct and
-     return an instance of Statfs. */
-    free(ptr);
     return 0;
 }
 #endif
@@ -184,10 +173,6 @@ static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
     if (!cls)
     {
         JNI_ERROR("invalid class: %s\n", cls_name);
-        if (ptr)
-        {
-            free((void *) ptr);
-        }
         return -1;
     }
     int fid_index = 0;
@@ -198,10 +183,6 @@ static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
         if (!fids[fid_index])
         {
             JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            if (ptr)
-            {
-                free((void *) ptr);
-            }
             return -1;
         }
     }
@@ -224,9 +205,6 @@ static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
     (*env)->SetLongArrayRegion(env, ar, 0, 2, cbuf);
     ar1 = (*env)->GetObjectField(env, *inst, fids[1]);
     (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
-    /* Free the space allocated for the stat struct and
-     return an instance of Timeval. */
-    free(ptr);
     return 0;
 }
 
@@ -246,10 +224,6 @@ static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
     if (!cls)
     {
         JNI_ERROR("invalid class: %s\n", cls_name);
-        if (ptr)
-        {
-            free((void *) ptr);
-        }
         return -1;
     }
     int fid_index = 0;
@@ -260,10 +234,6 @@ static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
         if (!fids[fid_index])
         {
             JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            if (ptr)
-            {
-                free((void *) ptr);
-            }
             return -1;
         }
     }
@@ -273,10 +243,6 @@ static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
      */
     (*env)->SetLongField(env, *inst, fids[0], ptr->actime);
     (*env)->SetLongField(env, *inst, fids[1], ptr->modtime);
-    /* Free the space allocated for the stat struct and
-     * return an instance of Stat.
-     */
-    free(ptr);
     return 0;
 }
 

@@ -33,7 +33,7 @@ int PINT_security_finalize(void)
 
 int PINT_init_capability(PVFS_capability *cap)
 {
-    memset(cap, 0, sizeof(cap));
+    memset(cap, 0, sizeof(*cap));
     
     return 0;
 }
@@ -120,7 +120,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
 int PINT_init_credential(PVFS_credential *cred)
 {
-    memset(cred, 0, sizeof(cred));
+    memset(cred, 0, sizeof(*cred));
 
     return 0;
 }

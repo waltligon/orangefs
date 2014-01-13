@@ -39,7 +39,7 @@ endif # BUILD_JNI
 #         Hadoop.
 ifdef BUILD_HADOOP
 
-HADOOP_ORGDIR := src/client/jni/org/apache/hadoop/fs/ofs
+HADOOP_ORGDIR := src/client/jni/org/orangefs/hadoop/fs/ofs
 
 HADOOPJAVA := \
 	$(HADOOP_ORGDIR)/OrangeFileSystem.java \

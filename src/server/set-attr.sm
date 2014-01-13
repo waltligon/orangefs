@@ -937,9 +937,33 @@ static PINT_sm_action setattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+#define PERM_STATIC  0x00FF0000
+#define PERM_SETATTR PINT_CAP_SETATTR
+#define PERM_RWS     (PINT_CAP_READ|PINT_CAP_WRITE|PINT_CAP_SETATTR)
+#define PERM_WS      (PINT_CAP_WRITE|PINT_CAP_SETATTR)
+
+#define PERM_TABLE_COUNT   12
+#define PERM_TABLE_ATTR     0
+#define PERM_TABLE_PERM     1
+
 static int perm_setattr(PINT_server_op *s_op)
 {
-    int ret;
+    /* permissions required for specified attributes
+       if entries are added, update PERM_TABLE_COUNT above */
+    uint32_t perm_table[][2] = { {PVFS_ATTR_COMMON_UID, PERM_SETATTR},
+                                 {PVFS_ATTR_COMMON_GID, PERM_SETATTR},
+                                 {PVFS_ATTR_COMMON_PERM, PERM_SETATTR},
+                                 {PVFS_ATTR_META_DFILES, PERM_STATIC},
+                                 {PVFS_ATTR_META_DIST, PERM_STATIC},
+                                 {PVFS_ATTR_DISTDIR_ATTR, PERM_STATIC},
+                                 {PVFS_ATTR_SYMLNK_ALL, PERM_SETATTR},
+                                 {PVFS_ATTR_COMMON_ATIME, PERM_RWS},
+                                 {PVFS_ATTR_COMMON_ATIME_SET, PERM_SETATTR},
+                                 {PVFS_ATTR_COMMON_MTIME, PERM_WS},
+                                 {PVFS_ATTR_COMMON_MTIME_SET, PERM_WS},
+                                 {PVFS_ATTR_COMMON_CTIME, PERM_WS}
+                               };
+
     PVFS_object_attr *attr = &s_op->attr;
     PVFS_object_attr *req_attr = &s_op->req->u.setattr.attr;
     PVFS_credential *cred = &s_op->req->u.setattr.credential;
@@ -947,74 +971,98 @@ static int perm_setattr(PINT_server_op *s_op)
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t num_groups = PVFS_REQ_LIMIT_GROUPS, i;
 
-    /* attrs may be set for a file with uninitialized metadata */
+    /* attrs may always be set for a file with uninitialized metadata */
     if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == NULL &&
         attr->owner == 0)
     {
         return 0;
     }
-    
-    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "%s: attr mask = %08x\n", 
+                 __func__, req_attr->mask);
+
+    /* check set attrs against perm table */
+    for (i = 0; i < PERM_TABLE_COUNT; i++)
     {
-        ret = 0;
-
-        /* if changing owner info, user must have admin rights, 
-         * or be changing owner info to self or a member group.
-         * note: you can only "change" the UID of a file you own to 
-         * yourself if you are not admin. This is consistent with chown. 
-         */
-        if (req_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
-            !(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        if (req_attr->mask & perm_table[i][PERM_TABLE_ATTR])
         {
-            /* map the credential to the user info */
-            ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
-            if (ret != 0)
+            /* check permission for this attr */
+            if (perm_table[i][PERM_TABLE_PERM] == PERM_STATIC)
             {
-                return ret;
+                /* static attributes can only be changed on new files */
+                gossip_err("%s: attempt to set static attribute 0x%x\n", __func__,
+                           perm_table[i][PERM_TABLE_ATTR]);
             }
-
-            /* check current owner */
-            if (attr->owner != uid)
+            else if (!(s_op->req->capability.op_mask & perm_table[i][PERM_TABLE_PERM]))
             {
+                gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG), 
+                             "%s: no permissions to set attr 0x%x\n", __func__, 
+                             perm_table[i][PERM_TABLE_ATTR]);
                 return -PVFS_EPERM;
-            }
-
-            /* verify that the user is changing owner to self */
-            if (req_attr->mask & PVFS_ATTR_COMMON_UID &&
-                uid != req_attr->owner)
-            {
-                return -PVFS_EPERM;
-            }
-
-            /* verify that the user has permission to change the file's group 
-             * note: you may "change" group to same group with no error even
-             * if you are not a member
-             */
-            if (req_attr->mask & PVFS_ATTR_COMMON_GID &&
-                attr->group != req_attr->group)
-            {
-                for (i = 0; i < num_groups; i++)
-                {
-                    if (group_array[i] == req_attr->group)
-                    {
-                        break;
-                    }
-                }
-                /* no group matches */
-                if (i >= num_groups)
-                {
-                    return -PVFS_EPERM;
-                }
             }
         }
-
     }
-    else
+
+    /* if changing owner info, user must have admin rights, 
+     * or be changing owner info to self or a member group.
+     * note: you can only "change" the UID of a file you own to 
+     * yourself if you are not admin. This is consistent with chown. 
+     */
+    if (req_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        !(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
     {
-        ret = -PVFS_EACCES;
+        /* map the credential to the user info */
+        int ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
+        if (ret != 0)
+        {
+            return ret;
+        }
+
+        /* check current owner */
+        if (attr->owner != uid)
+        {
+            gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                         "%s: only owner of a file can change its "
+                         "ownership\n", __func__);
+            return -PVFS_EPERM;
+        }
+
+        /* verify that the user is changing owner to self */
+        if (req_attr->mask & PVFS_ATTR_COMMON_UID &&
+            uid != req_attr->owner)
+        {
+            gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                         "%s: non-admin may only change owner to self\n",
+                         __func__);
+            return -PVFS_EPERM;
+        }
+
+        /* verify that the user has permission to change the file's group 
+         * note: you may "change" group to same group with no error even
+         * if you are not a member
+         */
+        if (req_attr->mask & PVFS_ATTR_COMMON_GID &&
+            attr->group != req_attr->group)
+        {
+            for (i = 0; i < num_groups; i++)
+            {
+                if (group_array[i] == req_attr->group)
+                {
+                    break;
+                }
+            }
+            /* no group matches */
+            if (i >= num_groups)
+            {
+                gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                             "%s: only members of a group may change ownership "
+                             "to that group\n", __func__);
+                return -PVFS_EPERM;
+            }
+        }
     }
 
-    return ret;
+    return 0;
 }
 
 PINT_GET_OBJECT_REF_DEFINE(setattr);

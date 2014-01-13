@@ -65,7 +65,6 @@ static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
     if (!cls)
     {
         JNI_ERROR("invalid class: %s\n", cls_name);
-        free(ptr);
         return -1;
     }
     int fid_index = 0;
@@ -76,7 +75,6 @@ static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
         if (!fids[fid_index])
         {
             JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            free(ptr);
             return -1;
         }
     }
@@ -91,8 +89,6 @@ static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
     (*env)->SetCharField(env, *inst, fids[3], (char) ptr->d_type);
     jstring d_name_string = (*env)->NewStringUTF(env, ptr->d_name);
     (*env)->SetObjectField(env, *inst, fids[4], d_name_string);
-
-    free(ptr);
     return 0;
 }
 
@@ -405,6 +401,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopendir(JNIEnv *env, jobject obj,
     if (fill_dirent(env, dir, &dir_obj) != 0)
     {
         JNI_ERROR("fill_dirent failed");
+    }
+    if(dir)
+    {
+        free(dir);
     }
     return dir_obj;
 }
@@ -1291,6 +1291,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_opendir(JNIEnv *env, jobject obj,
     if (fill_dirent(env, dir, &dir_obj) != 0)
     {
         JNI_ERROR("fill_dirent failed");
+    }
+    if(dir)
+    {
+        free(dir);
     }
     return dir_obj;
 }

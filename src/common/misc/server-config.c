@@ -3055,7 +3055,7 @@ DOTCONF_CB(get_param)
 
     if (NULL != param)
     {
-        memset(param, 0, sizeof(param));
+        memset(param, 0, sizeof(*param));
         param->name = (cmd->data.str ? strdup(cmd->data.str) : NULL);
         PINT_llist_add_to_tail(config_s->default_dist_config.param_list,
                                param);
