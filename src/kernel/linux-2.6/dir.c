@@ -311,7 +311,7 @@ get_new_buffer_index:
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        gossip_debug(GOSSIP_DIR_DEBUG,
                     "%s: calling filldir of \"..\" with pos = %llu\n",
-                    __func,
+                    __func__,
                     llu(pos));
 #else
        gossip_debug(GOSSIP_DIR_DEBUG,
