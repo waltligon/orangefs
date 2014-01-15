@@ -760,14 +760,9 @@ void PINT_sys_release(PVFS_sys_op_id op_id);
 void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
 
 /* internal helper macros */
+/* TODO V3 Rewrite this as genuine function and inline if necessary */
 #define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
 do {                                                          \
-    if (user_cred_p == NULL)                                  \
-    {                                                         \
-        gossip_lerr("Invalid user credentials! (nil)\n");     \
-        free(sm_p);                                           \
-        return -PVFS_EINVAL;                                  \
-    }                                                         \
     sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);     \
     if (!sm_p_cred_p)                                         \
     {                                                         \
