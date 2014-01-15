@@ -1416,7 +1416,7 @@ int PINT_manager_complete_op(PINT_manager_t manager,
     struct qhash_head *hash_entry;
     struct PINT_op_entry *entry;
     int ret;
-    struct qhash_head *link __attribute__ ((unused));
+    struct qhash_head *link GCC_UNUSED;
 
     gen_mutex_lock(&manager->mutex);
     hash_entry = qhash_search(manager->ops, &op->id);

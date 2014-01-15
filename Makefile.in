@@ -1320,6 +1320,8 @@ cleaner: clean
 	rm -f examples/pvfs2-server.rc
 	rm -f doc/doxygen/pvfs2-doxygen.conf
 	rm -f examples/fs.conf
+	rm -f examples/orangefs-client
+	rm -f examples/orangefs-server
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files

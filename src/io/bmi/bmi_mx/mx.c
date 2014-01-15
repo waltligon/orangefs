@@ -25,11 +25,11 @@ gen_mutex_t     mem_used_lock;  /* lock */
 #endif
 
 /* statics for event logging */
-static PINT_event_type bmi_mx_send_event_id __attribute__ ((unused));
-static PINT_event_type bmi_mx_recv_event_id __attribute__ ((unused));
+static PINT_event_type bmi_mx_send_event_id GCC_UNUSED;
+static PINT_event_type bmi_mx_recv_event_id GCC_UNUSED;
 
-static PINT_event_group bmi_mx_event_group __attribute__ ((unused));
-static pid_t bmi_mx_pid __attribute__ ((unused));
+static PINT_event_group bmi_mx_event_group GCC_UNUSED;
+static pid_t bmi_mx_pid GCC_UNUSED;
 
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
@@ -44,7 +44,7 @@ void *
 BMI_mx_memalloc(bmi_size_t size, enum bmi_op_type send_recv);
 
 static int
-bmx_peer_init_state(struct bmx_peer *peer) __attribute__ ((unused));
+bmx_peer_init_state(struct bmx_peer *peer) GCC_UNUSED;
 
 /**** Completion function token handling ****************************/
 /* We should not hold any locks when calling mx_test[_any](),
