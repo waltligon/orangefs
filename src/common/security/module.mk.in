@@ -3,8 +3,7 @@ SERVERSRC += $(DIR)/security-util.c \
              $(DIR)/pint-uid-map.c
 
 LIBSRC += $(DIR)/security-util.c \
-          $(DIR)/getugroups.c \
-	  $(DIR)/cert-util.c
+          $(DIR)/getugroups.c
 
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \
@@ -26,6 +25,8 @@ SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/pint-cert.c \
              $(DIR)/cert-util.c \
              $(DIR)/pint-ldap-map.c
+
+LIBSRC += $(DIR)/cert-util.c
 
 ifdef ENABLE_CAPCACHE
 SERVERSRC += $(DIR)/capcache.c
