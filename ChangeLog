@@ -4,6 +4,99 @@ OrangeFS Release ChangeLog
 SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
 
+Rev 10315
+
+* New Feature: added hint support to pvfs_open() to allow user to
+* provide various things like the number of servers to use, the
+* distribution to use, the layout to use, as well as tags that can be
+* used to trace requests.
+
+* New Feature: added new layout LOCAL which puts a file on the server on
+* the same node as the client, if there is one.  Otherwise defaults to
+* ROUND_ROBIN
+
+* Bug Fix: repaired a bug in the layout processing
+
+* Bug Fix: fixed some problems with void pointers and replaced a missing
+* function prototype
+
+* Bug Fix: Corrected a long time bug: if the number of unexpected requests
+defined in the config file is greater than 64, then the code inadvertently
+used invalid job_status_s addresses when calling
+server_post_unexpected_recv(). If a failure occurs, the error code in the
+status structure is updated with the error value. In this case, the code would
+NOT segfault, because the address is actually within valid address space on
+the heap; however, the code would be overwriting other global structures, like
+the known_method_table, etc. To correct this problem, I use a local
+job_status_s structure inside the server_post_unexpected_recv(). Please read
+the comments in that function to understand why this works.
+
+SVN:  Change #9272
+
+Fixed a bug when turning off malloc redirect.  Fixed bug prefenting hints
+being passed in to open.  Added a few comments.
+
+* New Feature: added usrint and ucache code allows programs to link
+* directly bypassing kernel
+
+* Bug Fix: rewrote layout algorithms for RANDOM and ROUND_ROBIN which
+* did not perform as advertized.  Still a question if metadata
+* selection works correctly or stuffed file allocation.
+
+* Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
+to 20 characters.
+
+Rev 10182
+
+* Reworked usrint initialization to support fork/exec effectively,
+* particularly for shells (like bash).  File descriptors were moved to
+* a Posix shared memory object so that they can be passed from parent
+* to child in a fork and from one program to the next in an exec.  Fork
+* creates a new shm object and copies the parent's into it.  Exec takes
+* over the previous program's object but must modify internal pointers.
+* program loading OFS usrint for the first time creates and initializes
+* a new object.  File descriptor status structs can be shared from
+* parent to child on a fork.  Shared synchronization is used to manage
+* access to these objects.  Management of free space in the shared
+* objects is done in unshared user space memory using fairly simple
+* free lists.
+*
+* Added features to gen_locks to initialize recursive and shared mutexes
+* and shared conds for use in the new usrint features.
+
+Rev 10075
+
+* Added support for glob in usrint
+*
+* Fixed several bugs that involved using an uncleared buffer that becomes
+* corrupted.
+*
+* Added a malloc and associated functions wrapper that uses #defines to
+* replace malloc with PINT-malloc().  PINT-malloc() uses glibc malloc() (and not
+* a client program's replacement for malloc) to do memory management.  Inserts 
+* a magic number before each allocated buffer that is check on free to prevent
+* a number of common malloc related bugs.  Zeros newly allocarted buffer.
+* Zeros buffer being freed.  Can be adapted for other uses as well.  Includes
+* malloc debugging calls (currently controlled distinctly from gossip but
+* will be integrated into gossip).  Configure options can turn off some or
+* all of these features.  Also incAudes a set of functions clean-malloc() that
+* calls to the default version of malloc().  This makes pint-mem.c obsolete.
+*
+* Began migrating to a new initialization mechanism that uses a feature of
+* GCC __attrubute__((constructor)) that causes a routine to run before main.
+* This should enable us to remove the many calls to init routines currently in
+* the usrint code.  May not work on other compilers, but there may be an 
+* older alternative.  Worst case we replace the many calls with macros.  A
+* similar destructor attribute exists for shutdown
+*
+* Reworked implementation of stdin, stdout, stderr so that we can use them
+* effectively with freopen and OrangeFS files.  Reworked freopen to support
+* this.  Can still be disabled with configure.
+*
+* Made some changes to handling of locks in streams.
+
+orangefs-2.8.7 (Subversion Tag v2.8.7)
+
 Trunk
 
 * New Feature: added human readable times to pvfs2-db-display.  Rev 9366.

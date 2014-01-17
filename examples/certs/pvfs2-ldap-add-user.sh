@@ -1,16 +1,16 @@
 #!/bin/bash
 # Add user to LDAP using info from /etc/passwd
 
-randpw ()
-{
-    chars="abcdefghijklmnopqrstuvwxyz0123456789"
-    for ((i=0; $i < 10; i++))
-    do        
-        pass+=${chars:$(($RANDOM % 36)):1}
-    done
-    
-    echo $pass
-}
+#randpw ()
+#{
+#    chars="abcdefghijklmnopqrstuvwxyz0123456789"
+#    for ((i=0; $i < 10; i++))
+#    do        
+#        pass+=${chars:$(($RANDOM % 36)):1}
+#    done
+#    
+#    echo $pass
+#}
 
 usage () 
 {
@@ -104,6 +104,11 @@ uidNumber: $ldapuid
 gidNumber: $ldapgid
 homeDirectory: $homedir
 loginShell: $ldapshell
-userPassword: `randpw`
+userPassword: $username
 _EOF
+
+if [ $? -eq 0 ]; then
+    echo "User $username created with password $username"
+    echo "Change password for security!"
+fi
 

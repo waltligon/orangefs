@@ -337,15 +337,15 @@ void print_dspace( DBT key, DBT val )
     print_ds_type( v->type );
 
     if (hex) {
-        printf("(fsid: %d)(handle: %llx)(uid: %u)(gid: %u)"
+        printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(%d)\n",
-           v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
+           v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
            ctimeStr, mtimeStr, atimeStr, val.size);
     }
     else {
-         printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
+         printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)",
-           v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
+           v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
            ctimeStr, mtimeStr, atimeStr);
     }
 
@@ -381,10 +381,7 @@ void print_keyval( DBT key, DBT val )
 
 
     k = key.data;
-    if (hex)
-        printf("(%llx)", llu(k->handle));
-    else
-        printf("(%llu)", llu(k->handle));
+    printf("(%s)", PVFS_OID_str(&k->handle));
     printf("(%c)", k->type);
 
     switch (k->type)
@@ -480,7 +477,7 @@ void print_keyval( DBT key, DBT val )
                 printf("(/ddh)(%d) -> ", key.size);
                 while ((void *) handle - val.data < val.size)
                 {
-                    printf("(%llu)", llu(*handle));
+                    printf("(%s)", PVFS_OID_str(handle));
                     handle++;
                 }
                 printf("\n");
@@ -670,9 +667,9 @@ int PINT_trove_dbpf_keyval_compare(
     memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
     memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
 
-    if(db_entry_a.handle != db_entry_b.handle)
+    if(PVFS_OID_cmp(&db_entry_a.handle, &db_entry_b.handle))
     {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
+        return (PVFS_OID_cmp(&db_entry_a.handle, &db_entry_b.handle)) ? -1 : 1;
     }
 
     if(a->size > b->size)

@@ -4,6 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+/* need this for #ifdefs below */
+#include "pvfs2-config.h"
+
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -16,7 +19,11 @@
 #ifndef WIN32
 #include <unistd.h>
 #endif
+#ifdef HAVE_OPENSSL_SHA_H
+#include <openssl/sha.h>
+#endif
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
@@ -26,16 +33,18 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
 
-/* FIXME: obtaining HOST_NAME_MAX is platform specific and should be handled more generally */
+/* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 64
 #endif
 
 struct handle_lookup_entry
 {
+/* V3 - no more extents */
+#if 0
     PVFS_handle_extent extent;
+#endif
     char* server_name;
     PVFS_BMI_addr_t server_addr;
 };
@@ -45,11 +54,19 @@ struct config_fs_cache_s
     struct qlist_head hash_link;
     struct filesystem_configuration_s *fs;
 
+/* V3 - no more handle ranges */
+#if 0
     /* index into fs->meta_handle_ranges obj (see server-config.h) */
     PINT_llist *meta_server_cursor;
 
     /* index into fs->data_handle_ranges obj (see server-config.h) */
     PINT_llist *data_server_cursor;
+#endif
+
+    /* copy of server_configuration_s/host_id (see server-config.h) */
+    char *data_local_alias;
+    /* handle mapping of local server (see server-config.h) */
+    struct host_handle_mapping_s *data_local_mapping;
 
     /*
       the following fields are used to cache arrays of unique physical
@@ -84,8 +101,9 @@ static int load_handle_lookup_table(
                         struct config_fs_cache_s *cur_config_fs_cache);
 #endif
 
+/* removed by WBL when selection algorithm rewritten 
 static int meta_randomized = 0;
-static int io_randomized = 0;
+static int io_randomized = 0; */
 
 /* PINT_cached_config_initialize()
  *
@@ -96,7 +114,10 @@ static int io_randomized = 0;
 int PINT_cached_config_initialize(void)
 {
     struct timeval tv;
+    unsigned int pid = 0;
+    unsigned int hostmix = 0;
     unsigned int seed = 0;
+    unsigned char *hashseed = NULL;
     char hostname[HOST_NAME_MAX];
     int ret;
     int i;
@@ -113,24 +134,47 @@ int PINT_cached_config_initialize(void)
      * concurrently 
      */
     gettimeofday(&tv, NULL);
-    seed += tv.tv_sec;
-    seed += tv.tv_usec;
 #ifdef WIN32
-    seed += GetCurrentProcessId();
+    pid = GetCurrentProcessId();
 #else
-    seed += getpid();
+    pid = getpid();
 #endif
 
     ret = gethostname(hostname, HOST_NAME_MAX);
     if(ret == 0)
     {
+        hostmix = 0;
         hostnamelen = strlen(hostname);
         for(i=0; i<hostnamelen; i++)
         {
-            seed += (hostname[hostnamelen - i - 1] + (i * 256));
+            hostmix += (hostname[i]);
         }
     }
-    
+
+    seed = (tv.tv_usec & 0xf000) |
+           ((hostmix & 0xf) << 16) |
+           ((pid & 0xf) << 8) |
+           (tv.tv_sec & 0xf) ; 
+
+#ifdef HAVE_OPENSSL_SHA_H
+#ifndef OPENSSL_NO_SHA1
+    hashseed = SHA1((unsigned char *)&seed, sizeof(seed), NULL);
+#endif
+#endif
+
+    if (hashseed)
+    {
+        int i;
+        unsigned char *seedptr;
+        /* use first byte of hashseed to select which bytes to use */
+        seedptr = (hashseed + ((*hashseed % 13) + 1));
+        seed = 0;
+        for (i = 0; i < sizeof(seed); i++)
+        {
+            seed |= seedptr[i] << (i * 8);
+        }
+    }
+    /* if no SHA1 so just use unhashed seed */
     srand(seed);
 
     return (PINT_fsid_config_cache_table ? 0 : -PVFS_ENOMEM);
@@ -259,7 +303,8 @@ int PINT_cached_config_reinitialize(struct server_configuration_s *config)
  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_handle_load_mapping(
-                            struct filesystem_configuration_s *fs)
+        struct filesystem_configuration_s *fs,
+        struct server_configuration_s *config)
 {
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     int ret;
@@ -274,12 +319,24 @@ int PINT_cached_config_handle_load_mapping(
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
 
         /* V3 obsolete */
-#if 0
         cur_config_fs_cache->meta_server_cursor =
                         cur_config_fs_cache->fs->meta_handle_ranges;
         cur_config_fs_cache->data_server_cursor =
                         cur_config_fs_cache->fs->data_handle_ranges;
-#endif
+        cur_config_fs_cache->data_local_alias =
+                        config->host_id;
+        /* find handle mapping of local host */
+        if (cur_config_fs_cache->data_local_alias)
+        {
+            cur_config_fs_cache->data_local_mapping =
+                    PINT_get_handle_mapping(
+                                    fs->data_handle_ranges, 
+                                    cur_config_fs_cache->data_local_alias);
+        }
+        else
+        {
+            cur_config_fs_cache->data_local_mapping = NULL;
+        }
 
         /* populate table used to speed up mapping of handle values 
          * to servers
@@ -362,8 +419,6 @@ int PINT_cached_config_get_server(PVFS_fs_id fs_id,
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
-/* V3 obsolete */
-#if 0
     if((int)type == PINT_SERVER_TYPE_META)
     {
         server_cursor = cur_config_cache->fs->meta_handle_ranges;
@@ -372,7 +427,6 @@ int PINT_cached_config_get_server(PVFS_fs_id fs_id,
     {
         server_cursor = cur_config_cache->fs->data_handle_ranges;
     }
-#endif
 
     cur_mapping = PINT_cached_config_find_server(server_cursor, host);
     /* didn't find the server */
@@ -425,7 +479,7 @@ int PINT_cached_config_get_next_meta(PVFS_fs_id fs_id,
                                      PVFS_BMI_addr_t *meta_addr,
                                      PVFS_handle_extent_array *ext_array)
 {
-    int ret = -PVFS_EINVAL, jitter = 0, num_meta_servers = 0;
+    int ret = -PVFS_EINVAL, randsrv = 0, num_meta_servers = 0;
     char *meta_server_bmi_str = NULL;
 /* V3 no more mappings */
 #if 0
@@ -434,69 +488,79 @@ int PINT_cached_config_get_next_meta(PVFS_fs_id fs_id,
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (ext_array)
+    if (!ext_array)
     {
-        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
-        if (hash_link)
-        {
-            cur_config_cache = qlist_entry(hash_link,
-                                           struct config_fs_cache_s,
-                                           hash_link);
+        gossip_err("PINT_cached_config_get_next_meta called with "
+                   "NULL ext_array.\n");
+        return -PVFS_EINVAL;
+    }
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
+    if (!hash_link)
+    {
+        gossip_err("Hash search failed to return configuration.\n");
+        return -PVFS_EINVAL;
+    }
+    cur_config_cache = qlist_entry(hash_link,
+                                   struct config_fs_cache_s,
+                                   hash_link);
 
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
-            assert(cur_config_cache->meta_server_cursor);
-
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+/* V3 obsolete */
 #if 0
-            num_meta_servers = PINT_llist_count(
-                            cur_config_cache->fs->meta_handle_ranges);
+    assert(cur_config_cache->meta_server_cursor);
 #endif
 
-            /* pick random starting point, then round robin */
-            if(!meta_randomized)
-            {
-                jitter = (rand() % num_meta_servers);
-                meta_randomized = 1;
-            }
-            else
-            {
-                /* we let the jitter loop below increment the cursor by one */ 
-                jitter = 0;
-            }
 /* V3 no more extents or mappings */
 #if 0
-            while(jitter-- > -1)
-            {
-                cur_mapping = PINT_llist_head(
-                                cur_config_cache->meta_server_cursor);
-                if (!cur_mapping)
-                {
-                    cur_config_cache->meta_server_cursor =
-                                    cur_config_cache->fs->meta_handle_ranges;
-                    cur_mapping = PINT_llist_head(
-                                    cur_config_cache->meta_server_cursor);
-                    assert(cur_mapping);
-                }
-                cur_config_cache->meta_server_cursor = PINT_llist_next(
-                                cur_config_cache->meta_server_cursor);
-            }
-            meta_server_bmi_str = cur_mapping->alias_mapping->bmi_address;
-
-            ext_array->extent_count =
-                            cur_mapping->handle_extent_array.extent_count;
-            ext_array->extent_array =
-                            cur_mapping->handle_extent_array.extent_array;
+    num_meta_servers = PINT_llist_count(
+                                  cur_config_cache->fs->meta_handle_ranges);
 #endif
 
-	    if (meta_addr != NULL)
-	    {
-		ret = BMI_addr_lookup(meta_addr, meta_server_bmi_str);
-	    }
-	    else
-	    {
-		ret = 0;
-	    }
+    randsrv = (rand() % num_meta_servers);
+
+/* V3 obsolete */
+#if 0
+    /* set cursor at beginning of list */
+    cur_config_cache->meta_server_cursor =
+                    cur_config_cache->fs->meta_handle_ranges;
+#endif
+
+/* V3 no more extents or mappings */
+#if 0
+    while(randsrv--)
+    {
+        cur_config_cache->meta_server_cursor =
+                        PINT_llist_next(cur_config_cache->meta_server_cursor);
+        if (!cur_config_cache->meta_server_cursor)
+        {
+            /* found end of list before we should have */
+            gossip_err("Found end of list of metaservers "
+                       "before expected in "
+                       "PINT_cached_config_get_next_meta\n");
+            /* return first metaserver */
+            cur_config_cache->meta_server_cursor =
+                            cur_config_cache->fs->meta_handle_ranges;
+            break;
         }
+
+    }
+
+    cur_mapping = PINT_llist_head(cur_config_cache->meta_server_cursor);
+
+    meta_server_bmi_str = cur_mapping->alias_mapping->bmi_address;
+
+    ext_array->extent_count = cur_mapping->handle_extent_array.extent_count;
+    ext_array->extent_array = cur_mapping->handle_extent_array.extent_array;
+#endif
+
+    if (meta_addr != NULL)
+    {
+	ret = BMI_addr_lookup(meta_addr, meta_server_bmi_str);
+    }
+    else
+    {
+	ret = 0;
     }
     return ret;
 }
@@ -570,16 +634,14 @@ int PINT_cached_config_map_servers(
 {
     struct qhash_head *hash_link;
     struct PINT_llist *server_list = NULL;
-/* V3 */
-#if 0
-    struct host_handle_mapping_s *cur_mapping = NULL;
-#endif
+    struct PINT_llist *server_list_head = NULL;
+    struct host_handle_mapping_s *sv = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    int ret = 0;
-    int num_io_servers, i;
+    int num_io_servers, i, df, ret;
+    int current_sv = -1;
     int start_index = -1;
-    int index;
-    int random_attempts;
+    int *random_array = NULL;
+    int *server_array = NULL;
 
     assert(inout_num_datafiles);
 
@@ -605,19 +667,57 @@ int PINT_cached_config_map_servers(
 
     switch(layout->algorithm)
     {
-        case PVFS_SYS_LAYOUT_LIST:
+    case PVFS_SYS_LAYOUT_LIST:
 
-            if(*inout_num_datafiles < layout->server_list.count)
+        if(*inout_num_datafiles < layout->server_list.count)
+        {
+            gossip_err("The specified datafile layout is larger"
+                       " than the number of requested datafiles\n");
+            return -PVFS_EINVAL;
+        }
+
+        *inout_num_datafiles = layout->server_list.count;
+        for(i = 0; i < layout->server_list.count; ++i)
+        {
+            if(handle_extent_array)
             {
-                gossip_err("The specified datafile layout is larger"
-                           " than the number of requested datafiles\n");
-                return -PVFS_EINVAL;
+/* V3 no more handle ranges mappings or extents */
+#if 0
+                ret = PINT_cached_config_get_extents(
+                                         fsid,
+                                         &layout->server_list.servers[i],
+                                         &handle_extent_array[i]);
+#endif
+                if(ret < 0)
+                {
+                    gossip_err("The address specified in the datafile "
+                               "layout is invalid\n");
+                    return ret;
+                }
             }
 
-            *inout_num_datafiles = layout->server_list.count;
-            for(i = 0; i < layout->server_list.count; ++i)
+            addr_array[i] = layout->server_list.servers[i];
+        }
+        break;
+
+    case PVFS_SYS_LAYOUT_LOCAL:
+        /*
+         * This layout puts the one datafile on the local
+         * machine, assuming the local machine is a server.
+         * This should have been determined when the config
+         * is parsed.  If this machine is not a server then
+         * use the default.
+         */
+        if (cur_config_cache->data_local_alias)
+        {
+            /* lookup addresses */
+            ret = BMI_addr_lookup(&addr_array[0],
+                                  cur_config_cache->data_local_alias);
+            if (!ret)
             {
-                if(handle_extent_array)
+                struct host_handle_mapping_s *mapping;
+                mapping = cur_config_cache->data_local_mapping;
+                if (mapping && handle_extent_array)
                 {
 /* V3 no more handle ranges mappings or extents */
 #if 0
@@ -633,142 +733,185 @@ int PINT_cached_config_map_servers(
                         return ret;
                     }
                 }
-
-                addr_array[i] = layout->server_list.servers[i];
+                /* local layout is only for one data file */
+                *inout_num_datafiles = 1;
             }
             break;
+        }
+        /* else random */
+        if(start_index == -1)
+        {
+            start_index = rand() % num_io_servers;
+        }
+        /* fall through */
 
-        case PVFS_SYS_LAYOUT_NONE:
+    case PVFS_SYS_LAYOUT_NONE:
+        /*
+         * This layout is just like Round Robin except
+         * it does not randomly set the start_index with
+         * a random call but uses zero.  If start_index
+         * is already set, just fall through.
+         */
+        if (start_index == -1)
+        {
             start_index = 0;
-            /* fall through */
+        }
+        /* fall through */
 
-        case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+    case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+        /*
+         * This layout generates a random number from 
+         * zero to num_io_servers - 1 and then allocates
+         * inout_num_datafiles servers starting with that
+         * as the first.  Other parts of the code ensure
+         * that inout_num_datafiles < num_io_servers but
+         * this code should correctly allocate multiple
+         * datafiles per server round robin - though that
+         * won't happen with the current caode base 
+         */
 
-            if(num_io_servers < *inout_num_datafiles)
-            {
-                *inout_num_datafiles = num_io_servers;
-            }
+        if(num_io_servers < *inout_num_datafiles)
+        {
+            *inout_num_datafiles = num_io_servers;
+        }
 
-            if(start_index == -1)
-            {
-                start_index = rand() % *inout_num_datafiles;
-            }
+        if(start_index == -1)
+        {
+            start_index = rand() % num_io_servers;
+        }
 
-            for(i = 0; i < *inout_num_datafiles; ++i)
-            {
+        /* start at beginning of server list */
+        server_list = server_list_head;
+        /* search for the start_index server */
+        for (i = 0; i < start_index; i++)
+        {
+            server_list = PINT_llist_next(server_list);
+        }
+        sv = PINT_llist_head(server_list);
+        assert(sv);
+        /* for each data file */
+        for(df = 0; df < *inout_num_datafiles; df++)
+        {
 /* V3 no more handle ranges mappings or extents */
 #if 0
-                cur_mapping = PINT_llist_head(server_list);
-                assert(cur_mapping);
+            /* lookup addresses */
+            ret = BMI_addr_lookup(&addr_array[df],
+                                  sv->alias_mapping->bmi_address);
 #endif
+            if (ret)
+            {
+                return ret;
+            }
+
+/* V3 no more handle ranges mappings or extents */
+#if 0
+            /* no one uses this but we get it anyway */
+            if(handle_extent_array)
+            {
+                handle_extent_array[df].extent_count =
+                                sv->handle_extent_array.extent_count;
+                handle_extent_array[df].extent_array =
+                                sv->handle_extent_array.extent_array;
+            }
+#endif
+            /* go to next server in list */
+            server_list = PINT_llist_next(server_list);
+            sv = PINT_llist_head(server_list);
+            if (!sv)
+            {
+                server_list = server_list_head;
+                sv = PINT_llist_head(server_list);
+            }
+            assert(sv);
+        }
+        break;
+
+    case PVFS_SYS_LAYOUT_RANDOM:
+        /* this layout randomizes the order but still uses each server
+         * only once
+         */
+
+        /* limit this layout to a number of datafiles no greater than
+         * the number of servers
+         */
+        if(num_io_servers < *inout_num_datafiles)
+        {
+            *inout_num_datafiles = num_io_servers;
+        }
+        /* init all the addrs to 0, so we know whether we've set an
+         * address at a particular index or not
+         */
+        random_array = (int *)malloc(*inout_num_datafiles * sizeof(int));
+        server_array = (int *)malloc(num_io_servers * sizeof(int));
+        memset(random_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
+        memset(server_array, 0, (num_io_servers)*sizeof(*addr_array));
+
+        /* generate list of unique random numbers from 0 to */
+        /* inout_num_datafiles - 1 */
+        for(df = 0; df < *inout_num_datafiles; df++)
+        {
+            int server = rand() % num_io_servers;
+            while (server_array[server])
+            {
+                /* if we get a conflict skip on down to next entry */
+                server = (server + 1) % num_io_servers;
+            }
+            server_array[server] = 1;
+            random_array[df] = server;
+        }
+        /* server array is only to make sure we don't duplicate */
+        free(server_array);
+
+        current_sv = 0;
+        server_list = server_list_head;
+        /* go through data file list in order */
+        for(df = 0; df < *inout_num_datafiles; df++)
+        {
+            /* if we're already past the next one on the list */
+            /* go back to head of the list */
+            if (random_array[df] < current_sv)
+            {
+                server_list = server_list_head;
+                current_sv = 0;
+            }
+            /* skip down the list to the one we want */
+            while(current_sv < random_array[df])
+            {
                 server_list = PINT_llist_next(server_list);
-
-                index = (i + start_index) % *inout_num_datafiles;
-/* V3 no more handle ranges mappings or extents */
-#if 0
-                ret = BMI_addr_lookup(
-                                &addr_array[index],
-                                cur_mapping->alias_mapping->bmi_address);
-#endif
-                if (ret)
-                {
-                    return ret;
-                }
-
-/* V3 no more handle ranges mappings or extents */
-#if 0
-                if(handle_extent_array)
-                {
-                    handle_extent_array[index].extent_count =
-                                cur_mapping->handle_extent_array.extent_count;
-                    handle_extent_array[index].extent_array =
-                                cur_mapping->handle_extent_array.extent_array;
-                }
-#endif
+                current_sv++;
             }
-            break;
-
-        case PVFS_SYS_LAYOUT_RANDOM:
-            /* this layout randomizes the order but still uses each server
-             * only once
-             */
-
-            /* limit this layout to a number of datafiles no greater than
-             * the number of servers
-             */
-            if(num_io_servers < *inout_num_datafiles)
+            /* get the server info */
+            sv = PINT_llist_head(server_list);
+            assert(sv);
+            /* lookup addresses */
+/* V3 no more handle ranges mappings or extents */
+#if 0
+            ret = BMI_addr_lookup(&addr_array[df],
+                                  sv->alias_mapping->bmi_address);
+            /* no one uses this but we get it anyway */
+            if(handle_extent_array)
             {
-                *inout_num_datafiles = num_io_servers;
+                handle_extent_array[df].extent_count =
+                                sv->handle_extent_array.extent_count;
+                handle_extent_array[df].extent_array =
+                             sv->handle_extent_array.extent_array;
             }
-
-            /* init all the addrs to 0, so we know whether we've set an
-             * address at a particular index or not
-             */
-            memset(addr_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
-
-            for(i = 0; i < *inout_num_datafiles; ++i)
-            {
-                /* go through server list in order */
-/* V3 no more handle ranges mappings or extents */
-#if 0
-                cur_mapping = PINT_llist_head(server_list);
-                assert(cur_mapping);
 #endif
-                server_list = PINT_llist_next(server_list);
+        }
+        /* done with this so free it */
+        free(random_array);
+        break;
 
-                /* select random index into caller's list */
-                index = rand() % *inout_num_datafiles;
-                random_attempts = 1;
-
-                /* if we have already filled that index, try another random
-                 * index 
-                 */ 
-                while(addr_array[index] != 0 && random_attempts < 6)
-                {
-                    index = rand() % *inout_num_datafiles;
-                    random_attempts++;
-                }
-
-                /* if we exhausted a max number of randomization attempts,
-                 * then just go linearly through list
-                 */
-                while(addr_array[index] != 0)
-                {
-                    index = (index + 1) % *inout_num_datafiles;
-                }
-
-                /* found an unused index */
-/* V3 no more handle ranges mappings or extents */
-#if 0
-                ret = BMI_addr_lookup(&addr_array[index],
-                                      cur_mapping->alias_mapping->bmi_address);
-#endif
-                if (ret)
-                {
-                    return ret;
-                }
-
-/* V3 no more handle ranges mappings or extents */
-#if 0
-                if(handle_extent_array)
-                {
-                    handle_extent_array[index].extent_count =
-                                cur_mapping->handle_extent_array.extent_count;
-                    handle_extent_array[index].extent_array =
-                                cur_mapping->handle_extent_array.extent_array;
-                }
-#endif
-            }
-            break;
-        default:
-            gossip_err("Unknown datafile mapping algorithm\n");
-            return -PVFS_EINVAL;
+    default:
+        gossip_err("Unknown datafile mapping algorithm\n");
+        return -PVFS_EINVAL;
     }
     return 0;
+
 }
 
-/* V3 becomes SID cache function */
-
+/* THIS APPEARS TO BE SUPERCEDED BY THE PREVIOUS FUNCTION*/
+#if 0
 /* PINT_cached_config_get_next_io()
  *
  * returns the address of a set of servers that should be used to
@@ -902,6 +1045,7 @@ int PINT_cached_config_get_next_io(
     }
     return ret;
 }
+#endif
 
 /* V3 becomes SID cache funcdtion */
 
@@ -973,8 +1117,9 @@ int PINT_cached_config_check_type(PVFS_fs_id fs_id,
     {
         return(-PVFS_EINVAL);
     }
-    cur_config_cache = qlist_entry(
-        hash_link, struct config_fs_cache_s, hash_link);
+    cur_config_cache = qlist_entry(hash_link,
+                                   struct config_fs_cache_s,
+                                   hash_link);
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
@@ -988,7 +1133,7 @@ int PINT_cached_config_check_type(PVFS_fs_id fs_id,
     for(i = 0; i < cur_config_cache->server_count; i++)
     {
         if (!(strcmp(cur_config_cache->server_array[i].addr_string,
-           server_addr_str)))
+                     server_addr_str)))
         {
             *server_type = cur_config_cache->server_array[i].server_type;
             return(0);
@@ -1354,8 +1499,6 @@ int PINT_cached_config_get_server_handle_count(const char *server_addr_str,
         assert(cur_config_cache);
         assert(cur_config_cache->fs);
 
-/* V3 obsolete */
-#if 0
         server_mapping = PINT_cached_config_find_server(
                      cur_config_cache->fs->meta_handle_ranges,
                      server_addr_str);
@@ -1373,7 +1516,6 @@ int PINT_cached_config_get_server_handle_count(const char *server_addr_str,
             *handle_count += PINT_extent_array_count_total(
                             &server_mapping->handle_extent_array);
         }
-#endif
     }
     return 0;
 }
@@ -1645,7 +1787,7 @@ static int cache_server_array(PVFS_fs_id fs_id)
                 tmp_server = PINT_llist_next(tmp_server);
                 server_bmi_str = cur_mapping->alias_mapping->bmi_address;
 
-                ret = BMI_addr_lookup(&tmp_bmi_addr,server_bmi_str);
+                ret = BMI_addr_lookup(&tmp_bmi_addr, server_bmi_str);
                 if (ret < 0)
                 {
                     return(ret);
@@ -1704,7 +1846,7 @@ static int cache_server_array(PVFS_fs_id fs_id)
     }
     return 0;
 
-  cleanup_allocations:
+cleanup_allocations:
     if (cur_config_cache->meta_server_array)
     {
         free(cur_config_cache->meta_server_array);
@@ -1764,9 +1906,9 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
 
 #if 0
 /* handle_lookup_entry_compare()
- *  *
- *   * comparison function used by qsort()
- *    */
+ * 
+ * comparison function used by qsort()
+ */
 static int handle_lookup_entry_compare(const void *p1, const void *p2)
 {
     const struct handle_lookup_entry* e1  = p1;
@@ -1819,9 +1961,13 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
         if
         (PVFS_OID_cmp(&cur_config_cache->handle_lookup_table[mid].extent.first,
                       &handle) < 0)
+        {
             low = mid + 1; 
+        }
         else
+        {
             high = mid;
+        }
     }
     if ((low < cur_config_cache->handle_lookup_table_size) && 
         (!PVFS_OID_cmp(&cur_config_cache->handle_lookup_table[low].extent.first,
@@ -1838,8 +1984,8 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
 
     /* confirm match */
     if(PINT_handle_in_extent(
-        &cur_config_cache->handle_lookup_table[table_index].extent,
-        handle))
+                    &cur_config_cache->handle_lookup_table[table_index].extent,
+                    handle))
     {
         return(&cur_config_cache->handle_lookup_table[table_index]);
     }
@@ -1884,7 +2030,7 @@ static int load_handle_lookup_table(
         while(cur_mapping)
         {
             /* each server may have multiple extents */
-            for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
+            for(i = 0; i < cur_mapping->handle_extent_array.extent_count; i++)
             {
                 count += 1;
             }
@@ -1899,7 +2045,7 @@ static int load_handle_lookup_table(
         free(cur_config_fs_cache->handle_lookup_table);
     }
     cur_config_fs_cache->handle_lookup_table = 
-        malloc(sizeof(*cur_config_fs_cache->handle_lookup_table) * count);
+            malloc(sizeof(*cur_config_fs_cache->handle_lookup_table) * count);
     if(!cur_config_fs_cache->handle_lookup_table)
     {
         return(-PVFS_ENOMEM);
@@ -1914,7 +2060,7 @@ static int load_handle_lookup_table(
         cur_mapping = PINT_llist_head(server_cursor);
         while(cur_mapping)
         {
-            for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
+            for(i = 0; i < cur_mapping->handle_extent_array.extent_count; i++)
             {
                 cur_config_fs_cache->handle_lookup_table[table_offset].extent 
                     = cur_mapping->handle_extent_array.extent_array[i];
@@ -1989,7 +2135,7 @@ int PINT_cached_config_io_server_names(char ***list,
        return(-PVFS_ENOMEM);
     }
 
-    memset(*list,0,sizeof(char *) * (*size));
+    memset(*list, 0, sizeof(char *) * (*size));
 
     for (i = 0; i < (*size); i++)
     {

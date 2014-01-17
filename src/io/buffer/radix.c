@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "pvfs2-internal.h"
 #include "radix.h"
 
 /*

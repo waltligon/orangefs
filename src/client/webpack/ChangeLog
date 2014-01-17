@@ -1,0 +1,16 @@
+2.9
+
+  Ported all code to work with OrangeFS 2.9. Overhauled the build system
+  so that modules can be built individually.
+
+2.8.7
+
+  added code to prevent seeing two slashes in file names under some
+  circumstances.
+
+  added code to enforce permissions on read and write.
+
+  morphed DavPVFSInit server directive into PVFSInit, now both
+  modules (and all modules in the future?) will use PVFSInit to 
+  decide whether or not to run PVFS_util_init_defaults().
+

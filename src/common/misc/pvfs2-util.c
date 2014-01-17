@@ -24,6 +24,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
@@ -34,7 +35,6 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "security-util.h"
 #include "pvfs-path.h"
@@ -68,7 +68,6 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
 
 #elif HAVE_FSTAB_H
-#include "openfile-util.h"
 
 #include <fstab.h>
 #define PINT_fstab_t FILE
@@ -181,7 +180,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
                                     PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
-                                    NULL, cred);
+                                    NULL, NULL, cred);
 }
 
 #ifdef ENABLE_SECURITY_MODE
@@ -193,21 +192,20 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
  * group - string representation of numeric gid
  * timeout - in seconds; value of 0 will result in default (1 hour)
  * keypath - path to client private key file
+ * certpath - path to client certificate file
  * cred - the credential object
  */
 int PVFS_util_gen_credential(const char *user,
                              const char *group,
                              unsigned int timeout,
                              const char *keypath,
+                             const char *certpath,
                              PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
     int filedes[2], errordes[2];
     int ret;
-#ifdef ENABLE_SECURITY_CERT
-    char *certpath;
-#endif
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
@@ -215,7 +213,10 @@ int PVFS_util_gen_credential(const char *user,
     }
 
 #ifdef ENABLE_SECURITY_CERT
-    certpath = getenv("PVFS2CERT_FILE");
+    if (!certpath && getenv("PVFS2CERT_FILE"))
+    {
+        certpath = getenv("PVFS2CERT_FILE");
+    }
 #endif
 
     memset(&newsa, 0, sizeof(newsa));
@@ -277,7 +278,7 @@ int PVFS_util_gen_credential(const char *user,
         if (certpath)
         {
             *ptr++ = "-c";
-            *ptr++ = certpath;
+            *ptr++ = (char*)certpath;
         }
 #endif
         *ptr++ = NULL;
@@ -594,7 +595,8 @@ int PINT_gen_unsigned_credential(const char *user,
  * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     if (cred == NULL)
     {
@@ -659,7 +661,9 @@ int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr,
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
-        dest_attr->dirdata_count = src_attr->dirdata_count;
+        dest_attr->distr_dir_servers_initial = src_attr->distr_dir_servers_initial;
+        dest_attr->distr_dir_servers_max = src_attr->distr_dir_servers_max;
+        dest_attr->distr_dir_split_size = src_attr->distr_dir_split_size;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -1666,6 +1670,9 @@ int PVFS_util_init_defaults(void)
     int ret = -1, i = 0, j = 0, found_one = 0;
     int failed_indices[PVFS2_MAX_INVALID_MNTENTS] = {0};
 
+    /* first set up our malloc */
+    init_glibc_malloc();
+
     /* use standard system tab files */
     const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
     if (!tab)
@@ -1693,6 +1700,12 @@ int PVFS_util_init_defaults(void)
         }
         else
         {
+            if (ret == -PVFS_EEXIST)
+            {
+                /* this mount already exists so count it as found */
+                found_one = 1;
+                continue;
+            }
             failed_indices[j++] = i;
 
             if (j > (PVFS2_MAX_INVALID_MNTENTS - 1))
@@ -1716,7 +1729,7 @@ int PVFS_util_init_defaults(void)
         if (failed_indices[i])
         {
             PVFS_util_remove_internal_mntent(
-                &tab->mntent_array[failed_indices[i]]);
+                          &tab->mntent_array[failed_indices[i]]);
         }
         else
         {

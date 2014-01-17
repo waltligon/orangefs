@@ -47,9 +47,19 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
+#ifdef ENABLE_CAPCACHE
+#include "capcache.h"
+#endif
+#ifdef ENABLE_CREDCACHE
+#include "credcache.h"
+#endif
+#ifdef ENABLE_CERTCACHE
+#include "certcache.h"
+#endif
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -191,6 +201,9 @@ int main(int argc, char **argv)
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
+
+    /* Set up out malloc wrapper by grabbing pointers to glibc malloc */
+    init_glibc_malloc();
 
     /* Enable the gossip interface to send out stderr and set an
      * initial debug mask so that we can output errors at startup.
@@ -572,6 +585,52 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     }
 
     *server_status_flag |= SERVER_SECURITY_INIT;
+
+#ifdef ENABLE_CAPCACHE
+    /* initialize the capability cache */
+    ret = PINT_capcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize capability cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CAPCACHE_INIT;
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CREDCACHE
+    /* initialize the credential cache */
+    ret = PINT_credcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize credential cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CREDCACHE_INIT;
+#endif
+
+#ifdef ENABLE_CERTCACHE
+    /* initialize the certificate cache */
+    ret = PINT_certcache_init();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize certificate cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CERTCACHE_INIT;
+
+    /* cache CA cert */
+    ret = PINT_security_cache_ca_cert();
+    if (ret != 0)
+    {
+        gossip_err("Warning: could not cache CA certificate: %d.\n", ret);
+    }
+#endif
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1747,6 +1806,28 @@ static int server_shutdown(PINT_server_status_flag status,
                      "module           [ stopped ]\n");
     }
 
+#ifdef ENABLE_CAPCACHE    
+    if (status & SERVER_CAPCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
+                     "cache           [   ...   ]\n");
+        PINT_capcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CERTCACHE    
+    if (status & SERVER_CERTCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
+                     "cache           [   ...   ]\n");
+        PINT_certcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CERTCACHE */
+
     if (status & SERVER_ENCODER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting encoder "
@@ -1969,7 +2050,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if(argc < optind)
+    if(argc <= optind)
     {
         gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;

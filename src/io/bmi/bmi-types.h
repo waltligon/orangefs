@@ -21,6 +21,7 @@
 #ifndef __BMI_TYPES_H
 #define __BMI_TYPES_H
 
+#include "pvfs2-internal.h"
 #include <stdlib.h>
 
 #ifdef WIN32
@@ -88,7 +89,8 @@ enum
     BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
     BMI_TCP_CLOSE_SOCKET = 13,
     BMI_OPTIMISTIC_BUFFER_REG = 14,
-    BMI_TCP_CHECK_UNEXPECTED = 15
+    BMI_TCP_CHECK_UNEXPECTED = 15,
+    BMI_TRANSPORT_METHODS_STRING = 16,
 };
 
 enum BMI_io_type

@@ -7,6 +7,7 @@
 #ifndef __PINT_CACHED_CONFIG_H
 #define __PINT_CACHED_CONFIG_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-mgmt.h"
@@ -30,7 +31,8 @@ int PINT_cached_config_finalize(void);
 
 #if 0
 int PINT_cached_config_handle_load_mapping(
-    struct filesystem_configuration_s *fs);
+    struct filesystem_configuration_s *fs,
+    struct server_configuration_s *config);
 #endif
 
 int PINT_cached_config_map_alias(
@@ -59,11 +61,14 @@ int PINT_cached_config_get_io(
     PVFS_BMI_addr_t *io_addr,
     PVFS_handle_extent_array *ext_array);
 
+/* This appears to be obsolete */
+#if 0
 int PINT_cached_config_get_next_io(
     PVFS_fs_id fsid,
     int num_servers,
     PVFS_BMI_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
+#endif
 
 const char *PINT_cached_config_map_addr(
     PVFS_fs_id fsid,

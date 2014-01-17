@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 
 static uint64_t debug_to_mask(__keyword_mask_t *mask_map, 

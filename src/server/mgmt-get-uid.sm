@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 #include "pint-uid-mgmt.h"
 #include "pint-util.h"
 
@@ -119,11 +120,15 @@ static PINT_sm_action uid_mgmt_do_work(
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_mgmt_get_uid(PINT_server_op *s_op)
+{
+    return 0;
+}
+
 struct PINT_server_req_params pvfs2_uid_mgmt_params =
 {
     .string_name = "mgmt_get_uid",
-/* TODO: orange-security */
-    .perm = (PINT_server_req_perm_fun) PINT_SERVER_CHECK_NONE,
+    .perm = perm_mgmt_get_uid,
     .state_machine = &pvfs2_uid_mgmt_sm
 };
 

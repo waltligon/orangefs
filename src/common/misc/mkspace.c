@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/stat.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2-attr.h"
 #include "trove.h"
 #include "mkspace.h"
@@ -22,7 +24,6 @@
 #include "str-utils.h"
 #include "extent-utils.h"
 #include "pvfs2-util.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
 #include "dist-dir-utils.h"
@@ -152,6 +153,9 @@ int pvfs2_mkspace(char *data_path,
 #endif
     TROVE_context_id trove_context = -1;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
+    struct stat root_stat;
+    struct stat meta_stat;
+    struct stat data_stat;
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -166,6 +170,52 @@ int pvfs2_mkspace(char *data_path,
                    data_handle_ranges : "NONE"));
 
     new_root_handle = root_handle;
+
+
+    /* init stat buffers */
+    memset(&root_stat, 0, sizeof(root_stat));
+    memset(&meta_stat, 0, sizeof(meta_stat));
+
+    /* call stat on root, meta, and data paths */
+    stat("/", &root_stat);
+    stat(meta_path, &meta_stat);
+
+    /* see if the metadata path is located on the root device */
+    if (meta_stat.st_dev == root_stat.st_dev)
+    {
+        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                      "*** WARNING *** *** WARNING *** *** WARNING ***\n");
+        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                      "*The MetadataStorageSpace path %s appears\n"
+                      "      to be on the root device.\n", meta_path);
+        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                      "*It is recommended that the meta data be\n"
+                      "      stored on a dedicated partition.\n");
+        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                      "*If you have a dedicated partition setup,\n"
+                      "      please be sure it is mounted.\n\n");   
+    }
+
+    if (!create_collection_only)
+    {
+        memset(&data_stat, 0, sizeof(data_stat));
+        stat(data_path, &data_stat);
+        /* see if the data path is located on the root device */
+        if (data_stat.st_dev == root_stat.st_dev)
+        {
+            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                          "*** WARNING *** *** WARNING *** *** WARNING ***\n");
+            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                          "*The DataStorageSpace path %s appears\n"
+                          "      to be on the root device.\n", data_path);
+            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                          "*It is recommended that the data be\n"
+                          "      stored on a dedicated partition.\n");
+            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
+                          "*If you have a dedicated partition setup,\n"
+                          "      please be sure it is mounted.\n\n");   
+        }
+    }
 
     /*
      * if we're only creating a collection inside an existing
@@ -304,7 +354,7 @@ int pvfs2_mkspace(char *data_path,
 	return -1;
     }
 
-    mkspace_print(verbose,"info: set handle ranges to %s\n",
+    mkspace_print(verbose, "info: set handle ranges to %s\n",
                   merged_handle_ranges);
 
     free(merged_handle_ranges);

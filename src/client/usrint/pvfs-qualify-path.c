@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs-path.h"
 
 
@@ -23,6 +24,9 @@
  * are no symbolic links.  If there are we assume this
  * will fail lookup later and we will have to run
  * pvfs_expand_path to work out the symbolic links.
+ *
+ * Sets PATH_QUALIFIED to indicate a successful run of this routine
+ * Clears all other flags.
  *
  * code taken from realpath
  *

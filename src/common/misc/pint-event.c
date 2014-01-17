@@ -20,6 +20,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "pint-event.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
@@ -28,8 +29,6 @@
 #include "quickhash.h"
 #include "id-generator.h"
 #include "str-utils.h"
-
-#include "pvfs2-config.h"
 
 #ifdef HAVE_TAU
 #include "pvfs_tau_api.h"

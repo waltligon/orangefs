@@ -203,7 +203,10 @@ typedef struct server_configuration_s
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */
     uint32_t  *precreate_low_threshold; /* threshold for each ds type */
+/* V3 ECQ - unneeded? */
+#if 0
     uint32_t init_num_dirdata_handles; /* initial number of dirdata handles when creating a new directory */
+#endif
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -228,6 +231,7 @@ typedef struct server_configuration_s
     void  *security;                /* BMI module specific information */
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
 #endif /* USE_TRUSTED */
+    int  prev_context;              /* currently only used for security */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_t       */
     PINT_llist *prime_servers;      /* ptrs are type prime_server_t     */
@@ -248,7 +252,17 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
+    char *ca_file;                   /* location of CA certificate */
+    char *user_cert_dn;              /* dn that forms the root of the
+                                      * user certificate dn
+                                      */
+    int user_cert_exp;               /* expiration of a user certificate
+                                      * in days
+                                      */
+/* V3 ECQ - unneeded? */
+#if 0
     char *ca_path;                   /* location of CA certificate */
+#endif
 
     char *ldap_hosts;                /* list of LDAP host URIs */
     char *ldap_bind_dn;              /* LDAP bind user */
@@ -267,6 +281,10 @@ typedef struct server_configuration_s
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;
+
+    int32_t distr_dir_servers_initial;
+    int32_t distr_dir_servers_max;
+    int32_t distr_dir_split_size;
 } server_configuration_t;
 
 int PINT_parse_config(

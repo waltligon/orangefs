@@ -1,0 +1,449 @@
+  
+                OrangeFS Apache Modules
+  
+  What are they?
+  -------------
+  
+  libmod_dav_orangefs.so is an Apache module that implements a 
+  native OrangeFS DAV repository. libmod_dav_orangefs.so works
+  with the standard mod_dav module that comes with Apache.
+  
+  libmod_orangefs_s3.so is an Apache module that allows you to 
+  store and retrieve Amazon Simple Storage Service (s3) buckets 
+  natively in OrangeFS.
+  
+  Where are they?
+  ---------------
+  
+  http://www.orangefs.org
+  
+  Documentation
+  -------------
+  
+  http://www.orangefs.org
+  
+  Installation
+  ------------
+  
+  $ ./configure
+  $ make
+  $ make install
+  
+  These modules are designed to be compiled and installed with 
+  "configure/make/make install". Both modules require apr-1-config, 
+  apxs (or apxs2), httpd and the Orangefs API library.  S3 also requires 
+  libxml2.  There are numerous ways to get these dependencies if you 
+  don't already have them, often they are obtained via packages built 
+  for whatever package manager your OS uses. Here's some example rpm 
+  package names...
+  
+  # rpm -qf  /usr/bin/apr-1-config
+  apr-devel-1.4.6-1.fc16.x86_64
+  
+  # rpm -qf /usr/sbin/apxs
+  httpd-devel-2.2.22-1.fc16.x86_64
+  
+  # rpm -qf /usr/include/httpd
+  httpd-devel-2.2.22-1.fc16.x86_64
+  
+  # rpm -qf /usr/include/libxml2
+  libxml2-devel-2.7.8-6.fc16.x86_64
+  
+  The first step to building the OrangeFS modules is to run configure in
+  the directory where you unpacked the module tar file. If you
+  installed the module dependencies using your OS's package
+  manager, you can probably just run configure with the module selection
+  arguments.
+
+  $ ./configure --enable-admin --enable-authn --enable-dav --enable-s3
+  
+  If any of the dependencies are not found when you run configure,
+  messages will inform you of how to help configure find the needed
+  dependencies. Here's an example of running configure with arguments
+  to specify where to find some of the dependencies:
+  
+  $ ./configure --with-apxs=/usr/local/dav/bin/apxs \
+                --with-pvfs2-config=/o2.8.5/install/bin/pvfs2-config \
+                --with-pvfs2-source=/o2.8.5/source/orangefs-2.8.5 \
+                --with-xml2-config=/usr/local/xml2-config
+
+  If a dependency of a module is not found and that module is selected
+  to be built, the configure script will report the error.
+  
+  When you type "make install", apxs will cause LoadModule statements
+  for each of the OrangeFS modules to be added to httpd.conf.
+  
+  The OrangeFS modules will also require some configuration directives
+  to be manually added to httpd.conf, some examples are at the end of
+  this README file.
+  
+  OrangeFS API library
+  --------------------
+  
+  By default OrangeFS builds its API library as a static library. To build 
+  these modules, which are themselves shared libraries, you need to first
+  build OrangeFS's API library as a shared library.
+   
+  ./configure --enable-shared  <-- on orangefs
+  
+  Once Apache uses LoadModule to load libmod_dav_orangefs.so and/or 
+  libmod_dav_s3.so, Apache will effectively become an OrangeFS client, and
+  Apache will need to be able to find the OrangeFS API library. 
+  
+  If you installed your OrangeFS API library someplace where Apache can't
+  find it, you can you edit /etc/ld.so.conf, or better yet, add a file to 
+  /etc/ld.so.conf.d. After you add your file to /etc/ld.so.conf.d, run
+  ldconfig, or reboot. As an example, if OrangeFS 2.8.5 was installed in
+  /o2.8.5/install.  
+  
+      cat /etc/ld.so.conf.d/orangefs.conf
+      /o2.8.5/install/lib
+  
+  Individual users who install OrangeFS in their own directory can edit 
+  their LD_LIBRARY_PATH if they can't edit /etc/ld.so.conf.
+  
+  Apache
+  ------
+  
+  If you install Apache with a package manager, enabling any features or
+  modules you might need is probably just a matter of configuration directives
+  in httpd.conf.
+  
+  If you compile Apache from sources, this invocation of configure should
+  get you enough standard modules and features to support use of the
+  OrangeFS modules:
+  
+  ./configure --prefix=/usr/local/dav --enable-so --enable-dav \
+              --enable-dbd --with-included-apr
+  
+    enable-so: allows Apache to load modules at start-up time
+  
+    enable-dav: enables DAV <g>
+  
+    enable-dbd: Apache DBD Framework... the DAV fs module uses berkeley db...
+  
+    with-included-apr:  The apr libraries come with Apache, you could choose
+                        to use apr libraries obtained some other way, but this
+                        is easy and probably what you want to do if you're
+                        installing Apache from source.
+  
+  Some Webdav clients
+  -------------------
+  
+  XP:   net use W: http://valkyrie.clemson.edu/pvfsmnt
+  
+  Mac: mount -t webdav http://valkyrie.clemson.edu/pvfsmnt /Volumes/valkyrie
+  
+  Linux: first, make sure that you have the davfs2 package installed...
+  
+         mount -t davfs http://valkyrie.clemson.edu/pvfsmnt /mnt
+  
+  web browser: http://valkyrie.clemson.edu/pvfsmnt
+  
+  DAV tester: http://www.webdav.org/neon/litmus/
+  
+  Authentication and Authorization
+  --------------------------------
+  
+  OrangeFs is a network filesystem. In general, an OrangeFs filesystem 
+  is filled with files and directories, all of which have normal unix 
+  permissions, they are associated with UIDs and GIDs.
+  
+  For security reasons, Apache typically runs as some unprivileged 
+  user, maybe daemon, UID = 2 a lot of the time. When it loads the OrangeFS 
+  modules Apache becomes an OrangeFs client. An OrangeFs client's credentials
+  contain, by default, the UID and GID of the client process.
+  
+  It would be a problem, in general, for an OrangeFs client with
+  an unprivileged UID/GID association to be able to read and write
+  on an OrangeFs filesystem containing many files with arbitrary
+  UID/GID associations. 
+  
+  When OrangeFs is running without signed credentials
+  OrangeFs client can set the UID/GID pair in the credential to
+  any value. This is where Authentication and Authorization are
+  important.
+
+  When OrangeFs is running without signed credentials or with key based
+  security OrangeFs client can set the UID/GID pair in the credential to
+  any value. This is where Authentication and Authorization are important.
+  In key based security, the credential is based on a machine private
+  certificate that Apache has access to. Thus Apache can claim to be any
+  logged in user. In certificate based security, the client provided
+  username and password are used to generate a credential.
+
+  If you don't need Authentication and Authorization, you can configure
+  Apache to access your OrangeFS filesystem via the DAV module like this:
+  
+  <Location /pvfsmnt>
+    DAV mod_dav_orangefs
+  </Location>
+  
+  With the above configuration, only the files and directories accessible
+  by the UID/GID that Apache is running as will be available.
+  
+  Here is a way that "local" Authentication and Authorization could work
+  for the DAV module:
+  
+    use normal Apache auth, preferably in digest mode, since basic
+    puts clear-text (encoded with base64) passwords on the wire. 
+  
+    The local machine (the one running Apache) needs to have 
+    a password/shadow file with users whose UID/GID pairs match
+    up to all/some-of the files and directories the OrangeFs filesystem.
+  
+    The local machine also needs to have a htpasswd/htdigest file whose
+    symbolic usernames match the ones in /etc/passwd. Besides whatever
+    other ways such a file could be obtained, one can be made from
+    /etc/shadow with all the administrative/non-OrangeFs users
+    removed. Passwords encrypted with SHA-512 are probably best, since
+    the htpasswd/htdigest file is readable by Apache (though it shouldn't 
+    be exposed) but digest mode needs you to use MD5. If you use https,
+    it could be safe to use basic auth, since the whole stream on the wire
+    is protected.
+  
+    Once a user is authenticated, his symbolic name will be added
+    to any request records. It can be fetched from there and fed to
+    getpwnam to obtain the needed UID/GID pair, which can then be
+    inserted into the credential.
+  
+       <Location /pvfsmnt>
+         DAV orangefs
+  
+         AuthType Digest
+         AuthName "Digest Auth Test"
+         AuthDigestDomain /pvfsmnt
+         AuthUserFile /usr/local/http/digest.file
+         AuthDigestProvider file
+         Require valid-user
+       </Location>
+  
+   
+  Here is a way that "ldap" Authentication and Authorization could work
+  for the DAV module:
+  
+    Normal configurations of Apache for ldap are fine, the problem
+    remains though that you need an ldap store filled with users who
+    have appropriate uid/gid attributes. Once you have a suitable
+    ldap tree:
+  
+       # ldapsearch -x -b 'dc=omnibond,dc=com' '(objectclass=person)'
+       dn: uid=luser1,ou=users,dc=omnibond,dc=com
+       uid: luser1
+       uidNumber: 1001
+       gidNumber: 1001
+       userPassword:: e1NTSEF9TndEUEdHQ0xmNHFGaSs3a0oydlFCd2NISDlxTVk1Ujk=
+  
+  
+       <Location /pvfsmnt>
+         DAV orangefs
+  
+         AuthType Basic
+         AuthName "ldap auth"
+         AuthBasicProvider ldap
+         AuthzLDAPAuthoritative off
+         AuthLDAPURL "ldap://valkyrie.omnibond.com/ou=users,dc=omnibond,dc=com?uid,uidNumber,gidNumber??(objectClass=*)"
+         Require valid-user
+       </Location>
+  
+
+    There are several other configurations directives for the DAV module
+    that are useful.
+
+    DAVpvfsDefaultPerms 10019 10020 000
+
+      The module prepares a data structure to hold a resource's
+      permissions prior to looking them up. Just to be safe, 
+      the UID, GID and PERMS fields in the data structure are
+      initialized to a known value, usually "nobody", "nobody" and
+      "000". If the module can't resolve user "nobody" or group "nobody"
+      then we just initialize UID and GID to 65534. If you'd rather
+      some other initialization values be used, you can specify
+      them with DAVpvfsDefaultPerms. Use numeric, not symbolic, values.
+
+    PutBufSize 524288
+
+      The PutBufSize directory/location configuration directive causes
+      mod_dav_orangefs to write blocks of the size indicated (in bytes)
+      when HTTP PUT is encountered. 
+
+      The default is 1meg (1048576).
+
+    ReadBufSize 262144
+
+      The ReadBufSize directory/location configuration directive comes into
+      play in two situations: COPY and GET.
+
+      When an HTTP COPY causes a copy of a file to be made, the source
+      file is read in ReadBufSize blocks, and written in ReadBufSize blocks.
+
+      When and HTTP GET for a file is encountered, the file is read in
+      ReadBufSize blocks.
+
+      The default is 1meg (1048576).
+
+    PVFSInit on/{module-name}
+
+      Before an OrangeFS client program (in this case Apache) can 
+      begin to interact with an OrangeFS filesystem, the client must
+      perform an initialization step by calling the PVFS_util_init_defaults
+      function.
+
+      It is not proper for a client process to call PVFS_util_init_defaults
+      more than once, without calling PVFS_sys_finalize between
+      PVFS_util_init_defaults calls.
+
+      When apache has more than one OrangeFS module loaded, there needs
+      to be a way to insure that only one of them calls 
+      PVFS_util_init_defaults. Furthermore, since dynamic modules are loaded
+      in the order that their LoadModule directives are encountered in
+      httpd.conf, the first OrangeFS module listed on a LoadModule
+      statement needs to be the OrangeFS module that calls 
+      PVFS_util_init_defaults since a module's initialization functions
+      will be executed when the module is loaded.
+
+      The standard "configure/make/make install" sequence will cause a 
+      PVFSInit server directive naming the appropriate OrangeFS module 
+      to be placed in httpd.conf.
+
+      PVFSInit defaults to "on".
+  
+  -------------------------------[ s3 ]---------------------------
+
+  The OrangeFS S3 Client enables Amazon Simple Storage Service (S3) 
+  client tools to access OrangeFS/PVFS2 file systems. 
+
+  For more information on Amazon S3, visit http://aws.amazon.com/s3/
+
+  Here is an example Apache configuration for the orangefs_s3 module:
+
+  Listen 81
+  <VirtualHost *:81>
+    SetHandler orangefs_s3
+    BucketRoot /orangefsmnt/s3
+    <Location />
+      AuthType AWS
+      AWSAccount username1 cleartextpassword 400 500
+      AWSAccount username2 cleartextpassword 600 700
+      require valid-user
+    </Location>
+  </VirtualHost>
+
+  The above configuration causes Apache to listen for s3 connections
+  on port 81. All the buckets will be stored in the OrangeFS filesystem
+  mounted at /orangefsmnt in a directory named s3. The example shows
+  valid users being listed directly in the httpd.conf file, but they can
+  also be in LDAP. Username1's uid is 400 and gid is 500.
+
+  s3cmd (http://s3tools.org/s3cmd) is a popular command line s3 client
+  you can use to demonstrate the orangefs_s3 module's functionality.
+
+  s3cmd requires a configuration file, here is an example:
+
+  $ cat /home/s3user/.s3cfg
+  access_key = username1
+  acl_public = False
+  bucket_location = US
+  debug_syncmatch = False
+  default_mime_type = binary/octet-stream
+  delete_removed = False
+  dry_run = False
+  encrypt = False
+  force = False
+  guess_mime_type = False
+  host_base = s3server.dns.name:81
+  host_bucket = %(bucket)s.s3server.dns.name:81
+  service_path = /
+  human_readable_sizes = False
+  preserve_attrs = True
+  proxy_host =
+  proxy_port = 0
+  recv_chunk = 4096
+  secret_key = cleartextpassword
+  send_chunk = 4096
+  use_https = False
+  #verbosity = DEBUG
+  
+  Your bucket name needs to be resolvable in the DNS. Here is some
+  Amazon documentation that helps to explain why:
+
+    http://docs.amazonwebservices.com/AmazonS3/latest/dev/VirtualHosting.html
+
+  A simple way to get your buckets to resolve, at least for testing,
+  might be to put them in the /etc/hosts file on your Apache server,
+  and in the /etc/hosts file on the computer where your s3 client
+  runs.
+
+  For example: if the Apache server running your orangefs_s3 module
+  is s3server.dns.name, and if s3server.dns.name's IP address is 10.11.12.13,
+  and if you want to create and access a bucket named bucketname, you
+  could add this line to your /etc/hosts files:
+
+  10.11.12.13 bucketname.s3server.dns.name
+
+  Here are some s3cmd examples. If things don't seem to be working,
+  s3cmd has a debug mode, and orangefs_s3 does also.
+
+  s3cmd --help 
+    print out s3cmd's help page.
+
+  s3cmd mb s3://bucketname
+    make a bucket named bucketname.
+
+  s3cmd rb s3://bucketname
+    remove a bucket named bucketname.
+
+  s3cmd ls 
+    see all your buckets.
+
+    $ s3cmd ls 
+    2012-05-29 11:24  s3://bucketname1
+    2012-05-29 11:26  s3://bucketname2
+
+  s3cmd ls s3://bucketname
+    see all the objects in the bucket named bucketname.
+
+  s3cmd sync dirname s3://bucketname 
+    synchronize all the object in a directory to a bucket.
+
+    $ find dirname
+    dirname
+    dirname/filename1
+    dirname/dirname2
+    dirname/filename2
+
+    $ s3cmd sync dirname s3://bucketname
+    dirname/filename1 -> s3://bucketname/dirname/filename1  [1 of 2]
+     0 of 0     0% in    0s     0.00 B/s  done
+    dirname/filename2 -> s3://bucketname/dirname/filename2  [2 of 2]
+     0 of 0     0% in    0s     0.00 B/s  done
+
+    $ s3cmd ls s3://hubcap
+    2012-05-29 11:24         0   s3://hubcap/dirname/filename1
+    2012-05-29 11:24         0   s3://hubcap/dirname/filename2
+   
+
+  s3cmd get s3://bucketname/dirname/filename1 localfilename
+    get a file from a bucket.
+    
+  s3cmd put /local/filename s3://bucketname
+    put a file into a bucket.
+
+  s3cmd del s3://bucketname/dirname/filename
+    delete a file from a bucket
+  
+
+  There are some limitations in the current (beta) release.  Currently, 
+  the following bucket features are not supported by mod_orangefs_s3:
+
+    * ACL
+    * Policy
+    * Lifecycle
+    * Location
+    * Logging
+    * Notification
+    * Versions
+    * RequestPayment
+    * Versioning
+    * Website  
+

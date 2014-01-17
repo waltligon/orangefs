@@ -490,14 +490,14 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     dirdata_server_index =
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+            &sm_p->getattr.attr.dist_dir_attr,
+            sm_p->getattr.attr.dist_dir_bitmap);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: dirdata_handle: %s\n",
-        PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                dirdata_server_index]));
+        PVFS_OID_str(&sm_p->getattr.attr.dirdata_handles[
+                                         dirdata_server_index]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -509,8 +509,8 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.sym.link_name,
                                sm_p->parent_ref.fs_id,
                                sm_p->parent_ref.handle,
-                               sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                        dirdata_server_index],
+                               sm_p->getattr.attr.dirdata_handles[
+                                                  dirdata_server_index],
                                sm_p->parent_ref.sid_count,
                                sm_p->parent_ref.sid_array,
                                sm_p->object_ref.handle,    /* new handle */
@@ -522,7 +522,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     /* V3 SHOULD BE THIS? */
-    /*  sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index], */
+    /*  sm_p->getattr.attr.dirdata_handles[dirdata_server_index], */
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->parent_ref.sid_array;

@@ -12,6 +12,7 @@
 
 #include "pvfs2-server.h"
 #include "pint-security.h"
+#include "pvfs2-internal.h"
 
 %%
 

@@ -21,6 +21,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
@@ -31,7 +32,6 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
-#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "security-util.h"
 
@@ -376,7 +376,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
  * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     if (cred == NULL)
     {
@@ -442,6 +443,9 @@ int PVFS_util_copy_sys_attr(
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
         dest_attr->dfile_count = src_attr->dfile_count;
+        dest_attr->distr_dir_servers_initial = src_attr->distr_dir_servers_initial;
+        dest_attr->distr_dir_servers_max = src_attr->distr_dir_servers_max;
+        dest_attr->distr_dir_split_size = src_attr->distr_dir_split_size;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
         dest_attr->flags = src_attr->flags;
@@ -1462,6 +1466,12 @@ int PVFS_util_init_defaults(void)
         }
         else
         {
+            if (ret == -PVFS_EEXIST)
+            {
+                /* this mount already exists so count it as found */
+                found_one = 1;
+                continue;
+            }
             failed_indices[j++] = i;
 
             if (j > (PVFS2_MAX_INVALID_MNTENTS - 1))
@@ -1974,6 +1984,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
+    {
+        attrmask |= PVFS_ATTR_DISTDIR_ATTR;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -2051,7 +2066,7 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     }
     if (obj_mask & PVFS_ATTR_DATA_SIZE)
     {
-        sys_mask |= PVFS_ATTR_DATA_SIZE;
+        sys_mask |= PVFS_ATTR_SYS_SIZE;
     }
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -2080,6 +2095,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_CAPABILITY)
     {
         sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
+    }
+    if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
@@ -2361,6 +2380,7 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
 
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

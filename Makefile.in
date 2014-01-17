@@ -70,6 +70,10 @@ sysconfdir = $(DESTDIR)@sysconfdir@
 VPATH = $(srcdir)
 SHELL = @SHELL@
 INSTALL = @INSTALL@
+
+# UID for security mode
+UID := $(shell id -u)
+
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
@@ -84,16 +88,20 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
-BUILD_USRINT = @BUILD_USRINT@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
+BUILD_HADOOP = @BUILD_HADOOP@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
 ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
 ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
+ENABLE_CAPCACHE = @ENABLE_CAPCACHE@
+ENABLE_CREDCACHE = @ENABLE_CREDCACHE@
+ENABLE_CERTCACHE = @ENABLE_CERTCACHE@
 NEEDS_LIBRT = @NEEDS_LIBRT@
+LIB_NEEDS_LIBRT = @LIB_NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
@@ -121,6 +129,9 @@ endif
 # build which client libs
 build_shared = @build_shared@
 build_static = @build_static@
+build_threaded = @build_threaded@
+build_usrint = @build_usrint@
+build_symbolic = @build_symbolic@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -176,7 +187,9 @@ INCLUDES := \
     src/io/job \
     src/io/dev \
     src/proto \
-    src/common/mgmt
+    src/common/mgmt \
+	src/common/hash \
+	src/common/llist
 GENINCLUDES := \
 	include
 endif
@@ -190,7 +203,8 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-BUILD_CFLAGS = @BUILD_CFLAGS@ -I$(srcdir)/src/common/sidcache
+BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
+BUILD_CFLAGS += -I$(srcdir)/src/common/sidcache
 BUILD_CFLAGS += -I$(srcdir)/include -I$(srcdir)/src/common/quicklist
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
@@ -202,11 +216,24 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 -lm @LIBS@ 
-LIBS_THREADED += -lpvfs2-threaded @LIBS@
+# Libraries - rt libs tend to depend on other libs so they go first
+LIBS += -lpvfs2
+ifdef LIB_NEEDS_LIBRT 
+	LIBS += -lrt
+endif
+LIBS += -lm @LIBS@ @THREAD_LIB@
+LIBS_THREADED += -lpvfs2-threaded
+ifdef LIB_NEEDS_LIBRT 
+	LIBS_THREADED += -lrt
+endif
+LIBS_THREADED += -lm @LIBS@ @THREAD_LIB@ 
 # need to include external dependency libs when building shared libraries
-DEPLIBS := @LIBS@
+ifdef LIB_NEEDS_LIBRT 
+	DEPLIBS += -lrt
+endif
+DEPLIBS += -lm @LIBS@ @THREAD_LIB@
 ULIBDEPLIBS := -lpvfs2
+# Misc defines
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -254,6 +281,7 @@ ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wundef -Wpointer-arith
     GCC_CFLAGS += -Wnested-externs
     GCC_CFLAGS += -Wredundant-decls
+    GCC_CFLAGS += -Wno-address -Wno-attributes
     # These are very noisy, and probably too strict.
     #GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
     #GCC_CFLAGS += -Wcast-qual
@@ -371,6 +399,11 @@ LIBS += @THREAD_LIB@ @OPENSSL_LIB@ @DB_LIB@ @UUID_LDFLAGS@
 DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
 LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@ @DB_LIB@ @UUID_LDFLAGS@
 
+# Moved up to where libs are set
+# LIBS += @THREAD_LIB@
+# DEPLIBS += @THREAD_LIB@
+# LIBS_THREADED += @THREAD_LIB@
+
 ################################################################
 # build BMI TCP?
 
@@ -477,6 +510,69 @@ CFLAGS += $(INTEL_CFLAGS)
 endif
 
 #################################################################
+# PVFS2 JNI Layer Flags and Variables
+# 
+# NOTES: 
+# Due  to depencies: 
+#    First, javac compiles the PVFS2 JNI Layer ".java" files.
+#    Second, javah generates headers included by the ".c" files of JNI layer.
+#    Since via src/client/jni/module.mk.in,
+#            ".c" files are added to ULIBSRC, which is used to build libofs,
+#            the PVFS2 JNI layer src is compiled.
+#
+#    Dependencies are specified later in the Makefile for the correct order
+#            of operations to take place.
+#
+#    JAVA_HOME is set via --with-jdk=<path_to_jdk> during the configure step 
+#            of PVFS2 build.
+#
+#    The JDK's include directory must be added to CFLAGS.
+#
+#   --enable-jni and --with-jdk=<path_to_jdk> must be specified during the 
+#            configure step to enable the jni layer to be built and 
+#            so JAVA_HOME can be set to the desired JDK.
+#
+#	--enable-shared must be specified during the configure step so that
+#            shared libraries will be built
+#
+ifdef BUILD_JNI
+JAVA_HOME := @JAVA_HOME@
+CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+JAVAC := $(JAVA_HOME)/bin/javac -J-Xmx256m
+JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
+JAR := $(JAVA_HOME)/bin/jar -J-Xmx256m
+JNI_DIR := $(srcdir)/src/client/jni
+ORGDIR := $(JNI_DIR)/org/orangefs/usrint
+ORGDOT := org.orangefs.usrint
+COMMONS_LOGGING_JAR := `ls $(JNI_DIR)/lib/commons-logging-api-*.jar`
+OFS_JNI_JAR := $(JNI_DIR)/lib/ofs_jni.jar
+JNIPOSIXHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
+JNISTDIOHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
+endif
+
+#################################################################
+# Hadoop Layer Variables
+#
+# NOTES:
+# This installation process will change after OrangeFS related Hadoop code is 
+#         commited to the Apache Hadoop Project.
+#
+#
+#
+#
+ifdef BUILD_HADOOP
+# Directory Containing PVFS2/Hadoop related .java files
+HADOOP_ORGDIR := $(JNI_DIR)/org/apache/hadoop/fs/ofs
+# Path to Hadoop Directory containing hadoop-core-*.jar
+HADOOP_PREFIX := @HADOOP_PREFIX@
+# Path to Hadoop's core Jar
+HADOOP_CORE_JAR := `ls $(HADOOP_PREFIX)/hadoop-core-*.jar`
+# Path to our temp PVFS jar file 
+#         (eventually will be a part of hadoop-core-*.jar)
+OFS_HADOOP_JAR := $(JNI_DIR)/lib/ofs_hadoop.jar
+endif
+
+#################################################################
 # Starter variables 
 
 # NOTES: These variables are used to categorize the various source
@@ -495,8 +591,6 @@ USERSRC :=
 LIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
-# JNI_ULIBSRC is source code wrapper of libofs for JNI use.
-#JNI_ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
@@ -531,6 +625,16 @@ PYCGEN :=
 PYCGEN_AUX :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
+# JNIPOSIXJAVA represents posix.c related JAVA files
+JNIPOSIXJAVA :=
+# JNISTDIOJAVA represents stdio.c related JAVA files
+JNISTDIOJAVA :=
+# JNISTREAMSCHANNELSJAVA represents Java Streams and Channels built on top of
+#         JNIPOSIXJAVA and JNISTDIOJAVA
+JNISTREAMSCHANNELSJAVA :=
+# HADOOPJAVA represents OrangeFS/Hadoop related Java files
+# TODO: commit src to Apache Hadoop
+HADOOPJAVA :=
 
 ################################################################
 # Top level (default) targets
@@ -550,6 +654,7 @@ LIBRARIES_STATIC := lib/libpvfs2.a
 LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
+
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
@@ -561,11 +666,12 @@ LIBRARIES_SHARED += lib/libbmi.so
 BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
-ifdef BUILD_USRINT
+ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
-LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
-LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
+# ifeq ($(build_symbolic),yes)
+# LIBRARIES_SHARED += lib/libofs-s.so
+# endif
 endif
 
 ifneq ($(build_static),yes)
@@ -577,6 +683,12 @@ ifneq ($(build_shared),yes)
 LIBRARIES_SHARED :=
 LIBRARIES_THREADED_SHARED := 
 endif
+
+ifneq ($(build_threaded),yes)
+LIBRARIES_THREADED_SHARED := 
+LIBRARIES_THREADED_STATIC :=
+endif
+
 
 LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
 LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
@@ -606,20 +718,14 @@ include $(patsubst %, %/module.mk, $(MODULES))
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBPICOBJS is a list of objects to put in the jni ofs lib
-#JNI_ULIBPICOBJS := $(patsubst %.c,%.o, $(filter %.c,$(JNI_ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBDEPENDS is a list of dependency files for the client lib
-#JNI_ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -634,25 +740,16 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDOBJS is a list of objects to put in the 
-# multithreaded JNI ofs lib
-#JNI_ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared jni 
-# ofs library
-#JNI_ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(JNI_ULIBSRC)))
 
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
-# JNI_ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded
-# jni ofs lib
-#JNI_ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(JNI_ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -758,13 +855,23 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
+# JNIPOSIXCLS is a list of posix.c related JNI compiled classes
+JNIPOSIXCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNIPOSIXJAVA)))
+# JNISTDIOCLS is a list of stdio.c related JNI compiled classes
+JNISTDIOCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTDIOJAVA)))
+# JNISTREAMSCHANNELSCLS is a list of compiled classes representing Java
+#         Input and Ouput Streams and Channels.
+JNISTREAMSCHANNELSCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTREAMSCHANNELSJAVA)))
+# HADOOPCLS is a list of compiled classes representing PVFS2/Hadoop related classes.
+HADOOPCLS := $(patsubst %.java,%.class, $(filter %.java, $(HADOOPJAVA)))
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
+DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
@@ -905,23 +1012,19 @@ lib/libofs.a: $(ULIBOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(ULIBOBJS)
 
-# rule for building the _multithreaded_ ofs library
-lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
-	$(Q) "  RANLIBTHREADED	$@"
-	$(E)$(INSTALL) -d lib
-	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
-
 # rule for building the shared ofs library
 lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-# rule for building the shared ofs _multithreaded_ library
-lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS) lib/libpvfs2.so
-	$(Q) "  LDSO		$@"
-	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+# ifeq ($(build_symbolic),yes)
+# rule for building the shared ofs library
+# lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
+# 	$(Q) "  LDSO		$@"
+# 	$(E)$(INSTALL) -d lib
+# 	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+# endif
 
 # rules for building virtual libraries
 lib/liborangefs.a: lib/libpvfs2.a
@@ -944,9 +1047,6 @@ lib/liborangefsposix.a: lib/libpvfs2.a
 lib/liborangefsposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
 	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
-
-# rule for building the JNI client shared library
-#lib/libPVFS2JNI.so: libPVFS2JNI.c PVFS2JNI.java javac javah  
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -974,6 +1074,54 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 $(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
 	$(Q) "  LD 		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+
+ifdef BUILD_HADOOP
+$(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
+	$(Q) "  JAVAC		$(HADOOPCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(HADOOP_CORE_JAR):$(OFS_JNI_JAR):$(JNI_DIR)" $(HADOOPJAVA)
+
+$(OFS_HADOOP_JAR): $(HADOOPCLS)
+	$(Q) "  JAR		$@"
+	$(E)$(JAR) cf $@ -C src/client/jni org/apache/hadoop/fs/ofs
+endif # BUILD_HADOOP
+
+ifdef BUILD_JNI
+$(JNISTREAMSCHANNELSCLS): $(JNISTREAMSCHANNELSJAVA)
+	$(Q) "  JAVAC		$(JNISTREAMSCHANNELSCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTREAMSCHANNELSJAVA)
+	
+$(OFS_JNI_JAR): $(JNIPOSIXCLS) $(JNISTDIOCLS) $(JNISTREAMSCHANNELSCLS)
+	$(Q) "  JAR		$@"
+	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/usrint
+
+$(JNIPOSIXCLS): $(JNIPOSIXJAVA)
+	$(Q) "  JAVAC		$(JNIPOSIXCLS)"
+	$(E)$(JAVAC) -cp $(JNI_DIR) $(JNIPOSIXJAVA)
+
+# Force the JNI posix .class files to be a dependency of the header file. 
+$(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
+	$(Q) "  JAVAH		$@"
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
+
+# Force the required javah generated header file to be a dependency of the 
+# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
+#         BUILD_HADOOP is defined.
+$(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
+
+$(JNISTDIOCLS): $(JNISTDIOJAVA)
+	$(Q) "  JAVAC		$(JNISTDIOCLS)"
+	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTDIOJAVA)
+
+# Force the JNI stdio .class files to be a dependency of the header file.
+$(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
+	$(Q) "  JAVAH		$@"
+	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
+
+# Force the required javah generated header file to be a dependency of the 
+# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
+#         BUILD_HADOOP is defined.
+$(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
+endif # BUILD_JNI
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -1153,7 +1301,21 @@ clean::
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
                 $(PYCGEN) $(PYCGEN_AUX) \
                 src/server/pvfs2-server-server.o \
-                src/apps/karma/karma src/apps/fuse/pvfs2fuse
+                src/apps/karma/karma src/apps/fuse/pvfs2fuse \
+                src/server/simple.conf examples/fs.conf
+
+ifdef BUILD_HADOOP
+clean ::
+	$(E)rm -f $(HADOOPCLS) $(OFS_HADOOP_JAR)
+endif
+
+ifdef BUILD_JNI
+clean::
+	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
+				$(ORGDIR)/*.class \
+    			$(OFS_JNI_JAR)
+endif
+
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 	$(E)rm -f $(POLICYCOMPGEN) 
@@ -1200,7 +1362,7 @@ cleaner: clean
 # except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.me
+	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.m4
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
@@ -1256,9 +1418,9 @@ endif
 src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
- --quiet src/server/simple.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--logging "server,network,storage,flow" --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
@@ -1267,20 +1429,20 @@ all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space \
- --quiet examples/fs.conf
+	--ioservers localhost --metaservers localhost --logfile $(prefix)/log/pvfs2-server.log \
+	--storage $(prefix)/storage/data --metadata $(prefix)/storage/meta \
+	--quiet examples/fs.conf
 endif
 
 install_doc:
 	install -d $(mandir)/man1
 	install -d $(mandir)/man5
-	rm -f ${mandir}/man1/*.gz
-	rm -f ${mandir}/man5/*.gz
+	rm -f ${mandir}/man1/pvfs2*.gz
+	rm -f ${mandir}/man5/pvfs2*.gz
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
-	gzip -f ${mandir}/man1/*.1
-	gzip -f ${mandir}/man5/*.5
+	gzip -f ${mandir}/man1/pvfs2*.1
+	gzip -f ${mandir}/man5/pvfs2*.5
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1293,6 +1455,7 @@ install:: all
 else
 install:: all install_doc
 	install -d $(includedir)
+	install -m 644 $(builddir)/include/orange.h $(includedir)
 	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
@@ -1352,6 +1515,8 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all.sh $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all.sh $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
 endif
@@ -1367,6 +1532,15 @@ endif
 
 	install -d $(sbindir)
 
+ifdef BUILD_HADOOP
+	install -m 755 $(OFS_HADOOP_JAR) $(libdir)
+endif
+
+ifdef BUILD_JNI
+	install -m 755 $(OFS_JNI_JAR) $(libdir)
+	install -m 755 $(COMMONS_LOGGING_JAR) $(libdir)
+endif
+
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
     ifeq ($(NPTL_WORKAROUND),)
@@ -1377,19 +1551,30 @@ ifdef BUILD_SERVER
     endif
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
-	touch $(bindir)/.pvfs2-genconfig-key    
+	touch $(bindir)/.pvfs2-genconfig-key
+        ifeq ($(UID),0)
+		chmod ug+s ${bindir}/pvfs2-gencred
+        endif
     endif
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
+	# create etc dir under install dir
+	install -d $(sysconfdir)
 endif
+
+install_security::
+	
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
-NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h)
+# version.h moved in linux 3.7
+VERSION_DOT_H := $(shell if test -r $(LINUX_KERNEL_SRC)/include/linux/version.h ;then ls $(LINUX_KERNEL_SRC)/include/linux/version.h ;elif test -r $(LINUX_KERNEL_SRC)/include/generated/uapi/linux/version.h ;then ls $(LINUX_KERNEL_SRC)/include/generated/uapi/linux/version.h ;else echo /tmp/version.h.NOT.FOUND; fi)
+
+NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(VERSION_DOT_H))
 ifeq ($(NUM_UTS_LINES),1)
-    KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+    KERNEL_VERS := $(shell grep UTS_RELEASE $(VERSION_DOT_H) | cut -d\" -f2)
 else
     # multiple locations of utsrelease.h, just find and grep so we don't have to change again
     KERNEL_VERS := $(shell find ${LINUX_KERNEL_SRC}/include -name utsrelease.h -exec grep UTS_RELEASE '{}' \; | cut -d \" -f2 )

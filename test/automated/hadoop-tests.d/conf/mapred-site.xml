@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+<property>
+  <name>mapred.job.tracker</name>
+  <value>__NODE001__:8021</value>
+</property>
+<property>
+  <name>mapred.map.tasks.speculative.execution</name>
+  <value>false</value>
+<final>true</final>
+</property>
+<property>
+ <name>mapred.reduce.tasks.speculative.execution</name>
+  <value>false</value>
+<final>true</final>
+</property>
+
+</configuration>

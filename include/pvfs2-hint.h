@@ -21,19 +21,19 @@
 #define PVFS_HINT_DFILE_COUNT_NAME   "pvfs.hint.dfile_count"
 #define PVFS_HINT_LAYOUT_NAME        "pvfs.hint.layout"
 #define PVFS_HINT_SERVERLIST_NAME    "pvfs.hint.serverlist"
-#define PVFS_HINT_NOCACHE_NAME       "pvfs.hint.nocache"
+#define PVFS_HINT_CACHE_NAME         "pvfs.hint.cache"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 
 #define PVFS_HINT_NULL NULL
 
 int PVFS_hint_add(PVFS_hint *hint,
-                  const char *type,
+                  const char *name,
                   int length,
                   void *value);
 
 int PVFS_hint_replace(PVFS_hint *hint,
-                      const char *type,
+                      const char *name,
                       int length,
                       void *value);
 
@@ -42,7 +42,7 @@ int PVFS_hint_copy(PVFS_hint old_hint, PVFS_hint *new_hint);
 void PVFS_hint_free(PVFS_hint hint);
 
 /* check to see if a hint has already been added */
-int PVFS_hint_check(PVFS_hint *hints, const char *type);
+int PVFS_hint_check(PVFS_hint *hints, const char *name);
 
 /* check to see if a hint should be transferred to the server */
 int PVFS_hint_check_transfer(PVFS_hint *hints);

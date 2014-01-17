@@ -80,7 +80,8 @@
 #define GOSSIP_SECURITY_DEBUG          ((uint64_t)1 << 58)
 #define GOSSIP_USRINT_DEBUG            ((uint64_t)1 << 59)
 #define GOSSIP_RCACHE_DEBUG            ((uint64_t)1 << 60)
-#define GOSSIP_SIDCACHE_DEBUG          ((uint64_t)1 << 61)
+#define GOSSIP_SECCACHE_DEBUG          ((uint64_t)1 << 61)
+#define GOSSIP_SIDCACHE_DEBUG          ((uint64_t)1 << 62)
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
@@ -227,6 +228,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "win_client", GOSSIP_WIN_CLIENT_DEBUG },
     /* Debug robust security code */
     { "security", GOSSIP_SECURITY_DEBUG },
+    /* Capability Cache */
+    { "seccache", GOSSIP_SECCACHE_DEBUG },
     /* Client User Interface */
     { "usrint", GOSSIP_USRINT_DEBUG },
     /* rcache */

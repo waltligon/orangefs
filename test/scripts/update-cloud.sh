@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 # must script to work around sudo issue
-script update.txt
+
 
 CHOICE=$VMSYSTEM
 

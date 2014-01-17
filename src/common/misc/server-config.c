@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -16,9 +17,14 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/stat.h>
 #ifdef WIN32
 #include <io.h>
+
+#include "wincommon.h"
 #endif
+
+#include "pvfs2-internal.h"
 
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
@@ -30,9 +36,7 @@
 #include "extent-utils.h"
 #include "mkspace.h"
 #include "pint-distribution.h"
-#include "pvfs2-config.h"
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 
 #ifdef HAVE_OPENSSL
 #include <openssl/evp.h>
@@ -129,7 +133,9 @@ static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
-static DOTCONF_CB(get_ca_path);
+static DOTCONF_CB(get_ca_file);
+static DOTCONF_CB(get_user_cert_dn);
+static DOTCONF_CB(get_user_cert_exp);
 static DOTCONF_CB(enter_ldap_context);
 static DOTCONF_CB(exit_ldap_context);
 static DOTCONF_CB(get_ldap_hosts);
@@ -144,10 +150,11 @@ static DOTCONF_CB(get_ldap_uid_attr);
 static DOTCONF_CB(get_ldap_gid_attr);
 static DOTCONF_CB(get_ldap_search_timeout);
 
-static DOTCONF_CB(get_init_num_dirdata_handles);
-static DOTCONF_CB(split_mem_limit);
 static DOTCONF_CB(tree_width);
 static DOTCONF_CB(tree_threshold);
+static DOTCONF_CB(distr_dir_servers_initial);
+static DOTCONF_CB(distr_dir_servers_max);
+static DOTCONF_CB(distr_dir_split_size);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -162,20 +169,46 @@ static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename);
 static int is_populated_filesystem_configuration(
                     struct filesystem_configuration_s *fs);
+/* V3 - no longer needed */
+#if 0
+static int root_handle_in_meta_range(
+                struct server_configuration_s *config_s,
+                struct filesystem_configuration_s *fs);
+#endif
 static int is_valid_filesystem_configuration(
                     struct server_configuration_s *config_s,
                     struct filesystem_configuration_s *fs);
+/* V3 - no longer needed */
+#if 0
+static char *get_handle_range_str(
+                                  struct server_configuration_s *config_s,
+                                  struct filesystem_configuration_s *fs,
+                                  int meta_handle_range);
+#endif
 static host_alias_t *find_host_alias_ptr_by_alias(
-                    struct server_configuration_s *config_s,
-                    char *alias,
-                    int *index);
+                                     struct server_configuration_s *config_s,
+                                     char *alias,
+                                     int *index);
+/* V3 - no longer needed */
+#if 0
+static struct host_handle_mapping_s *get_or_add_handle_mapping(
+                                                               PINT_llist *list,
+                                                               char *alias);
+static int build_extent_array(
+                              char *handle_range_str,
+                              PVFS_handle_extent_array *handle_extent_array);
+
 #ifdef __PVFS2_TROVE_SUPPORT__
+static int is_root_handle_in_my_range(
+                                      struct server_configuration_s *config_s,
+                                      struct filesystem_configuration_s *fs);
+#endif
 #endif
 
 /* PVFS2 servers are deployed using configuration files that provide information
  * about the file systems, storage locations and endpoints that each server
  * manages.  For every pvfs2 deployment, there should be a global config file
- * (<i>fs.conf</i>) shared across all of the pvfs2 servers. When the servers
+ * (fs.conf) shared across all of the pvfs2 servers. When the servers
  * are started up, a command line parameter (server-alias) indicates what options
  * are relevant and applicable for a particular server.
  * This parameter will be used by the server to parse relevant options.
@@ -232,15 +265,13 @@ static host_alias_t *find_host_alias_ptr_by_alias(
 static const configoption_t options[] =
 {
     /* Options specified within the Defaults context are used as 
-     * default values over all the pvfs2 server specific config files.
+     * default values over all the OrangeFS server specific config files.
      */
     {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_GLOBAL,NULL},
 
     /* Specifies the end-tag for the Defaults context.
      */
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
-
-    /*********** SECURITY OPTIONS ************/
 
     /* Options specified within the Security context are used to configure
      * settings related to key- or certificate-based security options.
@@ -258,11 +289,11 @@ static const configoption_t options[] =
      * from which the connections are going to be accepted and serviced.
      * The format of the TrustedPorts option is:
      *
-     * TrustedPorts StartPort-EndPort
+     * <c>TrustedPorts{</c><i>StartPort</i><c>}-{</c><i>EndPort</i><c>}</c>
      *
      * As an example:
      *
-     * TrustedPorts 0-65535
+     * <c>TrustedPorts 0-65535</c>
      */
     {"TrustedPorts",ARG_STR, get_trusted_portlist,NULL,
         CTX_SECURITY,NULL},
@@ -271,40 +302,66 @@ static const configoption_t options[] =
      * which the connections are going to be accepted and serviced.
      * The format of the TrustedNetwork option is:
      *
-     * TrustedNetwork bmi-network-address@bmi-network-mask
+     * <c>TrustedNetwork {</c><i>bmi-network-address@bmi-network-mask</i><c>}-{</c><i>EndPort</i><c>}</c>
      *
      * As an example:
      *
-     * TrustedNetwork tcp://192.168.4.0@24
+     * <c>TrustedNetwork tcp://192.168.4.0@24</c>
      */
     {"TrustedNetwork",ARG_LIST, get_trusted_network,NULL,
         CTX_SECURITY,NULL},
 #endif
 
-    /* Note: keywords below may be in Defaults for backwards-
-       compatiblity. For new files they should go in Security. */
-
     /* A path to a keystore file, which stores server and client 
      * public keys for key-based security. 
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
      */
     {"KeyStore", ARG_STR, get_key_store, NULL, 
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
     /* Path to the server private key file, in PEM format. Must 
      * correspond to CA certificate in certificate mode.
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
      */
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
-    /* Security timeout in seconds (TODO)
+    /* Security timeout in seconds
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
      */
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
 
     /* Path to CA certificate file in PEM format.
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
      */
-    {"CAPath", ARG_STR, get_ca_path, NULL,
+    {"CAFile", ARG_STR, get_ca_file, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
+
+    /* DN used for root of generated user certificate subject DN
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
+     */
+    {"UserCertDN", ARG_STR, get_user_cert_dn, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, 
+        "\"C=US, O=OrangeFS\""},
+
+    /* Expiration of generated user certificate in days 
+     * Note: May be in the Defaults section for backwards-compatibility.
+     * For newly-generated configuration files it should appear in the
+     * Security section.
+     */
+    {"UserCertExp", ARG_INT, get_user_cert_exp, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "365"},
 
     /* Open tag for LDAP options, used in certificate mode. 
      */
@@ -315,9 +372,7 @@ static const configoption_t options[] =
     {"</LDAP>", ARG_NONE, exit_ldap_context, NULL,
         CTX_LDAP, NULL},
 
-    /* List of LDAP hosts in URI format, e.g. "ldaps://ldap.acme.com:999"
-       TODO: make a list 
-     */
+    /* List of LDAP hosts in URI format, e.g. <c>ldaps://ldap.acme.com:999</c> */
     {"Hosts", ARG_STR, get_ldap_hosts, NULL,
         CTX_LDAP, "ldaps://localhost"},
 
@@ -327,19 +382,19 @@ static const configoption_t options[] =
         CTX_LDAP, NULL},
 
     /* Password of LDAP user to use when binding to LDAP directory. 
-     * May also be in form "file:{path}" which will load password from
-     * restricted file. 
+     * May also be in form <c>file:{</c><i>path</i><c>}</c> 
+     * which will load password from restricted file. 
      */
     {"BindPassword", ARG_STR, get_ldap_bind_password, NULL,
         CTX_LDAP, NULL},
 
-    /* May be "CN" or "DN". Controls how the certificate subject DN is 
+    /* May be <c>CN</c> or <c>DN</c>. Controls how the certificate subject DN is
      * used to search LDAP for a user. 
      */
     {"SearchMode", ARG_STR, get_ldap_search_mode, NULL,
         CTX_LDAP, "CN"},
 
-    /* DN of top-level LDAP search container. Only used in "CN" mode.     
+    /* DN of top-level LDAP search container. Only used in <c>CN</c> mode.     
      */
     {"SearchRoot", ARG_STR, get_ldap_search_root, NULL,
         CTX_LDAP, NULL},
@@ -349,12 +404,13 @@ static const configoption_t options[] =
     {"SearchClass", ARG_STR, get_ldap_search_class, NULL,
         CTX_LDAP, "inetOrgPerson"},
 
-    /* Attribute name to match certificate CN. Only used in "CN" mode. 
+    /* Attribute name to match certificate CN. Only used in <c>CN</c> mode. 
      */
     {"SearchAttr", ARG_STR, get_ldap_search_attr, NULL,
         CTX_LDAP, "CN"},
 
-    /* May be "onelevel" to search only SearchRoot container, or "subtree" to
+    /* May be <c>onelevel</c> to search only SearchRoot container,
+     * or <c>subtree</c> to
      * search SearchRoot container and all child containers.
      */
     {"SearchScope", ARG_STR, get_ldap_search_scope, NULL,
@@ -375,8 +431,6 @@ static const configoption_t options[] =
     {"SearchTimeout", ARG_INT, get_ldap_search_timeout, NULL,
         CTX_LDAP, "15"},
 
-    /********* END SECURITY OPTIONS **********/
-
     /* This groups the Alias mapping options.
      *
      * The Aliases context should be defined before any FileSystem contexts
@@ -394,11 +448,11 @@ static const configoption_t options[] =
      * allows us to reference individual servers by an alias instead of their
      * full HostID.  The format of the Alias option is:
      *
-     * Alias {Alias} (SID} {bmi address}
+     * <c>Alias {</c><i>alias string</i><c>} {</c><i>bmi address</i><c>}</c>
      *
      * As an example:
      *
-     * Alias mynode1 12345678-90ab-cdef-1234-567890abcdef tcp://hostname1.clustername1.domainname:12345
+     * <c>Alias mynode1 tcp://hostname1.clustername1.domainname:12345</c>
      *
      * Note: beginning with V3 Aliases specify a SID rather than a
      * BMI_addr. SIDs are UUIDs (36 character string representing
@@ -420,18 +474,18 @@ static const configoption_t options[] =
      * Suppose the Option name is X, its default value is Y,
      * and one wishes to override the option for a server to Y'.
      *
-     * <Defaults>
-     *     ..
-     *     X  Y
-     *     ..
-     * </Defaults>
+     * <p style="margin-bottom: 0pt;"><c>&lt;Defaults&gt;</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
+     * <p class="normal_indent_2" style="margin-bottom: 0pt;"><c>X Y</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
+     * <p style="margin-bottom: 0pt;"><c>&lt;/Defaults&gt;</c></p>
      *
-     * <ServerOptions>
-     *     Server {server alias}
-     *     ..
-     *     X Y'
-     *     ..
-     * </ServerOptions>
+     * <p style="margin-bottom: 0pt;"><c>&lt;ServerOptions&gt;</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>Server {</c><i>server alias</i><c>}</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>X Y'</c></p>
+     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
+     * <p style="margin-bottom: 0pt;"><c>&lt;/ServerOptions&gt;</c></p>
      *
      * The ServerOptions context REQUIRES the Server option specify
      * the server alias, which sets the remaining options specified
@@ -439,6 +493,7 @@ static const configoption_t options[] =
     */
     {"<ServerOptions>",ARG_NONE,enter_server_options_context,NULL,
         CTX_GLOBAL, NULL},
+
     /* Specifies the end-tag of the ServerOptions context.
      */
     {"</ServerOptions>",ARG_NONE,exit_server_options_context,NULL,
@@ -470,22 +525,22 @@ static const configoption_t options[] =
     {"PrimeServer", ARG_STR, get_primesrv, NULL,
             CTX_PRIMESERVERS, NULL},
 
-    /* This groups options specific to a filesystem.  A pvfs2 server may manage
-     * more than one filesystem, so a config file may have more than
-     * one Filesystem context, each defining the parameters of a different
-     * Filesystem.
+    /* This groups options specific to a file system.  An OrangeFS server may manage
+     * more than one file system, so a config file may have more than
+     * one FileSystem context, each defining the parameters of a different
+     * file system.
      */
     {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_GLOBAL,NULL},
 
-    /* Specifies the end-tag of a Filesystem context.
+    /* Specifies the end-tag of a FileSystem context.
      */
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
         NULL},
 
-     /* Specifies the beginning of a ExportOptions context.
-      * This groups options specific to a filesystem and related to the behavior
+     /* Specifies the beginning of an ExportOptions context.
+      * This groups options specific to a file system and related to the behavior
       * of how it gets exported to various clients. Most of these options
-      * will affect things like what uids get translated to and so on..
+      * will affect things like uid translation.
       */
      {"<ExportOptions>",ARG_NONE, enter_export_options_context, NULL,CTX_FILESYSTEM,
          NULL},
@@ -496,7 +551,7 @@ static const configoption_t options[] =
          NULL},
  
     /* This groups
-     * options specific to a filesystem and related to the behavior of the
+     * options specific to a file system and related to the behavior of the
      * storage system.  Mostly these options are passed directly to the
      * TROVE storage module which may or may not support them.  The
      * DBPF module (currently the only TROVE module available) supports
@@ -510,13 +565,13 @@ static const configoption_t options[] =
     {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,
         CTX_STORAGEHINTS,NULL},
 
-    /* Provides a context for defining the filesystem's default
+    /* Provides a context for defining the file system's default
      * distribution to use and the parameters to be set for that distribution.
      *
-     * Valid options within the Distribution context are Name, Param, and Value.
+     * Valid options within the Distribution context are <c>Name</c>, <c>Param</c>, and <c>Value</c>.
      *
-     * This context is an optional context within the Filesystem context.  If
-     * not specified, the filesystem defaults to the simple-stripe distribution.
+     * This context is an optional context within the FileSystem context.  If
+     * not specified, the file system defaults to the simple-stripe distribution.
      */
     {"<Distribution>",ARG_NONE, enter_distribution_context, NULL,
         CTX_FILESYSTEM, NULL},
@@ -527,53 +582,49 @@ static const configoption_t options[] =
         CTX_DISTRIBUTION, NULL},
 
     /* Opens a context for describing the root metadata
-     *
      */
     {"RootServers", ARG_NONE, enter_rootsrvs_context, NULL,
             CTX_FILESYSTEM, NULL},
 
     /* Closes a context for describing the root metadata
-     *
      */
     {"/RootServers", ARG_NONE, exit_rootsrvs_context, NULL,
             CTX_ROOTSERVERS, NULL},
 
     /* Specifies the SID of a server that holds a copy of the
      * filesystem root object.  The format is:
-     *
      * RootServer {Alias}
-     *
      */
     {"RootServer", ARG_STR, get_rootsrv, NULL,
             CTX_ROOTSERVERS, NULL},
 
-    /* Specifies the handle value for the root of the Filesystem.  This
-     * is a required option in the Filesystem context.  The format is:
+    /* Specifies the handle value for the root of the file system.  This
+     * is a required option in the FileSystem context.  The format is:
      *
-     * RootHandle {OID}
+     * <c>RootHandle {</c><i>OID</i><c>}</c>
      *
-     * Where {OID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     * Where <c>{</c><i>OID</i><c>}</c> is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
      *
      * In general its best to let the pvfs-genconfig script specify a
-     * RootHandle value for the filesystem.
+     * RootHandle value for the file system.
      */
     {"RootHandle", ARG_STR, get_root_handle, NULL,
             CTX_ROOTSERVERS, NULL},
 
-    /* This option specifies the name of the particular filesystem or
+    /* This option specifies the name of the particular file system or
      * distribution that its defined in.  It is a required option in
-     * Filesystem and Distribution contexts.
+     * FileSystem and Distribution contexts.
      */
     {"Name", ARG_STR, get_name, NULL,
         CTX_FILESYSTEM | CTX_DISTRIBUTION, NULL},
 
-    /* A pvfs server may manage more than one filesystem, and so a
+    /* An OrangeFS server may manage more than one file system, and so a
      * unique identifier is used to represent each one.  
      * This option specifies such an ID (sometimes called a 'collection
-     * id') for the filesystem it is defined in.  
+     * id') for the file system it is defined in.  
      *
      * The ID value can be any positive integer, no greater than
-     * 2147483647 (INT32_MAX).  It is a required option in the Filesystem
+     * 2147483647 (INT32_MAX).  It is a required option in the FileSystem
      * context.
      */
     {"ID", ARG_INT, get_filesystem_collid, NULL,
@@ -593,51 +644,52 @@ static const configoption_t options[] =
     {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "16"},
 
-    /* The gossip interface in pvfs allows users to specify different
-     * levels of logging for the pvfs server.  The output of these
+    /* The gossip interface in OrangeFS allows users to specify different
+     * levels of logging for the OrangeFS server.  The output of these
      * different log levels is written to a file, which is specified in
      * this option.  The value of the option must be the path pointing to a 
-     * file with valid write permissions.  The Logfile option can be
-     * specified for all the pvfs servers in the Defaults context or for
+     * file with valid write permissions.  The LogFile option can be
+     * specified for all the OrangeFS servers in the Defaults context or for
      * a particular server in the Global context.
      */
     {"LogFile", ARG_STR, get_logfile, NULL,
         CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs2-server.log"},
 
     /* The LogType option can be used to control the destination of log 
-     * messages from PVFS2 server.  The default value is "file", which causes
+     * messages from OrangeFS server.  The default value is <c>file</c>, which causes
      * all log messages to be written to the file specified by the LogFile
-     * parameter.  Another option is "syslog", which causes all log messages
+     * parameter.  Another option is <c>syslog</c>, which causes all log messages
      * to be written to syslog.
      */
     {"LogType", ARG_STR, get_logtype, NULL,
         CTX_DEFAULTS | CTX_SERVER_OPTIONS, "file"},
 
-    /* The gossip interface in pvfs allows users to specify different
-     * levels of logging for the pvfs server.  This option sets that level for
+    /* The gossip interface in OrangeFS allows users to specify different
+     * levels of logging for the OrangeFS server.  This option sets that level for
      * either all servers (by being defined in the Defaults context) or for
      * a particular server by defining it in the Global context.  Possible
      * values for event logging are:
      *
      * __EVENTLOGGING__
      *
-     * The value of the EventLogging option can be a comma separated list
+     * The value of the EventLogging option can be a comma-separated list
      * of the above values.  Individual values can also be negated with
      * a '-'.  Examples of possible values are:
      *
-     * EventLogging flow,msgpair,io
+     * <c>EventLogging flow,msgpair,io</c>
      * 
-     * EventLogging -storage
+     * <c>EventLogging -storage</c>
      * 
-     * EventLogging -flow,-flowproto
+     * <c>EventLogging -flow,-flowproto</c>
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"none,"},
 
+    /* Enable code related to the use of TAU (Tuning and Analysis Utilities) */
     {"EnableTracing",ARG_STR, get_event_tracing,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
 
-    /* At startup each pvfs server allocates space for a set number
+    /* At startup each OrangeFS server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
      * of each unexpected request.  This parameter specifies the number
      * of requests for which to allocate space.
@@ -645,70 +697,55 @@ static const configoption_t options[] =
      * A default value is set in the Defaults context which will be be used 
      * for all servers. 
      * However, the default value can also be overwritten by setting a separate value
-     * in the ServerOptions context using the Option tag.
+     * in the ServerOptions context.
      */
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
 
-    /* DEPRECATED 
-     * Specifies the local path for the pvfs2 server to use as 
-     * storage space for data files and metadata files. This option should not
-     * be used in conjuction with DataStorageSpace or MetadataStorageSpace. 
-     * This option is only meant as a migration path for configurations where i
-     * users do not want (or don't expect to need to) modify their configuration
-     * to run this version.
-     *
-     * This option specifies the default path for all servers and will appear 
-     * in the Defaults context.
-     *
-     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
-     * basis. Look at the "Option" tag for more details
-     * Example:
-     *
-     * StorageSpace /tmp/pvfs-data.storage
-     * DEPRECATED.
+    /* DEPRECATED. Use <c>DataStorageSpace</c> and <c>MetadataStorageSpace</c> 
+     *       instead.
      */
     {"StorageSpace",ARG_STR, get_storage_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
-    /* Specifies the local path for the pvfs2 server to use as storage space 
+    /* Specifies the local path for the OrangeFS server to use as storage space 
      * for data files. This option specifies the default path for all servers 
      * and will appear in the Defaults context.
      *
-     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
-     * basis. Look at the "Option" tag for more details
+     * NOTE: This can be overridden in the ServerOptions context on a per-server
+     * basis.
      * Example:
      *
-     * DataStorageSpace /tmp/pvfs-data.storage
+     * <c>DataStorageSpace /opt/orangefs/storage/data</c>
      */
     {"DataStorageSpace",ARG_STR, get_data_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
-    /* Specifies the local path for the pvfs2 server to use as storage space 
+    /* Specifies the local path for the OrangeFS server to use as storage space 
      * for metadata files. This option specifies the default path for all 
      * servers and will appear in the Defaults context.
      *
-     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
-     * basis. Look at the "Option" tag for more details
+     * NOTE: This can be overridden in the ServerOptions context on a per-server
+     * basis.
      * Example:
      *
-     * MetadataStorageSpace /tmp/pvfs-meta.storage
+     * <c>MetadataStorageSpace /opt/orangefs/storage/meta</c>
      */
     {"MetadataStorageSpace",ARG_STR, get_meta_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
      /* Current implementations of TCP on most systems use a window
-      * size that is too small for almost all uses of pvfs.  
+      * size that is too small for almost all uses of OrangeFS.  
       * We recommend administators
-      * should consider tuning the linux kernel maximum send and
+      * consider tuning the Linux kernel maximum send and
       * receive buffer sizes via the /proc settings.  The
       * <a href="http://www.psc.edu/networking/projects/tcptune/#Linux">
       * PSC tcp tuning section for linux</a> has good information
       * on how to do this.  
       *
       * The <i>TCPBufferSend</i> and
-      * <i>TCPBufferReceive</i> options allows setting the tcp window
-      * sizes for the pvfs clients and servers, if using the
+      * <i>TCPBufferReceive</i> options allow setting the tcp window
+      * sizes for the OrangeFS clients and servers, if using the
       * system wide settings is unacceptable.  The values should be
       * large enough to hold the full bandwidth delay product (BDP)
       * of the network.  Note that setting these values disables
@@ -725,7 +762,7 @@ static const configoption_t options[] =
          CTX_DEFAULTS,"0"},
 
      /* If enabled, specifies that the server should bind its port only on
-      * the specified address (rather than INADDR_ANY)
+      * the specified address (rather than INADDR_ANY).
       */
      {"TCPBindSpecific",ARG_STR, get_tcp_bind_specific,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
@@ -750,7 +787,7 @@ static const configoption_t options[] =
      {"ClientJobFlowTimeoutSecs",ARG_INT, get_client_job_flow_timeout,NULL,
          CTX_DEFAULTS, "300"},
 
-     /* Specifies the number of retry attempts for operations (when possible)
+     /* Specifies the number of retry attempts for operations (when possible).
       */
      {"ClientRetryLimit",ARG_INT, get_client_retry_limit,NULL,
          CTX_DEFAULTS, "5"},
@@ -760,15 +797,16 @@ static const configoption_t options[] =
      {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
          CTX_DEFAULTS, "2000"},
 
-    /* Specifies if file stuffing should be enabled or not.  Default is
-     * enabled; this option is only provided for benchmarking purposes 
+    /* Specifies if file stuffing should be enabled or not. File stuffing
+     * allows the data for a small file to be stored on the same server
+     * as the metadata.
      */
     {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
         CTX_FILESYSTEM,"yes"},
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
-      * when the pvfs server is running in admin mode.
+      * when the OrangeFS server is running in admin mode.
       *
       * Can be set in either Default or ServerOptions contexts.
       */
@@ -779,15 +817,15 @@ static const configoption_t options[] =
      * only tcp, infiniband, and myrinet are valid BMI modules.  
      * The format of the list is a comma separated list of one of:
      *
-     * bmi_tcp
-     * bmi_ib
-     * bmi_gm
+     * <c>bmi_tcp</c>
+     * <p><c>bmi_ib</c></p>
+     * <p><c>bmi_gm</c></p>
      *
      * For example:
      *
-     * BMIModules bmi_tcp,bmi_ib
+     * <c>BMIModules bmi_tcp,bmi_ib</c>
      *
-     * Note that only the bmi modules compiled into pvfs should be
+     * Note that only the bmi modules compiled into OrangeFS should be
      * specified in this list.  The BMIModules option can be specified
      * in either the Defaults or ServerOptions contexts.
      */
@@ -796,16 +834,16 @@ static const configoption_t options[] =
     /* List the flow modules to load when the server is started.  The modules
      * available for loading currently are:
      *
-     * flowproto_multiqueue - A flow module that handles all the possible flows,
-     * bmi->trove, trove->bmi, mem->bmi, bmi->mem.  At present, this is the
+     * <c>flowproto_multiqueue</c> - A flow module that handles all the possible flows,
+     * <c>bmi->trove</c>, <c>trove->bmi</c>, <c>mem->bmi</c>, <c>bmi->mem</c>.  At present, this is the
      * default and only available flow for production use.
      *
-     * flowproto_bmi_cache - A flow module that enables the use of the NCAC
-     * (network-centric adaptive cache) in the pvfs server.  Since the NCAC
+     * <c>flowproto_bmi_cache</c> - A flow module that enables the use of the NCAC
+     * (network-centric adaptive cache) in the OrangeFS server.  Since the NCAC
      * is currently disable and unsupported, this module exists as a proof
      * of concept only.
      *
-     * flowproto_dump_offsets - Used for debugging, this module allows the
+     * <c>flowproto_dump_offsets</c> - Used for debugging, this module allows the
      * developer to see what/when flows are being posted, without making
      * any actual BMI or TROVE requests.  This should only be used if you
      * know what you're doing.
@@ -817,23 +855,20 @@ static const configoption_t options[] =
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
      *
-     * usec: [%H:%M:%S.%U]
+     * <c>usec</c>: [%H:%M:%S.%U]
      *
-     * datetime: [%m/%d/%Y %H:%M:%S]
+     * <c>datetime</c>: [%m/%d/%Y %H:%M:%S]
      *
-     * thread: [%H:%M:%S.%U (%lu)]
+     * <c>thread</c>: [%H:%M:%S.%U (%lu)]
      *
-     * none
+     * <c>none</c>
      *
      * The format of the option is one of the above values.  For example,
      *
-     * LogStamp datetime
+     * <c>LogStamp datetime</c>
      */
     {"LogStamp",ARG_STR, get_logstamp,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"usec"},
-
-    /* --- end default options for all servers */
-    
 
     /* buffer size to use for bulk data transfers */
     {"FlowBufferSizeBytes", ARG_INT,
@@ -843,20 +878,13 @@ static const configoption_t options[] =
     {"FlowBuffersPerFlow", ARG_INT,
          get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
 
-    /* 
-     * File-system export options
-     *
-     * Define options that will influence the way a file-system gets exported
-     * to the rest of the world.
-     */
-
-    /* RootSquash option specifies whether the exported file-system needs to
+    /* RootSquash option specifies whether the exported file system needs to
     *  squash accesses by root. This is an optional parameter that needs 
     *  to be specified as part of the ExportOptions
      * context and is a list of BMI URL specification of client addresses 
      * for which RootSquash has to be enforced. 
      *
-     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     * <c>RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...</c>
      */
     {"RootSquash", ARG_LIST, get_root_squash, NULL,
         CTX_EXPORT, ""},
@@ -866,49 +894,56 @@ static const configoption_t options[] =
      * part of the ExportOptions context and is a list of BMI URL 
      * specification of client addresses for which RootSquash
      * has to be enforced. 
-     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     *
+     * <c>RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...</c>
      */
     {"RootSquashExceptions", ARG_LIST, get_root_squash_exceptions, NULL,
         CTX_EXPORT, ""},
 
-    /* ReadOnly option specifies whether the exported file-system needs to
+    /* ReadOnly option specifies whether the exported file system needs to
     *  disallow write accesses from clients or anything that modifies the 
-    *  state of the file-system.
+    *  state of the file system.
      * This is an optional parameter that needs to be specified as part of 
      * the ExportOptions context and is a list of BMI URL specification of 
      * client addresses for which ReadOnly has to be enforced.
      * An example: 
      *
-     * ReadOnly tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     * <c>ReadOnly tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...</c>
      */
     {"ReadOnly", ARG_LIST,  get_read_only,    NULL,
         CTX_EXPORT, ""},
 
-    /* AllSquash option specifies whether the exported file-system needs to 
-    *  squash all accesses to the file-system to a specified uid/gid!
+    /* AllSquash option specifies whether the exported file system needs to 
+    *  squash all accesses to the file system to a specified uid/gid.
      * This is an optional parameter that needs to be specified as part of 
      * the ExportOptions context and is a list of BMI URL specification of client 
      * addresses for which AllSquash has to be enforced.
      * An example:
      *
-     * AllSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     * <c>AllSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...</c>
      */
     {"AllSquash", ARG_LIST, get_all_squash,   NULL,
         CTX_EXPORT, ""},
 
-    /* AnonUID and AnonGID are 2 integers that tell the servers to translate 
-    *  the requesting clients' uid/gid to the specified ones whenever AllSquash
-    *  is specified!
-     * If these are not specified and AllSquash is specified then the uid used 
-     * will be that of nobody and gid that of nobody.
+    /* AnonUID tells the servers to translate the requesting client's uid
+     * to the specified one whenever AllSquash is specified.
+     * If this is not specified and AllSquash is specified then the uid used 
+     * will be that of nobody.
      * An example:
      *
      * AnonUID 3454
-     * AnonGID 3454
      */
-
     {"AnonUID",  ARG_STR,  get_anon_uid,     NULL,
         CTX_EXPORT, "65534"},
+
+    /* AnonGID tells the servers to translate the requesting client's gid
+     * to the specified one whenever AllSquash is specified.
+     * If this is not specified and AllSquash is specified then the gid used 
+     * will be that of nobody.
+     * An example:
+     *
+     * AnonGID 3454
+     */
     {"AnonGID",  ARG_STR,  get_anon_gid,     NULL,
         CTX_EXPORT, "65534"},
 
@@ -917,7 +952,7 @@ static const configoption_t options[] =
      * trove module can be given a hint to tell it how long to wait before
      * reusing handle values that have become freed up (only deleting files will
      * free up a handle).  The HandleRecycleTimeoutSecs option specifies
-     * the number of seconds to wait for each filesystem.  This is an
+     * the number of seconds to wait for each file system.  This is an
      * optional parameter that can be specified in the StorageHints context.
      */
     {"HandleRecycleTimeoutSecs", ARG_INT,
@@ -931,23 +966,23 @@ static const configoption_t options[] =
      * object types that should get cached in the attribute cache.  
      * The possible values for this option are:
      *
-     * dh - (datafile handles) This will cache the array of datafile handles for
-     *      each logical file in this filesystem
+     * <c>dh</c> - (datafile handles) This will cache the array of datafile handles for
+     *      each logical file in this file system
      * 
-     * md - (metafile distribution) This will cache (for each logical file)
+     * <c>md</c> - (metafile distribution) This will cache (for each logical file)
      *      the file distribution information used to create/manage
      *      the datafiles.  
      *
-     * de - (directory entries) This will cache the handles of 
-     *      the directory entries in this filesystem
+     * <c>de</c> - (directory entries) This will cache the handles of 
+     *      the directory entries in this file system
      *
-     * st - (symlink target) This will cache the target path 
-     *      for the symbolic links in this filesystem
+     * <c>st</c> - (symlink target) This will cache the target path 
+     *      for the symbolic links in this file system
      *
      * The format of this option is a comma-separated list of one or more
      * of the above values.  For example:
      *
-     * AttrCacheKeywords dh,md,de,st
+     * <c>AttrCacheKeywords dh,md,de,st</c>
      */
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
         CTX_STORAGEHINTS, 
@@ -973,8 +1008,8 @@ static const configoption_t options[] =
     
     /* The TroveSyncMeta option allows users to turn off metadata
      * synchronization with every metadata write.  This can greatly improve
-     * performance.  In general, this value should probably be set to yes,
-     * otherwise metadata transaction could be lost in the event of server
+     * performance.  In general, this value should probably be set to yes;
+     * otherwise, metadata transaction could be lost in the event of server
      * failover.
      */
     {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, 
@@ -987,11 +1022,16 @@ static const configoption_t options[] =
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
 
+    /* The DBCacheSizeBytes option allows users to set the size of the
+     * shared memory buffer pool (i.e., cache) for Berkeley DB. The size is
+     * specified in bytes.
+     * See BDB documentation for <c>set_cachesize()</c> for more info.
+     */
     {"DBCacheSizeBytes", ARG_INT, get_db_cache_size_bytes, NULL,
         CTX_STORAGEHINTS,"0"},
 
-    /* cache type for berkeley db environment.  "sys" and "mmap" are valid
-     * value for this option
+    /* cache type for berkeley db environment.  <c>sys</c> and <c>mmap</c> are valid
+     * values for this option
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
@@ -1003,8 +1043,8 @@ static const configoption_t options[] =
     {"Param", ARG_STR, get_param, NULL, 
         CTX_DISTRIBUTION, NULL},
     
-    /* This option specifies the value of the parameter who's name
-     * was specified in the previous option.
+    /* This option specifies the value of the parameter whose name
+     * was specified in the Param option.
      */
     {"Value", ARG_INT, get_value, NULL, 
         CTX_DISTRIBUTION, NULL},
@@ -1026,27 +1066,27 @@ static const configoption_t options[] =
         CTX_STORAGEHINTS, "1"},
 
     /* This option specifies the method used for trove.  The method specifies
-     * how both metadata and data are stored and managed by the PVFS servers.
+     * how both metadata and data are stored and managed by the OrangeFS servers.
      * Currently the
      * alt-aio method is the default.  Possible methods are:
-     * <ul>
-     * <li>alt-aio.  This uses a thread-based implementation of Asynchronous IO.
-     * <li>directio.  This uses a direct I/O implementation to perform I/O
+     *
+     * <c>alt-aio</c>  This uses a thread-based implementation of Asynchronous IO.
+     *
+     * <c>directio</c>  This uses a direct I/O implementation to perform I/O
      * operations to datafiles.  This method may give significant performance
-     * improvement if PVFS servers are running over shared storage, especially
+     * improvement if OrangeFS servers are running over shared storage, especially
      * for large I/O accesses.  For local storage, including RAID setups,
      * the alt-aio method is recommended.
      *
-     * <li>null-aio.  This method is an implementation 
+     * <c>null-aio</c>  This method is an implementation 
      * that does no disk I/O at all
      * and is only useful for development or debugging purposes.  It can
      * be used to test the performance of the network without doing I/O to disk.
-     * <li>dbpf.  Uses the system's Linux AIO implementation.  No longer
+     * <c>dbpf</c>  Uses the system's Linux AIO implementation.  No longer
      * recommended in production environments.
-     * </ul>
      *
      * Note that this option can be specified in either the <a href="#Defaults">
-     * Defaults</a> context of the main fs.conf, or in a filesystem specific 
+     * Defaults</a> context of fs.conf, or in a file system specific 
      * <a href="#StorageHints">StorageHints</a>
      * context, but the semantics of TroveMethod in the 
      * <a href="#Defaults">Defaults</a>
@@ -1054,9 +1094,9 @@ static const configoption_t options[] =
      * <a href="#Defaults">Defaults</a> context only specifies which 
      * method is used at
      * server initialization.  It does not specify the default TroveMethod
-     * for all the filesystems the server supports.  To set the TroveMethod
-     * for a filesystem, the TroveMethod must be placed in the 
-     * <a href="#StorageHints">StorageHints</a> context for that filesystem.
+     * for all the file systems the server supports.  To set the TroveMethod
+     * for a file system, the TroveMethod must be placed in the 
+     * <a href="#StorageHints">StorageHints</a> context for that file system.
      */
     {"TroveMethod", ARG_STR, get_trove_method, NULL, 
         CTX_DEFAULTS|CTX_STORAGEHINTS, "alt-aio"},
@@ -1070,7 +1110,7 @@ static const configoption_t options[] =
     {"SmallFileSize", ARG_INT, get_small_file_size, NULL, CTX_FILESYSTEM, NULL},
 
     /* Specifies the number of threads that should be started to service
-     * Direct I/O operations.  This defaults to 30.
+     * Direct I/O operations.
      */
     {"DirectIOThreadNum", ARG_INT, directio_thread_num, NULL,
         CTX_STORAGEHINTS, "30"},
@@ -1084,18 +1124,6 @@ static const configoption_t options[] =
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
 
-     /* Initial number of dirdata handles when creating a new directory.
-      * TODO: determine the default value, use 2 as a start
-      */
-     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2"},
-
-    /* Specifies the maximum size of data transmitted with a
-     *   directory split operation.
-     */
-    {"SplitMemLimit", ARG_INT, split_mem_limit, NULL,
-        CTX_FILESYSTEM, "0"},
-
     /* Specifies the number of partitions to use for tree communication. */
     {"TreeWidth", ARG_INT, tree_width, NULL,
         CTX_FILESYSTEM, "2"},
@@ -1105,6 +1133,18 @@ static const configoption_t options[] =
      */
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
+
+    /* Specifies the default for initial number of servers to hold directory entries. */
+    {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
+        CTX_FILESYSTEM, "1"},
+
+    /* Specifies the default for maximum number of servers to hold directory entries. */
+    {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
+        CTX_FILESYSTEM, "4"},
+
+    /* Specifies the default for number of directory entries on a server before splitting. */
+    {"DistrDirSplitSize", ARG_INT, distr_dir_split_size, NULL,
+        CTX_FILESYSTEM, "10000"},
 
     LAST_OPTION
 };
@@ -1171,7 +1211,8 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     /* read in the fs.conf defaults config file */
     config_s->configuration_context = CTX_GLOBAL;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
-                                     options, (void *)config_s, 
+                                     options,
+                                     (void *)config_s, 
                                      CASE_INSENSITIVE);
     if (!configfile)
     {
@@ -1269,7 +1310,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
 #endif /* ENABLE_SECURITY */
 
 #ifdef ENABLE_SECURITY_CERT
-    if (server_flag && !config_s->ca_path)
+    if (server_flag && !config_s->ca_file)
     {
         gossip_err("Configuration file error. No CA certificate path "
                    "specified.\n");
@@ -1415,6 +1456,7 @@ DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+    config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
     return NULL;
 }
@@ -1423,7 +1465,7 @@ DOTCONF_CB(exit_security_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_DEFAULTS;
+    config_s->configuration_context = config_s->prev_context;
     return NULL;
 }
 
@@ -1467,7 +1509,7 @@ DOTCONF_CB(enter_filesystem_context)
 
     if (config_s->host_aliases == NULL)
     {
-        return("Error in context.  Filesystem tag cannot "
+        return("Error in context.  FileSystem tag cannot "
                    "be declared before an Aliases tag.\n");
     }
 
@@ -1512,9 +1554,9 @@ DOTCONF_CB(exit_filesystem_context)
     */
     if (!is_populated_filesystem_configuration(fs_conf))
     {
-        gossip_err("Error: Filesystem configuration is invalid!\n");
-        return("Possible Error in context.  Cannot have /Filesystem "
-                   "tag before all filesystem attributes are declared.\n");
+        gossip_err("Error: File system configuration is invalid!\n");
+        return("Possible Error in context.  Cannot have /FileSystem "
+                   "tag before all file system attributes are declared.\n");
     }
 
     config_s->configuration_context = CTX_GLOBAL;
@@ -1707,9 +1749,6 @@ DOTCONF_CB(get_tcp_buffer_send)
     return NULL;
 }
 
-#ifdef WIN32
-#define strcasecmp   stricmp
-#endif
 DOTCONF_CB(get_tcp_bind_specific)
 {
     struct server_configuration_s *config_s =
@@ -2043,7 +2082,7 @@ DOTCONF_CB(get_root_squash)
             return("Could not allocate memory for root_squash_netmasks\n");
         }
         if (get_list_of_strings(cmd->arg_count, cmd->data.list,
-                    &fs_conf->root_squash_hosts) < 0)
+                                &fs_conf->root_squash_hosts) < 0)
         {
             free(fs_conf->root_squash_netmasks);
             fs_conf->root_squash_netmasks = NULL;
@@ -3179,7 +3218,7 @@ DOTCONF_CB(get_security_timeout)
     return NULL;
 }
 
-DOTCONF_CB(get_ca_path)
+DOTCONF_CB(get_ca_file)
 { 
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -3189,13 +3228,49 @@ DOTCONF_CB(get_ca_path)
     {
         return NULL;
     }
-    if (config_s->ca_path)
+    if (config_s->ca_file)
     {
-        free(config_s->ca_path);
+        free(config_s->ca_file);
     }
-    config_s->ca_path = 
+    config_s->ca_file = 
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     
+    return NULL;
+}
+
+DOTCONF_CB(get_user_cert_dn)
+{ 
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->user_cert_dn)
+    {
+        free(config_s->user_cert_dn);
+    }
+    config_s->user_cert_dn = 
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    
+    return NULL;
+}
+
+DOTCONF_CB(get_user_cert_exp)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+
+    config_s->user_cert_exp = cmd->data.value;
+
     return NULL;
 }
 
@@ -3226,7 +3301,6 @@ DOTCONF_CB(get_ldap_hosts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    /* TODO: read as list for failover */
     if (config_s->ldap_hosts)
     {
         free(config_s->ldap_hosts);
@@ -3407,41 +3481,10 @@ DOTCONF_CB(get_ldap_search_timeout)
     return NULL;
 }
 
-DOTCONF_CB(get_init_num_dirdata_handles)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-    if(cmd->data.value <= 0)
-    {
-        return "InitNumDirdataHandles has to be a positive integer!\n";
-    }
-    config_s->init_num_dirdata_handles = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(split_mem_limit)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s *)cmd->context;
-
-    struct filesystem_configuration_s *fs_conf =
-        (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-
-    fs_conf->split_mem_limit = cmd->data.value;
-
-    return NULL;
-}
-
 DOTCONF_CB(tree_width)
 {
     struct server_configuration_s *config_s =
-            (struct server_configuration_s *)cmd->context;
+        (struct server_configuration_s *)cmd->context;
 
     config_s->tree_width = cmd->data.value;
 
@@ -3451,12 +3494,43 @@ DOTCONF_CB(tree_width)
 DOTCONF_CB(tree_threshold)
 {
     struct server_configuration_s *config_s =
-            (struct server_configuration_s *)cmd->context;
+        (struct server_configuration_s *)cmd->context;
 
     config_s->tree_threshold = cmd->data.value;
 
     return NULL;
 }
+
+DOTCONF_CB(distr_dir_servers_initial)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_servers_initial = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(distr_dir_servers_max)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_servers_max = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(distr_dir_split_size)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s *)cmd->context;
+
+    config_s->distr_dir_split_size = cmd->data.value;
+
+    return NULL;
+}
+
 
 /*
  * Function: PINT_config_release
@@ -3601,7 +3675,7 @@ static int is_valid_alias(PINT_llist * host_aliases, char *str)
             assert(cur_alias->host_alias);
             assert(cur_alias->bmi_address);
 
-            if (strcmp(str,cur_alias->host_alias) == 0)
+            if (strcmp(str, cur_alias->host_alias) == 0)
             {
                 ret = 1;
                 break;
@@ -3618,7 +3692,6 @@ static int is_populated_filesystem_configuration(
     return ((fs && fs->coll_id && fs->file_system_name &&
              PVFS_OID_cmp(&fs->root_handle, &PVFS_HANDLE_NULL)) ? 1 : 0);
 }
- 
 static int is_valid_filesystem_configuration(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
@@ -3988,18 +4061,18 @@ int PINT_config_get_allowed_ports(struct server_configuration_s *config_s,
  *           char **allowed_networks (OUT)
  *           int *allowed_netmasks (OUT)
  *
- * Returns:  Fills up *allowed_network_count, *allowed_networks and *allowed_netmasks
+ * Returns:  Fills up *allowed_network_count, *allowed_networks and
+ *           *allowed_netmasks
  *           and returns 0 on success and -1 on failure
  *
  * Synopsis: Retrieve the list of allowed network addresses and netmasks
  */
 
-int PINT_config_get_allowed_networks(
-        struct server_configuration_s *config_s,
-        int  *enabled,
-        int  *allowed_networks_count,
-        char ***allowed_networks,
-        int  **allowed_masks)
+int PINT_config_get_allowed_networks(struct server_configuration_s *config_s,
+                                     int  *enabled,
+                                     int  *allowed_networks_count,
+                                     char ***allowed_networks,
+                                     int  **allowed_masks)
 {
     int ret = -1;
 
@@ -4050,7 +4123,7 @@ char *PINT_config_get_host_addr_ptr(struct server_configuration_s *config_s,
             assert(cur_alias->host_alias);
             assert(cur_alias->bmi_address);
 
-            if (strcmp(cur_alias->host_alias,alias) == 0)
+            if (strcmp(cur_alias->host_alias, alias) == 0)
             {
                 ret = cur_alias->bmi_address;
                 break;
@@ -4093,7 +4166,7 @@ char *PINT_config_get_host_alias_ptr(
             assert(cur_alias->host_alias);
             assert(cur_alias->bmi_address);
 
-            if (strcmp(cur_alias->bmi_address,bmi_address) == 0)
+            if (strcmp(cur_alias->bmi_address, bmi_address) == 0)
             {
                 ret = cur_alias->host_alias;
                 break;
@@ -4115,7 +4188,7 @@ char *PINT_config_get_host_alias_ptr(
 static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename)
 {
-    int fd = 0, nread = 0;
+    int fd = 0, nread = 0, file_found = 0;
     struct stat statbuf;
 #ifdef WIN32
     char working_dir[MAX_PATH+1];
@@ -4137,64 +4210,45 @@ static int cache_config_files(struct server_configuration_s *config_s,
     my_global_fn = ((global_config_filename != NULL) ?
                     global_config_filename : "fs.conf");
 
-    memset(&statbuf, 0, sizeof(struct stat));
-    if (stat(my_global_fn, &statbuf) == 0)
+    while(!file_found)
     {
-        if (statbuf.st_size == 0)
-        {
-            gossip_err("Invalid config file %s.  This "
-                       "file is 0 bytes in length!\n", my_global_fn);
-            goto error_exit;
-        }
-        config_s->fs_config_filename = strdup(my_global_fn);
-        config_s->fs_config_buflen = statbuf.st_size + 1;
-    }
-    else if (errno == ENOENT)
-    {
-        /* Not sure why we don't try the add working dir to
-         * path trick in this case as is done below but for
-         * now we'll leave the code this way in cases there
-         * is some corner case we don't know about.
-         */
-        gossip_err("Failed to find global config file %s.  This "
-                   "file does not exist!\n", my_global_fn);
-        goto error_exit;
-    }
-    else
-    {
-        /* It is unclear what errors to stat we are responding to here
-         * but the addition of more than one copy of the working dir
-         * is clearly a bad idea.  If one copy helps, great, otherwise
-         * we are calling an error.
-         */
-        assert(working_dir);
-#ifdef WIN32
-        _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
-#else
-        snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
-#endif
-        my_global_fn = buf;
+        static int one_shot = 0;
         memset(&statbuf, 0, sizeof(struct stat));
-        if (stat(my_global_fn, &statbuf) == 0)
+        if ((file_found = !stat(my_global_fn, &statbuf)) == 1)
         {
             if (statbuf.st_size == 0)
             {
                 gossip_err("Invalid config file %s.  This "
-                        "file is 0 bytes in length!\n", my_global_fn);
+                           "file is 0 bytes in length!\n", my_global_fn);
                 goto error_exit;
             }
             config_s->fs_config_filename = strdup(my_global_fn);
             config_s->fs_config_buflen = statbuf.st_size + 1;
         }
-        else
+        else if (errno == ENOENT)
         {
-            gossip_err("Failed to stat global config file %s.", my_global_fn);
+	    gossip_err("Failed to find global config file %s.  This "
+                       "file does not exist!\n", my_global_fn);
             goto error_exit;
+        }
+        else /* I don't think this code ever runs - WBL */
+        {
+            if (one_shot)
+            {
+                goto error_exit;
+            }
+            one_shot++;
+            assert(working_dir);
+#ifdef WIN32
+            _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
+#else
+            snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
+#endif
+            my_global_fn = buf;
         }
     }
 
-    if (!config_s->fs_config_filename ||
-        (config_s->fs_config_buflen == 0))
+    if (!config_s->fs_config_filename || (config_s->fs_config_buflen == 0))
     {
         gossip_err("Failed to stat fs config file.  Please make sure that ");
         gossip_err("the file %s\nexists, is not a zero file size, and has\n",
@@ -4233,10 +4287,10 @@ static int cache_config_files(struct server_configuration_s *config_s,
 
     return 0;
 
-  close_fd_fail:
+close_fd_fail:
     close(fd);
 
-  error_exit:
+error_exit:
     return 1;
 }
 
