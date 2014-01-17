@@ -687,13 +687,13 @@ int PINT_cached_config_map_servers(
                                          fsid,
                                          &layout->server_list.servers[i],
                                          &handle_extent_array[i]);
-#endif
                 if(ret < 0)
                 {
                     gossip_err("The address specified in the datafile "
                                "layout is invalid\n");
                     return ret;
                 }
+#endif
             }
 
             addr_array[i] = layout->server_list.servers[i];
@@ -797,11 +797,11 @@ int PINT_cached_config_map_servers(
             /* lookup addresses */
             ret = BMI_addr_lookup(&addr_array[df],
                                   sv->alias_mapping->bmi_address);
-#endif
             if (ret)
             {
                 return ret;
             }
+#endif
 
 /* V3 no more handle ranges mappings or extents */
 #if 0
