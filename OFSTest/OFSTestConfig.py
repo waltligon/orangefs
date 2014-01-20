@@ -219,6 +219,9 @@ class OFSTestConfig(object):
         # a bug on some ec2 setups.
         self.ofs_host_name_override = []
         
+        # Start the OrangeFS client on all nodes after installation?
+        self.start_client_on_all_nodes = False
+        
         
         #------------------------------
         #
@@ -557,9 +560,9 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_mount_point = temp
         
-        
-        
-        
+        temp = d.get('start_client_on_all_nodes')
+        if temp != None:
+            self.start_client_on_all_nodes = temp
         
         
         

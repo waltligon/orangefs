@@ -268,6 +268,8 @@ class OFSTestNetwork(object):
         
  
         for node in node_list:
+            node.created_openmpihosts = "~/openmpihosts"
+            node.created_mpichhosts = "~/mpichhosts"
             for n2 in node_list:
                 # can we ping the node?
                 #print "Pinging %s from local node" % n2.host_name
@@ -276,7 +278,13 @@ class OFSTestNetwork(object):
                 if rc != 0:
                     print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.host_name,n2.ip_address,n2.host_name)
                     node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.host_name,n2.host_name))
+                    # also create mpihosts files
+                    node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.host_name,node.created_openmpihosts))
+                    node.runSingleCommand('echo "%s:2" >> %s' % (n2.host_name,node.created_mpichhosts))
+
+                    
             node.runAllBatchCommands()
+
         node.host_name = node.runSingleCommandBacktick("hostname")
         
             
@@ -801,6 +809,10 @@ class OFSTestNetwork(object):
     def findExistingOFSInstallation(self):
         for node in self.created_nodes:
             rc = node.findExistingOFSInstallation()
+            if rc != 0:
+                return rc
+        
+        return 0
             
             
     
@@ -931,15 +943,24 @@ class OFSTestNetwork(object):
             slots = slots+1
         
         self.openmpi_version = build_node.openmpi_version
-        # create openmpihosts file
+
         build_node.changeDirectory(self.mpi_nfs_directory)
-        print 'grep -v localhost /etc/hosts | awk \'{print \$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
-        build_node.runSingleCommand('grep -v localhost /etc/hosts | awk \'{print \$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory))
-        
-        # update runtest to use openmpihosts file
-        print 'sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version)
-        build_node.runSingleCommand('sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version))
-        build_node.runSingleCommand('chmod a+x %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,build_node.openmpi_version))
+
+        # we created an openmpihost file earlier. Now copy it to the appropriate directory.
+        if build_node.created_openmpihosts != None:
+            rc = build_node.runSingleCommand("/bin/cp %s %s" % (build_node.created_openmpihosts,self.mpi_nfs_directory))
+            if rc == 0:
+                build_node.created_openmpihosts = self.mpi_nfs_directory + "/" + os.path.basename(build_node.created_openmpihosts)
+            
+        else:
+            #print 'grep -v localhost /etc/hosts | awk \'{print \\\$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
+            #output = []
+            build_node.runSingleCommand("grep -v localhost /etc/hosts | awk '{print \$2 \"\\tslots=%r\"}' > %s/openmpihosts" % (slots,self.mpi_nfs_directory),output)
+            print output
+        # update runtest to use openmpihosts file - should be done in patched openmpi
+        #print 'sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version)
+        #build_node.runSingleCommand('sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version))
+        #build_node.runSingleCommand('chmod a+x %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,build_node.openmpi_version))
         # update bashrc     
         for node in self.created_nodes:
             #node.openmpi_installation_location = self.mpi_nfs_directory

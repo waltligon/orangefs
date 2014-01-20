@@ -174,6 +174,10 @@ class OFSTestNode(object):
         self.hadoop_location = "/opt/"+self.hadoop_version
         self.jdk6_location = "/usr/java/default"
         
+        self.created_openmpihosts = None
+        
+        self.created_mpichhosts = None
+        self.romio_runtests_pvfs2 = None
         
         self.node_number = OFSTestNode.node_number
         OFSTestNode.node_number += 1
@@ -193,12 +197,12 @@ class OFSTestNode(object):
         #print "Getting current node information"
         
         # can we ssh in? We'll need the group if we can't, so let's try this first.
-        output = []
-        self.runSingleCommand("ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user,output)
-        print output
+        #$output = []
+        #self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,output)
+        #print output
         
         
-        self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {'print \\$4'}" % self.current_user)
+        self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user)
         
         print "Current group is "+self.current_group
 
@@ -206,7 +210,7 @@ class OFSTestNode(object):
         # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
                     
         if self.current_group.rstrip() == "":
-            self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk {\'print \\$4\'}" % self.current_user,remote_user="root")
+            self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,remote_user="root")
 
             print "Current group for %s (from root) is %s" % (self.current_user,self.current_group)
             if self.current_group.rstrip() == "":
@@ -409,6 +413,10 @@ class OFSTestNode(object):
         print "Trying naive attempt to create command list."
         return command
        
+    def runAllBatchCommands(self,output=[]):
+        # implemented in child class
+        pass
+        
       # Run a single command as a batchfile. Some systems require this for passwordless sudo
     def runSingleCommandAsBatch(self,command,output=[]):
         self.addBatchCommand(command)
@@ -423,12 +431,12 @@ class OFSTestNode(object):
         self.runAllBatchCommands(output)
 
     # copy files from the current node to a destination node.
-    def copyToRemoteNode(self,source, destinationNode, destination):
+    def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
         # implimented in subclass
         pass
       
     # copy files from a remote node to the current node.
-    def copyFromRemoteNode(self,sourceNode, source, destination):
+    def copyFromRemoteNode(self,sourceNode, source, destination, recursive=False):
         # implimented in subclass
         pass
       
@@ -1162,8 +1170,8 @@ class OFSTestNode(object):
           rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
         elif resource_type == "TAR":
           rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
-        elif resource_type == "REMOTEDIR":
-          self.copyOFSSourceFromRemoteNode(directory,dest_dir)
+        #elif resource_type == "REMOTEDIR":
+        #  self.copyOFSSourceFromRemoteNode(directory,dest_dir)
         elif resource_type == "LOCAL":
             # Must be "pushed" from local node to current node.
             # Get around this by copying to the buildnode, then resetting type.
@@ -1514,6 +1522,7 @@ class OFSTestNode(object):
         # TODO: Copy ofs_conf_file, don't just link
         #rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destinationNode, self.ofs_conf_file, True)
         destinationNode.ofs_conf_file =self.ofs_conf_file
+        destinationNode.ofs_fs_name = destinationNode.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destinationNode.ofs_conf_file)
         return rc
        
     def copyMpich2InstallationToNode(self,destinationNode):
@@ -1602,7 +1611,7 @@ class OFSTestNode(object):
                 self.ofs_conf_file = ofs_conf_file
         
         # Now set the fs name
-        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk {'print \$2'}" % self.ofs_conf_file)
+        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % self.ofs_conf_file)
         
         return rc
         
@@ -1744,9 +1753,14 @@ class OFSTestNode(object):
         sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log
         sudo /sbin/lsmod >> pvfs2-kernel-module.log
         '''
+        # first check to see if the kernel module is already installed.
+        rc = self.runSingleCommand('/sbin/lsmod | grep pvfs2')
+        if rc == 0:
+            return 0
         self.addBatchCommand("sudo /sbin/insmod %s/lib/modules/%s/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log" % (self.ofs_installation_location,self.kernel_version))
         self.addBatchCommand("sudo /sbin/lsmod >> pvfs2-kernel-module.log")
         self.runAllBatchCommands()
+        return 0
         
      
     #-------------------------------
@@ -1770,7 +1784,13 @@ class OFSTestNode(object):
             $keypath
         sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.logfile
         '''
-        # TBD: Add security.
+        
+        # if the client is already running, return.
+        rc = self.runSingleCommand("/bin/ps -f --no-heading -u root | grep pvfs2-client")
+        if rc == 0:
+            return 0
+        
+        # Todo: Add cert-based security.
         keypath = ""
         if security==None:
             pass
@@ -1792,6 +1812,7 @@ class OFSTestNode(object):
         #client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         #print "Client log output"
         #print client_log
+        return 0
         
     #-------------------------------
     #
@@ -2004,6 +2025,8 @@ class OFSTestNode(object):
             return rc
         
         self.mpich2_installation_location = location 
+        # change this!
+        self.romio_runtests_pvfs2 = self.mpich2_source_location+"ompi/mca/io/romio/romio/test/runtests"
         
         return 0
     
@@ -2019,7 +2042,8 @@ class OFSTestNode(object):
         
         self.openmpi_version = "openmpi-1.6.5"
         url_base = "http://devorange.clemson.edu/pvfs/"
-        url = url_base+self.openmpi_version+"-omnibond.tar.gz"
+        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
+        
 
         patch_name = "openmpi.patch"
         patch_url = url_base+patch_name
@@ -2037,7 +2061,7 @@ class OFSTestNode(object):
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf %s-omnibond.tar.gz"% self.openmpi_version)
+        self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
         
         self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
         self.changeDirectory(self.openmpi_source_location)
@@ -2104,6 +2128,8 @@ class OFSTestNode(object):
         
         self.openmpi_installation_location = install_location+"/openmpi"
         
+        self.romio_runtests_pvfs2 = self.openmpi_source_location+"/ompi/mca/io/romio/romio/test/runtests.pvfs2"
+        self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
         
         return 0
     
@@ -2119,32 +2145,32 @@ class OFSTestNode(object):
         # to find OrangeFS server, first finr the pvfs2-server file
         #ps -ef | grep -v grep| grep pvfs2-server | awk {'print $8'}
         output = []
-        pvfs2_server = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$8'}")
+        pvfs2_server = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk '{print \\$8}'")
         
         # We have <OFS installation>/sbin/pvfs2_server. Get what we want.
         (self.ofs_installation_location,sbin) = os.path.split(os.path.dirname(pvfs2_server))
         
         # to find OrangeFS conf file
         #ps -ef | grep -v grep| grep pvfs2-server | awk {'print $11'}
-        self.ofs_conf_file = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$11'}")
+        self.ofs_conf_file = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk '{print \\$11}'")
         
         # to find url
         
-        rc = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk {'print \$13'}",output)
+        rc = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk '{print \\$13}'",output)
         #print output
         alias = output[1].rstrip()
         
-        rc = self.runSingleCommandBacktick("grep %s %s | grep tcp: | awk {'print \$3'}" % (alias,self.ofs_conf_file),output )
+        rc = self.runSingleCommandBacktick("grep %s %s | grep tcp: | awk '{print \\$3}'" % (alias,self.ofs_conf_file),output )
         #print output
         url_base = output[1].rstrip()
         
-        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk {'print \$2'}" % self.ofs_conf_file)
+        self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % self.ofs_conf_file)
         
         # to find mount point
         # should be better than this.
 
 
-        rc = self.runSingleCommand("mount | grep pvfs2 | awk { 'print \$2'}",output)
+        rc = self.runSingleCommand("mount | grep pvfs2 | awk '{ print \\$2}'",output)
         if rc != 0:
             print "OrangeFS mount point not detected. Trying /tmp/mount/orangefs."
             self.ofs_mount_point = "/tmp/mount/orangefs"
@@ -2163,7 +2189,7 @@ class OFSTestNode(object):
 
         
         if rc == 0:
-            print output
+            #print output
             self.setEnvironmentVariable("PVFS2TAB_FILE",output[1].rstrip())
         
         # to find source
@@ -2171,6 +2197,7 @@ class OFSTestNode(object):
         #find / -name pvfs2-config.h.in -print 2> /dev/null
         # grep directory/configure 
         # grep -r 'prefix = /home/ec2-user/orangefs' /home/ec2-user/stable/Makefile
+        return 0
         
 
     def exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):

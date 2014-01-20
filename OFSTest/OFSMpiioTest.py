@@ -31,3 +31,19 @@ def romio_status(self,testing_network):
 def stadler_file_view_test(self,testing_network):
     pass
     
+def romio_testsuite(testing_node,output=[]):
+
+    #/opt/mpi/openmpi-1.6.5/ompi/mca/io/romio/romio/test
+    testing_node.changeDirectory("/opt/mpi/openmpi-1.6.5/ompi/mca/io/romio/romio/test")
+    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
+    
+    if rc != 0:
+        print output
+        print testing_node.__dict__
+        rc = testing_node.runSingleCommand("./%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
+
+    
+
+tests = [ romio_testsuite
+
+ ]

@@ -63,7 +63,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
       #
       #==========================================================================
      
-    def runAllBatchCommands(self):
+    def runAllBatchCommands(self,output=[]):
      
         
         # Open file with mode 700
