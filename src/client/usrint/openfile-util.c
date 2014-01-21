@@ -761,6 +761,7 @@ static void cleanup_usrint_internal(void)
     }
     /* unlink our area - remains until all others have unmapped */
     glibc_ops.unlink(shmobjpath);
+    /* ignore error here - should not be there anyway */
     /* clear globals */
     shmobj = -1;
     shmctrl = NULL;
@@ -1518,6 +1519,9 @@ static void init_descriptor_area_internal(void)
     }
     glibc_ops.close(shmobj);
     shmobj = PVFS_SHMOBJ;
+
+    /* unlink the /dev/shm entry - noone should need to open it again */
+    glibc_ops.unlink(shmobjpath);
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
