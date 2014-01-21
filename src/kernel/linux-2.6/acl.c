@@ -491,7 +491,9 @@ static int pvfs2_xattr_set_acl(struct inode *inode,
 {
     struct posix_acl *acl;
     int error;
-#ifdef HAVE_CURRENT_FSUID
+#ifdef HAVE_FROM_KUID
+    int fsuid = from_kuid(&init_user_ns, current_fsuid());
+#elif defined(HAVE_CURRENT_FSUID)
     int fsuid = current_fsuid();
 #else
     int fsuid = current->fsuid;
@@ -507,11 +509,21 @@ static int pvfs2_xattr_set_acl(struct inode *inode,
         return -EOPNOTSUPP;
     }
     /* Are we capable of setting acls on a file for which we should not be? */
+#ifdef HAVE_FROM_KUID
+    if ((fsuid != from_kuid(&init_user_ns,inode->i_uid)) && 
+        !capable(CAP_FOWNER))
+#else
     if ((fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+#endif
     {
         gossip_err("pvfs2_xattr_set_acl: operation not permitted "
                 "(current->fsuid %d), (inode->owner %d)\n", 
-                fsuid, inode->i_uid);
+                fsuid,
+#ifdef HAVE_FROM_KUID
+                from_kuid(&init_user_ns,inode->i_uid));
+#else
+		inode->i_uid);
+#endif
         return -EPERM;
     }
     if (value) 
@@ -872,7 +884,9 @@ int pvfs2_permission(struct inode *inode,
 # endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
 #endif /* HAVE_TWO_PARAM_PERMISSION */
 {
-#ifdef HAVE_CURRENT_FSUID
+#ifdef HAVE_FROM_KUID
+    int fsuid = from_kuid(&init_user_ns, current_fsuid());
+#elif defined(HAVE_CURRENT_FSUID)
     int fsuid = current_fsuid();
 #else
     int fsuid = current->fsuid;
@@ -899,7 +913,14 @@ int pvfs2_permission(struct inode *inode,
                      "in_group_p = %d "
                      "(ret = %d)\n",
                      llu(get_handle_from_ino(inode)), mask, inode->i_mode,
-                     fsuid, inode->i_uid, inode->i_gid, 
+                     fsuid,
+#ifdef HAVE_FROM_KUID
+                     from_kuid(&init_user_ns,inode->i_uid),
+                     from_kgid(&init_user_ns,inode->i_gid),
+#else
+                     inode->i_uid,
+                     inode->i_gid, 
+#endif
                      in_group_p(inode->i_gid),
                      ret);
         gossip_debug(GOSSIP_ACL_DEBUG,
