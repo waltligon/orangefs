@@ -1121,7 +1121,7 @@ def test_driver():
 
     import OFSSysintTest
     import OFSVFSTest
-    import OFSUserintTest
+    import OFSUsrintTest
 
     rc = 0
 
@@ -1178,7 +1178,7 @@ def test_driver():
     output.write("Userint Tests ==================================================\n")
     output.close()
 
-    for callable in OFSUserintTest.__dict__.values():
+    for callable in OFSUsrintTest.__dict__.values():
         try:
             rc = nodes[0].runOFSTest(callable)
             write_output("OFSTestNetwork.log",callable,rc)

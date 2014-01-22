@@ -1,10 +1,108 @@
+#!/usr/bin/python
+#
+#
+# OFSVFSTest
+#
+# This class implements tests to be run on the virtual file system.
+#
+#
+# variables:
+#
+#   header = Name of header printed in output file
+#   prefix = Name of prefix for test name
+#   run_client = False
+#   mount_fs = Does the file system need to be mounted?
+#   mount_as_fuse = False
+#   tests = list of test functions
+#------------------------------------------------------------------------------
+
 import inspect
 
+header = "OFS VFS Test(kmod)"
+prefix = "vfs-kmod"
+mount_fs = True
+run_client = True
+mount_as_fuse = False
+tests = [ 
+append,
+append2,
+bonnie,
+fdtree,
+fstest,
+fsx,
+iozone,
+mkdir_vfs,
+shelltest,
+symlink_vfs,
+tail,
+vfs_cp,
+ltp,
+dbench
+ ]
+
+#------------------------------------------------------------------------------
+#  
+# Test functions
+#
+# All functions MUST have the following parameters and return code convention.
+#
+#   params:
+#
+#   testing_node = OFSTestNode on which the tests will be run
+#   output = Array that stores output information
+#
+#   return:
+#   
+#        0: Test ran successfully
+#        !0: Test failed
+#------------------------------------------------------------------------------
 
 
-def append(testing_node,output=[]):
+#------------------------------------------------------------------------------
+#
+# setFuseConfig()
+#
+# The same tests are run for kernel mod (kmod) and fuse testing. This function 
+# sets the variable to fuse mode.
+#------------------------------------------------------------------------------
+
+def setFuseConfig():
+
+    OFSVFSTest.header = "OFS VFS Test(fuse)"
+    OFSVFSTest.prefix = "vfs-fuse"
+    OFSVFSTest.mount_fs = True
+    OFSVFSTest.run_client = False
+    OFSVFSTest.mount_as_fuse = True
     
+#------------------------------------------------------------------------------
+#
+# setKmodConfig()
+#
+# The same tests are run for kernel mod (kmod) and fuse testing. This function 
+# sets the variable to Kmod mode.
+#------------------------------------------------------------------------------
 
+def setKmodConfig():
+    OFSVFSTest.header = "OFS VFS Test(kmod)"
+    OFSVFSTest.prefix = "vfs-kmod"
+    OFSVFSTest.mount_fs = True
+    OFSVFSTest.run_client = True
+    OFSVFSTest.mount_as_fuse = False
+
+#------------------------------------------------------------------------------
+#
+#   append()
+#
+#   This test checks the append ( > and >>) functionality by appending to a 
+#   file on the mounted OrangeFS filesystem, then comparing it to an expected
+#   results reference file.
+#
+#   append2() tests in a directory on the OrangeFS filesystem while append()
+#   tests directly on the root of the filesystem.
+#
+#------------------------------------------------------------------------------
+    
+def append(testing_node,output=[]):
     
     append_test = testing_node.ofs_mount_point +"/append_test"
     local_reference = testing_node.ofs_installation_location + "/append_ref"
@@ -24,11 +122,20 @@ def append(testing_node,output=[]):
     rc = testing_node.runSingleCommand("diff -u %s %s" % (append_test, local_reference),output)
     return rc
 
+#------------------------------------------------------------------------------
+#   append2()
+#
+#   This test checks the append ( > and >>) functionality by appending to a 
+#   file on the mounted OrangeFS filesystem, then comparing it to an expected
+#   results reference file.
+#
+#   append2() tests in a directory on the OrangeFS filesystem while append()
+#   tests directly on the root of the filesystem.
+#------------------------------------------------------------------------------
+
 def append2(testing_node,output=[]):
-
-
     pvfs2_testdir = testing_node.ofs_mount_point +"/append_dir"
-    append_test = testing_node.ofs_mount_point +"/append_test2"
+    append_test =  pvfs2_testdir+"/append_test2"
     local_reference = testing_node.ofs_installation_location + "/append_ref2"
     
     test_string = ""
@@ -47,8 +154,14 @@ def append2(testing_node,output=[]):
 
     return rc
 
-
-
+#------------------------------------------------------------------------------
+#
+# bonnie()
+#
+# Bonnie++ tests large file IO and creation/deletion of small files.
+#
+# See http://sourceforge.net/projects/bonnie/
+#------------------------------------------------------------------------------
 
 def bonnie(testing_node,output=[]):
 
@@ -60,7 +173,7 @@ def bonnie(testing_node,output=[]):
     
     testing_node.changeDirectory("%s/bonnie++-1.03e" % testing_node.ofs_extra_tests_location)
     
-    # check to see if we have already compiled dbench
+    # check to see if we have already compiled bonnie++
     if testing_node.runSingleCommand( "[ -f %s/bonnie++-1.03e/bonnie++ ]" % testing_node.ofs_extra_tests_location):
 
         rc = testing_node.runSingleCommand("./configure",output)
@@ -71,16 +184,28 @@ def bonnie(testing_node,output=[]):
             return rc
         
     testing_node.changeDirectory(testing_node.ofs_mount_point)
-    if "ubuntu" in testing_node.distro.lower():
-        rc = testing_node.runSingleCommand("echo \""+testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 \"",output)
-    else:
-        rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
+	
+rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
     
 
     return rc
+
+#------------------------------------------------------------------------------
+#
+#   dbench()
+#
+#   DBENCH is a tool to generate I/O workloads to either a filesystem or to a 
+#   networked CIFS or NFS server. It can even talk to an OrangeFS target.
+#   DBENCH can be used to stress a filesystem or a server to see which workload
+#   it becomes saturated and can also be used for preditcion analysis to 
+#   determine "How many concurrent clients/applications performing this 
+#   workload can my server handle before response starts to lag?"
+#
+#   http://dbench.samba.org/
+#
+#------------------------------------------------------------------------------
     
 def dbench(testing_node,output=[]):
-
     
     rc = 0
     #make sure that the benchmarks have been installed
@@ -95,9 +220,8 @@ def dbench(testing_node,output=[]):
 
         rc = testing_node.runSingleCommand("make clean",output)
         rc = testing_node.runSingleCommand("./configure",output)
-        #if rc != 0:
-        #    return rc
-        
+
+        # Patch dbench to add support for OrangeFS
         rc = testing_node.runSingleCommand("patch -p3 < %s/test/automated/vfs-tests.d/dbench.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             return rc
@@ -106,21 +230,31 @@ def dbench(testing_node,output=[]):
         if rc != 0:
             return rc
 
+    # Copy the loadfile to the OrangeFS 
     rc = testing_node.runSingleCommand("cp client.txt %s" % testing_node.ofs_mount_point,output)
     if rc != 0:
         return rc
     
-    
+    # Run dbench from the mountpoint.
     testing_node.changeDirectory(testing_node.ofs_mount_point)
     
     
-#    if "ubuntu" in testing_node.distro.lower():
-#        rc = testing_node.runSingleCommand("testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300\"",output)
-#    else:
     rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300 ",output)
-       
-    return rc
     
+
+    return rc
+
+#------------------------------------------------------------------------------
+#
+# fdtree()
+#
+#   The fdtree software is used for testing the metadata performance of a file 
+#   system.
+#
+#   https://computing.llnl.gov/?set=code&page=sio_downloads
+#
+#------------------------------------------------------------------------------    
+
 def fdtree(testing_node,output=[]):
 
     
@@ -129,11 +263,23 @@ def fdtree(testing_node,output=[]):
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
     
+    # Run fdtree from the mountpoint
     testing_node.changeDirectory(testing_node.ofs_mount_point)
     rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/fdtree-1.0.1/fdtree.bash -l 4 -d 5",output)
     
     return rc
-    
+
+#------------------------------------------------------------------------------
+#
+# fstest()
+#
+#   Test filesystem (for example, fusecompress) for errors in implementing 
+#   random file access. It writes and reads random blocks of random lengths at 
+#   random locations, and verifies XOR sums at the end of operation.
+#
+#   https://code.google.com/p/fstest/
+#
+#------------------------------------------------------------------------------    
 def fstest(testing_node,output=[]):
 
     
@@ -148,6 +294,14 @@ def fstest(testing_node,output=[]):
         
     return rc
 
+#------------------------------------------------------------------------------
+#
+# fsx()
+#
+#   File system exerciser
+#
+#   http://codemonkey.org.uk/projects/fsx/
+#------------------------------------------------------------------------------
 def fsx(testing_node,output=[]):
 
     
@@ -158,15 +312,31 @@ def fsx(testing_node,output=[]):
 
         rc = testing_node.runSingleCommand("gcc %s/test/automated/vfs-tests.d/fsx.c -o %s/fsx" % (testing_node.ofs_source_location,testing_node.ofs_source_location),output)
         if rc != 0:
-            
             return rc
     
     rc = testing_node.runSingleCommand("%s/fsx -N 1000 -W -R %s/fsx_testfile" % (testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
-    
     return rc
 
-def iozone(testing_node,output=[]):
+#------------------------------------------------------------------------------
+#
+# iozone()
+#
+#   IOzone is a filesystem benchmark tool. The benchmark generates and measures
+#   a variety of file operations. Iozone has been ported to many machines and 
+#   runs under many operating systems.
+#
+#   Iozone is useful for performing a broad filesystem analysis of a vendor’s 
+#   computer platform. The benchmark tests file I/O performance for the 
+#   following operations:
+#
+#   Read, write, re-read, re-write, read backwards, read strided, fread, 
+#   fwrite, random read, pread ,mmap, aio_read, aio_write
+#
+#   http://www.iozone.org/
+#
+#------------------------------------------------------------------------------
 
+def iozone(testing_node,output=[]):
     
     rc = 0
     #make sure that the benchmarks have been installed
@@ -187,9 +357,23 @@ def iozone(testing_node,output=[]):
     rc = testing_node.runSingleCommand("./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" % testing_node.ofs_mount_point,output)
         
     return rc
-    
-def ltp(testing_node,output=[]):
 
+#------------------------------------------------------------------------------
+#
+#   ltp()
+#
+#   The Linux™ Test Project is a joint project started by SGI™ and maintained 
+#   by IBM®, that has a goal to deliver test suites to the open source 
+#   community that validate the reliability, robustness, and stability of 
+#   Linux. The LTP testsuite contains a collection of tools for testing the 
+#   Linux kernel and related features.
+#
+#   This runs the pvfs testcases for LTP
+#
+#   http://ltp.sourceforge.net/
+#
+#------------------------------------------------------------------------------    
+def ltp(testing_node,output=[]):
     
     LTP_ARCHIVE_VERSION = "ltp-full-20120903"
     LTP_ARCHIVE_TYPE = ".bz2"
@@ -205,7 +389,7 @@ def ltp(testing_node,output=[]):
     if "pvfs2fuse" in tmp[1]:
         vfs_type = "fuse"
         print "LTP test cannot be run for filesystem mounted via fuse"
-        return -99
+        return -999
     
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
@@ -227,16 +411,17 @@ def ltp(testing_node,output=[]):
         
         testing_node.changeDirectory(testing_node.ofs_extra_tests_location+"/"+LTP_ARCHIVE_VERSION)
         
+        # Patch ltp for OrangeFS support
         rc = testing_node.runSingleCommand("patch -p1 < %s/test/automated/vfs-tests.d/ltp-20120903-zoo-path.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             
             return rc
         
-        rc = testing_node.runSingleCommand('./configure --prefix=/tmp/ltp ADD_CFLAGS="-D_GNU_SOURCE"',output)
+        rc = testing_node.runSingleCommand('./configure --prefix=/tmp/ltp ADD_CFLAGS="-D_GNU_SOURCE -g -O0"',output)
         #if rc != 0:
         #    return rc
 
-        rc = testing_node.runSingleCommand('export CFLAGS="-g"; make all',output)
+        rc = testing_node.runSingleCommand('make all',output)
         if rc != 0:
             
             return rc
@@ -244,7 +429,6 @@ def ltp(testing_node,output=[]):
         testing_node.runSingleCommand('make install',output)
         if rc != 0:
             return rc
-    
         
     testing_node.runSingleCommand("cp %s/test/automated/vfs-tests.d/ltp-pvfs-testcases runtest/" % testing_node.ofs_source_location)
     testing_node.runSingleCommand("cp %s/test/automated/vfs-tests.d/ltp-pvfs-testcases /tmp/ltp/runtest/" % testing_node.ofs_source_location)
@@ -252,13 +436,11 @@ def ltp(testing_node,output=[]):
     testing_node.runSingleCommand("chmod 777 %s/ltp-tmp" % testing_node.ofs_mount_point)
     testing_node.runSingleCommand("umask 0")
     
-    
     testing_node.changeDirectory('/tmp/ltp')
     
-    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    #print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
     rc = testing_node.runSingleCommandAsBatch('sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
-#   #    if rc != 0:
-#        return rc
+
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
         print "Could not find ltp-pvfs-testcases.log file."
@@ -279,10 +461,14 @@ def ltp(testing_node,output=[]):
     
     return rc
     
-    
-    
-#    FAILCOUNT=`grep FAIL ltp-pvfs-testcases-$THISDATE.log | wc -l`
 
+#------------------------------------------------------------------------------
+#
+#   mkdir_vfs()
+#
+#   This runs the test-mkdir utility
+#
+#------------------------------------------------------------------------------    
     
 
 def mkdir_vfs(testing_node,output=[]):
@@ -290,25 +476,41 @@ def mkdir_vfs(testing_node,output=[]):
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+#------------------------------------------------------------------------------
+#
+#   shelltest()
+#
+#   This runs the pvfs2-shell-test.sh script.
+#------------------------------------------------------------------------------    
     
 def shelltest(testing_node,output=[]):
 
-    
-    
-    #print testing_node.runSingleCommandBacktick("find /tmp -name pvfs2-shell-test.sh")
-    #hack to workaround bug in pvfs2-shell-test.sh
     testing_node.changeDirectory("~")
     rc = testing_node.runSingleCommand("bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s 2>&1" % (testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
     return rc
+
+#------------------------------------------------------------------------------
+#
+#   symlink_vfs()
+#
+#   This runs the test-symlink-perms utility
+#------------------------------------------------------------------------------    
 
 def symlink_vfs(testing_node,output=[]):
 
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+#------------------------------------------------------------------------------
+# 
+# tail()
+#
+# This test checks to see if tail command works.
+#------------------------------------------------------------------------------    
     
 def tail(testing_node,output=[]):
-
     
     tail_test = testing_node.ofs_mount_point +"/tail_test"
     local_reference = testing_node.ofs_installation_location + "/tail_ref"
@@ -317,36 +519,35 @@ def tail(testing_node,output=[]):
     for i in range(25):
         test_string = "%s line%d\n" % (test_string,i)
     
-    # use a batchfile to create the files. This avoids redirect confusion
-    #testing_node.addBatchCommand("%s > %s" % (test_string,local_reference))
+    # Create the file
     testing_node.runSingleCommand("%s > %s" % (test_string,tail_test))
    
-    # now diff it
     rc = testing_node.runSingleCommand("tail "+tail_test,output)
+    # OK should do more here
     return rc
+
+#------------------------------------------------------------------------------
+#
+#	vfs_cp()
+#
+#	This copies a file to OrangeFS mountpoint and back. Copied file should be
+#	the same as the original.
+#------------------------------------------------------------------------------    
     
     
 def vfs_cp(testing_node,output=[]):
 
-
+    # open the vfs_cp.log file
     filename = open(inspect.stack()[0][3]+".log","w")
+    
+    # Copy file from installation location/bin to mount point
     testing_node.runSingleCommand("cp %s/bin/pvfs2-cp %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point))
+    
+    # Now copy it back to installation location.
     testing_node.runSingleCommand("cp %s/pvfs2-cp %s" % (testing_node.ofs_mount_point,testing_node.ofs_installation_location))
+    
+    # Compare original in the bin directory to what was copied back
     rc = testing_node.runSingleCommand("cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
-tests = [ append,
-append2,
-bonnie,
-dbench,
-fdtree,
-fstest,
-fsx,
-iozone,
-mkdir_vfs,
-shelltest,
-symlink_vfs,
-tail,
-vfs_cp,
-ltp
- ]
+

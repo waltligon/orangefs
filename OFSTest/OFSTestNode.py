@@ -304,11 +304,25 @@ class OFSTestNode(object):
 
       # Change the current directory on the node to run scripts.
     def changeDirectory(self, directory):
-        self.current_directory = directory
+        # cd "-" will restore previous directory
+        if directory is not "-": 
+            self.previous_directory = self.current_directory
+            self.current_directory = directory
+        else:
+            self.restoreDirectory()
+    
+    def restoreDirectory():
+        temp = self.current_directory
+        self.current_directory = self.previous_directory
+        self.previous_directory = temp
+
       
       # set an environment variable to a value
     def setEnvironmentVariable(self,variable,value):
         self.current_environment[variable] = value
+    
+    def unsetEnvironmentVariable(self,variable):
+        del self.current_environment[variable] 
       
       # The setenv parameter should be a string 
     def setEnvironment(self, setenv):

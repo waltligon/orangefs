@@ -551,9 +551,9 @@ class OFSTestMain(object):
 
         # run the usrint tests, if required.
         if self.config.run_usrint_tests == True:
-            # usrint tests are located in OFSUserintTest
+            # usrint tests are located in OFSUsrintTest
             # Todo: Change filename to OFSUsrintTest.py
-            import OFSUserintTest
+            import OFSUsrintTest
 
             # Todo: Check to see if usrint and fuse are compatible.
             if False == True:
@@ -564,10 +564,10 @@ class OFSTestMain(object):
                 head_node.stopOFSClient()
                 self.writeOutputHeader(filename,"Usrint Tests" % mount_type)
                 
-                # The list of usrint tests to run is found in OFSUserintTest.test.
+                # The list of usrint tests to run is found in OFSUsrintTest.test.
                 # This is an array of strings that correspond to function names.
                 # The functions are run in the order they are listed in the array.
-                for callable in OFSUserintTest.tests:
+                for callable in OFSUsrintTest.tests:
                     try:
                         rc = head_node.runOFSTest("usrint",callable)
                         self.writeOutput(filename,callable,rc)
