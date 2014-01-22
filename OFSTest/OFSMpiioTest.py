@@ -1,3 +1,30 @@
+#!/usr/bin/python
+#
+#
+# OFSMpiioTest
+#
+# This class implements tests to be run on the virtual file system.
+#
+#
+# variables:
+#
+#   header = Name of header printed in output file
+#   prefix = Name of prefix for test name
+#   run_client = False
+#   mount_fs = Does the file system need to be mounted?
+#   mount_as_fuse = False
+#   tests = list of test functions
+#------------------------------------------------------------------------------
+
+header = "OFS MPI-IO Test"
+prefix = "mpiio"
+mount_fs = False
+run_client = False
+mount_as_fuse = False
+tests = [ romio_testsuite
+
+ ]
+
 def functions(self,testing_network):
     pass
 def heidleberg_IO(self,testing_network):
@@ -31,6 +58,15 @@ def romio_status(self,testing_network):
 def stadler_file_view_test(self,testing_network):
     pass
     
+#------------------------------------------------------------------------------
+#
+#	romio_testsuite()
+#
+#   This is the romio testsuite that comes with mpich and can also be used with
+#   OpenMPI. 
+#
+#   This does not use pbs/torque, but uses the MPI process managers directly.
+#------------------------------------------------------------------------------
 def romio_testsuite(testing_node,output=[]):
 
     #/opt/mpi/openmpi-1.6.5/ompi/mca/io/romio/romio/test
@@ -40,10 +76,10 @@ def romio_testsuite(testing_node,output=[]):
     print "%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point)
     rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
     
+    #Todo: Compare actual results with expected.
+    
     return rc
 
     
 
-tests = [ romio_testsuite
 
- ]

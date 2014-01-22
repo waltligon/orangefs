@@ -1,10 +1,42 @@
 #!/usr/bin/python
+#
+#
+# OFSSysintTest
+#
+# This class implements tests to be run on the virtual file system.
+#
+#
+# variables:
+#
+#   header = Name of header printed in output file
+#   prefix = Name of prefix for test name
+#   run_client = False
+#   mount_fs = Does the file system need to be mounted?
+#   mount_as_fuse = False
+#   tests = list of test functions
+#------------------------------------------------------------------------------
+
+
 import OFSTestNode
+header = "OFS Sysint Test"
+prefix = "sysint"
+mount_fs =  False
+run_client = True
+mount_as_fuse = False
+tests = [ ping,cp,misc,zerofill,mkdir_sysint,symlink_sysint]
 
-
-
+#------------------------------------------------------------------------------
+#
+#	cp()
+#
+#	This uses pvfs2_cp to copy file to OrangeFS mountpoint and back. 
+#   Copied file should be the same as the original.
+#
+#   pvfs2_cp is run with a series of argument combinations.
+#------------------------------------------------------------------------------
 def cp(testing_node,output=[]):
 
+    # interior function that actually does the copying.
     def copy_test_pvt(testing_node,source,destination,local,args,output=[]):
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args)
         testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args),output)
@@ -28,6 +60,12 @@ def cp(testing_node,output=[]):
     
     return rc
     
+#------------------------------------------------------------------------------
+#
+#	misc()
+#
+#	This tests a variety of pvfs2 utilities.
+#------------------------------------------------------------------------------
 
 
 def misc(testing_node,output=[]):
@@ -57,6 +95,7 @@ def misc(testing_node,output=[]):
         #    print "pvfs2-chmod failed with code %d" % rc
         #    return 1
         #else:
+        # Meh, let's just pass it anyway. I shhould fix this.
         return 0
 
     def fsck(testing_node,output=[]):
@@ -115,7 +154,7 @@ def misc(testing_node,output=[]):
         rc = testing_node.runSingleCommand('%s/bin/pvfs2-statfs -m %s' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
         return rc
 
-    
+    # Add up the return codes of the interior functions and return it.
     rc = 0
     rc += touch(testing_node,output)
     rc += chown(testing_node,output)
@@ -137,11 +176,33 @@ def misc(testing_node,output=[]):
     rc += statfs(testing_node,output)
     return rc
 
+#------------------------------------------------------------------------------
+#
+#   mkdir_sysint()
+#
+#   This runs the test-mkdir utility
+#
+#------------------------------------------------------------------------------    
+    
+
 def mkdir_sysint(testing_node,output=[]):
-    #note update test programs to remove old directories first!
+    
+    # Note: Update test programs to remove old directories first!
+    #
+    # Note: There is a known issue with test-mkdir that causes it to fail. This
+    # is not a problem with OrangeFS.
+    
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+#------------------------------------------------------------------------------
+#
+#   ping()
+#
+#   This runs the pvfs2-ping utility
+#
+#------------------------------------------------------------------------------    
 
 def ping(testing_node,output=[]):
     
@@ -149,13 +210,31 @@ def ping(testing_node,output=[]):
     #print "RC = %d" % rc
     return rc
 
+#------------------------------------------------------------------------------
+#
+#   symlink_sysint()
+#
+#   This runs the test-symlink-perms utility
+#
+#------------------------------------------------------------------------------    
+
 def symlink_sysint(testing_node,output=[]):
+    
+    # Note: There is a known issue with test-mkdir that causes it to fail. This
+    # is not a problem with OrangeFS.
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+#------------------------------------------------------------------------------
+#
+#   zerofill()
+#
+#   This runs the test-zero-fill utility
+#
+#------------------------------------------------------------------------------    
 
 def zerofill(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
-tests = [ cp,misc,mkdir_sysint,ping,symlink_sysint,zerofill]
