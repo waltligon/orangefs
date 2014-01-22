@@ -1790,6 +1790,9 @@ class OFSTestNode(object):
         if rc == 0:
             return 0
         
+        # Clear the shared memory objects
+        self.clearSHM()
+        
         # Todo: Add cert-based security.
         keypath = ""
         if security==None:
@@ -2254,7 +2257,10 @@ class OFSTestNode(object):
             print output
             count = count + 1
         return 0
-        
+    
+    # This clears out all SHM objects.
+    def clearSHM(self):
+        self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
         
     
 #===================================================================================================

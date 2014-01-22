@@ -66,12 +66,15 @@ def mrbench(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  mrbench -numRuns 50" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
     return rc
 
+header = "Hadoop Tests"
+prefix = "hadoop"
+
 tests = [ wordcount,
 TestDFSIO_write,
 TestDFSIO_read,
 TestDFSIO_clean,
 mrbench,
-terasort_full_1g,
-terasort_full_5g
+terasort_full_1g
+
 
  ]

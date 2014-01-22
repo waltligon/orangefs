@@ -213,7 +213,7 @@ class OFSTestMain(object):
         if self.config.using_ec2 == True:
             # First, if we're using EC2/Openstack, open the connection
             print "===========================================================" 
-            print "Connecting to EC2/OpenStack using information from " % self.ec2rc.sh
+            print "Connecting to EC2/OpenStack using information from " + self.config.ec2rc_sh
             self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
     
             # if the configuration says that we need to create new EC2 nodes, 
@@ -396,7 +396,7 @@ class OFSTestMain(object):
 
     def writeOutputHeader(self,filename,header,mode='a+'):
         output = open(filename,mode)
-        output.write("%s ==================================================\n")
+        output.write("%s ==================================================\n" % header)
         output.close()
 
 
@@ -415,6 +415,7 @@ class OFSTestMain(object):
 
         # Results filename is specified in the config.
         filename = self.config.log_file
+        
         
         rc = 0
 
@@ -556,17 +557,12 @@ class OFSTestMain(object):
 
             # Todo: Check to see if usrint and fuse are compatible.
             if False == True:
-                output = open(filename,'a+')
-                output.write("Usrint Tests not compatible with fuse=====================================\n")
-                output.close()
+                self.writeOutputHeader("Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
                 head_node.unmountOFSFilesystem()
                 head_node.stopOFSClient()
-                
-                output = open(filename,'a+')
-                output.write("Usrint Tests ==================================================\n")
-                output.close()
+                self.writeOutputHeader(filename,"Usrint Tests" % mount_type)
                 
                 # The list of usrint tests to run is found in OFSUserintTest.test.
                 # This is an array of strings that correspond to function names.
@@ -628,7 +624,62 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
         
+                # run the hadoop tests, if required.
+        if self.config.run_hadoop_tests == True:
+            
+            # run the hadoop tests, if required.
+            import OFSHadoopTest
+            
+            # Unmount OrangeFS and stop the OrangeFS client.
+            head_node.unmountOFSFilesystem()
+            head_node.stopOFSClient()
+
+            self.writeOutputHeader(filename,"Hadoop Tests")
+            
+            # The list of hadoop tests to run is found in OFSHadoopTest.test.
+            # This is an array of strings that correspond to function names.
+            # The functions are run in the order they are listed in the array.
+
+            for callable in OFSHadoopTest.tests:
+                try:
+                    rc = head_node.runOFSTest("hadoop", callable)
+                    self.writeOutput(filename,callable,rc)
+                except:
+                    print "Unexpected error:", sys.exc_info()[0]
+                    traceback.print_exc()
+                    pass
+                    
+        # run miscellaneous tests after run.
+        if True == True:
+            
+            
+            import OFSMiscPostTest
+            
+            # Unmount OrangeFS and stop the OrangeFS client.
+            head_node.unmountOFSFilesystem()
+            head_node.stopOFSClient()
+
+            self.writeOutputHeader(filename,"Misc Tests (Post run)")
+            
+            # The list of misc tests to run is found in OFSMiscPostTest.test.
+            # This is an array of strings that correspond to function names.
+            # The functions are run in the order they are listed in the array.
+
+            for callable in OFSMiscPostTest.tests:
+                try:
+                    rc = head_node.runOFSTest("misc-post", callable)
+                    self.writeOutput(filename,callable,rc)
+                except:
+                    print "Unexpected error:", sys.exc_info()[0]
+                    traceback.print_exc()
+                    pass
         
+        try:
+            self.runFunctionGroup("OFSHadoopTest")
+        except:
+            "runFunctionGroup didn't work. Oh well"
+            traceback.print_exc()
+
 
         if self.config.ec2_delete_after_test == True:
             print ""
@@ -636,4 +687,23 @@ class OFSTestMain(object):
             print "Terminating Nodes"
             self.ofs_network.terminateAllEC2Nodes()
 
+    def runFunctionGroup(self,function_group_name):
+        
+        print function_group_name
+        function_group = getattr(__import__(function_group_name),function_group_name)
+        
+        self.writeOutputHeader(self.config.log_file,function_group.header)
+        
+        for callable in function_group.tests:
+            try:
+                rc = head_node.runOFSTest(function_group.prefix, callable)
+                self.writeOutput(filename,callable,rc)
+            except:
+                print "Unexpected error:", sys.exc_info()[0]
+                traceback.print_exc()
+                pass
+
+
+    
+    
 
