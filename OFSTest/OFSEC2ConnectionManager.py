@@ -243,10 +243,10 @@ class OFSEC2ConnectionManager(object):
             return 1
             
         try: 
-            print "Releasing external IP address %s" % node_instance.ext_ip_address
+        	print "Releasing external IP address %s" % node_instance.ext_ip_address
         	self.ec2_connection.release_address(node_instance.ext_ip_address)
         except:
-        	print: Warning: Could not release node_instance.ext_ip_address
+        	print "Warning: Could not release external IP Address "+ node_instance.ext_ip_address
         	
         print "Terminating node at %s" % ip_address
         
@@ -314,6 +314,8 @@ class OFSEC2ConnectionManager(object):
 
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
+        all_addresses = self.ec2_connection.get_all_addresses()
+        print all_addresses
         for i in instances:
             #print i.__dict__
 
@@ -408,24 +410,28 @@ class OFSEC2ConnectionManager(object):
         
         self.getAllEC2Instances()
         
+
+        
  #------------------------------------------------------------------------------
  #
  #	Future functionality
  #
  #------------------------------------------------------------------------------
- 
- 
-    def manageExistingEC2Node(self,ec2_node):
+
+    def getEC2ConfigFromEnvironment(self):
+    	print "This should be implemented, but isn't."
+    	
+    def manageExistingEC2Instance(self,ec2_node):
         pass
     
-    def getEC2NodeInformation(self,ec2_node):
+    def getEC2InstanceInformation(self,ec2_node):
         # get the EC2 Information for the node
         pass
     
-    def deleteEC2Node(self,ec2_node):
+    def deleteEC2Instance(self,ec2_node):
         pass
     
-    def hardRebootEC2Node(self,ec2_node):
+    def hardRebootEC2Instance(self,ec2_node):
         pass
     
     def deleteAllEC2Instances(self):
@@ -464,7 +470,7 @@ def OFSEC2ConnectionManager_test_driver():
         
     #print my_mgr
     for node in node_list:
-        my_mgr.terminateEC2Node(node)
+        my_mgr.terminateEC2Instance(node.ip_address)
 
 
 #OFSEC2ConnectionManager_test_driver()
