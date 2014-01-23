@@ -314,8 +314,11 @@ class OFSEC2ConnectionManager(object):
 
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
-        all_addresses = self.ec2_connection.get_all_addresses()
-        print all_addresses
+        try:
+			all_addresses = self.ec2_connection.get_all_addresses()
+			print all_addresses
+		except:
+			pass
         for i in instances:
             #print i.__dict__
 
@@ -326,8 +329,8 @@ class OFSEC2ConnectionManager(object):
         
             
             
-        print "Waiting 60 seconds for external networking"
-        time.sleep(60)
+        print "Waiting 30 seconds for external networking"
+        time.sleep(30)
         return external_addresses
         
 #------------------------------------------------------------------------------

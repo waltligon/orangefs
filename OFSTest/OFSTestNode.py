@@ -195,15 +195,22 @@ class OFSTestNode(object):
         
         self.distro = ""
         #print "Getting current node information"
-        
+		
+		
         # can we ssh in? We'll need the group if we can't, so let's try this first.
-        #$output = []
-        #self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,output)
-        #print output
+        output = []
+        self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,output)
+        print output
+        
         
         
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user)
-        
+
+		# is this a mac? Home located under /Users
+		# Wow, this is ugly. Need to stop hardcoding "/home"
+        if self.current_group.rstrip() == "":
+	        self.current_group = self.runSingleCommandBacktick(command="ls -l /Users/ | grep %s | awk '{print \\$4}'" % self.current_user)
+
         print "Current group is "+self.current_group
 
         # Direct access as root not good. Need to get the actual user in
