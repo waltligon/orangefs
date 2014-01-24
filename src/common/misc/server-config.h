@@ -44,7 +44,7 @@ typedef struct host_alias_s
 {
     char *host_alias;     /* this is a traditional host name */
     char *host_sid_text;  /* this is a SID in text format */
-    PVFS_SID host_sid;       /* this is a SID in binary format */
+    PVFS_SID host_sid;    /* this is a SID in binary format */
     char *bmi_address;
 } host_alias_t;
 
@@ -185,7 +185,7 @@ typedef struct server_configuration_s
     PVFS_SID host_sid;              /* SID of this server */
     char *host_id;                  /* bmi_address of this server */
     int host_index;
-    char *server_alias;             /* the command line server-alias parameter */
+    char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
@@ -197,7 +197,7 @@ typedef struct server_configuration_s
     int  server_job_flow_timeout;
     int  client_job_bmi_timeout; 
     int  client_job_flow_timeout;
-    int  client_retry_limit;        /* how many times to retry client operations */
+    int  client_retry_limit;        /* how many times to retry client ops */
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
@@ -207,6 +207,7 @@ typedef struct server_configuration_s
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
+    char *sidcachefile;             /* what file to write SIDcache to */
     char *event_logging;
     int enable_events;
     char *bmi_modules;              /* BMI modules                      */

@@ -72,8 +72,7 @@ int PINT_server_config_mgr_initialize(void)
 
     if (s_fsid_to_config_table == NULL)
     {
-        s_fsid_to_config_table =
-            qhash_init(hash_fsid_compare, hash_fsid, 17);
+        s_fsid_to_config_table = qhash_init(hash_fsid_compare, hash_fsid, 17);
         if (s_fsid_to_config_table)
         {
             s_min_handle_recycle_timeout_in_sec = -1;
@@ -103,11 +102,11 @@ int PINT_server_config_mgr_finalize(void)
             do
             {
                 hash_link = qhash_search_and_remove_at_index(
-                    s_fsid_to_config_table, i);
+                                    s_fsid_to_config_table,
+                                    i);
                 if (hash_link)
                 {
-                    config = qlist_entry(
-                        hash_link, server_config_t, hash_link);
+                    config = qlist_entry(hash_link, server_config_t, hash_link);
                     assert(config);
                     assert(config->server_config);
 
@@ -152,9 +151,9 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
         }
 
         /*
-          reset the min_handle_recycle_timeout_in_sec since it's going
-          to be re-determined at this point
-        */
+         * reset the min_handle_recycle_timeout_in_sec since it's going
+         * to be re-determined at this point
+         */
         s_min_handle_recycle_timeout_in_sec = -1;
 
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)

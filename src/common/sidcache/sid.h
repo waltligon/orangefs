@@ -18,6 +18,7 @@ extern int SID_add(const PVFS_SID *sid,
                    PVFS_BMI_addr_t bmi_addr,
                    const char *url);
 extern int SID_delete(const PVFS_SID *sid);
+extern int SID_update_type(const PVFS_SID *sid, int new_server_type);
 extern int SID_finalize(void);
 
 #endif /* SID_H */

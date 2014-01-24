@@ -147,8 +147,17 @@ typedef enum
     SERVER_PRECREATE_INIT      = (1 << 18),
     SERVER_UID_MGMT_INIT       = (1 << 19), 
     SERVER_SECURITY_INIT       = (1 << 20),
-    SERVER_SID_INIT            = (1 << 21)
+    SERVER_SID_INIT            = (1 << 21),
+    SERVER_FILESYS_INIT        = (1 << 22),
+    SERVER_BMI_CLIENT_INIT     = (1 << 23)
 } PINT_server_status_flag;
+
+/* this combination of flags is used to control pre-init of the server
+ * when reading a remove config file
+ */
+#define SERVER_CLIENT_INIT \
+            SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
+            SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
 
 typedef enum
 {   
@@ -933,6 +942,7 @@ int server_post_unexpected_recv(void);
 int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
+int server_state_machine_wait(void);
 
 /* lists of server ops */
 extern struct qlist_head posted_sop_list;

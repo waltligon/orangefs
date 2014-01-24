@@ -141,18 +141,20 @@ static void **server_completed_job_p_array = NULL;
 static job_status_s *server_job_status_array = NULL;
 
 /* Prototypes for internal functions */
+static int server_get_remote_config(
+                PINT_server_status_flag *server_status_flag,
+                struct server_configuration_s *server_config,
+                char *fs_conf);
 static int server_initialize(
-    PINT_server_status_flag *server_status_flag,
-    job_status_s *job_status_structs);
+                PINT_server_status_flag *server_status_flag,
+                job_status_s *job_status_structs);
 static int server_initialize_subsystems(
-    PINT_server_status_flag *server_status_flag);
+                PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
 static int server_check_if_root_directory_created(void);
 static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
-static int server_shutdown(
-    PINT_server_status_flag status,
-    int ret, int sig);
+static int server_shutdown(PINT_server_status_flag status, int ret, int sig);
 static void reload_config(void);
 static void server_sig_handler(int sig);
 static void hup_sighandler(int sig, siginfo_t *info, void *secret);
@@ -221,9 +223,25 @@ int main(int argc, char **argv)
                     "PVFS2 Server on node %s version %s starting...\n",
                     s_server_options.server_alias, PVFS2_VERSION);
 
+    /* retrieve remote config file if needed 
+     * may set fs_conf to a temp file 
+     */
+    ret = server_get_remote_config(&server_status_flag,
+                                   &server_config,
+                                   fs_conf);
+    if (ret)
+    {
+        gossip_err("Error: Retrieval of remote config failed.\n");
+        gossip_err("Error: Server aborting.\n");
+        ret = -PVFS_EINVAL;
+        goto server_shutdown;
+    }
+
     /* code to handle older two config file format */
-    ret = PINT_parse_config(&server_config, fs_conf,
-                            s_server_options.server_alias, 1);
+    ret = PINT_parse_config(&server_config,
+                            fs_conf,
+                            s_server_options.server_alias,
+                            1);
     if (ret)
     {
         gossip_err("Error: Please check your config files.\n");
@@ -257,7 +275,8 @@ int main(int argc, char **argv)
             goto server_shutdown;
         }
         gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space removed. Exiting.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "PVFS2 Server: storage space removed. Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
@@ -271,17 +290,18 @@ int main(int argc, char **argv)
             goto server_shutdown;
         }
         gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space created. Exiting.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "PVFS2 Server: storage space created. Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
 
     server_job_id_array = (job_id_t *)
-            malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
+                    malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
     server_completed_job_p_array = (void **)
-            malloc(PVFS_SERVER_TEST_COUNT * sizeof(void *));
+                    malloc(PVFS_SERVER_TEST_COUNT * sizeof(void *));
     server_job_status_array = (job_status_s *)
-            malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_status_s));
+                    malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_status_s));
 
     if (!server_job_id_array ||
         !server_completed_job_p_array ||
@@ -335,7 +355,7 @@ int main(int argc, char **argv)
 
     /* kick off timer for expired jobs */
     ret = server_state_machine_alloc_noreq(
-        PVFS_SERV_JOB_TIMER, &(tmp_op));
+                    PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -424,8 +444,8 @@ int main(int argc, char **argv)
                 * processing, so it is defined in the src/common
                 * directory.
                 */
-            ret = PINT_state_machine_continue(
-                    smcb, &server_job_status_array[i]);
+            ret = PINT_state_machine_continue(smcb,
+                                              &server_job_status_array[i]);
 
             if (SM_ACTION_ISERR(ret)) /* ret < 0 */
             {
@@ -479,6 +499,40 @@ static void remove_pidfile(void)
 {
     assert(s_server_options.pidfile);
     unlink(s_server_options.pidfile);
+}
+
+/* This function decides if the server should read a local config file
+ * or send a request to another server to get a config file.  We can
+ * control this with command line flags or an environment variable.  If
+ * a remote config is required we start up BMI as a client, perform an
+ * fs_add, read back the config and place it in a temp file where we
+ * will parse it just like a regular config file.  Finally we shut down
+ * BMI so it can be restarted later in server mode.
+ */
+static int server_get_remote_config(
+                PINT_server_status_flag *server_status_flag,
+                struct server_configuration_s *server_config,
+                char *fs_conf)
+{
+    int ret = 0;
+    if (0)
+    {
+        /* Initialize the bmi and job interfaces */
+        *server_status_flag |= SERVER_CLIENT_INIT;
+        ret = server_initialize_subsystems(server_status_flag);
+        if (ret < 0)
+        {
+            gossip_err("Error: Could not initialize server subsystems\n");
+            goto error_exit;
+        }
+        /* PVFS_sys_fs_add(mountent) */
+        BMI_finalize(); /* will restart later */
+        *server_status_flag &= !(SERVER_CLIENT_INIT | SERVER_BMI_INIT);
+    }
+    return 0;
+
+error_exit:
+    return ret;
 }
 
 /* server_initialize()
@@ -555,7 +609,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 
     /* handle backgrounding, setting up working directory, and so on. */
     ret = server_setup_process_environment(
-        s_server_options.server_background);
+                               s_server_options.server_background);
     if (ret < 0)
     {
         gossip_err("Error: Could not start server; aborting.\n");
@@ -694,7 +748,7 @@ static int server_setup_process_environment(int background)
  * - initialize the request scheduler
  * - initialize performance counters
  * - initialize uid tracker
- * - initialize precreate pool
+ * - server check-in
  */
 static int server_initialize_subsystems(
                 PINT_server_status_flag *server_status_flag)
@@ -706,11 +760,12 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
-    int bmi_flags = BMI_INIT_SERVER;
+    int bmi_flags = 0;
     int shm_key_hint;
     int server_index;
 
-    if(server_config.enable_events)
+    if(!(*server_status_flag & SERVER_EVENT_INIT) && 
+       server_config.enable_events)
     {
         ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
         if (ret < 0)
@@ -724,148 +779,205 @@ static int server_initialize_subsystems(
          *   STOP: ()
          */
         PINT_event_define_event(
-            NULL, "sm", "%d%d%d%llu%d", "", &PINT_sm_event_id);
+                        NULL, "sm", "%d%d%d%llu%d", "", &PINT_sm_event_id);
 
         *server_status_flag |= SERVER_EVENT_INIT;
     }
 
     /* Initialize distributions */
-    ret = PINT_dist_initialize(0);
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_DIST_INIT))
     {
-        gossip_err("Error initializing distribution interface.\n");
-        return ret;
-    }
-    *server_status_flag |= SERVER_DIST_INIT;
-
-    ret = PINT_encode_initialize();
-    if (ret < 0)
-    {
-        gossip_err("PINT_encode_initialize() failed.\n");
-        return ret;
+        ret = PINT_dist_initialize(0);
+        if (ret < 0)
+        {
+            gossip_err("Error initializing distribution interface.\n");
+            return ret;
+        }
+        *server_status_flag |= SERVER_DIST_INIT;
     }
 
-    *server_status_flag |= SERVER_ENCODER_INIT;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Passing %s as BMI listen address.\n",
-                 server_config.host_id);
-
-    /* does the configuration dictate that we bind to a specific address? */
-    if(server_config.tcp_bind_specific)
+    if(!(*server_status_flag & SERVER_ENCODER_INIT))
     {
-        bmi_flags |= BMI_TCP_BIND_SPECIFIC;
+        ret = PINT_encode_initialize();
+        if (ret < 0)
+        {
+            gossip_err("PINT_encode_initialize() failed.\n");
+            return ret;
+        }
+        *server_status_flag |= SERVER_ENCODER_INIT;
     }
 
-    /* Have bmi automatically increment reference count on addresses any
-     * time a new unexpected message appears.  The server will decrement it
-     * once it has completed processing related to that request.
-     */
-    bmi_flags |= BMI_AUTO_REF_COUNT;
-
-    ret = BMI_initialize(server_config.bmi_modules, 
-                         server_config.host_id,
-                         bmi_flags);
-    if (ret < 0)
+    /********** START OF BMI INIT ***********/
+    if(!(*server_status_flag & SERVER_BMI_INIT))
     {
-        PVFS_perror_gossip("Error: BMI_initialize", ret);
-        return ret;
-    }
+        char *modules = NULL;
+        char *listen_addrs = NULL;
+        if (*server_status_flag & SERVER_BMI_CLIENT_INIT)
+        {
+            bmi_flags = 0;
+            modules = NULL;
+            listen_addrs = NULL;
+        }
+        else
+        {
+            bmi_flags = BMI_INIT_SERVER;
+
+            /* does configuration dictate that we bind 
+             * to a specific address?
+             */
+            if(server_config.tcp_bind_specific)
+            {
+                bmi_flags |= BMI_TCP_BIND_SPECIFIC;
+            }
+
+            /* Have bmi automatically increment reference count on
+             * addresses any time a new unexpected message appears.  
+             * The server will decrement it once it has completed 
+             * processing related to that request.
+             */
+            bmi_flags |= BMI_AUTO_REF_COUNT;
+
+            modules = server_config.bmi_modules;
+            listen_addrs = server_config.host_id;
+
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "Passing %s as BMI listen address.\n",
+                         server_config.host_id);
+
+        }
+
+        ret = BMI_initialize(modules, listen_addrs, bmi_flags);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: BMI_initialize", ret);
+            return ret;
+        }
+
 #ifdef USE_TRUSTED
-    /* Pass the server_config file pointer to the lower
-     * levels for the trusted connections related functions to be
-     * called
-     */
-    BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
+        /* Pass the server_config file pointer to the lower
+         * levels for the trusted connections related functions to be
+         * called
+         */
+        BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
 #endif
-    *server_status_flag |= SERVER_BMI_INIT;
 
-    /** BEGIN TROVE INIT **/
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
-                                   &server_config.db_cache_size_bytes);
-    /* this should never fail */
-    assert(ret == 0);
-    ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
-                                   &server_config.trove_max_concurrent_io);
-    /* this should never fail */
-    assert(ret == 0);
+        /* Set the buffer size according to configuration file */
+        BMI_set_info(0,
+                     BMI_TCP_BUFFER_SEND_SIZE, 
+                     (void *)&server_config.tcp_buffer_size_send);
+        BMI_set_info(0,
+                     BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                     (void *)&server_config.tcp_buffer_size_receive);
 
-    /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Server using shm key hint: %d\n",
-                 shm_key_hint);
-    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
-    assert(ret == 0);
-
-    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
-                                               "mmap")))
-    {
-        /* set db cache type to mmap rather than sys */
-        init_flags |= TROVE_DB_CACHE_MMAP;
+        *server_status_flag |= SERVER_BMI_INIT;
     }
-
-    /* TODO: Why is this here and not up with BMI init? */
-    /* Set the buffer size according to configuration file */
-    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
-                 (void *)&server_config.tcp_buffer_size_send);
-    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
-                 (void *)&server_config.tcp_buffer_size_receive);
-
-    /* Fire up TROVE */
-    ret = trove_initialize(server_config.trove_method, 
-                           trove_coll_to_method_callback,
-                           server_config.data_path,
-                           server_config.meta_path,
-                           init_flags);
-
-    if (ret < 0)
-    {
-        PVFS_perror_gossip("Error: trove_initialize", ret);
-
-        gossip_err("\n***********************************************\n");
-        gossip_err("Invalid Storage Space: %s or %s\n\n",
-                   server_config.data_path, server_config.meta_path);
-        gossip_err("Storage initialization failed.  The most "
-                   "common reason\nfor this is that the storage space "
-                   "has not yet been\ncreated or is located on a "
-                   "partition that has not yet\nbeen mounted.  "
-                   "If you'd like to create the storage space,\n"
-                   "re-run this program with a -f option.\n");
-        gossip_err("\n***********************************************\n");
-        return ret;
-    }
-
-    *server_status_flag |= SERVER_TROVE_INIT;
+    /********** END OF BMI INIT ***********/
 
     /* create the configuration cache */
-    ret = PINT_cached_config_initialize();
-    if(ret < 0)
+    if(!(*server_status_flag & SERVER_CACHED_CONFIG_INIT))
     {
-        gossip_err("Error initializing cached_config interface.\n");
-        return(ret);
+        ret = PINT_cached_config_initialize();
+        if(ret < 0)
+        {
+            gossip_err("Error initializing cached_config interface.\n");
+            return(ret);
+        }
+        *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
     }
+
+    /********** START OF TROVE INIT ***********/
+    if(!(*server_status_flag & SERVER_TROVE_INIT))
+    {
+        /* this should never fail */
+        ret = trove_collection_setinfo(0,
+                                       0,
+                                       TROVE_DB_CACHE_SIZE_BYTES,
+                                       &server_config.db_cache_size_bytes);
+        assert(ret == 0);
+
+        /* this should never fail */
+        ret = trove_collection_setinfo(0,
+                                       0,
+                                       TROVE_MAX_CONCURRENT_IO,
+                                       &server_config.trove_max_concurrent_io);
+        assert(ret == 0);
+
+        /* help trove chose a differentiating shm key
+         * if needed for Berkeley DB
+         */
+        shm_key_hint = generate_shm_key_hint(&server_index);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Server using shm key hint: %d\n",
+                     shm_key_hint);
+
+        ret = trove_collection_setinfo(0,
+                                       0,
+                                       TROVE_SHM_KEY_HINT,
+                                       &shm_key_hint);
+        assert(ret == 0);
+
+        if(server_config.db_cache_type &&
+           (!strcmp(server_config.db_cache_type, "mmap")))
+        {
+            /* set db cache type to mmap rather than sys */
+            init_flags |= TROVE_DB_CACHE_MMAP;
+        }
+
+
+        /* Fire up TROVE */
+        ret = trove_initialize(server_config.trove_method, 
+                               trove_coll_to_method_callback,
+                               server_config.data_path,
+                               server_config.meta_path,
+                               init_flags);
+
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: trove_initialize", ret);
+
+            gossip_err("\n***********************************************\n");
+            gossip_err("Invalid Storage Space: %s or %s\n\n",
+                       server_config.data_path, server_config.meta_path);
+            gossip_err("Storage initialization failed.  The most "
+                       "common reason\nfor this is that the storage space "
+                       "has not yet been\ncreated or is located on a "
+                       "partition that has not yet\nbeen mounted.  "
+                       "If you'd like to create the storage space,\n"
+                       "re-run this program with a -f option.\n");
+            gossip_err("\n***********************************************\n");
+            return ret;
+        }
+
+        *server_status_flag |= SERVER_TROVE_INIT;
+    }
+
+    /* This must be done after trove_initialize and before initing the
+     * file systems in the loop below
+     */
 
     /* initialize the flow interface */
-    ret = PINT_flow_initialize(server_config.flow_modules, 0);
-
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_FLOW_INIT))
     {
-        PVFS_perror_gossip("Error: PINT_flow_initialize", ret);
-        return ret;
+        ret = PINT_flow_initialize(server_config.flow_modules, 0);
+
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: PINT_flow_initialize", ret);
+            return ret;
+        }
+        *server_status_flag |= SERVER_FLOW_INIT;
     }
 
-    *server_status_flag |= SERVER_FLOW_INIT;
-
-    cur = server_config.file_systems;
-    while(cur)
+    if(!(*server_status_flag & SERVER_FILESYS_INIT))
     {
-        cur_fs = PINT_llist_head(cur);
-        if (!cur_fs)
+        for(cur = server_config.file_systems; cur; cur = PINT_llist_next(cur))
         {
-            break;
-        }
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
 
         /* V3 no longer map handles */
 #if 0
@@ -877,77 +989,86 @@ static int server_initialize_subsystems(
         }
 #endif
 
-        /*
-         * set storage hints if any.  if any of these fail, we
-         * can't error out since they're just hints.  thus, we
-         * complain in logging and continue.
-         */
-        ret = trove_collection_setinfo(cur_fs->coll_id,
-                                       0,
-                                       TROVE_DIRECTIO_THREADS_NUM,
-                                       (void *)&cur_fs->directio_thread_num);
+            /*
+             * set storage hints if any.  if any of these fail, we
+             * can't error out since they're just hints.  thus, we
+             * complain in logging and continue.
+             */
+            ret = trove_collection_setinfo(
+                                   cur_fs->coll_id,
+                                   0,
+                                   TROVE_DIRECTIO_THREADS_NUM,
+                                   (void *)&cur_fs->directio_thread_num);
 
-        if (ret < 0)
-        {
-            gossip_err("Error setting directio threads num\n");
-        }
+            if (ret < 0)
+            {
+                gossip_err("Error setting directio threads num\n");
+            }
+    
+            ret = trove_collection_setinfo(
+                                   cur_fs->coll_id,
+                                   0,
+                                   TROVE_DIRECTIO_OPS_PER_QUEUE,
+                                   (void *)&cur_fs->directio_ops_per_queue);
 
-        ret = trove_collection_setinfo(cur_fs->coll_id,
-                                       0,
-                                       TROVE_DIRECTIO_OPS_PER_QUEUE,
-                                       (void *)&cur_fs->directio_ops_per_queue);
+            if (ret < 0)
+            {
+                gossip_err("Error setting directio ops per queue\n");
+            }
 
-        if (ret < 0)
-        {
-            gossip_err("Error setting directio ops per queue\n");
-        }
+            ret = trove_collection_setinfo(cur_fs->coll_id,
+                                           0,
+                                           TROVE_DIRECTIO_TIMEOUT,
+                                           (void *)&cur_fs->directio_timeout);
 
-        ret = trove_collection_setinfo(cur_fs->coll_id,
-                                       0,
-                                       TROVE_DIRECTIO_TIMEOUT,
-                                       (void *)&cur_fs->directio_timeout);
+            if (ret < 0)
+            {
+                gossip_err("Error setting directio threads num\n");
+            }
 
-        if (ret < 0)
-        {
-            gossip_err("Error setting directio threads num\n");
-        }
+            ret = trove_collection_lookup(cur_fs->trove_method,
+                                          cur_fs->file_system_name,
+                                          &(orig_fsid),
+                                          NULL,
+                                          NULL);
 
-        ret = trove_collection_lookup(cur_fs->trove_method,
-                                      cur_fs->file_system_name,
-                                      &(orig_fsid),
-                                      NULL,
-                                      NULL);
+            if (ret < 0)
+            {
+                gossip_err("Error initializing trove for filesystem %s\n",
+                            cur_fs->file_system_name);
+                return ret;
+            }
 
-        if (ret < 0)
-        {
-            gossip_err("Error initializing trove for filesystem %s\n",
-                        cur_fs->file_system_name);
-            return ret;
-        }
+            if(orig_fsid != cur_fs->coll_id)
+            {
+                gossip_err("Error: configuration file does "
+                           "not match storage collection.\n");
+                gossip_err("   storage file fs_id: %d\n", (int)orig_fsid);
+                gossip_err("   config  file fs_id: %d\n", (int)cur_fs->coll_id);
+                gossip_err("Warning: This most likely means "
+                           "that the configuration\n");
+                gossip_err("   files have been regenerated "
+                           "without destroying and\n");
+                gossip_err("   recreating the corresponding "
+                           "storage collection.\n");
+                return(-PVFS_ENODEV);
+            }
 
-        if(orig_fsid != cur_fs->coll_id)
-        {
-            gossip_err("Error: configuration file does not match storage collection.\n");
-            gossip_err("   storage file fs_id: %d\n", (int)orig_fsid);
-            gossip_err("   config  file fs_id: %d\n", (int)cur_fs->coll_id);
-            gossip_err("Warning: This most likely means that the configuration\n");
-            gossip_err("   files have been regenerated without destroying and\n");
-            gossip_err("   recreating the corresponding storage collection.\n");
-            return(-PVFS_ENODEV);
-        }
+            ret = trove_open_context(cur_fs->coll_id, &trove_context);
+            if (ret < 0)
+            {
+                gossip_err("Error initializing trove context\n");
+                return ret;
+            }
 
-        ret = trove_open_context(cur_fs->coll_id, &trove_context);
-        if (ret < 0)
-        {
-            gossip_err("Error initializing trove context\n");
-            return ret;
-        }
+            /*
+              set storage hints if any.  if any of these fail, we
+              can't error out since they're just hints.  thus, we
+              complain in logging and continue.
+            */
 
-        /*
-          set storage hints if any.  if any of these fail, we
-          can't error out since they're just hints.  thus, we
-          complain in logging and continue.
-        */
+        /* V3 handle recycle timeout is no longer needed */
+#if 0
         ret = trove_collection_setinfo(
                              cur_fs->coll_id,
                              trove_context, 
@@ -957,250 +1078,275 @@ static int server_initialize_subsystems(
         {
             gossip_err("Error setting handle timeout\n");
         }
+#endif
 
-        if (cur_fs->attr_cache_keywords &&
-            cur_fs->attr_cache_size &&
-            cur_fs->attr_cache_max_num_elems)
-        {
-            ret = trove_collection_setinfo(
-                                 cur_fs->coll_id,
-                                 trove_context, 
-                                 TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
-                                 (void *)cur_fs->attr_cache_keywords);
-            if (ret < 0)
+            if (cur_fs->attr_cache_keywords &&
+                cur_fs->attr_cache_size &&
+                cur_fs->attr_cache_max_num_elems)
             {
-                gossip_err("Error setting attr cache keywords\n");
+                ret = trove_collection_setinfo(
+                                     cur_fs->coll_id,
+                                     trove_context, 
+                                     TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
+                                     (void *)cur_fs->attr_cache_keywords);
+                if (ret < 0)
+                {
+                    gossip_err("Error setting attr cache keywords\n");
+                }
+
+                ret = trove_collection_setinfo(
+                                     cur_fs->coll_id,
+                                     trove_context, 
+                                     TROVE_COLLECTION_ATTR_CACHE_SIZE,
+                                     (void *)&cur_fs->attr_cache_size);
+                if (ret < 0)
+                {
+                    gossip_err("Error setting attr cache size\n");
+                }
+
+                ret = trove_collection_setinfo(
+                                     cur_fs->coll_id,
+                                     trove_context, 
+                                     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
+                                     (void *)&cur_fs->attr_cache_max_num_elems);
+                if (ret < 0)
+                {
+                    gossip_err("Error setting attr cache max num elems\n");
+                }
             }
 
             ret = trove_collection_setinfo(
                                  cur_fs->coll_id,
                                  trove_context, 
-                                 TROVE_COLLECTION_ATTR_CACHE_SIZE,
-                                 (void *)&cur_fs->attr_cache_size);
+                                 TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+                                 (void *)0);
             if (ret < 0)
             {
-                gossip_err("Error setting attr cache size\n");
+                gossip_err("Error initializing the attr cache\n");
             }
 
             ret = trove_collection_setinfo(
                                  cur_fs->coll_id,
-                                 trove_context, 
-                                 TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-                                 (void *)&cur_fs->attr_cache_max_num_elems);
-            if (ret < 0)
+                                 trove_context,
+                                 TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+                                 (void *)&cur_fs->coalescing_high_watermark);
+            if(ret < 0)
             {
-                gossip_err("Error setting attr cache max num elems\n");
+                gossip_err("Error setting coalescing high watermark\n");
+                return ret;
             }
+
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context,
+                                 TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+                                 (void *)&cur_fs->coalescing_low_watermark);
+            if(ret < 0)
+            {
+                gossip_err("Error setting coalescing low watermark\n");
+                return ret;
+            }
+            
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context,
+                                 TROVE_COLLECTION_META_SYNC_MODE,
+                                 (void *)&cur_fs->trove_sync_meta);
+            if(ret < 0)
+            {
+                gossip_err("Error setting metadata sync mode\n");
+                return ret;
+            } 
+            
+            ret = trove_collection_setinfo(
+                                 cur_fs->coll_id,
+                                 trove_context,
+                                 TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                                 (void *)&cur_fs->immediate_completion);
+            if(ret < 0)
+            {
+                gossip_err("Error setting trove immediate completion\n");
+                return ret;
+            } 
+
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "Sync on metadata update for %s: %s\n",
+                         cur_fs->file_system_name,
+                         ((cur_fs->trove_sync_meta == TROVE_SYNC) ?
+                                "yes" : "no"));
+
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "Sync on I/O data update for %s: %s\n",
+                         cur_fs->file_system_name,
+                         ((cur_fs->trove_sync_data == TROVE_SYNC) ?
+                                "yes" : "no"));
+
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "Export options for "
+                         "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
+                         " AnonUID %u\n AnonGID %u\n",
+                         cur_fs->file_system_name,
+                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ?
+                                 "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ?
+                                "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ?
+                                "yes" : "no",
+                         cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
+
+            /* format and pass sync mode to the flow implementation 
+             * for each file system configured
+             */
+            snprintf(buf,
+                     16,
+                     "%d,%d",
+                     cur_fs->coll_id,
+                     cur_fs->trove_sync_data);
+
+            PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+
+            trove_close_context(cur_fs->coll_id, trove_context);
+
         }
 
-        ret = trove_collection_setinfo(
-                             cur_fs->coll_id,
-                             trove_context, 
-                             TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-                             (void *)0);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Storage Init Complete (%s)\n",
+                     SERVER_STORAGE_MODE);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "%d filesystem(s) initialized\n",
+                     PINT_llist_count(server_config.file_systems));
+
+        /*
+         * Migrate database if needed
+         */
+        ret = trove_migrate(server_config.trove_method,
+			    server_config.data_path,
+			    server_config.meta_path);
         if (ret < 0)
         {
-            gossip_err("Error initializing the attr cache\n");
+            gossip_err("trove_migrate failed: ret=%d\n", ret);
+            return(ret);
         }
 
-        ret = trove_collection_setinfo(
-                             cur_fs->coll_id,
-                             trove_context,
-                             TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
-                             (void *)&cur_fs->coalescing_high_watermark);
-        if(ret < 0)
-        {
-            gossip_err("Error setting coalescing high watermark\n");
-            return ret;
-        }
-
-        ret = trove_collection_setinfo(
-                             cur_fs->coll_id,
-                             trove_context,
-                             TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
-                             (void *)&cur_fs->coalescing_low_watermark);
-        if(ret < 0)
-        {
-            gossip_err("Error setting coalescing low watermark\n");
-            return ret;
-        }
-            
-        ret = trove_collection_setinfo(
-                             cur_fs->coll_id,
-                             trove_context,
-                             TROVE_COLLECTION_META_SYNC_MODE,
-                             (void *)&cur_fs->trove_sync_meta);
-        if(ret < 0)
-        {
-            gossip_err("Error setting coalescing low watermark\n");
-            return ret;
-        } 
-            
-        ret = trove_collection_setinfo(
-                             cur_fs->coll_id,
-                             trove_context,
-                             TROVE_COLLECTION_IMMEDIATE_COMPLETION,
-                             (void *)&cur_fs->immediate_completion);
-        if(ret < 0)
-        {
-            gossip_err("Error setting trove immediate completion\n");
-            return ret;
-        } 
-
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "Sync on metadata update for %s: %s\n",
-                     cur_fs->file_system_name,
-                     ((cur_fs->trove_sync_meta == TROVE_SYNC) ?
-                            "yes" : "no"));
-
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "Sync on I/O data update for %s: %s\n",
-                     cur_fs->file_system_name,
-                     ((cur_fs->trove_sync_data == TROVE_SYNC) ?
-                            "yes" : "no"));
-
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "Export options for "
-                     "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
-                     " AnonUID %u\n AnonGID %u\n",
-                     cur_fs->file_system_name,
-                     (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ?
-                             "yes" : "no",
-                     (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ?
-                            "yes" : "no",
-                     (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ?
-                            "yes" : "no",
-                     cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
-
-        /* format and pass sync mode to the flow implementation */
-        snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
-                 cur_fs->trove_sync_data);
-        PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
-
-        trove_close_context(cur_fs->coll_id, trove_context);
-
-        cur = PINT_llist_next(cur);
+        *server_status_flag |= SERVER_FILESYS_INIT;
     }
+    /********** END OF TROVE INIT ***********/
 
-    *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Storage Init Complete (%s)\n",
-                 SERVER_STORAGE_MODE);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%d filesystem(s) initialized\n",
-                 PINT_llist_count(server_config.file_systems));
-
-    /*
-     * Migrate database if needed
+    /* I think this needs to happen before reading the config file
+     * I'm not sure if it will placed here or not!
      */
-    ret = trove_migrate(server_config.trove_method,
-			server_config.data_path,
-			server_config.meta_path);
-    if (ret < 0)
-    {
-        gossip_err("trove_migrate failed: ret=%d\n", ret);
-        return(ret);
-    }
-    /** END OF TROVE INIT **/
-
     /* Initialize SID cache */
-    ret = SID_initialize();
-    if(ret < 0)
+    if(!(*server_status_flag & SERVER_SID_INIT))
     {
-        PVFS_perror_gossip("Error: SID_initialize", ret);
-        return(ret);
+        ret = SID_initialize();
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("Error: SID_initialize", ret);
+            return(ret);
+        }
+        *server_status_flag |= SERVER_SID_INIT;
     }
-
-    *server_status_flag |= SERVER_SID_INIT;
 
     /* Initialize Job Timer */
-    ret = job_time_mgr_init();
-    if(ret < 0)
+    if(!(*server_status_flag & SERVER_JOB_TIME_MGR_INIT))
     {
-        PVFS_perror_gossip("Error: job_time_mgr_init", ret);
-        return(ret);
+        ret = job_time_mgr_init();
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("Error: job_time_mgr_init", ret);
+            return(ret);
+        }
+        *server_status_flag |= SERVER_JOB_TIME_MGR_INIT;
     }
-
-    *server_status_flag |= SERVER_JOB_TIME_MGR_INIT;
 
     /* initialize Job Interface */
-    ret = job_initialize(0);
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_JOB_INIT))
     {
-        PVFS_perror_gossip("Error: job_initialize", ret);
-        return ret;
+        ret = job_initialize(0);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: job_initialize", ret);
+            return ret;
+        }
+        *server_status_flag |= SERVER_JOB_INIT;
     }
-
-    *server_status_flag |= SERVER_JOB_INIT;
     
-    ret = job_open_context(&server_job_context);
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_JOB_CTX_INIT))
     {
-        gossip_err("Error opening job context.\n");
-        return ret;
+        ret = job_open_context(&server_job_context);
+        if (ret < 0)
+        {
+            gossip_err("Error opening job context.\n");
+            return ret;
+        }
+        *server_status_flag |= SERVER_JOB_CTX_INIT;
     }
-
-    *server_status_flag |= SERVER_JOB_CTX_INIT;
 
     /* initialize Request Scheduler */
-    ret = PINT_req_sched_initialize();
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_REQ_SCHED_INIT))
     {
-        PVFS_perror_gossip("Error: PINT_req_sched_intialize", ret);
-        return ret;
+        ret = PINT_req_sched_initialize();
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: PINT_req_sched_intialize", ret);
+            return ret;
+        }
+        *server_status_flag |= SERVER_REQ_SCHED_INIT;
     }
-    *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* Initialize performance counters */
-    /* hist size should be in server config too */
-    PINT_server_pc = PINT_perf_initialize(server_keys);
-    if(!PINT_server_pc)
+    if(!(*server_status_flag & SERVER_PERF_COUNTER_INIT))
     {
-        gossip_err("Error initializing performance counters.\n");
-        return(ret);
-    }
-
-    ret = PINT_perf_set_info(PINT_server_pc,
-                             PINT_PERF_UPDATE_INTERVAL, 
-                             server_config.perf_update_interval);
-    if (ret < 0)
-    {
-        gossip_err("Error PINT_perf_set_info (update interval)\n");
-        return(ret);
-    }
-
-    /* if history_size is greater than 1, start the rollover SM */
-    if (PINT_server_pc->running)
-    {
-        struct PINT_smcb *tmp_op = NULL;
-        ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
-                                               &(tmp_op));
-        if (ret == 0)
+        /* hist size should be in server config too */
+        PINT_server_pc = PINT_perf_initialize(server_keys);
+        if(!PINT_server_pc)
         {
-            ret = server_state_machine_start_noreq(tmp_op);
-        }
-        if (ret < 0)
-        {
-            PVFS_perror_gossip("Error: failed to start perf update "
-                        "state machine.\n", ret);
+            gossip_err("Error initializing performance counters.\n");
             return(ret);
         }
-    }
 
-    *server_status_flag |= SERVER_PERF_COUNTER_INIT;
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+
+        /* if history_size is greater than 1, start the rollover SM */
+        if (PINT_server_pc->running)
+        {
+            struct PINT_smcb *tmp_op = NULL;
+            ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                                   &(tmp_op));
+            if (ret == 0)
+            {
+                ret = server_state_machine_start_noreq(tmp_op);
+            }
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("Error: failed to start perf update "
+                                   "state machine.\n", ret);
+                return(ret);
+            }
+        }
+        *server_status_flag |= SERVER_PERF_COUNTER_INIT;
+    }
 #endif
 
     /* Initialize uid tracker */
-    ret = PINT_uid_mgmt_initialize();
-    if (ret < 0)
+    if(!(*server_status_flag & SERVER_UID_MGMT_INIT))
     {
-        gossip_err("Error initializing the uid management interface\n");
-        return (ret);
+        ret = PINT_uid_mgmt_initialize();
+        if (ret < 0)
+        {
+            gossip_err("Error initializing the uid management interface\n");
+            return (ret);
+        }
+        *server_status_flag |= SERVER_UID_MGMT_INIT;
     }
-
-    *server_status_flag |= SERVER_UID_MGMT_INIT;
 
 /* WBL V3 ADD */
     /* Perform Server Check-In */
@@ -2266,9 +2412,8 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op,
-    struct PINT_smcb **new_op)
+int server_state_machine_alloc_noreq(enum PVFS_server_op op,
+                                     struct PINT_smcb **new_op)
 {
     int ret = -PVFS_EINVAL;
 
@@ -2469,6 +2614,63 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
             else
                 return NULL;
             break;
+        }
+    }
+}
+
+/** Waits for a single server state machine to finish
+ * This is a specialized routine that exected ONE state machine
+ * to be running - it runs an abreviated loop to finish that one
+ * machine before returning.  Does not check for signals and stuff,
+ * this is only intended for early startup of the server.
+ */
+int server_state_machine_wait(void)
+{
+    int ret = 0;
+    job_id_t server_job_id_array[1];
+    int comp_ct;
+    void *server_completed_job_p_array[1];
+    job_status_s server_job_status_array[1];
+
+    for ( ;; )
+    {
+        comp_ct = 1;
+
+        ret = job_testcontext(server_job_id_array,
+                              &comp_ct,
+                              server_completed_job_p_array,
+                              server_job_status_array,
+                              PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                              server_job_context);
+        if (ret < 0)
+        {
+            gossip_lerr("pvfs2-server panic; main loop aborting\n");
+            return ret;
+        }
+
+        if (comp_ct == 1)
+        {
+            struct PINT_smcb *smcb = server_completed_job_p_array[0];
+
+               /* NOTE: PINT_state_machine_next() is a function that
+                * is shared with the client-side state machine
+                * processing, so it is defined in the src/common
+                * directory.
+                */
+            ret = PINT_state_machine_continue(smcb,
+                                              &server_job_status_array[0]);
+
+            if (ret == SM_ACTION_TERMINATE)
+            {
+                return server_job_status_array[0].error_code;
+            }
+
+            if (SM_ACTION_ISERR(ret)) /* ret < 0 */
+            {
+                PVFS_perror_gossip("Error: state machine processing error",
+                                   ret);
+                return ret;
+            }
         }
     }
 }

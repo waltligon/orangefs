@@ -446,7 +446,11 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
 
 /** SID_ADD
  * 
- * This function stores a sid into the sid_cache
+ * This function stores a sid into the sid_cache.
+ * Pass a pointer to a record counter if we are adding a new record
+ * and we will get an error if there is already a record with the same key.
+ * Otherwise we assume that we are updating a record, though it will
+ * insert silently if the record does not exist.
  *
  * Returns 0 on success, otherwise returns error code
 */
@@ -456,7 +460,8 @@ int SID_cache_add_server(DB **dbp,
                          int *num_db_records)
 {
     int ret = 0;          /* Function return value */
-    DBT key, value;        /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
+    DBT key, value;       /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
+    int putflags = 0;
 
     if(PVFS_SID_is_null(sid_server))
     {
@@ -475,14 +480,21 @@ int SID_cache_add_server(DB **dbp,
     /* to store it in the primary db */
     SID_cacheval_pack(cacheval, &value);
 
+    if (num_db_records != NULL)
+    {
+        /* we are adding a new record 
+         * we should not overwrite an old one
+         */
+        putflags |= DB_NOOVERWRITE;
+    }
+
     /* Placing the data into the database */
     ret = (*dbp)->put(*dbp,            /* Primary database pointer */
                       NULL,            /* Transaction pointer */
                       &key,            /* PVFS_SID */
                       &value,          /* Data is marshalled SID_cacheval_t */
-                      DB_NOOVERWRITE); /* Do not allow for overwrites because */
-                                       /* this is the primary database */
-    /* with DB_NOOVERWRITE does this return an error on a dup? */
+                      putflags);
+    /* with DB_NOOVERWRITE this returns an error on a dup */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -612,6 +624,8 @@ int SID_cache_update_server(DB **dbp,
 
     /* Updating the old attributes to the new values */
     SID_cache_copy_attrs(current_attrs, new_attrs->attr);
+
+    current_attrs->server_type = new_attrs->server_type;
         
     /* Updating the old bmi address to the new bmi_address */
     SID_cache_copy_bmi(current_attrs, new_attrs->bmi_addr);
@@ -619,14 +633,17 @@ int SID_cache_update_server(DB **dbp,
     /* Updating the old url to the new url */
     SID_cache_copy_url(&current_attrs, new_attrs->url);
 
+/* SHOULD NOT NEED THIS */
+#if 0
     /* Deleting the old record from the sid cache */
     ret = SID_cache_delete_server(dbp, sid_server, NULL);
     if(ret)
     {
         return(ret);
     }
+#endif
     
-    /* Adding the updated SID_cacheval_t struct back to the sid cache */
+    /* writing the updated SID_cacheval_t struct back to the sid cache */
     ret = SID_cache_add_server(dbp, sid_server, current_attrs, NULL);
     if(ret)
     {
@@ -685,12 +702,15 @@ int SID_cache_update_attrs(DB **dbp,
         }
     }
 
+/* SHOULD NOT NEED THIS */
+#if 0
     /* Deleting the old record from the cache */
     ret = SID_cache_delete_server(dbp, sid_server, NULL);
     if(ret)
     {
         return(ret);
     }
+#endif
 
     ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
     if(ret)
@@ -718,6 +738,52 @@ int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
         current_attrs->attr[i] = new_attr[i];
     }
     return(ret);
+}
+
+/* Add a type bit to an existing server in the SIDcache
+ */
+int SID_cache_update_type(DB **dbp,
+                          const PVFS_SID *sid_server,
+                          int new_server_type)
+{
+    int ret = 0;
+    SID_cacheval_t *sid_attrs;
+
+    /* If sid_server is not passed in as NULL then only the attr's 
+     * will be changed for the sid 
+     */
+    if(!dbp || !sid_server)
+    {
+        return(-EINVAL);
+    }
+    /* Getting the sid from the cache */
+    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    if(ret)
+    {
+        return(ret);
+    }
+
+    sid_attrs->server_type |= new_server_type;
+        
+/* SHOULD NOT NEED THIS */
+#if 0
+    /* Deleting the old record from the cache */
+    ret = SID_cache_delete_server(dbp, sid_server, NULL);
+    if(ret)
+    {
+        return(ret);
+    }
+#endif
+
+    ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+    if(ret)
+    {
+        SID_cacheval_free(&sid_attrs);
+        return(ret);
+    }
+
+    SID_cacheval_free(&sid_attrs);
+    return(ret);    
 }
 
 /*
@@ -751,12 +817,15 @@ int SID_cache_update_bmi(DB **dbp,
     {
         sid_attrs->bmi_addr = new_bmi_addr;
 
+/* SHOULD NOT NEED THIS */
+#if 0
         /* Deleting the old record from the sid cache */
         ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
+#endif
 
         ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
         if(ret)
@@ -829,14 +898,17 @@ int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
             return(ret);
         }        
 
+/* SHOULD NOT NEED THIS */
+#if 0
         /* Deleting the old record from the sid cache */
         ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
+#endif
 
-        /* Adding the updated SID_cacheval_t struct back to the sid cache */
+        /* Writing the updated SID_cacheval_t struct back to the sid cache */
         ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
         if(ret)
         {
@@ -1869,6 +1941,13 @@ int SID_finalize(void)
         return ret;
     }
 
+    return ret;
+}
+
+int SID_update_type(const PVFS_SID *sid, int new_server_type)
+{
+    int ret = 0;
+    ret = SID_cache_update_type(&SID_db, sid, new_server_type);
     return ret;
 }
 

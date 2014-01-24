@@ -76,6 +76,7 @@ static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
+static DOTCONF_CB(get_sidcache_file);
 static DOTCONF_CB(get_event_tracing);
 static DOTCONF_CB(get_filesystem_replication);
 static DOTCONF_CB(get_filesystem_collid);
@@ -169,6 +170,8 @@ static host_alias_t *find_host_alias_ptr_by_alias(
                     struct server_configuration_s *config_s,
                     char *alias,
                     int *index);
+static int compare_aliases(void* vkey,
+                           void* valias2);
 #ifdef __PVFS2_TROVE_SUPPORT__
 #endif
 
@@ -591,7 +594,7 @@ static const configoption_t options[] =
      * concurrently 
      */
     {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS, "16"},
+        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "16"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
@@ -631,11 +634,19 @@ static const configoption_t options[] =
      * 
      * EventLogging -flow,-flowproto
      */
-    {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"none,"},
+    {"EventLogging", ARG_LIST, get_event_logging_list, NULL,
+        CTX_DEFAULTS | CTX_SERVER_OPTIONS,"none,"},
 
     {"EnableTracing",ARG_STR, get_event_tracing,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
+        CTX_DEFAULTS| CTX_SERVER_OPTIONS,"no"},
+
+    /* The SID cache stores attributes and addresses for known servers
+     * indexed by SID.  This database is memory only, but is saved
+     * periodically to local storage and loaded when the server starts
+     * so we don't have to hunt for lots of servers at startup.
+     */
+    {"SIDCacheFile", ARG_STR, get_sidcache_file, NULL,
+        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs-sidcache"},
 
     /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
@@ -1866,6 +1877,24 @@ DOTCONF_CB(get_event_logging_list)
     return NULL;
 }
 
+DOTCONF_CB(get_sidcache_file)
+{
+    struct server_configuration_s *config_s = 
+             (struct server_configuration_s *)cmd->context;
+    /* free whatever was added in set_defaults phase */
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->sidcachefile)
+    {
+        free(config_s->sidcachefile);
+    }
+    config_s->sidcachefile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
 DOTCONF_CB(get_event_tracing)
 {
     struct server_configuration_s *config_s = 
@@ -2681,7 +2710,7 @@ DOTCONF_CB(get_rootsrv)
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    struct root_server_s *root_server = NULL;
+    struct host_alias_s *root_alias = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
             PINT_llist_head(config_s->file_systems);
@@ -2689,26 +2718,20 @@ DOTCONF_CB(get_rootsrv)
 
     if (cmd->arg_count != 1)
     {
-        return "Error: root server statement must include one alias";
+        return "Error: RootServer statement must include one alias";
     }
 
-    /* malloc new server */
-    root_server = (root_server_t *)malloc(sizeof(root_server_t));
-
-    /* fill in new server */
-    /* just leaving the SID in text for now */
-    root_server->host_sid_text = strdup(cmd->data.list[0]);
-
-    /* should we look up alias to verify? */
-    /* could also check for dups */
-
-    /* check if list initialized */
-    if (!fs_conf->root_servers)
+    /* look up alias */
+    if(config_s->host_aliases &&
+       !(root_alias = (host_alias_t *)PINT_llist_search(
+                                                 config_s->host_aliases, 
+                                                 (void *)cmd->data.list[0],
+                                                 compare_aliases)))
     {
-        fs_conf->root_servers = PINT_llist_new();
+        return "Error: RootServer alias not found";
     }
-    
-    PINT_llist_add_to_tail(fs_conf->root_servers, (void *)root_server);
+    /* update server type n SIDcache */
+    SID_update_type(&root_alias->host_sid, SID_SERVER_ROOT);
 
     /* increment the root_sid_count so we know how many there are */
     fs_conf->root_sid_count++;
@@ -2829,9 +2852,10 @@ DOTCONF_CB(get_alias_list)
     int len = 0;
     char *ptr;
 
-    if (cmd->arg_count < 2)
+    if (cmd->arg_count < 3)
     {
-        return "Error: alias must include at least one bmi address";
+        return "Error: Alias must include alias, SID, and "
+               "at least one bmi address";
     }
 
     /* prevent users from adding the same alias twice */
@@ -2878,47 +2902,25 @@ DOTCONF_CB(get_primesrv)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    struct prime_server_s *prime_server = NULL;
-    int i = 0;
-    int len = 0;
-    char *ptr;
+    struct host_alias_s *prime_alias = NULL;
 
-    /* check num args is 2 or more (Alias and 1 or more BMI_addr) */
-    if (cmd->arg_count < 2)
+    if (cmd->arg_count != 1)
     {
-        return "Error: prime server must include at least one bmi address";
+        return "Error: PrimeServer statement must include one alias";
     }
 
-    /* malloc new server */
-    prime_server = (prime_server_t *)malloc(sizeof(prime_server_t));
-
-    /* fill in new server */
-    prime_server->host_sid_text = strdup(cmd->data.list[0]);
-
-    /* should we look up alias to verify? */
-    /* could also check for dups */
-    /* could allow a direct SID instead of alias */
-
-    prime_server->bmi_address = (char *)calloc(1, PVFS_MAX_SERVER_ADDR_LIST);
-    ptr = prime_server->bmi_address;
-    for (i = 1; i < cmd->arg_count; i++)
+    /* look up alias */
+    if(config_s->host_aliases &&
+       !(prime_alias = (host_alias_t *)PINT_llist_search(
+                                                  config_s->host_aliases, 
+                                                  (void *)cmd->data.list[0],
+                                                  compare_aliases)))
     {
-	strncat(ptr, cmd->data.list[i], PVFS_MAX_SERVER_ADDR_LIST - len);
- 	len += strlen(cmd->data.list[i]);
-        if (i + 1 < cmd->arg_count)
-        {
-            strncat(ptr, ",", PVFS_MAX_SERVER_ADDR_LIST - len);
-        }
- 	len++;
+        return "Error: PrimeServer alias not found";
     }
+    /* update server type n SIDcache */
+    SID_update_type(&prime_alias->host_sid, SID_SERVER_PRIME);
 
-    /* check if list initialized */
-    if (!config_s->prime_servers)
-    {
-        config_s->prime_servers = PINT_llist_new();
-    }
-    
-    PINT_llist_add_to_tail(config_s->prime_servers, (void *)prime_server);
     return NULL;
 }
 

@@ -16,7 +16,21 @@ typedef struct SID_cacheval_s
     int attr[SID_NUM_ATTR];
     BMI_addr bmi_addr;
     char url[0];
+    int server_type;
 } SID_cacheval_t;
+
+/* server type file if cacheval holds an OR of these flags indicating
+ * what the server does
+ */
+
+enum {
+    SID_SERVER_NULL =    0,
+    SID_SERVER_META =    1,
+    SID_SERVER_DATA =    2,
+    SID_SERVER_DIRDATA = 4,
+    SID_SERVER_PRIME =   8,
+    SID_SERVER_ROOT =   16
+};
 
 /* these are defined in policyeval.c */
 /* they depend on SID_NUM_ATTR and thus they are here */
