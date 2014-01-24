@@ -1,340 +1,403 @@
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <poll.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/queue.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <unistd.h>
 
-#include "pvfs2.h"
-
-static char *mntdir;
-static FILE *proctable;
+#include <pvfs2.h>
 
 struct proc {
-    int fd;
-    pid_t pid;
-    char *cmdline;
-    FILE *log;
-    struct proc *next;
+	int pid; /* PID. */
+	int outfd; /* Output stream. */
+	char *cmdline; /* Invocation command line. */
+	FILE *f; /* Stream to write log to. */
+	SLIST_ENTRY(proc) procs;
 };
+SLIST_HEAD(prochead, proc);
 
-struct proclist {
-    int nprocs;
-    struct proc *procs;
-};
+struct proc *proc_alloc(int pid, int outfd, char *cmdline);
+void proc_free(struct proc *p);
+struct proc *prochead_find(struct prochead *prochead, int fd);
+struct proc *prochead_findpid(struct prochead *prochead, int pid);
 
-void proclist_init(struct proclist *pl);
-void proclist_add(struct proclist *pl, struct proc *newproc);
-struct proc *proclist_findfd(struct proclist *pl, int fd);
-struct proc *proclist_findpid(struct proclist *pl, int fd);
-void proclist_remove(struct proclist *pl, struct proc *oldproc);
-void proclist_fillpollfds(struct proclist *pl, struct pollfd *pfds, int events);
+struct pollfd *makepollfds(struct prochead *prochead, int *nfds);
+int dopollfds(struct prochead *prochead, char *procdir,
+              struct pollfd *fds, int nfds);
+int doinput(int fd, struct prochead *prochead, char *procdir);
+int startprocess(char *s, struct prochead *prochead, char *procdir);
+int dooutput(int fd, struct prochead *prochead);
 
-void child_status(int signal);
-void reopen_log(int signal);
-int setup_signals(void);
-int startproc(void);
-void endproc(int fd);
-void copytolog(struct proc *proc, char *buf, int buflen);
+int logstatus(struct prochead *prochead, char *procdir);
 
-void proclist_init(struct proclist *pl)
+void childstatus(int signal);
+
+struct proc *proc_alloc(int pid, int outfd, char *cmdline)
 {
-    pl->nprocs = 0;
-    pl->procs = NULL;
+	struct proc *p;
+	p = malloc(sizeof(struct proc));
+	p->pid = pid;
+	p->outfd = outfd;
+	p->cmdline = strdup(cmdline);
+	return p;
 }
 
-void proclist_add(struct proclist *pl, struct proc *newproc)
+void proc_free(struct proc *p)
 {
-    struct proc *proc;
-    /* Make sure the linked list is not contaminated. */
-    newproc->next = NULL;
-    pl->nprocs++;
-    if (pl->procs) {
-        proc = pl->procs;
-        while (proc->next)
-            proc = proc->next;
-        proc->next = newproc;
-    } else {
-        pl->procs = newproc;
-    }
+	free(p->cmdline);
+	free(p);
 }
 
-struct proc *proclist_findfd(struct proclist *pl, int fd)
+struct proc *prochead_find(struct prochead *prochead, int fd)
 {
-    struct proc *proc = pl->procs;
-    while (proc) {
-        if (proc->fd == fd)
-            return proc;
-        proc = proc->next;
-    }
-    return NULL;
+	struct proc *p;
+	SLIST_FOREACH(p, prochead, procs) {
+		if (p->outfd == fd)
+			return p;
+	}
+	return NULL;
 }
 
-struct proc *proclist_findpid(struct proclist *pl, pid_t pid)
+struct proc *prochead_findpid(struct prochead *prochead, int pid)
 {
-    struct proc *proc = pl->procs;
-    while (proc) {
-        if (proc->pid == pid)
-            return proc;
-        proc = proc->next;
-    }
-    return NULL;
+	struct proc *p;
+	SLIST_FOREACH(p, prochead, procs) {
+		if (p->pid == pid)
+			return p;
+	}
+	return NULL;
 }
 
-void proclist_remove(struct proclist *pl, struct proc *oldproc)
+/*
+ * Create pollfd structures from the process list.
+ */
+struct pollfd *makepollfds(struct prochead *prochead, int *nfds)
 {
-    struct proc *prevproc, *proc;
-    /* Should the first item be removed. */
-    if (pl->procs == oldproc) {
-        pl->procs = oldproc->next;
-        pl->nprocs--;
-        return;
-    }
-    /* Delete the appropriate item. */
-    prevproc = pl->procs;
-    proc = pl->procs->next;
-    while (proc) {
-        if (proc == oldproc) {
-            prevproc->next = oldproc->next;
-            pl->nprocs--;
-            return;
-        }
-        prevproc = proc;
-        proc = proc->next;
-    }
+	int size = 0, i = 0;
+	struct proc *p;
+	struct pollfd *fds;
+
+	/* Count the processes. */
+	size = 0;
+	SLIST_FOREACH(p, prochead, procs)
+		size++;
+
+	/* Allocate memory for each process plus the input stream. */
+	fds = malloc(sizeof(struct pollfd)*(size+1));
+	if (fds == NULL)
+		return NULL;
+	*nfds = size+1;
+
+	/* Setup poll to wait for output from any running process. */
+	SLIST_FOREACH(p, prochead, procs) {
+		fds[i].fd = p->outfd;
+		fds[i].events = POLLIN;
+		i++;
+	}
+
+	/* Setup poll to wait for a request from the input stream. */
+	fds[i].fd = 0;
+	fds[i].events = POLLIN;
+
+	return fds;
 }
 
-void proclist_fillpollfds(struct proclist *pl, struct pollfd *pfds, int events)
+/*
+ * Process each revents entry in the pollfd structures.
+ */
+int dopollfds(struct prochead *prochead, char *procdir,
+              struct pollfd *fds, int nfds)
 {
-    int i = 0;
-    struct proc *proc = pl->procs;
-    while (i < pl->nprocs) {
-        pfds[i].fd = proc->fd;
-        pfds[i].events = events;
-        i++;
-        proc = proc->next;
-    }
+	int i;
+	struct proc *p;
+	for (i = 0; i < nfds; i++) {
+		if (fds[i].revents & POLLIN) {
+			/* This is the input stream. */
+			if (fds[i].fd == 0)
+				doinput(fds[i].fd, prochead, procdir);
+			else
+			/* This is program output. */
+				dooutput(fds[i].fd, prochead);
+		}
+		if (fds[i].revents & POLLHUP || fds[i].revents & POLLERR
+		    || fds[i].revents & POLLNVAL) {
+			if (fds[i].fd == 0) {
+				exit(0);
+			} else {
+				p = prochead_find(prochead, fds[i].fd);
+				if (p == NULL) {
+					close(fds[i].fd);
+				} else {
+					close(p->outfd);
+					fclose(p->f);
+					proc_free(p);
+					SLIST_REMOVE(prochead, p, proc,
+					             procs);
+				}
+			}
+		}
+	}
+	return 0;
 }
 
-struct proclist pl;
-
-void child_status(int signal)
+/*
+ * Process input stream. This will start a process with the parameters
+ * read.
+ */
+int doinput(int fd, struct prochead *prochead, char *procdir)
 {
-    pid_t pid;
-    int status;
-    struct proc *proc;
-    pid = waitpid(0, &status, 0);
-    if (pid == -1) {
-        perror("Could not waitpid");
-        return;
-    }
-    proc = proclist_findpid(&pl, pid);
-    if (proc == NULL)
-        return;
-    endproc(proc->fd);
+	static char buf[1024];
+	static int offset;
+	int size;
+	char *string, *end = NULL, *oldend;
+
+	/* Read from input stream. */
+	size = read(fd, buf+offset, 1024-offset);
+	if (size == -1) {
+		if (errno == EINTR)
+			return 0;
+		else
+			return 1;
+	}
+	size += offset;
+
+	/* Split by the newlines. */
+	string = buf;
+	while (1) {
+		oldend = end;
+		end = memchr(string, '\n', size);
+		if (end == NULL)
+			break;
+		*end = 0;
+		startprocess(string, prochead, procdir);
+		if (end + 1 - string <= size) {
+			size -= end + 1 - string;
+			string = end + 1;
+		}
+	}
+	/* Put unterminated data at the beginning of the buffer and
+	 * setup the offset if applicable. */
+	if (size) {
+		/* If oldend is not set, then the unterminated data is
+		 * at the beginning of the buffer. */
+		if (oldend != NULL)
+			memmove(buf, oldend + 1, size);
+		if (size < 1024) {
+			offset = size;
+		} else {
+			fprintf(stderr, "discarding large input "
+			        "data\n");
+		}
+	} else {
+		offset = 0;
+	}
+	
+	return 0;
 }
 
-void reopen_log(int signal)
+/*
+ * Start a process with a pipe for the output stream and add it to the
+ * prochead list.
+ */
+int startprocess(char *s, struct prochead *prochead, char *procdir)
 {
-    char tablename[PVFS_PATH_MAX];
-    snprintf(tablename, PVFS_PATH_MAX, "%s/proctable", mntdir);
-    proctable = fopen(tablename, "a");
-    if (proctable == NULL) {
-        exit(1);
-    }
+	int r;
+	int fds[2];
+	struct proc *p;
+	char path[_POSIX_PATH_MAX];
+
+	r = pipe(fds);
+	if (r == -1)
+		return 1;
+
+	/* Startup a new process. */
+	r = fork();
+	if (r == -1) {
+		close(fds[0]);
+		close(fds[1]);
+		return 1;
+        } else if (r == 0) {
+		close(fds[0]);
+		close(0);
+		close(1);
+		close(2);
+		openat(0, "/dev/null", O_WRONLY);
+		dup2(fds[1], 1);
+		dup2(fds[1], 2);
+		execle("/bin/sh", "sh", "-c", s, NULL, NULL);
+		/* Prevent atexit routines from running twice. There is
+		 * no way to distinguish exec errors from program
+		 * errors. */
+		_exit(1);
+	}
+	close(fds[1]);
+
+	/* Add to prochead list. */
+	p = proc_alloc(r, fds[0], s);
+	/* Leave the process running and file descriptors active if
+	 * proc_alloc failed (i.e. there is no more system memory). */
+	if (p == NULL)
+		return 1;
+	snprintf(path, _POSIX_PATH_MAX, "%s/log.%d", procdir, p->pid);
+	p->f = fopen(path, "w");
+	SLIST_INSERT_HEAD(prochead, p, procs);
+	
+	return 0;
 }
 
-int setup_signals(void)
+/*
+ * Process output stream.
+ */
+int dooutput(int fd, struct prochead *prochead)
 {
-    struct sigaction act;
-    act.sa_handler = child_status;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGCHLD, &act, NULL) == -1)
-        return -1;
-    act.sa_handler = reopen_log;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    return sigaction(SIGHUP, &act, NULL);
+	struct proc *p;
+	int size;
+	char buf[1024];
+
+	p = prochead_find(prochead, fd);
+	if (p == NULL)
+		return 1;
+
+	size = read(fd, buf, 1024);
+
+	if (size == -1) {
+		return 1;
+	} else if (size == 0) {
+		close(p->outfd);
+		fclose(p->f);
+		proc_free(p);
+		SLIST_REMOVE(prochead, p, proc, procs);
+	} else {
+		/* XXX */
+		if (p->f)
+			fwrite(buf, size, 1, p->f);
+	}
+
+	return 0;
 }
 
-int startproc(void)
+int logstatus(struct prochead *prochead, char *procdir)
 {
-    char buf[1024];
-    int r;
-    int pipefds[2];
-    struct proc *proc;
-    /* Read program command line. */
-    if (fgets(buf, 1024, stdin) == NULL) {
-        if (feof(stdin))
-            return 1;
-        return 2;
-    }
-    *(strrchr(buf, '\n')) = 0;
-    if (pipe(pipefds)) {
-        return 2;
-    }
-    r = fork();
-    if (r == -1) {
-        return 2;
-    } else if (r == 0) {
-        /* Setup standard I/O and exec. */
-        close(pipefds[0]);
-        close(0);
-        close(1);
-        close(2);
-        dup2(pipefds[1], 1);
-        dup2(pipefds[1], 2);
-        close(pipefds[1]);
-        execlp("sh", "sh", "-c", buf, NULL);
-    } else {
-        char logname[PATH_MAX];
-        /* Success. */
-        close(pipefds[1]);
-        proc = malloc(sizeof(struct proc));
-        /* Or not. This could leak memory, but there are probably other
-         * problems if malloc is returning NULL. */
-        if (proc == NULL)
-            return 2;
-        proc->fd = pipefds[0];
-        proc->pid = r;
-        proc->cmdline = strdup(buf);
-        snprintf(logname, PVFS_PATH_MAX, "%s/proc.%d", mntdir, proc->pid);
-        proc->log = fopen(logname, "w");
-        if (proc->log == NULL)
-            return 2;
-        fprintf(proctable, "S %d %s\n", proc->pid, proc->cmdline);
-        fflush(proctable);
-        proclist_add(&pl, proc);
-    }
-    return 0;
+	char path[_POSIX_PATH_MAX];
+	FILE *f;
+	struct proc *p;
+
+	snprintf(path, _POSIX_PATH_MAX, "%s/table", procdir);
+
+	f = fopen(path, "w");
+	if (f == NULL)
+		return 1;
+
+	SLIST_FOREACH(p, prochead, procs) {
+		fprintf(f, "%d %s\n", p->pid, p->cmdline);
+	}
+
+	fclose(f);
+
+	return 0;
 }
 
-void endproc(int fd)
-{
-    struct proc *proc;
-    proc = proclist_findfd(&pl, fd);
-    fprintf(proctable, "E %d %s\n", proc->pid, proc->cmdline);
-    fflush(proctable);
-    free(proc->cmdline);
-    fflush(proc->log);
-    fclose(proc->log);
-    proclist_remove(&pl, proc);;
-}
+/* This is usually hidden by a local variable above. */
+struct prochead prochead;
+char procdir[_POSIX_PATH_MAX];
 
-void copytolog(struct proc *proc, char *buf, int buflen)
+/*
+ * Signal that a child has stopped running. Wait on it and report
+ * its status back into the process table.
+ */
+void childstatus(int signal)
 {
-    fwrite(buf, buflen, 1, proc->log);
-    fflush(proc->log);
+	int pid, status;
+	struct proc *p;
+	pid = waitpid(0, &status, 0);
+	if (pid == -1)
+		return;
+	p = prochead_findpid(&prochead, pid);
+	if (p == NULL)
+		return;
+	/* XXX */
+/*	printf("okay? %d %d\n", pid, status);*/
 }
 
 int main(void)
 {
-    int ret;
-    struct pollfd *pfds;
-    const PVFS_util_tab *tab;
-    char tablename[PATH_MAX];
+	const PVFS_util_tab *tab;
+	struct sigaction act;
+	struct pollfd *fds;
+	int nfds;
+	int r;
 
-    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-    if (ret < 0) {
-        PVFS_perror("PVFS_sys_initialize", ret);
-        return 1;
-    }
+	/* Start PVFS. */
+	r = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+	if (r < 0) {
+		PVFS_perror("PVFS_sys_initialize", r);
+		return 1;
+	}
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (tab == NULL) {
-        fprintf(stderr, "Failed to parse pvfstab.\n");
-        return 1;
-    }
+	tab = PVFS_util_parse_pvfstab(NULL);
+	if (tab == NULL) {
+		fprintf(stderr, "Failed to parse pvfstab.\n");
+		return 1;
+	}
 
-    if (tab->mntent_count < 1) {
-        fprintf(stderr, "pvfstab does not contain any filesystems.\n");
-        return 1;
-    }
+	if (tab->mntent_count < 1) {
+		fprintf(stderr, "pvfstab does not contain any filesystems.\n");
+		return 1;
+	}
 
-    mntdir = strdup(tab->mntent_array[0].mnt_dir);
-    if (mntdir == NULL) {
-        perror("Could not set mount directory");
-        return 1;
-    }
+	snprintf(procdir, _POSIX_PATH_MAX, "%s/proc", 
+	         tab->mntent_array[0].mnt_dir);
+	if (procdir == NULL) {
+		perror("Could not set mount directory");
+		return 1;
+	}
 
-    snprintf(tablename, PVFS_PATH_MAX, "%s/proctable", mntdir);
-    proctable = fopen(tablename, "a");
-    if (proctable == NULL) {
-        perror("Could not open process table");
-        return 1;
-    }
+	/* Register signal handler. */
+	act.sa_handler = childstatus;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	if (sigaction(SIGCHLD, &act, NULL) == -1) {
+		perror("sigaction");
+		return 1;
+	}
 
-    if (setup_signals()) {
-        perror("Could not setup signal handler");
-        return 1;
-    }
+	/* Initialize process list. */
+	SLIST_INIT(&prochead);
 
-    proclist_init(&pl);
+	while (1) {
+		logstatus(&prochead, procdir);
 
-    while (1) {
-        int r, i;
-        /* Generate list of fds to poll. */
-        pfds = malloc(sizeof(struct pollfd)*(pl.nprocs+1));
-        proclist_fillpollfds(&pl, pfds+1, POLLIN);
-        pfds[0].fd = 0;
-        pfds[0].events = POLLIN;
+		/* Make pollfd structures from process list. */
+		fds = makepollfds(&prochead, &nfds);
+		if (fds == NULL) {
+			perror("makepollfds");
+			abort();
+		}
 
-        /* Poll. Be careful of delivered signals. */
-        r = poll(pfds, pl.nprocs+1, -1);
-        if (r == -1) {
-            if (errno == EINTR) {
-                free(pfds);
-                continue;
-            }
-            perror("poll: ");
-            return 1;
-        }
+		r = poll(fds, nfds, -1);
+		if (r == -1 || r == 0) {
+			if (r == 0 || errno == EINTR) {
+				free(fds);
+				continue;
+			} else {
+				perror("poll");
+				abort();
+			}
+		}
 
-        /* Handle conditions on the first fd (standard input) specially.
-         * Stop if it should close. */
-        if (pfds[0].revents & POLLNVAL) {
-            return 0;
-        } else if (pfds[0].revents & POLLIN) {
-            r = startproc();
-            if (r == 1)
-                return 0;
-            else if (r)
-                perror("Could not start process");
-        }
+		dopollfds(&prochead, procdir, fds, nfds);
 
-        /* Handle conditions on the other fds, which are connected to
-         * processes we are monitoring. */
-        for (i = 1; i < pl.nprocs+1; i++) {
-            char buf[1024];
-            struct proc *proc;
-            /* Remove the process if there are errors. Copy the data to a log
-             * file otherwise. */
-            if (pfds[i].revents & POLLNVAL) {
-                endproc(pfds[i].fd);
-            } else if (pfds[i].revents & POLLIN) {
-                r = read(pfds[i].fd, buf, 1024);
-                if (r == -1) {
-                    if (errno != EINTR)
-                        perror("Cannot read from pipe");
-                } else if (r == 0) {
-                    close(pfds[i].fd);
-                    endproc(pfds[i].fd);
-                } else {
-                    proc = proclist_findfd(&pl, pfds[i].fd);
-                    copytolog(proc, buf, r);
-                }
-            }
-        }
+		free(fds);
+	}
 
-        /* A new pollfd table will be allocated each time. This is inefficient,
-         * but the intent is that this is not used for high-speed operations. */
-        free(pfds);
-    }
-    return 0;
+	free(procdir);
+
+	return 0;
 }
