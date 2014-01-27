@@ -317,7 +317,7 @@ class OFSEC2ConnectionManager(object):
         try:
 			all_addresses = self.ec2_connection.get_all_addresses()
 			print all_addresses
-		except:
+        except:
 			pass
         for i in instances:
             #print i.__dict__

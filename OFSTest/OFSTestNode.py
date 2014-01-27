@@ -53,11 +53,12 @@ class OFSTestNode(object):
       # initialize node. We don't have much info for the base class.
     def __init__(self):
         
-        #------
-        #
-        # identity variables
-        #
-        #-------
+#------------------------------------------------------------------------------
+#
+# Class members.
+#
+#
+#------------------------------------------------------------------------------
         
         # list of OrangeFS Aliases
         self.alias_list = None
@@ -155,30 +156,44 @@ class OFSTestNode(object):
         # svn branch (or ofs source directory name)
         self.ofs_branch = ""
         
+        # Location of orangefs.conf file.
+        self.ofs_conf_file = None
+        
+        # Do we need to build the kernel module?
+        self.build_kmod = False
+        
         # default tcp port
         self.ofs_tcp_port = "3396"
         
         # berkeley db4 location
         self.db4_dir = "/opt/db4"
         self.db4_lib_dir = self.db4_dir+"/lib"
-        self.ofs_conf_file = None
         
+        # MPICH related variables
         self.mpich2_installation_location = ""
         self.mpich2_source_location = ""
+        self.mpich2_version = ""
+        self.created_mpichhosts = None 
         
+        # OpenMPI related variables
         self.openmpi_installation_location = ""
         self.openmpi_source_location = ""
-        self.openmpi_version = ""  
+        self.openmpi_version = ""
+        self.created_openmpihosts = None  
         
+        # Where is the romio test script? 
+        # Sloppy - revise.
+        self.romio_runtests_pvfs2 = None
+        
+        # Hadoop variables
         self.hadoop_version = "hadoop-1.2.1"
         self.hadoop_location = "/opt/"+self.hadoop_version
         self.jdk6_location = "/usr/java/default"
         
-        self.created_openmpihosts = None
         
-        self.created_mpichhosts = None
-        self.romio_runtests_pvfs2 = None
         
+        
+        # Information about node in the network.
         self.node_number = OFSTestNode.node_number
         OFSTestNode.node_number += 1
 
@@ -308,8 +323,9 @@ class OFSTestNode(object):
       #
       #==========================================================================
 
-
-      # Change the current directory on the node to run scripts.
+    #--------------------------------------------------------------------------
+    # Change the current directory on the node to run scripts.
+    #--------------------------------------------------------------------------
     def changeDirectory(self, directory):
         # cd "-" will restore previous directory
         if directory is not "-": 
@@ -317,56 +333,76 @@ class OFSTestNode(object):
             self.current_directory = directory
         else:
             self.restoreDirectory()
-    
+    #--------------------------------------------------------------------------
+    # Restore directory - This restores the previous directory.
+    #--------------------------------------------------------------------------
     def restoreDirectory():
         temp = self.current_directory
         self.current_directory = self.previous_directory
         self.previous_directory = temp
 
-      
-      # set an environment variable to a value
+    #--------------------------------------------------------------------------  
+    # set an environment variable to a value
+    #--------------------------------------------------------------------------
     def setEnvironmentVariable(self,variable,value):
         self.current_environment[variable] = value
     
+    #--------------------------------------------------------------------------
+    # Erase an environment variable
+    #--------------------------------------------------------------------------
     def unsetEnvironmentVariable(self,variable):
         del self.current_environment[variable] 
-      
-      # The setenv parameter should be a string 
+    
+    #--------------------------------------------------------------------------  
+    # This function sets the environment based on the output of setenv.
+    # setenv is a string that is formatted like the output of the setenv command.
+    #-------------------------------------------------------------------------- 
     def setEnvironment(self, setenv):
-        #for each line in setenv
+    
         variable_list = setenv.split('\n')
         for variable in variable_list:
           #split based on the equals sign
           vname,value = variable.split('=')
           self.setEnvironmentVariable(vname,value)
-
-      # Clear all environment variables
+          
+    #--------------------------------------------------------------------------
+    # Clear all environment variables
+    #--------------------------------------------------------------------------
     def clearEnvironment(self):
           self.current_environment = {}
-      
-      # return current directory
+    
+    #--------------------------------------------------------------------------  
+    # return current directory
+    #--------------------------------------------------------------------------
     def printWorkingDirectory(self):
         return self.current_directory
-     
-      # Add a command to the list of commands being run.
-      # This is a single line of a shell script.
+    
+    
+    #--------------------------------------------------------------------------
+    # Add a command to the list of batch commands to be run.
+    # This is generally the single line of a shell script.
+    #--------------------------------------------------------------------------
     def addBatchCommand(self,command):
         self.batch_commands.append(command)
     
+    #--------------------------------------------------------------------------
+    # This runs a single command and returns the return code of that command
+    #
+    # command, stdout, and stderr are in the output list
+    #
+    #--------------------------------------------------------------------------
     def runSingleCommand(self,command,output=[],remote_user=None):
         
-        # This runs a single command and returns the return code of that command
-        # command, stdout, and stderr are in the output list
+        
         
         #print command
         if remote_user==None:
             remote_user = self.current_user
-        
+    
+        # get the correct format of the command line for the node we are running on.    
         command_line = self.prepareCommandLine(command=command,remote_user=remote_user)
         
-        #if "awk" in command_line:
-        #    print command_line
-        #print command_line
+        # run via Popen
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
@@ -376,11 +412,13 @@ class OFSTestNode(object):
             output.append(i)
 
         return p.returncode
-        
-
+     
+    #--------------------------------------------------------------------------    
+    # This runs a single command and returns the stdout of that command.
+    #--------------------------------------------------------------------------
       
     def runSingleCommandBacktick(self,command,output=[],remote_user=None):
-        # This runs a single command and returns the stdout of that command.
+        
         if remote_user==None:
             remote_user = self.current_user
       
@@ -391,13 +429,16 @@ class OFSTestNode(object):
         else:
             return ""
     
+    #--------------------------------------------------------------------------
+    # This method runs an OrangeFS test on the given node
+    #
+    # Output and errors are written to the output and errfiles
+    # 
+    # return is return code from the test function
+    #--------------------------------------------------------------------------
+#
     def runOFSTest(self,package,test_function,output=[],logfile="",errfile=""):
-        # This method runs an OrangeFS test on the given node
-        #
-        # Output and errors are written to the output and errfiles
-        # 
-        # return is return code from the test function
-        #
+
        
         print "Running test %s-%s" % (package,test_function.__name__)
         
@@ -419,30 +460,47 @@ class OFSTestNode(object):
         except:
             
             traceback.print_exc()
-            rc = -99
+            # RC -999 is a test program error.
+            rc = -999
         
         logfile_h.close()
             
         
         return rc
-        
-        
+    
+    #--------------------------------------------------------------------------    
+    # This method prepares the command line for run single command. 
+    # Should not be implemented here, but in subclass
+    #--------------------------------------------------------------------------
     
     def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         # Implimented in the client. Should not be here.
         print "This should be implimented in the subclass, not in OFSTestNode."
         print "Trying naive attempt to create command list."
         return command
+    
+    #--------------------------------------------------------------------------
+    # This method runs all the batch commands in the list. 
+    # Should not be implemented here, but in the subclass.
+    #--------------------------------------------------------------------------
        
     def runAllBatchCommands(self,output=[]):
         # implemented in child class
         pass
-        
-      # Run a single command as a batchfile. Some systems require this for passwordless sudo
+    
+    #--------------------------------------------------------------------------
+    # Run a single command as a batchfile. Some systems require this for passwordless sudo
+    #--------------------------------------------------------------------------
+    
     def runSingleCommandAsBatch(self,command,output=[]):
         self.addBatchCommand(command)
         self.runAllBatchCommands(output)
     
+    #--------------------------------------------------------------------------
+    # Run a batch file through the system.
+    #
+    # Not sure why this is here
+    #--------------------------------------------------------------------------
     def runBatchFile(self,filename,output=[]):
         #copy the old batch file to the batch commands list
         batch_file = open(filename,'r')
@@ -450,16 +508,29 @@ class OFSTestNode(object):
         
         # Then run it
         self.runAllBatchCommands(output)
-
+        
+    #--------------------------------------------------------------------------
     # copy files from the current node to a destination node.
+    # Should not be implemented here, but in the subclass.
+    #--------------------------------------------------------------------------
     def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
         # implimented in subclass
         pass
-      
+    
+    #--------------------------------------------------------------------------  
     # copy files from a remote node to the current node.
+    # Should not be implemented here, but in the subclass.
+    #--------------------------------------------------------------------------
     def copyFromRemoteNode(self,sourceNode, source, destination, recursive=False):
         # implimented in subclass
         pass
+    
+    #--------------------------------------------------------------------------
+    # writeToOutputFile()
+    #
+    # Write output (command, stdout, stderr) from runSingleCommand to a file.
+    # 
+    #--------------------------------------------------------------------------
       
     def writeToOutputFile(self,command_line,cmd_out,cmd_err):
         
@@ -554,6 +625,9 @@ class OFSTestNode(object):
     #
     #-------------------------------
     def installTorqueServer(self):
+        
+        #Each distro handles torque slightly differently.
+        
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
 
@@ -561,45 +635,21 @@ class OFSTestNode(object):
                 echo "Installing TORQUE from apt-get"
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
                 sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name
+                sudo bash -c "echo %s > /var/spool/torque/server_name"
                 
-                sudo qmgr -c "set server scheduling=true"
-                sudo qmgr -c "create queue orangefs_q queue_type=execution"
-                sudo qmgr -c "set queue orangefs_q started=true"
-                sudo qmgr -c "set queue orangefs_q enabled=true"
-                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
-                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
-                sudo qmgr -c "set server default_queue=orangefs_q"
-                sudo qmgr -c "set server operators += %s@%s"
-                sudo qmgr -c "set server managers += %s@%s"
-                
-                "
-            ''' % (self.host_name,self.host_name,self.current_user,self.host_name,self.current_user,self.host_name)
+
+            ''' % (self.host_name,self.host_name)
             self.addBatchCommand(batch_commands)
 
         elif "suse" in self.distro.lower():
             
-            
-            #print "TODO: Torque for "+self.distro
-            #return
-            # Torque should already have been installed via SuSE studio
+            # Torque should already have been installed via SuSE studio, but it needs to be setup.
 
             batch_commands = '''
                 sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name
-                
-                sudo qmgr -c "set server scheduling=true"
-                sudo qmgr -c "create queue orangefs_q queue_type=execution"
-                sudo qmgr -c "set queue orangefs_q started=true"
-                sudo qmgr -c "set queue orangefs_q enabled=true"
-                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
-                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
-                sudo qmgr -c "set server default_queue=orangefs_q"
-                sudo qmgr -c "set server operators += %s@%s"
-                sudo qmgr -c "set server managers += %s@%s"
-                
-                "
-            ''' % (self.host_name,self.host_name,self.current_user,self.host_name,self.current_user,self.host_name)
+                sudo bash -c "echo %s > /var/spool/torque/server_name"
+            ''' % (self.host_name,self.host_name)
+           
             
 
             self.addBatchCommand(batch_commands)
@@ -638,10 +688,36 @@ class OFSTestNode(object):
             else:
                 print "TODO: Torque for "+self.distro
                 batch_commands = ""
-            #print batch_commands    
+            #print batch_commands
+            self.addBatchCommand(batch_commands)
+            
+            # The following commands setup the Torque queue for OrangeFS on all systems.
+            qmgr_commands = '''            
+                sudo qmgr -c "set server scheduling=true"
+                sudo qmgr -c "create queue orangefs_q queue_type=execution"
+                sudo qmgr -c "set queue orangefs_q started=true"
+                sudo qmgr -c "set queue orangefs_q enabled=true"
+                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
+                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
+                sudo qmgr -c "set server default_queue=orangefs_q"
+                sudo qmgr -c "set server operators += %s@%s"
+                sudo qmgr -c "set server managers += %s@%s"
+                ''' % (self.current_user,self.host_name,self.current_user,self.host_name)
+
             self.addBatchCommand(batch_commands)
         
         self.runAllBatchCommands()
+        
+    #-------------------------------
+    #
+    # installTorqueClient
+    #
+    # This function installs and configures the torque client from the package management system on the node.
+    #
+    #-------------------------------        
+                                
+        
+
      
     def installTorqueClient(self,pbsserver):
         pbsserver_name = pbsserver.host_name
@@ -661,9 +737,6 @@ class OFSTestNode(object):
             self.addBatchCommand(batch_commands)
 
         elif "suse" in self.distro.lower():
-            # this needs to be fixed
-            #print "TODO: Torque for "+self.distro
-            #return
 
             # RPMS should have already been installed via SuSE studio
             batch_commands = '''
@@ -933,14 +1006,218 @@ class OFSTestNode(object):
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
         self.runAllBatchCommands()
+        
+        # Install Hadoop. 
         output = []
         self.changeDirectory("/opt")
+        # Download from a helluva open source mirror.
         self.runSingleCommand("wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
-        #print output
         self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
 
-        
+        # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
+
+   #-------------------------------
+    #
+    # installMPICH2
+    #
+    # This function installs mpich2 software
+    #
+    #-------------------------------
+    
+    #TODO: Must be reimplemented to match OpenMPI installation.
+
+    def installMpich2(self,location=None):
+        if location == None:
+            location = "/home/%s/mpich2" % self.current_user
+        
+        mpich_version = "mpich-3.0.4"
+            
+        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
+        url = "wget"
+        # just to make debugging less painful
+        #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
+        #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
+        self.runSingleCommand("mkdir -p "+location)
+        tempdir = self.current_directory
+        self.changeDirectory("/home/%s" % self.current_user)
+        
+        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+        rc = self.runSingleCommand("wget --quiet %s" % url)
+        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
+        if rc != 0:
+            print "Could not download mpich from %s." % url
+            self.changeDirectory(tempdir)
+            return rc
+
+        output = []
+        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
+        
+        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
+        self.changeDirectory(self.mpich2_source_location)
+        #self.runSingleCommand("ls -l",output)
+        #print output
+        
+        configure = '''
+        ./configure -q --prefix=%s \
+        --enable-romio --with-file-system=pvfs2 \
+        --with-pvfs2=%s \
+        --enable-g=dbg \
+         >mpich2config.log
+        ''' % (location,self.ofs_installation_location)
+        
+        #wd = self.runSingleCommandBacktick("pwd")
+        #print wd
+        #print configure
+        
+
+        print "Configuring MPICH"
+        rc = self.runSingleCommand(configure,output)
+        
+        if rc != 0:
+            print "Configure of MPICH failed. rc=%d" % rc
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        print "Building MPICH"
+        rc = self.runSingleCommand("make > mpich2make.log")
+        if rc != 0:
+            print "Make of MPICH failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+
+        print "Installing MPICH"
+        rc = self.runSingleCommand("make install > mpich2install.log")
+        if rc != 0:
+            print "Install of MPICH failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        print "Checking MPICH install"
+        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
+        if rc != 0:
+            print "Install of MPICH failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        self.mpich2_installation_location = location 
+        # change this!
+        self.romio_runtests_pvfs2 = self.mpich2_source_location+"ompi/mca/io/romio/romio/test/runtests"
+        
+        return 0
+    
+    #-------------------------------
+    #
+    # installOpenMPI
+    #
+    # This function installs OpenMPI software
+    #
+    #-------------------------------
+
+    def installOpenMPI(self,install_location=None,build_location=None):
+        
+        
+        if install_location == None:
+            install_location = "/opt/mpi"
+        
+        if build_location == None:
+            build_location = install_location
+        
+        self.openmpi_version = "openmpi-1.6.5"
+        url_base = "http://devorange.clemson.edu/pvfs/"
+        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
+        
+
+        patch_name = "openmpi.patch"
+        patch_url = url_base+patch_name
+        
+        self.runSingleCommand("mkdir -p "+build_location)
+        tempdir = self.current_directory
+        self.changeDirectory(build_location)
+        
+        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
+        rc = self.runSingleCommand("wget --quiet %s" % url)
+        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
+        if rc != 0:
+            print "Could not download %s from %s." % (self.openmpi_version,url)
+            self.changeDirectory(tempdir)
+            return rc
+
+        output = []
+        self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
+        
+        self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
+        self.changeDirectory(self.openmpi_source_location)
+        rc = self.runSingleCommand("wget --quiet %s" % patch_url)
+
+
+        # using pre-patched version. No longer needed.
+        '''
+        print "Patching %s" %self.openmpi_version
+        rc = self.runSingleCommand("patch -p0 < %s" % patch_name,output)
+        
+        
+        if rc != 0:
+            print "Patching %s failed. rc=%d" % (self.openmpi_version,rc)
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IReadContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
+        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IWriteContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
+        '''
+
+        
+        configure = './configure --prefix %s/openmpi --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
+        
+
+        print "Configuring %s" % self.openmpi_version
+        rc = self.runSingleCommand(configure,output)
+        
+        if rc != 0:
+            print "Configure of %s failed. rc=%d" % (self.openmpi_version,rc)
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        print "Making %s" % self.openmpi_version
+        rc = self.runSingleCommand("make > openmpimake.log")
+        if rc != 0:
+            print "Make of %s failed."
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+
+        print "Installing %s" % self.openmpi_version
+        rc = self.runSingleCommand("make install > openmpiinstall.log")
+        if rc != 0:
+            print "Install of %s failed." % self.openmpi_version
+            print output
+            self.changeDirectory(tempdir)
+            return rc
+        
+        #print "Checking MPICH install" % openmpi_version
+        #rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
+        #if rc != 0:
+        #    print "Install of MPICH failed."
+        #    print output
+        #    self.changeDirectory(tempdir)
+        #    return rc
+        
+        self.openmpi_installation_location = install_location+"/openmpi"
+        
+        self.romio_runtests_pvfs2 = self.openmpi_source_location+"/ompi/mca/io/romio/romio/test/runtests.pvfs2"
+        self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
+        
+        return 0
+    
+        
+    
+
 
     #-------------------------------
     #
@@ -965,9 +1242,6 @@ class OFSTestNode(object):
             svn_options = "%s --username %s --password %s" % (svn_options, svnusername,svnpassword)
             svn_action = "co"
         
-            
-        
-        
         print "svn %s %s %s" % (svn_action,svnurl,svn_options)
         self.changeDirectory(dest_dir)
         rc = self.runSingleCommand("svn %s %s %s" % (svn_action,svnurl,svn_options),output)
@@ -978,8 +1252,7 @@ class OFSTestNode(object):
         else:
             self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
             print "svn exported to %s" % self.ofs_source_location
-        
-        
+               
         return rc
 
 
@@ -1160,7 +1433,7 @@ class OFSTestNode(object):
     
     #-------------------------------
     #
-    # copyOFSSourceFromSVN
+    # copyOFSSourceFromRemoteNode
     #
     # This copies the source from a remote directory
     #
@@ -1170,10 +1443,19 @@ class OFSTestNode(object):
     def copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
         #implemented in subclass
         return 0
-        
+  
+    #-------------------------------
+    #
+    # copyOFSSource
+    #
+    # This copies the source from wherever it is. Uses helper functions to get it from
+    # the right place.
+    #
+    #-------------------------------      
       
       
     def copyOFSSource(self,resource_type,resource,dest_dir,username="",password=""):
+        
         # Make directory dest_dir
         rc = self.runSingleCommand("mkdir -p %s" % dest_dir)
         if rc != 0:
@@ -1192,13 +1474,17 @@ class OFSTestNode(object):
         elif resource_type == "TAR":
           rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
         #elif resource_type == "REMOTEDIR":
+        #    Remote node support not yet implimented.
         #  self.copyOFSSourceFromRemoteNode(directory,dest_dir)
         elif resource_type == "LOCAL":
-            # Must be "pushed" from local node to current node.
+            # Must be "pushed" from local node to current node instead of
+            # "pulled" by the current node.
+            #
             # Get around this by copying to the buildnode, then resetting type.
+            # to "BUILDNODE"
             pass
         elif resource_type == "BUILDNODE":
-          # else local directory
+          # Local directory on the current node. 
           rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
         else:
           print "Resource type %s not supported!\n" % resource_type
@@ -1229,15 +1515,15 @@ class OFSTestNode(object):
         configure_opts="",
         debug=False):
     
+        # Save build_kmod for later.
+        self.build_kmod = build_kmod
         
         # Change directory to source location.
         self.changeDirectory(self.ofs_source_location)
-        # Run prepare.
+        
         output = []
-        #cwd = self.runSingleCommandBacktick("pwd")
-        #print cwd
-        #ls = self.runSingleCommandBacktick("ls -l")
-        #print ls
+
+        # Installs patches to OrangeFS. Assumes patches are p1.
         print ofs_patch_files
         for patch in ofs_patch_files:
             
@@ -1245,14 +1531,15 @@ class OFSTestNode(object):
             rc = self.runSingleCommand("patch -c -p1 < %s" % patch)
             if rc != 0:
                 print "Patch Failed!"
-        
+       
+        # Run prepare. 
         rc = self.runSingleCommand("./prepare",output)
         if rc != 0:
             print self.ofs_source_location+"/prepare failed!" 
             print output
             return rc
         
-        #sanity check for OFS prefix
+        #sanity check for OFS installation prefix
         rc = self.runSingleCommand("mkdir -p "+ofs_prefix)
         if rc != 0:
             print "Could not create directory "+ofs_prefix
@@ -1267,13 +1554,15 @@ class OFSTestNode(object):
         
         self.kernel_source_location = "/lib/modules/%s" % self.kernel_version
         
-        
+        # Will always need prefix and db4 location.
         configure_opts = configure_opts+" --prefix=%s --with-db=%s" % (ofs_prefix,db4_prefix)
         
-        # various configure options
-        
+        # Add various options to the configure
+         
         if build_kmod == True:
+            
             if "suse" in self.distro.lower():
+                # SuSE puts kernel source in a different location.
                 configure_opts = "%s --with-kernel=%s/source" % (configure_opts,self.kernel_source_location)
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
@@ -1346,9 +1635,18 @@ class OFSTestNode(object):
             print output
         '''
         return mount_check
+    
+    #-------------------------------
+    #
+    # getAliasesFromConfigFile
+    #
+    # This reads the orangefs.conf file to get the alias names
+    #
+    # Implimented in child classes.
+    #
+    #-------------------------------
 
     def getAliasesFromConfigFile(self,config_file_name):
-        
         pass
         
         
@@ -1358,25 +1656,26 @@ class OFSTestNode(object):
     #
     # This makes the OrangeFS source
     #
-    #-------------------------------
-
-    
+    #-------------------------------    
     
     def makeOFSSource(self,make_options=""):
         # Change directory to source location.
         self.changeDirectory(self.ofs_source_location)
         output = []
+        # Clean up first.
         rc = self.runSingleCommand("make clean")
+        # Make
         rc = self.runSingleCommand("make "+make_options, output)
         if rc != 0:
             print "Build (make) of of OrangeFS at %s Failed!" % self.ofs_source_location
             print output
             return rc
-        
-        rc = self.runSingleCommand("make kmod",output)
-        if rc != 0:
-            print "Build (make) of of OrangeFS-kmod at %s Failed!" % self.ofs_source_location
-            print output
+        # Make the kernel module
+        if self.build_kmod == True:
+            rc = self.runSingleCommand("make kmod",output)
+            if rc != 0:
+                print "Build (make) of of OrangeFS-kmod at %s Failed!" % self.ofs_source_location
+                print output
             
         return rc
     
@@ -1416,10 +1715,11 @@ class OFSTestNode(object):
             print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
             print output
             return rc
-        self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
-        if rc != 0:
-            print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
-            print output
+        if self.build_kmod == True:
+            self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
+            if rc != 0:
+                print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
+                print output
         
         return rc
 
@@ -1431,8 +1731,6 @@ class OFSTestNode(object):
     #
     #-------------------------------
 
-    
-        
     def installOFSTests(self,configure_options=""):
         
         output = []
@@ -1461,63 +1759,85 @@ class OFSTestNode(object):
             print output
         return rc
    
-
     #-------------------------------
     #
-    # generatePAVConf
+    # exportNFSDirectory()
     #
-    # generates the pav.conf file for MPI testing
+    # this exports directory directory_name via NFS.
     #
     #-------------------------------
+    def exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):
+        if options == None:
+            options = "rw,sync,no_root_squash,no_subtree_check"
+        if network == None:
+            network = self.ip_address
+        if netmask == None:
+            netmask = 24
+        
+        
+        self.runSingleCommand("mkdir -p %s" % directory_name)
+        if "suse" in self.distro.lower():
+            commands = '''
+            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            sudo /sbin/rpcbind 
+            sleep 3
+            sudo /etc/init.d/nfs restart
+            sudo /etc/init.d/nfsserver restart
+            sudo exportfs -a
+            ''' % (directory_name,self.ip_address,netmask,options)
+        else:
+            commands = '''
+            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            #sudo service cups stop
+            #sudo service sendmail stop
+            sudo service rpcbind restart
+            sudo service nfs restart
+            sudo service nfs-kernel-server restart
+            sudo exportfs -a
+            ''' % (directory_name,self.ip_address,netmask,options)
+        
+        
+        
+        self.runSingleCommandAsBatch(commands)
+        time.sleep(30)
+        
+        return "%s:%s" % (self.ip_address,directory_name)
+    
+    #-------------------------------
+    #
+    # mountNFSDirectory()
+    #
+    # this mounts nfs_share at mountpoint with options.
+    #
+    #-------------------------------
+        
+    def mountNFSDirectory(self,nfs_share,mountpoint,options=""):
+        self.changeDirectory("/home/%s" % self.current_user)
+        self.runSingleCommand("mkdir -p %s" % mountpoint)
+        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mountpoint)
+        print commands
+        self.runSingleCommandAsBatch(commands)
+        output = []
+        rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
+        count = 0
+        while rc != 0 and count < 10 :
+            time.sleep(15)
+            self.runSingleCommandAsBatch(commands)
+            rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
+            print output
+            count = count + 1
+        return 0
+    
+    #-------------------------------
+    #
+    #    clearSHM()
+    #     This clears out all SHM objects for OrangeFS.
+    #-------------------------------
+    def clearSHM(self):
+        self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
+   
+   
 
-
-    def generatePAVConf(self,**kwargs):
-        
-        pav_conf = kwargs.get("pav_conf")
-        if pav_conf == None:
-            pav_conf = "/home/%s/pav.conf" % self.current_user
-        
-        keep_conf = kwargs.get("keep_conf")    
-        if keep_conf != None:
-            return pav_conf
-        
-        file = open("/tmp/pav.conf","w+")
-        
-        file.write("SRCDIR_TOP=%s\n" % self.ofs_source_location)
-        file.write("BUILDDIR=%s\n" % self.ofs_source_location)
-        
-        nodefile = self.runSingleCommandBacktick("echo REAL LIST OF NODES HERE")
-        
-        file.write("NODEFILE=%s\n" % nodefile)
-        file.write("IONCOUNT=1\n")
-        file.write("METACOUNT=1\n")
-        file.write("UNIQUEMETA=0\n")
-        # create this directory on all nodes
-        file.write("WORKINGDIR=/tmp/pvfs-pav-working\n")
-        file.write("PROTOCOL=tcp\n")
-        file.write("PVFSTCCPORT=%s\n" % self.ofs_tcp_port)
-        file.write("STORAGE=$WORKINGDIR/storage\n")
-        file.write("SERVERLOG=$WORKINGDIR/log\n")
-        file.write("MOUNTPOINT=%s\n" % self.ofs_mount_point)
-        file.write("BINDIR=$WORKINDIR/bin\n")
-        file.write("RCMDPROG=ssh -i %s\n" % self.sshNodeKeyFile)
-        file.write("RCPPROG=scp -i %s\n" % self.sshNodeKeyFile)
-        file.write("RCMDPROG_ROOT=ssh -l root -i %s\n" % self.sshNodeKeyFile)
-        file.write("PROGROOT=$SRCDIR_TOP/test/common/pav\n")
-        file.write("SERVER=%s/sbin/pvfs2-server\n" % self.ofs_installation_location)
-        file.write("PINGPROG=%s/bin/pvfs2-ping\n" % self.ofs_installation_location)
-        file.write("GENCONFIG=%s/bin/pvfs2-genconfig\n" % self.ofs_installation_location)
-        file.write("COPYBINS=1\n")
-        file.write("TROVESYNC=1\n")
-        file.write("MOUNT_FS=0\n")
-        file.write("KERNEL_KVER=%s\n" % self.kernel_version)
-        file.write("PVFS_KMOD=%s/lib/modules/%s/kernel/fs/pvfs2/pvfs2.ko\n" % (self.ofs_installation_location,self.kernel_version))
-        file.write("PVFS_CLIENT=%s/sbin/pvfs2-client\n" % self.ofs_installation_location)
-        file.write("COMPUTENODES_LAST=1\n")
-        file.close()
-        
-        return pav_conf
-        
         #============================================================================
         #
         # OFSServerFunctions
@@ -1528,7 +1848,7 @@ class OFSTestNode(object):
 
     #-------------------------------
     #
-    # opyOFSInstallationToNode
+    # copyOFSInstallationToNode
     #
     # this copies an entire OrangeFS installation from the current node to destinationNode.
     # Also sets the ofs_installation_location and ofs_branch on the destination
@@ -1546,12 +1866,7 @@ class OFSTestNode(object):
         destinationNode.ofs_fs_name = destinationNode.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destinationNode.ofs_conf_file)
         return rc
        
-    def copyMpich2InstallationToNode(self,destinationNode):
-        rc = self.copyToRemoteNode(self.mpich2_installation_location+"/", destinationNode, self.mpich2_installation_location, True)
-        rc = self.copyToRemoteNode(self.mpich2_source_location+"/", destinationNode, self.mpich2_source_location, True)
-        destinationNode.mpich2_installation_location = self.mpich2_installation_location
-        destinationNode.mpich2_source_location = self.mpich2_source_location
-        return rc
+
     #-------------------------------
     #
     # configureOFSServer
@@ -1664,18 +1979,13 @@ class OFSTestNode(object):
                 fs.conf $server_conf -a $alias
         '''
         
-        # This is sloppy, but should work. Ideally should reimplement in python, but don't want to reinvent the wheel.
+        
         print "Attempting to start OFSServer for host %s" % self.host_name
         
-        #self.runSingleCommand("ls -l %s" % self.ofs_installation_location)
-        #print "Installation location is %s" % self.ofs_installation_location
-        #print "Running command \"grep 'Alias ' %s/etc/orangefs.conf | grep %s | cut -d ' ' -f 2\"" % (self.ofs_installation_location,self.host_name)
 
         # need to get the alias list from orangefs.conf file
         if self.alias_list == None:
             self.alias_list = self.getAliasesFromConfigFile(self.ofs_conf_file)
-
-        #aliases = self.runSingleCommandBacktick('grep "Alias " %s/etc/orangefs.conf | grep %s | cut -d " " -f 2' % (self.ofs_installation_location,self.host_name))
         
         if len(self.alias_list) == 0:
             print "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location
@@ -1685,10 +1995,6 @@ class OFSTestNode(object):
         for alias in self.alias_list:
             # if the alias is for THIS host
             if self.host_name in alias:
-                
-                #self.runSingleCommand("rm -rf %s" % self.ofs_storage_location)
-                #self.runSingleCommand("mkdir -p %s" % self.ofs_storage_location)
-                #self.runSingleCommand("cat %s/etc/orangefs.conf")
                 
                 # create storage space for the server
                 rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
@@ -1712,20 +2018,10 @@ class OFSTestNode(object):
                 print server_start
                 rc = self.runSingleCommandAsBatch(server_start,output)
                 
-                #if rc != 0:
-                #    print "Could not start OrangeFS server"
-                #    print output
-                #    return rc
-
-                #self.runAllBatchCommands()
                 # give the servers 15 seconds to get running
                 print "Starting OrangeFS servers..."
                 time.sleep(15)
-    
-        #   print "Checking to see if OrangeFS servers are running..."
-        #   running = self.runSingleCommand("ps aux | grep pvfs2")
-        #      print running
-          
+
         #Now set up the pvfs2tab_file
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
@@ -1738,17 +2034,19 @@ class OFSTestNode(object):
         self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
        
         return 0
+    #-------------------------------
+    #
+    # stopOFSServer
+    #
+    # This function stops the OrangeFS servers.
+    #
+    #-------------------------------
         
     def stopOFSServer(self):
-        
-        # read the file from the .pid file.
-        # kill the pid
-        #self.runSingleCommand("for pidfile in %s/pvfs2-server*.pid ; do if [ -f $pidfile ] ; then kill -9 `cat $pidfile`; fi; done")
+        # Kill'em all and let root sort 'em out.        
+        # Todo: Install killall on SuSE based systems. 
         self.runSingleCommand("killall -s 9 pvfs2-server")
         
-        #ofs_servers = self.stopOFSServer("ps aux | grep pvfs2-server"
-        
-        # if it's still alive, use kill -9
         
     #============================================================================ 
     #
@@ -1833,9 +2131,7 @@ class OFSTestNode(object):
         # change the protection on the logfile to 644
         self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         self.runAllBatchCommands()
-        #client_log = self.runSingleCommandBacktick("cat %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
-        #print "Client log output"
-        #print client_log
+
         return 0
         
     #-------------------------------
@@ -1916,254 +2212,25 @@ class OFSTestNode(object):
 
     def stopOFSClient(self):
         
-        '''
-            mount | grep -q $PVFS2_MOUNTPOINT && sudo umount $PVFS2_MOUNTPOINT
-        ps -e | grep -q pvfs2-client && sudo killall pvfs2-client
-        sleep 1
-        /sbin/lsmod | grep -q pvfs2 && sudo /sbin/rmmod pvfs2
-        # let teardown always succeed.  pvfs2-client might already be killed
-        # and pvfs2 kernel module might not be loaded yet 
-        '''
+        # Unmount the filesystem.
         self.unmountOFSFilesystem()
         print "Stopping pvfs2-client process"
         self.addBatchCommand("sudo killall pvfs2-client")
         self.addBatchCommand("sleep 10")
         self.addBatchCommand("sudo killall -s 9 pvfs2-client")
         self.addBatchCommand("sleep 2")
-        #print "Removing pvfs2 kernel module."
-        #self.addBatchCommand("sudo /sbin/rmmod pvfs2")
-        #self.addBatchCommand("sleep 2")
         self.runAllBatchCommands()
         
     
+ 
     #-------------------------------
     #
-    # setupMPIEnvironment
+    # findExistingOFSInstallation
     #
-    # This function sets up the environment for MPI testing
-    #
-    #-------------------------------
-    
-        
-    def setupMPIEnvironment(self):
-        
-        home_dir = "/home/"+self.current_user
-        self.setEnvironmentVariable("PAV_CONFIG","%s/pav.conf" % home_dir)
-
-        # cluster environments need a few things available on a cluster-wide file
-        # system: pav (which needs some pvfs2 programs), the mpi program, mpich2
-        # (specifically mpd and tools )
-
-        self.setEnvironmentVariable("CLUSTER_DIR","%s/nightly" % home_dir)
-        self.addBatchCommand("mkdir -p ${CLUSTER_DIR}")
-        self.addBatchCommand("rm -rf ${CLUSTER_DIR}/pav ${CLUSTER_DIR}/mpich2 ${CLUSTER_DIR}/pvfs2")
-        self.addBatchCommand("cp -ar %s/test/common/pav ${CLUSTER_DIR}" % self.ofs_source_location)
-        self.addBatchCommand("cp -ar %s/soft/mpich2 ${CLUSTER_DIR}" % self.ofs_source_location)
-        self.addBatchCommand("cp -ar %s ${CLUSTER_DIR}/pvfs2" % self.ofs_installation_location)
-        self.runAllBatchCommands()
-    
-    #-------------------------------
-    #
-    # installMPICH2
-    #
-    # This function installs mpich2 software
+    # This function finds an existing OrangeFS installation on the node
     #
     #-------------------------------
-    
-
-    def installMpich2(self,location=None):
-        if location == None:
-            location = "/home/%s/mpich2" % self.current_user
         
-        mpich_version = "mpich-3.0.4"
-            
-        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
-        url = "wget"
-        # just to make debugging less painful
-        #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
-        #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
-        self.runSingleCommand("mkdir -p "+location)
-        tempdir = self.current_directory
-        self.changeDirectory("/home/%s" % self.current_user)
-        
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
-        rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
-        if rc != 0:
-            print "Could not download mpich from %s." % url
-            self.changeDirectory(tempdir)
-            return rc
-
-        output = []
-        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
-        
-        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
-        self.changeDirectory(self.mpich2_source_location)
-        #self.runSingleCommand("ls -l",output)
-        #print output
-        
-        configure = '''
-        ./configure -q --prefix=%s \
-		--enable-romio --with-file-system=pvfs2 \
-		--with-pvfs2=%s \
-		--enable-g=dbg \
-		 >mpich2config.log
-        ''' % (location,self.ofs_installation_location)
-        
-        #wd = self.runSingleCommandBacktick("pwd")
-        #print wd
-        #print configure
-        
-
-        print "Configuring MPICH"
-        rc = self.runSingleCommand(configure,output)
-        
-        if rc != 0:
-            print "Configure of MPICH failed. rc=%d" % rc
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        print "Building MPICH"
-        rc = self.runSingleCommand("make > mpich2make.log")
-        if rc != 0:
-            print "Make of MPICH failed."
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-
-        print "Installing MPICH"
-        rc = self.runSingleCommand("make install > mpich2install.log")
-        if rc != 0:
-            print "Install of MPICH failed."
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        print "Checking MPICH install"
-        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
-        if rc != 0:
-            print "Install of MPICH failed."
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        self.mpich2_installation_location = location 
-        # change this!
-        self.romio_runtests_pvfs2 = self.mpich2_source_location+"ompi/mca/io/romio/romio/test/runtests"
-        
-        return 0
-    
-
-    def installOpenMPI(self,install_location=None,build_location=None):
-        
-        
-        if install_location == None:
-            install_location = "/opt/mpi"
-        
-        if build_location == None:
-            build_location = install_location
-        
-        self.openmpi_version = "openmpi-1.6.5"
-        url_base = "http://devorange.clemson.edu/pvfs/"
-        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
-        
-
-        patch_name = "openmpi.patch"
-        patch_url = url_base+patch_name
-        
-        self.runSingleCommand("mkdir -p "+build_location)
-        tempdir = self.current_directory
-        self.changeDirectory(build_location)
-        
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
-        rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
-        if rc != 0:
-            print "Could not download %s from %s." % (self.openmpi_version,url)
-            self.changeDirectory(tempdir)
-            return rc
-
-        output = []
-        self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
-        
-        self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
-        self.changeDirectory(self.openmpi_source_location)
-        rc = self.runSingleCommand("wget --quiet %s" % patch_url)
-
-
-        # using pre-patched version. No longer needed.
-        '''
-        print "Patching %s" %self.openmpi_version
-        rc = self.runSingleCommand("patch -p0 < %s" % patch_name,output)
-        
-        
-        if rc != 0:
-            print "Patching %s failed. rc=%d" % (self.openmpi_version,rc)
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IReadContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
-        self.runSingleCommand("sed -i s/ADIOI_PVFS2_IWriteContig/NULL/ ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c")
-        '''
-        #self.runSingleCommand("ls -l",output)
-        #print output
-        
-        configure = './configure --prefix %s/openmpi --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
-        
-        #wd = self.runSingleCommandBacktick("pwd")
-        #print wd
-        #print configure
-        
-
-        print "Configuring %s" % self.openmpi_version
-        rc = self.runSingleCommand(configure,output)
-        
-        if rc != 0:
-            print "Configure of %s failed. rc=%d" % (self.openmpi_version,rc)
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        print "Making %s" % self.openmpi_version
-        rc = self.runSingleCommand("make > openmpimake.log")
-        if rc != 0:
-            print "Make of %s failed."
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-
-        print "Installing %s" % self.openmpi_version
-        rc = self.runSingleCommand("make install > openmpiinstall.log")
-        if rc != 0:
-            print "Install of %s failed." % self.openmpi_version
-            print output
-            self.changeDirectory(tempdir)
-            return rc
-        
-        #print "Checking MPICH install" % openmpi_version
-        #rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
-        #if rc != 0:
-        #    print "Install of MPICH failed."
-        #    print output
-        #    self.changeDirectory(tempdir)
-        #    return rc
-        
-        self.openmpi_installation_location = install_location+"/openmpi"
-        
-        self.romio_runtests_pvfs2 = self.openmpi_source_location+"/ompi/mca/io/romio/romio/test/runtests.pvfs2"
-        self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
-        
-        return 0
-    
-        
-    
-
-
-        
-        
-
 
     def findExistingOFSInstallation(self):
         # to find OrangeFS server, first finr the pvfs2-server file
@@ -2208,9 +2275,6 @@ class OFSTestNode(object):
             rc = self.runSingleCommand("grep -l -r '%s/%s\s%s' /etc 2> /dev/null" % (url_base,self.ofs_fs_name,self.ofs_mount_point),output)
         
         
-        #if rc != 0:
-        #    rc = self.runSingleCommand("grep -l -r '%s/%s\s%s' / 2> /dev/null" % (url_base,self.ofs_fs_name,self.ofs_mount_point),output)
-
         
         if rc == 0:
             #print output
@@ -2223,65 +2287,9 @@ class OFSTestNode(object):
         # grep -r 'prefix = /home/ec2-user/orangefs' /home/ec2-user/stable/Makefile
         return 0
         
+        
 
-    def exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):
-        if options == None:
-            options = "rw,sync,no_root_squash,no_subtree_check"
-        if network == None:
-            network = self.ip_address
-        if netmask == None:
-            netmask = 24
-        
-        
-        self.runSingleCommand("mkdir -p %s" % directory_name)
-        if "suse" in self.distro.lower():
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
-            sudo /sbin/rpcbind 
-            sleep 3
-            sudo /etc/init.d/nfs restart
-            sudo /etc/init.d/nfsserver restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
-        else:
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
-            #sudo service cups stop
-            #sudo service sendmail stop
-            sudo service rpcbind restart
-            sudo service nfs restart
-            sudo service nfs-kernel-server restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
-        
-        
-        
-        self.runSingleCommandAsBatch(commands)
-        time.sleep(30)
-        
-        return "%s:%s" % (self.ip_address,directory_name)
-        
-        
-    def mountNFSDirectory(self,nfs_share,mountpoint,options=""):
-        self.changeDirectory("/home/%s" % self.current_user)
-        self.runSingleCommand("mkdir -p %s" % mountpoint)
-        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mountpoint)
-        print commands
-        self.runSingleCommandAsBatch(commands)
-        output = []
-        rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
-        count = 0
-        while rc != 0 and count < 10 :
-            time.sleep(15)
-            self.runSingleCommandAsBatch(commands)
-            rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
-            print output
-            count = count + 1
-        return 0
-    
-    # This clears out all SHM objects.
-    def clearSHM(self):
-        self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
+
         
     
 #===================================================================================================
