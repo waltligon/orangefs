@@ -13,22 +13,15 @@
 #   run_client = False
 #   mount_fs = Does the file system need to be mounted?
 #   mount_as_fuse = False
-#   tests = list of test functions
+#   tests = list of test functions (at end of file)
 #------------------------------------------------------------------------------
 
-import inspect
+
 header = "OFS Hadoop Test"
 prefix = "hadoop"
 mount_fs = False
 run_client = False
 mount_as_fuse = False
-tests = [ wordcount,
-TestDFSIO_write,
-TestDFSIO_read,
-TestDFSIO_clean,
-mrbench,
-terasort_full_1g
- ]
 
 
 #------------------------------------------------------------------------------
@@ -158,3 +151,10 @@ def mrbench(testing_node,output=[]):
     return rc
 
 
+tests = [ wordcount,
+TestDFSIO_write,
+TestDFSIO_read,
+TestDFSIO_clean,
+mrbench,
+terasort_full_1g
+ ]

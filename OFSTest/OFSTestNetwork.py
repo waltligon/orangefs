@@ -10,7 +10,6 @@ import OFSTestNode
 import OFSTestLocalNode 
 import OFSTestRemoteNode 
 import OFSEC2ConnectionManager
-from boto import *
 import Queue
 import threading
 import time
@@ -422,9 +421,6 @@ class OFSTestNetwork(object):
     def copyOFSToNodeList(self,destination_list=None):
         self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
-    def copyMpich2ToNodeList(self,destination_list=None):
-        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyMpich2InstallationToNode,destination_list=destination_list)
-
 
     def copyResourceToNodeList(self,node_function,destination_list=None):
         # This is a multi-threaded recursive copy routine.
@@ -537,7 +533,7 @@ class OFSTestNetwork(object):
     def mountOFSFilesystemAllNodes(self,mount_fuse=False):
         
         # todo: make this multithreaded
-        for node in created_nodes:
+        for node in self.created_nodes:
             self.mountOFSFilesystem(mount_fuse=mount_fuse,client_node=node)
         
     def stopOFSClient(self,client_node=None):
@@ -551,19 +547,19 @@ class OFSTestNetwork(object):
     def stopOFSClientAllNodes(self):
         
         # todo: make this multithreaded
-        for node in created_nodes:
+        for node in self.created_nodes:
             self.stopOFSClient(node)
 
     
     def unmountOFSFilesystemAllNodes(self):
         
         # todo: make this multithreaded
-        for node in created_nodes:
+        for node in self.created_nodes:
             self.unmountOFSFilesystem(node)
 
     def terminateAllEC2Nodes(self):
         for node in self.created_nodes:
-             if node.is_ec2 == True:
+            if node.is_ec2 == True:
                 self.terminateEC2Node(node)
  
     def installTorque(self):
@@ -645,7 +641,7 @@ class OFSTestNetwork(object):
 
         mpiexec -np %d %s
         mpdallexit
-        ''' % (length(self.created_nodes),length(self.created_nodes),self.created_nodes[0].mpich2_installation_location,self.created_nodes[0].current_user,length(self.created_nodes),length(self.created_nodes),command)
+        ''' % (len(self.created_nodes),len(self.created_nodes),self.created_nodes[0].mpich2_installation_location,self.created_nodes[0].current_user,len(self.created_nodes),len(self.created_nodes),command)
         
         print script
         return script
@@ -954,7 +950,7 @@ class OFSTestNetwork(object):
             
         else:
             #print 'grep -v localhost /etc/hosts | awk \'{print \\\$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
-            #output = []
+            output = []
             build_node.runSingleCommand("grep -v localhost /etc/hosts | awk '{print \$2 \"\\tslots=%r\"}' > %s/openmpihosts" % (slots,self.mpi_nfs_directory),output)
             print output
         # update runtest to use openmpihosts file - should be done in patched openmpi
@@ -1023,202 +1019,202 @@ class OFSTestNetwork(object):
         return rc
         
     
-def test_driver():
-    my_node_manager = OFSTestNetwork()
-    my_node_manager.addEC2Connection("ec2-cred/ec2rc.sh","Buildbot","/home/jburton/buildbot.pem")
-
-    nodes  = my_node_manager.createNewEC2Nodes(4,"cloud-ubuntu-12.04","c1.small")
-    #nodes  = my_node_manager.createNewEC2Nodes(6,"cloud-sl6","c1.small")
-
-    '''
-    ec2_ip_addresses = ['10.20.102.98','10.20.102.97','10.20.102.99','10.20.102.100']
-
-    nodes = []
-
-    for my_address in ec2_ip_addresses:
-        nodes.append(my_node_manager.addRemoteNode(ip_address=my_address,username="ubuntu",key="/home/jburton/buildbot.pem",is_ec2=True))
-    for node in nodes:
-        node.setEnvironmentVariable("VMSYSTEM","cloud-ubuntu-12.04")
-    '''
-
-    print ""
-    print "==================================================================="
-    print "Updating New Nodes"
-    
-    my_node_manager.updateEC2Nodes()
-
-    print ""
-    print "==================================================================="
-    print "Installing Required Software"
-    my_node_manager.installRequiredSoftware()
-
-    print ""
-    print "==================================================================="
-    print "Installing Torque"
-    my_node_manager.installTorque()
-
-    print ""
-    print "==================================================================="
-    
-    print "Check Torque"
-    my_node_manager.checkTorque()
-     
-    print ""
-    print "==================================================================="
-    print "Downloading and Installing OrangeFS"
-
-    my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/branches/stable")
-    #my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/trunk")
-    #my_node_manager.buildAndInstallOFSFromSource(resource_type="TAR",resource_location="http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz")
-    #for node in my_node_manager.created_nodes:
-    #    node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
-    #    node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
-    print ""
-    print "==================================================================="
-    print "Installing Benchmarks"
-
-
-    my_node_manager.installBenchmarks()
-
-
-
-    print ""
-    print "==================================================================="
-    print "Copy installation to all nodes"
-
-    my_node_manager.configureOFSServer()
-    my_node_manager.copyOFSToNodeList()
-
-
-        
-    print ""
-    print "==================================================================="
-    print "Start OFS Server"
-    my_node_manager.startOFSServers()
-
-    print ""
-    print "==================================================================="
-    print "Start Client"
-    my_node_manager.startOFSClient()
-
-    print ""
-    print "==================================================================="
-    print "Mount Filesystem"
-    my_node_manager.mountOFSFilesystem()
-
-
-    print ""
-    print "==================================================================="
-    print "Run Tests"
-    communicate = []
-    rc = nodes[0].runSingleCommand(command="ps aux | grep pvfs",output=communicate)
-    print "RC = %d" % rc
-    print "STDOUT = "+communicate[1]
-    print "STDERR = "+communicate[2]
-    nodes[0].runSingleCommand("mount")
-    nodes[0].runSingleCommand("dmesg")
-
-
-    import OFSSysintTest
-    import OFSVFSTest
-    import OFSUsrintTest
-
-    rc = 0
-
-
-    def write_output(filename,function,rc):
-        output = open(filename,'a+')
-        if rc != 0:
-            output.write("%s........................................FAIL: RC = %d\n" % (function.__name__,rc))
-        else:
-            output.write("%s........................................PASS.\n" % function.__name__)
-        output.close()
-
-    #filename = "OFSTestNetwork.log"    
-    output = open(filename,'w+')
-    output.write("Sysint Tests ==================================================\n")
-    output.close()
-
-    for callable in OFSSysintTest.__dict__.values():
-        try:
-            #print "Running %s" % callable.__name__
-            rc = nodes[0].runOFSTest(callable)
-            write_output(filename,callable,rc)
-        except AttributeError:
-            pass
-        except TypeError:
-            pass
-
-    output = open(filename,'a+')
-    nodes[0].runSingleCommandBacktick("dmesg")
-    output.write("VFS Tests ==================================================\n")
-    output.close()
-
-    for callable in OFSVFSTest.__dict__.values():
-        try:
-            rc = nodes[0].runOFSTest(callable)
-            write_output(filename,callable,rc)
-        except AttributeError:
-            pass
-        except TypeError:
-            pass
-   
-    #my_node_manager.stopOFSServers()
-    #my_node_manager.stopOFSClient()
-
-    #for node in my_node_manager.created_nodes:
-
-     #   node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
-        #node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
-    
-    #my_node_manager.startOFSServers()
-    ''' 
-    output = open(filename,'a+')
-    nodes[0].runSingleCommandBacktick("dmesg")
-    output.write("Userint Tests ==================================================\n")
-    output.close()
-
-    for callable in OFSUsrintTest.__dict__.values():
-        try:
-            rc = nodes[0].runOFSTest(callable)
-            write_output("OFSTestNetwork.log",callable,rc)
-        except AttributeError:
-            pass
-        except TypeError:
-            pass
-
-    '''
-
-
-
-      
-    print ""
-    print "==================================================================="
-    print "Stop Client"
-    my_node_manager.stopOFSServers()
-
-
-
-    print ""
-    print "==================================================================="
-    print "Terminating Nodes"
-
-  #  my_node_manager.terminateAllEC2Nodes()
-   
-    #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get update && sudo apt-get -y dist-upgrade < /dev/zero && sudo reboot"])
-    #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo reboot"])
-
-
-
-    #print "Getting source"
-    #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get -y install subversion"])
-    #my_node_manager.runSimultaneousCommands(node_list=nodes,node_function=OFSTestNode.copyOFSSource,kwargs={"resource_type": "SVN","resource": "http://orangefs.org/svn/orangefs/trunk","dest_dir": "/tmp/ubuntu"})
-
-    #for n in nodes:
-    #    my_node_manager.terminateEC2Node(n)
-
-    #print my_node.runSingleCommand("whoami")
-
-#Call script with -t to test
-if len(sys.argv) > 1 and sys.argv[1] == "-t":
-    test_driver()
+# def test_driver():
+#     my_node_manager = OFSTestNetwork()
+#     my_node_manager.addEC2Connection("ec2-cred/ec2rc.sh","Buildbot","/home/jburton/buildbot.pem")
+# 
+#     nodes  = my_node_manager.createNewEC2Nodes(4,"cloud-ubuntu-12.04","c1.small")
+#     #nodes  = my_node_manager.createNewEC2Nodes(6,"cloud-sl6","c1.small")
+# 
+#     '''
+#     ec2_ip_addresses = ['10.20.102.98','10.20.102.97','10.20.102.99','10.20.102.100']
+# 
+#     nodes = []
+# 
+#     for my_address in ec2_ip_addresses:
+#         nodes.append(my_node_manager.addRemoteNode(ip_address=my_address,username="ubuntu",key="/home/jburton/buildbot.pem",is_ec2=True))
+#     for node in nodes:
+#         node.setEnvironmentVariable("VMSYSTEM","cloud-ubuntu-12.04")
+#     '''
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Updating New Nodes"
+#     
+#     my_node_manager.updateEC2Nodes()
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Installing Required Software"
+#     my_node_manager.installRequiredSoftware()
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Installing Torque"
+#     my_node_manager.installTorque()
+# 
+#     print ""
+#     print "==================================================================="
+#     
+#     print "Check Torque"
+#     my_node_manager.checkTorque()
+#      
+#     print ""
+#     print "==================================================================="
+#     print "Downloading and Installing OrangeFS"
+# 
+#     my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/branches/stable")
+#     #my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/trunk")
+#     #my_node_manager.buildAndInstallOFSFromSource(resource_type="TAR",resource_location="http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz")
+#     #for node in my_node_manager.created_nodes:
+#     #    node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
+#     #    node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
+#     print ""
+#     print "==================================================================="
+#     print "Installing Benchmarks"
+# 
+# 
+#     my_node_manager.installBenchmarks()
+# 
+# 
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Copy installation to all nodes"
+# 
+#     my_node_manager.configureOFSServer()
+#     my_node_manager.copyOFSToNodeList()
+# 
+# 
+#         
+#     print ""
+#     print "==================================================================="
+#     print "Start OFS Server"
+#     my_node_manager.startOFSServers()
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Start Client"
+#     my_node_manager.startOFSClient()
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Mount Filesystem"
+#     my_node_manager.mountOFSFilesystem()
+# 
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Run Tests"
+#     communicate = []
+#     rc = nodes[0].runSingleCommand(command="ps aux | grep pvfs",output=communicate)
+#     print "RC = %d" % rc
+#     print "STDOUT = "+communicate[1]
+#     print "STDERR = "+communicate[2]
+#     nodes[0].runSingleCommand("mount")
+#     nodes[0].runSingleCommand("dmesg")
+# 
+# 
+#     import OFSSysintTest
+#     import OFSVFSTest
+#     import OFSUsrintTest
+# 
+#     rc = 0
+# 
+# 
+#     def write_output(filename,function,rc):
+#         output = open(filename,'a+')
+#         if rc != 0:
+#             output.write("%s........................................FAIL: RC = %d\n" % (function.__name__,rc))
+#         else:
+#             output.write("%s........................................PASS.\n" % function.__name__)
+#         output.close()
+# 
+#     #filename = "OFSTestNetwork.log"    
+#     output = open(filename,'w+')
+#     output.write("Sysint Tests ==================================================\n")
+#     output.close()
+# 
+#     for callable in OFSSysintTest.__dict__.values():
+#         try:
+#             #print "Running %s" % callable.__name__
+#             rc = nodes[0].runOFSTest(callable)
+#             write_output(filename,callable,rc)
+#         except AttributeError:
+#             pass
+#         except TypeError:
+#             pass
+# 
+#     output = open(filename,'a+')
+#     nodes[0].runSingleCommandBacktick("dmesg")
+#     output.write("VFS Tests ==================================================\n")
+#     output.close()
+# 
+#     for callable in OFSVFSTest.__dict__.values():
+#         try:
+#             rc = nodes[0].runOFSTest(callable)
+#             write_output(filename,callable,rc)
+#         except AttributeError:
+#             pass
+#         except TypeError:
+#             pass
+#    
+#     #my_node_manager.stopOFSServers()
+#     #my_node_manager.stopOFSClient()
+# 
+#     #for node in my_node_manager.created_nodes:
+# 
+#      #   node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
+#         #node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
+#     
+#     #my_node_manager.startOFSServers()
+#     ''' 
+#     output = open(filename,'a+')
+#     nodes[0].runSingleCommandBacktick("dmesg")
+#     output.write("Userint Tests ==================================================\n")
+#     output.close()
+# 
+#     for callable in OFSUsrintTest.__dict__.values():
+#         try:
+#             rc = nodes[0].runOFSTest(callable)
+#             write_output("OFSTestNetwork.log",callable,rc)
+#         except AttributeError:
+#             pass
+#         except TypeError:
+#             pass
+# 
+#     '''
+# 
+# 
+# 
+#       
+#     print ""
+#     print "==================================================================="
+#     print "Stop Client"
+#     my_node_manager.stopOFSServers()
+# 
+# 
+# 
+#     print ""
+#     print "==================================================================="
+#     print "Terminating Nodes"
+# 
+#   #  my_node_manager.terminateAllEC2Nodes()
+#    
+#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get update && sudo apt-get -y dist-upgrade < /dev/zero && sudo reboot"])
+#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo reboot"])
+# 
+# 
+# 
+#     #print "Getting source"
+#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get -y install subversion"])
+#     #my_node_manager.runSimultaneousCommands(node_list=nodes,node_function=OFSTestNode.copyOFSSource,kwargs={"resource_type": "SVN","resource": "http://orangefs.org/svn/orangefs/trunk","dest_dir": "/tmp/ubuntu"})
+# 
+#     #for n in nodes:
+#     #    my_node_manager.terminateEC2Node(n)
+# 
+#     #print my_node.runSingleCommand("whoami")
+# 
+# #Call script with -t to test
+# if len(sys.argv) > 1 and sys.argv[1] == "-t":
+#     test_driver()

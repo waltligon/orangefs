@@ -61,12 +61,11 @@
 #				
 #------------------------------------------------------------------------------
 
-
-import os
+#import os
 import time
 import re
 from boto import ec2
-from pprint import pprint
+#from pprint import pprint
 from datetime import datetime, timedelta
 
 
@@ -102,16 +101,16 @@ class OFSEC2ConnectionManager(object):
         
         # Default region name is RegionOne
         if region_name == None:
-        	self.ec2_region_name = "RegionOne"
+            self.ec2_region_name = "RegionOne"
         else:
-	        self.ec2_region_name = region_name
+            self.ec2_region_name = region_name
         
        
         if ec2_config_file is not None:
-	        # Read the ec2rc.sh file if provided
+            # Read the ec2rc.sh file if provided
             self.readEC2ConfigFile(ec2_config_file)
         else:
-        	# Otherwise, get the configuration from the environment.
+            # Otherwise, get the configuration from the environment.
             self.getEC2ConfigFromEnvironment()
         
 #------------------------------------------------------------------------------
@@ -270,7 +269,7 @@ class OFSEC2ConnectionManager(object):
 #		A list of new instances.
 #		
 #------------------------------------------------------------------------------        
-    def createNewEC2Instances(self,number_nodes,image_system,type):
+    def createNewEC2Instances(self,number_nodes,image_system,instance_type):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -286,9 +285,9 @@ class OFSEC2ConnectionManager(object):
             print "Image %s Not Found!" % image_system
             return None
         
-        print "Creating %d new %s %s instances." % (number_nodes,type,image_system)
+        print "Creating %d new %s %s instances." % (number_nodes,instance_type,image_system)
         orangefs_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
-        reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=type,subnet_id=orangefs_subnet) 
+        reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=instance_type,subnet_id=orangefs_subnet) 
         
         print "Waiting 60 seconds for all instances to start."
         time.sleep(60)
@@ -315,8 +314,8 @@ class OFSEC2ConnectionManager(object):
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
         try:
-			all_addresses = self.ec2_connection.get_all_addresses()
-			print all_addresses
+            all_addresses = self.ec2_connection.get_all_addresses()
+            print all_addresses
         except:
 			pass
         for i in instances:
@@ -415,15 +414,15 @@ class OFSEC2ConnectionManager(object):
         
 
         
- #------------------------------------------------------------------------------
- #
- #	Future functionality
- #
- #------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
+#
+#	Future functionality
+#
+#------------------------------------------------------------------------------
 
     def getEC2ConfigFromEnvironment(self):
-    	print "This should be implemented, but isn't."
-    	
+        print "This should be implemented, but isn't."
+        
     def manageExistingEC2Instance(self,ec2_node):
         pass
     
@@ -445,11 +444,11 @@ class OFSEC2ConnectionManager(object):
 #	Test driver - Not currently in use.
 #
 #------------------------------------------------------------------------------
-	 
+
     
 def OFSEC2ConnectionManager_test_driver():
     
-   # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
+    # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
     my_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
     print "Connect to EC2"
     #old_mgr.connect(debug=1)

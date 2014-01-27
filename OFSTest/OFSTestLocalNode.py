@@ -104,7 +104,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
         del output[:]
-        output.append(command_line)
+        output.append(command)
         for i in p.communicate():
             output.append(i)
         

@@ -21,7 +21,7 @@ prefix = "posttest"
 mount_fs = False
 run_client = False
 mount_as_fuse = False
-tests = [ checkSHM ]
+
     
 #------------------------------------------------------------------------------
 #  
@@ -61,4 +61,4 @@ def checkSHM(testing_node,output=[]):
         # And if it succeeds, return failure.
         return 1
 
-
+tests = [ checkSHM ]

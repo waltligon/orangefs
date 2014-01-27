@@ -696,8 +696,8 @@ class OFSTestMain(object):
         
         for callable in function_group.tests:
             try:
-                rc = head_node.runOFSTest(function_group.prefix, callable)
-                self.writeOutput(filename,callable,rc)
+                rc = self.ofs_network.runOFSTest(function_group.prefix, callable)
+                self.writeOutput(self.config.filename,callable,rc)
             except:
                 print "Unexpected error:", sys.exc_info()[0]
                 traceback.print_exc()

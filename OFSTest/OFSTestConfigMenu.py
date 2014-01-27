@@ -6,8 +6,9 @@
 #
 
 #
-from os.path import basename, isdir
+
 from OFSTestConfig import *
+import os
 
 
 
@@ -172,7 +173,7 @@ class OFSTestConfigMenu(OFSTestConfig):
                 ip_address = self.ip_prompt(prompt="Please enter the ip address of the next node:",validate=True)
                 self.node_ip_address.append(ip_address)
                 username = self.string_prompt(prompt="Please enter login userid for this node:")
-                my_node_manager.addRemoteNode(ip_address=ip_address,username=username,keyname=keyfile,is_ec2=is_ec2)
+                #my_node_manager.addRemoteNode(ip_address=ip_address,username=username,keyname=keyfile,is_ec2=is_ec2)
                 self.node_usernames.append(username)
                 print "Nodes are:"
                 for i in range(len(self.node_ip_address)):

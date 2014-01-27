@@ -336,7 +336,7 @@ class OFSTestNode(object):
     #--------------------------------------------------------------------------
     # Restore directory - This restores the previous directory.
     #--------------------------------------------------------------------------
-    def restoreDirectory():
+    def restoreDirectory(self):
         temp = self.current_directory
         self.current_directory = self.previous_directory
         self.previous_directory = temp
@@ -2292,172 +2292,172 @@ class OFSTestNode(object):
 
         
     
-#===================================================================================================
-# Unit test script begins here
-#===================================================================================================
-def test_driver():
-    local_machine = OFSTestLocalNode()
-    local_machine.addRemoteKey('10.20.102.54',"/home/jburton/buildbot.pem")
-    local_machine.addRemoteKey('10.20.102.60',"/home/jburton/buildbot.pem")
-    
-    '''
-    local_machine.changeDirectory("/tmp")
-    local_machine.setEnvironmentVariable("FOO","BAR")
-    local_machine.runSingleCommand("echo $FOO")
-    local_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
-    local_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
-    local_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
-    local_machine.runAllBatchCommands()
-    
-
-    
-    #local_machine.copyOFSSource("LOCALDIR","/home/jburton/testingjdb/","/tmp/jburton/testingjdb/")
-    #local_machine.configureOFSSource()
-    #local_machine.makeOFSSource()
-    #local_machine.installOFSSource()
-    '''
-    
-    remote_machine = OFSTestRemoteNode('ec2-user','10.20.102.54',"/home/jburton/buildbot.pem",local_machine)
-    remote_machine1 = OFSTestRemoteNode('ec2-user','10.20.102.60', "/home/jburton/buildbot.pem",local_machine)
-
-'''
-    remote_machine.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
-    remote_machine1.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
-
-   # remote_machine.uploadNodeKeyFromLocal(local_machine)
-   # remote_machine1.uploadNodeKeyFromLocal(local_machine)
-    remote_machine.uploadRemoteKeyFromLocal(local_machine,remote_machine1.ip_address)
-    remote_machine1.uploadRemoteKeyFromLocal(local_machine,remote_machine.ip_address)
-    
-    remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/trunk","/tmp/ec2-user/")
-    print "Configuring remote source"
-    remote_machine.configureOFSSource()
-    remote_machine.makeOFSSource()
-    remote_machine.installOFSSource()
-    
-    #remote_machine1.runSingleCommandAsBatch("sudo rm /tmp/mount/orangefs/touched")
-    #remote_machine1.copyOFSSource("TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz","/tmp/ec2-user/")
-
-
-    print ""
-    print "-------------------------------------------------------------------------"
-    print "Configuring remote source without shared libraries on " + remote_machine.host_name
-    print ""
-    remote_machine.runSingleCommand("rm -rf /tmp/ec2-user")
-    remote_machine.runSingleCommand("rm -rf /tmp/orangefs")
-    remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/benchmarks")
-    remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
-    remote_machine.configureOFSSource()
-    remote_machine.makeOFSSource()
-    remote_machine.installOFSSource()
-
-    remote_machine.configureOFSServer([remote_machine])
-    remote_machine.stopOFSServer()
-    remote_machine.startOFSServer()
-    #remote_machine.stopOFSServer()
-    print ""
-    print "Checking to see if pvfs2 server is running..."
-    remote_machine.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs before mount..."
-    remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-    remote_machine.installKernelModule()
-    remote_machine.startOFSClient()
-    remote_machine.mountOFSFilesystem()
-    print ""
-    print "Checking to see if pvfs2 client is running..."
-    remote_machine.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-    print "Checking pvfs2 mount..."
-    remote_machine.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs after mount..."
-    remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-    print ""
-    print "Checking to see if mounted FS works..."
-    remote_machine.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs after touch..."
-    remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-    print ""
-
-    remote_machine.stopOFSClient()
-    remote_machine.stopOFSServer()
-    print "Checking to see if all pvfs2 services have stopped."
-    remote_machine.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-
-    print ""
-    print "-------------------------------------------------------------------------"
-    print "Configuring remote source with shared libraries on " + remote_machine1.host_name
-    print ""
-    remote_machine1.runSingleCommand("rm -rf /tmp/orangefs")
-    remote_machine1.runSingleCommand("rm -rf /tmp/ec2-user")
-    remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/")
-    remote_machine1.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
-
-
-    remote_machine1.configureOFSSource("--enable-strict --enable-shared --enable-ucache --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % remote_machine1.getKernelVersion())
-    #remote_machine1.configureOFSSource()
-    remote_machine1.makeOFSSource()
-    remote_machine1.installOFSSource()
-
-    remote_machine1.configureOFSServer([remote_machine1])
-    remote_machine1.stopOFSServer()
-    remote_machine1.startOFSServer()
-    #remote_machine1.stopOFSServer()
-    print ""
-    print "Checking to see if pvfs2 server is running..."
-    remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs before mount..."
-    remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-    remote_machine1.installKernelModule()
-    remote_machine1.startOFSClient()
-    remote_machine1.mountOFSFilesystem()
-    print ""
-    print "Checking to see if pvfs2 client is running..."
-    remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-    print "Checking pvfs2 mount..."
-    remote_machine1.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs after mount..."
-    remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-    print ""
-    print "Checking to see if mounted FS works"
-    remote_machine1.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
-    print ""
-    print "Checking to see what is in /tmp/mount/orangefs after touch..."
-    remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-
-    remote_machine1.stopOFSClient()
-    remote_machine1.stopOFSServer()
-    print "Checking to see if all pvfs2 services have stopped..."
-    remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-    print ""
-
-
-    #export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib
-    #export PRELOAD="LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
-
-    #local_machine.copyToRemoteNode("/home/jburton/buildbot.pem",remote_machine,"~/buildbot.pem",False)
-    #remote_machine.copyToRemoteNode("~/buildbot.pem",remote_machine1,"~/buildbot.pem",False)
-
-    
-    remote_machine.setEnvironmentVariable("FOO","BAR")
-    remote_machine.runSingleCommand("echo $FOO")
-    remote_machine.runSingleCommand("hostname -s")
-    remote_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
-    remote_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
-    remote_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
-    remote_machine.addBatchCommand("touch /tmp/touched")
-    remote_machine.addBatchCommand("sudo apt-get update && sudo apt-get -y dist-upgrade")
-    remote_machine.addBatchCommand("sudo yum -y upgrade")
-    remote_machine.runAllBatchCommands()
-    
-   ''' 
-    
-#Call script with -t to test
-#if len(sys.argv) > 1 and sys.argv[1] == "-t":
-#    test_driver()
+# #===================================================================================================
+# # Unit test script begins here
+# #===================================================================================================
+# def test_driver():
+#     local_machine = OFSTestLocalNode()
+#     local_machine.addRemoteKey('10.20.102.54',"/home/jburton/buildbot.pem")
+#     local_machine.addRemoteKey('10.20.102.60',"/home/jburton/buildbot.pem")
+#     
+#     '''
+#     local_machine.changeDirectory("/tmp")
+#     local_machine.setEnvironmentVariable("FOO","BAR")
+#     local_machine.runSingleCommand("echo $FOO")
+#     local_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
+#     local_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
+#     local_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
+#     local_machine.runAllBatchCommands()
+#     
+# 
+#     
+#     #local_machine.copyOFSSource("LOCALDIR","/home/jburton/testingjdb/","/tmp/jburton/testingjdb/")
+#     #local_machine.configureOFSSource()
+#     #local_machine.makeOFSSource()
+#     #local_machine.installOFSSource()
+#     '''
+#     
+#     remote_machine = OFSTestRemoteNode('ec2-user','10.20.102.54',"/home/jburton/buildbot.pem",local_machine)
+#     remote_machine1 = OFSTestRemoteNode('ec2-user','10.20.102.60', "/home/jburton/buildbot.pem",local_machine)
+# 
+# '''
+#     remote_machine.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
+#     remote_machine1.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
+# 
+#    # remote_machine.uploadNodeKeyFromLocal(local_machine)
+#    # remote_machine1.uploadNodeKeyFromLocal(local_machine)
+#     remote_machine.uploadRemoteKeyFromLocal(local_machine,remote_machine1.ip_address)
+#     remote_machine1.uploadRemoteKeyFromLocal(local_machine,remote_machine.ip_address)
+#     
+#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/trunk","/tmp/ec2-user/")
+#     print "Configuring remote source"
+#     remote_machine.configureOFSSource()
+#     remote_machine.makeOFSSource()
+#     remote_machine.installOFSSource()
+#     
+#     #remote_machine1.runSingleCommandAsBatch("sudo rm /tmp/mount/orangefs/touched")
+#     #remote_machine1.copyOFSSource("TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz","/tmp/ec2-user/")
+# 
+# 
+#     print ""
+#     print "-------------------------------------------------------------------------"
+#     print "Configuring remote source without shared libraries on " + remote_machine.host_name
+#     print ""
+#     remote_machine.runSingleCommand("rm -rf /tmp/ec2-user")
+#     remote_machine.runSingleCommand("rm -rf /tmp/orangefs")
+#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/benchmarks")
+#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
+#     remote_machine.configureOFSSource()
+#     remote_machine.makeOFSSource()
+#     remote_machine.installOFSSource()
+# 
+#     remote_machine.configureOFSServer([remote_machine])
+#     remote_machine.stopOFSServer()
+#     remote_machine.startOFSServer()
+#     #remote_machine.stopOFSServer()
+#     print ""
+#     print "Checking to see if pvfs2 server is running..."
+#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs before mount..."
+#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
+#     remote_machine.installKernelModule()
+#     remote_machine.startOFSClient()
+#     remote_machine.mountOFSFilesystem()
+#     print ""
+#     print "Checking to see if pvfs2 client is running..."
+#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+#     print "Checking pvfs2 mount..."
+#     remote_machine.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs after mount..."
+#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
+#     print ""
+#     print "Checking to see if mounted FS works..."
+#     remote_machine.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs after touch..."
+#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
+#     print ""
+# 
+#     remote_machine.stopOFSClient()
+#     remote_machine.stopOFSServer()
+#     print "Checking to see if all pvfs2 services have stopped."
+#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+# 
+#     print ""
+#     print "-------------------------------------------------------------------------"
+#     print "Configuring remote source with shared libraries on " + remote_machine1.host_name
+#     print ""
+#     remote_machine1.runSingleCommand("rm -rf /tmp/orangefs")
+#     remote_machine1.runSingleCommand("rm -rf /tmp/ec2-user")
+#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/")
+#     remote_machine1.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
+# 
+# 
+#     remote_machine1.configureOFSSource("--enable-strict --enable-shared --enable-ucache --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % remote_machine1.getKernelVersion())
+#     #remote_machine1.configureOFSSource()
+#     remote_machine1.makeOFSSource()
+#     remote_machine1.installOFSSource()
+# 
+#     remote_machine1.configureOFSServer([remote_machine1])
+#     remote_machine1.stopOFSServer()
+#     remote_machine1.startOFSServer()
+#     #remote_machine1.stopOFSServer()
+#     print ""
+#     print "Checking to see if pvfs2 server is running..."
+#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs before mount..."
+#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
+#     remote_machine1.installKernelModule()
+#     remote_machine1.startOFSClient()
+#     remote_machine1.mountOFSFilesystem()
+#     print ""
+#     print "Checking to see if pvfs2 client is running..."
+#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+#     print "Checking pvfs2 mount..."
+#     remote_machine1.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs after mount..."
+#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
+#     print ""
+#     print "Checking to see if mounted FS works"
+#     remote_machine1.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
+#     print ""
+#     print "Checking to see what is in /tmp/mount/orangefs after touch..."
+#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
+# 
+#     remote_machine1.stopOFSClient()
+#     remote_machine1.stopOFSServer()
+#     print "Checking to see if all pvfs2 services have stopped..."
+#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
+#     print ""
+# 
+# 
+#     #export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib
+#     #export PRELOAD="LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
+# 
+#     #local_machine.copyToRemoteNode("/home/jburton/buildbot.pem",remote_machine,"~/buildbot.pem",False)
+#     #remote_machine.copyToRemoteNode("~/buildbot.pem",remote_machine1,"~/buildbot.pem",False)
+# 
+#     
+#     remote_machine.setEnvironmentVariable("FOO","BAR")
+#     remote_machine.runSingleCommand("echo $FOO")
+#     remote_machine.runSingleCommand("hostname -s")
+#     remote_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
+#     remote_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
+#     remote_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
+#     remote_machine.addBatchCommand("touch /tmp/touched")
+#     remote_machine.addBatchCommand("sudo apt-get update && sudo apt-get -y dist-upgrade")
+#     remote_machine.addBatchCommand("sudo yum -y upgrade")
+#     remote_machine.runAllBatchCommands()
+#     
+#    ''' 
+#     
+# #Call script with -t to test
+# #if len(sys.argv) > 1 and sys.argv[1] == "-t":
+# #    test_driver()

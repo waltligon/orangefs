@@ -13,7 +13,7 @@
 #   run_client = False
 #   mount_fs = Does the file system need to be mounted?
 #   mount_as_fuse = False
-#   tests = list of test functions
+#   tests = list of test functions (at end of file)
 #------------------------------------------------------------------------------
 
 import inspect
@@ -23,22 +23,7 @@ prefix = "vfs-kmod"
 mount_fs = True
 run_client = True
 mount_as_fuse = False
-tests = [ 
-append,
-append2,
-bonnie,
-fdtree,
-fstest,
-fsx,
-iozone,
-mkdir_vfs,
-shelltest,
-symlink_vfs,
-tail,
-vfs_cp,
-ltp,
-dbench
- ]
+
 
 #------------------------------------------------------------------------------
 #  
@@ -68,11 +53,17 @@ dbench
 
 def setFuseConfig():
 
-    OFSVFSTest.header = "OFS VFS Test(fuse)"
-    OFSVFSTest.prefix = "vfs-fuse"
-    OFSVFSTest.mount_fs = True
-    OFSVFSTest.run_client = False
-    OFSVFSTest.mount_as_fuse = True
+    global header 
+    global prefix
+    global mount_fs
+    global run_client
+    global mount_as_fuse
+    
+    header = "OFS VFS Test(fuse)"
+    prefix = "vfs-fuse"
+    mount_fs = True
+    run_client = False
+    mount_as_fuse = True
     
 #------------------------------------------------------------------------------
 #
@@ -83,11 +74,18 @@ def setFuseConfig():
 #------------------------------------------------------------------------------
 
 def setKmodConfig():
-    OFSVFSTest.header = "OFS VFS Test(kmod)"
-    OFSVFSTest.prefix = "vfs-kmod"
-    OFSVFSTest.mount_fs = True
-    OFSVFSTest.run_client = True
-    OFSVFSTest.mount_as_fuse = False
+
+    global header 
+    global prefix
+    global mount_fs
+    global run_client
+    global mount_as_fuse
+
+    header = "OFS VFS Test(kmod)"
+    prefix = "vfs-kmod"
+    mount_fs = True
+    run_client = True
+    mount_as_fuse = False
 
 #------------------------------------------------------------------------------
 #
@@ -184,10 +182,8 @@ def bonnie(testing_node,output=[]):
             return rc
         
     testing_node.changeDirectory(testing_node.ofs_mount_point)
-	
-rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
+    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
     
-
     return rc
 
 #------------------------------------------------------------------------------
@@ -325,7 +321,7 @@ def fsx(testing_node,output=[]):
 #   a variety of file operations. Iozone has been ported to many machines and 
 #   runs under many operating systems.
 #
-#   Iozone is useful for performing a broad filesystem analysis of a vendor’s 
+#   Iozone is useful for performing a broad filesystem analysis of a vendors 
 #   computer platform. The benchmark tests file I/O performance for the 
 #   following operations:
 #
@@ -362,8 +358,8 @@ def iozone(testing_node,output=[]):
 #
 #   ltp()
 #
-#   The Linux™ Test Project is a joint project started by SGI™ and maintained 
-#   by IBM®, that has a goal to deliver test suites to the open source 
+#   The Linux Test Project is a joint project started by SGI and maintained 
+#   by IBM that has a goal to deliver test suites to the open source 
 #   community that validate the reliability, robustness, and stability of 
 #   Linux. The LTP testsuite contains a collection of tools for testing the 
 #   Linux kernel and related features.
@@ -550,4 +546,19 @@ def vfs_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
-
+tests = [ 
+append,
+append2,
+bonnie,
+fdtree,
+fstest,
+fsx,
+iozone,
+mkdir_vfs,
+shelltest,
+symlink_vfs,
+tail,
+vfs_cp,
+ltp,
+dbench
+ ]

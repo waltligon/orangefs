@@ -16,14 +16,11 @@
 #   tests = list of test functions
 #------------------------------------------------------------------------------
 
-
-import OFSTestNode
 header = "OFS Sysint Test"
 prefix = "sysint"
 mount_fs =  False
 run_client = True
 mount_as_fuse = False
-tests = [ ping,cp,misc,zerofill,mkdir_sysint,symlink_sysint]
 
 #------------------------------------------------------------------------------
 #
@@ -237,4 +234,6 @@ def symlink_sysint(testing_node,output=[]):
 def zerofill(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
+
+tests = [ ping,cp,misc,zerofill,mkdir_sysint,symlink_sysint]
 

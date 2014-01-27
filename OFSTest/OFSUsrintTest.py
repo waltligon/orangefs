@@ -13,7 +13,7 @@
 #   run_client = False
 #   mount_fs = Does the file system need to be mounted?
 #   mount_as_fuse = False
-#   tests = list of test functions
+#   tests = list of test functions (at end of file)
 #------------------------------------------------------------------------------
 
 import inspect
@@ -23,21 +23,7 @@ prefix = "usrint"
 mount_fs = False
 run_client = False
 mount_as_fuse = False
-tests = [ 
-append,
-append2,
-bonnie,
-fdtree,
-fstest,
-fsx,
-iozone,
-mkdir_usrint,
-shelltest,
-symlink_usrint,
-tail,
-usrint_cp,
-ltp,
-dbench ]
+
 
 #------------------------------------------------------------------------------
 #  
@@ -57,36 +43,6 @@ dbench ]
 #------------------------------------------------------------------------------
 
 
-#------------------------------------------------------------------------------
-#
-# setFuseConfig()
-#
-# The same tests are run for kernel mod (kmod) and fuse testing. This function 
-# sets the variable to fuse mode.
-#------------------------------------------------------------------------------
-
-def setFuseConfig():
-
-    OFSVFSTest.header = "OFS VFS Test(fuse)"
-    OFSVFSTest.prefix = "vfs-fuse"
-    OFSVFSTest.mount_fs = True
-    OFSVFSTest.run_client = False
-    OFSVFSTest.mount_as_fuse = True
-    
-#------------------------------------------------------------------------------
-#
-# setKmodConfig()
-#
-# The same tests are run for kernel mod (kmod) and fuse testing. This function 
-# sets the variable to Kmod mode.
-#------------------------------------------------------------------------------
-
-def setKmodConfig():
-    OFSVFSTest.header = "OFS VFS Test(kmod)"
-    OFSVFSTest.prefix = "vfs-kmod"
-    OFSVFSTest.mount_fs = True
-    OFSVFSTest.run_client = True
-    OFSVFSTest.mount_as_fuse = False
 
 #------------------------------------------------------------------------------
 #
@@ -281,7 +237,7 @@ def fdtree(testing_node,output=[]):
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
 
     # fdtree must be run from the mountpoint, but need to cd to that directory w/usrint libraries.
-	testing_node.changeDirectory("~")
+    testing_node.changeDirectory("~")
     rc = testing_node.runSingleCommand("%s cd %s; bash -c \"%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5\"" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
     
     return rc
@@ -297,7 +253,6 @@ def fdtree(testing_node,output=[]):
 #   https://code.google.com/p/fstest/
 #
 #------------------------------------------------------------------------------    
-def fstest(testing_node,output=[]):
 
     
 def fstest(testing_node,output=[]):
@@ -340,7 +295,7 @@ def fsx(testing_node,output=[]):
 #   a variety of file operations. Iozone has been ported to many machines and 
 #   runs under many operating systems.
 #
-#   Iozone is useful for performing a broad filesystem analysis of a vendor’s 
+#   Iozone is useful for performing a broad filesystem analysis of a vendor's 
 #   computer platform. The benchmark tests file I/O performance for the 
 #   following operations:
 #
@@ -376,8 +331,8 @@ def iozone(testing_node,output=[]):
 #
 #   ltp()
 #
-#   The Linux™ Test Project is a joint project started by SGI™ and maintained 
-#   by IBM®, that has a goal to deliver test suites to the open source 
+#   The Linux Test Project is a joint project started by SGI and maintained 
+#   by IBM, that has a goal to deliver test suites to the open source 
 #   community that validate the reliability, robustness, and stability of 
 #   Linux. The LTP testsuite contains a collection of tools for testing the 
 #   Linux kernel and related features.
@@ -551,4 +506,18 @@ def usrint_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
-
+tests = [ 
+append,
+append2,
+bonnie,
+fdtree,
+fstest,
+fsx,
+iozone,
+mkdir_usrint,
+shelltest,
+symlink_usrint,
+tail,
+usrint_cp,
+ltp,
+dbench ]

@@ -13,7 +13,7 @@
 #   run_client = False
 #   mount_fs = Does the file system need to be mounted?
 #   mount_as_fuse = False
-#   tests = list of test functions
+#   tests = list of test functions (at end of file)
 #------------------------------------------------------------------------------
 
 header = "OFS MPI-IO Test"
@@ -21,9 +21,6 @@ prefix = "mpiio"
 mount_fs = False
 run_client = False
 mount_as_fuse = False
-tests = [ romio_testsuite
-
- ]
 
 def functions(self,testing_network):
     pass
@@ -80,6 +77,7 @@ def romio_testsuite(testing_node,output=[]):
     
     return rc
 
-    
+tests = [ romio_testsuite ]
+
 
 
