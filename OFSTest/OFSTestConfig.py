@@ -9,17 +9,6 @@
 ################################################################################
 
 
-
-###############################################################################################'
-#
-# class OFSTestNode(object)
-#
-# OrangeFS is a complex file system with a wide variety of functionality that
-# can run on many different systems in many different configurations. This
-# class holds the variables that control OrangeFS setup and testing
-# 
-################################################################################################
-
 class OFSTestConfig(object):
     
     #------------------------------------------------------------------
@@ -259,6 +248,8 @@ class OFSTestConfig(object):
     #
     # This method can "override" existing values as specified in str_args
     # str_args are an array of variable=value strings.
+    #
+    # implemented to add support for command line override of config files.
     #
     #------------------------------------------------------------------
 

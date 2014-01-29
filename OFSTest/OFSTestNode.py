@@ -181,6 +181,10 @@ class OFSTestNode(object):
         self.openmpi_version = ""
         self.created_openmpihosts = None  
         
+        # Where is the common mpi nfs directory?
+        self.mpi_nfs_directory = ""
+        
+        
         # Where is the romio test script? 
         # Sloppy - revise.
         self.romio_runtests_pvfs2 = None

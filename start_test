@@ -5,6 +5,7 @@
 from OFSTest import OFSTestMain
 from OFSTest import OFSTestConfigMenu
 from OFSTest import OFSTestConfigFile
+from OFSTest import OFSTestConfig
 import sys
 import getopt
 import os, errno
