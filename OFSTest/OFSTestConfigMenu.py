@@ -31,10 +31,10 @@ class OFSTestConfigMenu(OFSTestConfig):
     def yes_no_prompt(self,prompt):
 
         while True:
-            input = self.string_prompt(prompt+" [Y/N]:")
-            if input.lower() == 'y':
+            prompt_input = self.string_prompt(prompt+" [Y/N]:")
+            if prompt_input.lower() == 'y':
                 return True
-            elif input.lower() == 'n':
+            elif prompt_input.lower() == 'n':
                 return False
             else:
                 print "Invalid input. Please enter Y or N."

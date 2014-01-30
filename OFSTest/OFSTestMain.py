@@ -186,7 +186,7 @@ class OFSTestMain(object):
             )
         
         '''
-        # Todo: Start OFS Server and client if they haven't been started.
+        # TODO: Start OFS Server and client if they haven't been started.
         # Is this necessary?
         
         print ""
@@ -325,7 +325,7 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         print "Copy installation to all nodes"
-        # Todo: Should handle this with exceptions.
+        # TODO: Should handle this with exceptions.
         rc = self.ofs_network.copyOFSToNodeList()
         
 
@@ -342,7 +342,7 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Start OFS Server"
         rc = self.ofs_network.startOFSServers()
-        #Todo: Need to handle error conditions
+        #TODO: Need to handle error conditions
         
         if self.config.start_client_on_all_nodes == True:
             print ""
@@ -359,7 +359,7 @@ class OFSTestMain(object):
             self.ofs_network.installOpenMPI()
 
             '''
-            # Todo: Add mpich support.
+            # TODO: Add mpich support.
             print ""
             print "==================================================================="
             print "Install mpich2"
@@ -411,7 +411,7 @@ class OFSTestMain(object):
         print "Run Tests"
         
 
-        # todo: Move this section to OFSTestNetwork
+        # TODO: Move this section to OFSTestNetwork
 
         # Results filename is specified in the config.
         filename = self.config.log_file
@@ -552,10 +552,10 @@ class OFSTestMain(object):
         # run the usrint tests, if required.
         if self.config.run_usrint_tests == True:
             # usrint tests are located in OFSUsrintTest
-            # Todo: Change filename to OFSUsrintTest.py
+
             import OFSUsrintTest
 
-            # Todo: Check to see if usrint and fuse are compatible.
+            # TODO: Check to see if usrint and fuse are compatible.
             if False == True:
                 self.writeOutputHeader("Usrint Tests not compatible with fuse=====================================\n")
             else:

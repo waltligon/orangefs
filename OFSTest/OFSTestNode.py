@@ -319,13 +319,13 @@ class OFSTestNode(object):
         
         
        
-      #==========================================================================
-      # 
-      # Utility functions
-      #
-      # These functions implement basic shell functionality 
-      #
-      #==========================================================================
+#==========================================================================
+# 
+# Utility functions
+#
+# These functions implement basic shell functionality 
+#
+#==========================================================================
 
     #--------------------------------------------------------------------------
     # Change the current directory on the node to run scripts.
@@ -365,15 +365,15 @@ class OFSTestNode(object):
     
         variable_list = setenv.split('\n')
         for variable in variable_list:
-          #split based on the equals sign
-          vname,value = variable.split('=')
-          self.setEnvironmentVariable(vname,value)
+            #split based on the equals sign
+            vname,value = variable.split('=')
+            self.setEnvironmentVariable(vname,value)
           
     #--------------------------------------------------------------------------
     # Clear all environment variables
     #--------------------------------------------------------------------------
     def clearEnvironment(self):
-          self.current_environment = {}
+        self.current_environment = {}
     
     #--------------------------------------------------------------------------  
     # return current directory
@@ -1292,17 +1292,17 @@ class OFSTestNode(object):
             tarflags = "zxf"
             taridx = tarfile.index(".tar.gz")
         elif ".tgz" in tarfile:
-          tarflags = "zxf"
-          taridx = tarfile.index(".tgz")
+            tarflags = "zxf"
+            taridx = tarfile.index(".tgz")
         elif ".tar.bz2" in tarfile:
-          tarflags = "jxf"
-          taridx = tarfile.index(".tar.bz2")
+            tarflags = "jxf"
+            taridx = tarfile.index(".tar.bz2")
         elif ".tar" in tarfile:
-          tarflags = "xf"
-          taridx = tarfile.index(".tar")
+            tarflags = "xf"
+            taridx = tarfile.index(".tar")
         else:
-          print "%s Not a tarfile" % tarurl
-          return 1
+            print "%s Not a tarfile" % tarurl
+            return 1
     
         tardir = tarfile[:taridx]
         rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
@@ -2048,7 +2048,7 @@ class OFSTestNode(object):
         
     def stopOFSServer(self):
         # Kill'em all and let root sort 'em out.        
-        # Todo: Install killall on SuSE based systems. 
+        # TODO: Install killall on SuSE based systems. 
         self.runSingleCommand("killall -s 9 pvfs2-server")
         
         
@@ -2116,7 +2116,7 @@ class OFSTestNode(object):
         # Clear the shared memory objects
         self.clearSHM()
         
-        # Todo: Add cert-based security.
+        # TODO: Add cert-based security.
         keypath = ""
         if security==None:
             pass

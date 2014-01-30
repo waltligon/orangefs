@@ -49,7 +49,7 @@ def wordcount(testing_node,output=[]):
     testing_node.runSingleCommand("%s/bin/hadoop dfs -copyFromLocal /home/%s/gutenberg/* /user/%s/gutenberg" % (testing_node.hadoop_location,testing_node.current_user,testing_node.current_user))
     
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  wordcount /user/%s/gutenberg /user/%s/gutenberg-output" % (testing_node.hadoop_location,testing_node.hadoop_location,testing_node.current_user,testing_node.current_user),output)
-    # Todo: Compare acutal results with expected.
+    # TODO: Compare acutal results with expected.
     return rc
 
 #------------------------------------------------------------------------------

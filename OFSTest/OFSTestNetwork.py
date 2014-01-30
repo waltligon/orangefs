@@ -649,7 +649,7 @@ class OFSTestNetwork(object):
         rc = node_function(destination_list[0],destination_list[list_length/2])
         
         
-        # Todo: Throw an exception if the copy fails.
+        # TODO: Throw an exception if the copy fails.
        
         queue = Queue.Queue()
         class CopyThread(threading.Thread):
@@ -771,7 +771,7 @@ class OFSTestNetwork(object):
 #------------------------------------------------------------------------------
     def mountOFSFilesystemAllNodes(self,mount_fuse=False,node_list=None):
         
-        # todo: make this multithreaded
+        # TODO: make this multithreaded
         for node in self.created_nodes:
             self.mountOFSFilesystem(mount_fuse=mount_fuse,client_node=node)
 #------------------------------------------------------------------------------   
@@ -796,7 +796,7 @@ class OFSTestNetwork(object):
     def stopOFSClientAllNodes(self,node_list=None):
         if node_list == None:
             node_list = self.created_nodes
-        # todo: make this multithreaded
+        # TODO: make this multithreaded
         for node in node_list:
             self.stopOFSClient(node)
 
@@ -810,7 +810,7 @@ class OFSTestNetwork(object):
     def unmountOFSFilesystemAllNodes(self,node_list=None):
         if node_list == None:
             node_list = self.created_nodes
-        # todo: make this multithreaded
+        # TODO: make this multithreaded
         for node in node_list:
             self.unmountOFSFilesystem(node)
 
