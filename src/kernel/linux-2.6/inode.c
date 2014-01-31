@@ -320,6 +320,15 @@ int pvfs2_getattr(
         pvfs2_inode = PVFS2_I(inode);
         kstat->blksize = pvfs2_inode->blksize;
     }
+    else if (ret == -EINTR)
+    {
+        /* In this case, an interrupt signal was pending when we wanted to wait for the getattr op.
+         * So, instead of going to sleep with a pending interrupt, we allow the interrupt to take
+         * precedence.  However, we don't want to mark the inode "bad" in this case; we want the 
+         * getattr to be retried.
+         */
+        ret = -EAGAIN;
+    }
     else
     {
         /* assume an I/O error and flag inode as bad */
