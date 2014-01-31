@@ -1,20 +1,25 @@
 #!/usr/bin/python
 #
+# @namespace OFSUsrintTest
 #
-# OFSVFSTest
-#
-# This class implements tests to be run on the virtual file system.
+# @brief This class implements tests for the user integration libraries.
 #
 #
-# variables:
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# Do we need to run the PVFS2 client?
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# Do we mount it via fuse?
+# @var  tests  
+# List of test functions (at end of file)
 #
-#   header = Name of header printed in output file
-#   prefix = Name of prefix for test name
-#   run_client = False
-#   mount_fs = Does the file system need to be mounted?
-#   mount_as_fuse = False
-#   tests = list of test functions (at end of file)
-#------------------------------------------------------------------------------
+#
+
 
 import inspect
 
@@ -25,7 +30,7 @@ run_client = False
 mount_as_fuse = False
 
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------#
 #  
 # Test functions
 #
@@ -40,13 +45,13 @@ mount_as_fuse = False
 #   
 #        0: Test ran successfully
 #        !0: Test failed
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------#
 
 
 
-#------------------------------------------------------------------------------
+##
 #
-#   append()
+# @fn append(testing_node,output=[]):
 #
 #   This test checks the append ( > and >>) functionality by appending to a 
 #   file on the mounted OrangeFS filesystem, then comparing it to an expected
@@ -55,7 +60,14 @@ mount_as_fuse = False
 #   append2() tests in a directory on the OrangeFS filesystem while append()
 #   tests directly on the root of the filesystem.
 #
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+
     
 def append(testing_node,output=[]):
     
@@ -86,8 +98,9 @@ def append(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s diff -u %s %s" % (preload, append_test, local_reference),output)
     return rc
 
-#------------------------------------------------------------------------------
-#   append2()
+##
+#
+# @fn append2(testing_node,output=[]):
 #
 #   This test checks the append ( > and >>) functionality by appending to a 
 #   file on the mounted OrangeFS filesystem, then comparing it to an expected
@@ -95,7 +108,13 @@ def append(testing_node,output=[]):
 #
 #   append2() tests in a directory on the OrangeFS filesystem while append()
 #   tests directly on the root of the filesystem.
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
 
 def append2(testing_node,output=[]):
     pvfs2_testdir = testing_node.ofs_mount_point +"/append_dir"
@@ -129,14 +148,21 @@ def append2(testing_node,output=[]):
 
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-# bonnie()
+# @fn bonnie(testing_node,output=[]):
 #
 # Bonnie++ tests large file IO and creation/deletion of small files.
 #
 # See http://sourceforge.net/projects/bonnie/
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+
 
 def bonnie(testing_node,output=[]):
 
@@ -165,9 +191,9 @@ def bonnie(testing_node,output=[]):
 
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   dbench()
+# @fn dbench(testing_node,output=[]):
 #
 #   DBENCH is a tool to generate I/O workloads to either a filesystem or to a 
 #   networked CIFS or NFS server. It can even talk to an OrangeFS target.
@@ -178,7 +204,13 @@ def bonnie(testing_node,output=[]):
 #
 #   http://dbench.samba.org/
 #
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
     
 def dbench(testing_node,output=[]):
     
@@ -215,16 +247,22 @@ def dbench(testing_node,output=[]):
        
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-# fdtree()
+# @fn fdtree(testing_node,output=[]):
 #
 #   The fdtree software is used for testing the metadata performance of a file 
 #   system.
 #
 #   https://computing.llnl.gov/?set=code&page=sio_downloads
 #
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#    
 
 def fdtree(testing_node,output=[]):
 
@@ -242,9 +280,9 @@ def fdtree(testing_node,output=[]):
     
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-# fstest()
+# @fn fstest(testing_node,output=[]):
 #
 #   Test filesystem (for example, fusecompress) for errors in implementing 
 #   random file access. It writes and reads random blocks of random lengths at 
@@ -252,7 +290,13 @@ def fdtree(testing_node,output=[]):
 #
 #   https://code.google.com/p/fstest/
 #
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#    
 
     
 def fstest(testing_node,output=[]):
@@ -267,14 +311,20 @@ def fstest(testing_node,output=[]):
         
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-# fsx()
+# @fn fsx(testing_node,output=[]):
 #
 #   File system exerciser
 #
 #   http://codemonkey.org.uk/projects/fsx/
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
 def fsx(testing_node,output=[]):
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("%s mkdir -p %s/fsx" % (preload,testing_node.ofs_mount_point))
@@ -287,9 +337,9 @@ def fsx(testing_node,output=[]):
     
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-# iozone()
+# @fn iozone(testing_node,output=[]):
 #
 #   IOzone is a filesystem benchmark tool. The benchmark generates and measures
 #   a variety of file operations. Iozone has been ported to many machines and 
@@ -304,7 +354,13 @@ def fsx(testing_node,output=[]):
 #
 #   http://www.iozone.org/
 #
-#------------------------------------------------------------------------------
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
 
 def iozone(testing_node,output=[]):
     
@@ -327,9 +383,9 @@ def iozone(testing_node,output=[]):
         
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   ltp()
+# @fn ltp(testing_node,output=[]):
 #
 #   The Linux Test Project is a joint project started by SGI and maintained 
 #   by IBM, that has a goal to deliver test suites to the open source 
@@ -341,7 +397,12 @@ def iozone(testing_node,output=[]):
 #
 #   http://ltp.sourceforge.net/
 #
-#------------------------------------------------------------------------------    
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#  
 def ltp(testing_node,output=[]):
     
     LTP_ARCHIVE_VERSION = "ltp-full-20120903"
@@ -422,13 +483,19 @@ def ltp(testing_node,output=[]):
     return rc
     
 
-#------------------------------------------------------------------------------
+##
 #
-#   mkdir_usrint()
+# @fn mkdir_usrint(testing_node,output=[]):
 #
 #   This runs the test-mkdir utility
 #
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
     
 
 def mkdir_usrint(testing_node,output=[]):
@@ -437,12 +504,18 @@ def mkdir_usrint(testing_node,output=[]):
     rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   shelltest()
+# @fn shelltest(testing_node,output=[]):
 #
 #   This runs the pvfs2-shell-test.sh script.
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+# 
     
 def shelltest(testing_node,output=[]):
     
@@ -453,12 +526,18 @@ def shelltest(testing_node,output=[]):
     rc = testing_node.runSingleCommand("LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so cd %s; bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   symlink_usrint()
+# @fn symlink_usrint(testing_node,output=[]):
 #
 #   This runs the test-symlink-perms utility
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+# 
 def symlink_usrint(testing_node,output=[]):
 
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
@@ -466,12 +545,18 @@ def symlink_usrint(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 # 
-# tail()
+# @fn tail(testing_node,output=[]):
 #
 # This test checks to see if tail command works.
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#    
     
 def tail(testing_node,output=[]):
     
@@ -489,13 +574,19 @@ def tail(testing_node,output=[]):
     rc = testing_node.runSingleCommand("bash -c '%s tail %s'" % (preload,tail_test),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#	usrint_cp()
+# @fn usrint_cp(testing_node,output=[]):
 #
 #	This copies a file to OrangeFS mountpoint and back. Copied file should be
 #	the same as the original.
-#------------------------------------------------------------------------------    
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#  
     
     
 def usrint_cp(testing_node,output=[]):

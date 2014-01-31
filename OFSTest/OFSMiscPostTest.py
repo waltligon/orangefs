@@ -1,20 +1,26 @@
 #!/usr/bin/python
+##
+#
+# @namespace OFSMiscPostTest
+#
+# @brief This class implements tests to be run after all other tests have run.
 #
 #
-# OFSMiscPostTest
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# False
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# False
+# @var  tests  
+# List of test functions (at end of file)
 #
-# This class implements tests to be run after all other tests have run.
 #
-#
-# variables:
-#
-#   header = Name of header printed in output file
-#   prefix = Name of prefix for test name
-#   run_client = False
-#   mount_fs = Does the file system need to be mounted?
-#   mount_as_fuse = False
-#   tests = list of test functions
-#------------------------------------------------------------------------------
+
 
 header = "OFS Post-run Tests"
 prefix = "posttest"
@@ -41,14 +47,20 @@ mount_as_fuse = False
 #------------------------------------------------------------------------------
 
 
-#------------------------------------------------------------------------------
-# 
-# checkSHM()
+
+## 
+# @fn checkSHM(testing_node,output=[]):
 #
 # checks to see if there are any pvfs files in the /dev/shm directory. No files
 # should remain in directory after client is shut down.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
 #
-#------------------------------------------------------------------------------
+#
+
 
 def checkSHM(testing_node,output=[]):
  

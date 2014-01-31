@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #
-#
+# @class OFSTestConfigMenu
 # This class implements a dialog for Python based testing
-#
+# Needs to be updated.
 #
 
 #

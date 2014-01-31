@@ -1,9 +1,8 @@
 #!/usr/bin/python
-###############################################################################
-#
-# OFSTestConfigFile
+##
+# @class OFSTestConfigFile
 # 
-# This class reads the configuration from a file.
+# @brief This class reads the configuration from a file.
 #
 ################################################################################
 
@@ -17,15 +16,16 @@ class OFSTestConfigFile(OFSTestConfig):
         super(OFSTestConfigFile,self).__init__()
         
         
-    #------------------------------------------------------------------
+    ##
     #
-    # setConfig
+    # @fn setConfig(self,kwargs={}):
     #
     # This function reads the configuration into a dictionary D, which
     # is passed to the setConfigFromDict in the parent class.
-    # 
-    #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param kwargs Dictionary with variable=value pairing. 
+    
+    
     def setConfig(self,kwargs={}):
         
         #read the file into a dictionary

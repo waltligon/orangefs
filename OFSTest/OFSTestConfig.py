@@ -1,32 +1,27 @@
 #!/usr/bin/python
 
-###############################################################################
+##
 #
-# OFSTestConfig
+# @class OFSTestConfig
 # 
-# This class holds the configuration for OrangeFS
+# @brief This class holds the configuration for OrangeFS
 #
-################################################################################
+# These variables in this class control the configuration of OFSTest. OFSTest can 
+# setup an instance of OrangeFS on any real or virtual cluster with 
+# passwordless ssh access for one user and passwordless sudo access for
+# that user. 
+#
+
+
 
 
 class OFSTestConfig(object):
     
-    #------------------------------------------------------------------
-    #
-    # setup variables
-    #
-    #
-    # These variables control the configuration of OFSTest. OFSTest can 
-    # setup an instance of OrangeFS on any real or virtual cluster with 
-    # passwordless ssh access for one user and passwordless sudo access for
-    # that user. 
-    #
-    #------------------------------------------------------------------
     
     
     def __init__(self):
         
-    
+        ## @var log_file
         # name of output logfile
         self.log_file = "OFSTest.log"
         
@@ -36,58 +31,73 @@ class OFSTestConfig(object):
         #
         #------------------------------
        
-        # are we using OpenStack/EC2
+        ## @var using_ec2
+        # Are we using OpenStack/EC2?
         self.using_ec2 = False
         
+        ## @var ec2rc_sh
         # Location of the ec2rc.sh file
         self.ec2rc_sh = ""
         
-        # path of ssh key used to access all nodes
+        ## @var ssh_key_filepath
+        # Path of ssh key used to access all nodes
         self.ssh_key_filepath = ""
         
-        # list of differing keypaths if applicable
-        # TODO: Add multikey functionality.
+        ## @var ssh_key_filepaths 
+        # List of differing keypaths, if applicable
         self.ssh_key_filepaths = []
         
+        ## @var ec2_key_name
         # Internal ec2 key name. Must be consistant accross nodes.
         self.ec2_key_name = ""
         
+        ## @var number_new_ec2_nodes
         # Number of new ec2 nodes to be created. 
         # If == 0, then using existing nodes.
         self.number_new_ec2_nodes = 0
         
+        ## @var ec2_image
         # Image name to be launched for ec2 instance.
         # Must be consistant across nodes.
         self.ec2_image = ""
         
+        ## @var ec2_machine
         # ec2 machine type (e.g. m1.medium)
         # Must be consistant across nodes.
         self.ec2_machine = ""
         
+        ## @var ec2_delete_after_test
         # Should the nodes be deleted after testing?
         self.ec2_delete_after_test = False
         
+        ## @var ec2_domain
         # EC2 domain
         self.ec2_domain=None
         
-        # Associate external ip address with EC2 nodes.
+        ## @var ec2_associate_ip
+        # Associate external ip address with EC2 nodes?
         self.ec2_associate_ip=False
         
-        # list of node ip addresses. If a private network is used, this is the
+        ## @var node_ip_addresses
+        # List of node ip addresses. If a private network is used, this is the
         # Internal network.
         self.node_ip_addresses = []
         
-        # list of addresses accessible from the local machine.
+        ## @var node_ext_ip_addresses
+        # List of addresses accessible from the local machine.
         # if node_ip_addresses is accessible, this need not be set.
         self.node_ext_ip_addresses = []
         
-        # single username to access all nodes
+        ## @var node_username
+        # Single username to access all nodes
         self.node_username = "ec2-user"
         
+        ## @var node_usernames
         # usernames for login of individual nodes, if necessary
         self.node_usernames = []
         
-        # no longer needed
+        ## @var ofs_fs_name
+        # Name of OrangeFS filesystem service in URL. No longer needed
         self.ofs_fs_name=None
         
         #------------------------------
@@ -96,13 +106,15 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
+        ## @var ofs_resource_location
         # location of OrangeFS source
         self.ofs_resource_location = ""
         
+        ## @var ofs_resource_type
         # What package is the OrangeFS source? SVN, TAR, Local Dir, Node? 
         self.ofs_resource_type = ""
         
-        
+        ## @var pvfs2genconfig_opts
         # Additional options for pvfs2genconfig to generate Orangefs.conf file
         self.pvfs2genconfig_opts = ""
         
@@ -112,43 +124,55 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
-        # --enable-fuse
+        ## @var install_fuse
+        # Build Fuse module
         self.install_fuse=False
             
-        # --prefix=
-        self.install_prefix = None
+        ## @var install_prefix
+        # Where to install OrangeFS.
+        self.install_prefix = "/opt/orangefs"
         
-        # --with-db=
+        ## @var db4_prefix
+        # Location of DB4
         self.db4_prefix = "/opt/db4"
 
-        # add --with-kernel option
+        ## @var install_OFS_client
+        # Install the OrangeFS client and add --with-kernel option
         self.install_OFS_client = True
 
-        # add --enable=shared
+        ## @var install_shared
+        # --enable-shared flag
         self.install_shared = False
         
-        # --enable-strict
+        ## @var enable_strict
+        # --enable-strict flag
         self.enable_strict = True
         
-        # disable security. Options are "Key" and "Cert"
+        ## @var ofs_security_mode
+        # Security Mode. Default is None. Options are "Key" and "Cert"
         self.ofs_security_mode = None
         
-        # build the kernel module?
+        ## @var ofs_build_kmod
+        # Build the kernel module?
         self.ofs_build_kmod = True
         
-        # compile with -g debugging option?
+        ## @var ofs_compile_debug
+        # Compile with -g debugging option?
         self.ofs_compile_debug = True
 
-        # list of patches to patch OrangeFS source
+        ## @var ofs_patch_files
+        # List of patches to patch OrangeFS source
         self.ofs_patch_files=[]
         
-        # username of svn user. Allows checkout instead of export
+        ## @var svn_username
+        # Username of svn user. Allows checkout instead of export
         self.svn_username = None
 
-        # enable OrangeFS hadoop support
+        ## @var install_hadoop
+        # Enable OrangeFS hadoop support
         self.install_hadoop = False
 
+        ## @var configure_opts
         # Additional options for configure
         self.configure_opts = ""
 
@@ -158,23 +182,28 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
+        ## @var mount_OFS_after_setup
         # Mount the filesystem after setup
         self.mount_OFS_after_setup = True
         
+        ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
         self.ofs_mount_as_fuse = False
         
+        ## @var install_tests
         # Install OrangeFS tests
         self.install_tests = True
         
+        ## @var install_OFS_server
         # Install and start the OrangeFS server software
         self.install_OFS_server = True
         
+        ## @var install_MPI
         # Install MPI software, including Torque
         self.install_MPI = False
         
-        # Additional installation option
+        ## @var install_opts
+        # Additional installation options
         self.install_opts = ""
         
         
@@ -184,30 +213,37 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
+        ## @var ofs_extra_tests_location
         # location of suite of testing benchmarks
         self.ofs_extra_tests_location = None
         
+        ## @var ofs_pvfs2tab_file
         # location of PVFS2TAB_FILE. Mountpoint will be read from file
         self.ofs_pvfs2tab_file = None
         
+        ## @var ofs_source_location
         # location of orangefs on the main node
         self.ofs_source_location = None
         
+        ## @var ofs_config_file
         #Location of OrangeFS.conf file
         self.ofs_config_file = None
         
+        ## @var delete_existing_data
         # Delete data on OrangeFS partition
         self.delete_existing_data = False
         
+        ## @var ofs_mount_point
         # OrangeFS mount point
         self.ofs_mount_point = None
         
+        ## @var ofs_host_name_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
         # a bug on some ec2 setups.
         self.ofs_host_name_override = []
         
+        ## @var start_client_on_all_nodes
         # Start the OrangeFS client on all nodes after installation?
         self.start_client_on_all_nodes = False
         
@@ -218,6 +254,13 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
+        ## @var run_sysint_tests
+        ## @var run_usrint_tests
+        ## @var run_vfs_tests
+        ## @var run_fuse_tests
+        ## @var run_mpi_tests
+        ## @var run_hadoop_tests
+        
         self.run_sysint_tests = False
         self.run_usrint_tests = False
         self.run_vfs_tests = False
@@ -227,31 +270,33 @@ class OFSTestConfig(object):
         
         
     
-    #------------------------------------------------------------------
+    ##
     #
-    # setConfig
-    #
+    # @fn setConfig(self,kwargs={}):
     #
     # A universal method for setting the initial configuration. Overridden
     # in subclasses
     #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param kwargs Argument list with keywords.
+    
+    
 
     
     def setConfig(self,kwargs={}):
         pass
         
-    #------------------------------------------------------------------
+    ##
     #
-    # addConfig
+    # @fn addConfig(self,str_args=[]):
     #
     #
-    # This method can "override" existing values as specified in str_args
-    # str_args are an array of variable=value strings.
+    # This method can "override" existing values as specified in str_args. 
+    # This was implemented to add support for command line override of config files.
     #
-    # implemented to add support for command line override of config files.
-    #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param str_args An array of variable=value strings.
+    
 
     
     def addConfig(self,str_args=[]):
@@ -284,29 +329,30 @@ class OFSTestConfig(object):
         
         self.setConfigFromDict(d)
         
-    #------------------------------------------------------------------
+    ##
     #
-    # printDict
-    #
+    # @fn printDict(self):
     #
     # This prints all the setup variables. Used for debugging.
-    #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # 
 
     
     def printDict(self):
         print self.__dict__
 
 
-    #------------------------------------------------------------------
+    ##
     #
-    # setConfigFromDict
-    #
+    # @fn setConfigFromDict(self,d={}):
     #
     # This method takes a formatted dictionary d and converts the values
-    # into the variables of this class.
+    # into the variables of this class. Every new variable added above will
+    # need an entry here.
     #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param d Dictionary with varible names and values.
+    
     
     
     

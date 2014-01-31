@@ -1,20 +1,26 @@
 #!/usr/bin/python
+##
+#
+# @namespace OFSMpiioTest
+#
+# @brief This class implements mpi-io tests to be run on the virtual file system.
 #
 #
-# OFSMpiioTest
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# False
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# Do we mount it via fuse?
+# @var  tests  
+# List of test functions (at end of file)
 #
-# This class implements tests to be run on the virtual file system.
 #
-#
-# variables:
-#
-#   header = Name of header printed in output file
-#   prefix = Name of prefix for test name
-#   run_client = False
-#   mount_fs = Does the file system need to be mounted?
-#   mount_as_fuse = False
-#   tests = list of test functions (at end of file)
-#------------------------------------------------------------------------------
+
 
 header = "OFS MPI-IO Test"
 prefix = "mpiio"
@@ -55,15 +61,20 @@ def romio_status(self,testing_network):
 def stadler_file_view_test(self,testing_network):
     pass
     
-#------------------------------------------------------------------------------
+##
 #
-#	romio_testsuite()
+# @fn romio_testsuite(testing_node,output=[]):
 #
-#   This is the romio testsuite that comes with mpich and can also be used with
-#   OpenMPI. 
+# @brief This is the romio testsuite that comes with mpich and can also be used with OpenMPI. 
+# This does not use pbs/torque, but uses the MPI process managers directly.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
 #
-#   This does not use pbs/torque, but uses the MPI process managers directly.
-#------------------------------------------------------------------------------
+#
+
 def romio_testsuite(testing_node,output=[]):
 
     #/opt/mpi/openmpi-1.6.5/ompi/mca/io/romio/romio/test

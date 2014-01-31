@@ -1,20 +1,24 @@
 #!/usr/bin/python
+##
+# @package OFSTest
+# @namespace OFSHadoopTest
+#
+# @brief This class implements hadoop tests to be run on the virtual file system.
+#
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# False
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# False
+# @var  tests  
+# List of test functions (at end of file)
 #
 #
-# OFSHadoopTest
-#
-# This class implements tests to be run on the virtual file system.
-#
-#
-# variables:
-#
-#   header = Name of header printed in output file
-#   prefix = Name of prefix for test name
-#   run_client = False
-#   mount_fs = Does the file system need to be mounted?
-#   mount_as_fuse = False
-#   tests = list of test functions (at end of file)
-#------------------------------------------------------------------------------
 
 
 header = "OFS Hadoop Test"
@@ -24,14 +28,20 @@ run_client = False
 mount_as_fuse = False
 
 
-#------------------------------------------------------------------------------
+##
 #
-#	wordcount()
+# @fn	wordcount(testing_node,output[])
 #
-#   Tests hadoop using the wordcount program with a series of gutenberg project
+# @brief  Tests hadoop using the wordcount program with a series of gutenberg project
 #   e-books.
 #
-#------------------------------------------------------------------------------
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
 
 def wordcount(testing_node,output=[]):
 
@@ -52,27 +62,37 @@ def wordcount(testing_node,output=[]):
     # TODO: Compare acutal results with expected.
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#	TestDFSIO_clean()
+# @fn	TestDFSIO_clean(testing_node,output=[]):
 #
-#   runs TestDFSIO with clean option
+# @brief Runs TestDFSIO with clean option
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
 #
-#------------------------------------------------------------------------------
+#
+
 
 def TestDFSIO_clean(testing_node,output=[]):
 
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  TestDFSIO -clean" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#	TestDFSIO_read()
+# @fn TestDFSIO_read(testing_node,output=[]):
 #
-#   runs TestDFSIO with read option. Must be run after write, but not after 
+# @brief Runs TestDFSIO with read option. Must be run after write, but not after 
 #   clean.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
 #
-#------------------------------------------------------------------------------
 
 def TestDFSIO_read(testing_node,output=[]):
 
@@ -80,26 +100,36 @@ def TestDFSIO_read(testing_node,output=[]):
     return rc
 
 
-#------------------------------------------------------------------------------
+##
 #
-#	TestDFSIO_write()
+# @fn TestDFSIO_write(testing_node,output=[]):
 #
-#   runs TestDFSIO with write option - Must be run before read.
+# @brief Runs TestDFSIO with write option - Must be run before read.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
 #
-#------------------------------------------------------------------------------
 
 def TestDFSIO_write(testing_node,output=[]):
 
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  TestDFSIO -write -nrFiles 10 -fileSize 100" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#	terasort_full_5g()
+# @fn terasort_full_5g(testing_node,output=[]):
 #
-#   runs terasort with 5G worth of data per node
+# @brief Runs terasort with 5G worth of data per node
 #
-#------------------------------------------------------------------------------
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
 
 
 def terasort_full_5g(testing_node,output=[]):
@@ -114,13 +144,19 @@ def terasort_full_5g(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  teravalidate /user/%s/terasort5-output /user/%s/terasort5-validate" % (testing_node.hadoop_location,testing_node.hadoop_location,testing_node.current_user,testing_node.current_user),output)
 
     return rc      
-#------------------------------------------------------------------------------
+##
 #
-#	terasort_full_1g()
+# @fn	terasort_full_1g(testing_node,output=[]):
 #
-#   runs terasort with 1G worth of data per node
+# @brief  Runs terasort with 1G worth of data per node
 #
-#------------------------------------------------------------------------------
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
 
     
 def terasort_full_1g(testing_node,output=[]):
@@ -137,18 +173,24 @@ def terasort_full_1g(testing_node,output=[]):
     return rc     
 
 
-#------------------------------------------------------------------------------
+##
 #
-#   mrbench()
+# @fn mrbench(testing_node,output=[]):
 #
-#   Hadoop MapReduce benchmark
+# @brief  Hadoop MapReduce benchmark
 #
-#------------------------------------------------------------------------------ 
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
     
 def mrbench(testing_node,output=[]):
 
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  mrbench -numRuns 50" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
     return rc
+
 
 
 tests = [ wordcount,

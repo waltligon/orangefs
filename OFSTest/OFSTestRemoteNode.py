@@ -1,14 +1,12 @@
 #!/usr/bin/python
-###############################################################################################
+##
 #
-# class OFSTestRemoteNode(OFSTestNode)
+# @class OFSTestRemoteNode @extends OFSTestNode
 #
+# This class is an abstraction of all remote machines, virtual and bare metal. 
 #
-# This class is for the all remote machines
-#
-#
-#
-################################################################################################
+# Currently OFSTestRemoteNode only supports Linux machines.
+
 import os
 import subprocess
 import shlex
@@ -19,6 +17,21 @@ import xml.etree.ElementTree as ET
 import OFSTestNode
 
 class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
+ 
+    ##
+    # @fn __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
+    #
+    # Initialization routine.
+    #
+    # @param self The object pointer
+    # @param username Name of current user
+    # @param ip_address IP address of node on cluster network.
+    # @param key Location on local machine of SSH key used to access node.
+    # @param local_node OFSTestLocalNode object that represents the local machine
+    # @param is_ec2 Is this an ec2/OpenStack node?
+    # @param ext_ip_address IP address of node accessible from local machine if different from cluster IP.
+    # 
+    # @return None, but will print ssh command used to access node.
  
     def __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
 
@@ -47,12 +60,29 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
          
         #print "Host,kernel:  %s,%s" % (self.host_name,self.kernel_version)
         
+    ##
+    #
+    # @fn getKeyFileFromLocal(self,localnode):
+    #
+    # Uploads the SSH key from the localnode to the remote node and adds information to local keytable.
+    #
+    # @param self The object pointer
+    # @param local_node OFSTestLocalNode object that represents the local machine
+    
         
     def getKeyFileFromLocal(self,localnode):
         localnode.addRemoteKey(self.ext_ip_address,self.sshLocalKeyFile)
         self.uploadNodeKeyFromLocal(localnode)
         
-
+    ##
+    # @fn def getAliasesFromConfigFile(self,config_file_name):
+    #
+    # Reads the OrangeFS alias from the configuration file.
+    #
+    # @param self The object pointer
+    # @param config_file_name Full path to the configuration file. (Usually orangefs.conf)
+    #
+    # @return list of alias names 
         
     def getAliasesFromConfigFile(self,config_file_name):
         
@@ -68,7 +98,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         alias_lines = alias.split('\n')
         
         aliases = []
-        #!/usr/bin/python        
+                
                 
         for line in alias_lines:
             if "Alias " in line:
@@ -84,10 +114,14 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
          
         
         
-        
-        
-        # ok, now let's get the os version.
-        # should have the architecture and version from the kernel name 
+    ##       
+    # @fn runAllBatchCommands(self,output=[]):
+    #
+    # Writes stored batch commands to a file, then runs them.
+    # 
+    # @param self The object pointer
+    # @param output Output of command
+
     def runAllBatchCommands(self,output=[]):
         OFSTestNode.batch_count = OFSTestNode.batch_count+1
 
@@ -99,7 +133,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         script_file.write("script runcommand\n")
         
         for element in self.current_environment:
-          script_file.write("export %s=%s\n" % (element, self.current_environment[element]))
+            script_file.write("export %s=%s\n" % (element, self.current_environment[element]))
         
         # change to current directory
         script_file.write("cd %s\n" % self.current_directory)
@@ -111,9 +145,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         # command
         for command in self.batch_commands:
-          script_file.write(command)
-          script_file.write('\n');
-        
+            script_file.write(command)
+            script_file.write('\n');
+
 
         script_file.write("exit\n")
         script_file.close()
@@ -133,10 +167,20 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         return p.returncode
         
 
-    
-            
-            
-        
+    ##       
+    # @fn prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
+    #
+    # Formats the command line to run on this specific type of node with appropriate environment.
+    # 
+    # @param self The object pointer
+    # @param command Shell command to be run.
+    # @param outfile File to redirect stdout to.
+    # @param append_out Append outfile or overwrite?
+    # @param errfile File to redirect stderr to.
+    # @param append_err Append errfile or overwrite?
+    # @param remote_user Run command as this user
+    #
+    # @return String Formatted command line.
         
 
 
@@ -174,7 +218,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         command_chunks.append("cd %s; " % self.current_directory)
         #now append each variable followed by a space
         for variable in self.current_environment:
-          command_chunks.append("export %s=%s; " % (variable,self.current_environment[variable]))
+            command_chunks.append("export %s=%s; " % (variable,self.current_environment[variable]))
         #now append the command
         command_chunks.append(command)
                 
@@ -185,13 +229,23 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         #Command chunks has the entire command, but not the way python likes it. Join the chunks into one string
         command_line = ''.join(command_chunks)
-        #print command_line
-        # now use shlex to get the right list for python
-        #command_v = shlex.split(command_line)
-        #command_v[-1] = '"%s"' % command_v[-1]
+
         return command_line
     
 
+    ##
+    #
+    # @fn copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
+    #
+    # This copies files from this node to the remote node via rsync.
+    #
+    # @param self The object pointer
+    # @param source Source file or directory
+    # @param destination_node Node to which files should be copied
+    # @param destination Destination file or directory on remote node.
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
     
      
     def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
@@ -199,9 +253,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         rflag = ""
         # verify source file exists
         if recursive == True:
-          rflag = "-a"
+            rflag = "-a"
         else:
-          rflag = ""
+            rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ip_address,destination)
         #print rsync_command
@@ -211,15 +265,31 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             print "Could not copy to remote node"
             print output
         return rc
+    
+    ##
+    #
+    # @fn copyFromRemoteNode(self, source_node, source, destination, recursive=False):
+    #
+    # This copies files from the remote node to this node via rsync.
+    #
+    # @param self The object pointer
+    # @param source_node Node from which files should be copied
+    # @param source Source file or directory on remote node.
+    # @param destination Destination file or directory
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
+    
+      
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
         # This runs the copy command remotely 
         rflag = ""
         # verify source file exists
         if recursive == True:
-          rflag = "-a"
+            rflag = "-a"
         else:
-          rflag = ""
+            rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ip_address,source,destination)
         
@@ -230,6 +300,17 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             print output
         return rc
       
+    ##
+    #
+    # @fn uploadNodeKeyFromLocal(self,local_node):
+    #
+    # This function uploads a the key that accesses the current node from the local machine to the current node.
+    # This allows the this node to distribute its own key to other nodes.
+    #
+    # @param self The object pointer
+    # @param local_node OFSTestLocalNode object that represents the local machine  
+    #
+    
     def uploadNodeKeyFromLocal(self, local_node):
         
         # This function uploads a key 
@@ -243,7 +324,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
             return rc
  
-       #set the ssh key file to the uploaded location.
+        #set the ssh key file to the uploaded location.
         self.sshNodeKeyFile = "/home/%s/.ssh/%s" % (self.current_user,keybasename)
         
         #symlink to id_rsa
@@ -254,6 +335,18 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     
 
         return 0
+    
+    ##
+    #
+    # @fn uploadRemoteKeyFromLocal(self,local_node,remote_address):
+    #
+    # This function uploads the key used to access a remote node at remote_address from the local machine. 
+    # It then adds this to the nodes key table.
+    #
+    # @param self The object pointer
+    # @param local_node OFSTestLocalNode object that represents the local machine  
+    # @param remote_address Address of remote node associated with the SSH key. 
+    
       
     def uploadRemoteKeyFromLocal(self,local_node,remote_address):
         # This function uploads a key for a remote node and adds it to the table

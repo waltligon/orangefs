@@ -1,20 +1,23 @@
 #!/usr/bin/python
+##
+#
+# @namespace OFSSysintTest
+#
+# @brief This class implements system integration tests to be run on the virtual file system.
 #
 #
-# OFSSysintTest
-#
-# This class implements tests to be run on the virtual file system.
-#
-#
-# variables:
-#
-#   header = Name of header printed in output file
-#   prefix = Name of prefix for test name
-#   run_client = False
-#   mount_fs = Does the file system need to be mounted?
-#   mount_as_fuse = False
-#   tests = list of test functions
-#------------------------------------------------------------------------------
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# False
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# Do we mount it via fuse?
+# @var  tests  
+# List of test functions (at end of file)
 
 header = "OFS Sysint Test"
 prefix = "sysint"
@@ -22,15 +25,22 @@ mount_fs =  False
 run_client = True
 mount_as_fuse = False
 
-#------------------------------------------------------------------------------
+##
 #
-#	cp()
+# @fn cp(testing_node,output=[]):
 #
 #	This uses pvfs2_cp to copy file to OrangeFS mountpoint and back. 
 #   Copied file should be the same as the original.
 #
 #   pvfs2_cp is run with a series of argument combinations.
-#------------------------------------------------------------------------------
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+
 def cp(testing_node,output=[]):
 
     # interior function that actually does the copying.
@@ -57,12 +67,19 @@ def cp(testing_node,output=[]):
     
     return rc
     
-#------------------------------------------------------------------------------
+##
 #
-#	misc()
+# @fn misc(testing_node,output=[]):
 #
 #	This tests a variety of pvfs2 utilities.
-#------------------------------------------------------------------------------
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+
 
 
 def misc(testing_node,output=[]):
@@ -173,13 +190,20 @@ def misc(testing_node,output=[]):
     rc += statfs(testing_node,output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   mkdir_sysint()
+# @fn  mkdir_sysint(testing_node,output=[]):
 #
 #   This runs the test-mkdir utility
 #
-#------------------------------------------------------------------------------    
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
     
 
 def mkdir_sysint(testing_node,output=[]):
@@ -193,13 +217,20 @@ def mkdir_sysint(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   ping()
+# @fn  ping(testing_node,output=[]):
 #
 #   This runs the pvfs2-ping utility
 #
-#------------------------------------------------------------------------------    
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
 
 def ping(testing_node,output=[]):
     
@@ -207,13 +238,20 @@ def ping(testing_node,output=[]):
     #print "RC = %d" % rc
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   symlink_sysint()
+# @fn  symlink_sysint(testing_node,output=[]):
 #
 #   This runs the test-symlink-perms utility
 #
-#------------------------------------------------------------------------------    
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
 
 def symlink_sysint(testing_node,output=[]):
     
@@ -223,13 +261,19 @@ def symlink_sysint(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
-#------------------------------------------------------------------------------
+##
 #
-#   zerofill()
+# @fn  zerofill(testing_node,output=[]):
 #
 #   This runs the test-zero-fill utility
 #
-#------------------------------------------------------------------------------    
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#    
 
 def zerofill(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
