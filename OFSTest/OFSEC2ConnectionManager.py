@@ -1,28 +1,12 @@
 #!/usr/bin/python
 ## 
-# @class OFSEC2ConnectionManager OFSEC2ConnectionManager.py
+# @package OFSTest
+# @class OFSEC2ConnectionManager
 #
 # @brief This class manages the EC2 connection. It has no awareness of OFSTestNodes or the OFSTestNetwork.
 #
 #
-# Members:
-#
-#        ec2_instance_names = {}
-#        ec2_instance_list = {}
-#        ec2_access_key = EC2 Access key. In ec2rc.sh file.
-#        ec2_endpoint = Endpoint is the hostname. e.g. devstack.clemson.edu
-#        ec2_path = Path to EC2 on the host (URL = http://host:port/path)
-#        ec2_port = Port is TCP port.
-#        ec2_secret_key = EC2 Secret Key. In ec2rc.sh file.
-#        ec2_region = EC2 region. Received after initial connect.
-#        ec2_connection = The ec2.connection.EC2Connection object.
-#        ec2_image_list = List of all available images
-#        ec2_key_list = List of all available keys (not used)
-#        ec2_region_name = EC2 region name. Required to connect.
-#		 ec2_is_secure - Is this http or https?       
-#		 instance_key - Name of key (in EC2) used to access instance via SSH
-#		 instance_key_location - *.pem ssh key used to access instance.
-#
+
 #
 # Methods:
 #
@@ -58,7 +42,7 @@
 #
 #	deleteOldInstances():	Deletes instances over a certain number of days old.
 #				
-##
+
 
 #import os
 import time
@@ -72,7 +56,7 @@ from datetime import datetime, timedelta
 class OFSEC2ConnectionManager(object):
 ##
 #
-# __init__(self,ec2_config_file=None,region_name=None):
+# @fn __init__(self,ec2_config_file=None,region_name=None):
 # @param self The object pointer
 # @param ec2_config_file Path to ec2rc.sh file.
 # @param region_name Name of ec2 region to connect to.
@@ -81,6 +65,52 @@ class OFSEC2ConnectionManager(object):
     
     def __init__(self,ec2_config_file=None,region_name=None):
         
+##
+# @var self.ec2_instance_names
+# @brief Dictionary of EC2 instance names
+#
+# @var self.ec2_instance_list
+# @brief Dictionary of EC2 instances
+#
+# @var self.ec2_access_key  
+# @brief EC2 Access key. In ec2rc.sh file.
+#
+# @var self.ec2_endpoint
+# @brief Endpoint is the hostname. e.g. devstack.clemson.edu
+#
+# @var self.ec2_path
+# @brief Path to EC2 on the host (URL = http://host:port/path)
+#
+# @var self.ec2_port
+# @brief Port is TCP port.
+#
+# @var self.ec2_secret_key
+# @brief EC2 Secret Key. In ec2rc.sh file.
+#
+# @var self.ec2_region
+# @brief EC2 region. Received after initial connect.
+#
+# @var self.ec2_connection
+# @brief The ec2.connection.EC2Connection object.
+#
+# @var self.ec2_image_list
+# @brief List of all available images
+#
+# @var self.ec2_key_list
+# @brief List of all available keys (not used)
+#
+# @var self.ec2_region_name
+# @brief EC2 region name. Required to connect.
+#
+# @var self.ec2_is_secure
+# @brief Is this http or https?
+#       
+# @var String self.instance_key
+# @brief Name of key (in EC2) used to access instance via SSH
+#
+# @var String self.instance_key_location
+# @brief  *.pem ssh key used to access instance.
+#
         self.ec2_instance_names = {}
         self.ec2_instance_list = {}
         self.ec2_access_key = ""
@@ -95,6 +125,8 @@ class OFSEC2ConnectionManager(object):
         self.ec2_is_secure = False
         self.instance_key = None
         self.instance_key_location = None
+        self.ec2_region_name = None
+    
         
         # Default region name is RegionOne
         if region_name == None:
@@ -112,9 +144,9 @@ class OFSEC2ConnectionManager(object):
         
 ##
 #
-#	readEC2ConfigFile(self,filename):
+# @fn readEC2ConfigFile(self,filename):
 #
-#		Reads relevant values from ec2rc.sh file.
+# Reads relevant values from ec2rc.sh file.
 #
 # @param self The object pointer
 #
@@ -164,13 +196,10 @@ class OFSEC2ConnectionManager(object):
                 
 ##
 #      
-#	connect(debug):			Gets region info and connects to EC2. 
-#							ec2.connection.EC2Connection object
-#							should be stored in self.ec2_connection.
-#
-#	Arguments:
-#
-#	debug = Debug level.
+# @fn connect(self,debug): 
+# Gets region info and connects to EC2. ec2.connection.EC2Connection object should be stored in self.ec2_connection.
+# @param self The object pointer
+# @param debug  Debug level.
 ##
 
     def connect(self,debug=0):
@@ -191,10 +220,11 @@ class OFSEC2ConnectionManager(object):
 
 ##
 #      
-#	setEC2Key(keyname,keylocation)
-#
-#				Sets key name (EC2) and key location (file) used to create and
-#				access EC2 instances.
+# @fn setEC2Key(self,keyname,keylocation):
+# Sets key name (EC2) and key location (file) used to create and access EC2 instances.
+# @param self  The object pointer
+# @param keyname Name of key in EC2
+# @param keylocation Location of .pem file in filesystem.
 #
 ##
 
@@ -203,8 +233,11 @@ class OFSEC2ConnectionManager(object):
         self.instance_key_location = keylocation
 
 ##
-#	getAllImages():			Returns a list of available EC2 Images	
-##
+# @fn getAllImages(self ):	
+# Get a list of all the EC2 images
+# @param self  The object pointer		
+# @return A list of available EC2 Images	
+#
 
     def getAllImages(self):
         self.checkEC2Connection()        
@@ -213,17 +246,16 @@ class OFSEC2ConnectionManager(object):
         return self.ec2_image_list
 
 ##
+# @fn terminateEC2Instance(self,ip_address)
+# Terminates a running EC2 instance 
 #
-#	terminateEC2Instance(ip_address):	Terminates a running EC2 instance 
+# @param self The object pointer
+# @param	ip_address IP address (internal) of the node.
 #
-#	Arguments:
-#		ip_address: IP address (internal) of the node.
+# @return 1	Instance not found for that ip address
+# @return 0	Instance terminated.
 #
-#	Return:
-#		1:	Instance not found for that ip address
-#		0:	Instance terminated.
 #
-##
         
     def terminateEC2Instance(self,ip_address):
         
@@ -254,18 +286,17 @@ class OFSEC2ConnectionManager(object):
         return 0
 ##
 #
-#	createNewEC2Instances(number_nodes,image_system,type): 
-#							Creates new EC2 instances and returns list of them.
+# @fn createNewEC2Instances(self,number_nodes,image_system,type): 
+# Creates new EC2 instances and returns list of them.
 #
-#	Arguments:
-#		number_nodes 	= Number of nodes to create
-#		image_system	= Image to run. (e.g. "cloud-ubuntu-12.04")
-#		type			= Image "flavor" (e.g. "m1.medium")
+# @param self The object pointer
+# @param number_nodes  Number of nodes to create
+# @param image_system Image to run. (e.g. "cloud-ubuntu-12.04")
+# @param type Image "flavor" (e.g. "m1.medium")
 #
-#	Return:
-#		A list of new instances.
+# @return	A list of new instances.
 #		
-##        
+        
     def createNewEC2Instances(self,number_nodes,image_system,instance_type):
         self.checkEC2Connection()  
         
@@ -304,9 +335,11 @@ class OFSEC2ConnectionManager(object):
         return new_instances
 
 ##      
-#	associateIPAddress():	Creates an new external IP address and associates 
-#							with the instances in the array.
-##
+# @fn associateIPAddresses(self,instances[],domain=None):	
+# Creates an new external IP address and associates	with the instances in the array.
+# @param self The object pointer
+# @return A list of the external addresses
+#
 
     def associateIPAddresses(self,instances=[],domain=None):
         external_addresses = []
@@ -331,10 +364,10 @@ class OFSEC2ConnectionManager(object):
         
 ##
 #
-#	checkEC2Connection():	Checks to see if the EC2 connection is available. 
-#							Connects if it isn't.
-# 
-##
+# @fn checkEC2Connection(self):	
+# Checks to see if the EC2 connection is available.	Connects if it isn't.
+# @param self The object pointer
+#
 
     def checkEC2Connection(self):
         if self.ec2_connection == None:
@@ -342,10 +375,10 @@ class OFSEC2ConnectionManager(object):
 
 ##
 #
-#	getAllEC2Instances():	Gets all instances from EC2 connection. Returns a
-#							list of instances.
+# @fn getAllEC2Instances(self):	
+# Gets all instances from EC2 connection. Returns a	list of instances.
+# @param self The object pointer
 #
-##
     
     def getAllEC2Instances(self):
         self.checkEC2Connection()
@@ -356,9 +389,9 @@ class OFSEC2ConnectionManager(object):
 
 ##
 #
-#	printAllInstanceStatus():	Prints the status of all instances. For 
-#								debugging.
-#				
+# @fn	printAllInstanceStatus(self):	
+# Prints the status of all instances. For debugging.
+# @param self The object pointer
 ##
     
     def printAllInstanceStatus(self):
@@ -368,9 +401,15 @@ class OFSEC2ConnectionManager(object):
 
 ##
 #
-#	instanceIsDaysOld():	Tests whether an instance is so many days old.
-#				
-##
+# @fn	instanceIsDaysOld(self,instance,days_old):	
+# Tests whether an instance is so many days old.
+# @param self The object pointer
+# @param instance Instance to check
+# @param days_old Age to check
+# 
+# @return True if instance is at least days_old days old
+# @return Fals if instance is not days_old
+#
         
     def instanceIsDaysOld(self,instance,days_old=7):
         today = datetime.today()
@@ -381,7 +420,7 @@ class OFSEC2ConnectionManager(object):
         print today
         print launch
         
-        if today - launch > week:
+        if today - launch >= week:
             print "Expired"
             return True
         else:
@@ -389,8 +428,13 @@ class OFSEC2ConnectionManager(object):
 ##
 # deleteOldInstances(days_old,name_filter,key_filter)
 #
-#	delete instances over a certain number of days old.
-##
+# Delete instances over a certain number of days old.
+# @param self The object pointer
+# @param days_old Age to check
+# @param name_filter Filter to only delete instances matching name
+# @param key_filter Filter to only delete instance associated with this EC2 key
+#
+#
     def deleteOldInstances(self,days_old=7,name_filter="",key_filter=""):    
         
         self.checkEC2Connection()
@@ -414,8 +458,8 @@ class OFSEC2ConnectionManager(object):
 ##
 #
 #	Future functionality
+# 
 #
-##
 
     def getEC2ConfigFromEnvironment(self):
         print "This should be implemented, but isn't."
@@ -442,34 +486,34 @@ class OFSEC2ConnectionManager(object):
 #
 ##
 
-    
-def OFSEC2ConnectionManager_test_driver():
-    
-    # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
-    my_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
-    print "Connect to EC2"
-    #old_mgr.connect(debug=1)
-    my_mgr.connect(debug=1)
-    
-    print "Testing connection"
-    #old_mgr.printAllInstanceStatus()
-    #my_mgr.printAllInstanceStatus()
-    #my_mgr.getAllImages()
-    #my_mgr.deleteOldInstances(days_old=3)
-    #old_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
-    my_mgr.setEC2Key("BuildBot2","/home/jburton/cuer1/buildbot2.pem")
-
-    
-    
-    
-        
-    print "Creating Instances"
-    
-    node_list = my_mgr.createNewEC2Instances(number_nodes=1,image_system="cloud-rhel6",type="m1.small")
-        
-    #print my_mgr
-    for node in node_list:
-        my_mgr.terminateEC2Instance(node.ip_address)
-
-
-#OFSEC2ConnectionManager_test_driver()
+#     
+# def OFSEC2ConnectionManager_test_driver():
+#     
+#     # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
+#     my_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
+#     print "Connect to EC2"
+#     #old_mgr.connect(debug=1)
+#     my_mgr.connect(debug=1)
+#     
+#     print "Testing connection"
+#     #old_mgr.printAllInstanceStatus()
+#     #my_mgr.printAllInstanceStatus()
+#     #my_mgr.getAllImages()
+#     #my_mgr.deleteOldInstances(days_old=3)
+#     #old_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
+#     my_mgr.setEC2Key("BuildBot2","/home/jburton/cuer1/buildbot2.pem")
+# 
+#     
+#     
+#     
+#         
+#     print "Creating Instances"
+#     
+#     node_list = my_mgr.createNewEC2Instances(number_nodes=1,image_system="cloud-rhel6",type="m1.small")
+#         
+#     #print my_mgr
+#     for node in node_list:
+#         my_mgr.terminateEC2Instance(node.ip_address)
+# 
+# 
+# #OFSEC2ConnectionManager_test_driver()
