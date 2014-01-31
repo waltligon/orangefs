@@ -386,8 +386,7 @@ class OFSTestNetwork(object):
 
                     
             node.runAllBatchCommands()
-
-        node.host_name = node.runSingleCommandBacktick("hostname")
+            node.host_name = node.runSingleCommandBacktick("hostname")
 
 #------------------------------------------------------------------------------
 # updateNodes(node_list)
