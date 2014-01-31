@@ -1186,7 +1186,7 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.created_nodes
             
-        for i,node in enumerate():
+        for i,node in enumerate(node_list):
 
             # source - Must provide location
             node.resource_location = resource_location
