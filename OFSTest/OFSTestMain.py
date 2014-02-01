@@ -1,9 +1,8 @@
 # !/usr/bin/python
 ##
-# @ class OFSTestMain.py
+# @class OFSTestMain
 #
-# @brief This class drives the OrangeFS testing. This sets up OrangeFS on the 
-# OFSTestNetwork based on the OFSTestConfig.
+# @brief This class drives the OrangeFS testing. This sets up OrangeFS on the OFSTestNetwork based on the OFSTestConfig.
 #
 #
 
@@ -26,7 +25,7 @@
 #
 #   runTest()       Runs the tests for OrangeFS as specified by the config.
 #
-#------------------------------------------------------------------------------
+
 
 import OFSTestConfig
 import OFSTestConfigFile
@@ -84,7 +83,8 @@ class OFSTestMain(object):
     #   
     # Prints the dictionary of self.config. For debugging.
     #
-    # @var self The object pointer
+    # @param self The object pointer
+    
     
     def printConfig(self):
         self.config.printDict()
@@ -111,7 +111,7 @@ class OFSTestMain(object):
     ##
     # @fn initNetwork(self)
     #
-    # builds the OFSTestNetwork virtual cluster based on the config values.
+    # @brief Builds the OFSTestNetwork virtual cluster based on the config values.
     #
     # @param self The object pointer
     
@@ -160,15 +160,15 @@ class OFSTestMain(object):
         return 0
         
 
-##
-# @fn checkOFS(self)
-#
-# checks to see if OrangeFS is setup on the cluster. 
-#
-# @param self The object pointer
-#
-# @return 0 OrangeFS setup
-# @return Not 0 OrangeFS not setup
+    ##
+    # @fn checkOFS(self)
+    #
+    # checks to see if OrangeFS is setup on the cluster. 
+    #
+    # @param self The object pointer
+    #
+    # @return 0 OrangeFS setup
+    # @return Not 0 OrangeFS not setup
 
     
     def checkOFS(self):
@@ -411,31 +411,31 @@ class OFSTestMain(object):
         
         return 0
 
-##
-#
-# @fn writeOutputHeader(self,filename,header,mode='a+'):
-#
-# Writes the output header to the file.
-#
-# @param self The object pointer
-# @param filename The file to write the message
-# @param header The message to write in the header
-# @param mode Mode to open the file. Default is append (a+).
-#
+    ##
+    #
+    # @fn writeOutputHeader(self,filename,header,mode='a+'):
+    #
+    # Writes the output header to the file.
+    #
+    # @param self The object pointer
+    # @param filename The file to write the message
+    # @param header The message to write in the header
+    # @param mode Mode to open the file. Default is append (a+).
+    #
 
     def writeOutputHeader(self,filename,header,mode='a+'):
         output = open(filename,mode)
         output.write("%s ==================================================\n" % header)
         output.close()
-
-##
-# @fn   runTest(self):       
-#
-# Runs the tests for OrangeFS as specified by the config. 
-#
-# @param self The object pointer
-
-# TODO: Reimpliment this.
+    
+    ##
+    # @fn   runTest(self):       
+    #
+    # Runs the tests for OrangeFS as specified by the config. 
+    #
+    # @param self The object pointer
+    
+    # TODO: Reimpliment this.
 
 
     def runTest(self):
@@ -727,15 +727,15 @@ class OFSTestMain(object):
             print "Terminating Nodes"
             self.ofs_network.terminateAllEC2Nodes()
 
-##
-#
-# @fn runFunctionGroup(self,function_group_name):
-#
-# Run a function group. Function groups are in separate files with appropriate test functions in them.
-# For example, OFSSysintTest.py contains the OFSSysintTest function group that tests the system integration functions.
-#
-# @param self The object pointer
-# @param function_group_name The name of the python namespace that contains the function. This should be the same as the python file that contains the functions without the .py extension.
+    ##
+    #
+    # @fn runFunctionGroup(self,function_group_name):
+    #
+    # Run a function group. Function groups are in separate files with appropriate test functions in them.
+    # For example, OFSSysintTest.py contains the OFSSysintTest function group that tests the system integration functions.
+    #
+    # @param self The object pointer
+    # @param function_group_name The name of the python namespace that contains the function. This should be the same as the python file that contains the functions without the .py extension.
 
     def runFunctionGroup(self,function_group_name):
         

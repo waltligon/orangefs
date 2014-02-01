@@ -37,11 +37,13 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         # Local nodes are neither remote nor EC2
         self.is_remote = False
         ## @var is_ec2
+        # Is this node an ec2 node? Always false, even if it's true.
         self.is_ec2 = False
         ## @var ip_address
         # set to local host
         self.ip_address = "127.0.0.1"
         ## @var current_user 
+        # Current logged in user.
         self.current_user = self.runSingleCommandBacktick("whoami")
         #print self.current_user
         self.currentNodeInformation()
@@ -198,7 +200,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
 
     ##
     #
-    # @fn copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
+    # @fn copyToRemoteNode(self, source, destination_node, destination, recursive=False):
     #
     # This copies files from this node to the remote node via rsync.
     #

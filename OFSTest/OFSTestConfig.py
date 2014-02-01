@@ -255,17 +255,27 @@ class OFSTestConfig(object):
         #------------------------------
         
         ## @var run_sysint_tests
-        ## @var run_usrint_tests
-        ## @var run_vfs_tests
-        ## @var run_fuse_tests
-        ## @var run_mpi_tests
-        ## @var run_hadoop_tests
-        
+        # Run the system integration tests?
         self.run_sysint_tests = False
+        
+        ## @var run_usrint_tests
+        # Run the user integration library tests?
         self.run_usrint_tests = False
+        
+        ## @var run_vfs_tests
+        # Run the kernel module vfs tests?
         self.run_vfs_tests = False
+        
+        ## @var run_fuse_tests
+        # Run the fuse vfs tests?
         self.run_fuse_tests = False
+        
+        ## @var run_mpi_tests
+        # Run OrangeFS ROM-IO tests.
         self.run_mpi_tests = False
+        
+        ## @var run_hadoop_tests
+        # Run OrangeFS Hadoop tests
         self.run_hadoop_tests = False
         
         
