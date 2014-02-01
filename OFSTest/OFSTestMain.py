@@ -1,11 +1,12 @@
 # !/usr/bin/python
-# 
-# OFSTestMain.py
+##
+# @ class OFSTestMain.py
 #
-# This class drives the OrangeFS testing. This sets up OrangeFS on the 
+# @brief This class drives the OrangeFS testing. This sets up OrangeFS on the 
 # OFSTestNetwork based on the OFSTestConfig.
 #
 #
+
 # Members:
 #
 # OFSTestConfig self.config = Testing configuration. 
@@ -30,7 +31,6 @@
 import OFSTestConfig
 import OFSTestConfigFile
 import OFSTestConfigMenu
-import OFSTestConfigBuildbot
 import OFSTestNetwork
 import time
 import sys
@@ -39,47 +39,66 @@ from pprint import pprint
 
 class OFSTestMain(object):
     
-#------------------------------------------------------------------------------
-#
-# __init__()
-#
-# Members:
-#
-# OFSTestConfig self.config = Testing configuration. 
-# OFSTestNework self.network = Virtual cluster.
-#
-#------------------------------------------------------------------------------
+    ##
+    #
+    # @fn __init__(self,config):
+    #
+    # @brief Sets the config and initializes the network class.
+    #
+    # @param self The object pointer
+    # @param config an OFSTestConfig object that represents the test configuration. 
+
     
     def __init__(self,config):
-        self.config = config
-        self.ofs_network = OFSTestNetwork.OFSTestNetwork()
 
-#------------------------------------------------------------------------------
-#   setConfig()     Sets self.config based on info from the command line, 
-#                   config file, etc.
-#------------------------------------------------------------------------------
+        # Class Members:
+
+        ##
+        # @var self.config  
+        # OFSTestConfig Testing configuration.
+        self.config = config 
+        
+        # @var self.network 
+        # OFSTestNework Virtual cluster.
+        self.ofs_network = OFSTestNetwork.OFSTestNetwork()
+        
+        
+
+
+    ##
+    #
+    # @fn setConfig(self,**kwargs):
+    #
+    # @brief Sets self.config based on info from the command line, config file, etc.
+    #
+    # @param self The object pointer
+    # @param kwargs Dictionary with configuration variable,value pairs. See OFSTestConfig for possible values.
+
 
 
     def setConfig(self,**kwargs):
         self.config.setConfig(**kwargs)
     
-#------------------------------------------------------------------------------
-#   printConfig()   Prints the dictionary of self.config. For debugging.
-#------------------------------------------------------------------------------    
+    ##
+    #  @fn printConfig(self):
+    #   
+    # Prints the dictionary of self.config. For debugging.
+    #
+    # @var self The object pointer
+    
     def printConfig(self):
         self.config.printDict()
 
-#------------------------------------------------------------------------------
-#   writeOutput()   Writes the output of a test to the output file. If test 
-#                   function returns 0, assume success, otherwise, failure.
-#
-#   args: 
-#           filename: Name of output file
-#           function: Function that was tested.
-#           rc:       Return code of function
-#    
-#------------------------------------------------------------------------------    
-
+    ##
+    # @fn writeOutput(self,filename,function,rc):   
+    #
+    # Writes the output of a test to the output file. If test function returns 0, assume success, otherwise, failure.
+    #
+    # @param self The object pointer
+    # @param filename Name of output file
+    # @param function Function that was tested.
+    # @param rc  Return code of the tested function
+    #    
 
     def writeOutput(self,filename,function,rc):
         output = open(filename,'a+')
@@ -89,12 +108,12 @@ class OFSTestMain(object):
             output.write("%s........................................PASS.\n" % function.__name__)
         output.close()
     
-#------------------------------------------------------------------------------
-# initNetwork()
-#
-# builds the OFSTestNetwork virtual cluster based on the config values.
-#
-#------------------------------------------------------------------------------
+    ##
+    # @fn initNetwork(self)
+    #
+    # builds the OFSTestNetwork virtual cluster based on the config values.
+    #
+    # @param self The object pointer
     
     def initNetwork(self):
 
@@ -141,16 +160,15 @@ class OFSTestMain(object):
         return 0
         
 
-#------------------------------------------------------------------------------
-# checkOFS()
+##
+# @fn checkOFS(self)
 #
 # checks to see if OrangeFS is setup on the cluster. 
 #
-# return:
-#           == 0 - OrangeFS setup
-#           != 0 - OrangeFS not setup
+# @param self The object pointer
 #
-#------------------------------------------------------------------------------
+# @return 0 OrangeFS setup
+# @return Not 0 OrangeFS not setup
 
     
     def checkOFS(self):
@@ -203,9 +221,12 @@ class OFSTestMain(object):
         '''
         return 0
         
-#------------------------------------------------------------------------------
-#   setupOFS()      Builds the OFSTestNetwork as specified by the config.
-#------------------------------------------------------------------------------
+    ##
+    # @fn setupOFS(self):      
+    #
+    #    Builds the OFSTestNetwork as specified by the config.
+    #
+    # @param self The object pointer
         
     def setupOFS(self):
         
@@ -390,14 +411,31 @@ class OFSTestMain(object):
         
         return 0
 
-#------------------------------------------------------------------------------
-#   runTest()       Runs the tests for OrangeFS as specified by the config.
-#------------------------------------------------------------------------------
+##
+#
+# @fn writeOutputHeader(self,filename,header,mode='a+'):
+#
+# Writes the output header to the file.
+#
+# @param self The object pointer
+# @param filename The file to write the message
+# @param header The message to write in the header
+# @param mode Mode to open the file. Default is append (a+).
+#
 
     def writeOutputHeader(self,filename,header,mode='a+'):
         output = open(filename,mode)
         output.write("%s ==================================================\n" % header)
         output.close()
+
+##
+# @fn   runTest(self):       
+#
+# Runs the tests for OrangeFS as specified by the config. 
+#
+# @param self The object pointer
+
+# TODO: Reimpliment this.
 
 
     def runTest(self):
@@ -562,7 +600,7 @@ class OFSTestMain(object):
                 # Unmount OrangeFS and stop the OrangeFS client.
                 head_node.unmountOFSFilesystem()
                 head_node.stopOFSClient()
-                self.writeOutputHeader(filename,"Usrint Tests" % mount_type)
+                self.writeOutputHeader(filename,"Usrint Tests")
                 
                 # The list of usrint tests to run is found in OFSUsrintTest.test.
                 # This is an array of strings that correspond to function names.
@@ -674,6 +712,8 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
         
+        # Test runfunction group
+        # TODO: Remove this.
         try:
             self.runFunctionGroup("OFSHadoopTest")
         except:
@@ -686,6 +726,16 @@ class OFSTestMain(object):
             print "==================================================================="
             print "Terminating Nodes"
             self.ofs_network.terminateAllEC2Nodes()
+
+##
+#
+# @fn runFunctionGroup(self,function_group_name):
+#
+# Run a function group. Function groups are in separate files with appropriate test functions in them.
+# For example, OFSSysintTest.py contains the OFSSysintTest function group that tests the system integration functions.
+#
+# @param self The object pointer
+# @param function_group_name The name of the python namespace that contains the function. This should be the same as the python file that contains the functions without the .py extension.
 
     def runFunctionGroup(self,function_group_name):
         
