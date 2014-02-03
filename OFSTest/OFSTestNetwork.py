@@ -206,17 +206,18 @@ class OFSTestNetwork(object):
     #    @param machine_type  EC2 "flavor" of virtual node
     #    @param associateip  Associate to external ip?
     #    @param domain Domain to associate with external ip
+    #	 @param ec2_subnet ec2 subnet id for primary network interface.
     #
     #    @returns list of new nodes.
 
 
     
-    def createNewEC2Nodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None):
+    def createNewEC2Nodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None,ec2_subnet=None):
         
         # This function creates number nodes on the ec2 system. 
         # It returns a list of nodes
         
-        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type)
+        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type,ec2_subnet)
         # new instances should have a 60 second delay to make sure everything is running.
 
         ip_addresses = []

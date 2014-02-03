@@ -199,7 +199,7 @@ class OFSTestMain(object):
             resource_type=self.config.ofs_resource_type,
             ofs_config_file=self.config.ofs_config_file,
             ofs_fs_name=self.config.ofs_fs_name,
-            ofs_hostname_override=self.config.ofs_hostname_override,
+            ofs_host_name_override=self.config.ofs_host_name_override,
             ofs_mount_point=self.config.ofs_mount_point
             )
         
@@ -242,7 +242,7 @@ class OFSTestMain(object):
             if self.config.number_new_ec2_nodes > 0:
                 print "===========================================================" 
                 print "Creating %d new EC2/OpenStack Nodes" % self.config.number_new_ec2_nodes
-                self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain)
+                self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain,self.config.ec2_subnet)
             
         # Setup the virtual cluster.
         self.initNetwork()

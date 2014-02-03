@@ -5,7 +5,7 @@
 import time
 import re
 from boto import ec2
-#from pprint import pprint
+from pprint import pprint
 from datetime import datetime, timedelta
 
 ## 
@@ -25,6 +25,7 @@ class OFSEC2ConnectionManager(object):
     # @param self The object pointer
     # @param ec2_config_file Path to ec2rc.sh file.
     # @param region_name Name of ec2 region to connect to.
+    #
 
     
     def __init__(self,ec2_config_file=None,region_name=None):
@@ -248,18 +249,19 @@ class OFSEC2ConnectionManager(object):
         return 0
     ##
     #
-    # @fn createNewEC2Instances(self,number_nodes,image_system,type): 
+    # @fn createNewEC2Instances(self,number_nodes,image_system,instance_type): 
     # Creates new EC2 instances and returns list of them.
     #
     # @param self The object pointer
     # @param number_nodes  Number of nodes to create
     # @param image_system Image to run. (e.g. "cloud-ubuntu-12.04")
-    # @param type Image "flavor" (e.g. "m1.medium")
+    # @param instance_type Image "flavor" (e.g. "m1.medium")
+	# @param subnet_id Id of subnet instance should run on 
     #
     # @return	A list of new instances.
     #		
         
-    def createNewEC2Instances(self,number_nodes,image_system,instance_type):
+    def createNewEC2Instances(self,number_nodes,image_system,instance_type,subnet_id=None):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -276,9 +278,19 @@ class OFSEC2ConnectionManager(object):
             return None
         
         print "Creating %d new %s %s instances." % (number_nodes,instance_type,image_system)
-        orangefs_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
-        reservation = image.run(min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, security_groups=None, user_data=None, addressing_type=None, instance_type=instance_type,subnet_id=orangefs_subnet) 
+        #print image.__dict__
         
+        # Must provide subnet information to handle multiple subnets. 
+        if subnet_id != None:
+            #TODO: Associate public IP address in one step.  
+            interface = ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet_id,device_index=0, groups=['default'],associate_public_ip_address=False)
+            
+            interfaces = ec2.networkinterface.NetworkInterfaceCollection(interface)
+
+            reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, user_data=None, instance_type=instance_type,network_interfaces=interfaces) 
+        else:
+            reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, user_data=None, instance_type=instance_type)
+
         print "Waiting 60 seconds for all instances to start."
         time.sleep(60)
         
@@ -293,6 +305,7 @@ class OFSEC2ConnectionManager(object):
         
         for i in new_instances:
             print "Created new EC2 instance %s " % i.id
+            #pprint(i.__dict__)
         
         return new_instances
 
@@ -322,8 +335,8 @@ class OFSEC2ConnectionManager(object):
         
             
             
-        print "Waiting 30 seconds for external networking"
-        time.sleep(30)
+        print "Waiting 60 seconds for external networking"
+        time.sleep(60)
         return external_addresses
         
     ##

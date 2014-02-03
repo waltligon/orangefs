@@ -29,7 +29,7 @@ mount_as_fuse = False
 #
 # @fn cp(testing_node,output=[]):
 #
-#	This uses pvfs2_cp to copy file to OrangeFS mount_point and back. 
+#	This uses pvfs2_cp to copy file to OrangeFS mountpoint and back. 
 #   Copied file should be the same as the original.
 #
 #   pvfs2_cp is run with a series of argument combinations.

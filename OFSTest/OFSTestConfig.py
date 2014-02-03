@@ -12,7 +12,7 @@
 # that user. 
 #
 
-
+from pprint import pprint
 
 
 class OFSTestConfig(object):
@@ -237,11 +237,11 @@ class OFSTestConfig(object):
         # OrangeFS mount point
         self.ofs_mount_point = None
         
-        ## @var ofs_hostname_override
+        ## @var ofs_host_name_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
         # a bug on some ec2 setups.
-        self.ofs_hostname_override = []
+        self.ofs_host_name_override = []
         
         ## @var start_client_on_all_nodes
         # Start the OrangeFS client on all nodes after installation?
@@ -277,6 +277,13 @@ class OFSTestConfig(object):
         ## @var run_hadoop_tests
         # Run OrangeFS Hadoop tests
         self.run_hadoop_tests = False
+        
+        ## @var ec2_subnet
+        # ec2 subnet ID for primary network interface
+        #self.ec2_subnet=None
+        #TODO: Remove hardcoded definition. 
+        self.ec2_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
+        
         
         
     
@@ -349,7 +356,7 @@ class OFSTestConfig(object):
 
     
     def printDict(self):
-        print self.__dict__
+        pprint(self.__dict__)
 
 
     ##
@@ -430,13 +437,13 @@ class OFSTestConfig(object):
             for user in userlist:
                 self.node_usernames.append(user)
         
-        temp = d.get('ofs_hostname_override')
+        temp = d.get('ofs_host_name_override')
         if temp != None:
             
             userlist = temp.split(" ")
             #print userlist
             for user in userlist:
-                self.ofs_hostname_override.append(user)
+                self.ofs_host_name_override.append(user)
         
         # one username for all nodes
         temp = d.get('node_username')
@@ -611,6 +618,9 @@ class OFSTestConfig(object):
         if temp != None:
             self.start_client_on_all_nodes = temp
         
+        temp = d.get('ec2_subnet')
+        if temp != None:
+            self.ec2_subnet = temp
         
         
         
