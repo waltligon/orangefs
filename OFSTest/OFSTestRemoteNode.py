@@ -1,7 +1,7 @@
 #!/usr/bin/python
 ##
 #
-# @class OFSTestRemoteNode @extends OFSTestNode
+# @class OFSTestRemoteNode
 #
 # This class is an abstraction of all remote machines, virtual and bare metal. 
 #
@@ -38,7 +38,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         print "-----------------------------------------------------------"    
         super(OFSTestRemoteNode,self).__init__()
         
-        # need ip_address, user_name, host_name, and local keyfile to connect
+        # need ip_address, user_name, hostname, and local keyfile to connect
         self.ip_address = ip_address
         
         # do we have an external ip address?
@@ -58,7 +58,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         print "SSH: "+self.ssh_command
          
-        #print "Host,kernel:  %s,%s" % (self.host_name,self.kernel_version)
+        #print "Host,kernel:  %s,%s" % (self.hostname,self.kernel_version)
         
     ##
     #

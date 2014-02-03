@@ -274,7 +274,7 @@ def fdtree(testing_node,output=[]):
     
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
 
-    # fdtree must be run from the mountpoint, but need to cd to that directory w/usrint libraries.
+    # fdtree must be run from the mount_point, but need to cd to that directory w/usrint libraries.
     testing_node.changeDirectory("~")
     rc = testing_node.runSingleCommand("%s cd %s; bash -c \"%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5\"" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
     
@@ -500,7 +500,7 @@ def ltp(testing_node,output=[]):
 
 def mkdir_usrint(testing_node,output=[]):
     
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -541,7 +541,7 @@ def shelltest(testing_node,output=[]):
 def symlink_usrint(testing_node,output=[]):
 
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("%s PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -578,7 +578,7 @@ def tail(testing_node,output=[]):
 #
 # @fn usrint_cp(testing_node,output=[]):
 #
-#	This copies a file to OrangeFS mountpoint and back. Copied file should be
+#	This copies a file to OrangeFS mount_point and back. Copied file should be
 #	the same as the original.
 #
 # @param testing_node OFSTestNode on which tests are run.

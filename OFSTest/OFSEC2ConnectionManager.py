@@ -25,7 +25,6 @@ class OFSEC2ConnectionManager(object):
     # @param self The object pointer
     # @param ec2_config_file Path to ec2rc.sh file.
     # @param region_name Name of ec2 region to connect to.
-    #
 
     
     def __init__(self,ec2_config_file=None,region_name=None):

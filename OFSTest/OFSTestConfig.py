@@ -237,11 +237,11 @@ class OFSTestConfig(object):
         # OrangeFS mount point
         self.ofs_mount_point = None
         
-        ## @var ofs_host_name_override
+        ## @var ofs_hostname_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
         # a bug on some ec2 setups.
-        self.ofs_host_name_override = []
+        self.ofs_hostname_override = []
         
         ## @var start_client_on_all_nodes
         # Start the OrangeFS client on all nodes after installation?
@@ -430,13 +430,13 @@ class OFSTestConfig(object):
             for user in userlist:
                 self.node_usernames.append(user)
         
-        temp = d.get('ofs_host_name_override')
+        temp = d.get('ofs_hostname_override')
         if temp != None:
             
             userlist = temp.split(" ")
             #print userlist
             for user in userlist:
-                self.ofs_host_name_override.append(user)
+                self.ofs_hostname_override.append(user)
         
         # one username for all nodes
         temp = d.get('node_username')

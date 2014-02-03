@@ -1,7 +1,7 @@
 #!/usr/bin/python
 ##
 #
-# @class OFSTestLocalNode @extends OFSTestNode
+# @class OFSTestLocalNode 
 #
 #
 # This class is for the local machine. 

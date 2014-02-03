@@ -199,7 +199,7 @@ class OFSTestMain(object):
             resource_type=self.config.ofs_resource_type,
             ofs_config_file=self.config.ofs_config_file,
             ofs_fs_name=self.config.ofs_fs_name,
-            ofs_host_name_override=self.config.ofs_host_name_override,
+            ofs_hostname_override=self.config.ofs_hostname_override,
             ofs_mount_point=self.config.ofs_mount_point
             )
         
@@ -270,15 +270,15 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Exporting and mounting test nfs directories"
         
-        nfs_dir = "/home/%s/nfsdir" % self.ofs_network.created_nodes[0].current_user
-        rc = self.ofs_network.created_nodes[0].runSingleCommand("mkdir -p %s" % nfs_dir)
+        nfs_dir = "/home/%s/nfsdir" % self.ofs_network.network_nodes[0].current_user
+        rc = self.ofs_network.network_nodes[0].runSingleCommand("mkdir -p %s" % nfs_dir)
         
-        self.ofs_network.exportNFSDirectory(directory=nfs_dir,nfs_server_list=[self.ofs_network.created_nodes[0]])
-        nfs_share = "%s:%s" % (self.ofs_network.created_nodes[0].ip_address,nfs_dir)
-        nfs_mountpoint = "/opt/nfsmount"
-        self.ofs_network.mountNFSDirectory(nfs_share=nfs_share,mountpoint=nfs_mountpoint,options="bg,intr,noac,nfsvers=3")
+        self.ofs_network.exportNFSDirectory(directory=nfs_dir,nfs_server_list=[self.ofs_network.network_nodes[0]])
+        nfs_share = "%s:%s" % (self.ofs_network.network_nodes[0].ip_address,nfs_dir)
+        nfs_mount_point = "/opt/nfsmount"
+        self.ofs_network.mountNFSDirectory(nfs_share=nfs_share,mount_point=nfs_mount_point,options="bg,intr,noac,nfsvers=3")
         
-        for node in self.ofs_network.created_nodes:
+        for node in self.ofs_network.network_nodes:
             node.runSingleCommand("mount -t nfs")
 
         '''    
@@ -442,7 +442,7 @@ class OFSTestMain(object):
         
         # Good debug information.
         #print "Printing dictionary of master node"
-        #pprint(self.ofs_network.created_nodes[0].__dict__)
+        #pprint(self.ofs_network.network_nodes[0].__dict__)
         
         print ""
         print "==================================================================="
@@ -459,7 +459,7 @@ class OFSTestMain(object):
 
         # head_node is the first node in the cluster. This is the node from 
         # where all the tests will be run.
-        head_node = self.ofs_network.created_nodes[0]
+        head_node = self.ofs_network.network_nodes[0]
         
         # Set the LD_LIBRARY_PATH and LIBRARY_PATH on the head node
         # TODO: Do we still need to do this?

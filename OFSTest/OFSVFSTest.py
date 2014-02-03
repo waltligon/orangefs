@@ -264,7 +264,7 @@ def dbench(testing_node,output=[]):
     if rc != 0:
         return rc
     
-    # Run dbench from the mountpoint.
+    # Run dbench from the mount_point.
     testing_node.changeDirectory(testing_node.ofs_mount_point)
     
     
@@ -298,7 +298,7 @@ def fdtree(testing_node,output=[]):
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
     
-    # Run fdtree from the mountpoint
+    # Run fdtree from the mount_point
     testing_node.changeDirectory(testing_node.ofs_mount_point)
     rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/fdtree-1.0.1/fdtree.bash -l 4 -d 5",output)
     
@@ -537,7 +537,7 @@ def ltp(testing_node,output=[]):
 
 def mkdir_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -574,7 +574,7 @@ def shelltest(testing_node,output=[]):
 # 
 def symlink_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -611,7 +611,7 @@ def tail(testing_node,output=[]):
 #
 # @fn vfs_cp(testing_node,output=[]):
 #
-#	This copies a file to OrangeFS mountpoint and back. Copied file should be
+#	This copies a file to OrangeFS mount_point and back. Copied file should be
 #	the same as the original.
 #
 # @param testing_node OFSTestNode on which tests are run.

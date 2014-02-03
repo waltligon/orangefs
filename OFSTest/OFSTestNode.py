@@ -72,9 +72,9 @@ class OFSTestNode(object):
         # ip address on external network
         self.ext_ip_address = self.ip_address
         
-        ## @var host_name
+        ## @var hostname
         # current hostname
-        self.host_name = ""
+        self.hostname = ""
         
         ## @var distro
         # operating system
@@ -88,7 +88,8 @@ class OFSTestNode(object):
         # location of the linux kernel source
         self.kernel_source_location = ""
         
-        ## @var kernel_version (uname -r)
+        ## @var kernel_version 
+        # Output of (uname -r)
         self.kernel_version=""
         
         ## @var is_remote
@@ -235,7 +236,7 @@ class OFSTestNode(object):
         # Version of hadoop software
         self.hadoop_version = "hadoop-1.2.1"
         
-        ## @var hadoop location
+        ## @var hadoop_location
         # Location of hadoop installation
         self.hadoop_location = "/opt/"+self.hadoop_version
         
@@ -262,8 +263,8 @@ class OFSTestNode(object):
         
         self.distro = ""
         #print "Getting current node information"
-		
-		
+
+
         # can we ssh in? We'll need the group if we can't, so let's try this first.
         output = []
         self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,output)
@@ -341,7 +342,7 @@ class OFSTestNode(object):
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
 
         # get the hostname
-        self.host_name = self.runSingleCommandBacktick("hostname")
+        self.hostname = self.runSingleCommandBacktick("hostname")
 
         # SuSE distros require a hostname kludge to get it to work. Otherwise all instances will be set to the same hostname
         # That's a better solution than what Openstack gives us. So why not? 
@@ -350,20 +351,20 @@ class OFSTestNode(object):
             print "Renaming %s based node to %s" % (self.distro,suse_host)
             self.runSingleCommandAsBatch("sudo hostname %s" % suse_host)
             self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
-            self.host_name = suse_host
+            self.hostname = suse_host
             
         # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
-        elif len(self.host_name) > 15 and self.is_ec2 == True:
-            short_host_name = self.host_name[:15]
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_host_name)
-            self.runSingleCommandAsBatch("sudo hostname %s" % short_host_name)
-            print "Truncating hostname %s to %s" % (self.host_name,short_host_name)
-            self.host_name = self.host_name[:15]
+        elif len(self.hostname) > 15 and self.is_ec2 == True:
+            short_hostname = self.hostname[:15]
+            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_hostname)
+            self.runSingleCommandAsBatch("sudo hostname %s" % short_hostname)
+            print "Truncating hostname %s to %s" % (self.hostname,short_hostname)
+            self.hostname = self.hostname[:15]
         elif self.is_ec2 == False:
             print "Not an EC2 Node!"
         
         # print out node information
-        print "Node: %s %s %s %s" % (self.host_name,self.distro,self.kernel_version,self.processor_type)
+        print "Node: %s %s %s %s" % (self.hostname,self.distro,self.kernel_version,self.processor_type)
         
         
        
@@ -687,10 +688,10 @@ class OFSTestNode(object):
     #
     # ssh utility functions
     # @param self The object pointer
-    # @address remote ip address
+    # @param address remote ip address
     
     def getRemoteKeyFile(self,address):
-        #print "Looking for %s in keytable for %s" % (address,self.host_name)
+        #print "Looking for %s in keytable for %s" % (address,self.hostname)
         #print self.keytable
         return self.keytable[address]
     
@@ -768,9 +769,9 @@ class OFSTestNode(object):
             self.addBatchCommand("sudo /sbin/reboot ")
         
         self.runAllBatchCommands()
-        print "Node "+self.host_name+" at "+self.ip_address+" updated."
+        print "Node "+self.hostname+" at "+self.ip_address+" updated."
         
-        print "Node "+self.host_name+" at "+self.ip_address+" Rebooting."
+        print "Node "+self.hostname+" at "+self.ip_address+" Rebooting."
     
     ##
     # @fn installTorqueServer(self):
@@ -793,7 +794,7 @@ class OFSTestNode(object):
                 sudo bash -c "echo %s > /var/spool/torque/server_name"
                 
 
-            ''' % (self.host_name,self.host_name)
+            ''' % (self.hostname,self.hostname)
             self.addBatchCommand(batch_commands)
 
         elif "suse" in self.distro.lower():
@@ -803,7 +804,7 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo bash -c "echo %s > /etc/torque/server_name"
                 sudo bash -c "echo %s > /var/spool/torque/server_name"
-            ''' % (self.host_name,self.host_name)
+            ''' % (self.hostname,self.hostname)
            
             
 
@@ -824,7 +825,7 @@ class OFSTestNode(object):
                     sudo bash -c "echo %s > /etc/torque/server_name"
                     sudo bash -c "echo %s > /var/lib/torque/server_name"
 
-                ''' % (self.processor_type,self.host_name,self.host_name)
+                ''' % (self.processor_type,self.hostname,self.hostname)
             elif "5." in self.distro:
                 batch_commands = '''
                    
@@ -839,7 +840,7 @@ class OFSTestNode(object):
                     sudo bash -c "echo %s > /etc/torque/server_name"
                     sudo bash -c "echo %s > /var/lib/torque/server_name"
 
-                ''' % (self.processor_type,self.host_name,self.host_name)
+                ''' % (self.processor_type,self.hostname,self.hostname)
             else:
                 print "TODO: Torque for "+self.distro
                 batch_commands = ""
@@ -857,7 +858,7 @@ class OFSTestNode(object):
                 sudo qmgr -c "set server default_queue=orangefs_q"
                 sudo qmgr -c "set server operators += %s@%s"
                 sudo qmgr -c "set server managers += %s@%s"
-                ''' % (self.current_user,self.host_name,self.current_user,self.host_name)
+                ''' % (self.current_user,self.hostname,self.current_user,self.hostname)
 
             self.addBatchCommand(batch_commands)
         
@@ -875,7 +876,7 @@ class OFSTestNode(object):
 
      
     def installTorqueClient(self,pbsserver):
-        pbsserver_name = pbsserver.host_name
+        pbsserver_name = pbsserver.hostname
         print "Installing Torque Client for "+self.distro.lower()
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
@@ -1603,7 +1604,7 @@ class OFSTestNode(object):
         return rc
     
     ##
-    # @fn
+    # @fn copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
     #
     # This copies the source from a remote directory
     #
@@ -1623,7 +1624,7 @@ class OFSTestNode(object):
     # This copies the source from wherever it is. Uses helper functions to get it from
     # the right place.
     # @param self The object pointer
-    # @param resouce_type Type of resource. Possible values are "SVN,TAR,LOCAL,BUILDNODE"
+    # @param resource_type Type of resource. Possible values are "SVN,TAR,LOCAL,BUILDNODE"
     # @param resource Resource location (url or directory)
     # @param dest_dir Destination on local machine
     # @param username Username needed to access resource
@@ -1696,7 +1697,7 @@ class OFSTestNode(object):
     # @param db4_prefix Location of Berkeley DB4 
     # @param security_mode OFS Security Mode: None,"Key","Cert"
     # @param ofs_patch_files List of patch files for OrangeFS
-    # @param configure_options Additional configure options
+    # @param configure_opts Additional configure options
     # @param debug Debug mode?
       
     def configureOFSSource(self,
@@ -2011,19 +2012,19 @@ class OFSTestNode(object):
         return "%s:%s" % (self.ip_address,directory_name)
     
     ##
-    # @fn mountNFSDirectory(self,nfs_share,mountpoint,options=""):
+    # @fn mountNFSDirectory(self,nfs_share,mount_point,options=""):
     #
-    # this mounts nfs_share at mountpoint with options.
+    # this mounts nfs_share at mount_point with options.
     # @param self The object pointer
     # @param nfs_share NFS share to mount
-    # @param mount_point NFS mountpoint on machine
+    # @param mount_point NFS mount_point on machine
     # @param options NFS mount options
 
         
-    def mountNFSDirectory(self,nfs_share,mountpoint,options=""):
+    def mountNFSDirectory(self,nfs_share,mount_point,options=""):
         self.changeDirectory("/home/%s" % self.current_user)
-        self.runSingleCommand("mkdir -p %s" % mountpoint)
-        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mountpoint)
+        self.runSingleCommand("mkdir -p %s" % mount_point)
+        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mount_point)
         print commands
         self.runSingleCommandAsBatch(commands)
         output = []
@@ -2057,23 +2058,23 @@ class OFSTestNode(object):
         #=============================================================================
 
     ##
-    # @fn
+    # @fn copyOFSInstallationToNode(self,destination_node):
     #
-    # This copies an entire OrangeFS installation from the current node to destinationNode.
+    # This copies an entire OrangeFS installation from the current node to destination_node.
     # Also sets the ofs_installation_location and ofs_branch on the destination
     # @param self The object pointer
-    #
+    # @param destination_node OFSTestNode to which the installation is copied.
 
 
 
-    def copyOFSInstallationToNode(self,destinationNode):
-        rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destinationNode, self.ofs_installation_location, True)
-        destinationNode.ofs_installation_location = self.ofs_installation_location
-        destinationNode.ofs_branch =self.ofs_branch
+    def copyOFSInstallationToNode(self,destination_node):
+        rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destination_node, self.ofs_installation_location, True)
+        destination_node.ofs_installation_location = self.ofs_installation_location
+        destination_node.ofs_branch =self.ofs_branch
         # TODO: Copy ofs_conf_file, don't just link
-        #rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destinationNode, self.ofs_conf_file, True)
-        destinationNode.ofs_conf_file =self.ofs_conf_file
-        destinationNode.ofs_fs_name = destinationNode.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destinationNode.ofs_conf_file)
+        #rc = self.copyToRemoteNode(self.ofs_conf_file+"/", destination_node, self.ofs_conf_file, True)
+        destination_node.ofs_conf_file =self.ofs_conf_file
+        destination_node.ofs_fs_name = destination_node.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destination_node.ofs_conf_file)
         return rc
        
 
@@ -2086,6 +2087,7 @@ class OFSTestNode(object):
     # @param ofs_fs_name OrangeFS filesystem name in url
     # @param configuration_options Additional configuration options
     # @param ofs_source_location Location of OrangeFS source
+    # @param ofs_storage_location Location of OrangeFS storage
     # @param ofs_conf_file Configuration file name. Default is [OFS location]/etc/orangefs.conf
     # @param security OFS security level None,"Key","Cert"
 
@@ -2109,7 +2111,7 @@ class OFSTestNode(object):
         
         # Add each ofs host to the string of hosts.
         for ofs_host in ofs_hosts_v:
-            ofs_host_str = ofs_host_str + ofs_host.host_name + ":3396,"
+            ofs_host_str = ofs_host_str + ofs_host.hostname + ":3396,"
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -2194,7 +2196,7 @@ class OFSTestNode(object):
         '''
         
         
-        print "Attempting to start OFSServer for host %s" % self.host_name
+        print "Attempting to start OFSServer for host %s" % self.hostname
         
 
         # need to get the alias list from orangefs.conf file
@@ -2208,14 +2210,14 @@ class OFSTestNode(object):
         # for all the aliases in the file
         for alias in self.alias_list:
             # if the alias is for THIS host
-            if self.host_name in alias:
+            if self.hostname in alias:
                 
                 # create storage space for the server
-                rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias),output)
                 if rc != 0:
                     # If storage space is already there, creating it will fail. Try deleting and recreating.
-                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -r %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
-                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias),output)
+                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -r %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias),output)
+                    rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias),output)
                     if rc != 0:
                         print "Could not create OrangeFS storage space"
                         print output
@@ -2228,7 +2230,7 @@ class OFSTestNode(object):
                     prefix = "sudo LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
                     
                     
-                server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.host_name,self.ofs_installation_location,alias)
+                server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias)
                 print server_start
                 rc = self.runSingleCommandAsBatch(server_start,output)
                 
@@ -2240,7 +2242,7 @@ class OFSTestNode(object):
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.host_name,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.runSingleCommandAsBatch("sudo ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
@@ -2391,14 +2393,14 @@ class OFSTestNode(object):
         
         # mount with fuse
         if mount_fuse == True:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s via fuse" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.host_name,self.ofs_tcp_port,self.ofs_fs_name),output)
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s via fuse" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.hostname,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
         #mount with kmod
         else:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.host_name,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
+            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
             self.runAllBatchCommands()
         
         print "Waiting 30 seconds for mount"            
@@ -2556,7 +2558,7 @@ class OFSTestNode(object):
 # 
 #     print ""
 #     print "-------------------------------------------------------------------------"
-#     print "Configuring remote source without shared libraries on " + remote_machine.host_name
+#     print "Configuring remote source without shared libraries on " + remote_machine.hostname
 #     print ""
 #     remote_machine.runSingleCommand("rm -rf /tmp/ec2-user")
 #     remote_machine.runSingleCommand("rm -rf /tmp/orangefs")
@@ -2604,7 +2606,7 @@ class OFSTestNode(object):
 # 
 #     print ""
 #     print "-------------------------------------------------------------------------"
-#     print "Configuring remote source with shared libraries on " + remote_machine1.host_name
+#     print "Configuring remote source with shared libraries on " + remote_machine1.hostname
 #     print ""
 #     remote_machine1.runSingleCommand("rm -rf /tmp/orangefs")
 #     remote_machine1.runSingleCommand("rm -rf /tmp/ec2-user")

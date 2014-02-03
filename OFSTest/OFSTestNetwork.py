@@ -7,7 +7,7 @@
 #
 # Every network must have the following:
 #
-# 1. At least one OFSTestNode in the created_nodes array.
+# 1. At least one OFSTestNode in the network_nodes array.
 # 2. A local_master, which represents the local machine from which the tests are run.
 #
 # EC2/OpenStack based virtual networks will also have an ec2_connection_manager.
@@ -41,7 +41,7 @@ class OFSTestNetwork(object):
         self.ec2_connection_manager = None
         # dictionary of instances
            
-        self.created_nodes = []
+        self.network_nodes = []
         
         print "==================================================================="
         print "Checking Local machine"
@@ -49,45 +49,48 @@ class OFSTestNetwork(object):
         self.mpi_nfs_directory = ""
         self.openmpi_version = ""
 
-        #self.created_nodes['127.0.0.1']=self.local_master
+        #self.network_nodes['127.0.0.1']=self.local_master
    
 
     ##
-    # @fn  findNode(self,ip_address="",host_name=""):
+    # @fn  findNode(self,ip_address="",hostname=""):
     #
     # Finds an OFSTestNode by ip address or hostname
     #
     # @param self The object pointer
+    # @param ip_address IP address of the node
+    # @param hostname Hostname of the node
     #
     # @returns OFSTestNode if found, None, if not found.
     #
 
-    def findNode(self,ip_address="",host_name=""):
+    def findNode(self,ip_address="",hostname=""):
     
         
         if ip_address != "":
             if ip_address == self.local_master.ip_address:
                 return self.local_master
             else:
-                return next((i for i in self.created_nodes if i.ip_address == ip_address), None) 
-        elif host_name != "":
+                return next((i for i in self.network_nodes if i.ip_address == ip_address), None) 
+        elif hostname != "":
             print "Available host names"
-            print [i.host_name for i in self.created_nodes]
-            if host_name == self.local_master.host_name:
+            print [i.hostname for i in self.network_nodes]
+            if hostname == self.local_master.hostname:
                 return self.local_master
             else:
-                return next((i for i in self.created_nodes if i.host_name == host_name), None) 
+                return next((i for i in self.network_nodes if i.hostname == hostname), None) 
         else:
             return None
 
     ##
     #  @fn addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
     #
-    #    Creates a new OFSTestNode and adds it to the created_nodes list.
+    #    Creates a new OFSTestNode and adds it to the network_nodes list.
     #
     # @param self The object pointer
     # @param username User login
     # @param ip_address IP address of node
+    # @param key ssh key file location to access the node for username
     # @param is_ec2 Is this an EC2/OpenStack node?
     # @param ext_ip_address Externally accessible IP address
     #
@@ -102,7 +105,7 @@ class OFSTestNetwork(object):
         remote_node = OFSTestRemoteNode.OFSTestRemoteNode(username=username,ip_address=ip_address,key=key,local_node=self.local_master,is_ec2=is_ec2,ext_ip_address=ext_ip_address)
                 
         # Add to the node dictionary
-        self.created_nodes.append(remote_node)
+        self.network_nodes.append(remote_node)
         
         # Return the new node
         return remote_node
@@ -126,7 +129,7 @@ class OFSTestNetwork(object):
         #passes in a thread class that does the work on a node list with arguments args
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
          
         queue = Queue.Queue()
         class NodeThread(threading.Thread):
@@ -194,7 +197,7 @@ class OFSTestNetwork(object):
     ##
     # @fn createNewEC2Nodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
     #
-    # Creates new ec2 nodes and adds them to created_nodes list.
+    # Creates new ec2 nodes and adds them to network_nodes list.
     #
     #
     #    @param self The object pointer  
@@ -264,7 +267,7 @@ class OFSTestNetwork(object):
             new_ofs_test_nodes.append(new_node)
         
             # Add the node to the created nodes list.
-            self.created_nodes.append(new_node)
+            self.network_nodes.append(new_node)
         
         # return the list of newly created nodes.
         
@@ -285,7 +288,7 @@ class OFSTestNetwork(object):
     def uploadKeys(self,node_list=None):
         # if a list is not provided upload all keys
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
             
         for node in node_list:
             self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
@@ -303,7 +306,7 @@ class OFSTestNetwork(object):
     def enablePasswordlessSSH(self,node_list=None):
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
         for src_node in node_list:
             # passwordless access to localhost
@@ -312,8 +315,8 @@ class OFSTestNetwork(object):
             
             for dest_node in node_list:
                 # passwordless access to all other nodes
-                print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.host_name,dest_node.host_name,dest_node.ip_address,dest_node.ext_ip_address)
-                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.host_name,src_node.current_user))
+                print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.hostname,dest_node.hostname,dest_node.ip_address,dest_node.ext_ip_address)
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.hostname,src_node.current_user))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ext_ip_address,src_node.current_user))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ip_address,src_node.current_user))
                 
@@ -337,7 +340,7 @@ class OFSTestNetwork(object):
         
         # if the node was terminated, remove it from the list.
         if rc == 0:
-            self.created_nodes = [ x for x in self.created_nodes if x.ip_address != remote_node.ip_address]
+            self.network_nodes = [ x for x in self.network_nodes if x.ip_address != remote_node.ip_address]
         else:
             print "Could not delete node at %s, error code %d" % (remote_node.ip_address,rc)
             
@@ -358,9 +361,9 @@ class OFSTestNetwork(object):
         # This only updates the EC2 controlled nodes
          
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
-        ec2_nodes = [node for node in self.created_nodes if node.is_ec2 == True]
+        ec2_nodes = [node for node in self.network_nodes if node.is_ec2 == True]
         self.updateNodes(ec2_nodes)   
 
 
@@ -378,7 +381,7 @@ class OFSTestNetwork(object):
         
         #This function updates the etc hosts file on each node with the 
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
  
         for node in node_list:
@@ -386,19 +389,19 @@ class OFSTestNetwork(object):
             node.created_mpichhosts = "~/mpichhosts"
             for n2 in node_list:
                 # can we ping the node?
-                #print "Pinging %s from local node" % n2.host_name
-                rc = node.runSingleCommand("ping -c 1 %s" % n2.host_name)
+                #print "Pinging %s from local node" % n2.hostname
+                rc = node.runSingleCommand("ping -c 1 %s" % n2.hostname)
                 # if not, add to the /etc/hosts file
                 if rc != 0:
-                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.host_name,n2.ip_address,n2.host_name)
-                    node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.host_name,n2.host_name))
+                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,n2.hostname)
+                    node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.hostname,n2.hostname))
                     # also create mpihosts files
-                    node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.host_name,node.created_openmpihosts))
-                    node.runSingleCommand('echo "%s:2" >> %s' % (n2.host_name,node.created_mpichhosts))
+                    node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.hostname,node.created_openmpihosts))
+                    node.runSingleCommand('echo "%s:2" >> %s' % (n2.hostname,node.created_mpichhosts))
 
                     
             node.runAllBatchCommands()
-            node.host_name = node.runSingleCommandBacktick("hostname")
+            node.hostname = node.runSingleCommandBacktick("hostname")
 
     ##
     # @fn updateNodes(self,node_list)
@@ -410,7 +413,7 @@ class OFSTestNetwork(object):
      
     def updateNodes(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
             
         # Run updateNode on the nodes simultaneously. 
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.updateNode)
@@ -419,10 +422,10 @@ class OFSTestNetwork(object):
         time.sleep(90)
         # workaround for strange cuer1 issue where hostname changes on reboot.
         for node in node_list:
-            tmp_host_name = node.runSingleCommandBacktick("hostname")
-            if tmp_host_name != node.host_name:
-                print "Hostname changed from %s to %s! Resetting to %s" % (node.host_name,tmp_host_name,node.host_name)
-                node.runSingleCommandAsBatch("sudo hostname %s" % node.host_name)
+            tmp_hostname = node.runSingleCommandBacktick("hostname")
+            if tmp_hostname != node.hostname:
+                print "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname)
+                node.runSingleCommandAsBatch("sudo hostname %s" % node.hostname)
     
     ##
     # @fn installRequiredSoftware(self,node_list=None):
@@ -436,7 +439,7 @@ class OFSTestNetwork(object):
     
     def installRequiredSoftware(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
     
     ##
@@ -507,7 +510,7 @@ class OFSTestNetwork(object):
         print "Resource type is "+resource_type+" location is "+resource_location
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
         if build_node == None:
             build_node = node_list[0]
@@ -526,10 +529,10 @@ class OFSTestNetwork(object):
             #download_location = "%s%s" % (download_location,dir_list)
             # create the destination directory
             #rc = build_node.runSingleCommand("mkdir -p "+download_location)
-            #print "Copying source from %s to %s" % (resource_location,build_node.host_name)
+            #print "Copying source from %s to %s" % (resource_location,build_node.hostname)
             rc = self.local_master.copyToRemoteNode(resource_location,build_node,download_location,True)
             if rc != 0:
-                print "Could not copy source from %s to %s" % (resource_location,build_node.host_name)
+                print "Could not copy source from %s to %s" % (resource_location,build_node.hostname)
                 return rc
             #rc = build_node.runSingleCommand("ls -l "+download_location+dir_list,output)
             #print output
@@ -548,7 +551,7 @@ class OFSTestNetwork(object):
             
             rc = self.local_master.copyToRemoteNode(patch,build_node,patch,False)
             if rc != 0:
-                print "Could not upload patch at %s to buildnode %s" % (patch,build_node.host_name)
+                print "Could not upload patch at %s to buildnode %s" % (patch,build_node.hostname)
 
 
         rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode,enable_hadoop=enable_hadoop)
@@ -574,10 +577,10 @@ class OFSTestNetwork(object):
         
     def installOFSBuild(self,build_node=None,install_opts="",node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
         if build_node == None:
-            build_node = self.created_nodes[0]
+            build_node = self.network_nodes[0]
         return build_node.installOFSSource(install_opts)
     
    
@@ -593,7 +596,7 @@ class OFSTestNetwork(object):
 
     def installOFSTests(self,client_node=None,configure_options="",node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         return client_node.installOFSTests(configure_options)
@@ -610,7 +613,7 @@ class OFSTestNetwork(object):
 
     def installBenchmarks(self,build_node=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if build_node == None:
             build_node = node_list[0]
         return build_node.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/home/%s/benchmarks" % build_node.current_user)
@@ -630,7 +633,7 @@ class OFSTestNetwork(object):
        
     def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if master_node == None:
             master_node = node_list[0]
         return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
@@ -646,12 +649,12 @@ class OFSTestNetwork(object):
         
     def copyOFSToNodeList(self,destination_list=None):
         if destination_list == None:
-            destination_list = self.created_nodes;
+            destination_list = self.network_nodes;
         self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
        
     ##    
-    #  @fn copyOFSResourceToNodeList(self,node_function,destination_list=None):
+    #  @fn copyResourceToNodeList(self,node_function,destination_list=None):
     #
     # This is a multi-threaded recursive copy routine.
     # Function copies OrangeFS from list[0] to list[len/2]
@@ -672,7 +675,7 @@ class OFSTestNetwork(object):
 
         
         if destination_list == None:
-            destination_list = self.created_nodes
+            destination_list = self.network_nodes
             
         # This assumes that the OFS installation is at the destination_list[0]
         list_length = len(destination_list)
@@ -738,7 +741,7 @@ class OFSTestNetwork(object):
           
     def stopOFSServers(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.stopOFSServer)
         time.sleep(20)
 
@@ -754,7 +757,7 @@ class OFSTestNetwork(object):
 
     def startOFSServers(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.startOFSServer)
         time.sleep(20)
 
@@ -770,7 +773,7 @@ class OFSTestNetwork(object):
 
     def startOFSClientAllNodes(self,security=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         for node in node_list:
             self.startOFSClient(node,security)
    
@@ -787,7 +790,7 @@ class OFSTestNetwork(object):
             
     def startOFSClient(self,client_node=None,security=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         client_node.installKernelModule()
@@ -809,7 +812,7 @@ class OFSTestNetwork(object):
 
     def mountOFSFilesystem(self,mount_fuse=False,client_node=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         client_node.mountOFSFilesystem(mount_fuse=mount_fuse)
@@ -833,7 +836,7 @@ class OFSTestNetwork(object):
     def mountOFSFilesystemAllNodes(self,mount_fuse=False,node_list=None):
         
         # TODO: make this multithreaded
-        for node in self.created_nodes:
+        for node in self.network_nodes:
             self.mountOFSFilesystem(mount_fuse=mount_fuse,client_node=node)
    
     ##    
@@ -848,7 +851,7 @@ class OFSTestNetwork(object):
         
     def stopOFSClient(self,client_node=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         client_node.stopOFSClient()
@@ -865,7 +868,7 @@ class OFSTestNetwork(object):
 
     def stopOFSClientAllNodes(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         # TODO: make this multithreaded
         for node in node_list:
             self.stopOFSClient(node)
@@ -883,7 +886,7 @@ class OFSTestNetwork(object):
     
     def unmountOFSFilesystemAllNodes(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         # TODO: make this multithreaded
         for node in node_list:
             self.unmountOFSFilesystem(node)
@@ -900,7 +903,7 @@ class OFSTestNetwork(object):
 
     def terminateAllEC2Nodes(self, node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         for node in node_list:
             if node.is_ec2 == True:
                 self.terminateEC2Node(node)
@@ -921,7 +924,7 @@ class OFSTestNetwork(object):
     def installTorque(self, node_list=None, head_node=None):
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
         if head_node == None:
             head_node = node_list[0]
@@ -936,31 +939,31 @@ class OFSTestNetwork(object):
                 
                 torque_node_cpu = node_list[i].runSingleCommandBacktick('grep proc /proc/cpuinfo | wc -l')
                 if "ubuntu" in head_node.distro.lower() or "mint" in head_node.distro.lower() or "debian" in head_node.distro.lower():
-                    head_node.runSingleCommand("sudo bash -c 'echo \"%s np=%s\" >> /var/spool/torque/server_priv/nodes'" % (node_list[i].host_name,torque_node_cpu))
+                    head_node.runSingleCommand("sudo bash -c 'echo \"%s np=%s\" >> /var/spool/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
                 elif "centos" in head_node.distro.lower() or "scientific linux" in head_node.distro.lower() or "redhat" in head_node.distro.lower() or "fedora" in head_node.distro.lower():
-                    head_node.runSingleCommandAsBatch("sudo bash -c 'echo \"%s np=%s\" >> /var/lib/torque/server_priv/nodes'" % (node_list[i].host_name,torque_node_cpu))
+                    head_node.runSingleCommandAsBatch("sudo bash -c 'echo \"%s np=%s\" >> /var/lib/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
         head_node.restartTorqueServer()    
 
         # wait for the server to start
         time.sleep(15)
         
-        down_host_names = self.checkTorque()
+        down_hostnames = self.checkTorque()
         print "Down torque nodes: "
-        print down_host_names
+        print down_hostnames
         retries = 0
 
         try:
-            while len(down_host_names) > 0 and retries < 5:
-                for host_name in down_host_names:
+            while len(down_hostnames) > 0 and retries < 5:
+                for hostname in down_hostnames:
                     # if a node is down, try restarting Torque Mom. Not sure why this happens.
-                    node = self.findNode(host_name=host_name.rstrip())
+                    node = self.findNode(hostname=hostname.rstrip())
                     node.restartTorqueMom()
                 
                 #wait for all clients to start
                 time.sleep(15)
-                down_host_names = self.checkTorque()
+                down_hostnames = self.checkTorque()
                 print "Down torque nodes: "
-                print down_host_names
+                print down_hostnames
                 retries = retries + 1
         # break on an AttributeErrors if node isn't found
         except AttributeError:
@@ -980,7 +983,7 @@ class OFSTestNetwork(object):
     def checkTorque(self, node_list=None, head_node=None):
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         
         if head_node == None:
             head_node = node_list[0]
@@ -1010,7 +1013,7 @@ class OFSTestNetwork(object):
 # 
 #         mpiexec -np %d %s
 #         mpdallexit
-#         ''' % (len(self.created_nodes),len(self.created_nodes),self.created_nodes[0].mpich2_installation_location,self.created_nodes[0].current_user,len(self.created_nodes),len(self.created_nodes),command)
+#         ''' % (len(self.network_nodes),len(self.network_nodes),self.network_nodes[0].mpich2_installation_location,self.network_nodes[0].current_user,len(self.network_nodes),len(self.network_nodes),command)
 #         
 #         print script
 #         return script
@@ -1019,17 +1022,17 @@ class OFSTestNetwork(object):
 #         
 #     def blockPBSUntilDone(self,jobid):
 #         
-#         rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+#         rc = self.network_nodes[0].runSingleCommand("qstat -i %s" % jobid)
 # 
 #         while rc == 0:
 #             time.sleep(60)
-#             rc = self.created_nodes[0].runSingleCommand("qstat -i %s" % jobid)
+#             rc = self.network_nodes[0].runSingleCommand("qstat -i %s" % jobid)
 #             
 #     
 #     def setupMPIEnvironment(self,headnode=None):
 #         
 #         if headnode==None:
-#             headnode = self.created_nodes[0]
+#             headnode = self.network_nodes[0]
 #     
 #         headnode.setupMPIEnvironment()
 
@@ -1048,7 +1051,7 @@ class OFSTestNetwork(object):
         # TODO: Make this match installOpenMPI()         
         
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if head_node==None:
             head_node = node_list[0]
     
@@ -1067,7 +1070,7 @@ class OFSTestNetwork(object):
     
     def generateOFSKeys(self,node_list=None,head_node=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if head_node==None:
             head_node = node_list[0]
             
@@ -1094,13 +1097,13 @@ class OFSTestNetwork(object):
     
     def generateOFSServerKeys(self,node_list=None,security_node=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if security_node==None:
             security_node = node_list[0]
         
         #for each server, create a private server key at <orangefs>/etc/orangefs-serverkey.pem
         #cd /tmp/$USER/keys
-        #openssl genrsa -out orangefs-serverkey-(remote host_name).pem 2048
+        #openssl genrsa -out orangefs-serverkey-(remote hostname).pem 2048
         #copy  orangefs-serverkey-(remote_hostname).pem <orangefs>/etc/
         output = []
        
@@ -1108,16 +1111,16 @@ class OFSTestNetwork(object):
         security_node.runSingleCommand("mkdir -p /tmp/%s/security" % security_node.current_user)
         security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
         
-        for node in self.created_nodes:
-            keyname = "orangefs-serverkey-%s.pem" % node.host_name
+        for node in self.network_nodes:
+            keyname = "orangefs-serverkey-%s.pem" % node.hostname
             rc = security_node.runSingleCommand("openssl genrsa -out %s 2048" % keyname,output)
             if rc != 0:
-                print "Could not create server security key for "+node.host_name
+                print "Could not create server security key for "+node.hostname
                 print output 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy server security key %s for %s " % (keyname,node.host_name)
+                print "Could not copy server security key %s for %s " % (keyname,node.hostname)
                 print output 
                 return rc
             
@@ -1139,7 +1142,7 @@ class OFSTestNetwork(object):
     
     def generateOFSClientKeys(self,node_list=None,security_node=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if security_node==None:
             security_node = node_list[0]
 
@@ -1155,16 +1158,16 @@ class OFSTestNetwork(object):
         security_node.runSingleCommand("mkdir -p /tmp/%s/security" % security_node.current_user)
         security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
 
-        for node in self.created_nodes:
-            keyname = "pvfs2-clientkey-%s.pem" % node.host_name
+        for node in self.network_nodes:
+            keyname = "pvfs2-clientkey-%s.pem" % node.hostname
             rc = security_node.runSingleCommand("openssl genrsa -out %s 1024" % keyname,output)
             if rc != 0:
-                print "Could not create client security key for "+node.host_name
+                print "Could not create client security key for "+node.hostname
                 print output 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy client security key %s for %s " % (keyname,node.host_name)
+                print "Could not copy client security key %s for %s " % (keyname,node.hostname)
                 print output 
                 return rc
 
@@ -1185,7 +1188,7 @@ class OFSTestNetwork(object):
     
     def generateOFSKeystoreFile(self,node_list=None,security_node=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if security_node==None:
             security_node = node_list[0]
         
@@ -1210,34 +1213,34 @@ class OFSTestNetwork(object):
         security_node.changeDirectory("/tmp/%s/security" % security_node.current_user)
         
         # generate the keystore for entire network
-        for node in self.created_nodes:
+        for node in self.network_nodes:
             
-            server_keyname = "orangefs-serverkey-%s.pem" % node.host_name
-            client_keyname = "pvfs2-clientkey-%s.pem" % node.host_name
+            server_keyname = "orangefs-serverkey-%s.pem" % node.hostname
+            client_keyname = "pvfs2-clientkey-%s.pem" % node.hostname
             if node.alias_list == None:
                 node.alias_list = node.getAliasesFromConfigFile(node.ofs_installation_location + "/etc/orangefs.conf")
             if len(node.alias_list) == 0:
                 print "Could not get aliases"
                 return -1
             for alias in node.alias_list:
-                if node.host_name in alias:
+                if node.hostname in alias:
                     security_node.runSingleCommand('echo "S:%s" >> orangefs-keystore' % alias)
                     security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % server_keyname)
                 
-            security_node.runSingleCommand('echo "C:%s" >> orangefs-keystore' % node.host_name)
+            security_node.runSingleCommand('echo "C:%s" >> orangefs-keystore' % node.hostname)
             security_node.runSingleCommand('openssl rsa -in %s -pubout >> orangefs-keystore' % client_keyname)
             
-        for node in self.created_nodes:
+        for node in self.network_nodes:
 
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destination_node=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy keystore for %s " % (node.host_name)
+                print "Could not copy keystore for %s " % (node.hostname)
                 print output 
                 return rc
             #now protect the files
             rc = node.runSingleCommand("chmod 400 %s/etc/*.pem" % node.ofs_installation_location)
             if rc != 0:
-                print "Could not protect keys on %s " % (node.host_name)
+                print "Could not protect keys on %s " % (node.hostname)
                 print output 
                 return rc
 
@@ -1257,7 +1260,7 @@ class OFSTestNetwork(object):
      
     def findExistingOFSInstallation(self,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         for node in node_list:
             rc = node.findExistingOFSInstallation()
             if rc != 0:
@@ -1276,7 +1279,7 @@ class OFSTestNetwork(object):
     #             resource_type,
     #             ofs_config_file,
     #             ofs_fs_name,
-    #             ofs_host_name_override,
+    #             ofs_hostname_override,
     #             ofs_mount_point,
     #             node_list = None
     #             ):
@@ -1284,6 +1287,7 @@ class OFSTestNetwork(object):
     #    Manually set OrangeFS settings for each node in the list. Used for retesting.
     #
     #    @param self The object pointer
+    #    @param ofs_installation_location Directory where OrangeFS is installed. Should be the same on all nodes.
     #    @param db4_prefix Location of Berkeley DB4
     #    @param ofs_extra_tests_location Location of 3rd party benchmarks
     #    @param pvfs2tab_file Location of pvfs2tab file
@@ -1291,8 +1295,8 @@ class OFSTestNetwork(object):
     #    @param resource_type Form of source: TAR,SVN,LOCAL,BUILDNODE
     #    @param ofs_config_file Location of orangefs.conf file
     #    @param ofs_fs_name Name of OrangeFS in filesystem url
-    #    @param ofs_host_name_override Change hostname to this. Needed to work around an openstack issue
-    #    @param ofs_mount_point Location of OrangeFS mountpoint
+    #    @param ofs_hostname_override Change hostname to this. Needed to work around an openstack issue
+    #    @param ofs_mount_point Location of OrangeFS mount_point
     #    @param node_list List of nodes in network
         
     def networkOFSSettings(self,
@@ -1304,13 +1308,13 @@ class OFSTestNetwork(object):
             resource_type,
             ofs_config_file,
             ofs_fs_name,
-            ofs_host_name_override = None,
+            ofs_hostname_override = None,
             ofs_mount_point = None,
             node_list = None
             ):
 
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
             
         for i,node in enumerate(node_list):
 
@@ -1351,10 +1355,10 @@ class OFSTestNetwork(object):
                 node.ofs_mount_point = ofs_mount_point
             
             # Hostname override. Needed to workaround an openstack problem.
-            if len(ofs_host_name_override) > 0:
+            if len(ofs_hostname_override) > 0:
                 try:
-                    node.host_name = ofs_host_name_override[i]
-                    node.runSingleCommandAsBatch("sudo hostname "+node.host_name)
+                    node.hostname = ofs_hostname_override[i]
+                    node.runSingleCommandAsBatch("sudo hostname "+node.hostname)
                 except:
                     # if not, ignore the error
                     pass
@@ -1377,7 +1381,7 @@ class OFSTestNetwork(object):
 
     def exportNFSDirectory(self,directory,nfs_server_list=None,options=None,network=None,netmask=None):
         if nfs_server_list == None:
-            nfs_server_list = self.created_nodes
+            nfs_server_list = self.network_nodes
         
         rc = 0
         for nfs_server in nfs_server_list:
@@ -1387,28 +1391,28 @@ class OFSTestNetwork(object):
  
   
     ##
-    #    @fn mountNFSDirectory(self,nfs_share,mountpoint,options="",nfs_client_list=None):
+    #    @fn mountNFSDirectory(self,nfs_share,mount_point,options="",nfs_client_list=None):
     #
-    #    Mount an NFS share at mountpoint for each client in the client list.
+    #    Mount an NFS share at mount_point for each client in the client list.
     #
     # @param self The object pointer
     # @param nfs_share NFS share to mount
-    # @param mount_point NFS mountpoint on machine
+    # @param mount_point NFS mount_point on machine
     # @param options NFS mount options
     # @param nfs_client_list List of NFS client nodes
          
     
-    def mountNFSDirectory(self,nfs_share,mountpoint,options="",nfs_client_list=None):
+    def mountNFSDirectory(self,nfs_share,mount_point,options="",nfs_client_list=None):
         
         if nfs_client_list == None:
-            nfs_client_list = self.created_nodes
+            nfs_client_list = self.network_nodes
     
         fail = 0
         
         for nfs_client in nfs_client_list:
-            rc = nfs_client.mountNFSDirectory(nfs_share,mountpoint,options)
+            rc = nfs_client.mountNFSDirectory(nfs_share,mount_point,options)
             if rc != 0:
-                print "Mounting %s at %s with options %s on %s failed with RC=%d" %(nfs_share,mountpoint,options,nfs_client.ip_address,rc)
+                print "Mounting %s at %s with options %s on %s failed with RC=%d" %(nfs_share,mount_point,options,nfs_client.ip_address,rc)
                 fail = fail+1
             
         
@@ -1424,14 +1428,14 @@ class OFSTestNetwork(object):
     # @param self The object pointer
     # @param build_node Node used to build OpenMPI
     # @param mpi_nfs_directory Location to install OpenMPI. This should be an nfs directory accessible from all nodes
-    # @param build_location Location to build OpenMPI. This should be a local directory on the build node
+    # @param mpi_local_directory Location to build OpenMPI. This should be a local directory on the build node
     # @param node_list List of nodes in OpenMPI network.
     
     
 
     def installOpenMPI(self,mpi_nfs_directory=None,build_node=None,mpi_local_directory=None,node_list=None):
         if node_list == None:
-            node_list = self.created_nodes
+            node_list = self.network_nodes
         if build_node == None:
             build_node = node_list[0]
         
@@ -1451,7 +1455,7 @@ class OFSTestNetwork(object):
         time.sleep(30)
         
         # mount the local directory as an NFS directory on all nodes.
-        rc = self.mountNFSDirectory(nfs_share=nfs_share,mountpoint=self.mpi_nfs_directory,options="bg,intr,noac,nfsvers=3")
+        rc = self.mountNFSDirectory(nfs_share=nfs_share,mount_point=self.mpi_nfs_directory,options="bg,intr,noac,nfsvers=3")
         
         # build mpi in the build location, but install it to the nfs directory
         rc = build_node.installOpenMPI(install_location=self.mpi_nfs_directory,build_location=self.mpi_nfs_directory)
@@ -1463,7 +1467,7 @@ class OFSTestNetwork(object):
 
         # Testing requires np=4
         MAX_SLOTS = 4
-        number_nodes = len(self.created_nodes)
+        number_nodes = len(self.network_nodes)
     
         # number of slots needed is total/nodes.
         slots = (MAX_SLOTS / number_nodes) 
@@ -1492,7 +1496,7 @@ class OFSTestNetwork(object):
         #build_node.runSingleCommand('sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version))
         #build_node.runSingleCommand('chmod a+x %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,build_node.openmpi_version))
         # update bashrc     
-        for node in self.created_nodes:
+        for node in self.network_nodes:
             #node.openmpi_installation_location = self.mpi_nfs_directory
             # have we already done this?
             #done = node.runSingleCommand("grep -v %s /home/%s/.bashrc" % (node.openmpi_installation_location,node.current_user))
@@ -1519,7 +1523,7 @@ class OFSTestNetwork(object):
      
     def setupHadoop(self,hadoop_nodes=None,master_node=None):
         if hadoop_nodes == None:
-            hadoop_nodes = self.created_nodes
+            hadoop_nodes = self.network_nodes
         
         if master_node == None:
             master_node = hadoop_nodes[0]
@@ -1538,16 +1542,16 @@ class OFSTestNetwork(object):
             master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
             
             # update mapred-site.xml
-            node.runSingleCommand("sed -i s/__NODE001__/%s/ %s/conf/mapred-site.xml" % (master_node.host_name,node.hadoop_location))
+            node.runSingleCommand("sed -i s/__NODE001__/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
             
             # update core-site.xml
             node.runSingleCommand("sed -i s,__MNT_LOCATION__,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
 
             # point slave node to master
-            node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.host_name,node.hadoop_location))
+            node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.hostname,node.hadoop_location))
             
             # notify master of new slave
-            master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.host_name,master_node.hadoop_location))
+            master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.hostname,master_node.hadoop_location))
             
         output = []
         master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location,output)
@@ -1612,7 +1616,7 @@ class OFSTestNetwork(object):
 #     my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/branches/stable")
 #     #my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/trunk")
 #     #my_node_manager.buildAndInstallOFSFromSource(resource_type="TAR",resource_location="http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz")
-#     #for node in my_node_manager.created_nodes:
+#     #for node in my_node_manager.network_nodes:
 #     #    node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
 #     #    node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
 #     print ""
@@ -1708,7 +1712,7 @@ class OFSTestNetwork(object):
 #     #my_node_manager.stopOFSServers()
 #     #my_node_manager.stopOFSClient()
 # 
-#     #for node in my_node_manager.created_nodes:
+#     #for node in my_node_manager.network_nodes:
 # 
 #      #   node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
 #         #node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))

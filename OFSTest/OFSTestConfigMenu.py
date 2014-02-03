@@ -109,7 +109,7 @@ class OFSTestConfigMenu(OFSTestConfig):
 
     #======================================
     #
-    # def get_host_name
+    # def get_hostname
     #
     # This function asks the user for a hostname
     # Can also validate existance
