@@ -475,9 +475,10 @@ def ltp(testing_node,output=[]):
             
             return rc
         
-        rc = testing_node.runSingleCommand('./configure --prefix=/tmp/ltp ADD_CFLAGS="-D_GNU_SOURCE -g -O0"',output)
-        #if rc != 0:
-        #    return rc
+        rc = testing_node.runSingleCommand("./configure --prefix=/tmp/ltp ADD_CFLAGS='-D_GNU_SOURCE -g -O0'",output)
+        if rc != 0:
+            
+            return rc
 
         rc = testing_node.runSingleCommand('make all',output)
         if rc != 0:

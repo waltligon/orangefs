@@ -228,7 +228,7 @@ def dbench(testing_node,output=[]):
         rc = testing_node.runSingleCommand("make clean",output)
         rc = testing_node.runSingleCommand("./configure",output)
 
-		# Patch dbench to add support for OrangeFS
+        # Patch dbench to add support for OrangeFS
         rc = testing_node.runSingleCommand("patch -p3 < %s/test/automated/usrint-tests.d/dbench.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             return rc
@@ -276,7 +276,7 @@ def fdtree(testing_node,output=[]):
 
     # fdtree must be run from the mount_point, but need to cd to that directory w/usrint libraries.
     testing_node.changeDirectory("~")
-    rc = testing_node.runSingleCommand("%s cd %s; bash -c \"%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5\"" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
+    rc = testing_node.runSingleCommand("%s cd %s; bash -c '%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5'" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
     
     return rc
 
@@ -437,11 +437,11 @@ def ltp(testing_node,output=[]):
             
             return rc
         
-        rc = testing_node.runSingleCommand('./configure --prefix=/tmp/ltp ADD_CFLAGS="-D_GNU_SOURCE"',output)
+        rc = testing_node.runSingleCommand("./configure --prefix=/tmp/ltp ADD_CFLAGS='-D_GNU_SOURCE'",output)
         #if rc != 0:
         #    return rc
 
-        rc = testing_node.runSingleCommand('export CFLAGS="-g"; make all',output)
+        rc = testing_node.runSingleCommand("export CFLAGS='-g'; make all",output)
         if rc != 0:
             
             return rc
