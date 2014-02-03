@@ -1,31 +1,14 @@
 #!/usr/bin/python
 
-###############################################################################
+##
 #
-# OFSTestNode
+# @class OFSTestNode
 # 
-# This is the base class for all test nodes that run OrangeFS. Local and 
+# @brief This is the base class for all test nodes that run OrangeFS. Local and 
 # remote; Client, Server, and Build nodes. 
 #
 # OFSTestNode is an abstract class. All nodes should be of a more specific 
 # subclass type.
-#
-################################################################################
-
-import os
-import subprocess
-import shlex
-import cmd
-import time
-import sys
-import xml.etree.ElementTree as ET
-import traceback
-#import scriptine.shell
-
-###############################################################################################'
-#
-# class OFSTestNode(object)
-#
 #
 # This class represents all machines that are part of the OFS process. This includes local, remote
 # and remote-ec2 based machines.
@@ -40,17 +23,34 @@ import traceback
 # OFSTestServer functions: Configure and run OrangeFS server
 # OFSTestBuilder functions: Compile OrangeFS and build rpms/dpkgs.
 # OFSTestClient functions: Configure and run OrangeFS client
-#
-################################################################################################
 
+
+import os
+import subprocess
+import shlex
+import cmd
+import time
+import sys
+import xml.etree.ElementTree as ET
+import traceback
+
+
+## @var batch_count
 # global variable for batch counting
 batch_count = 0
 
 class OFSTestNode(object):
     
+    ## @var node_number
+    # variable for number of node in the cluster.
     node_number = 0
     
-      # initialize node. We don't have much info for the base class.
+    ##
+    # @fn __init__(self):
+    # Initialize node. We don't have much info for the base class.
+    # 
+    # @param self The object pointer.
+    
     def __init__(self):
         
 #------------------------------------------------------------------------------
@@ -60,36 +60,46 @@ class OFSTestNode(object):
 #
 #------------------------------------------------------------------------------
         
+        ## @var alias_list    
         # list of OrangeFS Aliases
         self.alias_list = None
         
+        ## @var ip_address
         # ip address on internal network
         self.ip_address = ""
         
+        ## @var ext_ip_address
         # ip address on external network
         self.ext_ip_address = self.ip_address
         
+        ## @var host_name
         # current hostname
         self.host_name = ""
         
+        ## @var distro
         # operating system
         self.distro = ""
         
+        ## @var package_system
         # package system (rpm/dpkg)
         self.package_system=""
         
+        ## @var kernel_source_location
         # location of the linux kernel source
         self.kernel_source_location = ""
         
-        # kernel version (uname -r)
+        ## @var kernel_version (uname -r)
         self.kernel_version=""
         
+        ## @var is_remote
         # is this a remote machine?
         self.is_remote=True
         
+        ## @var is_ec2
         # is this an ec2/openstack instance?
         self.is_ec2=False
         
+        ## @var processor_type
         # type of processor (i386/x86_64)
         self.processor_type = "x86_64"
         
@@ -99,34 +109,41 @@ class OFSTestNode(object):
         #
         #-------
         
+        ## @var current_user
         # main user login. Usually ec2-user for ec2 instances.
         self.current_user = ""
         
+        ## @var current_directory
         # current working directory
         self.current_directory = "~"
+        
+        ## @var previous_directory
         #previous directory
         self.previous_directory = "~"
         
+        ## @var current_environment
         # current environment variables
         self.current_environment = {}
         
+        ## @var batch_commands
         # commands written to a batch file
         self.batch_commands = []
         
         #-------------------------------------------------------
         # sshKeys
-        #
-        #
-        # The node key file is the file on the node that contains the key to access this machine.
-        # The local key file is the location of the key on the local host. Local key file is ALWAYS on the
-        # localhost.
-        #
-        # The keytable is a dictionary of locations of keys to remote machines on the current node.
-        #
         #--------------------------------------------------------
 
+        ## @var sshLocalKeyFile
+        # The local key file is the location of the key on the local host. Local key file is ALWAYS on the
+        # localhost.
         self.sshLocalKeyFile = ""
+        
+        ## @var sshNodeKeyFile
+        # The node key file is the file on the node that contains the key to access this machine.       
         self.sshNodeKeyFile = ""
+        
+        ## @var keytable
+        # The keytable is a dictionary of locations of keys to remote machines on the current node.
         self.keytable = {}
         
         #----------------------------------------------------------
@@ -135,65 +152,96 @@ class OFSTestNode(object):
         #
         #----------------------------------------------------------
        
+        ## @var ofs_source_location
         # This is the location of the OrangeFS source
         self.ofs_source_location = ""
         
+        ## @var ofs_storage_location
         # This is the location of the OrangeFS storage
         self.ofs_storage_location = ""
 
+        ## @var ofs_installation_location
         # This is where OrangeFS is installed. Defaults to /opt/orangefs
         self.ofs_installation_location = ""
-        
+
+        ## @var ofs_extra_tests_location
         # This is the location of the third party benchmarks
         self.ofs_extra_tests_location = ""
 
+        ## @var ofs_mount_point
         # This is the mount_point for OrangeFS
         self.ofs_mount_point = ""
         
+        ## @var ofs_fs_name
         # This is the OrangeFS service name. pvfs2-fs < 2.9, orangefs >= 2.9
         self.ofs_fs_name="orangefs"
         
+        ## @var ofs_branch
         # svn branch (or ofs source directory name)
         self.ofs_branch = ""
         
+        ## @var ofs_conf_file
         # Location of orangefs.conf file.
         self.ofs_conf_file = None
         
+        ## @var build_kmod
         # Do we need to build the kernel module?
         self.build_kmod = False
         
+        ## @var ofs_tcp_port
         # default tcp port
         self.ofs_tcp_port = "3396"
         
+        ## @var db4_dir
         # berkeley db4 location
         self.db4_dir = "/opt/db4"
+        
+        ## @var db4_lib_dir
+        # berkeley db4 library location
         self.db4_lib_dir = self.db4_dir+"/lib"
         
-        # MPICH related variables
+        
         self.mpich2_installation_location = ""
         self.mpich2_source_location = ""
         self.mpich2_version = ""
         self.created_mpichhosts = None 
         
         # OpenMPI related variables
+        
+        ## @var openmpi_installation_location
+        ## @var openmpi_source_location
+        ## @var openmpi_version
+        ## @var created_openmpihosts
+        # Created openmpihosts file
+        
         self.openmpi_installation_location = ""
         self.openmpi_source_location = ""
         self.openmpi_version = ""
         self.created_openmpihosts = None  
         
+        ## @var mpi_nfs_directory
         # Where is the common mpi nfs directory?
         self.mpi_nfs_directory = ""
         
-        
-        # Where is the romio test script? 
+        ## @var romio_runtests_pvfs2
+        # Where is the romio test script?
+         
         # Sloppy - revise.
         self.romio_runtests_pvfs2 = None
         
-        # Hadoop variables
-        self.hadoop_version = "hadoop-1.2.1"
-        self.hadoop_location = "/opt/"+self.hadoop_version
-        self.jdk6_location = "/usr/java/default"
         
+        # Hadoop variables
+        ## @var hadoop_version
+        # Version of hadoop software
+        self.hadoop_version = "hadoop-1.2.1"
+        
+        ## @var hadoop location
+        # Location of hadoop installation
+        self.hadoop_location = "/opt/"+self.hadoop_version
+        
+        ## @var jdk6_location
+        # Location of Oracle JDK 6
+        self.jdk6_location = "/usr/java/default"
         
         
         
@@ -201,13 +249,13 @@ class OFSTestNode(object):
         self.node_number = OFSTestNode.node_number
         OFSTestNode.node_number += 1
 
-    #==========================================================================
+    ##
     # 
-    # currentNodeInformation
+    # @fn currentNodeInformation(self):
     #
     # Logs into the node to gain information about the system
     #
-    #==========================================================================
+    # @param self The object pointer
     
 
     def currentNodeInformation(self):
@@ -225,10 +273,10 @@ class OFSTestNode(object):
         
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user)
 
-		# is this a mac? Home located under /Users
-		# Wow, this is ugly. Need to stop hardcoding "/home"
+        # is this a mac? Home located under /Users
+        # Wow, this is ugly. Need to stop hardcoding "/home"
         if self.current_group.rstrip() == "":
-	        self.current_group = self.runSingleCommandBacktick(command="ls -l /Users/ | grep %s | awk '{print \\$4}'" % self.current_user)
+            self.current_group = self.runSingleCommandBacktick(command="ls -l /Users/ | grep %s | awk '{print \\$4}'" % self.current_user)
 
         print "Current group is "+self.current_group
 
@@ -327,9 +375,13 @@ class OFSTestNode(object):
 #
 #==========================================================================
 
-    #--------------------------------------------------------------------------
+    ##
+    # @fn changeDirectory(self, directory):
     # Change the current directory on the node to run scripts.
-    #--------------------------------------------------------------------------
+    #
+    # @param self The object pointer
+    # @param directory New directory. Note: "-" will change to previous directory.
+    
     def changeDirectory(self, directory):
         # cd "-" will restore previous directory
         if directory is not "-": 
@@ -337,30 +389,42 @@ class OFSTestNode(object):
             self.current_directory = directory
         else:
             self.restoreDirectory()
-    #--------------------------------------------------------------------------
+    ##
+    # @fn restoreDirectory(self):
     # Restore directory - This restores the previous directory.
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    
     def restoreDirectory(self):
         temp = self.current_directory
         self.current_directory = self.previous_directory
         self.previous_directory = temp
 
-    #--------------------------------------------------------------------------  
+    ##
+    # @fn setEnvironmentVariable(self,variable,value):  
     # set an environment variable to a value
-    #--------------------------------------------------------------------------
+    # @param self The object pointer    
+    # @param variable Variable name
+    # @param value Value of variable
+    
     def setEnvironmentVariable(self,variable,value):
         self.current_environment[variable] = value
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn unsetEnvironmentVariable(self,variable):
     # Erase an environment variable
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param variable Variable name
+    
     def unsetEnvironmentVariable(self,variable):
         del self.current_environment[variable] 
     
-    #--------------------------------------------------------------------------  
+    ## 
+    # @fn setEnvironment(self, setenv): 
     # This function sets the environment based on the output of setenv.
-    # setenv is a string that is formatted like the output of the setenv command.
-    #-------------------------------------------------------------------------- 
+    # 
+    # @param self The object pointer
+    # @param setenv A string that is formatted like the output of the setenv command.
+     
     def setEnvironment(self, setenv):
     
         variable_list = setenv.split('\n')
@@ -369,32 +433,44 @@ class OFSTestNode(object):
             vname,value = variable.split('=')
             self.setEnvironmentVariable(vname,value)
           
-    #--------------------------------------------------------------------------
+    ##
+    # @fn clearEnvironment(self):
     # Clear all environment variables
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    
     def clearEnvironment(self):
         self.current_environment = {}
     
-    #--------------------------------------------------------------------------  
-    # return current directory
-    #--------------------------------------------------------------------------
+    ##
+    # @fn printWorkingDirectory(self):  
+    # 
+    # @param self The object pointer
+    # @return current directory
+    
     def printWorkingDirectory(self):
         return self.current_directory
     
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn addBatchCommand(self,command):
     # Add a command to the list of batch commands to be run.
     # This is generally the single line of a shell script.
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param command The command to add
+    
     def addBatchCommand(self,command):
         self.batch_commands.append(command)
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn runSingleCommand(self,command,output=[],remote_user=None):
     # This runs a single command and returns the return code of that command
     #
     # command, stdout, and stderr are in the output list
-    #
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param command The command to run
+    # @param output Output list
+    # @param remote_user User to run as. Default is current user.
+    
     def runSingleCommand(self,command,output=[],remote_user=None):
         
         
@@ -417,10 +493,14 @@ class OFSTestNode(object):
 
         return p.returncode
      
-    #--------------------------------------------------------------------------    
+    ##
+    # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
     # This runs a single command and returns the stdout of that command.
-    #--------------------------------------------------------------------------
-      
+    # @param self The object pointer
+    # @param command The command to run
+    # @param output Output list
+    # @param remote_user User to run as. Default is current user.
+          
     def runSingleCommandBacktick(self,command,output=[],remote_user=None):
         
         if remote_user==None:
@@ -433,13 +513,21 @@ class OFSTestNode(object):
         else:
             return ""
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn runOFSTest(self,package,test_function,output=[],logfile="",errfile=""):
     # This method runs an OrangeFS test on the given node
     #
     # Output and errors are written to the output and errfiles
     # 
     # return is return code from the test function
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param package Test package name
+    # @param test_function Test function to run.
+    # @param output Output list
+    # @param logfile File to log stdout
+    # @param errfile File to log stderr
+    
+    
 #
     def runOFSTest(self,package,test_function,output=[],logfile="",errfile=""):
 
@@ -472,10 +560,21 @@ class OFSTestNode(object):
         
         return rc
     
-    #--------------------------------------------------------------------------    
+    ##
+    # @fn prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):   
     # This method prepares the command line for run single command. 
     # Should not be implemented here, but in subclass
-    #--------------------------------------------------------------------------
+    #
+    # @param self The object pointer
+    # @param command Shell command to be run.
+    # @param outfile File to redirect stdout to.
+    # @param append_out Append outfile or overwrite?
+    # @param errfile File to redirect stderr to.
+    # @param append_err Append errfile or overwrite?
+    # @param remote_user Run command as this user
+    #
+    # @return String Formatted command line.
+    
     
     def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         # Implimented in the client. Should not be here.
@@ -483,28 +582,39 @@ class OFSTestNode(object):
         print "Trying naive attempt to create command list."
         return command
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn runAllBatchCommands(self,output=[]):
     # This method runs all the batch commands in the list. 
     # Should not be implemented here, but in the subclass.
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param output Output list
+
        
     def runAllBatchCommands(self,output=[]):
         # implemented in child class
         pass
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn runSingleCommandAsBatch(self,command,output=[]):
     # Run a single command as a batchfile. Some systems require this for passwordless sudo
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param command Shell command to be run.
+    # @param output Output list
+    
     
     def runSingleCommandAsBatch(self,command,output=[]):
         self.addBatchCommand(command)
         self.runAllBatchCommands(output)
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn runBatchFile(self,filename,output=[]):
     # Run a batch file through the system.
     #
     # Not sure why this is here
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param filename Batch file name
+    # @param output Output list
+    
     def runBatchFile(self,filename,output=[]):
         #copy the old batch file to the batch commands list
         batch_file = open(filename,'r')
@@ -513,28 +623,53 @@ class OFSTestNode(object):
         # Then run it
         self.runAllBatchCommands(output)
         
-    #--------------------------------------------------------------------------
+    ##
+    # @fn copyToRemoteNode(self, source, destination_node, destination, recursive=False):
     # copy files from the current node to a destination node.
     # Should not be implemented here, but in the subclass.
-    #--------------------------------------------------------------------------
-    def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
+    # @param self The object pointer
+    # @param source Source file or directory
+    # @param destination_node Node to which files should be copied
+    # @param destination Destination file or directory on remote node.
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
+    
+    
+    def copyToRemoteNode(self, source, destination_node, destination, recursive=False):
         # implimented in subclass
         pass
-    
-    #--------------------------------------------------------------------------  
-    # copy files from a remote node to the current node.
+
+    ##
+    #
+    # @fn copyFromRemoteNode(self, source_node, source, destination, recursive=False):
+    #
+    # This copies files from the remote node to this node via rsync.
     # Should not be implemented here, but in the subclass.
-    #--------------------------------------------------------------------------
+    #
+    # @param self The object pointer
+    # @param source_node Node from which files should be copied
+    # @param source Source file or directory on remote node.
+    # @param destination Destination file or directory
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
+    
     def copyFromRemoteNode(self,sourceNode, source, destination, recursive=False):
         # implimented in subclass
         pass
     
-    #--------------------------------------------------------------------------
+    ##
+    # @fn writeToOutputFile(self,command_line,cmd_out,cmd_err):
     # writeToOutputFile()
     #
     # Write output (command, stdout, stderr) from runSingleCommand to a file.
     # 
-    #--------------------------------------------------------------------------
+    # @param self The object pointer
+    # @param command_line command that was run
+    # @param cmd_out stdout of command
+    # @param cmd_err stderr of command
+    
       
     def writeToOutputFile(self,command_line,cmd_out,cmd_err):
         
@@ -547,25 +682,41 @@ class OFSTestNode(object):
         outfile.write("\n")
         outfile.close()
       
-    #---------------------
+    ##
+    # @fn getRemoteKeyFile(self,address):
     #
     # ssh utility functions
-    #
-    #---------------------
+    # @param self The object pointer
+    # @address remote ip address
+    
     def getRemoteKeyFile(self,address):
         #print "Looking for %s in keytable for %s" % (address,self.host_name)
         #print self.keytable
         return self.keytable[address]
+    
+    ##
+    # @fn addRemoteKey(self,address,keylocation):
+    #This method adds the location of the key for machine at address to the keytable.
+    # @param self The object pointer
+    # @param address ip address of remote machine
+    # @param keylocation location of ssh key for remote machine on node.
       
     def addRemoteKey(self,address,keylocation):
         #
         #This method adds the location of the key for machine at address to the keytable.
         #
         self.keytable[address] = keylocation
+    
+    ##
+    # @fn copyLocal(self, source, destination, recursive):
+    # This runs the copy command locally 
+    # @param self The object pointer
+    # @param source Source directory
+    # @param destination Destination directory
+    # @param recursive Copy recursively?
      
-     
-    def copyLocal(self, source, destination, recursive):
-        # This runs the copy command locally 
+    def copyLocal(self, source, destination, recursive=False):
+        
         rflag = ""
         # verify source file exists
         if recursive == True:
@@ -590,13 +741,13 @@ class OFSTestNode(object):
     #
     #=============================================================================
     
-    #-------------------------------
-    #
-    # updateNode
+    ##
+    # @fn updateNode(self):
     #
     # This function updates the software on the node via the package management system
+    # @param self The object pointer
     #
-    #-------------------------------
+    
     
     
     def updateNode(self):
@@ -621,13 +772,13 @@ class OFSTestNode(object):
         
         print "Node "+self.host_name+" at "+self.ip_address+" Rebooting."
     
-    #-------------------------------
-    #
-    # installTorqueServer
+    ##
+    # @fn installTorqueServer(self):
     #
     # This function installs and configures the torque server from the package management system on the node.
+    # @param self The object pointer
     #
-    #-------------------------------
+    
     def installTorqueServer(self):
         
         #Each distro handles torque slightly differently.
@@ -712,13 +863,13 @@ class OFSTestNode(object):
         
         self.runAllBatchCommands()
         
-    #-------------------------------
-    #
-    # installTorqueClient
+    ##
+    # @fn installTorqueClient(self,pbsserver):
     #
     # This function installs and configures the torque client from the package management system on the node.
-    #
-    #-------------------------------        
+    # @param self The object pointer
+    # @param pbsserver OFSTestNode that is the pbsserver
+            
                                 
         
 
@@ -790,13 +941,12 @@ class OFSTestNode(object):
         #print batch_commands  
         self.runAllBatchCommands()
             
-    #-------------------------------
-    #
-    # restartTorqueServer
-    #
+    ##
+    # @fn restartTorqueServer(self):
     # When installed from the package manager, torque doesn't start with correct options. This restarts it.
+    # @param self The object pointer
     #
-    #-------------------------------
+  
 
 
     def restartTorqueServer(self):
@@ -826,13 +976,13 @@ class OFSTestNode(object):
         self.runAllBatchCommands()
 
         
-    #-------------------------------
-    #
-    # restartTorqueMom
+    ##
+    # @fn restartTorqueMom(self):
     #
     # When installed from the package manager, torque doesn't start with correct options. This restarts it.
+    # @param self The object pointer
     #
-    #-------------------------------
+
 
     
     def restartTorqueMom(self):
@@ -846,13 +996,13 @@ class OFSTestNode(object):
     
 
 
-    #-------------------------------
-    #
-    # installRequiredSoftware
-    #
+    ##
+    # @fn installRequiredSoftware(self):
+    # 
     # This installs all the prerequisites for building and testing OrangeFS from the package management system
+    # @param self The object pointer
     #
-    #-------------------------------
+
 
 
     def installRequiredSoftware(self):
@@ -1021,15 +1171,17 @@ class OFSTestNode(object):
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
 
-   #-------------------------------
-    #
-    # installMPICH2
+    ##
+    # @fn installMpich2(self,location=None):
     #
     # This function installs mpich2 software
+    # TODO: Must be reimplemented to match OpenMPI installation.
+    # @param self The object pointer
+    # @param location Location to install mpich
     #
-    #-------------------------------
+
     
-    #TODO: Must be reimplemented to match OpenMPI installation.
+    
 
     def installMpich2(self,location=None):
         if location == None:
@@ -1114,13 +1266,15 @@ class OFSTestNode(object):
         
         return 0
     
-    #-------------------------------
-    #
-    # installOpenMPI
+    ##
+    # @fn installOpenMPI(self,install_location=None,build_location=None):
     #
     # This function installs OpenMPI software
+    # @param self The object pointer
+    # @param install_location Location to install OpenMPI
+    # @param build_location Location to build OpenMPI
     #
-    #-------------------------------
+    
 
     def installOpenMPI(self,install_location=None,build_location=None):
         
@@ -1223,13 +1377,16 @@ class OFSTestNode(object):
     
 
 
-    #-------------------------------
-    #
-    # copyOFSSourceFromSVN
+    ##
+    # @fn copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword):
     #
     # This copies the source from an SVN branch
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param svnurl Url of svn resource
+    # @param dest_dir Destination directory on machine
+    # @param svnusername svn username
+    # @param svnpassword svn password
+    
 
 
     def copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword):
@@ -1260,13 +1417,17 @@ class OFSTestNode(object):
         return rc
 
 
-    #-------------------------------
-    #
-    # install benchmarks
+    ##
+    # @fn installBenchmarks(self,tarurl="http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz",dest_dir="",configure_options="",make_options="",install_options=""):
     #
     # This downloads and untars the thirdparty benchmarks
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param tarurl Url of tarfile
+    # @param dest_dir Destination on local machine
+    # @param configure_options Options for configure
+    # @param make_options Options for make
+    # @param install_options Options for install
+ 
 
 
     def installBenchmarks(self,tarurl="http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz",dest_dir="",configure_options="",make_options="",install_options=""):
@@ -1318,14 +1479,18 @@ class OFSTestNode(object):
         return 0
     
     
-    
-    #-------------------------------
-    #
-    # makeFromTarFile
+    ##
+    # @fn makeFromTarFile(self,tarurl,dest_dir,configure_options="",make_options="",install_options=""):
     #
     # This is a generic function to ./configure, make, make install a tarball
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param tarurl Url of tarfile
+    # @param dest_dir Destination on local machine
+    # @param configure_options Options for configure
+    # @param make_options Options for make
+    # @param install_options Options for install
+ 
+
 
     def makeFromTarFile(self,tarurl,dest_dir,configure_options="",make_options="",install_options=""):
         tarfile = os.path.basename(tarurl)
@@ -1339,17 +1504,17 @@ class OFSTestNode(object):
             tarflags = "zxf"
             taridx = tarfile.index(".tar.gz")
         elif ".tgz" in tarfile:
-          tarflags = "zxf"
-          taridx = tarfile.index(".tgz")
+            tarflags = "zxf"
+            taridx = tarfile.index(".tgz")
         elif ".tar.bz2" in tarfile:
-          tarflags = "jxf"
-          taridx = tarfile.index(".tar.bz2")
+            tarflags = "jxf"
+            taridx = tarfile.index(".tar.bz2")
         elif ".tar" in tarfile:
-          tarflags = "xf"
-          taridx = tarfile.index(".tar")
+            tarflags = "xf"
+            taridx = tarfile.index(".tar")
         else:
-          print "%s Not a tarfile" % tarurl
-          return 1
+            print "%s Not a tarfile" % tarurl
+            return 1
         
         tardir = tarfile[:taridx]
         self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
@@ -1361,14 +1526,15 @@ class OFSTestNode(object):
         self.runSingleCommand("make install "+install_options)
     
     
-    #-------------------------------
-    #
-    # copyOFSSourceFromRemoteTarball
+    ##
+    # @fn copyOFSSourceFromRemoteTarball(self,tarurl,dest_dir):
     #
     # This downloads the source from a remote tarball. Several forms are 
     # supported
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param tarurl Url of tarfile
+    # @param dest_dir Destination on local machine
+   
     
     
     def copyOFSSourceFromRemoteTarball(self,tarurl,dest_dir):
@@ -1388,20 +1554,20 @@ class OFSTestNode(object):
         taridx = 0
         
         if ".tar.gz" in tarfile:
-          tarflags = "zxf"
-          taridx = tarfile.index(".tar.gz")
+            tarflags = "zxf"
+            taridx = tarfile.index(".tar.gz")
         elif ".tgz" in tarfile:
-          tarflags = "zxf"
-          taridx = tarfile.index(".tgz")
+            tarflags = "zxf"
+            taridx = tarfile.index(".tgz")
         elif ".tar.bz2" in tarfile:
-          tarflags = "jxf"
-          taridx = tarfile.index(".tar.bz2")
+            tarflags = "jxf"
+            taridx = tarfile.index(".tar.bz2")
         elif ".tar" in tarfile:
-          tarflags = "xf"
-          taridx = tarfile.index(".tar")
+            tarflags = "xf"
+            taridx = tarfile.index(".tar")
         else:
-          print "%s Not a tarfile" % tarurl
-          return 1
+            print "%s Not a tarfile" % tarurl
+            return 1
         
         rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile),output)
         if rc != 0:
@@ -1417,13 +1583,14 @@ class OFSTestNode(object):
         # source_location = /tmp/user/source
         return rc
   
-    #-------------------------------
-    #
-    # copyOFSSourceFromDirectory
+    ##
+    # @fn copyOFSSourceFromDirectory(self,directory,dest_dir):
     #
     # This copies the source from a local directory
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param directory Directory that contains OFS source.
+    # @param dest_dir Destination on local machine
+   
 
 
     def copyOFSSourceFromDirectory(self,directory,dest_dir):
@@ -1435,27 +1602,32 @@ class OFSTestNode(object):
         self.ofs_branch = dest_list[-1]
         return rc
     
-    #-------------------------------
-    #
-    # copyOFSSourceFromRemoteNode
+    ##
+    # @fn
     #
     # This copies the source from a remote directory
     #
-    #-------------------------------
+    # @param self The object pointer
+    # @param source_node OFSTestNode that has the source
+    # @param directory Directory that contains OFS source.
+    # @param dest_dir Destination on local machine
 
       
     def copyOFSSourceFromRemoteNode(self,source_node,directory,dest_dir):
         #implemented in subclass
         return 0
   
-    #-------------------------------
-    #
-    # copyOFSSource
+    ##
+    # @fn copyOFSSource(self,resource_type,resource,dest_dir,username="",password=""):
     #
     # This copies the source from wherever it is. Uses helper functions to get it from
     # the right place.
-    #
-    #-------------------------------      
+    # @param self The object pointer
+    # @param resouce_type Type of resource. Possible values are "SVN,TAR,LOCAL,BUILDNODE"
+    # @param resource Resource location (url or directory)
+    # @param dest_dir Destination on local machine
+    # @param username Username needed to access resource
+    # @param password Password needed to access resource     
       
       
     def copyOFSSource(self,resource_type,resource,dest_dir,username="",password=""):
@@ -1474,9 +1646,9 @@ class OFSTestNode(object):
         #print "Copy "+ resource_type+ " "+ resource+ " "+dest_dir
         
         if resource_type == "SVN":
-          rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
+            rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
         elif resource_type == "TAR":
-          rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
+            rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
         #elif resource_type == "REMOTEDIR":
         #    Remote node support not yet implimented.
         #  self.copyOFSSourceFromRemoteNode(directory,dest_dir)
@@ -1488,23 +1660,44 @@ class OFSTestNode(object):
             # to "BUILDNODE"
             pass
         elif resource_type == "BUILDNODE":
-          # Local directory on the current node. 
-          rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
+            # Local directory on the current node. 
+            rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
         else:
-          print "Resource type %s not supported!\n" % resource_type
-          return -1
+            print "Resource type %s not supported!\n" % resource_type
+            return -1
         
         
         return rc
         
-    #-------------------------------
+    ##
+    # @fn configureOFSSource(self,
+    #         build_kmod=True,
+    #         enable_strict=False,
+    #         enable_fuse=False,
+    #         enable_shared=False,
+    #         enable_hadoop=False,
+    #         ofs_prefix="/opt/orangefs",
+    #         db4_prefix="/opt/db4",
+    #         security_mode=None,
+    #         ofs_patch_files=[],
+    #         configure_opts="",
+    #         debug=False):
     #
-    # configureOFSSource
     #
     # This prepares the OrangeFS source and runs the configure command.
     #
-    #-------------------------------
-
+    # @param self The object pointer
+    # @param build_kmod Build the kernel module
+    # @param enable_strict Use --enable-strict option
+    # @param enable_fuse Enable fuse support
+    # @param enable_shared Build shared libraries
+    # @param enable_hadoop Enable hadoop support
+    # @param ofs_prefix Where to install OrangeFS
+    # @param db4_prefix Location of Berkeley DB4 
+    # @param security_mode OFS Security Mode: None,"Key","Cert"
+    # @param ofs_patch_files List of patch files for OrangeFS
+    # @param configure_options Additional configure options
+    # @param debug Debug mode?
       
     def configureOFSSource(self,
         build_kmod=True,
@@ -1616,15 +1809,19 @@ class OFSTestNode(object):
 
         return rc
     
-    #-------------------------------
-    #
-    # checkMount
+    ##
+    # @fn checkMount(self,mount_point=None,output=[]):
     #
     # This looks to see if a given mount_point is mounted.
-    # return == 0 => mounted
-    # return != 0 => not mounted
     #
-    #-------------------------------
+    # @param self The object pointer
+    # @param mount_point Mount point to check
+    # @param output Output list
+    #
+    # @return Is 0 - mounted
+    # @return Is not 0 - not mounted
+    #
+
 
         
     def checkMount(self,mount_point=None,output=[]):
@@ -1640,27 +1837,30 @@ class OFSTestNode(object):
         '''
         return mount_check
     
-    #-------------------------------
+    ##
+    # @fn def getAliasesFromConfigFile(self,config_file_name):
     #
-    # getAliasesFromConfigFile
-    #
-    # This reads the orangefs.conf file to get the alias names
-    #
+    # Reads the OrangeFS alias from the configuration file. 
     # Implimented in child classes.
     #
-    #-------------------------------
-
+    #
+    # @param self The object pointer
+    # @param config_file_name Full path to the configuration file. (Usually orangefs.conf)
+    #
+    # @return list of alias names 
+        
     def getAliasesFromConfigFile(self,config_file_name):
         pass
         
         
-    #-------------------------------
-    #
-    # makeOFSSource
-    #
+    ##
+    # @fn makeOFSSource(self,make_options=""):
     # This makes the OrangeFS source
     #
-    #-------------------------------    
+    # @param self The object pointer
+    # @param make_options Addtional make options
+    
+    
     
     def makeOFSSource(self,make_options=""):
         # Change directory to source location.
@@ -1683,13 +1883,12 @@ class OFSTestNode(object):
             
         return rc
     
-    #-------------------------------
-    #
-    # getKernelVerions
+    ##
+    # @fn getKernelVersion(self):
     #
     # wrapper for uname -r
-    #
-    #-------------------------------
+    # @param self The object pointer
+
 
 
 
@@ -1698,13 +1897,14 @@ class OFSTestNode(object):
         #  return self.kernel_version
         return self.runSingleCommand("uname -r")
 
-    #-------------------------------
-    #
-    # installOFSSource
+    ##
+    # @fn installOFSSource(self,install_options="",install_as_root=False):
     #
     # This looks to see if a given mount_point is mounted
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param install_options Addtional install options
+    # @param install_as_root Install OFS as root?
+
       
     def installOFSSource(self,install_options="",install_as_root=False):
         self.changeDirectory(self.ofs_source_location)
@@ -1727,13 +1927,13 @@ class OFSTestNode(object):
         
         return rc
 
-    #-------------------------------
+    ##
+    # @fn installOFSTests(self,configure_options=""):
     #
-    # installOFSTests
-    #
-    # this installs the OrangeFS test programs
-    #
-    #-------------------------------
+    # This installs the OrangeFS test programs in the OFS source tree
+    # @param self The object pointer
+    # @param configure_options Addtional configure options
+    
 
     def installOFSTests(self,configure_options=""):
         
@@ -1762,14 +1962,17 @@ class OFSTestNode(object):
             print "Could not install OrangeFS tests"
             print output
         return rc
-   
-    #-------------------------------
-    #
-    # exportNFSDirectory()
+    
+    ##
+    # @fn exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):
     #
     # this exports directory directory_name via NFS.
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param directory_name Directory to export
+    # @param options NFS options
+    # @param network Network on which to export
+    # @param netmask Netmask for network
+
     def exportNFSDirectory(self,directory_name,options=None,network=None,netmask=None):
         if options == None:
             options = "rw,sync,no_root_squash,no_subtree_check"
@@ -1807,13 +2010,15 @@ class OFSTestNode(object):
         
         return "%s:%s" % (self.ip_address,directory_name)
     
-    #-------------------------------
-    #
-    # mountNFSDirectory()
+    ##
+    # @fn mountNFSDirectory(self,nfs_share,mountpoint,options=""):
     #
     # this mounts nfs_share at mountpoint with options.
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param nfs_share NFS share to mount
+    # @param mount_point NFS mountpoint on machine
+    # @param options NFS mount options
+
         
     def mountNFSDirectory(self,nfs_share,mountpoint,options=""):
         self.changeDirectory("/home/%s" % self.current_user)
@@ -1832,11 +2037,12 @@ class OFSTestNode(object):
             count = count + 1
         return 0
     
-    #-------------------------------
-    #
-    #    clearSHM()
-    #     This clears out all SHM objects for OrangeFS.
-    #-------------------------------
+    ##
+    # @fn clearSHM(self):
+    #   
+    #  This clears out all SHM objects for OrangeFS.
+    # @param self The object pointer
+
     def clearSHM(self):
         self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
    
@@ -1850,14 +2056,14 @@ class OFSTestNode(object):
         #
         #=============================================================================
 
-    #-------------------------------
+    ##
+    # @fn
     #
-    # copyOFSInstallationToNode
-    #
-    # this copies an entire OrangeFS installation from the current node to destinationNode.
+    # This copies an entire OrangeFS installation from the current node to destinationNode.
     # Also sets the ofs_installation_location and ofs_branch on the destination
+    # @param self The object pointer
     #
-    #-------------------------------
+
 
 
     def copyOFSInstallationToNode(self,destinationNode):
@@ -1871,13 +2077,18 @@ class OFSTestNode(object):
         return rc
        
 
-    #-------------------------------
-    #
-    # configureOFSServer
+    ##
+    # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
     #
     # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf 
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param ofs_hosts_v List of OFS hosts
+    # @param ofs_fs_name OrangeFS filesystem name in url
+    # @param configuration_options Additional configuration options
+    # @param ofs_source_location Location of OrangeFS source
+    # @param ofs_conf_file Configuration file name. Default is [OFS location]/etc/orangefs.conf
+    # @param security OFS security level None,"Key","Cert"
+
       
     
        
@@ -1898,7 +2109,7 @@ class OFSTestNode(object):
         
         # Add each ofs host to the string of hosts.
         for ofs_host in ofs_hosts_v:
-           ofs_host_str = ofs_host_str + ofs_host.host_name + ":3396,"
+            ofs_host_str = ofs_host_str + ofs_host.host_name + ":3396,"
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -1954,14 +2165,13 @@ class OFSTestNode(object):
         self.ofs_fs_name = self.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % self.ofs_conf_file)
         
         return rc
-        
-    #-------------------------------
-    #
-    # startOFSServer
+    ##
+    # @fn startOFSServer(self,run_as_root=False):
     #
     # This function starts the orangefs server
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param run_as_root Run as root user
+
         
       
     def startOFSServer(self,run_as_root=False):
@@ -2038,11 +2248,12 @@ class OFSTestNode(object):
         self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
        
         return 0
-    #-------------------------------
-    #
-    # stopOFSServer
+    
+    ##
+    # @fn stopOFSServer(self):
     #
     # This function stops the OrangeFS servers.
+    # @param self The object pointer
     #
     #-------------------------------
         
@@ -2060,13 +2271,13 @@ class OFSTestNode(object):
     #
     #=============================================================================
     
-    #-------------------------------
-    #
-    # installKernelModule
+    ##
+    # @fn installKernelModule(self):
     #
     # This function inserts the kernel module into the kernel
+    # @param self The object pointer
     #
-    #-------------------------------
+
 
     def installKernelModule(self):
         
@@ -2086,13 +2297,13 @@ class OFSTestNode(object):
         return 0
         
      
-    #-------------------------------
-    #
-    # startOFSClient
+    ##
+    # @fn startOFSClient(self,security=None):
     #
     # This function starts the orangefs client
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param security OFS security level None,"Key","Cert"
+
     def startOFSClient(self,security=None):
         # Starting the OFS Client is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
@@ -2138,13 +2349,14 @@ class OFSTestNode(object):
 
         return 0
         
-    #-------------------------------
-    #
-    # mountOFSFilesystem
+    ##
+    # @fn mountOFSFilesystem(self,mount_fuse=False,mount_point=None):
     #
     # This function mounts OrangeFS via kernel module or fuse
-    #
-    #-------------------------------
+    # @param self The object pointer
+    # @param mount_fuse Mount with fuse module?
+    # @param mount_point OFS Mountpoint. Default is /tmp/mount/orangefs
+
       
     def mountOFSFilesystem(self,mount_fuse=False,mount_point=None):
         # Mounting the OFS Filesystem is a root task, therefore, it must be done via batch.
@@ -2192,26 +2404,25 @@ class OFSTestNode(object):
         print "Waiting 30 seconds for mount"            
         time.sleep(30)
 
-    #-------------------------------
-    #
-    # mountOFSFilesystem
+    ##
+    # @fn unmountOFSFilesystem(self):
     #
     # This function unmounts OrangeFS. Works for both kmod and fuse
+    # @param self The object pointer
     #
-    #-------------------------------
+
     
     def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mount_point
         self.addBatchCommand("sudo umount %s" % self.ofs_mount_point)
         self.addBatchCommand("sleep 10")
 
-    #-------------------------------
+    ##
+    # @fn stopOFSClient(self):
     #
-    # stopOFSClient
+    # This function stops the orangefs client and unmounts the filesystem
+    # @param self The object pointer
     #
-    # This function stops the orangefs client
-    #
-    #-------------------------------
     
 
     def stopOFSClient(self):
@@ -2227,13 +2438,13 @@ class OFSTestNode(object):
         
     
  
-    #-------------------------------
-    #
-    # findExistingOFSInstallation
+    ##
+    # @fn findExistingOFSInstallation(self):
     #
     # This function finds an existing OrangeFS installation on the node
+    # @param self The object pointer
     #
-    #-------------------------------
+
         
 
     def findExistingOFSInstallation(self):

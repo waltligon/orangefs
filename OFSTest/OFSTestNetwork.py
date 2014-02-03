@@ -1,6 +1,6 @@
 #!/usr/bin/python
-#
-# OFSTestNetwork.py
+##
+# @class OFSTestNetwork.py
 #
 # OFSTestNework is the class that forms the abstraction for the cluster. All operations on the cluster
 # should be performed via OFSTestNetwork, not the OFSTestNodes.
@@ -12,7 +12,7 @@
 #
 # EC2/OpenStack based virtual networks will also have an ec2_connection_manager.
 #
-#------------------------------------------------------------------------------
+
 
 import os
 import OFSTestNode
@@ -26,13 +26,14 @@ from pprint import pprint
 
 class OFSTestNetwork(object):
 
-#------------------------------------------------------------------------------
-#
-# __init__()
-#
-#    Initializes variables and creates local master.
-#
-#------------------------------------------------------------------------------
+    ##
+    #
+    # @fn __init__(self)
+    #
+    # Initializes variables and creates local master.
+    #
+    # @param self The object pointer
+    
 
     def __init__(self):
     
@@ -50,15 +51,17 @@ class OFSTestNetwork(object):
 
         #self.created_nodes['127.0.0.1']=self.local_master
    
-#------------------------------------------------------------------------------
-#
-#    findNode(ip_address,host_name)
-#
-#    Finds an OFSTestNode by ip address or hostname
-#
-#    Returns OFSTestNode if found, None, if not found.
-#
-#------------------------------------------------------------------------------
+
+    ##
+    # @fn  findNode(self,ip_address="",host_name=""):
+    #
+    # Finds an OFSTestNode by ip address or hostname
+    #
+    # @param self The object pointer
+    #
+    # @returns OFSTestNode if found, None, if not found.
+    #
+
     def findNode(self,ip_address="",host_name=""):
     
         
@@ -76,15 +79,21 @@ class OFSTestNetwork(object):
                 return next((i for i in self.created_nodes if i.host_name == host_name), None) 
         else:
             return None
-#------------------------------------------------------------------------------
-#
-#    addRemoteNode(username,ip_address,key,is_ec2=False,ext_ip_address=None)
-#
-#    Creates a new OFSTestNode and adds it to the created_nodes list.
-#
-#    Returns the OFSTestNode
-#
-#------------------------------------------------------------------------------
+
+    ##
+    #  @fn addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
+    #
+    #    Creates a new OFSTestNode and adds it to the created_nodes list.
+    #
+    # @param self The object pointer
+    # @param username User login
+    # @param ip_address IP address of node
+    # @param is_ec2 Is this an EC2/OpenStack node?
+    # @param ext_ip_address Externally accessible IP address
+    #
+    #  @returns the OFSTestNode
+    #
+
         
     def addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
         #This function adds a remote node
@@ -98,20 +107,19 @@ class OFSTestNetwork(object):
         # Return the new node
         return remote_node
 
-#------------------------------------------------------------------------------
-#
-#    runSimultaneousCommands(self,node_list,node_function=OFSTestNode.OFSTestNode.runSingleCommand,args=[],kwargs={})
-#
-#    Runs a command on multiple nodes.
-#
-#    Parameters:
-#                node_list = List of nodes to run command on 
-#                node_function = Python function to run on all OFSTestNodes.
-#                                Default is OFSTestNode.runSingleCommand
-#                args[]        =    Arguments to Python node_function
-#                kwargs{}    = Keyword args to Python node_function
-#
-#------------------------------------------------------------------------------        
+
+    ##
+    #    @fn runSimultaneousCommands(self,node_list,node_function=OFSTestNode.OFSTestNode.runSingleCommand,args=[],kwargs={})
+    #
+    #    Runs a command on multiple nodes.
+    #
+    #    @param self The object pointer
+    #    @param node_list  List of nodes to run command on 
+    #    @param node_function Python function to run on all OFSTestNodes. Default is OFSTestNode.runSingleCommand
+    #    @param args Arguments to Python node_function
+    #    @param kwargs Keyword args to Python node_function
+    #
+        
         
     def runSimultaneousCommands(self,node_list=None,node_function=OFSTestNode.OFSTestNode.runSingleCommand,args=[],kwargs={}):
         
@@ -163,18 +171,18 @@ class OFSTestNetwork(object):
         #wait on the queue until everything has been processed     
         queue.join()
           
-#------------------------------------------------------------------------------
-#
-#    addEC2Connection(self,ec2_config_file,key_name,key_location)
-#
-#    add the EC2Connection
-#
-#    Parameters:
-#                ec2_config_file = location of ec2rc.sh file 
-#                key_name = Name of EC2 key to access node
-#                key_location = Location of .pem file that contains the EC2 key
-#
-#------------------------------------------------------------------------------   
+
+    ##
+    # @fn   addEC2Connection(self,ec2_config_file,key_name,key_location)
+    #
+    #    Initialize the EC2Connection
+    #
+    #    @param self The object pointer
+    #    @param ec2_config_file location of ec2rc.sh file 
+    #    @param key_name Name of EC2 key to access node
+    #    @param key_location Location of .pem file that contains the EC2 key
+    #
+   
     
     
     def addEC2Connection(self,ec2_config_file,key_name,key_location):
@@ -182,24 +190,22 @@ class OFSTestNetwork(object):
         self.ec2_connection_manager = OFSEC2ConnectionManager.OFSEC2ConnectionManager(ec2_config_file)
         self.ec2_connection_manager.setEC2Key(key_name,key_location)
         
-#------------------------------------------------------------------------------
-#
-# createNewEC2Nodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
-#
-# Creates new ec2 nodes and adds them to created_nodes list.
-#
-# Parameters
-#    
-#    number_nodes = number of nodes to be created
-#    image_name = Name of EC2 image to launch
-#    machine_type = EC2 "flavor" of virtual node
-#    associateip = Associate to external ip?
-#    domain = Domain to associate with external ip
-#
-# Return
-#
-#    Returns list of new nodes.
-#------------------------------------------------------------------------------
+
+    ##
+    # @fn createNewEC2Nodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
+    #
+    # Creates new ec2 nodes and adds them to created_nodes list.
+    #
+    #
+    #    @param self The object pointer  
+    #    @param number_nodes  number of nodes to be created
+    #    @param image_name  Name of EC2 image to launch
+    #    @param machine_type  EC2 "flavor" of virtual node
+    #    @param associateip  Associate to external ip?
+    #    @param domain Domain to associate with external ip
+    #
+    #    @returns list of new nodes.
+
 
     
     def createNewEC2Nodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None):
@@ -264,16 +270,16 @@ class OFSTestNetwork(object):
         
         return new_ofs_test_nodes
     
-#------------------------------------------------------------------------------
-#
-# uploadKeys(node_list=None)
+
+##
+# @fn uploadKeys(node_list=None)
 #
 # Upload ssh keys to the list of remote nodes
 #
-# Parameters:
-#    node_list = list of nodes to upload the keys.
+#    @param self The object pointer
+#    @param node_list list of nodes to upload the keys.
 #
-#------------------------------------------------------------------------------
+
  
 
     def uploadKeys(self,node_list=None):
@@ -284,14 +290,15 @@ class OFSTestNetwork(object):
         for node in node_list:
             self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestRemoteNode.OFSTestRemoteNode.uploadRemoteKeyFromLocal, args=[self.local_master,node.ext_ip_address])
         
-#------------------------------------------------------------------------------
-#      
-# enablePasswordlessSSH(node_list=None):
-#
-# Enable passwordless SSH for the node for the current user.
-#
-#------------------------------------------------------------------------------
-        
+
+    ##      
+    # @fn enablePasswordlessSSH(self,node_list=None):
+    #
+    # Enable passwordless SSH for the node for the current user.
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to enable passwordless ssh
+            
 
     def enablePasswordlessSSH(self,node_list=None):
         
@@ -310,13 +317,14 @@ class OFSTestNetwork(object):
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ext_ip_address,src_node.current_user))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ip_address,src_node.current_user))
                 
-#------------------------------------------------------------------------------
-#      
-# terminateEC2Node(remote_node)
-#
-# Terminate the remote node and remove it from the created node list.
-#
-#------------------------------------------------------------------------------
+
+    ##      
+    # @fn terminateEC2Node(self, remote_node)
+    #
+    # Terminate the remote node and remove it from the created node list.
+    #
+    #    @param self The object pointer
+    #    @param remote_node Node to be terminated.
 
 
     def terminateEC2Node(self,remote_node):
@@ -335,14 +343,16 @@ class OFSTestNetwork(object):
             
         return rc
 
-#------------------------------------------------------------------------------
-#      
-# updateEC2Nodes():
-#
-#    Update only the EC2 Nodes
-#
-#
-#------------------------------------------------------------------------------
+
+    ##      
+    # @fn updateEC2Nodes(self,node_list=None):
+    #
+    #    Update only the EC2 Nodes
+    # 
+    # @param self The object pointer
+    # @param node_list List of nodes to update.
+    #
+
         
     def updateEC2Nodes(self,node_list=None):
         # This only updates the EC2 controlled nodes
@@ -353,14 +363,16 @@ class OFSTestNetwork(object):
         ec2_nodes = [node for node in self.created_nodes if node.is_ec2 == True]
         self.updateNodes(ec2_nodes)   
 
-#------------------------------------------------------------------------------
-# updateEtcHosts(node_list)
-#
-# This function updates the etc hosts file on each node with the hostname and ip
-# address. Also creates the necessary mpihosts config files.
-#
-# This function updates the etc hosts file on each node with the
-#------------------------------------------------------------------------------
+
+    ##
+    # @fn updateEtcHosts(self,node_list=None):
+    #
+    # This function updates the etc hosts file on each node with the hostname and ip
+    # address. Also creates the necessary mpihosts config files.
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network
+
 
     def updateEtcHosts(self,node_list=None):
         
@@ -388,12 +400,13 @@ class OFSTestNetwork(object):
             node.runAllBatchCommands()
             node.host_name = node.runSingleCommandBacktick("hostname")
 
-#------------------------------------------------------------------------------
-# updateNodes(node_list)
-#
-# This updates the system software on the list of nodes.
-#
-#------------------------------------------------------------------------------
+    ##
+    # @fn updateNodes(self,node_list)
+    #
+    # This updates the system software on the list of nodes.
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
      
     def updateNodes(self,node_list=None):
         if node_list == None:
@@ -410,13 +423,15 @@ class OFSTestNetwork(object):
             if tmp_host_name != node.host_name:
                 print "Hostname changed from %s to %s! Resetting to %s" % (node.host_name,tmp_host_name,node.host_name)
                 node.runSingleCommandAsBatch("sudo hostname %s" % node.host_name)
-
-#------------------------------------------------------------------------------
-# installRequiredSoftware(self,node_list=None):
-#
-# This installs the required software on all the nodes
-#
-#------------------------------------------------------------------------------                
+    
+    ##
+    # @fn installRequiredSoftware(self,node_list=None):
+    #
+    # This installs the required software on all the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
+                    
         
     
     def installRequiredSoftware(self,node_list=None):
@@ -424,47 +439,48 @@ class OFSTestNetwork(object):
             node_list = self.created_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
     
-#------------------------------------------------------------------------------
-# buildOFSFromSource(
-#         resource_type,
-#         resource_location,
-#         download_location=None,
-#         build_node=None,
-#         build_kmod=True,
-#         enable_strict=False,
-#         enable_fuse=False,
-#         enable_shared=False,
-#         enable_hadoop=False,
-#         ofs_prefix="/opt/orangefs",
-#         db4_prefix="/opt/db4",
-#         security_mode=None,
-#         ofs_patch_files=[],
-#         configure_opts="",
-#         make_opts="",
-#         debug=False):
-#
-#
-# This builds OrangeFS on the build node
-#
-# Parameters
-#
-#    resource_type: What form is the source tree? (SVN,TAR,LOCAL) etc.
-#    resource_location: Where is the source located?
-#    download_location: Where should the source be downloaded to?
-#    build_node:    On which node should OFS be build (default first)
-#    build_kmod:    Build kernel module
-#    enable_strict:    Enable strict option
-#    enable_fuse:    Build fuse module
-#    enable_shared:     Build shared libraries
-#    enable_hadoop:    Build hadoop support
-#    ofs_prefix:    Where should OFS be installed?
-#    db4_prefix:    Where is db4 located?
-#    security_mode:    None, Cert, Key
-#    ofs_patch_files: Location of OrangeFS patches.
-#    configure_opts:    Additional configure options
-#    make_opts:        Make options
-#
-#------------------------------------------------------------------------------      
+    ##
+    # @fn buildOFSFromSource(
+    #         resource_type,
+    #         resource_location,
+    #         download_location=None,
+    #         build_node=None,
+    #         build_kmod=True,
+    #         enable_strict=False,
+    #         enable_fuse=False,
+    #         enable_shared=False,
+    #         enable_hadoop=False,
+    #         ofs_prefix="/opt/orangefs",
+    #         db4_prefix="/opt/db4",
+    #         security_mode=None,
+    #         ofs_patch_files=[],
+    #         configure_opts="",
+    #         make_opts="",
+    #         debug=False,
+    #         node_list=None):
+    #
+    #
+    # This builds OrangeFS on the build node
+    #
+    #    @param self The object pointer
+    #    @param resource_type What form is the source tree? (SVN,TAR,LOCAL) etc.
+    #    @param resource_location Where is the source located?
+    #    @param download_location Where should the source be downloaded to?
+    #    @param build_node    On which node should OFS be build (default first)
+    #    @param build_kmod    Build kernel module
+    #    @param enable_strict    Enable strict option
+    #    @param enable_fuse    Build fuse module
+    #    @param enable_shared     Build shared libraries
+    #    @param enable_hadoop    Build hadoop support
+    #    @param ofs_prefix    Where should OFS be installed?
+    #    @param db4_prefix    Where is db4 located?
+    #    @param security_mode    None, Cert, Key
+    #    @param ofs_patch_files Location of OrangeFS patches.
+    #    @param configure_opts    Additional configure options
+    #    @param make_opts        Make options
+    #    @param debug    Enable debugging
+    #    @param node_list List of nodes to update
+          
 
     def buildOFSFromSource(self,
         resource_type,
@@ -482,15 +498,19 @@ class OFSTestNetwork(object):
         ofs_patch_files=[],
         configure_opts="",
         make_opts="",
-        debug=False):
+        debug=False,
+        node_list=None):
         
         output = []
         dir_list = ""
         
         print "Resource type is "+resource_type+" location is "+resource_location
         
+        if node_list == None:
+            node_list = self.created_nodes
+        
         if build_node == None:
-            build_node = self.created_nodes[0]
+            build_node = node_list[0]
             
         if download_location == None:
             download_location = "/home/%s/" % build_node.current_user
@@ -541,54 +561,71 @@ class OFSTestNetwork(object):
         
         return rc
 
-#------------------------------------------------------------------------------   
-#    
-#    installOFSBuild(build_node=None,install_opts=""):
-#
-#    Install the OrangeFS build on a given node
-#------------------------------------------------------------------------------       
-    
-    def installOFSBuild(self,build_node=None,install_opts=""):
+   
+    ##    
+    #    @fn installOFSBuild(self,build_node=None,install_opts="",node_list=None):
+    #
+    #    Install the OrangeFS build on a given node
+    #    @param self The object pointer
+    #    @param build_node Node on which to build OrangeFS
+    #    @param install_opts Other install options
+    #    @param node_list List of nodes in network
+           
+        
+    def installOFSBuild(self,build_node=None,install_opts="",node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
+        
         if build_node == None:
             build_node = self.created_nodes[0]
         return build_node.installOFSSource(install_opts)
     
-#------------------------------------------------------------------------------   
-#    
-#    installOFSTests(build_node=None,install_opts=""):
-#
-#    Install the OrangeFS tests in the source code on a given node
-#------------------------------------------------------------------------------ 
+   
+    ##    
+    #    @fn installOFSTests(self,build_node=None,install_opts=""):
+    #
+    #    Install the OrangeFS tests in the source code on a given node
+    #    @param self The object pointer
+    #    @param client_node Node on which to install OrangeFS tests
+    #    @param configure_opts Other install options
+    #    @param node_list List of nodes in network.
+ 
 
-    def installOFSTests(self,client_node=None,configure_options=""):
+    def installOFSTests(self,client_node=None,configure_options="",node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if client_node == None:
-            client_node = self.created_nodes[0]
+            client_node = node_list[0]
         return client_node.installOFSTests(configure_options)
 
-#------------------------------------------------------------------------------   
-#    
-#    installBenchmarks(build_node=None):
-#
-#    Install the 3rd party benchmarks on the given node.
-#------------------------------------------------------------------------------ 
+   
+    ##    
+    #    @fn installBenchmarks(self,build_node=None,node_list=None):
+    #
+    #    Install the 3rd party benchmarks on the given node.
+    #    @param self The object pointer
+    #    @param build_node Node on which to install benchmark tests
+    #    @param node_list List of nodes in network.
+ 
 
-    def installBenchmarks(self,build_node=None):
+    def installBenchmarks(self,build_node=None,node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if build_node == None:
-            build_node = self.created_nodes[0]
+            build_node = node_list[0]
         return build_node.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/home/%s/benchmarks" % build_node.current_user)
 
-#------------------------------------------------------------------------------   
-#    
-#    configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
-#
-#    Parameters:
-#
-#    ofs_fs_name    Default name of OrangeFS service: version < 2.9 = "pvfs2-fs"; version >= 2.9 = "orangefs"
-#    master_node    Master node in the cluster.
-#    node_list      List of nodes in OrangeFS cluster
-#    pvfs2genconfig_opts = Additional options for pvfs2genconfig utility
-#    security        None, "Key", "Cert"
-#------------------------------------------------------------------------------ 
+   
+    ##    
+    #    @fn configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
+    #
+    #    @param self The object pointer
+    #    @param ofs_fs_name    Default name of OrangeFS service: version < 2.9 = "pvfs2-fs"; version >= 2.9 = "orangefs"
+    #    @param master_node    Master node in the cluster.
+    #    @param node_list      List of nodes in OrangeFS cluster
+    #    @param pvfs2genconfig_opts = Additional options for pvfs2genconfig utility
+    #    @param security        None, "Key", "Cert"
+
  
        
     def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
@@ -598,36 +635,38 @@ class OFSTestNetwork(object):
             master_node = node_list[0]
         return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
 
-#------------------------------------------------------------------------------   
-#    
-#    copyOFSToNodeList(destination_list=None)
-#
-#    Copy OFS from build node to rest of cluster.
-#------------------------------------------------------------------------------         
+   
+    ##    
+    #    @fn copyOFSToNodeList(self,destination_list=None):
+    #
+    #    Copy OFS from build node to rest of cluster.
+    #    
+    #    @param self The object pointer
+    #    @param destination_list List of nodes to copy OrangeFS to. OFS should already be at destination_list[0].
         
     def copyOFSToNodeList(self,destination_list=None):
         if destination_list == None:
             destination_list = self.created_nodes;
         self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
-#------------------------------------------------------------------------------   
-#    
-#    copyOFSResourceToNodeList(node_function,destination_list=None)
-#
-# This is a multi-threaded recursive copy routine.
-# Function copies OrangeFS from list[0] to list[len/2]
-# Then it partitions the list into two parts and copies again. This copies at
-# O(log n) time.
-#
-# For an eight node setup [0:7], copy is as follows:
-# 1: 0->4
-# 2: 0->2 4->6
-# 3: 0->1 2->3 4->5 6->7
-#
-# Parameters:
-#    node_function    Python function/method that does copying
-#    destination_list    list of nodes. Assumption is source is at node[0].
-#------------------------------------------------------------------------------    
+       
+    ##    
+    #  @fn copyOFSResourceToNodeList(self,node_function,destination_list=None):
+    #
+    # This is a multi-threaded recursive copy routine.
+    # Function copies OrangeFS from list[0] to list[len/2]
+    # Then it partitions the list into two parts and copies again. This copies at
+    # O(log n) time.
+    #
+    # For an eight node setup [0:7], copy is as follows:
+    # 1: 0->4
+    # 2: 0->2 4->6
+    # 3: 0->1 2->3 4->5 6->7
+    #
+    #    @param self The object pointer
+    #    @param node_function    Python function/method that does copying
+    #    @param destination_list    list of nodes. Assumption is source is at node[0].
+        
 
     def copyResourceToNodeList(self,node_function,destination_list=None):
 
@@ -688,12 +727,14 @@ class OFSTestNetwork(object):
         #wait on the queue until everything has been processed     
         queue.join()
     
-#------------------------------------------------------------------------------   
-#    
-#    stopOFSServers(node_list):
-#
-#    Stops the OrangeFS servers on the nodes
-#------------------------------------------------------------------------------     
+   
+    ##    
+    #    @fn stopOFSServers(self,node_list=None):
+    #
+    #    Stops the OrangeFS servers on the nodes
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+     
           
     def stopOFSServers(self,node_list=None):
         if node_list == None:
@@ -701,12 +742,15 @@ class OFSTestNetwork(object):
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.stopOFSServer)
         time.sleep(20)
 
-#------------------------------------------------------------------------------   
-#    
-#    startOFSServers(node_list):
-#
-#    Starts the OrangeFS servers on the nodes
-#------------------------------------------------------------------------------     
+   
+    ##    
+    #    @fn startOFSServers(self,node_list=None):
+    #
+    #    Starts the OrangeFS servers on the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+     
 
     def startOFSServers(self,node_list=None):
         if node_list == None:
@@ -714,28 +758,38 @@ class OFSTestNetwork(object):
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.startOFSServer)
         time.sleep(20)
 
-#------------------------------------------------------------------------------   
-#    
-#    startOFSClientAllNodes(node_list, security):
-#
-#    Starts the OrangeFS servers on all created nodes
-#------------------------------------------------------------------------------     
+   
+    ##    
+    #    @fn startOFSClientAllNodes(self,security=None,node_list=None):
+    #
+    #    Starts the OrangeFS servers on all created nodes
+    #    @param self The object pointer
+    #    @param security OFS security mode: None,"Key","Cert"
+    #    @param node_list List of nodes in network.
+     
 
     def startOFSClientAllNodes(self,security=None,node_list=None):
         if node_list == None:
             node_list = self.created_nodes
         for node in node_list:
             self.startOFSClient(node,security)
-#------------------------------------------------------------------------------   
-#    
-#    startOFSClient(client_node, security):
-#
-#    Starts the OrangeFS servers on one node
-#------------------------------------------------------------------------------
+   
+    ##    
+    #    @fn startOFSClient(self,client_node=None,security=None):
+    #
+    #    Starts the OrangeFS servers on one node
+    #
+    #    @param self The object pointer
+    #    @param client_node Node on which to run OrangeFS client
+    #    @param security OFS security mode: None,"Key","Cert"
+    #    @param node_list List of nodes in network.
+
             
-    def startOFSClient(self,client_node=None,security=None):
+    def startOFSClient(self,client_node=None,security=None,node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if client_node == None:
-            client_node = self.created_nodes[0]
+            client_node = node_list[0]
         client_node.installKernelModule()
         #client_node.runSingleCommand('/sbin/lsmod | grep pvfs')
         client_node.startOFSClient(security=security)
@@ -744,16 +798,20 @@ class OFSTestNetwork(object):
         time.sleep(10)
         #client_node.runSingleCommand('ps aux | grep pvfs')
 
-#------------------------------------------------------------------------------   
-#    
-#    mountOFSFilesystem(mount_fuse,client_node):
-#
-#    Mount OrangeFS on a given client node.
-#------------------------------------------------------------------------------
+    ##
+    # @fn mountOFSFilesystem(self,mount_fuse=False,client_node=None,node_list=None):
+    #    Mount OrangeFS on a given client node.
+    #    @param self The object pointer
+    #    @param mount_fuse Mount using fuse module?
+    #    @param client_node Node on which to run OrangeFS client
+    #    @param node_list List of nodes in network.
 
-    def mountOFSFilesystem(self,mount_fuse=False,client_node=None,):
+
+    def mountOFSFilesystem(self,mount_fuse=False,client_node=None,node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if client_node == None:
-            client_node = self.created_nodes[0]
+            client_node = node_list[0]
         client_node.mountOFSFilesystem(mount_fuse=mount_fuse)
         time.sleep(10)
         print "Checking mount"
@@ -762,35 +820,48 @@ class OFSTestNetwork(object):
         #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mount_point)
         #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mount_point)
 
-#------------------------------------------------------------------------------   
-#    
-#    mountOFSFilesystemAllNodes(mount_fuse):
-#
-#    Mount OrangeFS on a given client node.
-#------------------------------------------------------------------------------
+   
+    ##    
+    # @fn mountOFSFilesystemAllNodes(self,mount_fuse=False,node_list=None):
+    #
+    #    Mount OrangeFS on all nodes
+    #    @param self The object pointer
+    #    @param mount_fuse Mount using fuse module?
+    #    @param node_list List of nodes in network.
+
+
     def mountOFSFilesystemAllNodes(self,mount_fuse=False,node_list=None):
         
         # TODO: make this multithreaded
         for node in self.created_nodes:
             self.mountOFSFilesystem(mount_fuse=mount_fuse,client_node=node)
-#------------------------------------------------------------------------------   
-#    
-#    stopOFSClient(client_node=None):
-#
-#    Stop the OrangeFS client on a given node
-#------------------------------------------------------------------------------
+   
+    ##    
+    #    @fn stopOFSClient(self,client_node=None,node_list=None):
+    #
+    #    Stop the OrangeFS client on a given node
+    #    @param self The object pointer
+    #    @param client_node Node on which to run OrangeFS client
+    #    @param node_list List of nodes in network.
+
+
         
-    def stopOFSClient(self,client_node=None):
+    def stopOFSClient(self,client_node=None,node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if client_node == None:
-            client_node = self.created_nodes[0]
+            client_node = node_list[0]
         client_node.stopOFSClient()
         
-#------------------------------------------------------------------------------   
-#    
-#    stopOFSClientAllNodes(node_list=None):
-#
-#    Stop the OrangeFS client on all nodes in list
-#------------------------------------------------------------------------------
+   
+    ##    
+    #    @fn stopOFSClientAllNodes(self,node_list=None):
+    #
+    #    Stop the OrangeFS client on all nodes in list
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+
+
 
     def stopOFSClientAllNodes(self,node_list=None):
         if node_list == None:
@@ -799,12 +870,16 @@ class OFSTestNetwork(object):
         for node in node_list:
             self.stopOFSClient(node)
 
-#------------------------------------------------------------------------------   
-#    
-#    unmountOFSFilesystemAllNodes(node_list=None):
-#
-#    Unmount the OrangeFS directory on all nodes in list
-#------------------------------------------------------------------------------
+   
+    ##    
+    #    @fn unmountOFSFilesystemAllNodes(self,node_list=None):
+    #
+    #    Unmount the OrangeFS directory on all nodes in list    
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+
+
+
     
     def unmountOFSFilesystemAllNodes(self,node_list=None):
         if node_list == None:
@@ -813,12 +888,15 @@ class OFSTestNetwork(object):
         for node in node_list:
             self.unmountOFSFilesystem(node)
 
-#------------------------------------------------------------------------------   
-#    
-#    terminateAllEC2Nodes(node_list=None):
-#
-#    Terminate all the ec2 nodes in a list
-#------------------------------------------------------------------------------
+   
+    ##    
+    #    @fn terminateAllEC2Nodes(self,node_list=None):
+    #
+    #    Terminate all the ec2 nodes in a list
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+
+
 
     def terminateAllEC2Nodes(self, node_list=None):
         if node_list == None:
@@ -827,12 +905,17 @@ class OFSTestNetwork(object):
             if node.is_ec2 == True:
                 self.terminateEC2Node(node)
 
-#------------------------------------------------------------------------------   
-#    
-#    installTorque(node_list=None, head_node=None):
-#
-#    Install Torque on the virtual cluster
-#------------------------------------------------------------------------------                
+   
+    ##    
+    #    installTorque(self,node_list=None, head_node=None):
+    #
+    #    Install Torque on the virtual cluster
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of Torque setup
+
+
+                
     
  
     def installTorque(self, node_list=None, head_node=None):
@@ -883,12 +966,16 @@ class OFSTestNetwork(object):
         except AttributeError:
             pass
     
-#------------------------------------------------------------------------------   
-#    
-#    checkTorque(node_list=None, head_node=None):
-#
-#    Check to see if Torque is running properly.
-#------------------------------------------------------------------------------      
+   
+    ##    
+    #    @fn checkTorque(self, node_list=None, head_node=None):
+    #
+    #    Check to see if Torque is running properly.
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of Torque setup
+
+      
             
     def checkTorque(self, node_list=None, head_node=None):
         
@@ -946,12 +1033,15 @@ class OFSTestNetwork(object):
 #     
 #         headnode.setupMPIEnvironment()
 
-#------------------------------------------------------------------------------   
-#    
-#    installMpich2(node_list=None, head_node=None):
-#
-#    Install Mpich on the virtual cluster
-#------------------------------------------------------------------------------   
+   
+    ##    
+    #    @fn installMpich2(self, node_list=None, head_node=None):
+    #
+    #    Install Mpich on the virtual cluster
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of Torque setup
+   
      
      
     def installMpich2(self,node_list=None,head_node=None):
@@ -964,12 +1054,16 @@ class OFSTestNetwork(object):
     
         head_node.installMpich2()
 
-#------------------------------------------------------------------------------   
-#    
-#    generateOFSKeys()
-#
-#    Generate SSH keys for OrangeFS security
-#------------------------------------------------------------------------------   
+   
+    ##    
+    #   @fn generateOFSKeys(self,node_list=None,head_node=None):
+    #
+    #    Generate SSH keys for OrangeFS security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of ssh setup
+
+   
     
     def generateOFSKeys(self,node_list=None,head_node=None):
         if node_list == None:
@@ -988,12 +1082,15 @@ class OFSTestNetwork(object):
             return rc
         return 0
 
-#------------------------------------------------------------------------------   
-#    
-#    generateOFSServerKeys()
-#
-#    Generate server SSH keys for OrangeFS security
-#------------------------------------------------------------------------------    
+   
+    ##    
+    #    @fn generateOFSServerKeys(self,node_list=None,security_node=None)
+    #
+    #    Generate server SSH keys for OrangeFS security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param security_node Node that generates server keys
+    
     
     def generateOFSServerKeys(self,node_list=None,security_node=None):
         if node_list == None:
@@ -1018,7 +1115,7 @@ class OFSTestNetwork(object):
                 print "Could not create server security key for "+node.host_name
                 print output 
                 return rc
-            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
                 print "Could not copy server security key %s for %s " % (keyname,node.host_name)
                 print output 
@@ -1031,12 +1128,14 @@ class OFSTestNetwork(object):
 
         return 0
 
-#------------------------------------------------------------------------------   
-#    
-#    generateOFSClientKeys()
-#
-#    Generate client SSH keys for OrangeFS security
-#------------------------------------------------------------------------------   
+   
+    ##    
+    #  @fn  generateOFSClientKeys(self,node_list=None,security_node=None)
+    #
+    #    Generate client SSH keys for OrangeFS security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param security_node Node that generates server keys   
     
     def generateOFSClientKeys(self,node_list=None,security_node=None):
         if node_list == None:
@@ -1063,7 +1162,7 @@ class OFSTestNetwork(object):
                 print "Could not create client security key for "+node.host_name
                 print output 
                 return rc
-            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destinationNode=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
                 print "Could not copy client security key %s for %s " % (keyname,node.host_name)
                 print output 
@@ -1072,14 +1171,16 @@ class OFSTestNetwork(object):
 
         return 0
     
-#------------------------------------------------------------------------------   
-#    
-#    generateOFSKeystoreFile()
-#
-#    Generate OrangeFS keystore file for security
-#
-#
-#------------------------------------------------------------------------------       
+   
+    ##    
+    #    @fn generateOFSKeystoreFile(self,node_list=None,security_node=None):
+    #
+    #    Generate OrangeFS keystore file for security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param security_node Node that generates server keys
+
+       
 
     
     def generateOFSKeystoreFile(self,node_list=None,security_node=None):
@@ -1128,7 +1229,7 @@ class OFSTestNetwork(object):
             
         for node in self.created_nodes:
 
-            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destinationNode=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
+            rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destination_node=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
             if rc != 0:
                 print "Could not copy keystore for %s " % (node.host_name)
                 print output 
@@ -1144,13 +1245,16 @@ class OFSTestNetwork(object):
         return 0
 
 
-#------------------------------------------------------------------------------  
-#
-#    findExistingOFSInstallation()
-#
-#    find an existing OrangeFS installation for each node in the list.
-#
-#------------------------------------------------------------------------------     
+  
+    ##
+    #  @fn  findExistingOFSInstallation(self,node_list=None):
+    #
+    #    find an existing OrangeFS installation for each node in the list.
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    
+     
     def findExistingOFSInstallation(self,node_list=None):
         if node_list == None:
             node_list = self.created_nodes
@@ -1161,14 +1265,36 @@ class OFSTestNetwork(object):
         
         return 0
             
-#------------------------------------------------------------------------------  
-#
-#    networkOFSSettings()
-#
-#    Manually set OrangeFS settings for each node in the list. Used for retesting.
-#
-#------------------------------------------------------------------------------          
-    
+      
+    ##
+    #       @fn networkOFSSettings(self,
+    #             ofs_installation_location,
+    #             db4_prefix,
+    #             ofs_extra_tests_location,
+    #             pvfs2tab_file,
+    #             resource_location,
+    #             resource_type,
+    #             ofs_config_file,
+    #             ofs_fs_name,
+    #             ofs_host_name_override,
+    #             ofs_mount_point,
+    #             node_list = None
+    #             ):
+    #
+    #    Manually set OrangeFS settings for each node in the list. Used for retesting.
+    #
+    #    @param self The object pointer
+    #    @param db4_prefix Location of Berkeley DB4
+    #    @param ofs_extra_tests_location Location of 3rd party benchmarks
+    #    @param pvfs2tab_file Location of pvfs2tab file
+    #    @param resource_location Location of OrangeFS source
+    #    @param resource_type Form of source: TAR,SVN,LOCAL,BUILDNODE
+    #    @param ofs_config_file Location of orangefs.conf file
+    #    @param ofs_fs_name Name of OrangeFS in filesystem url
+    #    @param ofs_host_name_override Change hostname to this. Needed to work around an openstack issue
+    #    @param ofs_mount_point Location of OrangeFS mountpoint
+    #    @param node_list List of nodes in network
+        
     def networkOFSSettings(self,
             ofs_installation_location,
             db4_prefix,
@@ -1178,8 +1304,8 @@ class OFSTestNetwork(object):
             resource_type,
             ofs_config_file,
             ofs_fs_name,
-            ofs_host_name_override,
-            ofs_mount_point,
+            ofs_host_name_override = None,
+            ofs_mount_point = None,
             node_list = None
             ):
 
@@ -1234,13 +1360,20 @@ class OFSTestNetwork(object):
                     pass
             #node.setEnvironmentVariable("LD_LIBRARY_PATH",node.db4_lib+":"+node.ofs_installation_location+":$LD_LIBRARY_PATH")
 
-#------------------------------------------------------------------------------  
-#
-#    exportNFSDirectory()
-#
-#    export an NFS directory for each server in the list.
-#
-#------------------------------------------------------------------------------        
+  
+    ##
+    #  @fn exportNFSDirectory(self,directory,nfs_server_list=None,options=None,network=None,netmask=None,node_list=None):
+    #
+    #    export an NFS directory for each server in the list.
+    #
+    # @param self The object pointer
+    # @param nfs_server_list List of NFS servers
+    # @param directory_name Directory to export
+    # @param options NFS options
+    # @param network Network on which to export
+    # @param netmask Netmask for network
+
+        
 
     def exportNFSDirectory(self,directory,nfs_server_list=None,options=None,network=None,netmask=None):
         if nfs_server_list == None:
@@ -1252,13 +1385,18 @@ class OFSTestNetwork(object):
 
         return rc
  
-#------------------------------------------------------------------------------  
-#
-#    mountNFSDirectory()
-#
-#    Mount an NFS share at mountpoint for each client in the client list.
-#
-#------------------------------------------------------------------------------     
+  
+    ##
+    #    @fn mountNFSDirectory(self,nfs_share,mountpoint,options="",nfs_client_list=None):
+    #
+    #    Mount an NFS share at mountpoint for each client in the client list.
+    #
+    # @param self The object pointer
+    # @param nfs_share NFS share to mount
+    # @param mount_point NFS mountpoint on machine
+    # @param options NFS mount options
+    # @param nfs_client_list List of NFS client nodes
+         
     
     def mountNFSDirectory(self,nfs_share,mountpoint,options="",nfs_client_list=None):
         
@@ -1276,17 +1414,26 @@ class OFSTestNetwork(object):
         
         return fail
 
-#------------------------------------------------------------------------------  
-#
-#    installOpenMPI()
-#
-#    installOpenMPI at the mpi_nfs_directory
-#
-#------------------------------------------------------------------------------    
+  
 
-    def installOpenMPI(self,mpi_nfs_directory=None,build_node=None,mpi_local_directory=None):
+    ##
+    # @fn installOpenMPI(self,mpi_nfs_directory=None,build_node=None,mpi_local_directory=None,node_list=None):
+    #
+    # This function installs OpenMPI software at the mpi_nfs_directory
+    #
+    # @param self The object pointer
+    # @param build_node Node used to build OpenMPI
+    # @param mpi_nfs_directory Location to install OpenMPI. This should be an nfs directory accessible from all nodes
+    # @param build_location Location to build OpenMPI. This should be a local directory on the build node
+    # @param node_list List of nodes in OpenMPI network.
+    
+    
+
+    def installOpenMPI(self,mpi_nfs_directory=None,build_node=None,mpi_local_directory=None,node_list=None):
+        if node_list == None:
+            node_list = self.created_nodes
         if build_node == None:
-            build_node = self.created_nodes[0]
+            build_node = node_list[0]
         
         
         # the nfs directory is where all nodes will access MPI
@@ -1359,14 +1506,17 @@ class OFSTestNetwork(object):
         return rc
 
 
-#------------------------------------------------------------------------------  
-#
-#    setupHadoop()
-#
-#    Hadoop should be installed with required software. This configures hadoop 
-#    for OrangeFS testing on the virtual cluster.
-#
-#------------------------------------------------------------------------------ 
+  
+    ##
+    # @fn   setupHadoop(self,hadoop_nodes=None,master_node=None):
+    #
+    #    Hadoop should be installed with required software. This configures hadoop 
+    #    for OrangeFS testing on the virtual cluster.
+    #
+    # @param self The object pointer
+    # @param hadoop_nodes Nodes on which to setup hadoop
+    # @param master_node Hadoop master node
+     
     def setupHadoop(self,hadoop_nodes=None,master_node=None):
         if hadoop_nodes == None:
             hadoop_nodes = self.created_nodes
@@ -1385,7 +1535,7 @@ class OFSTestNetwork(object):
             node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
             node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/ofs_hadoop.jar:\$JNI_LIBRARY_PATH/ofs_jni.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             # copy templates to node
-            master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destinationNode=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
             
             # update mapred-site.xml
             node.runSingleCommand("sed -i s/__NODE001__/%s/ %s/conf/mapred-site.xml" % (master_node.host_name,node.hadoop_location))
