@@ -39,6 +39,12 @@ extern DB     *SID_attr_index[SID_NUM_ATTR];
 extern DBC    *SID_attr_cursor[SID_NUM_ATTR];
 #endif
 
+extern DB  *SID_type_db;               /* secondary db for server type */
+extern DBC *SID_type_cursor;           /* cursor for server type db */
+extern DB  *SID_type_sid_index;        /* index on sid for server type db */
+extern DBC *SID_type_sid_cursor;       /* cursor for server type sid index */
+
+
 /* <===================== GLOBAL DATABASE DEFINES =====================> */
 /* Used to set the in cache memory size for DB environment*/
 #define CACHE_SIZE_GB (0)
@@ -118,6 +124,9 @@ extern int SID_cache_store(DBC *cursorp,
 
 /*
  * This function stores the sid into the sid cache
+ * If db_records is NULL, assumes we are updating an existing record
+ * If db_records is not NULL, we are adding a new record, and dups will
+ * cause an error.
  *
  * Returns 0 on success, otherwise returns an error code
  */
@@ -157,7 +166,8 @@ extern int SID_cache_lookup_bmi(DB **dbp,
  */
 extern int SID_cache_update_server(DB **dbp,
                                    const PVFS_SID *sid_server,
-                                   SID_cacheval_t *new_attrs);
+                                   SID_cacheval_t *new_attrs,
+                                   uint32_t sid_types);
 
 /*
  * This function updates the attributes for a sid in the database if a sid
@@ -198,6 +208,8 @@ extern int SID_cache_update_url(DB **dbp,
 extern int SID_cache_copy_url(SID_cacheval_t **current_sid_attrs, 
                               char *new_url);
 
+extern int SID_cache_update_type(const PVFS_SID *sid_server,
+                                 uint32_t new_type_val);
 /*
  * This function deletes a record from the sid cache if a sid with a matching
  * sid_server parameter is found in the database
@@ -252,13 +264,13 @@ extern void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey);
 ***********************************************************************
 * The following is the order in which the functions should be called to
 * the open the sidcache:                                              
-* 1. SID_create_open_environment (
+* 1. SID_create_environment (
 *                    If an environment is not needed then this function 
 *                    can be skipped and the environment variable can be
 *                    passed as NULL to rest of the database functions) 
-* 2. SID_create_open_sid_cache
-* 3. SID_create_open_assoc_sec_dbs
-* 4. SID_create_open_dbcs        
+* 2. SID_create_sid_cache
+* 3. SID_create_assoc_sec_dbs
+* 4. SID_create_dbcs        
 ***********************************************************************
 */
 /*
@@ -266,7 +278,7 @@ extern void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey);
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_create_open_environment(DB_ENV **envp);
+extern int SID_create_environment(DB_ENV **envp);
 
 /*
  * This function creates and opens the primary database handle, which
@@ -274,7 +286,7 @@ extern int SID_create_open_environment(DB_ENV **envp);
  *
  * Returns 0 on success, otherwise returns an error code 
  */
-extern int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
+extern int SID_create_sid_cache(DB_ENV *envp, DB **dbp);
 
 /*
  * This function creates, opens, and associates the secondary attribute
@@ -285,7 +297,7 @@ extern int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
+extern int SID_create_secondary_dbs(DB_ENV *envp,
                                          DB *dbp,
                                          DB *secondary_dbs[], 
                                          int (* secdbs_callback_functions[])(
@@ -300,7 +312,7 @@ extern int SID_create_open_assoc_sec_dbs(DB_ENV *envp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
+extern int SID_create_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
 
 
 /************************************************************************

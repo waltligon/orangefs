@@ -187,6 +187,9 @@ typedef struct server_configuration_s
     int host_index;
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
+
+    char *sid_cache_file;           /* name of the file to save sid cache */
+
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
     char *fs_config_filename;       /* the fs.conf file name            */
@@ -199,11 +202,13 @@ typedef struct server_configuration_s
     int  client_job_flow_timeout;
     int  client_retry_limit;        /* how many times to retry client ops */
     int  client_retry_delay_ms;     /* delay between retries */
-    int  perf_update_interval;      /* how quickly (in msecs) to
-                                       update perf monitor              */
-    uint32_t  *precreate_batch_size;    /* batch size for each ds type */
-    uint32_t  *precreate_low_threshold; /* threshold for each ds type */
-    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles when creating a new directory */
+    int  perf_update_interval;      /* how quickly (in msecs) to */
+                                    /*    update perf monitor    */
+    /* V3 remove precreate stuff */
+    uint32_t *precreate_batch_size;    /* batch size for each ds type */
+    uint32_t *precreate_low_threshold; /* threshold for each ds type */
+    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles */
+                                       /*    when creating a new directory */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -220,48 +225,52 @@ typedef struct server_configuration_s
                                      * specific server address
                                      */
 #ifdef USE_TRUSTED
-    int           ports_enabled;    /* Should we enable trusted port connections at all? */
-    unsigned long allowed_ports[2]; /* {Min, Max} value of ports from which connections will be allowed */
-    int          network_enabled;   /* Should we enable trusted network connections at all? */
-    int   allowed_networks_count;   /* Number of trusted networks parsed */
-    char  **allowed_networks;       /* BMI addresses of the trusted networks */
-    int   *allowed_masks;            /* Netmasks for each of the specified trusted network */
-    void  *security;                /* BMI module specific information */
-    void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
+    int ports_enabled; /* Should we enable trusted port connections at all? */
+    unsigned long allowed_ports[2]; /* {Min, Max} value of ports from */
+                                    /*   which connections will be allowed */
+    int network_enabled;           /* Should we enable trusted network */
+                                   /*   connections at all? */
+    int allowed_networks_count;    /* Number of trusted networks parsed */
+    char **allowed_networks;       /* BMI addresses of the trusted networks */
+    int *allowed_masks;            /* Netmasks for each of the */
+                                   /*   specified trusted network */
+    void *security;                /* BMI module specific information */
+    void (*security_dtor)(void *); /* Destructor to free BMI module */
+                                   /*   specific information */
 #endif /* USE_TRUSTED */
-    int  configuration_context;
-    PINT_llist *host_aliases;       /* ptrs are type host_alias_t       */
-    PINT_llist *prime_servers;      /* ptrs are type prime_server_t     */
-    PINT_llist *file_systems;       /* ptrs are type
-                                       filesystem_configuration_t       */
+    int configuration_context;
+    PINT_llist *host_aliases;     /* ptrs are type host_alias_t      */
+    PINT_llist *prime_servers;    /* ptrs are type prime_server_t    */
+    PINT_llist *file_systems;     /* ptrs are type */
+                                  /*   filesystem_configuration_t    */
     distribution_config_t default_dist_config;  /* distribution conf */
-    int db_cache_size_bytes;        /* cache size to use in berkeley db
-                                       if zero, use defaults */
+    int db_cache_size_bytes;      /* cache size to use in berkeley db */
+                                  /*   if zero, use defaults */
     char *db_cache_type;
-    int trove_alt_aio_mode;         /* enables experimental alternative AIO
-                                     * implementation for some types of 
-                                     * operations 
-                                     */
-    int trove_max_concurrent_io;    /* allow the number of aio operations to
-                                     * be configurable.
-                                     */
+    int trove_alt_aio_mode;       /* enables experimental alternative AIO
+                                   * implementation for some types of 
+                                   * operations 
+                                   */
+    int trove_max_concurrent_io;  /* allow the number of aio operations to
+                                   * be configurable.
+                                   */
     int trove_method;
 	
-    char *keystore_path;             /* location of trusted server public keys */
-    char *serverkey_path;            /* location of server private key */
-    char *ca_path;                   /* location of CA certificate */
+    char *keystore_path;          /* location of trusted server public keys */
+    char *serverkey_path;         /* location of server private key */
+    char *ca_path;                /* location of CA certificate */
 
-    char *ldap_hosts;                /* list of LDAP host URIs */
-    char *ldap_bind_dn;              /* LDAP bind user */
-    char *ldap_bind_password;        /* LDAP bind password */
-    int ldap_search_mode;            /* PVFS2_LDAP_SEARCH_CN or ..._DN */
-    char *ldap_search_root;          /* DN of LDAP search container */
-    char *ldap_search_class;         /* LDAP user class name */
-    char *ldap_search_attr;          /* LDAP naming attribute */
-    int ldap_search_scope;           /* Corresponds to SUBTREE or ONELEVEL */
-    char *ldap_uid_attr;             /* attribute that stores UID */
-    char *ldap_gid_attr;             /* attribute that stores GID */
-    int ldap_search_timeout;         /* search timeout in seconds */
+    char *ldap_hosts;             /* list of LDAP host URIs */
+    char *ldap_bind_dn;           /* LDAP bind user */
+    char *ldap_bind_password;     /* LDAP bind password */
+    int ldap_search_mode;         /* PVFS2_LDAP_SEARCH_CN or ..._DN */
+    char *ldap_search_root;       /* DN of LDAP search container */
+    char *ldap_search_class;      /* LDAP user class name */
+    char *ldap_search_attr;       /* LDAP naming attribute */
+    int ldap_search_scope;        /* Corresponds to SUBTREE or ONELEVEL */
+    char *ldap_uid_attr;          /* attribute that stores UID */
+    char *ldap_gid_attr;          /* attribute that stores GID */
+    int ldap_search_timeout;      /* search timeout in seconds */
 
     int security_timeout;
 

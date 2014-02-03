@@ -38,7 +38,6 @@ CLIENT_SMCGEN := \
 	$(DIR)/client-job-timer.c \
 	$(DIR)/perf-count-timer.c \
 	$(DIR)/pint-sysdev-unexp.c \
-	$(DIR)/server-get-config.c \
 	$(DIR)/fs-add.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \
@@ -53,8 +52,6 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-get-dirdata-handle.c \
 	$(DIR)/mgmt-get-uid-list.c \
 	$(DIR)/mgmt-get-dirdata-array.c
-
-#	$(DIR)/sys-small-io.c \
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

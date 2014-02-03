@@ -143,8 +143,7 @@ static job_status_s *server_job_status_array = NULL;
 /* Prototypes for internal functions */
 static int server_get_remote_config(
                 PINT_server_status_flag *server_status_flag,
-                struct server_configuration_s *server_config,
-                char *fs_conf);
+                struct server_configuration_s *server_config);
 static int server_initialize(
                 PINT_server_status_flag *server_status_flag,
                 job_status_s *job_status_structs);
@@ -226,28 +225,34 @@ int main(int argc, char **argv)
     /* retrieve remote config file if needed 
      * may set fs_conf to a temp file 
      */
-    ret = server_get_remote_config(&server_status_flag,
-                                   &server_config,
-                                   fs_conf);
-    if (ret)
+    if (1)
     {
-        gossip_err("Error: Retrieval of remote config failed.\n");
-        gossip_err("Error: Server aborting.\n");
-        ret = -PVFS_EINVAL;
-        goto server_shutdown;
+        ret = server_get_remote_config(&server_status_flag,
+                                       &server_config);
+        if (ret)
+        {
+            gossip_err("Error: Retrieval of remote config failed.\n");
+            gossip_err("Error: Server aborting.\n");
+            ret = -PVFS_EINVAL;
+            goto server_shutdown;
+        }
+        /* copy config to a temp file for possible reload */
+        /* fs_conf = server_config->something; */
     }
-
-    /* code to handle older two config file format */
-    ret = PINT_parse_config(&server_config,
-                            fs_conf,
-                            s_server_options.server_alias,
-                            1);
-    if (ret)
+    else
     {
-        gossip_err("Error: Please check your config files.\n");
-        gossip_err("Error: Server aborting.\n");
-        ret = -PVFS_EINVAL;
-        goto server_shutdown;
+        /* code to handle older two config file format */
+        ret = PINT_parse_config(&server_config,
+                                fs_conf,
+                                s_server_options.server_alias,
+                                1);
+        if (ret)
+        {
+            gossip_err("Error: Please check your config files.\n");
+            gossip_err("Error: Server aborting.\n");
+            ret = -PVFS_EINVAL;
+            goto server_shutdown;
+        }
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
@@ -501,34 +506,36 @@ static void remove_pidfile(void)
     unlink(s_server_options.pidfile);
 }
 
-/* This function decides if the server should read a local config file
- * or send a request to another server to get a config file.  We can
- * control this with command line flags or an environment variable.  If
- * a remote config is required we start up BMI as a client, perform an
+/* This function sends a request to another server to get a config file.
+ * We start up BMI as a client, perform an
  * fs_add, read back the config and place it in a temp file where we
  * will parse it just like a regular config file.  Finally we shut down
  * BMI so it can be restarted later in server mode.
  */
 static int server_get_remote_config(
                 PINT_server_status_flag *server_status_flag,
-                struct server_configuration_s *server_config,
-                char *fs_conf)
+                struct server_configuration_s *server_config)
 {
     int ret = 0;
-    if (0)
+    PVFS_BMI_addr_t bmi_addr;
+    struct PVFS_sys_mntent *mntent;
+    PVFS_credential *credential;
+
+    /* Initialize the bmi and job interfaces */
+    *server_status_flag |= SERVER_CLIENT_INIT;
+    ret = server_initialize_subsystems(server_status_flag);
+    if (ret < 0)
     {
-        /* Initialize the bmi and job interfaces */
-        *server_status_flag |= SERVER_CLIENT_INIT;
-        ret = server_initialize_subsystems(server_status_flag);
-        if (ret < 0)
-        {
-            gossip_err("Error: Could not initialize server subsystems\n");
-            goto error_exit;
-        }
-        /* PVFS_sys_fs_add(mountent) */
-        BMI_finalize(); /* will restart later */
-        *server_status_flag &= !(SERVER_CLIENT_INIT | SERVER_BMI_INIT);
+        gossip_err("Error: Could not initialize server subsystems\n");
+        goto error_exit;
     }
+    /* Find a config server in the SID cache */
+    ret = PVFS_SID_get_server_first(&bmi_addr, SID_SERVER_CONFIG);
+
+    PINT_server_get_config(server_config, mntent, credential, NULL);
+
+    BMI_finalize(); /* will restart later */
+    *server_status_flag &= !(SERVER_CLIENT_INIT | SERVER_BMI_INIT);
     return 0;
 
 error_exit:

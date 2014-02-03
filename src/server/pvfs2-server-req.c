@@ -57,6 +57,7 @@ extern struct PINT_server_req_params pvfs2_tree_setattr_params;
 extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
 extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
 extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
+extern struct PINT_server_req_params pvfs2_server_get_config_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -109,7 +110,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 45 */ {PVFS_SERV_MGMT_GET_DIRENT, &pvfs2_mgmt_get_dirent_params},
     /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
     /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
-    /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params}
+    /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
+    /* 49 */ {PVFS_SERV_GET_CONFIG, &pvfs2_server_get_config_params}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

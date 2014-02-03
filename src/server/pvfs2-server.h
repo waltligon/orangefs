@@ -35,6 +35,7 @@
 #include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+#include "server-config.h"
 
 
 extern job_context_id server_job_context;
@@ -949,11 +950,14 @@ extern struct qlist_head posted_sop_list;
 extern struct qlist_head inprogress_sop_list;
 
 /* starts state machines not associated with an incoming request */
-int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op, struct PINT_smcb ** new_op);
-int server_state_machine_start_noreq(
-    struct PINT_smcb *new_op);
+int server_state_machine_alloc_noreq(enum PVFS_server_op op,
+                                     struct PINT_smcb ** new_op);
+int server_state_machine_start_noreq(struct PINT_smcb *new_op);
 int server_state_machine_complete_noreq(PINT_smcb *smcb);
+int PINT_server_get_config(struct server_configuration_s *config,
+                           struct PVFS_sys_mntent *mntent_p,
+                           const PVFS_credential *credential,
+                           PVFS_hint hints);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0

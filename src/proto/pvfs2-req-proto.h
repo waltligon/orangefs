@@ -94,6 +94,7 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_CREATE_ROOT_DIR = 46,
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
+    PVFS_SERV_GET_CONFIG = 49,  /* server to server get config */
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS

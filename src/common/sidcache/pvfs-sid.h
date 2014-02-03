@@ -37,6 +37,13 @@ int PVFS_OBJ_gen_data(PVFS_object_ref *obj,
  */
 int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid);
 
+/**
+ * Look up a list of SIDs by type and return the matching BMI address
+ */
+int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+
+int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+
 #endif
 
 /*
