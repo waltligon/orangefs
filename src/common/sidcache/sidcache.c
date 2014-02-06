@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "pvfs2-internal.h"
 #include "gossip.h"
@@ -53,10 +54,12 @@ static int SID_cache_parse_header(FILE *inpfile,
                                   int **attr_positions);
 static int SID_create_type_table(void);
 static char *SID_type_to_string(const uint32_t typeval);
-static uint32_t SID_string_to_type(const char *typestring);
-int SID_type_store(PVFS_SID *sid, FILE *outpfile);
-int SID_get_type(PVFS_SID *sid, uint32_t *typeval);
-int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val);
+static int SID_type_store(PVFS_SID *sid, FILE *outpfile);
+static int SID_cache_update_type(const PVFS_SID *sid_server,
+                                 uint32_t new_type_val);
+static int SID_cache_update_attrs(DB *dbp,
+                                  const PVFS_SID *sid_server,
+                                  int new_attr[]);
 
 /* <====================== INITIALIZATION FUNCTIONS =======================> */
 
@@ -145,8 +148,10 @@ struct type_conv
     {SID_SERVER_VALID_TYPES , "ALL"} ,
     {SID_SERVER_NULL        , "INVALID"}
 };
+/* This must be defined as the size of the longest typestring */
+#define MAX_TYPE_STR 8
     
-char *SID_type_to_string(const uint32_t typeval)
+static char *SID_type_to_string(const uint32_t typeval)
 {
     int i;
     for (i = 0;
@@ -155,15 +160,125 @@ char *SID_type_to_string(const uint32_t typeval)
          i++);
     return type_conv_table[i].typestring;
 }
-    
+ 
+/* This function is exported for parsing the config file */
 uint32_t SID_string_to_type(const char *typestring)
 {
     int i;
+    char *mytype;
+    int len;
+
+    if(!typestring)
+    {
+        return SID_SERVER_NULL;
+    }
+
+    len = strnlen(typestring, MAX_TYPE_STR + 1);
+
+    if (len > MAX_TYPE_STR)
+    {
+        return SID_SERVER_NULL;
+    }
+
+    mytype = (char *)malloc(len + 1);
+
+    for (i = 0; i < len; i++);
+    {
+        mytype[i] = toupper(mytype[i]);
+    }
+    mytype[len] = 0;
+
     for (i = 0;
-         strcmp(type_conv_table[i].typestring, typestring) &&
+         strcmp(type_conv_table[i].typestring, mytype) &&
          type_conv_table[i].typeval != SID_SERVER_NULL;
          i++);
+
+    free(mytype);
+
     return type_conv_table[i].typeval;
+}
+
+/* We are expecting a string of the form "someattr=val" where val is an
+ * integer.  If attributes is not careted yet, we create it.  If
+ * something goes wrong we pretty much just return -1 without trying to
+ * diagnose it sinice this is a very limited parse
+ */
+int SID_set_attr(const char *attr_str, int **attributes)
+{
+    int i = 0;;
+    int len = 0;;
+    int eqflag = 0;
+    int atflag = 0;
+    char *myattr = NULL;
+    char *myval = NULL;
+
+    if (!attributes || !attr_str)
+    {
+        return -1;
+    }
+
+    len = strnlen(attr_str, MAX_ATTR_STR);
+
+    if (len > MAX_ATTR_STR)
+    {
+        return -1;
+    }
+
+    myattr = (char *)malloc(len + 1);
+    for (i = 0; i < len; i++)
+    {
+        if (attr_str[i] == '=')
+        {
+            myattr[i] = 0;
+            if (i == len - 1)
+            {
+                /* badly formed string */
+                free(myattr);
+                return -1;
+            }
+            myval = &myattr[i + 1];
+            eqflag = 1;
+        }
+        else
+        {
+            myattr[i] = tolower(attr_str[i]);
+        }
+    }
+    myattr[len] = 0;
+    if (!eqflag)
+    {
+        /* badly formed string */
+        free(myattr);
+        return -1;
+    }
+
+    if (!*attributes)
+    {
+        *attributes = (int *)malloc(SID_NUM_ATTR * sizeof(int));
+        memset(*attributes, -1, SID_NUM_ATTR * sizeof(int));
+        atflag = 1;
+    }
+
+    for (i = 0; i < SID_NUM_ATTR; i++)
+    {
+        if(!strcmp(myattr, SID_attr_map[i]))
+        {
+            /* found the one we want */
+            *attributes[i] = atoi(myval);
+            free(myattr);
+            return 0;
+        }
+    }
+    /* didn't find it, just return */
+
+    if (atflag)
+    {
+        /* we created this but didn't add any data so get rid of it */
+        free(*attributes);
+        *attributes = NULL;
+    }
+    free(myattr);
+    return -1;
 }
 
 /* <====================== SID_cacheval_t FUNCTIONS =======================> */
@@ -467,7 +582,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
  * The number of sids in the file is returned through the
  * parameter db_records.
  */
-int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
+int SID_cache_load(DB *dbp, FILE *inpfile, int *num_db_records)
 {
     int ret = 0;                      /* Function return value */
     int i = 0;                        /* Loop index variables */
@@ -594,7 +709,7 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
  *
  * Returns 0 on success, otherwise returns error code
 */
-int SID_cache_add_server(DB **dbp,
+int SID_cache_add_server(DB *dbp,
                          const PVFS_SID *sid_server,
                          const SID_cacheval_t *cacheval,
                          int *num_db_records)
@@ -629,11 +744,11 @@ int SID_cache_add_server(DB **dbp,
     }
 
     /* Placing the data into the database */
-    ret = (*dbp)->put(*dbp,            /* Primary database pointer */
-                      NULL,            /* Transaction pointer */
-                      &key,            /* PVFS_SID */
-                      &value,          /* Data is marshalled SID_cacheval_t */
-                      putflags);
+    ret = (dbp)->put(dbp,            /* Primary database pointer */
+                     NULL,            /* Transaction pointer */
+                     &key,            /* PVFS_SID */
+                     &value,          /* Data is marshalled SID_cacheval_t */
+                     putflags);
     /* with DB_NOOVERWRITE this returns an error on a dup */
     if(ret)
     {
@@ -664,7 +779,7 @@ int SID_cache_add_server(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  * Caller is expected to free the cacheval via SID_cacheval_free
  */
-int SID_cache_lookup_server(DB **dbp,
+int SID_cache_lookup_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             SID_cacheval_t **cacheval)
 {
@@ -676,11 +791,11 @@ int SID_cache_lookup_server(DB **dbp,
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
    
-    ret = (*dbp)->get(*dbp,  /* Primary database pointer */
-                      NULL,  /* Transaction Handle */
-                      &key,  /* Sid_sid_t sid */
-                      &data, /* Data is marshalled SID_cacheval_t struct */
-                      0);    /* get flags */
+    ret = (dbp)->get(dbp,   /* Primary database pointer */
+                     NULL,  /* Transaction Handle */
+                     &key,  /* Sid_sid_t sid */
+                     &data, /* Data is marshalled SID_cacheval_t struct */
+                     0);    /* get flags */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -703,7 +818,7 @@ int SID_cache_lookup_server(DB **dbp,
  *
  * Caller is expected to free the bmi_addr memory
  */
-int SID_cache_lookup_bmi(DB **dbp, const PVFS_SID *search_sid, char **bmi_url)
+int SID_cache_lookup_bmi(DB *dbp, const PVFS_SID *search_sid, char **bmi_url)
 {
     SID_cacheval_t *temp;
     int ret;
@@ -739,7 +854,7 @@ int SID_cache_lookup_bmi(DB **dbp, const PVFS_SID *search_sid, char **bmi_url)
  *
  * Returns 0 on success, otherwise returns error code
  */
-int SID_cache_update_server(DB **dbp,
+int SID_cache_update_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             SID_cacheval_t *new_attrs,
                             uint32_t sid_types)
@@ -815,13 +930,13 @@ int SID_cache_update_server(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_attrs(DB **dbp,
+int SID_cache_update_attrs(DB *dbp,
                            const PVFS_SID *sid_server,
                            int new_attr[])
 {
     int ret = 0;
     int i = 0;   /* Loop index variable */
-    SID_cacheval_t *sid_attrs;
+    SID_cacheval_t *sid_data;
 
     /* If sid_server is not passed in as NULL then only the attr's 
      * will be changed for the sid 
@@ -830,8 +945,8 @@ int SID_cache_update_attrs(DB **dbp,
     {
         return(-EINVAL);
     }
-    /* Getting the sid from the cache */
-    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    /* Get the sid from the cache */
+    ret = SID_cache_lookup_server(dbp, sid_server, &sid_data);
     if(ret)
     {
         return(ret);
@@ -839,12 +954,10 @@ int SID_cache_update_attrs(DB **dbp,
         
     for(i = 0; i < SID_NUM_ATTR; i++)
     {
-        /* If the new value is different the original value, then the 
-         * original value is updated to the new attribute value 
-         */
-        if(sid_attrs->attr[i] != new_attr[i])
+        /* a -1 indicates the new_attr does not need an update */
+        if(new_attr[i] != -1)
         {
-            sid_attrs->attr[i] = new_attr[i];
+            sid_data->attr[i] = new_attr[i];
         }
     }
 
@@ -858,14 +971,14 @@ int SID_cache_update_attrs(DB **dbp,
     }
 #endif
 
-    ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+    ret = SID_cache_add_server(dbp, sid_server, sid_data, NULL);
     if(ret)
     {
-        SID_cacheval_free(&sid_attrs);
+        SID_cacheval_free(&sid_data);
         return(ret);
     }
 
-    SID_cacheval_free(&sid_attrs);
+    SID_cacheval_free(&sid_data);
     return(ret);    
 }
 
@@ -941,7 +1054,7 @@ int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_bmi(DB **dbp,
+int SID_cache_update_bmi(DB *dbp,
                          const PVFS_SID *sid_server,
                          BMI_addr new_bmi_addr)
 {
@@ -1006,7 +1119,7 @@ int SID_cache_copy_bmi(SID_cacheval_t *current_attrs, BMI_addr new_bmi_addr)
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
+int SID_cache_update_url(DB *dbp, const PVFS_SID *sid_server, char *new_url)
 {
     int ret = 0;
     int tmp_attrs[SID_NUM_ATTR];
@@ -1120,7 +1233,7 @@ int SID_cache_copy_url(SID_cacheval_t **current_attrs, char *new_url)
   *
   * Returns 0 on success, otherwise returns an error code 
   */
-int SID_cache_delete_server(DB **dbp,
+int SID_cache_delete_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             int *db_records)
 {
@@ -1136,10 +1249,10 @@ int SID_cache_delete_server(DB **dbp,
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
 
-    ret = (*dbp)->del(*dbp, /* Primary database (sid cache) pointer */
-                      NULL, /* Transaction Handle */
-                      &key, /* SID_cacheval_t key */
-                      0);   /* Delete flag */
+    ret = (dbp)->del(dbp,  /* Primary database (sid cache) pointer */
+                     NULL, /* Transaction Handle */
+                     &key, /* SID_cacheval_t key */
+                     0);   /* Delete flag */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -2117,7 +2230,7 @@ int SID_load(const char *path)
     }
 
     /* load cache from file */
-    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
+    ret = SID_cache_load(SID_db, inpfile, &sids_in_cache);
     if (ret < 0)
     {
         /* something failed, close up the database */
@@ -2149,7 +2262,7 @@ int SID_loadbuffer(const char *buffer, int size)
         return(-1);
     }
     /* load buffer into the cache */
-    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
+    ret = SID_cache_load(SID_db, inpfile, &sids_in_cache);
     fclose(inpfile);
     return ret;
 }
@@ -2298,7 +2411,7 @@ int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
     memset(&cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
     cval->bmi_addr = bmi_addr;
     strcpy(cval->url, url);
-    ret = SID_cache_add_server(&SID_db, sid, cval, &sids_in_cache);
+    ret = SID_cache_add_server(SID_db, sid, cval, &sids_in_cache);
     free(cval);
     return ret;
 }
@@ -2307,7 +2420,7 @@ int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
 int SID_delete(const PVFS_SID *sid)
 {
     int ret = 0;
-    ret = SID_cache_delete_server(&SID_db, sid, &sids_in_cache);
+    ret = SID_cache_delete_server(SID_db, sid, &sids_in_cache);
     return ret;
 }
 
@@ -2348,6 +2461,13 @@ int SID_update_type(const PVFS_SID *sid, int new_server_type)
 {
     int ret = 0;
     ret = SID_cache_update_type(sid, new_server_type);
+    return ret;
+}
+
+int SID_update_attributes(const PVFS_SID *sid_server, int new_attr[])
+{   
+    int ret = 0;
+    ret = SID_cache_update_attrs(SID_db, sid_server, new_attr);
     return ret;
 }
 

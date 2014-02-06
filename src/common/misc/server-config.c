@@ -48,10 +48,10 @@ static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
 static DOTCONF_CB(enter_security_context);
 static DOTCONF_CB(exit_security_context);
-static DOTCONF_CB(enter_aliases_context);
-static DOTCONF_CB(exit_aliases_context);
-static DOTCONF_CB(enter_primesrvs_context);
-static DOTCONF_CB(exit_primesrvs_context);
+static DOTCONF_CB(enter_server_context);
+static DOTCONF_CB(exit_server_context);
+static DOTCONF_CB(enter_serverdef_context);
+static DOTCONF_CB(exit_serverdef_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
 static DOTCONF_CB(enter_rootsrvs_context);
@@ -69,7 +69,6 @@ static DOTCONF_CB(get_tcp_buffer_send);
 static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
-static DOTCONF_CB(get_primesrv);
 static DOTCONF_CB(get_rootsrv);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
@@ -80,7 +79,11 @@ static DOTCONF_CB(get_sidcache_file);
 static DOTCONF_CB(get_event_tracing);
 static DOTCONF_CB(get_filesystem_replication);
 static DOTCONF_CB(get_filesystem_collid);
-static DOTCONF_CB(get_alias_list);
+static DOTCONF_CB(get_alias);
+static DOTCONF_CB(get_sid);
+static DOTCONF_CB(get_address_list);
+static DOTCONF_CB(get_type_list);
+static DOTCONF_CB(get_attribute_list);
 static DOTCONF_CB(check_this_server);
 #ifdef USE_TRUSTED
 static DOTCONF_CB(get_trusted_portlist);
@@ -155,6 +158,7 @@ const char *contextchecker(command_t *cmd, unsigned long mask);
 
 /* internal helper functions */
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
+static int is_valid_host(host_alias_t *host);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
@@ -380,28 +384,12 @@ static const configoption_t options[] =
 
     /********* END SECURITY OPTIONS **********/
 
-    /* This groups the Alias mapping options.
+    /* This groups the Server definition options including alias, SID,
+     * address, type, and attributes.
      *
-     * The Aliases context should be defined before any FileSystem contexts
+     * This context should be defined before any FileSystem contexts
      * are defined, as options in the FileSystem context usually need to
      * reference the aliases defined in this context.
-     */
-    {"<Aliases>",ARG_NONE, enter_aliases_context,NULL,CTX_GLOBAL,NULL},
-
-    /* Specifies the end-tag for the Aliases context.
-     */
-    {"</Aliases>",ARG_NONE, exit_aliases_context,NULL,CTX_ALIASES,NULL},
-
-    /* Specifies an alias in the form of a non-whitespace string that
-     * can be used to reference a BMI server address (a HostID).  This
-     * allows us to reference individual servers by an alias instead of their
-     * full HostID.  The format of the Alias option is:
-     *
-     * Alias {Alias} (SID} {bmi address}
-     *
-     * As an example:
-     *
-     * Alias mynode1 12345678-90ab-cdef-1234-567890abcdef tcp://hostname1.clustername1.domainname:12345
      *
      * Note: beginning with V3 Aliases specify a SID rather than a
      * BMI_addr. SIDs are UUIDs (36 character string representing
@@ -409,7 +397,73 @@ static const configoption_t options[] =
      * is handled by the SID cache, and typically loaded from a distinct
      * text file and then updated online.
      */
-    {"Alias", ARG_LIST, get_alias_list, NULL, CTX_ALIASES, NULL},
+    {"<ServerDefines>", ARG_NONE, enter_server_context, NULL, CTX_GLOBAL, NULL},
+
+    /* Specifies the end-tag for the ServerDefines context.
+     */
+    {"</ServerDefines>", ARG_NONE, exit_server_context, NULL, CTX_SERVER, NULL},
+
+    /* THis groups defines for a single server
+     */
+    {"<ServerDef>", ARG_NONE, enter_serverdef_context, NULL, CTX_SERVER, NULL},
+
+    /* Specifies the end-tag for the ServerDef context.
+     */
+    {"</ServerDef>", ARG_NONE, exit_serverdef_context, NULL, CTX_SERVERDEF, NULL},
+
+
+    /* Specifies an alias in the form of a non-whitespace string that
+     * can be used to reference a BMI server address (a HostID).  This
+     * allows us to reference individual servers by an alias instead of their
+     * full HostID.  The format of the Alias option is:
+     *
+     *     Alias {Alias}
+     *
+     * As an example:
+     *
+     *     Alias mynode1 
+     */
+    {"Alias", ARG_STR, get_alias, NULL, CTX_SERVERDEF, NULL},
+
+    /* Specifies the SID of a server, which is in a standard UUID format
+     *
+     *     SID (SID}
+     *
+     * As an example:
+     *
+     *     SID 12345678-90ab-cdef-1234-567890abcdef
+     */
+    {"SID", ARG_STR, get_sid, NULL, CTX_SERVERDEF, NULL},
+
+    /* Specifies one or more addresses for a server in BMI URI form
+     *
+     *     Address {bmi address} ...
+     *
+     * As an example:
+     *
+     *     Address tcp://hostname1.clustername1.domainname:12345
+     */
+    {"Address", ARG_LIST, get_address_list, NULL, CTX_SERVERDEF, NULL},
+
+    /* Sprecifies one or more server types for a server
+     *
+     *     Type {type-word} ...
+     *
+     * As an example:
+     *
+     *     Type meta data dirdata
+     */
+    {"Type", ARG_LIST, get_type_list, NULL, CTX_SERVERDEF, NULL},
+
+    /* Specfies one or more user attributes for a server
+     *
+     *     Attribute {type-word} ...
+     *
+     * As an example:
+     *
+     *     Attribute RACK=3 TIER=1
+     */
+    {"Attribute", ARG_LIST, get_attribute_list, NULL, CTX_SERVERDEF, NULL},
 
     /* This groups the Server specific options.
      *
@@ -440,63 +494,43 @@ static const configoption_t options[] =
      * the server alias, which sets the remaining options specified
      * in the context for that server.
     */
-    {"<ServerOptions>",ARG_NONE,enter_server_options_context,NULL,
-        CTX_GLOBAL, NULL},
+    {"<ServerOptions>", ARG_NONE, enter_server_options_context, NULL,
+            CTX_SERVERDEF, NULL},
     /* Specifies the end-tag of the ServerOptions context.
      */
-    {"</ServerOptions>",ARG_NONE,exit_server_options_context,NULL,
-        CTX_SERVER_OPTIONS,NULL},
+    {"</ServerOptions>", ARG_NONE, exit_server_options_context, NULL,
+            CTX_SERVER_OPTIONS, NULL},
 
     /* Defines the server alias for the server specific options that
      * are to be set within the ServerOptions context.
      */
     {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
 
-    /* Open a context for specifying prime servers for SID mgmt
-     *
-     */
-    {"PrimeServers", ARG_NONE, enter_primesrvs_context, NULL,
-            CTX_GLOBAL, NULL},
-
-    /* Close a context for specifying prime servers for SID mgmt
-     *
-     */
-    {"/PrimeServers", ARG_NONE, exit_primesrvs_context, NULL,
-            CTX_PRIMESERVERS, NULL},
-
-    /* Specifies the SID and BMI address of a Prime Server that is
-     * used to manage SID mappings.
-     *
-     * Format is PrimeServer {Alias}
-     *
-     */
-    {"PrimeServer", ARG_STR, get_primesrv, NULL,
-            CTX_PRIMESERVERS, NULL},
-
     /* This groups options specific to a filesystem.  A pvfs2 server may manage
      * more than one filesystem, so a config file may have more than
      * one Filesystem context, each defining the parameters of a different
      * Filesystem.
      */
-    {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_GLOBAL,NULL},
+    {"<FileSystem>", ARG_NONE, enter_filesystem_context, NULL,
+            CTX_GLOBAL, NULL},
 
     /* Specifies the end-tag of a Filesystem context.
      */
-    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
-        NULL},
+    {"</FileSystem>", ARG_NONE, exit_filesystem_context, NULL,
+            CTX_FILESYSTEM, NULL},
 
      /* Specifies the beginning of a ExportOptions context.
       * This groups options specific to a filesystem and related to the behavior
       * of how it gets exported to various clients. Most of these options
       * will affect things like what uids get translated to and so on..
       */
-     {"<ExportOptions>",ARG_NONE, enter_export_options_context, NULL,CTX_FILESYSTEM,
-         NULL},
+     {"<ExportOptions>", ARG_NONE, enter_export_options_context, NULL,
+             CTX_FILESYSTEM, NULL},
  
      /* Specifies the end-tag of the ExportOptions context.
       */
-     {"</ExportOptions>",ARG_NONE, exit_export_options_context, NULL,CTX_EXPORT,
-         NULL},
+     {"</ExportOptions>", ARG_NONE, exit_export_options_context, NULL,
+             CTX_EXPORT, NULL},
  
     /* This groups
      * options specific to a filesystem and related to the behavior of the
@@ -505,13 +539,13 @@ static const configoption_t options[] =
      * DBPF module (currently the only TROVE module available) supports
      * all of them.
      */
-    {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,
-        CTX_FILESYSTEM,NULL},
+    {"<StorageHints>",ARG_NONE, enter_storage_hints_context, NULL,
+            CTX_FILESYSTEM, NULL},
 
     /* Specifies the end-tag of the StorageHints context.
      */
-    {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,
-        CTX_STORAGEHINTS,NULL},
+    {"</StorageHints>",ARG_NONE, exit_storage_hints_context, NULL,
+            CTX_STORAGEHINTS, NULL},
 
     /* Provides a context for defining the filesystem's default
      * distribution to use and the parameters to be set for that distribution.
@@ -522,12 +556,12 @@ static const configoption_t options[] =
      * not specified, the filesystem defaults to the simple-stripe distribution.
      */
     {"<Distribution>",ARG_NONE, enter_distribution_context, NULL,
-        CTX_FILESYSTEM, NULL},
+            CTX_FILESYSTEM, NULL},
 
     /* Specifies the end-tag for the Distribution context.
      */
     {"</Distribution>", ARG_NONE, exit_distribution_context, NULL,
-        CTX_DISTRIBUTION, NULL},
+            CTX_DISTRIBUTION, NULL},
 
     /* Opens a context for describing the root metadata
      *
@@ -547,8 +581,7 @@ static const configoption_t options[] =
      * RootServer {Alias}
      *
      */
-    {"RootServer", ARG_STR, get_rootsrv, NULL,
-            CTX_ROOTSERVERS, NULL},
+    {"RootServer", ARG_STR, get_rootsrv, NULL, CTX_ROOTSERVERS, NULL},
 
     /* Specifies the handle value for the root of the Filesystem.  This
      * is a required option in the Filesystem context.  The format is:
@@ -568,7 +601,7 @@ static const configoption_t options[] =
      * Filesystem and Distribution contexts.
      */
     {"Name", ARG_STR, get_name, NULL,
-        CTX_FILESYSTEM | CTX_DISTRIBUTION, NULL},
+            CTX_FILESYSTEM | CTX_DISTRIBUTION, NULL},
 
     /* A pvfs server may manage more than one filesystem, and so a
      * unique identifier is used to represent each one.  
@@ -580,7 +613,7 @@ static const configoption_t options[] =
      * context.
      */
     {"ID", ARG_INT, get_filesystem_collid, NULL,
-        CTX_FILESYSTEM, NULL},
+            CTX_FILESYSTEM, NULL},
 
     /* All metadata in a file system is replicated to the same degree.
      * This defines the number of copies of each metadata object in the
@@ -588,13 +621,13 @@ static const configoption_t options[] =
      * replication).
      */
     {"MetaReplicationFactor", ARG_INT, get_filesystem_replication, NULL,
-        CTX_FILESYSTEM, "1"},
+            CTX_FILESYSTEM, "1"},
 
     /* maximum number of AIO operations that Trove will allow to run
      * concurrently 
      */
     {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
-        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "16"},
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "16"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
@@ -605,7 +638,7 @@ static const configoption_t options[] =
      * a particular server in the Global context.
      */
     {"LogFile", ARG_STR, get_logfile, NULL,
-        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs2-server.log"},
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs2-server.log"},
 
     /* The LogType option can be used to control the destination of log 
      * messages from PVFS2 server.  The default value is "file", which causes
@@ -614,7 +647,7 @@ static const configoption_t options[] =
      * to be written to syslog.
      */
     {"LogType", ARG_STR, get_logtype, NULL,
-        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "file"},
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "file"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  This option sets that level for
@@ -635,10 +668,10 @@ static const configoption_t options[] =
      * EventLogging -flow,-flowproto
      */
     {"EventLogging", ARG_LIST, get_event_logging_list, NULL,
-        CTX_DEFAULTS | CTX_SERVER_OPTIONS,"none,"},
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "none,"},
 
-    {"EnableTracing",ARG_STR, get_event_tracing,NULL,
-        CTX_DEFAULTS| CTX_SERVER_OPTIONS,"no"},
+    {"EnableTracing",ARG_STR, get_event_tracing, NULL,
+            CTX_DEFAULTS| CTX_SERVER_OPTIONS, "no"},
 
     /* The SID cache stores attributes and addresses for known servers
      * indexed by SID.  This database is memory only, but is saved
@@ -646,7 +679,7 @@ static const configoption_t options[] =
      * so we don't have to hunt for lots of servers at startup.
      */
     {"SIDCacheFile", ARG_STR, get_sidcache_file, NULL,
-        CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs-sidcache"},
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs-sidcache"},
 
     /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
@@ -658,8 +691,8 @@ static const configoption_t options[] =
      * However, the default value can also be overwritten by setting a separate value
      * in the ServerOptions context using the Option tag.
      */
-     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
+     {"UnexpectedRequests", ARG_INT, get_unexp_req, NULL,
+             CTX_DEFAULTS | CTX_SERVER_OPTIONS, "50"},
 
     /* DEPRECATED 
      * Specifies the local path for the pvfs2 server to use as 
@@ -679,8 +712,8 @@ static const configoption_t options[] =
      * StorageSpace /tmp/pvfs-data.storage
      * DEPRECATED.
      */
-    {"StorageSpace",ARG_STR, get_storage_path,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+    {"StorageSpace", ARG_STR, get_storage_path, NULL,
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, NULL},
 
     /* Specifies the local path for the pvfs2 server to use as storage space 
      * for data files. This option specifies the default path for all servers 
@@ -692,8 +725,8 @@ static const configoption_t options[] =
      *
      * DataStorageSpace /tmp/pvfs-data.storage
      */
-    {"DataStorageSpace",ARG_STR, get_data_path,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+    {"DataStorageSpace", ARG_STR, get_data_path, NULL,
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, NULL},
 
     /* Specifies the local path for the pvfs2 server to use as storage space 
      * for metadata files. This option specifies the default path for all 
@@ -705,8 +738,8 @@ static const configoption_t options[] =
      *
      * MetadataStorageSpace /tmp/pvfs-meta.storage
      */
-    {"MetadataStorageSpace",ARG_STR, get_meta_path,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+    {"MetadataStorageSpace", ARG_STR, get_meta_path, NULL,
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, NULL},
 
      /* Current implementations of TCP on most systems use a window
       * size that is too small for almost all uses of pvfs.  
@@ -727,49 +760,49 @@ static const configoption_t options[] =
       * <a href="http://www.psc.edu/networking/projects/tcptune/#options">
       * PSC networking options</a> for details.
       */
-     {"TCPBufferSend",ARG_INT, get_tcp_buffer_send,NULL,
-         CTX_DEFAULTS,"0"},
+     {"TCPBufferSend", ARG_INT, get_tcp_buffer_send, NULL,
+             CTX_DEFAULTS, "0"},
 
      /* See the <a href="#TCPBufferSend">TCPBufferSend</a> option.
       */
-      {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
-         CTX_DEFAULTS,"0"},
+      {"TCPBufferReceive", ARG_INT, get_tcp_buffer_receive, NULL,
+             CTX_DEFAULTS, "0"},
 
      /* If enabled, specifies that the server should bind its port only on
       * the specified address (rather than INADDR_ANY)
       */
-     {"TCPBindSpecific",ARG_STR, get_tcp_bind_specific,NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
+     {"TCPBindSpecific", ARG_STR, get_tcp_bind_specific, NULL,
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "no"},
 
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
-     {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},
+     {"ServerJobBMITimeoutSecs", ARG_INT, get_server_job_bmi_timeout, NULL,
+             CTX_DEFAULTS | CTX_SERVER_OPTIONS, "300"},
      
      /* Specifies the timeout value in seconds for TROVE jobs on the server.
       */
-     {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},
+     {"ServerJobFlowTimeoutSecs", ARG_INT, get_server_job_flow_timeout, NULL,
+             CTX_DEFAULTS | CTX_SERVER_OPTIONS, "300"},
      
      /* Specifies the timeout value in seconds for BMI jobs on the client.
       */
-     {"ClientJobBMITimeoutSecs",ARG_INT, get_client_job_bmi_timeout,NULL,
-         CTX_DEFAULTS, "300"},
+     {"ClientJobBMITimeoutSecs", ARG_INT, get_client_job_bmi_timeout, NULL,
+             CTX_DEFAULTS, "300"},
 
      /* Specifies the timeout value in seconds for FLOW jobs on the client.
       */
-     {"ClientJobFlowTimeoutSecs",ARG_INT, get_client_job_flow_timeout,NULL,
-         CTX_DEFAULTS, "300"},
+     {"ClientJobFlowTimeoutSecs", ARG_INT, get_client_job_flow_timeout, NULL,
+             CTX_DEFAULTS, "300"},
 
      /* Specifies the number of retry attempts for operations (when possible)
       */
-     {"ClientRetryLimit",ARG_INT, get_client_retry_limit,NULL,
-         CTX_DEFAULTS, "5"},
+     {"ClientRetryLimit", ARG_INT, get_client_retry_limit, NULL,
+             CTX_DEFAULTS, "5"},
 
      /* Specifies the delay in milliseconds to wait between retries.
       */
-     {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
-         CTX_DEFAULTS, "2000"},
+     {"ClientRetryDelayMilliSecs", ARG_INT, get_client_retry_delay, NULL,
+             CTX_DEFAULTS, "2000"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
@@ -1438,15 +1471,15 @@ DOTCONF_CB(exit_security_context)
     return NULL;
 }
 
-DOTCONF_CB(enter_aliases_context)
+DOTCONF_CB(enter_server_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_ALIASES;
+    config_s->configuration_context = CTX_SERVER;
     return NULL;
 }
 
-DOTCONF_CB(exit_aliases_context)
+DOTCONF_CB(exit_server_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
@@ -1454,19 +1487,66 @@ DOTCONF_CB(exit_aliases_context)
     return NULL;
 }
 
-DOTCONF_CB(enter_primesrvs_context)
+DOTCONF_CB(enter_serverdef_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_PRIMESERVERS;
+    /* begin defining a new server */
+    if (config_s->new_host)
+    {
+        /* There is a host from a previous decl hanging around */
+        /* gossip_error("left over host being removed"); */
+        free_host_alias(config_s->new_host);
+    }
+    config_s->new_host = (host_alias_t *)malloc(sizeof(host_alias_t));
+    config_s->configuration_context = CTX_SERVERDEF;
     return NULL;
 }
 
-DOTCONF_CB(exit_primesrvs_context)
+DOTCONF_CB(exit_serverdef_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
+    /* end defining a new server */
+    if (!config_s->new_host)
+    {
+        /* gossip_error("missing host definition"); */
+    }
+    else
+    {
+        if (!is_valid_host(config_s->new_host))
+        {
+            free_host_alias(config_s->new_host);
+            config_s->new_host = NULL;
+            return "Error: incomplete host definition\n";
+        }
+
+        /* add to SID cache */
+        PVFS_SID_str2bin(config_s->new_host->host_sid_text,
+                         &config_s->new_host->host_sid);
+
+        SID_add(&config_s->new_host->host_sid,
+                0,
+                config_s->new_host->bmi_address);
+
+        SID_update_type(&config_s->new_host->host_sid,
+                        config_s->new_host->server_type);
+
+        SID_update_attributes(&config_s->new_host->host_sid,
+                              config_s->new_host->attributes);
+
+        /* add to config list of aliases */
+        if (!config_s->host_aliases)
+        {
+            config_s->host_aliases = PINT_llist_new();
+        }
+
+        PINT_llist_add_to_tail(config_s->host_aliases,
+                               (void *)config_s->new_host);
+
+        config_s->new_host = NULL;
+    }
+    config_s->configuration_context = CTX_SERVER;
     return NULL;
 }
 
@@ -1538,6 +1618,7 @@ DOTCONF_CB(enter_rootsrvs_context)
                     (struct server_configuration_s *)cmd->context;
     static int first_time = 1;
 
+    /* V3 this is NOT right */
     if (!first_time)
     {
         /* can only specify root servers once, this is an error */
@@ -1559,7 +1640,7 @@ DOTCONF_CB(exit_rootsrvs_context)
     struct filesystem_configuration_s *fs_conf =
             (struct filesystem_configuration_s *)
             PINT_llist_head(config_s->file_systems);
-    struct root_server_s *cur_root_server;
+    struct host_alias_s *cur_root_server;
     PINT_llist *cur = NULL;
     int i;
 
@@ -1575,21 +1656,29 @@ DOTCONF_CB(exit_rootsrvs_context)
      * SIDcache and build the root_sid_array
      */
     cur = fs_conf->root_servers;
-    for(i = 0; i < fs_conf->root_sid_count; i++)
+    for (i = 0; i < fs_conf->root_sid_count; i++)
     {
         if(!cur)
         {
             gossip_err("Error, ran out of root servers too soon\n");
             return("Error, ran out of root servers too soon\n");
         }
-        cur_root_server = PINT_llist_head(cur);
+        cur_root_server = (struct host_alias_s *)PINT_llist_head(cur);
         if (!cur_root_server)
         {
             break;
         }
-        /* convert SID into array */
-        PVFS_SID_str2bin(cur_root_server->host_sid_text,
-                         &fs_conf->root_sid_array[i]);
+        if (PVFS_SID_cmp(&cur_root_server->host_sid, &PVFS_SID_NULL))
+        {
+            if (!cur_root_server->host_sid_text)
+            {
+                return "Error, host_alias has no SID";
+            }
+            /* convert SID into bin - should not have to do this */
+            PVFS_SID_str2bin(cur_root_server->host_sid_text,
+                             &fs_conf->root_sid_array[i]);
+        }
+        fs_conf->root_sid_array[i] = cur_root_server->host_sid;
         
         cur = PINT_llist_next(cur);
     }
@@ -1887,11 +1976,11 @@ DOTCONF_CB(get_sidcache_file)
     {
         return NULL;
     }
-    if (config_s->sidcachefile)
+    if (config_s->sidcache_file)
     {
-        free(config_s->sidcachefile);
+        free(config_s->sidcache_file);
     }
-    config_s->sidcachefile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->sidcache_file = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
@@ -2713,12 +2802,12 @@ DOTCONF_CB(get_rootsrv)
     struct host_alias_s *root_alias = NULL;
 
     fs_conf = (struct filesystem_configuration_s *)
-            PINT_llist_head(config_s->file_systems);
+                            PINT_llist_head(config_s->file_systems);
     assert(fs_conf); /* TODO: replace with error handling */
 
     if (cmd->arg_count != 1)
     {
-        return "Error: RootServer statement must include one alias";
+        return "Error: RootServer statement must include one alias\n";
     }
 
     /* look up alias */
@@ -2728,10 +2817,19 @@ DOTCONF_CB(get_rootsrv)
                                                  (void *)cmd->data.list[0],
                                                  compare_aliases)))
     {
-        return "Error: RootServer alias not found";
+        return "Error: RootServer alias not found\n";
     }
+    /* This doesn't tell us much - we have no way to id which root */
     /* update server type n SIDcache */
     SID_update_type(&root_alias->host_sid, SID_SERVER_ROOT);
+
+    /* add to list of root servers for this fs */
+    if (!fs_conf->root_servers)
+    {
+        fs_conf->root_servers = PINT_llist_new();
+    }
+
+    PINT_llist_add_to_tail(fs_conf->root_servers, (void *)root_alias);
 
     /* increment the root_sid_count so we know how many there are */
     fs_conf->root_sid_count++;
@@ -2834,46 +2932,89 @@ DOTCONF_CB(get_filesystem_collid)
     return NULL;
 }
 
-static int compare_aliases(void* vkey,
-                           void* valias2)
+static int compare_aliases(void *vkey,
+                           void *valias2)
 {
-    char * hostaliaskey1 = (char *)vkey;
-    host_alias_t * alias2 = (host_alias_t *)valias2;
+    char *hostaliaskey1 = (char *)vkey;
+    host_alias_t *alias2 = (host_alias_t *)valias2;
     
     return strcmp(hostaliaskey1, alias2->host_alias);
 }
 
-DOTCONF_CB(get_alias_list)
+DOTCONF_CB(get_alias)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    struct host_alias_s *cur_alias = NULL;
-    int i = 0;
-    int len = 0;
-    char *ptr;
 
-    if (cmd->arg_count < 3)
+    if (cmd->arg_count != 1)
     {
-        return "Error: Alias must include alias, SID, and "
-               "at least one bmi address";
+        return "Error: Alias must include a single alias\n";
+    }
+
+    if (config_s->new_host->host_alias)
+    {
+        return "Error: Alias already defined for this server\n";
     }
 
     /* prevent users from adding the same alias twice */
     if(config_s->host_aliases &&
        PINT_llist_search(config_s->host_aliases, 
-                         (void *)cmd->data.list[0],
+                         (void *)cmd->data.str,
                          compare_aliases))
     {
-        return "Error: alias already defined";
+        return "Error: alias already defined\n";
     }
 
-    cur_alias = (host_alias_t *)malloc(sizeof(host_alias_t));
-    cur_alias->host_alias = strdup(cmd->data.list[0]);
-    cur_alias->host_sid_text = strdup(cmd->data.list[1]);
+    config_s->new_host->host_alias = strdup(cmd->data.str);
 
-    cur_alias->bmi_address = (char *)calloc(1, PVFS_MAX_SERVER_ADDR_LIST);
-    ptr = cur_alias->bmi_address;
-    for (i = 2; i < cmd->arg_count; i++)
+    return NULL;
+}
+
+DOTCONF_CB(get_sid)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    if (cmd->arg_count != 1)
+    {
+        return "Error: SID must include a single OID\n";
+    }
+
+    if (config_s->new_host->host_sid_text)
+    {
+        return "Error: SID already defined for this server\n";
+    }
+
+    config_s->new_host->host_sid_text = strdup(cmd->data.str);
+
+    return NULL;
+}
+
+DOTCONF_CB(get_address_list)
+{
+    int i = 0;
+    int len = 0;
+    char *ptr;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    if (cmd->arg_count < 1)
+    {
+        return "Error: Address must include at least one address\n";
+    }
+
+    if (!config_s->new_host->bmi_address)
+    {
+        config_s->new_host->bmi_address =
+                        (char *)calloc(1, PVFS_MAX_SERVER_ADDR_LIST);
+    }
+    else
+    {
+        len = strlen(config_s->new_host->bmi_address);
+    }
+    ptr = config_s->new_host->bmi_address;
+
+    for (i = 0; i < cmd->arg_count; i++)
     {
         strncat(ptr, cmd->data.list[i], PVFS_MAX_SERVER_ADDR_LIST - len);
         len += strlen(cmd->data.list[i]);
@@ -2884,20 +3025,52 @@ DOTCONF_CB(get_alias_list)
         len++;
     }
 
-    if (!config_s->host_aliases)
-    {
-        config_s->host_aliases = PINT_llist_new();
-    }
-    
-    /* add to config list of aliases */
-    PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
-
-    /* add to SID cache */
-    PVFS_SID_str2bin(cur_alias->host_sid_text, &cur_alias->host_sid);
-    SID_add(&cur_alias->host_sid, 0, cur_alias->bmi_address);
     return NULL;
 }
 
+DOTCONF_CB(get_type_list)
+{
+    int i;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    if (cmd->arg_count < 1)
+    {
+        return "Error: Type must include at least one server type\n";
+    }
+
+    /* convert type string into bit field */
+    for (i = 0; i < cmd->arg_count; i++)
+    {
+        config_s->new_host->server_type |=
+                        SID_string_to_type(cmd->data.list[i]);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_attribute_list)
+{
+    int i;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    if (cmd->arg_count < 1)
+    {
+        return "Error: Attribute must include at least one user attribute\n";
+    }
+
+    /* convert attribute as needed */
+    for (i = 0; i < cmd->arg_count; i++)
+    {
+        SID_set_attr(cmd->data.list[i], &config_s->new_host->attributes);
+    }
+
+    return NULL;
+}
+
+/* V3 old version */
+#if 0
 DOTCONF_CB(get_primesrv)
 {
     struct server_configuration_s *config_s = 
@@ -2923,6 +3096,7 @@ DOTCONF_CB(get_primesrv)
 
     return NULL;
 }
+#endif
 
 DOTCONF_CB(get_param)
 {
@@ -3560,14 +3734,14 @@ void PINT_config_release(struct server_configuration_s *config_s)
         /* free all filesystem objects */
         if (config_s->file_systems)
         {
-            PINT_llist_free(config_s->file_systems,free_filesystem);
+            PINT_llist_free(config_s->file_systems, free_filesystem);
             config_s->file_systems = NULL;
         }
 
         /* free all host alias objects */
         if (config_s->host_aliases)
         {
-            PINT_llist_free(config_s->host_aliases,free_host_alias);
+            PINT_llist_free(config_s->host_aliases, free_host_alias);
             config_s->host_aliases = NULL;
         }
 
@@ -3584,6 +3758,22 @@ void PINT_config_release(struct server_configuration_s *config_s)
     }
 }
 
+/* This function checks to see that the minimum fields for a valid host
+ * alias are present before we add a host into the list of aliases.
+ */
+static int is_valid_host(host_alias_t *host)
+{
+    if (!host->host_alias || !host->host_sid_text || !host->bmi_address ||
+        !host->server_type)
+    {
+        return 0; /* false, it is not valid */
+    }
+    return 1; /* true, it is valid */
+}
+
+/* This function checks to see of the alias pointed to by str is already
+ * present on the list of aliases pointed to by host_aliases.
+ */
 static int is_valid_alias(PINT_llist * host_aliases, char *str)
 {
     int ret = 0;
@@ -3603,15 +3793,15 @@ static int is_valid_alias(PINT_llist * host_aliases, char *str)
             assert(cur_alias->host_alias);
             assert(cur_alias->bmi_address);
 
-            if (strcmp(str,cur_alias->host_alias) == 0)
+            if (strcmp(str, cur_alias->host_alias) == 0)
             {
-                ret = 1;
+                ret = 1; /* true, it is valid (found) */
                 break;
             }
             cur = PINT_llist_next(cur);
         }
     }
-    return ret;
+    return ret; /* false, it is not valid (not found) */
 }
 
 static int is_populated_filesystem_configuration(
@@ -3643,26 +3833,10 @@ static void free_host_alias(void *ptr)
     if (alias)
     {
         free(alias->host_alias);
-        alias->host_alias = NULL;
-
+        free(alias->host_sid_text);
         free(alias->bmi_address);
-        alias->bmi_address = NULL;
-
+        free(alias->attributes);
         free(alias);
-        alias = NULL;
-    }
-}
-
-static void free_root_server(void *ptr)
-{
-    struct root_server_s *root_server = (struct root_server_s *)ptr;
-    if (root_server)
-    {
-        free(root_server->host_sid_text);
-        root_server->host_sid_text = NULL;
-
-        free(root_server);
-        root_server = NULL;
     }
 }
 
@@ -3682,7 +3856,10 @@ static void free_filesystem(void *ptr)
             fs->root_sid_array = NULL;
         }
 
-        PINT_llist_free(fs->root_servers, free_root_server);
+        /* Items on the root_servers list are also on the alias list of
+         * the server config so don't actually remove them, only the links
+         */
+        PINT_llist_free(fs->root_servers, NULL);
 
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
@@ -3748,8 +3925,8 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs)
 {
     PINT_llist *cur = NULL;
-    struct root_server_s *cur_root_server = NULL;
-    struct root_server_s *new_root_server = NULL;
+    struct host_alias_s *cur_root_server = NULL;
+    struct host_alias_s *new_root_server = NULL;
 
     if (dest_fs && src_fs)
     {
@@ -3806,8 +3983,8 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                 /* end of list */
                 break;
             }
-            new_root_server = (struct root_server_s *)malloc(
-                                            sizeof(struct root_server_s));
+            new_root_server = (struct host_alias_s *)malloc(
+                                            sizeof(struct host_alias_s));
             if (!new_root_server)
             {
                 gossip_err("failed to alloacte memory for a root server\n");

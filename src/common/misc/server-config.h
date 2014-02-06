@@ -19,18 +19,16 @@ enum
 {
     CTX_GLOBAL           = (1 << 1),
     CTX_DEFAULTS         = (1 << 2),
-    CTX_ALIASES          = (1 << 3),
-    CTX_FILESYSTEM       = (1 << 4),
-    CTX_METAHANDLERANGES = (1 << 5),
-    CTX_DATAHANDLERANGES = (1 << 6),
-    CTX_STORAGEHINTS     = (1 << 7),
-    CTX_DISTRIBUTION     = (1 << 8),
-    CTX_SECURITY         = (1 << 9),
-    CTX_EXPORT           = (1 << 10),
-    CTX_SERVER_OPTIONS   = (1 << 11),
-    CTX_ROOTSERVERS      = (1 << 12),
-    CTX_PRIMESERVERS     = (1 << 13),
-    CTX_LDAP             = (1 << 14),
+    CTX_SERVER           = (1 << 3),
+    CTX_SERVERDEF        = (1 << 4),
+    CTX_SERVER_OPTIONS   = (1 << 5),
+    CTX_FILESYSTEM       = (1 << 6),
+    CTX_ROOTSERVERS      = (1 << 7),
+    CTX_STORAGEHINTS     = (1 << 8),
+    CTX_DISTRIBUTION     = (1 << 9),
+    CTX_SECURITY         = (1 << 10),
+    CTX_EXPORT           = (1 << 11),
+    CTX_LDAP             = (1 << 12),
 };
 
 typedef struct phys_server_desc_s
@@ -45,19 +43,10 @@ typedef struct host_alias_s
     char *host_alias;     /* this is a traditional host name */
     char *host_sid_text;  /* this is a SID in text format */
     PVFS_SID host_sid;    /* this is a SID in binary format */
-    char *bmi_address;
+    char *bmi_address;    /* URI address */
+    uint32_t server_type; /* bit fields */
+    int *attributes;      /* array of integers */
 } host_alias_t;
-
-typedef struct prime_server_s
-{
-    char *host_sid_text;  /* this is a SID in text format */
-    char *bmi_address;
-} prime_server_t;
-
-typedef struct root_server_s
-{
-    char *host_sid_text;  /* this is a SID in text format */
-} root_server_t;
 
 /* V3 obsolete */
 #if 0
@@ -91,20 +80,7 @@ typedef struct filesystem_configuration_s
     int root_sid_count;
     PVFS_SID *root_sid_array; /* array of binary SIDs */
 
-    /* ptrs are type root_server_t */
-    PINT_llist *root_servers; /* list of text SIDs */
-
-    /* ptrs are type prime_server_t */
-    PINT_llist *prime_servers; /* list of text SIDs */
-
-/* V3 obsolete */
-#if 0
-    /* ptrs are type host_handle_mapping_s */
-    PINT_llist *meta_handle_ranges;
-
-    /* ptrs are type host_handle_mapping_s */
-    PINT_llist *data_handle_ranges;
-#endif
+    PINT_llist *root_servers; /* ptrs are type host_alias_t */
 
     /* FS level defaults - some can be overridden */
     int default_num_dfiles;             /* num defiles for each file */
@@ -188,8 +164,7 @@ typedef struct server_configuration_s
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
 
-    char *sid_cache_file;           /* name of the file to save sid cache */
-
+    char *sidcache_file;            /* name of the file to save sidcache */
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
     char *fs_config_filename;       /* the fs.conf file name            */
@@ -207,12 +182,12 @@ typedef struct server_configuration_s
     /* V3 remove precreate stuff */
     uint32_t *precreate_batch_size;    /* batch size for each ds type */
     uint32_t *precreate_low_threshold; /* threshold for each ds type */
+
     uint32_t init_num_dirdata_handles; /* initial number of dirdata handles */
                                        /*    when creating a new directory */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
-    char *sidcachefile;             /* what file to write SIDcache to */
     char *event_logging;
     int enable_events;
     char *bmi_modules;              /* BMI modules                      */
@@ -226,24 +201,24 @@ typedef struct server_configuration_s
                                      */
 #ifdef USE_TRUSTED
     int ports_enabled; /* Should we enable trusted port connections at all? */
-    unsigned long allowed_ports[2]; /* {Min, Max} value of ports from */
-                                    /*   which connections will be allowed */
-    int network_enabled;           /* Should we enable trusted network */
-                                   /*   connections at all? */
-    int allowed_networks_count;    /* Number of trusted networks parsed */
+    unsigned long allowed_ports[2]; /* {Min, Max} value of ports from       */
+                                    /*   which connections will be allowed  */
+    int network_enabled;           /* Should we enable trusted network      */
+                                   /*   connections at all?                 */
+    int allowed_networks_count;    /* Number of trusted networks parsed     */
     char **allowed_networks;       /* BMI addresses of the trusted networks */
-    int *allowed_masks;            /* Netmasks for each of the */
-                                   /*   specified trusted network */
-    void *security;                /* BMI module specific information */
-    void (*security_dtor)(void *); /* Destructor to free BMI module */
-                                   /*   specific information */
+    int *allowed_masks;            /* Netmasks for each of the              */
+                                   /*   specified trusted network           */
+    void *security;                /* BMI module specific information       */
+    void (*security_dtor)(void *); /* Destructor to free BMI module         */
+                                   /*   specific information                */
 #endif /* USE_TRUSTED */
     int configuration_context;
-    PINT_llist *host_aliases;     /* ptrs are type host_alias_t      */
-    PINT_llist *prime_servers;    /* ptrs are type prime_server_t    */
+    host_alias_t *new_host;       /* temp spot for a new host alias   */
+    PINT_llist *host_aliases;     /* ptrs are type host_alias_t       */
     PINT_llist *file_systems;     /* ptrs are type */
-                                  /*   filesystem_configuration_t    */
-    distribution_config_t default_dist_config;  /* distribution conf */
+                                  /*   filesystem_configuration_t     */
+    distribution_config_t default_dist_config;  /* distribution conf  */
     int db_cache_size_bytes;      /* cache size to use in berkeley db */
                                   /*   if zero, use defaults */
     char *db_cache_type;
@@ -280,37 +255,36 @@ typedef struct server_configuration_s
 } server_configuration_t;
 
 int PINT_parse_config(
-    struct server_configuration_s *config_s,
-    char *global_config_filename,
-    char *server_alias_name,
-    int server_flag);
+        struct server_configuration_s *config_s,
+        char *global_config_filename,
+        char *server_alias_name,
+        int server_flag);
 
-void PINT_config_release(
-    struct server_configuration_s *config_s);
+void PINT_config_release(struct server_configuration_s *config_s);
 
 #ifdef USE_TRUSTED
 
 int PINT_config_get_allowed_ports(
-    struct server_configuration_s *config,
-    int  *enabled,
-    unsigned long *allowed_ports);
+        struct server_configuration_s *config,
+        int  *enabled,
+        unsigned long *allowed_ports);
 
 int PINT_config_get_allowed_networks(
-    struct server_configuration_s *config,
-    int  *enabled,
-    int   *allowed_networks_count,
-    char  ***allowed_networks,
-    int   **allowed_masks);
+        struct server_configuration_s *config,
+        int  *enabled,
+        int   *allowed_networks_count,
+        char  ***allowed_networks,
+        int   **allowed_masks);
 
 #endif
 
 char *PINT_config_get_host_addr_ptr(
-    struct server_configuration_s *config_s,
-    char *alias);
+        struct server_configuration_s *config_s,
+        char *alias);
 
 char *PINT_config_get_host_alias_ptr(
-    struct server_configuration_s *config_s,
-    char *bmi_address);
+        struct server_configuration_s *config_s,
+        char *bmi_address);
 
 /* V3 obsolete */
 #if 0
@@ -333,23 +307,23 @@ char *PINT_config_get_merged_handle_range_str(
 #endif
 
 int PINT_config_is_valid_configuration(
-    struct server_configuration_s *config_s);
+        struct server_configuration_s *config_s);
 
 int PINT_config_is_valid_collection_id(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id);
+        struct server_configuration_s *config_s,
+        PVFS_fs_id fs_id);
 
 struct filesystem_configuration_s *PINT_config_find_fs_name(
-    struct server_configuration_s *config_s,
-    char *fs_name);
+        struct server_configuration_s *config_s,
+        char *fs_name);
 
 struct filesystem_configuration_s *PINT_config_find_fs_id(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id);
+        struct server_configuration_s *config_s,
+        PVFS_fs_id fs_id);
 
 PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
-    struct server_configuration_s *config_s,
-    char *fs_name);
+        struct server_configuration_s *config_s,
+        char *fs_name);
 
 /* V3 obsolete */
 #if 0
@@ -359,17 +333,17 @@ struct host_handle_mapping_s *PINT_get_handle_mapping(
 #endif
 
 PINT_llist *PINT_config_get_filesystems(
-    struct server_configuration_s *config_s);
+        struct server_configuration_s *config_s);
 
 int PINT_config_trim_filesystems_except(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id);
+        struct server_configuration_s *config_s,
+        PVFS_fs_id fs_id);
 
 int PINT_config_get_fs_key(
-    struct server_configuration_s *config,
-    PVFS_fs_id fs_id,
-    char **key,
-    int *length);
+        struct server_configuration_s *config,
+        PVFS_fs_id fs_id,
+        char **key,
+        int *length);
 
 /* defined in src/server/pvfs2-server.c only valid in server code */
 struct server_configuration_s *get_server_config_struct(void);

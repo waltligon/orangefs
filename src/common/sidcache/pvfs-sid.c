@@ -139,7 +139,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    ret = SID_cache_lookup_server(&SID_db, sid, &temp_cacheval);
+    ret = SID_cache_lookup_server(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;

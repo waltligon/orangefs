@@ -109,7 +109,7 @@ extern void SID_cacheval_unpack(SID_cacheval_t **the_sids_attrs, DBT *data);
  * 
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records);
+extern int SID_cache_load(DB *dbp, FILE *inpfile, int *num_db_records);
 
 /*
  * This function dumps the contents of the sid cache in ASCII to the file
@@ -130,7 +130,7 @@ extern int SID_cache_store(DBC *cursorp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_add_server(DB **dbp,
+extern int SID_cache_add_server(DB *dbp,
                                 const PVFS_SID *sid_server,
                                 const SID_cacheval_t *cacheval_t, 
                                 int *db_records);
@@ -143,7 +143,7 @@ extern int SID_cache_add_server(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_lookup_server(DB **dbp,
+extern int SID_cache_lookup_server(DB *dbp,
                                    const PVFS_SID *sid_server,
                                    SID_cacheval_t **cacheval_t);
 
@@ -152,7 +152,7 @@ extern int SID_cache_lookup_server(DB **dbp,
  * malloc's the char * passed in, and copies the bmi address of the retrieved
  * struct into that char *.
  */
-extern int SID_cache_lookup_bmi(DB **dbp,
+extern int SID_cache_lookup_bmi(DB *dbp,
                                 const PVFS_SID *search_sid,
                                 char **bmi_addr);
 
@@ -164,7 +164,7 @@ extern int SID_cache_lookup_bmi(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error 
  */
-extern int SID_cache_update_server(DB **dbp,
+extern int SID_cache_update_server(DB *dbp,
                                    const PVFS_SID *sid_server,
                                    SID_cacheval_t *new_attrs,
                                    uint32_t sid_types);
@@ -175,9 +175,12 @@ extern int SID_cache_update_server(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
+/* Now static */
+#if 0
 extern int SID_cache_update_attrs(DB **dbp,
                                   const PVFS_SID *sid_server,
                                   int new_attr[]);
+#endif
 
 extern int SID_cache_copy_attrs(SID_cacheval_t *current_sid_attrs, 
                                 int new_attr[]);
@@ -188,7 +191,7 @@ extern int SID_cache_copy_attrs(SID_cacheval_t *current_sid_attrs,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_update_bmi(DB **dbp,
+extern int SID_cache_update_bmi(DB *dbp,
                                 const PVFS_SID *sid_server,
                                 BMI_addr new_bmi_addr);
 
@@ -201,22 +204,25 @@ extern int SID_cache_copy_bmi(SID_cacheval_t *current_sid_attrs,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_update_url(DB **dbp,
+extern int SID_cache_update_url(DB *dbp,
                                 const PVFS_SID *sid_server,
                                 char *new_url);
 
 extern int SID_cache_copy_url(SID_cacheval_t **current_sid_attrs, 
                               char *new_url);
 
+/* V3 now static */
+#if 0
 extern int SID_cache_update_type(const PVFS_SID *sid_server,
                                  uint32_t new_type_val);
+#endif
 /*
  * This function deletes a record from the sid cache if a sid with a matching
  * sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code 
  */
-extern int SID_cache_delete_server(DB **dbp,
+extern int SID_cache_delete_server(DB *dbp,
                                    const PVFS_SID *sid_server,
                                    int *db_records);
 
@@ -298,9 +304,9 @@ extern int SID_create_sid_cache(DB_ENV *envp, DB **dbp);
  * Returns 0 on success, otherwise returns an error code
  */
 extern int SID_create_secondary_dbs(DB_ENV *envp,
-                                         DB *dbp,
-                                         DB *secondary_dbs[], 
-                                         int (* secdbs_callback_functions[])(
+                                    DB *dbp,
+                                    DB *secondary_dbs[], 
+                                    int (* secdbs_callback_functions[])(
                                                      DB *pri,
                                                      const DBT *pkey,
                                                      const DBT *pdata,
