@@ -1387,16 +1387,18 @@ class OFSTestNode(object):
     # @param dest_dir Destination directory on machine
     # @param svnusername svn username
     # @param svnpassword svn password
+    # @param svnoptions additional SVN options
     
 
 
-    def copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword):
+    def copyOFSSourceFromSVN(self,svnurl,dest_dir,svnusername,svnpassword,svn_options=None):
     
         output = []
         self.ofs_branch = os.path.basename(svnurl)
     
         #export svn by default. This merely copies from SVN without allowing update
-        svn_options = ""
+        if svn_options == None:
+            svn_options = ""
         svn_action = "export --force"
         
         # use the co option if we have a username and password
@@ -1629,9 +1631,10 @@ class OFSTestNode(object):
     # @param dest_dir Destination on local machine
     # @param username Username needed to access resource
     # @param password Password needed to access resource     
+    # @param options Options for accessing resource (e.g. svn options)
       
       
-    def copyOFSSource(self,resource_type,resource,dest_dir,username="",password=""):
+    def copyOFSSource(self,resource_type,resource,dest_dir,username="",password="",options=None):
         
         # Make directory dest_dir
         rc = self.runSingleCommand("mkdir -p %s" % dest_dir)
@@ -1647,7 +1650,7 @@ class OFSTestNode(object):
         #print "Copy "+ resource_type+ " "+ resource+ " "+dest_dir
         
         if resource_type == "SVN":
-            rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password)
+            rc = self.copyOFSSourceFromSVN(resource,dest_dir,username,password,options)
         elif resource_type == "TAR":
             rc = self.copyOFSSourceFromRemoteTarball(resource,dest_dir)
         #elif resource_type == "REMOTEDIR":

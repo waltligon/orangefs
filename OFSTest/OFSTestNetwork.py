@@ -483,6 +483,7 @@ class OFSTestNetwork(object):
     #    @param configure_opts    Additional configure options
     #    @param make_opts        Make options
     #    @param debug    Enable debugging
+    #    @param svn_options    Additional options for SVN
     #    @param node_list List of nodes to update
           
 
@@ -503,7 +504,9 @@ class OFSTestNetwork(object):
         configure_opts="",
         make_opts="",
         debug=False,
-        node_list=None):
+        svn_options=None,
+        node_list=None,
+        ):
         
         output = []
         dir_list = ""
@@ -542,7 +545,7 @@ class OFSTestNetwork(object):
         
             resource_type = "BUILDNODE"
             resource_location = download_location+dir_list
-        rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list)
+        rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list,svn_options)
         
         if rc != 0:
             return rc

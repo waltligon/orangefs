@@ -299,7 +299,8 @@ class OFSTestMain(object):
         ofs_patch_files=self.config.ofs_patch_files,
         configure_opts=self.config.configure_opts,
         security_mode=self.config.ofs_security_mode,
-        debug=self.config.ofs_compile_debug
+        debug=self.config.ofs_compile_debug,
+        svn_options=self.config.svn_options
         )
         
         if rc != 0:

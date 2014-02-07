@@ -167,6 +167,15 @@ class OFSTestConfig(object):
         ## @var svn_username
         # Username of svn user. Allows checkout instead of export
         self.svn_username = None
+        
+        ## @var svn_password
+        # Password of svn user. Allows checkout instead of export
+        self.svn_password = None
+
+        
+        ## @var svn_options
+        # Additional options for SVN
+        self.svn_options = None
 
         ## @var install_hadoop
         # Enable OrangeFS hadoop support
@@ -621,6 +630,18 @@ class OFSTestConfig(object):
         temp = d.get('ec2_subnet')
         if temp != None:
             self.ec2_subnet = temp
+
+        temp = d.get('svn_password')
+        if temp != None:
+            self.svn_password = temp
+
+        temp = d.get('svn_username')
+        if temp != None:
+            self.svn_username = temp
+
+        temp = d.get('svn_options')
+        if temp != None:
+            self.svn_options = temp
         
         
         
