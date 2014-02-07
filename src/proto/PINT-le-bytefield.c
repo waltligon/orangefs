@@ -336,6 +336,7 @@ static void lebf_initialize(void)
                 req.u.mgmt_split_dirent.dist = &tmp_dist;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
+#ifdef ENABLE_SECURITY_CERT
             case PVFS_SERV_MGMT_GET_USER_CERT:
                 req.u.mgmt_get_user_cert.fs_id = 0;
                 req.u.mgmt_get_user_cert.userid = tmp_name;
@@ -349,6 +350,7 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_user_cert_keyreq.fs_id = 0;
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq;
                 break;
+#endif
             case PVFS_SERV_MGMT_PROC_START:
             case PVFS_SERV_MGMT_PROC_STOP:
                 /* nothing special */
@@ -533,8 +535,10 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
+#ifdef ENABLE_SECURITY_CERT
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+#endif
         CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
         CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
 
@@ -640,8 +644,10 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+#ifdef ENABLE_SECURITY_CERT
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+#endif
         CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
         CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
 
@@ -767,11 +773,12 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
+#ifdef ENABLE_SECURITY_CERT
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+#endif
         CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
         CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
-
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -864,8 +871,10 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+#ifdef ENABLE_SECURITY_CERT
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+#endif
         CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
         CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
 
@@ -1101,8 +1110,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_IMM_COPIES:
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#ifdef ENABLE_SECURITY_CERT
             case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
             case PVFS_SERV_MGMT_GET_USER_CERT:
+#endif
             case PVFS_SERV_MGMT_PROC_START:
             case PVFS_SERV_MGMT_PROC_STOP:
               /*nothing to free*/
@@ -1279,7 +1290,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       decode_free(resp->u.mgmt_get_uid.uid_info_array);
                       break;
                    }
-
+#ifdef ENABLE_SECURITY_CERT
                 case PVFS_SERV_MGMT_GET_USER_CERT:
                    { 
                       decode_free(resp->u.mgmt_get_user_cert.cert.buf);                      
@@ -1291,7 +1302,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       decode_free(resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
                       break;
                    }
-
+#endif
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:

@@ -451,6 +451,7 @@ PVFS_error PVFS_mgmt_get_uid_list(
     PVFS_hint hints,
     void *user_ptr);
 
+#ifdef ENABLE_SECURITY_CERT
 PVFS_error PVFS_imgmt_get_user_cert(
     PVFS_fs_id fs_id,
     const char *userid,
@@ -471,6 +472,7 @@ PVFS_error PVFS_mgmt_get_user_cert(
     PVFS_certificate *cert,
     PVFS_security_key *privkey,
     uint32_t exp);
+#endif /* ENABLE_SECURITY_CERT */
 
 PVFS_error PVFS_imgmt_proc_start(
     PVFS_fs_id fs_id,

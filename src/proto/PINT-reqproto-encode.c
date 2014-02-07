@@ -236,8 +236,8 @@ int PINT_decode(void* input_buffer,
 	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
             == enc_type_recved))
        	{
-	    struct PVFS_server_req* tmp_req __attribute__ ((unused));
-	    struct PVFS_server_req* tmp_resp __attribute__ ((unused));
+	    struct PVFS_server_req* tmp_req GCC_UNUSED;
+	    struct PVFS_server_req* tmp_resp GCC_UNUSED;
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {

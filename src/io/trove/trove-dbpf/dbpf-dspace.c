@@ -718,7 +718,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     int start_size;
     void *tmp_ptr;
     void *tmp_handle;
-    void *tmp_attr __attribute__ ((unused));
+    void *tmp_attr GCC_UNUSED;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
     TROVE_ds_attributes attr;
 

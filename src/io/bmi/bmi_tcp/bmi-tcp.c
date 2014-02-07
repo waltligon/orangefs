@@ -181,25 +181,33 @@ struct tcp_msg_header
     char enc_hdr[TCP_ENC_HDR_SIZE];  /* encoded version of header info */
 };
 
-#define BMI_TCP_ENC_HDR(hdr)						\
-    do {								\
-        uint32_t *tmp32;                                                \
-        tmp32 = (uint32_t *)&(hdr).enc_hdr[0];                          \
-	*(tmp32) = htobmi32((hdr).magic_nr);	                        \
-	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
-	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
-	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
-    } while(0)						    
+#define BMI_TCP_ENC_HDR(hdr)                        \
+    do {                                            \
+        uint32_t *tmp32;                            \
+        uint64_t *tmp64;                            \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[0];     \
+        *(tmp32) = htobmi32((hdr).magic_nr);        \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[4];     \
+        *(tmp32) = htobmi32((hdr).mode);            \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[8];     \
+        *(tmp64) = htobmi64((hdr).tag);             \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[16];    \
+        *(tmp64) = htobmi64((hdr).size);            \
+    } while(0)
 
-#define BMI_TCP_DEC_HDR(hdr)						\
-    do {								\
-        uint32_t tmp32;                                                 \
-        memcpy(&tmp32,&(hdr).enc_hdr[0],sizeof(uint32_t));              \
-        (hdr).magic_nr = bmitoh32(tmp32);                               \
-        (hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));       \
-        (hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));        \
-        (hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));      \
-    } while(0)						    
+#define BMI_TCP_DEC_HDR(hdr)                                     \
+    do {                                                         \
+        uint64_t tmp64;                                          \
+        uint32_t tmp32;                                          \
+        memcpy(&tmp32, &(hdr).enc_hdr[0], sizeof(uint32_t));     \
+        (hdr).magic_nr = bmitoh32(tmp32);                        \
+        memcpy(&tmp32, &(hdr).enc_hdr[4], sizeof(uint32_t));     \
+        (hdr).mode = bmitoh32(tmp32);                            \
+        memcpy(&tmp64, &(hdr).enc_hdr[8], sizeof(uint64_t));     \
+        (hdr).tag = bmitoh64(tmp64);                             \
+        memcpy(&tmp64, &(hdr).enc_hdr[16], sizeof(uint64_t));    \
+        (hdr).size = bmitoh64(tmp64);                            \
+    } while(0)
 
 
 /* enumerate states that we care about */

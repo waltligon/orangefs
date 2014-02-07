@@ -61,8 +61,10 @@ extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
 extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
 extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
 extern struct PINT_server_req_params pvfs2_tree_getattr_params;
+#ifdef ENABLE_SECURITY_CERT
 extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
+#endif
 extern struct PINT_server_req_params pvfs2_mgmt_proc_start_params;
 extern struct PINT_server_req_params pvfs2_mgmt_proc_stop_params;
 
@@ -119,11 +121,13 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
     /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
     /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
-    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
-    /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
+    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params}
+#ifdef ENABLE_SECURITY_CERT    
+    /* 50 */ ,{PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
     /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params},
     /* 52 */ {PVFS_SERV_MGMT_PROC_START, &pvfs2_mgmt_proc_start_params},
     /* 53 */ {PVFS_SERV_MGMT_PROC_STOP, &pvfs2_mgmt_proc_stop_params}
+#endif
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

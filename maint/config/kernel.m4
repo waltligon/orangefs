@@ -2103,6 +2103,29 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         )
         CFLAGS=$tmp_cflags
 
+        dnl By 3.6, the kernel is focusing on the concept of "namespace",
+        dnl and that has to be handled when peering at uids and gids.
+        dnl We'll check for from_kuid and if we find it, we'll assume we
+        dnl have to handle namespace whenever we mess with a kuid_t.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for from_kuid)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+                #include <linux/sched.h>
+                #include <linux/cred.h>
+        ], [
+                int uid = from_kuid(&init_user_ns, current_fsuid());
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_FROM_KUID, 1, [Define if from_kuid function is found]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
         dnl 2.6.32 added a mandatory name field to the bdi structure
         AC_MSG_CHECKING(if kernel backing_dev_info struct has a name field)
 	AC_TRY_COMPILE([

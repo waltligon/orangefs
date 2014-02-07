@@ -95,8 +95,10 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
+#ifdef ENABLE_SECURITY_CERT
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+#endif
     PVFS_SERV_MGMT_PROC_START = 52,
     PVFS_SERV_MGMT_PROC_STOP = 53,
 
@@ -2415,6 +2417,7 @@ do {                                                                 \
     (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);     \
 } while (0)
 
+#ifdef ENABLE_SECURITY_CERT
 /* get_user_cert ******************************************************/
 /* - retrieve user certificate/key from server given user id/password */
 
@@ -2524,6 +2527,8 @@ endecode_fields_1_struct(
     PVFS_security_key, public_key);
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
+
+#endif /* ENABLE_SECURITY_CERT */
 
 /* proc_start *****************************************/
 /* - request the server to start a background process */
@@ -2635,8 +2640,10 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
+#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+#endif
         struct PVFS_servreq_mgmt_proc_start mgmt_proc_start;
         struct PVFS_servreq_mgmt_proc_stop mgmt_proc_stop;
     } u;
@@ -2700,8 +2707,10 @@ struct PVFS_server_resp
         struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
+#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+#endif
         struct PVFS_servresp_mgmt_proc_start mgmt_proc_start;
         struct PVFS_servresp_mgmt_proc_stop mgmt_proc_stop;
     } u;
