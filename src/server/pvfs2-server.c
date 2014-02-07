@@ -3119,7 +3119,7 @@ int startmonitor(void)
         }
         for (i = 3; i < sysconf(_SC_OPEN_MAX); i++)
             close(i);
-        execlp(SBINDIR "/pvfs2-monitor", "pvfs2-monitor", NULL);
+        execlp(LIBDIR "/pvfs2/pvfs2-monitor", "pvfs2-monitor", NULL);
         exit(1);
     }
     return pipefds[1];

@@ -262,8 +262,8 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
-  # make bindir, sbindir, and sysconfdir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"' -DSBINDIR='"$(sbindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+  # make bindir, libdir, and sysconfdir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"' -DLIBDIR='"$(libdir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
@@ -1530,7 +1530,8 @@ ifdef BUILD_SERVER
     ifdef ENABLE_SECURITY_CERT
 	touch $(bindir)/.pvfs2-genconfig-cert
     endif
-	install -m 755 $(MONITOR) $(sbindir)/pvfs2-monitor
+	install -d $(libdir)/pvfs2
+	install -m 755 $(MONITOR) $(libdir)/pvfs2/pvfs2-monitor
 endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)
