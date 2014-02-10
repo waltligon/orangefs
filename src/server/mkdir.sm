@@ -226,6 +226,13 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
  * Synopsis: Initialize dist_dir_struct in s_op->attr.u.dir and s_op->u.mkdir
  *           
  */
+/* V3
+ * For V3, this state may also be able to obtain the necessary OIDs and SIDs
+ * and format them correctly in the dist dir data structures.
+ * The SIDs for one OID should include the local server. The SIDs for all
+ * other OIDs should *not* include the local server (or only as a replica).
+ * (Need to think about overall strategy for choosing these SIDs.)
+*/
 static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
@@ -357,6 +364,19 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE; 
 }
 
+/*
+ * Function: mkdir_create_local_dirdata_dspace
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Store local dirdata info.
+ *           
+ */
+/*
+ * V3 - May be able to incorporate into mkdir_create_dist_dir_struct */
 static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
@@ -386,6 +406,9 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
 
     /* where does handle_array come from? who allocates these OIDs, this
      * code or trove?
+     * from ECQ: This code (or above in mkdir_create_dist_dir_struct) should
+     * allocate these OIDs. If it were done by trove then choosing of
+     * local and remote OIDs would have to be handled differently.
      */
 
 /* no extents in V3 */

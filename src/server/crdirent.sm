@@ -272,6 +272,10 @@ machine pvfs2_crdirent_sm
  * storing request structure fields in state machine so that nested
  * machines are not dependent on request type
  */
+/* ECQ: Not sure why it is necessary to copy fields from the request structure.
+ * This state machine is not itself nested and the only nested state machines
+ * it calls are prelude_sm, pvfs2_msgpairarray_sm, and pvfs2_final_response_sm.
+*/
 static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
@@ -720,6 +724,9 @@ static PINT_sm_action crdirent_write_directory_entry(
     return ret;
 }
 
+/* ECQ: Not sure dir_attr_update_required is adding any value here. The
+ * only way to get here is from successful completion of
+ * crdirent_write_directory_entry */
 static PINT_sm_action crdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
