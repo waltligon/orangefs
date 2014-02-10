@@ -682,6 +682,8 @@ LIBRARIES_THREADED_SHARED :=
 LIBRARIES_THREADED_STATIC :=
 endif
 
+LIBRARIES_SHARED := lib/libpvfs2-bgproc.so
+
 
 LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
 LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
@@ -786,6 +788,7 @@ MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
 BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
 BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
+BGPROCAPPS := $(patsubst %.c,%, $(filter %.c, $(BGPROCAPPSRC)))
 
 # KERNAPPOBJS is a list of kernel driver userland objects
 KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC))) \
@@ -1219,6 +1222,9 @@ lib/libpvfs2-bgproc.so: $(BGPROCOBJS) lib/libpvfs2.so
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-bgproc.so,-z,interpose,-Bsymbolic -o $@ $(BGPROCOBJS) $(DEPLIBS)
 
+$(BGPROCAPPS): %: %.o $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) -lpvfs2-bgproc $(call modldflags,$<)
 
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
@@ -1553,6 +1559,9 @@ ifdef BUILD_SERVER
     endif
 	install -d $(libdir)/pvfs2
 	install -m 755 $(MONITOR) $(libdir)/pvfs2/pvfs2-monitor
+	for i in $(notdir $(BGPROCAPPS)) ; do \
+	    install -m 755 src/client/bgproc/apps/$$i $(libdir)/pvfs2/$$i ; \
+	done
 endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)
