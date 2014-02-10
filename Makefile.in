@@ -784,6 +784,9 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
+BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
+BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
+
 # KERNAPPOBJS is a list of kernel driver userland objects
 KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC))) \
                $(patsubst %.c,%-threaded.o, $(filter %.c,$(KERNAPPTHRSRC)))
@@ -864,7 +867,8 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) )
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) ) \
+    $(BGPROCDEPENDS)
 endif
 
 ####################################################################
@@ -874,7 +878,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(MONITOR) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(MONITOR) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) bgproc
 endif
 
 # target for building admin tools
@@ -1202,6 +1206,20 @@ $(USERTOOLS): %: %.o $(LIBRARIES)
 
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
 
+# PVFS Background Processes (bgproc)
+bgproc: lib/libpvfs2-bgproc.a lib/libpvfs2-bgproc.so
+
+lib/libpvfs2-bgproc.a: $(BGPROCOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(BGPROCOBJS)
+
+lib/libpvfs2-bgproc.so: $(BGPROCOBJS) lib/libpvfs2.so
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-bgproc.so,-z,interpose,-Bsymbolic -o $@ $(BGPROCOBJS) $(DEPLIBS)
+
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
@@ -1280,7 +1298,8 @@ clean::
                 $(STATECOMP) $(STATECOMPOBJS) \
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
-                src/server/simple.conf examples/fs.conf
+                src/server/simple.conf examples/fs.conf \
+                $(BGPROCOBJS) $(OBJPROCDEPENDS)
 
 ifdef BUILD_HADOOP
 clean ::
