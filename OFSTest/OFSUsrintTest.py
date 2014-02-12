@@ -186,7 +186,7 @@ def bonnie(testing_node,output=[]):
         
     testing_node.changeDirectory(testing_node.ofs_mount_point)
 
-    rc = testing_node.runSingleCommand("echo export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location),output)
+    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; %s/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_extra_tests_location),output)
     
 
     return rc
@@ -276,7 +276,7 @@ def fdtree(testing_node,output=[]):
 
     # fdtree must be run from the mount_point, but need to cd to that directory w/usrint libraries.
     testing_node.changeDirectory("~")
-    rc = testing_node.runSingleCommand("%s cd %s; bash -c '%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5'" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
+    rc = testing_node.runSingleCommand("%s cd %s; %s bash -c \"%s/fdtree-1.0.1/fdtree.bash -l 4 -d 5\"" % (preload,testing_node.ofs_mount_point,preload,testing_node.ofs_extra_tests_location),output)
     
     return rc
 
