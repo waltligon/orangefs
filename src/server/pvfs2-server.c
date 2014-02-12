@@ -53,6 +53,9 @@
 #ifdef ENABLE_CAPCACHE
 #include "capcache.h"
 #endif
+#ifdef ENABLE_REVOCATION
+#include "revlist.h"
+#endif
 #ifdef ENABLE_CREDCACHE
 #include "credcache.h"
 #endif
@@ -602,6 +605,19 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_CAPCACHE_INIT;
 #endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_REVOCATION
+    /* initialize the revocation list */
+    ret = PINT_revlist_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize revocation list;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_REVOCATION_INIT;
+#endif
 
 #ifdef ENABLE_CREDCACHE
     /* initialize the credential cache */
@@ -1809,6 +1825,17 @@ static int server_shutdown(
                      "cache           [ stopped ]\n");
     }
 #endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_REVOCATION
+    if (status & SERVER_REVOCATION_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting revocation "
+                     "list            [   ...   ]\n");
+        PINT_revlist_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         revocation "
+                     "list            [ stopped ]\n");
+    }
+#endif /* ENABLE_REVOCATION */
 
 #ifdef ENABLE_CERTCACHE    
     if (status & SERVER_CERTCACHE_INIT)

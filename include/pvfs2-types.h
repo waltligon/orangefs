@@ -1116,6 +1116,7 @@ endecode_fields_1a_struct (
     PVFS_key_data, buf);
 #define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
 
+typedef uint64_t PVFS_capability_id;
 typedef unsigned char *PVFS_signature;
 
 /* A capability defines permissions for a set of handles. */
@@ -1124,6 +1125,7 @@ struct PVFS_capability
 {
     char *issuer;              /* alias of the issuing server */
     PVFS_fs_id fsid;           /* fsid for which this capability is valid */
+    PVFS_capability_id cap_id; /* id number used mainly for revocation */
     uint32_t sig_size;         /* length of the signature in bytes */
     PVFS_signature signature;  /* digital signature */
     PVFS_time timeout;         /* seconds after epoch to time out */
@@ -1135,7 +1137,7 @@ endecode_fields_3a2a_struct (
     PVFS_capability,
     string, issuer,
     PVFS_fs_id, fsid,
-    skip4,,
+    PVFS_capability_id, cap_id,
     uint32_t, sig_size,
     PVFS_signature, signature,
     PVFS_time, timeout,

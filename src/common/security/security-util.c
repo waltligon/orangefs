@@ -18,6 +18,9 @@
 #include "security-util.h"
 #include "server-config.h"
 
+#ifdef __PVFS2_SERVER__
+
+#endif
 /* PINT_print_op_mask
  *
  * Writes capability operation mask into string buffer.
@@ -201,6 +204,7 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s capability:\n", prefix);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cap->issuer);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tid: %llx\n", llu(cap->cap_id));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfsid: %u\n", cap->fsid);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cap->sig_size);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
@@ -246,6 +250,7 @@ void PINT_cleanup_capability(PVFS_capability *cap)
         cap->handle_array = NULL;
         cap->signature = NULL;
         cap->sig_size = 0;
+        cap->cap_id = 0;
         cap->issuer = NULL;
     }
 }

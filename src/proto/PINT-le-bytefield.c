@@ -1357,6 +1357,7 @@ static int check_resp_size(struct PVFS_server_resp *resp)
 static void zero_capability(PVFS_capability *cap)
 {
     cap->issuer = "";
+    cap->cap_id = 0;
     cap->sig_size = 0;
     cap->num_handles = 0;
 }

@@ -2,17 +2,26 @@ DIR := src/common/security
 SERVERSRC += $(DIR)/security-util.c \
              $(DIR)/pint-uid-map.c
 
+NEEDCACHE = $(or ENABLE_CAPCACHE, ENABLE_CERTCACHE, ENABLE_CERTCACHE)
+
+ifdef NEEDCACHE
+SERVERSRC += $(DIR)/seccache.c
+endif
+
+ifdef ENABLE_CAPCACHE
+SERVERSRC += $(DIR)/capcache.c
+endif
+
+ifdef ENABLE_REVOCATION
+SERVERSRC += $(DIR)/revlist.c
+endif
+
 LIBSRC += $(DIR)/security-util.c \
           $(DIR)/getugroups.c
 
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \
-             $(DIR)/security-hash.c \
-             $(DIR)/seccache.c
-
-ifdef ENABLE_CAPCACHE
-SERVERSRC += $(DIR)/capcache.c
-endif
+             $(DIR)/security-hash.c
 
 ifdef ENABLE_CREDCACHE
 SERVERSRC += $(DIR)/credcache.c
@@ -21,16 +30,11 @@ endif
 else ifdef ENABLE_SECURITY_CERT
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c \
-	     $(DIR)/seccache.c \
              $(DIR)/pint-cert.c \
              $(DIR)/cert-util.c \
              $(DIR)/pint-ldap-map.c
 
 LIBSRC += $(DIR)/cert-util.c
-
-ifdef ENABLE_CAPCACHE
-SERVERSRC += $(DIR)/capcache.c
-endif
 
 ifdef ENABLE_CREDCACHE
 SERVERSRC += $(DIR)/credcache.c

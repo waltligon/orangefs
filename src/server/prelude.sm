@@ -371,7 +371,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credential *cred = NULL;
-    int ret = -PVFS_EINVAL, capcache_hit = 0, credcache_hit = 0;
+    int ret = -PVFS_EINVAL;
+#ifdef ENABLE_CAPCACHE
+    int capcache_hit = 0, cap_flags;
+#endif
+#ifdef ENABLE_CREDCACHE
+    int credcache_hit = 0;
+#endif
+
     DECLARE_PROFILER(profiler);
 
     /* Profile validate operation */
@@ -417,9 +424,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             (PINT_credcache_lookup(cred) != NULL);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cred cache %s\n", __func__,
                  (credcache_hit) ? "hit" : "miss");
-#endif
         /* do not verify credential on credcache hit */
         ret = (credcache_hit) ? 1 : PINT_verify_credential(cred);
+#else
+    ret = PINT_verify_credential(cred);
+#endif
+        
 
 #ifdef ENABLE_CREDCACHE
         if (!credcache_hit && ret)
@@ -515,19 +525,53 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
 
     /* check capability cache for non-null capabilities */
-#ifdef ENABLE_CAPCACHE
+#ifdef ENABLE_CAPCACHE    
     capcache_hit = 1;
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
         capcache_hit = 
-            (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
+            (PINT_capcache_lookup(&s_op->req->capability, &cap_flags) != NULL);        
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                  (capcache_hit) ? "hit" : "miss");
     }
-#endif
 
-    /* do not verify cap on cache hit */
-    ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
+    if (capcache_hit)
+    {
+#ifdef ENABLE_REVOCATION
+        /* check revocation flag */
+        if (cap_flags & CAPCACHE_REVOKED)
+        {
+            /* if revoked, tell client to try again, getting a new cap */
+            js_p->error_code = -PVFS_EAGAIN;
+
+            return SM_ACTION_COMPLETE;
+        }
+        else
+        {
+#endif
+            /* note: no need to verify cap on cache hit */
+            ret = 1;
+#ifdef ENABLE_REVOCATION
+        }
+#endif
+    }
+    else
+    {
+        ret = PINT_verify_capability(&s_op->req->capability);
+        if (ret)
+        {
+            int ret2 = PINT_capcache_insert(&s_op->req->capability, 
+                                            CAPCACHE_VALID);
+            if (ret2 != 0)
+            {
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: warning: could not "
+                             "cache capability (%d)\n", __func__, ret2);
+            }
+        }
+    }
+#else
+    ret = PINT_verify_capability(&s_op->req->capability);
+#endif
 
     /* check operation permissions */
     if (ret)

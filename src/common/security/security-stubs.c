@@ -16,10 +16,15 @@
 #include "pint-util.h"
 #include "server-config.h"
 #include "pint-cached-config.h"
+#include "gen-locks.h"
 
 #include "pint-security.h"
 #include "security-util.h"
 
+/* capability ID declarations */
+static gen_mutex_t cap_id_mutex = GEN_MUTEX_INITIALIZER;
+uint32_t cap_server_id;
+uint32_t next_cap_seqnum = 1;
 
 int PINT_security_initialize(void)
 {
@@ -40,18 +45,7 @@ int PINT_init_capability(PVFS_capability *cap)
 
 int PINT_sign_capability(PVFS_capability *cap)
 {
-    const struct server_configuration_s *config;
-
-    config = PINT_get_server_config();
-    assert(config && config->server_alias);
-
-    cap->issuer = (char *) malloc(strlen(config->server_alias) + 3);
-    if (cap->issuer == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    strcpy(cap->issuer, "S:");
-    strcat(cap->issuer, config->server_alias);
+    const struct server_configuration_s *config = PINT_get_server_config();
 
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
@@ -116,6 +110,37 @@ int PINT_verify_capability(const PVFS_capability *cap)
     }
 
     return 1;
+}
+
+/* PINT_set_capability_id
+ *
+ * Sets an ID for a capability, which consists of the server ID and 
+ * a sequence number.
+ *
+ * returns negative on error.
+ * returns zero on success.
+ */
+int PINT_set_capability_id(PVFS_capability *cap)
+{
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    gen_mutex_lock(&cap_id_mutex);
+
+    cap->cap_id = (((PVFS_capability_id) cap_server_id) << 32) |
+                   next_cap_seqnum++;
+
+    /* skip 0 for sequence number */
+    if (next_cap_seqnum == 0)
+    {
+        next_cap_seqnum++;
+    }
+
+    gen_mutex_unlock(&cap_id_mutex);
+
+    return 0;
 }
 
 int PINT_init_credential(PVFS_credential *cred)

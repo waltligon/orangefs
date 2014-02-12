@@ -30,6 +30,10 @@
 /* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
 
+/* capability ID declarations */
+#define GET_CAP_SERVER_ID(cap_id)   (cap_id >> 32)
+#define GET_CAP_SEQNUM(cap_id)      (cap_id & 0x00000000FFFFFFFFL)
+
 #ifdef WIN32
 #define PINT_SECURITY_CHECK(rc, label, format, ...) \
     do { \
@@ -134,6 +138,7 @@ int PINT_security_cache_ca_cert(void);
 #endif
 
 int PINT_init_capability(PVFS_capability *cap);
+int PINT_set_capability_id(PVFS_capability *cap);
 int PINT_sign_capability(PVFS_capability *cap);
 int PINT_verify_capability(const PVFS_capability *cap);
 int PINT_server_to_server_capability(PVFS_capability *capability,

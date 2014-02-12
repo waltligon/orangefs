@@ -69,6 +69,10 @@ struct CRYPTO_dynlock_value
     gen_mutex_t mutex;
 };
 
+/* capability ID declarations */
+static gen_mutex_t cap_id_mutex = GEN_MUTEX_INITIALIZER;
+uint32_t cap_server_id;
+uint32_t next_cap_seqnum = 1;
 
 /* thread-safe OpenSSL helper functions */
 static int setup_threading(void);
@@ -103,14 +107,14 @@ static int load_public_keys(const char*);
  *    
  *  returns PVFS_EALREADY if already initialized
  *  returns PVFS_EIO if key file is missing or invalid
- *  returns 0 on sucess
+ *  returns 0 on success
  */
 int PINT_security_initialize(void)
 {
     const struct server_configuration_s *config = PINT_get_server_config();
     int ret;
 #ifdef ENABLE_SECURITY_KEY
-    PINT_llist_p l;
+    PINT_llist_p host_aliases;
     host_alias_s *host_alias;
     char buf[HOST_NAME_MAX+2];
 #endif
@@ -140,8 +144,12 @@ int PINT_security_initialize(void)
         cleanup_threading();
         gen_mutex_unlock(&security_init_mutex);
         return ret;
-    }    
+    }
 
+    /* get capability server ID */
+    cap_server_id = config->host_index + 1;
+
+    /* check for ServerKey */
     PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error,
                              "ServerKey not defined in configuration file... "
                              "aborting\n");
@@ -176,25 +184,25 @@ int PINT_security_initialize(void)
         return -PVFS_EIO;
     }
 
-    l = config->host_aliases;
-    if (!PINT_llist_empty(l))
-        do {
-            if (PINT_llist_empty(l))
-                break;
-            host_alias = PINT_llist_head(l);
-            snprintf(buf, HOST_NAME_MAX+2, "S:%s",
-                     host_alias->host_alias);
-            if (SECURITY_lookup_pubkey(buf) == NULL) {
-                gossip_err("Could not find public key for alias "
-                           "'%s'\n", buf);
+    host_aliases = config->host_aliases;
+    while (host_aliases) {
+        host_alias = PINT_llist_head(host_aliases);
+        if (host_alias)
+        {
+            snprintf(buf, HOST_NAME_MAX+2, "S:%s", host_alias->host_alias);
+            if (SECURITY_lookup_pubkey(buf) == NULL)
+            {
+                gossip_err("Could not find public key for alias '%s'\n", buf);
                 SECURITY_hash_finalize();
                 EVP_cleanup();
                 ERR_free_strings();
                 cleanup_threading();
                 gen_mutex_unlock(&security_init_mutex);
-                return -PVFS_EIO;
+                return -PVFS_ENXIO;
             }
-        } while ((l = PINT_llist_next(l)));
+        }
+        host_aliases = PINT_llist_next(host_aliases);
+    }
 
 #elif ENABLE_SECURITY_CERT
 
@@ -455,6 +463,7 @@ int PINT_sign_capability(PVFS_capability *cap)
     ret = EVP_SignUpdate(&mdctx, 
                          cap->issuer, 
                          strlen(cap->issuer) * sizeof(char));
+    ret &= EVP_SignUpdate(&mdctx, &cap->cap_id, sizeof(PVFS_capability_id));
     ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -518,6 +527,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     strcat(capability->issuer, config->server_alias);
 
     capability->fsid = fs_id;
+    /* TODO: ID (reserved?) */
     capability->timeout =
         PINT_util_get_current_time() + config->security_timeout;
     capability->op_mask = ~((uint32_t)0);
@@ -618,6 +628,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
     ret = EVP_VerifyUpdate(&mdctx, 
                            cap->issuer,
                            strlen(cap->issuer) * sizeof(char));
+    ret &= EVP_VerifyUpdate(&mdctx, &cap->cap_id, sizeof(PVFS_capability_id));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -643,6 +654,37 @@ int PINT_verify_capability(const PVFS_capability *cap)
     EVP_MD_CTX_cleanup(&mdctx);
 
     return (ret == 1);
+}
+
+/* PINT_set_capability_id
+ *
+ * Sets an ID for a capability, which consists of the server ID and 
+ * a sequence number.
+ *
+ * returns negative on error.
+ * returns zero on success.
+ */
+int PINT_set_capability_id(PVFS_capability *cap)
+{
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    gen_mutex_lock(&cap_id_mutex);
+
+    cap->cap_id = (((PVFS_capability_id) cap_server_id) << 32) | 
+                   next_cap_seqnum++;
+
+    /* skip 0 for sequence number */
+    if (next_cap_seqnum == 0)
+    {
+        next_cap_seqnum++;
+    }
+
+    gen_mutex_unlock(&cap_id_mutex);
+
+    return 0;
 }
 
 /* PINT_init_credential

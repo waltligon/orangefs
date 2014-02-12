@@ -63,6 +63,9 @@ typedef uint64_t u_int64_t;
 #define encode_PVFS_signature(pptr,x) encode_char(pptr,x)
 #define decode_PVFS_signature(pptr,x) decode_char(pptr,x)
 
+#define encode_PVFS_capability_id(pptr,x) encode_uint64_t(pptr,x)
+#define decode_PVFS_capability_id(pptr,x) decode_uint64_t(pptr,x)
+
 #define encode_PVFS_cert_data(pptr,x) encode_char(pptr,x)
 #define decode_PVFS_cert_data(pptr,x) decode_char(pptr,x)
 

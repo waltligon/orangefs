@@ -53,6 +53,8 @@ typedef struct seccache_entry_s {
     PVFS_size data_size;
 } seccache_entry_t;
 
+#define SECCACHE_ENTRY(entry)    ((seccache_entry_t *) entry)
+
 /* implementation-defined cache functions */
 /* note: some entry params declared "void *" for compatibility with
    PINT_llist functions */
