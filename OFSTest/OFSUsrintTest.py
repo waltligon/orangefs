@@ -523,8 +523,9 @@ def shelltest(testing_node,output=[]):
     
     #print testing_node.runSingleCommandBacktick("find /tmp -name pvfs2-shell-test.sh")
     #hack to workaround bug in pvfs2-shell-test.sh
-    testing_node.changeDirectory("~")
-    rc = testing_node.runSingleCommand("export LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so; cd %s; bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
+    #testing_node.changeDirectory("~")
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    rc = testing_node.runSingleCommand("export %s; cd %s; %s bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s" % (preload,testing_node.ofs_mount_point,preload,testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
     return rc
 
 ##
