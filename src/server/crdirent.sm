@@ -28,13 +28,9 @@ int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 enum
 {
-    INVALID_OBJECT = 131,
-    INVALID_DIRDATA,
-    UPDATE_DIR_ATTR_REQUIRED,
+    UPDATE_DIR_ATTR_REQUIRED = 131,
     SPLIT_REQUIRED,
-    NO_SPLIT_REQUIRED,
     SPLIT_FATAL_ERROR,
-    LOCAL_METAHANDLE,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
 };
@@ -76,20 +72,6 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_validate;
         success => write_directory_entry;
-        INVALID_OBJECT => validation_object_type_failure;
-        INVALID_DIRDATA => validation_dirdata_mismatch;
-        default => final_response;
-    }
-
-    state validation_object_type_failure
-    {
-        run validation_object_type_failure;
-        default => final_response;
-    }
-
-    state validation_dirdata_mismatch
-    {
-        run validation_dirdata_mismatch;
         default => final_response;
     }
 
@@ -124,7 +106,6 @@ machine pvfs2_crdirent_sm
     state check_for_split
     {
         run crdirent_check_for_split;
-/*        SPLIT_REQUIRED => activate_server_setup; */
         SPLIT_REQUIRED => retrieve_dir_entries;
         default => final_response;
     }
@@ -611,7 +592,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
 
-        js_p->error_code = INVALID_DIRDATA;
+        js_p->error_code = -PVFS_EAGAIN;
         return SM_ACTION_COMPLETE;
     }
     else
@@ -621,27 +602,6 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     }
 
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_object_type_failure(struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "crdirent: validation_object_type_failure called\n");
-
-    js_p->error_code = -PVFS_ENOTDIR;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_dirdata_mismatch(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_dirdata_"
-                 "mismatch called, let client try again!!\n");
-
-    /* using a new error code?? use the try again error code*/
-    js_p->error_code = -PVFS_EAGAIN;
     return SM_ACTION_COMPLETE;
 }
 
