@@ -663,30 +663,6 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
         
-                # run the hadoop tests, if required.
-        if self.config.run_hadoop_tests == True:
-            
-            # run the hadoop tests, if required.
-            import OFSHadoopTest
-            
-            # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
-
-            self.writeOutputHeader(filename,"Hadoop Tests")
-            
-            # The list of hadoop tests to run is found in OFSHadoopTest.test.
-            # This is an array of strings that correspond to function names.
-            # The functions are run in the order they are listed in the array.
-
-            for callable in OFSHadoopTest.tests:
-                try:
-                    rc = head_node.runOFSTest("hadoop", callable)
-                    self.writeOutput(filename,callable,rc)
-                except:
-                    print "Unexpected error:", sys.exc_info()[0]
-                    traceback.print_exc()
-                    pass
                     
         # run miscellaneous tests after run.
         if True == True:
@@ -713,20 +689,20 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
         
-        # Test runfunction group
-        # TODO: Remove this.
-        try:
-            self.runFunctionGroup("OFSHadoopTest")
-        except:
-            "runFunctionGroup didn't work. Oh well"
-            traceback.print_exc()
-
-
-        if self.config.ec2_delete_after_test == True:
-            print ""
-            print "==================================================================="
-            print "Terminating Nodes"
-            self.ofs_network.terminateAllEC2Nodes()
+#         # Test runfunction group
+#         # TODO: Remove this.
+#         try:
+#             self.runFunctionGroup("OFSHadoopTest")
+#         except:
+#             "runFunctionGroup didn't work. Oh well"
+#             traceback.print_exc()
+# 
+# 
+#         if self.config.ec2_delete_after_test == True:
+#             print ""
+#             print "==================================================================="
+#             print "Terminating Nodes"
+#             self.ofs_network.terminateAllEC2Nodes()
 
     ##
     #
