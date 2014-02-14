@@ -295,12 +295,6 @@ int main(int argc, char **argv)
         return(0);
     }
 
-    monfd = startmonitor();
-    if (monfd == 0) {
-        gossip_err("Could not initialize pvfs2-monitor.\n");
-        return(1);
-    }
-
     server_job_id_array = (job_id_t *)
         malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
     server_completed_job_p_array = (void **)
@@ -510,6 +504,7 @@ static void remove_pidfile(void)
  *
  * Handles:
  * - backgrounding, redirecting logging
+ * - starting the background process module
  * - starting the security module
  * - initializing all the subsystems (BMI, Trove, etc.)
  * - setting up the state table used to map new requests to
@@ -586,6 +581,13 @@ static int server_initialize(
     {
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
+    }
+
+    /* start the background process monitor. */
+    monfd = startmonitor();
+    if (monfd == 0) {
+        gossip_err("Could not initialize pvfs2-monitor.\n");
+        return(1);
     }
 
     /* initialize the security module */

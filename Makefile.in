@@ -1210,7 +1210,7 @@ $(USERTOOLS): %: %.o $(LIBRARIES)
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
 
 # PVFS Background Processes (bgproc)
-bgproc: lib/libpvfs2-bgproc.a lib/libpvfs2-bgproc.so
+bgproc: lib/libpvfs2-bgproc.a lib/libpvfs2-bgproc.so $(BGPROCAPPS)
 
 lib/libpvfs2-bgproc.a: $(BGPROCOBJS)
 	$(Q) "  RANLIB	$@"

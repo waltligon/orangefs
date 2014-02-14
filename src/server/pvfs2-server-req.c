@@ -61,12 +61,12 @@ extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
 extern struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params;
 extern struct PINT_server_req_params pvfs2_mgmt_split_dirent_params;
 extern struct PINT_server_req_params pvfs2_tree_getattr_params;
+extern struct PINT_server_req_params pvfs2_mgmt_proc_start_params;
+extern struct PINT_server_req_params pvfs2_mgmt_proc_stop_params;
 #ifdef ENABLE_SECURITY_CERT
 extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
 #endif
-extern struct PINT_server_req_params pvfs2_mgmt_proc_start_params;
-extern struct PINT_server_req_params pvfs2_mgmt_proc_stop_params;
 
 
 /* table of incoming request types and associated parameters */
