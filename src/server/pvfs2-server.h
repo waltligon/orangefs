@@ -877,12 +877,14 @@ extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_revoke_cap_work_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_revoke_cap_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
@@ -897,7 +899,9 @@ extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_revoke_cap_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

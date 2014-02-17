@@ -43,8 +43,11 @@ int PINT_capcache_init(void);
 
 int PINT_capcache_finalize(void);
 
-seccache_entry_t * PINT_capcache_lookup(PVFS_capability *cap,
-                                        int *cap_flags);
+seccache_entry_t *PINT_capcache_lookup(PVFS_capability *cap,
+                                       int *cap_flags);
+
+seccache_entry_t *PINT_capcache_lookup_by_id(PVFS_capability_id cap_id,
+                                             int *cap_flags);
 
 int PINT_capcache_insert(PVFS_capability *cap,
                          int flags);

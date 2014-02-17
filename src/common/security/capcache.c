@@ -503,6 +503,7 @@ seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap,
 
     entry = PINT_seccache_lookup(capcache, &cmp_data);
 
+#ifdef ENABLE_REVOCATION
     if (entry == NULL)
     {
         /* check revocation list for revoked cap */
@@ -529,6 +530,7 @@ seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap,
             }
         }
     }
+#endif
 
     if (entry != NULL && cap_flags != NULL)
     {
@@ -537,6 +539,21 @@ seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap,
 
     return entry;
 }
+
+/* lookup capability by ID number */
+seccache_entry_t * PINT_capcache_lookup_by_id(PVFS_capability_id cap_id,
+                                              int *cap_flags)
+{
+    PVFS_capability cap;
+
+    /* use a null cap for the comparison */
+    PINT_null_capability(&cap);
+
+    cap.cap_id = cap_id;
+
+    return PINT_capcache_lookup(&cap, cap_flags);
+}
+
 
 /* insert entry for capability */
 int PINT_capcache_insert(PVFS_capability *cap, int flags)

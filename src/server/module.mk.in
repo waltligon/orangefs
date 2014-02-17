@@ -16,6 +16,7 @@ ifdef BUILD_SERVER
 		$(DIR)/batch-remove.c \
 		$(DIR)/crdirent.c \
 		$(DIR)/set-attr.c \
+		$(DIR)/revoke-cap.c \
 		$(DIR)/mkdir.c \
 		$(DIR)/get-attr.c \
 		$(DIR)/list-attr.c \

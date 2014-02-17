@@ -25,7 +25,8 @@ enum
     STATE_METAFILE = 7,
     STATE_SYMLINK = 8,
     STATE_DIRDATA = 9,
-    STATE_DIRECTORY = 10
+    STATE_DIRECTORY = 10,
+    STATE_REVOKE = 11
 };
 
 %%
@@ -59,6 +60,32 @@ nested machine pvfs2_set_dirdata_attr_work_sm
     }
 }
 
+nested machine pvfs2_set_attr_revoke_cap_sm
+{
+    state set_attr_revoke_cap_init
+    {
+        run setattr_revoke_cap_init;
+        default => set_attr_revoke_cap_setup_msgpair;
+    }
+
+    state set_attr_revoke_cap_setup_msgpair
+    {
+        run setattr_revoke_cap_setup_msgpair;
+        default => set_attr_revoke_cap_xfer_msgpair;
+    }
+
+    state set_attr_revoke_cap_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => set_attr_revoke_cap_cleanup;
+    }
+
+    state set_attr_revoke_cap_cleanup
+    {
+        run setattr_revoke_cap_cleanup;
+        default => return;
+    }
+}
 
 nested machine pvfs2_set_attr_work_sm
 {
@@ -110,6 +137,19 @@ nested machine pvfs2_set_attr_work_sm
     state setobj_attrib
     {
         run setattr_setobj_attribs;
+        default => check_revoke_cap;
+    }
+
+    state check_revoke_cap
+    {
+        run setattr_check_revoke_cap;
+        STATE_REVOKE => revoke_cap;
+        default => work_cleanup;
+    }
+
+    state revoke_cap
+    {
+        jump pvfs2_set_attr_revoke_cap_sm;
         default => work_cleanup;
     }
 
@@ -883,6 +923,96 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
         NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
+}
+
+/* determine whether capability revocation needed */
+static PINT_sm_action setattr_check_revoke_cap(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+#ifdef ENABLE_REVOCATION
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p;
+
+    /* do not process revocation if an error has occurred */
+    if (js_p->error_code < 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* TODO */
+    js_p->error_code = 0;
+
+    a_p = &s_op->req->u.setattr.attr;
+    if (a_p->mask & 
+        (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID|PVFS_ATTR_COMMON_PERM))
+    {
+        js_p->error_code = STATE_REVOKE;
+        /* TODO: gossip */
+    }
+
+#endif
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action setattr_revoke_cap_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* TODO */
+    js_p->error_code = 0;
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* setup TREE_REVOKE_CAP request */
+static PINT_sm_action setattr_revoke_cap_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability cap;
+    PVFS_capability_id cap_id = 0; /* TODO: temp */
+    int ret, num_servers = 0;
+    
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
+
+    /* TODO */
+    /* get a server-to-server cap with admin flag enabled */
+
+    PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
+        msg_p->req,
+        cap,
+        s_op->req->u.setattr.fs_id,
+        cap_id,
+        num_servers,
+        NULL, /* handle_array */
+        s_op->req->hints);
+
+    msg_p->fs_id = s_op->req->u.setattr.fs_id;
+    /* msg_p->handle = remote_dirdata_handles[0]; TODO */
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action setattr_revoke_cap_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
 }
 
 /*

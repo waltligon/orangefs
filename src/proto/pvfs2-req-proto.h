@@ -95,9 +95,11 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
+    PVFS_SERV_REVOKE_CAP = 50,
+    PVFS_SERV_TREE_REVOKE_CAP = 51,
 #ifdef ENABLE_SECURITY_CERT
-    PVFS_SERV_MGMT_GET_USER_CERT = 50,
-    PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+    PVFS_SERV_MGMT_GET_USER_CERT = 52,
+    PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 53,
 #endif
 
     /* leave this entry last */
@@ -461,7 +463,7 @@ do {                                                  \
 
 struct PVFS_servreq_tree_setattr
 {
-    PVFS_fs_id  fs_id;
+    PVFS_fs_id fs_id;
     PVFS_credential credential;
     PVFS_ds_type objtype;
     PVFS_object_attr attr;      /* new attributes */
@@ -480,7 +482,7 @@ endecode_fields_4a_struct(
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) + extra_size_PVFS_object_attr)
 
 #define PINT_SERVREQ_TREE_SETATTR_FILL(__req,                            \
-                                 __cap,                                \
+                                 __cap,                                  \
                                  __cred,                                 \
                                  __fsid,                                 \
                                  __objtype,                              \
@@ -499,6 +501,40 @@ do {                                                                     \
     PINT_copy_object_attr(&(__req).u.tree_setattr.attr, &(__attr));      \
     (__req).u.tree_setattr.num_servers = (__num_servers);                \
     (__req).u.tree_setattr.handle_array = (__handle_array);              \
+} while (0)
+
+struct PVFS_servreq_tree_revoke_cap
+{
+    PVFS_fs_id fs_id;
+    PVFS_capability_id cap_id;
+    uint32_t num_servers;
+    PVFS_handle *handle_array;
+};
+endecode_fields_2a_struct(
+    PVFS_servreq_tree_revoke_cap,
+    PVFS_fs_id, fs_id,
+    PVFS_capability_id, cap_id,
+    uint32_t, num_servers,
+    PVFS_handle, handle_array);
+#define extra_size_PVFS_servreq_tree_revoke_cap \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_TREE_REVOKE_CAP_FILL(__req,                         \
+                                    __cap,                               \
+                                    __fs_id,                             \
+                                    __cap_id,                            \
+                                    __num_servers,                       \
+                                    __handle_array,                      \
+                                    __hints)                             \
+do {                                                                     \
+    memset(&(__req), 0, sizeof(__req));                                  \
+    (__req).op = PVFS_SERV_TREE_REVOKE_CAP;                              \
+    (__req).hints = (__hints);                                           \
+    (__req).capability = (__cap);                                        \
+    (__req).u.tree_revoke_cap.fs_id = (__fs_id);                         \
+    (__req).u.tree_revoke_cap.cap_id = (__cap_id);                       \
+    (__req).u.tree_revoke_cap.num_servers = (__num_servers);             \
+    (__req).u.tree_revoke_cap.handle_array = (__handle_array);           \
 } while (0)
 
 struct PVFS_servreq_tree_remove
@@ -883,6 +919,33 @@ do {                                             \
     (__attr).objtype = (__objtype);              \
     (__attr).mask |= PVFS_ATTR_SYS_TYPE;         \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
+} while (0)
+
+/* revoke_cap *************************************************/
+/* - handles capability revocation */
+
+struct PVFS_servreq_revoke_cap
+{
+    PVFS_fs_id fs_id;
+    PVFS_capability_id cap_id;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_revoke_cap,
+    PVFS_fs_id, fs_id,
+    PVFS_capability_id, cap_id);
+
+#define PINT_SERVREQ_REVOKE_CAP_FILL(__req,      \
+                                     __cap,      \
+                                     __fs_id,    \
+                                     __cap_id,   \
+                                     __hints)    \
+do {                                             \
+    memset(&(__req), 0, sizeof(__req));          \
+    (__req).op = PVFS_SERV_REVOKE_CAP;           \
+    (__req).capability = (__cap);                \
+    (__req).hints = (__hints);                   \
+    (__req).u.revoke_cap.fs_id = (__fs_id);      \
+    (__req).u.revoke_cap.cap_id = (__cap_id);    \
 } while (0)
 
 /* lookup path ************************************************/
@@ -2545,6 +2608,7 @@ struct PVFS_server_req
         struct PVFS_servreq_io io;
         struct PVFS_servreq_getattr getattr;
         struct PVFS_servreq_setattr setattr;
+        struct PVFS_servreq_revoke_cap revoke_cap;
         struct PVFS_servreq_mkdir mkdir;
         struct PVFS_servreq_readdir readdir;
         struct PVFS_servreq_lookup_path lookup_path;
@@ -2574,6 +2638,7 @@ struct PVFS_server_req
         struct PVFS_servreq_tree_getattr tree_getattr;
         struct PVFS_servreq_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servreq_tree_setattr tree_setattr;
+        struct PVFS_servreq_tree_revoke_cap tree_revoke_cap;
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
