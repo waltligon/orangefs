@@ -130,11 +130,15 @@ int PINT_server_config_mgr_finalize(void)
 
 int PINT_server_config_mgr_reload_cached_config_interface(void)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL;
+/* V3 apparently nothing uses this so not sure why its here */
+#if 0
+    int i = 0;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
+#endif
 
     if (SC_MGR_INITIALIZED())
     {
@@ -150,6 +154,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
             return ret;
         }
 
+/* V3 apparently nothing uses this so not sure why its here */
+#if 0
         /*
          * reset the min_handle_recycle_timeout_in_sec since it's going
          * to be re-determined at this point
@@ -204,6 +210,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 #endif
             }
         }
+#endif
         gen_mutex_unlock(&s_server_config_mgr_mutex);
         ret = 0;
     }
@@ -269,7 +276,7 @@ int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
     }
     return ret;
 
-  add_failure:
+add_failure:
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_config_mgr_add_"
                  "config: add_failure reached\n");
 
@@ -349,7 +356,16 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
         gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret_config);
 
-        hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
+        if (fs_id != PVFS_FS_ID_NULL)
+        {
+            /* find based on fs_id */
+            hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
+        }
+        else
+        {
+            /* grab the first one - we should be on the server */
+            hash_link = qhash_first(s_fsid_to_config_table);
+        }
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -406,10 +422,13 @@ void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s
     }
 }
 
+/* V3 is this even used anywhere */
+#if 0
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
 {
     return s_min_handle_recycle_timeout_in_sec;
 }
+#endif
 
 static int hash_fsid(void *key, int table_size)
 {

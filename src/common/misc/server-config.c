@@ -44,6 +44,7 @@ static DOTCONF_CB(get_logstamp);
 static DOTCONF_CB(get_storage_path);
 static DOTCONF_CB(get_data_path);
 static DOTCONF_CB(get_meta_path);
+static DOTCONF_CB(get_config_path);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
 static DOTCONF_CB(enter_security_context);
@@ -75,7 +76,6 @@ static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
-static DOTCONF_CB(get_sidcache_file);
 static DOTCONF_CB(get_event_tracing);
 static DOTCONF_CB(get_filesystem_replication);
 static DOTCONF_CB(get_filesystem_collid);
@@ -673,14 +673,6 @@ static const configoption_t options[] =
     {"EnableTracing",ARG_STR, get_event_tracing, NULL,
             CTX_DEFAULTS| CTX_SERVER_OPTIONS, "no"},
 
-    /* The SID cache stores attributes and addresses for known servers
-     * indexed by SID.  This database is memory only, but is saved
-     * periodically to local storage and loaded when the server starts
-     * so we don't have to hunt for lots of servers at startup.
-     */
-    {"SIDCacheFile", ARG_STR, get_sidcache_file, NULL,
-            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs-sidcache"},
-
     /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
      * of each unexpected request.  This parameter specifies the number
@@ -740,6 +732,14 @@ static const configoption_t options[] =
      */
     {"MetadataStorageSpace", ARG_STR, get_meta_path, NULL,
             CTX_DEFAULTS | CTX_SERVER_OPTIONS, NULL},
+
+    /* The SID cache stores attributes and addresses for known servers
+     * indexed by SID.  This database is memory only, but is saved
+     * periodically to local storage and loaded when the server starts
+     * so we don't have to hunt for lots of servers at startup.
+     */
+    {"ConfigStorageSpace", ARG_STR, get_config_path, NULL,
+            CTX_DEFAULTS | CTX_SERVER_OPTIONS, "/tmp/pvfs-config.storage"},
 
      /* Current implementations of TCP on most systems use a window
       * size that is too small for almost all uses of pvfs.  
@@ -1189,7 +1189,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     {
         config_s->server_alias = strdup(server_alias_name);
     }
-    if (server_flag && !server_alias_name)
+    if ((server_flag & PARSE_CONFIG_SERVER) && !server_alias_name)
     {
         gossip_err("Server alias not provided for server config\n");
         return 1;
@@ -1215,7 +1215,10 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     /* read in the fs.conf defaults config file */
     config_s->configuration_context = CTX_GLOBAL;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
-                                     options, (void *)config_s, 
+                                     NULL,
+                                     0,
+                                     options,
+                                     (void *)config_s, 
                                      CASE_INSENSITIVE);
     if (!configfile)
     {
@@ -1234,6 +1237,17 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     }
     PINT_dotconf_cleanup(configfile);
 
+    /* only the first config file must pass all of the remaining checks
+     * others are either partial configs or updates to dynamic parts of
+     * the config.  The issues addressed in these checks should not
+     * change after the initial load
+     */
+    if (!(server_flag & PARSE_CONFIG_INIT))
+    {
+        return 1;
+    }
+
+    /* set up reference to local server for client */
     if (server_alias_name) 
     {
         struct host_alias_s *halias;
@@ -1242,7 +1256,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
                                               &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
-            if (server_flag)
+            if (server_flag & PARSE_CONFIG_SERVER)
             {
                 gossip_err("Configuration file error. "
                            "No host ID specified for alias %s.\n",
@@ -1257,7 +1271,8 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         }
     }
 
-    if (server_flag && !config_s->data_path)
+    /* check for errors */
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
                    "No data storage path specified for alias %s.\n",
@@ -1265,7 +1280,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         return 1;
     }
 
-    if (server_flag && !config_s->meta_path)
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->meta_path)
     {
         gossip_err("Configuration file error. "
                    "No metadata storage path specified for alias %s.\n",
@@ -1298,13 +1313,13 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     }
 
 #ifdef ENABLE_SECURITY_KEY
-    if (server_flag && !config_s->keystore_path)
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->keystore_path)
     {
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
 
-    if (server_flag && !config_s->serverkey_path)
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
@@ -1313,7 +1328,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
 #endif /* ENABLE_SECURITY */
 
 #ifdef ENABLE_SECURITY_CERT
-    if (server_flag && !config_s->ca_path)
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->ca_path)
     {
         gossip_err("Configuration file error. No CA certificate path "
                    "specified.\n");
@@ -1507,10 +1522,11 @@ DOTCONF_CB(exit_serverdef_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_SERVER;
     /* end defining a new server */
     if (!config_s->new_host)
     {
-        /* gossip_error("missing host definition"); */
+        return "Error: missing host definition\n";
     }
     else
     {
@@ -1526,14 +1542,12 @@ DOTCONF_CB(exit_serverdef_context)
                          &config_s->new_host->host_sid);
 
         SID_add(&config_s->new_host->host_sid,
-                0,
-                config_s->new_host->bmi_address);
+                0, /* internal BMI ID */
+                config_s->new_host->bmi_address,
+                config_s->new_host->attributes);
 
         SID_update_type(&config_s->new_host->host_sid,
                         config_s->new_host->server_type);
-
-        SID_update_attributes(&config_s->new_host->host_sid,
-                              config_s->new_host->attributes);
 
         /* add to config list of aliases */
         if (!config_s->host_aliases)
@@ -1546,7 +1560,6 @@ DOTCONF_CB(exit_serverdef_context)
 
         config_s->new_host = NULL;
     }
-    config_s->configuration_context = CTX_SERVER;
     return NULL;
 }
 
@@ -1966,7 +1979,7 @@ DOTCONF_CB(get_event_logging_list)
     return NULL;
 }
 
-DOTCONF_CB(get_sidcache_file)
+DOTCONF_CB(get_config_path)
 {
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
@@ -1976,11 +1989,11 @@ DOTCONF_CB(get_sidcache_file)
     {
         return NULL;
     }
-    if (config_s->sidcache_file)
+    if (config_s->config_path)
     {
-        free(config_s->sidcache_file);
+        free(config_s->config_path);
     }
-    config_s->sidcache_file = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->config_path = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
@@ -4248,18 +4261,20 @@ char *PINT_config_get_host_addr_ptr(struct server_configuration_s *config_s,
  *
  * Returns:  char * (alias) on success; NULL on failure
  *
- * Synopsis: retrieve the alias matching the specified bmi_address
+ * Synopsis: retrieve the alias matching the specified bmi_url
+ *
+ * This is a linear search, should probably be a hash table
  *   
  */
 char *PINT_config_get_host_alias_ptr(
         struct server_configuration_s *config_s,
-        char *bmi_address)
+        char *bmi_url)
 {
     char *ret = (char *)0;
     PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias = NULL;
 
-    if (config_s && bmi_address)
+    if (config_s && bmi_url)
     {
         cur = config_s->host_aliases;
         while(cur)
@@ -4272,7 +4287,7 @@ char *PINT_config_get_host_alias_ptr(
             assert(cur_alias->host_alias);
             assert(cur_alias->bmi_address);
 
-            if (strcmp(cur_alias->bmi_address,bmi_address) == 0)
+            if (strcmp(cur_alias->bmi_address, bmi_url) == 0)
             {
                 ret = cur_alias->host_alias;
                 break;

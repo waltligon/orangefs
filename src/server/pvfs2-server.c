@@ -222,10 +222,23 @@ int main(int argc, char **argv)
                     "PVFS2 Server on node %s version %s starting...\n",
                     s_server_options.server_alias, PVFS2_VERSION);
 
-    /* retrieve remote config file if needed 
-     * may set fs_conf to a temp file 
+    /* read the local config file first to get initial settings */
+    /* code to handle older two config file format */
+    ret = PINT_parse_config(&server_config,
+                            fs_conf,
+                            s_server_options.server_alias,
+                            PARSE_CONFIG_SERVER | PARSE_CONFIG_INIT);
+    if (ret)
+    {
+        gossip_err("Error: Please check your config files.\n");
+        gossip_err("Error: Server aborting.\n");
+        ret = -PVFS_EINVAL;
+        goto server_shutdown;
+    }
+
+    /* retrieve aux and remote config files as needed 
      */
-    if (1)
+    if (0)
     {
         ret = server_get_remote_config(&server_status_flag,
                                        &server_config);
@@ -238,21 +251,6 @@ int main(int argc, char **argv)
         }
         /* copy config to a temp file for possible reload */
         /* fs_conf = server_config->something; */
-    }
-    else
-    {
-        /* code to handle older two config file format */
-        ret = PINT_parse_config(&server_config,
-                                fs_conf,
-                                s_server_options.server_alias,
-                                1);
-        if (ret)
-        {
-            gossip_err("Error: Please check your config files.\n");
-            gossip_err("Error: Server aborting.\n");
-            ret = -PVFS_EINVAL;
-            goto server_shutdown;
-        }
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
@@ -1599,8 +1597,10 @@ static void reload_config(void)
     gossip_debug(GOSSIP_SERVER_DEBUG, "Reloading configuration %s\n",
                  fs_conf);
     /* We received a SIGHUP. Update configuration in place */
-    if (PINT_parse_config(&sighup_server_config, fs_conf,
-                          s_server_options.server_alias, 1) < 0)
+    if (PINT_parse_config(&sighup_server_config,
+                          fs_conf,
+                          s_server_options.server_alias,
+                          PARSE_CONFIG_SERVER) < 0)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");

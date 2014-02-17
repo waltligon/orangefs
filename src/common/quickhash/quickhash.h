@@ -65,18 +65,18 @@ struct qhash_table
  * returns pointer to table on success, NULL on failure
  */
 static inline struct qhash_table *qhash_init(
-    int (*compare) (void *key,
-		    struct qhash_head * link),
-    int (*hash) (void *key,
-		 int table_size),
-    int table_size)
+                                  int (*compare) (void *key,
+		                                  struct qhash_head *link),
+                                  int (*hash) (void *key,
+		                               int table_size),
+                                  int table_size)
 {
     int i = 0;
     struct qhash_table *new_table = NULL;
 
     /* create struct to contain table information */
     new_table = (struct qhash_table *)
-        qhash_malloc(sizeof(struct qhash_table));
+                    qhash_malloc(sizeof(struct qhash_table));
     if (!new_table)
     {
 	return (NULL);
@@ -89,7 +89,7 @@ static inline struct qhash_table *qhash_init(
 
     /* create array for actual table */
     new_table->array = (struct qhash_head *)
-	qhash_malloc(sizeof(struct qhash_head) * table_size);
+	            qhash_malloc(sizeof(struct qhash_head) * table_size);
     if (!new_table->array)
     {
 	qhash_free(new_table);
@@ -113,8 +113,7 @@ static inline struct qhash_table *qhash_init(
  *
  * no return value
  */
-static inline void qhash_finalize(
-    struct qhash_table *old_table)
+static inline void qhash_finalize(struct qhash_table *old_table)
 {
     qhash_free(old_table->array);
     qhash_free(old_table);
@@ -127,10 +126,9 @@ static inline void qhash_finalize(
  *
  * no return value
  */
-static inline void qhash_add(
-    struct qhash_table *table,
-    void *key,
-    struct qhash_head *link)
+static inline void qhash_add(struct qhash_table *table,
+                             void *key,
+                             struct qhash_head *link)
 {
     int index = 0;
 
@@ -145,6 +143,30 @@ static inline void qhash_add(
     return;
 }
 
+/* qhash_first()
+ *
+ * searches for the first link in the hash table
+ * used on server where there is only one config in the mgr table
+ *
+ * returns pointer to link on success, NULL on failure (or item
+ * not found)
+ */
+static inline struct qhash_head *qhash_first(struct qhash_table *table)
+{
+    int index = 0;
+
+    qhash_lock(&table->lock);
+    for (index = 0; index < table->table_size; index++)
+    {
+        if (qlist_empty(&(table->array[index])))
+        {
+            return &(table->array[index]);
+        }
+    }
+    qhash_unlock(&table->lock);
+    return NULL;
+}
+
 /* qhash_search()
  *
  * searches for a link in the hash table
@@ -153,9 +175,8 @@ static inline void qhash_add(
  * returns pointer to link on success, NULL on failure (or item
  * not found)
  */
-static inline struct qhash_head *qhash_search(
-    struct qhash_table *table,
-    void *key)
+static inline struct qhash_head *qhash_search(struct qhash_table *table,
+                                              void *key)
 {
     int index = 0;
     struct qhash_head *tmp_link = NULL;
@@ -186,8 +207,8 @@ static inline struct qhash_head *qhash_search(
  * not found)
  */
 static inline struct qhash_head *qhash_search_at_index(
-    struct qhash_table *table,
-    int index)
+                                                 struct qhash_table *table,
+                                                 int index)
 {
     struct qhash_head *tmp_link = NULL;
 
@@ -215,8 +236,8 @@ static inline struct qhash_head *qhash_search_at_index(
  * not found).  On success, link is removed from hashtable.
  */
 static inline struct qhash_head *qhash_search_and_remove(
-    struct qhash_table *table,
-    void *key)
+                                                  struct qhash_table *table,
+                                                  void *key)
 {
     int index = 0;
     struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
@@ -248,8 +269,8 @@ static inline struct qhash_head *qhash_search_and_remove(
  * not found).  On success, link is removed from hashtable.
  */
 static inline struct qhash_head *qhash_search_and_remove_at_index(
-    struct qhash_table *table,
-    int index)
+                                                  struct qhash_table *table,
+                                                  int index)
 {
     struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
 

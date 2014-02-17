@@ -164,7 +164,7 @@ typedef struct server_configuration_s
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
 
-    char *sidcache_file;            /* name of the file to save sidcache */
+    char *config_path;              /* name of the file to save sidcache */
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
     char *fs_config_filename;       /* the fs.conf file name            */
@@ -253,6 +253,12 @@ typedef struct server_configuration_s
     int32_t tree_width;
     int32_t tree_threshold;
 } server_configuration_t;
+
+enum
+{
+    PARSE_CONFIG_SERVER = (1 << 0),
+    PARSE_CONFIG_INIT   = (1 << 1)
+};
 
 int PINT_parse_config(
         struct server_configuration_s *config_s,

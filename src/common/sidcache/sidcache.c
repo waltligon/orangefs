@@ -14,9 +14,9 @@
 #include "pvfs2-debug.h"
 #include "pvfs3-handle.h"
 #include "sidcache.h"
-#if 0
+#include "pvfs2-server.h"
+#include "server-config.h"
 #include "server-config-mgr.h"
-#endif
 
 /* Length of string representation of PVFS_SID */
 /* #define SID_STR_LEN (37) in sidcache.h */
@@ -1294,6 +1294,10 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
                                    DB_SET);
 
     /* halt on error or DB_NOTFOUND */
+    if (ret == 0)
+    {
+        fprintf(outpfile, "\t\tType ");
+    }
     while(ret == 0)
     {
         /* write type to file */
@@ -1305,6 +1309,7 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
                                        DB_NEXT);
     }
 
+    fprintf(outpfile, "\n");
     /* Normal return should be DB_NOTFOUND, 0 is no error */
     if (ret != 0 && ret != DB_NOTFOUND)
     {
@@ -1330,10 +1335,13 @@ int SID_cache_store(DBC *cursorp,
     int ret = 0;                   /* Function return value */
     int i = 0;                     /* Loop index variable */
     DBT key, data;          	   /* Database variables */
+/* V3 old version */
+#if 0
     char *ATTRS = "ATTRS: ";       /* Tag for the number of attributes on */
                                    /*     the first line of dump file */
     char *SIDS = "SIDS: ";         /* Tag for the number of sids on the */
                                    /*     first line of the dump file */
+#endif
     char tmp_sid_str[SID_STR_LEN]; /* Temporary string to hold the string */
                                    /*     representation of the sids */
     PVFS_SID tmp_sid;              /* Temporary SID to hold contents of */
@@ -1342,9 +1350,13 @@ int SID_cache_store(DBC *cursorp,
                                    /*     hold contents of database */
     PVFS_SID sid_buffer;           /* Temporary SID */
     uint32_t db_flags;
+    struct server_configuration_s *config_s = NULL;
 
     /* First Write SID File Header */
+    fprintf(outpfile, "<ServerDefines>\n");
 
+/* V3 old version */
+#if 0
     /* Write the number of attributes in
      * the cache to the dump file's first line 
      */
@@ -1366,10 +1378,11 @@ int SID_cache_store(DBC *cursorp,
        fprintf(outpfile, "%s ", SID_attr_map[i]);
     }
     fprintf(outpfile, "%c", '\n');
+#endif
 
     /* Now Write SID Records */
 
-    /* Initializing the database variables */
+    /* Initialize the database variables */
     SID_zero_dbt(&key, &data, NULL);
 
     /* this routine can either output a whole db or a list of SIDs
@@ -1386,29 +1399,56 @@ int SID_cache_store(DBC *cursorp,
         db_flags = DB_FIRST;
     }
 
-    /* Iterating over the database to get the sids */
+    config_s = PINT_server_config_mgr_get_config(PVFS_FS_ID_NULL);
+
+    /* Iterate over the database to get the sids */
     while(cursorp->get(cursorp, &key, &data, db_flags) == 0)
     {
+        char *alias;
         SID_cacheval_unpack(&tmp_sid_attrs, &data);
     
         PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
         PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
 
+        /* this is a sequential search - probably should make hash tbl */
+        alias = PINT_config_get_host_alias_ptr(config_s, tmp_sid_attrs->url);
+
+        fprintf(outpfile,"\t<ServerDef>\n");
+        if (alias)
+        {
+            fprintf(outpfile,"\t\tAlias %s\n", alias);
+        }
+        fprintf(outpfile,"\t\tSID %s\n", tmp_sid_str);
+        fprintf(outpfile,"\t\tAddress %s\n", tmp_sid_attrs->url);
+
+/* V3 old version */
+#if 0
         /* Write SID and address info */
         fprintf(outpfile, "%s ", tmp_sid_str);
         fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
         fprintf(outpfile, "%s ", tmp_sid_attrs->url);
+#endif
 
-        /* Writing the sids and their attributes to the dump file */
+        /* Write the user attributes to the dump file */
+        fprintf(outpfile,"\t\tAttributes ");
         for(i = 0; i < SID_NUM_ATTR; i++)
         {
+            
+            fprintf(outpfile,
+                    "%s=%d ",
+                    SID_attr_map[i],
+                    tmp_sid_attrs->attr[i]);      
+/* V3 old version */
+#if 0
             fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
+#endif
         }
+        fprintf(outpfile,"\n"); /* end of attributes */
 
         /* Write system attributes for the server */
         SID_type_store(&tmp_sid, outpfile);
 
-        fprintf(outpfile, "\n");
+        fprintf(outpfile, "\t</ServerDef>\n");
 
         SID_cacheval_free(&tmp_sid_attrs);
 
@@ -1426,6 +1466,8 @@ int SID_cache_store(DBC *cursorp,
         }
     }
 
+    /* End of servers to write to file */
+    fprintf(outpfile, "</ServerDefines>\n");
     return(ret);
 }
 
@@ -2397,9 +2439,14 @@ errorout:
 }
 
 /* Add one entry to the SID cache - does not add attributes */
-int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
+/* should we add a mechanism to add attributes? */
+int SID_add(const PVFS_SID *sid,
+            PVFS_BMI_addr_t bmi_addr,
+            const char *url,
+            int attributes[])
 {
     int ret = 0;
+    int i = 0;
     SID_cacheval_t *cval;
 
     cval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) + strlen(url) + 1);
@@ -2410,7 +2457,23 @@ int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
     /* load up the cval */
     memset(&cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
     cval->bmi_addr = bmi_addr;
+    /* if bmi_addr is zero, should be register with BMI? */
     strcpy(cval->url, url);
+    if (attributes)
+    {
+        /* this assumes we are adding a new record so we are not
+         * overwriting existing attribtes
+         */
+        for (i = 0; i < SID_NUM_ATTR; i++)
+        {
+            cval->attr[i] = attributes[i];
+        }
+    }
+    /* should we check for an existing server?
+     * at this point if a server already exists this should fail and we
+     * just move on to the next one - might want to do some kind of
+     * update, not sure
+     */
     ret = SID_cache_add_server(SID_db, sid, cval, &sids_in_cache);
     free(cval);
     return ret;
