@@ -970,8 +970,8 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability cap;
-    PVFS_capability_id cap_id = 0; /* TODO: temp */
+    PVFS_capability cap, *rev_cap;
+    PVFS_handle cap_handle[1];
     int ret, num_servers = 0;
     
     PINT_msgpair_init(&s_op->msgarray_op);
@@ -979,19 +979,31 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
 
     /* TODO */
-    /* get a server-to-server cap with admin flag enabled */
+    /* get a server-to-server cap */
+    cap_handle[0] = s_op->req->u.setattr.handle;
+    ret = PINT_server_to_server_capability(&cap, s_op->req->u.setattr.fs_id,
+                                           1, cap_handle);
+    if (ret != 0)
+    {
+        gossip_err("%s: could not generate server-to-server cap (%d)\n",
+                   __func__, ret);
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* locate the capability to be revoked */
+    ret = PINT_capcache_lookup_by_handle(cap_handle[0], &rev_cap);
 
     PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
         msg_p->req,
         cap,
         s_op->req->u.setattr.fs_id,
-        cap_id,
-        num_servers,
-        NULL, /* handle_array */
+        rev_cap->cap_id,
+        s_op->attr.u.meta.dfile_count, /* TODO */
+        s_op->attr.u.meta.dfile_array, /* TODO */
         s_op->req->hints);
 
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
-    /* msg_p->handle = remote_dirdata_handles[0]; TODO */
+    msg_p->handle = s_op->attr.u.meta.dfile_array[0]; /* TODO */
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
@@ -1012,6 +1024,10 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
 static PINT_sm_action setattr_revoke_cap_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_cleanup_capability(s_op->msgarray_op.msgpair.req.capability);
+
     return SM_ACTION_COMPLETE;
 }
 

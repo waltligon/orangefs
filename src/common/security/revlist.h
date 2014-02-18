@@ -40,8 +40,7 @@ seccache_entry_t *PINT_revlist_lookup(const char *server,
 									  PVFS_capability_id cap_id);
 
 int PINT_revlist_insert(const char *server, 
-                        PVFS_capability_id cap_id,
-                        PVFS_time expiration);
+                        PVFS_capability_id cap_id);
 
 int PINT_revlist_remove(seccache_entry_t *entry);
 

@@ -36,6 +36,13 @@ machine pvfs2_revoke_cap_sm
     state init
     {
         run revoke_cap_init;
+        success => prelude;
+        default => cleanup;
+    }
+
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
         success => do_work;
         default => cleanup;
     }
@@ -43,7 +50,7 @@ machine pvfs2_revoke_cap_sm
     state do_work
     {
         jump pvfs2_revoke_cap_work_sm;
-        default => terminate;
+        default => cleanup;
     }
 
     state cleanup
@@ -72,6 +79,14 @@ static PINT_sm_action revoke_cap_init(struct PINT_smcb *smcb,
 static PINT_sm_action revoke_cap_set_revocation(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
+#ifdef ENABLE_REVOCATION
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    const char *server = ""; /* TODO */
+
+    js_p->error_code = PINT_capcache_revoke_cap(server,
+        s_op->req->u.revoke_cap.cap_id);
+#endif
+
     return SM_ACTION_COMPLETE;
 }
 

@@ -61,8 +61,13 @@ static seccache_methods_t capcache_methods = {
 
 /*** capability cache helper functions ***/
 #ifdef ENABLE_SECURITY_MODE
-static int PINT_capcache_quick_cmp(void *key,
+static int capcache_quick_cmp(void *key,
                                    void *entry);
+#endif
+
+#ifdef ENABLE_REVOCATION
+static int capcache_handle_cmp(void *key,
+                               void *entry);
 #endif
 
 /*** capability cache methods ***/
@@ -253,8 +258,8 @@ static void PINT_capcache_debug(const char *prefix,
  * capability fields are equivalent. Returns nonzero otherwise.
  */
 #ifdef ENABLE_SECURITY_MODE
-static int PINT_capcache_quick_cmp(void *key,
-                                   void *entry)
+static int capcache_quick_cmp(void *key,
+                              void *entry)
 {
     PVFS_capability *kcap, *ecap;
     seccache_entry_t *pentry;
@@ -295,14 +300,14 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
     index = capcache->methods.get_index(&cmp_data, capcache->hash_limit);
 
     PINT_seccache_lock(capcache);
-    
+     
     /* iterate over the hash table chain at the calculated index until a match
      * is found.
      */
     curr_entry = (seccache_entry_t *) PINT_llist_search(
         capcache->hash_table[index],
         &cmp_data,
-        &PINT_capcache_quick_cmp);
+        &capcache_quick_cmp);
 
     /* release the lock */
     PINT_seccache_unlock(capcache);
@@ -335,124 +340,6 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
 }
 #endif
 
-/** PINT_capcache_id_cmp
- * Compares two PVFS_capability structures. Returns 0 if the
- * capability IDs are equal. Returns nonzero otherwise.
- */
-#if 0
-
-/* TODO: remove */
-
-static int PINT_capcache_id_cmp(void * data,
-                                void * entry)
-{
-    PVFS_capability *kcap, *ecap;
-    seccache_entry_t *pentry;
-
-    pentry = (seccache_entry_t *) entry;
-
-    /* ignore chain end marker */
-    if (pentry->data == NULL)
-    {
-        return 1;
-    }
-
-    ecap = CAPCACHE_ENTRY_CAP(pentry);
-    kcap = CAPCACHE_DATA_CAP(data);
-
-    return ecap->cap_id != kcap->cap_id;
-}
-
-/** PINT_capcache_check_revocation
- *  Checks whether specified capability is revoked
- * 
- *  Returns 0 if not revoked (or not in cache)
- *  Returns CAPCACHE_CAP_REVOKED (1) if revoked
- *  Returns negative PVFS_error on error
- */ 
-int PINT_capcache_check_revocation(PVFS_capability *cap)
-{
-    seccache_entry_t *curr_entry = NULL;
-    capcache_data_t cmp_data, *cap_data;
-    uint16_t index = 0;
-    int ret, rev_flag = 0;
-
-    /* TODO: last received revocation time comparison */
-
-    /* fill in entry for comparison */
-    cmp_entry.cap = cap;
-    cmp_entry.flags = 0;
-
-    index = capcache->methods.get_index(&cmp_data, capcache->hash_limit);
-
-    PINT_seccache_lock(capcache);
-
-    /* iterate over the hash table chain at the calculated index until a match
-     * is found.
-     */
-    curr_entry = (seccache_entry_t *) PINT_llist_search(
-        capcache->hash_table[index],
-        &cmp_data,
-        &PINT_capcache_id_cmp);
-
-    if (curr_entry == NULL)
-    {
-        /* check revocation list for match */
-        ret = PINT_revlist_lookup(cap->issuer, cap->cap_id);
-        if (ret == PINT_REVLIST_FOUND)
-        {
-            gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: revocation list entry "
-                         "for cap %llu found\n", __func__, cap->cap_id);
-
-            /* cap will be inserted into the cache with the revoked
-               flag set */
-            rev_flag = 1;
-
-            /* remove revocation list entry */
-            PINT_revlist_remove(cap->cap_id);
-        }
-        else if (ret < 0)
-        {
-            /* error */
-            gossip_err("Warning: %s: revocation list search returned %d\n",
-                         __func__, ret);
-        }
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry for cap %llu found\n",
-                     __func__, llu(cap->cap_id));
-    }
-
-    /* release the lock */
-    PINT_seccache_unlock(capcache);
-
-    if (rev_flag)
-    {
-        /* insert revoked capability */
-        ret = PINT_capcache_insert(cap, CAPCACHE_REVOKED);
-        if (ret < 0)
-        {
-            gossip_err("Warning: could not insert revoked capability:\n");
-            PINT_debug_capability(cap, "Current");
-        }
-    }
-
-    /* get revocation */
-    if (curr_entry)
-    {
-        cap_data = (capcache_data_t *) curr_entry->data;
-        return (cap_data->flags & CAPCACHE_REVOKED) ? 1 : 0;
-    }
-    else if (rev_flag)
-    {
-        return 1;
-    }
-
-    return 0;
-}
-
-#endif /* 0 */
 
 /** PINT_capcache_init
  * Initializes the capability cache.
@@ -490,73 +377,107 @@ int PINT_capcache_finalize(void)
     return 0;
 }
 
-/* lookup entry using capability */
-seccache_entry_t * PINT_capcache_lookup(PVFS_capability * cap,
-                                        int *cap_flags)
+/* lookup entry using capability
+ *    returns:
+ *       CAPCACHE_LOOKUP_NOT_FOUND (0)
+ *       CAPCACHE_LOOKUP_FOUND (1)
+ *       CAPCACHE_LOOKUP_REVOKED (2)
+ *       or -PVFS_error on error
+ */
+static int capcache_lookup_internal(PVFS_capability *cap,
+                                    seccache_entry_t **entry,
+                                    int *cap_flags)
 {
     capcache_data_t cmp_data;
-    seccache_entry_t *entry, *rev_entry;
-    int ret;
+    seccache_entry_t *int_entry, *rev_entry;
+    int ret = 0, int_flags = 0;
 
     cmp_data.cap = cap;
     cmp_data.flags = 0;
 
-    entry = PINT_seccache_lookup(capcache, &cmp_data);
+    int_entry = PINT_seccache_lookup(capcache, &cmp_data);
+    if (int_entry != NULL)
+    {
+        int_flags = ((capcache_data_t *) int_entry->data)->flags;
+    }
 
 #ifdef ENABLE_REVOCATION
-    if (entry == NULL)
+    if (int_entry == NULL)
     {
-        /* check revocation list for revoked cap */
+        /* check revocation list for revoked cap */        
         rev_entry = PINT_revlist_lookup(cap->issuer, cap->cap_id);
         if (rev_entry != NULL)
         {
-            /* cache capability with revoked flag */
-            ret = PINT_capcache_insert(cap, CAPCACHE_REVOKED);
-            if (ret == 0)
+            if (!PINT_capability_is_null(cap))
             {
-                /* set entry to one just inserted */
-                entry = PINT_seccache_lookup(capcache, &cmp_data);
-
-                /* remove revocation list entry */
-                ret = PINT_revlist_remove(rev_entry);
-                if (ret != 0)
+                /* cache capability with revoked flag */
+                ret = PINT_capcache_insert(cap, CAPCACHE_REVOKED);
+                if (ret == 0)
                 {
-                    PVFS_perror_gossip("Error removing revocation list entry", ret);
-                }                
+                    /* set int_entry to one just inserted */
+                    int_entry = PINT_seccache_lookup(capcache, &cmp_data);
+                    if (int_entry == NULL)
+                    {
+                        gossip_err("%s: int_entry NULL\n", __func__);
+                        ret = -PVFS_EINVAL;
+                        return ret;
+                    }
+    
+                    /* remove revocation list entry */
+                    ret = PINT_revlist_remove(rev_entry);
+                    if (ret != 0)
+                    {
+                        PVFS_perror_gossip("Error removing revocation list entry", ret);
+                    }
+                }
+                else
+                {
+                    PVFS_perror_gossip("Error inserting revoked capability", ret);
+                }
             }
-            else
-            {
-                PVFS_perror_gossip("Error inserting revoked capability", ret);
-            }
+            int_flags = CAPCACHE_REVOKED;            
         }
     }
 #endif
 
-    if (entry != NULL && cap_flags != NULL)
+    /* determine return code */
+    if (ret == 0)
     {
-        *cap_flags = ((capcache_data_t *) entry->data)->flags;
+        if (int_flags & CAPCACHE_REVOKED)
+        {
+            ret = CAPCACHE_LOOKUP_REVOKED;
+        }
+        else if (int_entry != NULL)
+        {
+            ret = CAPCACHE_LOOKUP_FOUND;
+        }
+        else
+        {
+            ret = CAPCACHE_LOOKUP_NOT_FOUND;
+        }
     }
 
-    return entry;
+    if (cap_flags != NULL)
+    {
+        *cap_flags = int_flags;
+    }
+
+    if (entry != NULL)
+    {
+        *entry = int_entry;
+    }
+
+    return ret;
 }
 
-/* lookup capability by ID number */
-seccache_entry_t * PINT_capcache_lookup_by_id(PVFS_capability_id cap_id,
-                                              int *cap_flags)
+int PINT_capcache_lookup(PVFS_capability *cap,
+                         int *cap_flags)
 {
-    PVFS_capability cap;
-
-    /* use a null cap for the comparison */
-    PINT_null_capability(&cap);
-
-    cap.cap_id = cap_id;
-
-    return PINT_capcache_lookup(&cap, cap_flags);
+    return capcache_lookup_internal(cap, NULL, cap_flags);
 }
-
 
 /* insert entry for capability */
-int PINT_capcache_insert(PVFS_capability *cap, int flags)
+int PINT_capcache_insert(PVFS_capability *cap, int cap_flags)
 {
     PVFS_capability *cachecap;
     capcache_data_t *data;
@@ -581,7 +502,7 @@ int PINT_capcache_insert(PVFS_capability *cap, int flags)
     if (ret == 0)
     {
         data->cap = cachecap;
-        data->flags = flags;
+        data->flags = cap_flags;
 
         ret = PINT_seccache_insert(capcache, data, sizeof(capcache_data_t));
         if (ret == 0) {
@@ -597,5 +518,131 @@ int PINT_capcache_insert(PVFS_capability *cap, int flags)
 
     return ret;
 }
+
+#ifdef ENABLE_REVOCATION
+
+/** capcache_handle_cmp
+ *  Determine whether handle is covered by capability
+ */
+static int capcache_handle_cmp(void *key, 
+                               void *entry)
+{
+    PVFS_handle handle = *((PVFS_handle *) key);
+    seccache_entry_t *pentry = (seccache_entry_t *) entry;
+    PVFS_capability *cap = NULL;
+    int i;
+
+    /* ignore chain end marker */
+    if (pentry->data == NULL)
+    {
+        return 1;
+    }
+
+    cap = CAPCACHE_ENTRY_CAP(pentry);
+    
+    for (i = 0; i < cap->num_handles; i++)
+    {
+        if (cap->handle_array[i] == handle)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+/*** TODO ***/
+int PINT_capcache_lookup_by_handle(PVFS_handle handle,
+                                   PVFS_capability **cap)
+{
+    seccache_entry_t *curr_entry = NULL;
+    uint16_t index = 0;
+    PVFS_capability *curr_cap;
+
+    index = capcache->methods.get_index(&cmp_data, capcache->hash_limit);
+
+    PINT_seccache_lock(capcache);
+
+    /* iterate over the hash table chain at the calculated index until a match
+     * is found.
+     */
+    curr_entry = (seccache_entry_t *) PINT_llist_search(
+        capcache->hash_table[index],
+        &cmp_data,
+        &capcache_quick_cmp);
+
+    /* release the lock */
+    PINT_seccache_unlock(capcache);
+
+    if (curr_entry != NULL)
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry found\n",
+                     __func__);
+    }
+    else
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+
+/* revoke a capability or create an entry on the revocation list */
+int PINT_capcache_revoke_cap(const char *server,
+                             PVFS_capability_id cap_id)
+{
+    int ret = 0, cap_flags;
+    seccache_entry_t *entry;
+    PVFS_capability null_cap, *cap, *copy_cap;
+
+    /* use null capability for comparison */
+    PINT_null_capability(&null_cap);
+    null_cap.cap_id = cap_id;
+
+    /* lookup specified cap id */
+    ret = capcache_lookup_internal(&null_cap, &entry, &cap_flags);
+    if (ret != CAPCACHE_LOOKUP_REVOKED)
+    {
+        /* already revoked -- done */
+        return 0;
+    }
+    if (entry != NULL)
+    {
+        /* copy the capability */
+        cap = CAPCACHE_ENTRY_CAP(entry);
+        copy_cap = PINT_dup_capability(cap);
+        if (copy_cap == NULL)
+        {
+            return -PVFS_ENOMEM;
+        }
+        /* remove current capability entry */
+        PINT_seccache_remove(capcache, entry);
+
+        /* remove valid and set revoked flag */
+        cap_flags = ((capcache_data_t *) entry->data)->flags;
+        cap_flags &= ~CAPCACHE_VALID;
+        cap_flags |= CAPCACHE_REVOKED;
+
+        /* insert revoked capability */
+        ret = PINT_capcache_insert(copy_cap, cap_flags);
+    }
+    else
+    {
+        /* store cap_id in revocation list */
+        ret = PINT_revlist_insert(server, cap_id);
+    }
+
+    PINT_cleanup_capability(&null_cap);
+
+    if (ret != 0)
+    {
+        /* TODO: gossip */
+    }
+
+    return ret;
+}
+
+#endif /* ENABLE_REVOCATION */
 
 #endif /* ENABLE_CAPCACHE */

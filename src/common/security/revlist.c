@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "revlist.h"
+#include "server-config.h"
 #include "security-util.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
@@ -25,11 +26,12 @@
 seccache_t *revlist = NULL;
 
 /* revocation list declarations */
-
 #define REVLIST_ENTRY_DATA(entry) \
     ((revocation_data_t *) ((seccache_entry_t *) entry)->data)
 
 #define REVLIST_DATA(data)    ((revocation_data_t *) data)
+
+#define REVLIST_TIMEOUT    10
 
 /* revocation list methods */
 static void PINT_revlist_set_expired(seccache_entry_t *entry,
@@ -168,7 +170,6 @@ static void PINT_revlist_debug(const char *prefix,
  */
 int PINT_revlist_init(void)
 {
-
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing revocation list...\n");
 
     revlist = PINT_seccache_new("Revocation", &revlist_methods, 0);
@@ -176,6 +177,8 @@ int PINT_revlist_init(void)
     {
         return -PVFS_ENOMEM;
     }
+
+    PINT_seccache_set(revlist, SECCACHE_TIMEOUT, REVLIST_TIMEOUT);
 
     return 0;
 }
@@ -220,8 +223,7 @@ seccache_entry_t *PINT_revlist_lookup(const char *server,
  * return 0 on success, -PVFS_ERROR otherwise
  */
 int PINT_revlist_insert(const char *server, 
-                        PVFS_capability_id cap_id,
-                        PVFS_time expiration)
+                        PVFS_capability_id cap_id)
 {
     revocation_data_t *rev_data;
     int ret;
@@ -249,7 +251,8 @@ int PINT_revlist_insert(const char *server,
     /* copy fields */
     strcpy(rev_data->server, server);
     rev_data->cap_id = cap_id;
-    rev_data->expiration = expiration;
+    rev_data->expiration = PINT_util_get_current_time() + 
+        PINT_seccache_get(revlist, SECCACHE_TIMEOUT);
 
     /* add to revlist */
     ret = PINT_seccache_insert(revlist, rev_data, sizeof(revocation_data_t));

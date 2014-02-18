@@ -30,7 +30,9 @@
 #define CAPCACHE_VALID        0x2
 #define CAPCACHE_REVOKED      0x4
 
-#define CAPCACHE_CAP_REVOKED    1
+#define CAPCACHE_LOOKUP_NOT_FOUND  0
+#define CAPCACHE_LOOKUP_FOUND      1
+#define CAPCACHE_LOOKUP_REVOKED    2
 
 /* capcache entry structure */
 typedef struct capcache_data_s {
@@ -43,17 +45,22 @@ int PINT_capcache_init(void);
 
 int PINT_capcache_finalize(void);
 
-seccache_entry_t *PINT_capcache_lookup(PVFS_capability *cap,
-                                       int *cap_flags);
-
-seccache_entry_t *PINT_capcache_lookup_by_id(PVFS_capability_id cap_id,
-                                             int *cap_flags);
+int PINT_capcache_lookup(PVFS_capability *cap,
+                         int *cap_flags);
 
 int PINT_capcache_insert(PVFS_capability *cap,
-                         int flags);
+                         int cap_flags);
 
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
 int PINT_capcache_quick_sign(PVFS_capability *cap);
+#endif
+
+#ifdef ENABLE_REVOCATION
+int PINT_capcache_lookup_by_handle(PVFS_handle handle,
+                                   PVFS_capability **cap);
+
+int PINT_capcache_revoke_cap(const char *server,
+                             PVFS_capability_id cap_id);
 #endif
 
 /* End of Externally Visible Capability Cache API */

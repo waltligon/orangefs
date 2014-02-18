@@ -521,6 +521,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     capability->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (capability->issuer == NULL)
     {
+        PINT_cleanup_capability(capability);
         return -PVFS_ENOMEM;
     }
     strcpy(capability->issuer, "S:");
