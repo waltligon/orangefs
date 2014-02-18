@@ -695,7 +695,8 @@ static PINT_sm_action crdirent_write_directory_entry(
     /* this is the name for the parent entry */
     s_op->key.buffer = s_op->u.crdirent.name;
     s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
-
+    //s_op->val.buffer = &s_op->u.crdirent.new_handle;
+    //s_op->val.buffer_sz = sizeof(PVFS_handle);
     s_op->val.buffer = s_op->u.crdirent.handle_sid_s;
     //s_op->val.buffer_sz = sizeof(PVFS_handle);
     s_op->val.buffer_sz = sizeof(int) + sizeof(PVFS_handle) + &s_op->u.crdirent.sid_store->count * sizeof(PVFS_SID);
