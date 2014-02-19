@@ -213,6 +213,10 @@ seccache_entry_t *PINT_revlist_lookup(const char *server,
     cmp_data.server = (char *) server;
     cmp_data.cap_id = cap_id;
 
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: looking up cap %llx for "
+                                        "server %s\n", __func__, llu(cap_id),
+                                        (server != NULL) ? server : "(null)");
+
     return PINT_seccache_lookup(revlist, &cmp_data);
 }
 
@@ -228,28 +232,38 @@ int PINT_revlist_insert(const char *server,
     revocation_data_t *rev_data;
     int ret;
 
+    /* TODO
     if (server == NULL)
     {
         return -PVFS_EINVAL;
     }
+    */
+
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: inserting cap %llx for "
+                                        "server %s\n", __func__, llu(cap_id),
+                                        (server != NULL) ? server : "(null)");
+
 
     /* allocate data and fields */
-    rev_data = (revocation_data_t *) malloc(sizeof(revocation_data_t));
+    rev_data = (revocation_data_t *) calloc(1, sizeof(revocation_data_t));
     if (rev_data == NULL)
     {
         return -PVFS_ENOMEM;
     }
 
-    rev_data->server = (char *) malloc(strlen(server) + 1);
-    if (rev_data->server == NULL)
+    /* copy server (TODO) */
+    if (server != NULL)
     {
-        free(rev_data);
+        rev_data->server = (char *) malloc(strlen(server) + 1);
+        if (rev_data->server == NULL)
+        {
+            free(rev_data);
 
-        return -PVFS_ENOMEM;
+            return -PVFS_ENOMEM;
+        }
+        strcpy(rev_data->server, server);
     }
 
-    /* copy fields */
-    strcpy(rev_data->server, server);
     rev_data->cap_id = cap_id;
     rev_data->expiration = PINT_util_get_current_time() + 
         PINT_seccache_get(revlist, SECCACHE_TIMEOUT);

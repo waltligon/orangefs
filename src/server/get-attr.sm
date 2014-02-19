@@ -1479,7 +1479,7 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
-#ifdef ENABLE_SECURITY_CERT
+#ifdef ENABLE_SECURITY_MODE
     /* no capabilities for unsigned credential; some operations
        still allowed */
     if (!IS_UNSIGNED_CRED(&s_op->u.getattr.credential))
@@ -1499,7 +1499,7 @@ static PINT_sm_action getattr_create_capability(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-#ifdef ENABLE_SECURITY_CERT
+#ifdef ENABLE_SECURITY_MODE
     } /* if */
 #endif
     

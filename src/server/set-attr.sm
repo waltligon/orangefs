@@ -16,9 +16,13 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-security.h"
+#include "security-util.h"
 #include "pint-uid-map.h"
 #include "pint-cached-config.h"
 #include "dist-dir-utils.h"
+#ifdef ENABLE_CAPCACHE
+#include "capcache.h"
+#endif
 
 enum
 {
@@ -972,13 +976,12 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability cap, *rev_cap;
     PVFS_handle cap_handle[1];
-    int ret, num_servers = 0;
+    int ret;
     
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
-
-    /* TODO */
+    
     /* get a server-to-server cap */
     cap_handle[0] = s_op->req->u.setattr.handle;
     ret = PINT_server_to_server_capability(&cap, s_op->req->u.setattr.fs_id,
@@ -987,6 +990,8 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     {
         gossip_err("%s: could not generate server-to-server cap (%d)\n",
                    __func__, ret);
+        js_p->error_code = ret;
+
         return SM_ACTION_COMPLETE;
     }
 
@@ -1014,10 +1019,12 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     {
         gossip_err("Failed to map dirdata server address\n");
         js_p->error_code = ret;
+
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
-    js_p->error_code = 0;
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1026,7 +1033,7 @@ static PINT_sm_action setattr_revoke_cap_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_cleanup_capability(s_op->msgarray_op.msgpair.req.capability);
+    PINT_cleanup_capability(&s_op->msgarray_op.msgpair.req.capability);
 
     return SM_ACTION_COMPLETE;
 }
