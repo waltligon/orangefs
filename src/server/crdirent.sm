@@ -28,8 +28,7 @@ int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 enum
 {
-    UPDATE_DIR_ATTR_REQUIRED = 131,
-    SPLIT_REQUIRED,
+    SPLIT_REQUIRED = 131,
     SPLIT_FATAL_ERROR,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
@@ -78,14 +77,7 @@ machine pvfs2_crdirent_sm
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
-        success => check_for_req_dir_update;
-        default => final_response;
-    }
-
-    state check_for_req_dir_update
-    {
-        run crdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        success => update_directory_attr;
         default => final_response;
     }
 
@@ -127,7 +119,6 @@ machine pvfs2_crdirent_sm
     state split_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-/*        success => remove_local_copies; */
         success => activate_server_setup;
         default => split_cleanup_msgpairarray;
     }
@@ -677,28 +668,9 @@ static PINT_sm_action crdirent_write_directory_entry(
                                  server_job_context,
                                  s_op->req->hints);
 
-    /*
-     * creating an entry will cause directory times to be updated.
-     */
-    s_op->u.crdirent.dir_attr_update_required = 1;
     return ret;
 }
 
-/* ECQ: Not sure dir_attr_update_required is adding any value here. The
- * only way to get here is from successful completion of
- * crdirent_write_directory_entry */
-static PINT_sm_action crdirent_check_for_req_dir_update(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if ((js_p->error_code == 0) &&
-        (s_op->u.crdirent.dir_attr_update_required))
-    {
-        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
-    }
-    return SM_ACTION_COMPLETE;
-}
-    
 static PINT_sm_action crdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -711,15 +683,6 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_uid uid;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t num_groups;
-
-    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
-    {
-        PVFS_perror_gossip("previous keyval write failed",
-                           js_p->error_code);
-        return SM_ACTION_COMPLETE;
-    }
-
-    js_p->error_code = 0;
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.crdirent.dirdata_attr;
