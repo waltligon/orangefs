@@ -922,6 +922,11 @@ $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
+# special rules for devel tool objects which also require db components
+$(DEVELOBJS): %.o: %.c
+	$(Q) "  CC              $@"
+	$(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
+
 ifdef BUILD_BMI_ONLY
 # rule for building the bmi library
 lib/libbmi.a: $(LIBBMIOBJS)
@@ -1025,7 +1030,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): %: %.o
+$(DEVELTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD              $@"
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb
 
@@ -1235,7 +1240,7 @@ clean::
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
                 $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
