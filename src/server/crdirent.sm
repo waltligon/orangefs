@@ -613,6 +613,8 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
  * Synopsis: We are now ready to store the name/handle pair in the k/v
  *           space for directory handles.
  */
+/* V3: Need to write backpointer to bucket.
+ * The handle is the key. Need to think about how to store related SIDs. */
 static PINT_sm_action crdirent_write_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
