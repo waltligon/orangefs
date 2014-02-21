@@ -187,25 +187,6 @@ static int PINT_capcache_compare(void *key,
     ecap = CAPCACHE_ENTRY_CAP(pentry);
     kcap = CAPCACHE_DATA_CAP(key);
 
-#if 0
-    /* TODO: remove */
-    /* if both sig_sizes are 0, they're null caps */
-    if (kcap->sig_size == 0 && ecap->sig_size == 0)
-    {
-        return 0;
-    }
-    /* sizes don't match -- shouldn't happen */
-    else if (kcap->sig_size != ecap->sig_size)
-    {
-        gossip_err("Warning: capability cache: signature size mismatch "
-                   "(key: %d   entry: %d)\n", kcap->sig_size, ecap->sig_size);
-        return 1;
-    }
-
-    /* compare signatures */
-    return memcmp(kcap->signature, ecap->signature, kcap->sig_size);
-#endif
-
     return kcap->cap_id != ecap->cap_id;
 }
 
@@ -245,7 +226,7 @@ static void PINT_capcache_cleanup(void *entry)
 static void PINT_capcache_debug(const char *prefix,
                                 void *data)
 {
-    char sig_buf[10], mask_buf[10];
+    char sig_buf[16], mask_buf[16];
     PVFS_capability *cap;
     int i;
 
@@ -268,7 +249,7 @@ static void PINT_capcache_debug(const char *prefix,
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tfsid: %u\n", cap->fsid);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsig_size: %u\n", cap->sig_size);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsignature: %s\n",
-                 PINT_util_bytes2str(cap->signature, sig_buf, 4));
+                 PINT_util_bytes2str(cap->signature, sig_buf, cap->sig_size));
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\ttimeout: %d\n",
                  (int) cap->timeout);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\top_mask: %s\n",
@@ -282,6 +263,7 @@ static void PINT_capcache_debug(const char *prefix,
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "\thandle %d: %llu\n",
                      i+1, llu(cap->handle_array[i]));
     }
+
 }
 
 /** PINT_capcache_quick_cmp
@@ -330,7 +312,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
 
     PINT_seccache_lock(capcache);
 
-    /* save the current get_index function */
+    /* get the index of the hash table chain */
     index = capcache->methods.get_index(&cmp_data, capcache->hash_limit);
      
     /* iterate over the hash table chain at the calculated index until a match
@@ -351,6 +333,8 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
     }
     else
     {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: no entry\n",
+                     __func__);
         return 1;
     }
 

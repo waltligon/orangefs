@@ -462,8 +462,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     ret = EVP_SignUpdate(&mdctx, 
                          cap->issuer, 
-                         strlen(cap->issuer) * sizeof(char));
-    ret &= EVP_SignUpdate(&mdctx, &cap->cap_id, sizeof(PVFS_capability_id));
+                         strlen(cap->issuer) * sizeof(char));    
     ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -527,8 +526,14 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     strcpy(capability->issuer, "S:");
     strcat(capability->issuer, config->server_alias);
 
+    ret = PINT_set_capability_id(capability);
+    if (ret != 0)
+    {
+        PINT_cleanup_capability(capability);
+        return ret;
+    }
+
     capability->fsid = fs_id;
-    /* TODO: ID (reserved?) */
     capability->timeout =
         PINT_util_get_current_time() + config->security_timeout;
     capability->op_mask = ~((uint32_t)0);
@@ -572,6 +577,8 @@ int PINT_verify_capability(const PVFS_capability *cap)
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Verified null capability\n");
         return 1;
     }
+
+    PINT_debug_capability(cap, "Verifying");
 
     /* if capability has timed out */
     if (PINT_util_get_current_time() >= cap->timeout)
@@ -620,16 +627,9 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    if (!ret)
-    {
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
-    }
-
-    ret = EVP_VerifyUpdate(&mdctx, 
-                           cap->issuer,
-                           strlen(cap->issuer) * sizeof(char));
-    ret &= EVP_VerifyUpdate(&mdctx, &cap->cap_id, sizeof(PVFS_capability_id));
+    ret &= EVP_VerifyUpdate(&mdctx, 
+                            cap->issuer,
+                            strlen(cap->issuer) * sizeof(char));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -638,18 +638,18 @@ int PINT_verify_capability(const PVFS_capability *cap)
     if (cap->num_handles)
     {
         ret &= EVP_VerifyUpdate(&mdctx, 
-                               cap->handle_array,
-                               cap->num_handles * sizeof(PVFS_handle));
+                                cap->handle_array,
+                                cap->num_handles * sizeof(PVFS_handle));
     }
     if (ret)
     {
         ret = EVP_VerifyFinal(&mdctx, cap->signature, cap->sig_size, 
                               pubkey);
     }
-    else 
+
+    if (ret != 1)
     {
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
+        PINT_security_error("Capability verify", -PVFS_ESECURITY);
     }
     
     EVP_MD_CTX_cleanup(&mdctx);
@@ -864,7 +864,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
-    char buf[256], sigbuf[16];
+    char sigbuf[16];
     int ret;
 #ifdef ENABLE_SECURITY_CERT
     X509 *cert;
@@ -970,14 +970,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    if (!ret)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure\n");
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
-    }
-
-    ret = EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
     ret &= EVP_VerifyUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {
@@ -990,19 +983,14 @@ int PINT_verify_credential(const PVFS_credential *cred)
                                 strlen(cred->issuer) * sizeof(char));
     }
     ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
-    if (!ret)
+    if (ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure\n");
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
+        ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
     }
 
-    ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
-    if (ret < 0)
+    if (ret != 1)
     {
-        ERR_error_string_n(ERR_get_error(), buf, 256);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error verifying credential: "
-                     "%s\n", buf);
+        PINT_security_error("Credential verify", -PVFS_ESECURITY);
     }
 
     EVP_MD_CTX_cleanup(&mdctx);

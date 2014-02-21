@@ -1522,11 +1522,15 @@ static PINT_sm_action getattr_create_capability(
     ret = PINT_capcache_quick_sign(&resp_attr->capability);
     if (ret != 0)
     {
-        ret = PINT_sign_capability(&resp_attr->capability);        
+        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                     "getattr: signing capability...\n");
+        ret = PINT_sign_capability(&resp_attr->capability);
     }
     else
     {
         /* no need to insert capability into cache */
+        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                     "getattr: used quick sign\n");
         insert_flag = 0;
     }
 #else

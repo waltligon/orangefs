@@ -30,7 +30,8 @@ enum
     STATE_SYMLINK = 8,
     STATE_DIRDATA = 9,
     STATE_DIRECTORY = 10,
-    STATE_REVOKE = 11
+    STATE_REVOKE = 11,
+    STATE_REVOKE_NOT_NEEDED = 12
 };
 
 %%
@@ -74,8 +75,9 @@ nested machine pvfs2_set_attr_revoke_cap_sm
 
     state set_attr_revoke_cap_setup_msgpair
     {
-        run setattr_revoke_cap_setup_msgpair;
-        default => set_attr_revoke_cap_xfer_msgpair;
+        run setattr_revoke_cap_setup_msgpair;        
+        success => set_attr_revoke_cap_xfer_msgpair;
+        default => set_attr_revoke_cap_cleanup;
     }
 
     state set_attr_revoke_cap_xfer_msgpair
@@ -943,7 +945,6 @@ static PINT_sm_action setattr_check_revoke_cap(
         return SM_ACTION_COMPLETE;
     }
 
-    /* TODO */
     js_p->error_code = 0;
 
     a_p = &s_op->req->u.setattr.attr;
@@ -951,9 +952,7 @@ static PINT_sm_action setattr_check_revoke_cap(
         (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID|PVFS_ATTR_COMMON_PERM))
     {
         js_p->error_code = STATE_REVOKE;
-        /* TODO: gossip */
     }
-
 #endif
 
     return SM_ACTION_COMPLETE;
@@ -962,7 +961,6 @@ static PINT_sm_action setattr_check_revoke_cap(
 static PINT_sm_action setattr_revoke_cap_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    /* TODO */
     js_p->error_code = 0;
 
     return SM_ACTION_COMPLETE;
@@ -976,7 +974,15 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability cap, *rev_cap;
     PVFS_handle cap_handle[1];
-    int ret;
+    int ret, i;
+
+    /* not necessary if dfiles haven't been filled in */
+    if (s_op->attr.u.meta.dfile_count == 0 ||
+        s_op->attr.u.meta.dfile_array == NULL)
+    {
+        js_p->error_code = STATE_REVOKE_NOT_NEEDED;
+        return SM_ACTION_COMPLETE;
+    }
     
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -997,6 +1003,41 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
 
     /* locate the capability to be revoked */
     ret = PINT_capcache_lookup_by_handle(cap_handle[0], &rev_cap);
+
+    /* capability not found or error */
+    if (ret <= 0)
+    {        
+        if (ret == CAPCACHE_LOOKUP_NOT_FOUND)
+        {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: Could not locate cap for "
+                         "handle %llu - exiting SM\n", __func__, 
+                         llu(cap_handle[0]));
+            js_p->error_code = STATE_REVOKE_NOT_NEEDED;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: Error %d looking up cap "
+                         "for handle %llu - exiting SM\n", __func__, ret,
+                         llu(cap_handle[0]));
+            js_p->error_code = ret;
+        }
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* debug message */
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: building revocation message:\n",
+                 __func__);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tCapability ID: %llx\n",
+                 llu(rev_cap->cap_id));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tPrimary handle: %llu\n", 
+                 llu(cap_handle[0]));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tData handles:\n");
+    for (i = 0; i < s_op->attr.u.meta.dfile_count; i++)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\t    %llu\n", 
+                     llu(s_op->attr.u.meta.dfile_array[i]));
+    }
 
     PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
         msg_p->req,
@@ -1032,6 +1073,11 @@ static PINT_sm_action setattr_revoke_cap_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (js_p->error_code == STATE_REVOKE_NOT_NEEDED)
+    {
+        js_p->error_code = 0;
+    }
 
     PINT_cleanup_capability(&s_op->msgarray_op.msgpair.req.capability);
 
