@@ -70,12 +70,19 @@ nested machine pvfs2_set_attr_revoke_cap_sm
     state set_attr_revoke_cap_init
     {
         run setattr_revoke_cap_init;
-        default => set_attr_revoke_cap_setup_msgpair;
+        default => set_attr_revoke_cap_get_dfiles;
+    }
+
+    state set_attr_revoke_cap_get_dfiles
+    {
+        run setattr_revoke_cap_get_dfiles;
+        success => set_attr_revoke_cap_setup_msgpair;
+        default => set_attr_revoke_cap_cleanup;
     }
 
     state set_attr_revoke_cap_setup_msgpair
     {
-        run setattr_revoke_cap_setup_msgpair;        
+        run setattr_revoke_cap_setup_msgpair;
         success => set_attr_revoke_cap_xfer_msgpair;
         default => set_attr_revoke_cap_cleanup;
     }
@@ -534,7 +541,7 @@ static PINT_sm_action setattr_setobj_attribs(
         gossip_debug(GOSSIP_SETATTR_DEBUG, " request has dfile_count of "
                      "%d | dspace has %d\n",
                      s_op->req->u.setattr.attr.u.meta.dfile_count,
-                     s_op->attr.u.meta.dfile_count);
+                     a_p->u.meta.dfile_count);
 
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
                      "disk\n", dspace_a_p->u.meta.dfile_count);
@@ -966,21 +973,95 @@ static PINT_sm_action setattr_revoke_cap_init(
     return SM_ACTION_COMPLETE;
 }
 
+/* get datafiles for object */
+static PINT_sm_action setattr_revoke_cap_get_dfiles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p = &s_op->attr;
+    uint32_t dfile_count = a_p->u.meta.dfile_count;
+    job_id_t job_id;
+
+    a_p->u.meta.dfile_array = NULL;
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: dfile_count is %u\n",
+                 __func__, dfile_count);
+
+    if (dfile_count == 0)
+    {
+        js_p->error_code = STATE_REVOKE_NOT_NEEDED;
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up trove job */
+    s_op->u.setattr.revoke_cap_key.buffer =
+        Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->u.setattr.revoke_cap_key.buffer_sz = 
+        Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+    
+    a_p->u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
+    if (a_p->u.meta.dfile_array == NULL)
+    {
+        gossip_err("%s: Cannot allocate dfile array\n", __func__);
+        js_p->error_code = -PVFS_ENOMEM;
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->u.setattr.revoke_cap_val.buffer = a_p->u.meta.dfile_array;
+    s_op->u.setattr.revoke_cap_val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
+
+    gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                 "%s: reading %d datafile handles (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 __func__, dfile_count, s_op->req->u.setattr.fs_id,
+                 llu(s_op->req->u.setattr.handle), 
+                 (char *) s_op->u.setattr.revoke_cap_key.buffer,
+                 s_op->u.setattr.revoke_cap_key.buffer_sz, 
+                 s_op->u.setattr.revoke_cap_val.buffer,
+                 s_op->u.setattr.revoke_cap_val.buffer_sz);
+
+    return job_trove_keyval_read(
+               s_op->req->u.setattr.fs_id,
+               s_op->req->u.setattr.handle,
+               &s_op->u.setattr.revoke_cap_key,
+               &s_op->u.setattr.revoke_cap_val,
+               0,
+               NULL,
+               smcb,
+               0,
+               js_p,
+               &job_id,
+               server_job_context,
+               s_op->req->hints);
+
+}
+
 /* setup TREE_REVOKE_CAP request */
 static PINT_sm_action setattr_revoke_cap_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p = &s_op->attr;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability cap, *rev_cap;
     PVFS_handle cap_handle[1];
     int ret, i;
 
-    /* not necessary if dfiles haven't been filled in */
-    if (s_op->attr.u.meta.dfile_count == 0 ||
-        s_op->attr.u.meta.dfile_array == NULL)
+    /* exit on error */
+    if (js_p->error_code < 0)
     {
-        js_p->error_code = STATE_REVOKE_NOT_NEEDED;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* check data sizes */
+    if (s_op->u.setattr.revoke_cap_val.read_sz != 
+        s_op->u.setattr.revoke_cap_val.buffer_sz)
+    {
+        gossip_err("%s: invalid buffer size for dfile read\n", __func__);
+        js_p->error_code = -PVFS_EIO;
+
         return SM_ACTION_COMPLETE;
     }
     
@@ -1033,10 +1114,10 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tPrimary handle: %llu\n", 
                  llu(cap_handle[0]));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tData handles:\n");
-    for (i = 0; i < s_op->attr.u.meta.dfile_count; i++)
+    for (i = 0; i < a_p->u.meta.dfile_count; i++)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\t    %llu\n", 
-                     llu(s_op->attr.u.meta.dfile_array[i]));
+                     llu(a_p->u.meta.dfile_array[i]));
     }
 
     PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
@@ -1044,12 +1125,12 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
         cap,
         s_op->req->u.setattr.fs_id,
         rev_cap->cap_id,
-        s_op->attr.u.meta.dfile_count, /* TODO */
-        s_op->attr.u.meta.dfile_array, /* TODO */
+        a_p->u.meta.dfile_count,
+        a_p->u.meta.dfile_array,
         s_op->req->hints);
 
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
-    msg_p->handle = s_op->attr.u.meta.dfile_array[0]; /* TODO */
+    msg_p->handle = a_p->u.meta.dfile_array[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
@@ -1073,10 +1154,16 @@ static PINT_sm_action setattr_revoke_cap_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p = &s_op->req->u.setattr.attr;
 
     if (js_p->error_code == STATE_REVOKE_NOT_NEEDED)
     {
         js_p->error_code = 0;
+    }
+
+    if (a_p->u.meta.dfile_array != NULL)
+    {
+        free(a_p->u.meta.dfile_array);
     }
 
     PINT_cleanup_capability(&s_op->msgarray_op.msgpair.req.capability);

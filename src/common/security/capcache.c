@@ -249,7 +249,7 @@ static void PINT_capcache_debug(const char *prefix,
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tfsid: %u\n", cap->fsid);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsig_size: %u\n", cap->sig_size);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tsignature: %s\n",
-                 PINT_util_bytes2str(cap->signature, sig_buf, cap->sig_size));
+                 PINT_util_bytes2str(cap->signature, sig_buf, 4));
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\ttimeout: %d\n",
                  (int) cap->timeout);
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\top_mask: %s\n",

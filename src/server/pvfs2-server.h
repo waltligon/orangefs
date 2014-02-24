@@ -410,6 +410,12 @@ struct PINT_server_crdirent_op
     PVFS_ds_keyval *entries_val_a;
 };
 
+struct PINT_server_setattr_op
+{
+    PVFS_ds_keyval revoke_cap_key;
+    PVFS_ds_keyval revoke_cap_val;
+};
+
 struct PINT_server_rmdirent_op
 {
     PVFS_handle dirdata_handle;
@@ -692,7 +698,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        // struct PINT_server_setattr_op setattr;
+        struct PINT_server_setattr_op setattr;
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;
