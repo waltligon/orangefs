@@ -85,10 +85,10 @@ typedef struct PINT_server_trove_keys
 /* wrapper object that keeps track of all of the servers where a given OID is stored */
 typedef struct PINT_handle_SID_store_object
 {
-    size_t count; /* This number should match the associated number of copies set for this OID */
+    int32_t count; /* This number should match the associated number of copies set for this OID */
     PVFS_handle handle;
     PVFS_SID *sids;
-} PINT_OID_SID_s;
+} PINT_handle_SID_s;
 
 /* This is defined in src/server/pvfs2-server.c
  * These values index this table
@@ -381,8 +381,9 @@ struct PINT_server_crdirent_op
     PVFS_credential credential;
     PVFS_capability capability;
     char *name;
-    PVFS_handle new_handle;
-    PVFS_SID *new_sid;
+    //PVFS_handle new_handle;
+    //PVFS_SID *new_sid;
+    PINT_handle_SID_s* packed_handle;
     PVFS_handle parent_handle;
     PVFS_SID *parent_sid;
     PVFS_fs_id fs_id;
