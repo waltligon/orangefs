@@ -699,7 +699,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     //s_op->val.buffer_sz = sizeof(PVFS_handle);
     s_op->val.buffer = s_op->u.crdirent.packed_handle;
     //s_op->val.buffer_sz = sizeof(PVFS_handle);
-    s_op->val.buffer_sz = sizeof(int32_t) + sizeof(PVFS_handle) + &s_op->u.crdirent.packed_handle->count * sizeof(PVFS_SID);
+    s_op->val.buffer_sz = sizeof(int32_t) + sizeof(PVFS_handle) + s_op->u.crdirent.packed_handle->count * sizeof(PVFS_SID);
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
                  "for %s (handle = %s) to dirdata dspace %s\n",
                  s_op->u.crdirent.name,
