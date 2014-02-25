@@ -284,12 +284,12 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
                       "crdirent entry: %s points to %s\n", 
                       s_op->req->u.crdirent.name,
                       //TODO PVFS_OID_str(&s_op->u.crdirent.new_handle),
-                      PVFS_OID_str(s_op->u.crdirent.packed_handle->handle));
+                      PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle));
     //create memory block big enough to hold handle and sids
     memory_size = sizeof(PVFS_handle) + sizeof(int32_t) + 
                                         sizeof(PVFS_SID*);
     //Add in alloc check for safety
-    memory_buffer = (PINT_handle_SID_s*) malloc(memory_size);
+    memory_buffer = malloc(memory_size);
 
 
     js_p->error_code = 0;
@@ -299,11 +299,11 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
     //Set packed handle to buffer
     s_op->u.crdirent.packed_handle = memory_buffer;
     s_op->u.crdirent.packed_handle->handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.packed_handle->sid_count = s_op->req->u.crdirent.sid_count;
-    s_op->u.crdirent.packed_handle->sids = (PVFS_SID*)malloc(sizeof(PVFS_SID) * s_op->u.crdirent.packed_handle->sids);
+    s_op->u.crdirent.packed_handle->count = s_op->req->u.crdirent.sid_count;
+    s_op->u.crdirent.packed_handle->sids = (PVFS_SID*)malloc(sizeof(PVFS_SID) * s_op->u.crdirent.packed_handle->count);
     memcpy(s_op->u.crdirent.packed_handle->sids, s_op->req->u.crdirent.new_sid_array, 
                                                  s_op->req->u.crdirent.sid_count);
-    s_op->u.crdirent.packed_handle->sid_count = s_op->req->u.crdirent.sid_count;
+//    s_op->u.crdirent.packed_handle->sid_count = s_op->req->u.crdirent.sid_count;
     s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
@@ -578,7 +578,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
             "  got crdirent for %s (with handle %s) in %s\n",
             s_op->u.crdirent.name,
             //TODO PVFS_OID_str(&s_op->u.crdirent.new_handle),
-                 PVFS_OID_str(s_op->u.crdirent.packed_handle->handle),
+                 PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle),
             PVFS_OID_str(&s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
@@ -697,14 +697,14 @@ static PINT_sm_action crdirent_write_directory_entry(
     s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
     //s_op->val.buffer = &s_op->u.crdirent.new_handle;
     //s_op->val.buffer_sz = sizeof(PVFS_handle);
-    s_op->val.buffer = s_op->u.crdirent.handle_sid_s;
+    s_op->val.buffer = s_op->u.crdirent.packed_handle;
     //s_op->val.buffer_sz = sizeof(PVFS_handle);
-    s_op->val.buffer_sz = sizeof(int) + sizeof(PVFS_handle) + &s_op->u.crdirent.sid_store->count * sizeof(PVFS_SID);
+    s_op->val.buffer_sz = sizeof(int32_t) + sizeof(PVFS_handle) + &s_op->u.crdirent.sid_store->count * sizeof(PVFS_SID);
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
                  "for %s (handle = %s) to dirdata dspace %s\n",
                  s_op->u.crdirent.name,
                 //TODO PVFS_OID_str(&s_op->u.crdirent.new_handle),
-                 PVFS_OID_str(s_op->u.crdirent.packed_handle->handle);
+                 PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle);
                  PVFS_OID_str(&s_op->u.crdirent.dirent_handle));
 
     keyval_flags = TROVE_SYNC;
@@ -857,7 +857,7 @@ static PINT_sm_action crdirent_check_for_split(
                       "crdirent entry: %s points to %s\n",
                       s_op->req->u.crdirent.name,
                       //TODO PVFS_OID_str(&s_op->u.crdirent.new_handle),
-                 PVFS_OID_str(s_op->u.crdirent.packed_handle->handle));
+                 PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle));
 
     if (js_p->error_code != 0)
     {
