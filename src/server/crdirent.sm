@@ -703,7 +703,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry for %s (handle = %s) to dirdata dspace %s\n",
                  s_op->u.crdirent.name,
                 //TODO PVFS_OID_str(&s_op->u.crdirent.new_handle),
-                 PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle);
+                 PVFS_OID_str(&s_op->u.crdirent.packed_handle->handle),
                  PVFS_OID_str(&s_op->u.crdirent.dirent_handle));
 
     keyval_flags = TROVE_SYNC;
