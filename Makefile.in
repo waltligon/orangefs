@@ -556,7 +556,7 @@ endif
 #
 ifdef BUILD_HADOOP
 # Directory Containing PVFS2/Hadoop related .java files
-HADOOP_ORGDIR := $(JNI_DIR)/org/apache/hadoop/fs/ofs
+HADOOP_ORGDIR := $(JNI_DIR)/org/orangefs/hadoop/fs/ofs
 # Path to Hadoop Directory containing hadoop-core-*.jar
 HADOOP_PREFIX := @HADOOP_PREFIX@
 # Path to Hadoop's core Jar
@@ -1052,9 +1052,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
+$(DEVELTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
 ifdef BUILD_HADOOP
 $(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
@@ -1063,7 +1063,7 @@ $(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
 
 $(OFS_HADOOP_JAR): $(HADOOPCLS)
 	$(Q) "  JAR		$@"
-	$(E)$(JAR) cf $@ -C src/client/jni org/apache/hadoop/fs/ofs
+	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/hadoop/fs/ofs
 endif # BUILD_HADOOP
 
 ifdef BUILD_JNI
@@ -1262,7 +1262,7 @@ clean::
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
                 $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
@@ -1320,6 +1320,8 @@ cleaner: clean
 	rm -f examples/pvfs2-server.rc
 	rm -f doc/doxygen/pvfs2-doxygen.conf
 	rm -f examples/fs.conf
+	rm -f examples/orangefs-client
+	rm -f examples/orangefs-server
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
@@ -1478,8 +1480,6 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all.sh $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all.sh $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
 endif
@@ -1494,6 +1494,8 @@ endif
 	done
 
 	install -d $(sbindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all $(sbindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all $(sbindir)
 
 ifdef BUILD_HADOOP
 	install -m 755 $(OFS_HADOOP_JAR) $(libdir)

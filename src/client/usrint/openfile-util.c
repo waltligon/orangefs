@@ -1351,7 +1351,7 @@ static void init_descriptor_area(void)
     int dtable_count = 0;  /* number of used slots in descriptor table */
     int parentobj;
     pvfs_shmcontrol_t *parentctl;
-    int parentsize;
+    int parentsize GCC_UNUSED;
     pvfs_desc_list_t *pdl;
 
     init_debug("Forked, running init descriptor area\n");

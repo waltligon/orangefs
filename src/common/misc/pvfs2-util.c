@@ -599,7 +599,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         return -PVFS_EINVAL;
     }
 
-    memset(cred, 0, sizeof(cred));
+    memset(cred, 0, sizeof(*cred));
 
     return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }

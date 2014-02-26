@@ -86,7 +86,7 @@ static void *trove_thread_function(void *ptr)
     int ret = -1;
     int i=0;
     struct PINT_thread_mgr_trove_callback *tmp_callback;
-    int timeout = thread_mgr_test_timeout;
+    int timeout GCC_UNUSED = thread_mgr_test_timeout;
 
 #ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_start("TROVE");
@@ -167,7 +167,7 @@ static void *bmi_thread_function(void *ptr)
     int i=0;
     int test_timeout = thread_mgr_test_timeout;
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
-    int thread_running=0;
+    int thread_running GCC_UNUSED = 0;
 
     gen_mutex_lock(&bmi_thread_running_mutex);
     thread_running = bmi_thread_running;
@@ -419,7 +419,7 @@ out:
  */
 int PINT_thread_mgr_trove_start(void)
 {
-    int ret;
+    int ret GCC_UNUSED;
 
     gen_mutex_lock(&trove_mutex);
     if(trove_thread_ref_count > 0)
