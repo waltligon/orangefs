@@ -32,19 +32,22 @@ static char *lost_and_found_string = "lost+found";
 */
 
 /* V3 NEXT remove this struct and all references to it */
-
+#if 0
 static TROVE_handle s_used_handles[4] =
 {
-    TROVE_HANDLE_NULL_INIT, TROVE_HANDLE_NULL_INIT,
-    TROVE_HANDLE_NULL_INIT, TROVE_HANDLE_NULL_INIT
+    TROVE_HANDLE_NULL_INIT,
+    TROVE_HANDLE_NULL_INIT,
+    TROVE_HANDLE_NULL_INIT,
+    TROVE_HANDLE_NULL_INIT
 };
+#endif
 
-#define mkspace_print(v, format, f...)              \
-do {                                                \
- if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)             \
-   gossip_debug(GOSSIP_SERVER_DEBUG, format, ##f);  \
- else if (v == PVFS2_MKSPACE_STDERR_VERBOSE)        \
-   fprintf(stderr,format, ##f);                     \
+#define mkspace_print(v, format, f...)                   \
+do {                                                     \
+    if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)               \
+        gossip_debug(GOSSIP_SERVER_DEBUG, format, ##f);  \
+    else if (v == PVFS2_MKSPACE_STDERR_VERBOSE)          \
+        fprintf(stderr,format, ##f);                     \
 } while(0)
 
 /* V3 NEXT remove this func and all references to it */
@@ -130,42 +133,56 @@ if (1)
 
 int pvfs2_mkspace(char *data_path,
                   char *meta_path,
+                  char *config_path,
                   char *collection,
                   TROVE_coll_id coll_id,
                   TROVE_handle root_handle,
+                  TROVE_handle root_dirdata_handle,
+                  PVFS_SID *root_sid_array,
+                  int root_sid_count,
+/* V3 no longer used */
+#if 0
                   char *meta_handle_ranges,
                   char *data_handle_ranges,
+#endif
                   int create_collection_only,
                   int verbose)
 {
-    int ret = - 1, count = 0;
+    int ret = - 1;
     TROVE_op_id op_id;
+    TROVE_context_id trove_context = -1;
+    int count = 0;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     TROVE_keyval_s *key_a = NULL, *val_a = NULL;
     TROVE_ds_attributes_s attr;
+    TROVE_handle new_root_handle = root_handle;
+
 /* V3 */
 #if 0
     TROVE_handle_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     char *merged_handle_ranges = NULL;
+    TROVE_handle new_root_dirdata_handle = TROVE_HANDLE_NULL;
 #endif
-    TROVE_context_id trove_context = -1;
-    TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
 
-    mkspace_print(verbose,"Data storage space     : %s\n",data_path);
-    mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
-    mkspace_print(verbose,"Collection   : %s\n",collection);
-    mkspace_print(verbose,"ID           : %d\n",coll_id);
-    mkspace_print(verbose,"Root Handle  : %s\n",PVFS_OID_str(&root_handle));
+    mkspace_print(verbose, "Data storage space     : %s\n", data_path);
+    mkspace_print(verbose, "Metadata storage space : %s\n", meta_path);
+    mkspace_print(verbose, "Collection   : %s\n", collection);
+    mkspace_print(verbose, "ID           : %d\n", coll_id);
+    mkspace_print(verbose, "Root Handle  : %s\n", PVFS_OID_str(&root_handle));
+    mkspace_print(verbose, "Root Dirdata Handle  : %s\n",
+                  PVFS_OID_str(&root_dirdata_handle));
+
+/* V3 no longer used */
+#if 0
     mkspace_print(verbose,"Meta Handles : %s\n",
                   (meta_handle_ranges && strlen(meta_handle_ranges) ?
                    meta_handle_ranges : "NONE"));
     mkspace_print(verbose,"Data Handles : %s\n",
                   (data_handle_ranges && strlen(data_handle_ranges) ?
                    data_handle_ranges : "NONE"));
-
-    new_root_handle = root_handle;
+#endif
 
     /*
      * if we're only creating a collection inside an existing
@@ -181,6 +198,7 @@ int pvfs2_mkspace(char *data_path,
 			       NULL, 
 			       data_path,
 			       meta_path,
+			       config_path,
 			       0);
         if (ret > -1)
         {
@@ -192,6 +210,7 @@ int pvfs2_mkspace(char *data_path,
         ret = trove_storage_create(TROVE_METHOD_DBPF,
                                    data_path,
                                    meta_path,
+                                   config_path,
                                    NULL,
                                    &op_id);
         if (ret != 1)
@@ -206,6 +225,7 @@ int pvfs2_mkspace(char *data_path,
                            NULL, 
 	                   data_path,
                            meta_path,
+                           config_path,
                            0);
     if (ret < 0)
     {
@@ -213,10 +233,15 @@ int pvfs2_mkspace(char *data_path,
 	return -1;
     }
 
-    mkspace_print(verbose,"info: created data storage space '%s'.\n",
+    mkspace_print(verbose,
+                  "info: created data storage space '%s'.\n",
                   data_path);
-    mkspace_print(verbose,"info: created metadata storage space '%s'.\n",
+    mkspace_print(verbose,
+                  "info: created metadata storage space '%s'.\n",
                   meta_path);
+    mkspace_print(verbose,
+                  "info: created config storage space '%s'.\n",
+                  config_path);
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(TROVE_METHOD_DBPF,
@@ -226,7 +251,8 @@ int pvfs2_mkspace(char *data_path,
                                   &op_id);
     if (ret == 1)
     {
-	mkspace_print(verbose, "warning: collection lookup succeeded "
+	mkspace_print(verbose,
+                      "warning: collection lookup succeeded "
                       "before it should; aborting!\n");
 	trove_finalize(TROVE_METHOD_DBPF);
 	return -1;
@@ -236,8 +262,10 @@ int pvfs2_mkspace(char *data_path,
     ret = trove_collection_create(collection, coll_id, NULL, &op_id);
     if (ret != 1)
     {
-	mkspace_print(verbose,"error: collection create failed for "
-                      "collection '%s'.\n",collection);
+	mkspace_print(verbose,
+                      "error: collection create failed for "
+                      "collection '%s'.\n",
+                      collection);
 	return -1;
     }
 
@@ -249,13 +277,20 @@ int pvfs2_mkspace(char *data_path,
                                   &op_id);
     if (ret != 1)
     {
-	mkspace_print(verbose,"error: collection lookup failed for "
-                      "collection '%s' after create.\n",collection);
+	mkspace_print(verbose,
+                      "error: collection lookup failed for "
+                      "collection '%s' after create.\n",
+                      collection);
 	return -1;
     }
 
     mkspace_print(verbose, "info: created collection '%s'.\n",collection);
 
+/* V3 all of this stuff was moved to the new routine in pvfs2-server.c
+ * performed after the server is fully up and running and so are the
+ * other servers involved with the root dir
+ */
+#if 1
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
@@ -309,7 +344,6 @@ int pvfs2_mkspace(char *data_path,
 
     free(merged_handle_ranges);
 #endif
- 
 
     /*
      * if a root_handle is specified, 1) create a dataspace to hold the
@@ -360,9 +394,23 @@ int pvfs2_mkspace(char *data_path,
             return -1;
         }
 
-        mkspace_print(verbose,"info: created root directory "
-                      "with handle %s.\n", PVFS_OID_str(&new_root_handle));
+        /* if new_root_handle is not eq to root_handle we have a problem
+         */
+        if(!PVFS_OID_cmp(&root_handle, &new_root_handle))
+        {
+            gossip_err("Trove did not use the handle passed in for the root\n");
+            return -1;
+        }
+
+        mkspace_print(verbose,
+                      "info: created root directory "
+                      "with handle %s.\n",
+                      PVFS_OID_str(&new_root_handle));
+
+/* V3 not used */
+#if 0
         s_used_handles[0] = new_root_handle;
+#endif
 
         /* set collection attribute for root handle */
         key.buffer = ROOT_HANDLE_KEYSTR;
@@ -450,6 +498,7 @@ int pvfs2_mkspace(char *data_path,
                   PVFS_OID_str(&root_handle),
                   coll_id,
                   ROOT_HANDLE_KEYSTR);
+#endif
 
     /* free space */
     if (key_a)
@@ -466,6 +515,7 @@ int pvfs2_mkspace(char *data_path,
 
 int pvfs2_rmspace(char *data_path,
                   char *meta_path,
+                  char *config_path,
                   char *collection,
                   TROVE_coll_id coll_id,
                   int remove_collection_only,
@@ -478,42 +528,56 @@ int pvfs2_rmspace(char *data_path,
     /* try to initialize; fails if storage space isn't there */
     if (!trove_is_initialized)
     {
-        ret = trove_initialize(
-	    TROVE_METHOD_DBPF, NULL,
-	    data_path, meta_path, 0);
+        ret = trove_initialize(TROVE_METHOD_DBPF,
+                               NULL,
+	                       data_path,
+                               meta_path,
+                               config_path,
+                               0);
         if (ret == -1)
         {
-            gossip_err("error: storage space %s or %s does not "
-                       "exist; aborting!\n", data_path, meta_path);
+            gossip_err("error: storage space %s, %s or %s does not "
+                       "exist; aborting!\n",
+                       data_path,
+                       meta_path,
+                       config_path);
             return -1;
         }
         trove_is_initialized = 1;
     }
 
-    mkspace_print(verbose, "Attempting to remove collection %s\n",
+    mkspace_print(verbose,
+                  "Attempting to remove collection %s\n",
                   collection);
 
-    ret = trove_collection_remove(
-	TROVE_METHOD_DBPF, collection, NULL, &op_id);
-    mkspace_print(
-        verbose, "PVFS2 Collection %s removed %s\n", collection,
-        (((ret == 1) || (ret == -TROVE_ENOENT)) ? "successfully" :
-         "with errors"));
+    ret = trove_collection_remove(TROVE_METHOD_DBPF, collection, NULL, &op_id);
+    mkspace_print(verbose,
+                  "PVFS2 Collection %s removed %s\n",
+                  collection,
+                  (((ret == 1) || (ret == -TROVE_ENOENT)) ?
+                                "successfully" : "with errors"));
 
     if (!remove_collection_only)
     {
-        ret = trove_storage_remove(TROVE_METHOD_DBPF, data_path, meta_path, 
-				   NULL, &op_id);
+        ret = trove_storage_remove(TROVE_METHOD_DBPF,
+                                   data_path,
+                                   meta_path, 
+                                   config_path, 
+				   NULL,
+                                   &op_id);
 	/*
 	 * it is a bit weird to do a trove_finaliz() prior to blowing away
 	 * the storage space, but this allows the __db files of the DB env
 	 * to be blown away for the rmdir() to work correctly!
 	 */
 	trove_finalize(TROVE_METHOD_DBPF);
-        mkspace_print(
-            verbose, "PVFS2 Storage Space %s and %s removed %s\n",
-            data_path, meta_path, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
-                            "successfully" : "with errors"));
+        mkspace_print(verbose,
+                      "PVFS2 Storage Space %s, %s and %s removed %s\n",
+                      data_path,
+                      meta_path,
+                      config_path,
+                      (((ret == 1) || (ret == -TROVE_ENOENT)) ?
+                                      "successfully" : "with errors"));
 
         trove_is_initialized = 0;
     }

@@ -236,7 +236,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    /* retrieve aux and remote config files as needed 
+    /* V3 retrieve aux and remote config files as needed 
+     * not active just yet
      */
     if (0)
     {
@@ -251,6 +252,10 @@ int main(int argc, char **argv)
         }
         /* copy config to a temp file for possible reload */
         /* fs_conf = server_config->something; */
+
+        /* V3 Write config data if it has changed since the version on
+         * disk
+         */
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
@@ -935,6 +940,7 @@ static int server_initialize_subsystems(
                                trove_coll_to_method_callback,
                                server_config.data_path,
                                server_config.meta_path,
+                               server_config.config_path,
                                init_flags);
 
         if (ret < 0)
@@ -1415,7 +1421,10 @@ static int server_check_if_root_directory_created( void )
 
     PINT_llist *cur_f = server_config.file_systems;
     struct filesystem_configuration_s *cur_fs;
+/* V3 */
+#if 0
     char handle_server[BMI_MAX_ADDR_LEN];
+#endif
     job_status_s js;
     job_id_t j_id;
     PVFS_ds_keyval key, val;
@@ -1429,6 +1438,9 @@ static int server_check_if_root_directory_created( void )
     /* iterate through list of file systems */
     while(cur_f)
     {
+        PINT_llist *rsrv_link;
+        int is_root_srv = 0; /* flag indicates this is a root server */
+
         cur_fs = PINT_llist_head(cur_f);
         if (!cur_fs)
         {
@@ -1439,6 +1451,18 @@ static int server_check_if_root_directory_created( void )
          * that hold a root object - rather than look at handle ranges
          * and server names to decide this
          */
+        rsrv_link = cur_fs->root_servers;
+        while(rsrv_link)
+        {
+            host_alias_t *rsrv = PINT_llist_head(rsrv_link);
+            if (!PVFS_SID_cmp(&rsrv->host_sid, &server_config.host_sid))
+            {
+                is_root_srv = 1;
+                break;
+            }
+            rsrv_link = PINT_llist_next(rsrv_link);
+        }
+/* V3 */
 #if 0
         /*
            check if root handle is in our handle range for this fs.
@@ -1449,32 +1473,47 @@ static int server_check_if_root_directory_created( void )
 
         ret = PINT_cached_config_get_server_name( handle_server,
                 BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+        if ((ret == 0) && (strcmp(handle_server, server_config.host_id) == 0))
 #endif
-        if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
+        if (is_root_srv)
         {
-            /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
-             * record, we want one. */
+            /* we own this handle, hurrah! now look if we have a
+             * DIST_DIR_ATTR keyval record, we want one.
+             */
             key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
             key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
             val.buffer_sz = sizeof(PVFS_dist_dir_attr);
             val.buffer = &dist_dir_attr;
 
-            ret = job_trove_keyval_read(cur_fs->coll_id, root_handle,
-                    &key, &val,
-                    0, NULL, NULL, 0,
-                    &js, &j_id, server_job_context,
-                    NULL);
-            while(ret == 0)
+            ret = job_trove_keyval_read(cur_fs->coll_id,
+                                        root_handle,
+                                        &key,
+                                        &val,
+                                        0,
+                                        NULL,
+                                        NULL,
+                                        0,
+                                        &js,
+                                        &j_id,
+                                        server_job_context,
+                                        NULL);
+            /* Wait for job to finish */
+            while (ret == 0)
             {
-                ret = job_test(j_id, &outcount, NULL, &js,
-                        PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+                ret = job_test(j_id,
+                               &outcount,
+                               NULL,
+                               &js,
+                               PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                               server_job_context);
             }
-
-            if(js.error_code != 0)
+            /* Job is now finished */
+            if (js.error_code != 0)
             {
                 /* launch root-dir-create noreq state machine */
-                   ret = server_state_machine_alloc_noreq(
-                   PVFS_SERV_MGMT_CREATE_ROOT_DIR, &(tmp_op));
+                ret = server_state_machine_alloc_noreq(
+                                           PVFS_SERV_MGMT_CREATE_ROOT_DIR,
+                                           &(tmp_op));
                 if (ret < 0)
                 {
                     return ret;
@@ -2356,6 +2395,7 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
          */
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
         s_op->op = s_op->req->op;
+        /* V3 host_index is probably obsolete */
         PVFS_hint_add(&s_op->req->hints,
                       PVFS_HINT_SERVER_ID_NAME,
                       sizeof(uint32_t),

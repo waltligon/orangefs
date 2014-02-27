@@ -66,51 +66,54 @@ extern "C" {
 #define DBPF_BSTREAM_MAX_NUM_BUCKETS  64
 
 #define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
-(PVFS_OID_hash32(&(__handle)) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
+    (PVFS_OID_hash32(&(__handle)) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
 #define DBPF_GET_DATA_DIRNAME(__buf, __path_max, __base)                 \
-do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
+    do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
 
 #define DBPF_GET_META_DIRNAME(__buf, __path_max, __base)                 \
-do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
+    do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
+
+#define DBPF_GET_CONFIG_DIRNAME(__buf, __path_max, __base)               \
+    do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
-#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __base)            \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __base, STO_ATTRIB_DBNAME);      \
-} while (0)
+#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __base)             \
+    do {                                                                  \
+        snprintf(__buf, __path_max, "/%s/%s", __base, STO_ATTRIB_DBNAME); \
+    } while (0)
 
 #define COLLECTIONS_DBNAME "collections.db"
-#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __base)           \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __base, COLLECTIONS_DBNAME);     \
-} while (0)
+#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __base)             \
+    do {                                                                   \
+        snprintf(__buf, __path_max, "/%s/%s", __base, COLLECTIONS_DBNAME); \
+    } while (0)
 
 #define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __base, __collid)       \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x", __base, __collid);             \
-} while (0)
+    do {                                                                 \
+        snprintf(__buf, __path_max, "/%s/%08x", __base, __collid);       \
+    } while (0)
 
 #define COLL_ATTRIB_DBNAME "collection_attributes.db"
 #define DBPF_GET_COLL_ATTRIB_DBNAME(__buf,__path_max,__base,__collid)    \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
-           COLL_ATTRIB_DBNAME);                                          \
-} while (0)
+    do {                                                                 \
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,     \
+                 COLL_ATTRIB_DBNAME);                                    \
+    } while (0)
 
 #define DS_ATTRIB_DBNAME "dataspace_attributes.db"
 #define DBPF_GET_DS_ATTRIB_DBNAME(__buf,__path_max,__base,__collid)      \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
-           DS_ATTRIB_DBNAME);                                            \
-} while (0)
+    do {                                                                 \
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,     \
+                 DS_ATTRIB_DBNAME);                                      \
+    } while (0)
 
 #define BSTREAM_DIRNAME "bstreams"
 #define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __base, __collid)    \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
-           BSTREAM_DIRNAME);                                             \
-} while (0)
+    do {                                                                 \
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,     \
+                 BSTREAM_DIRNAME);                                       \
+    } while (0)
 
 #define STRANDED_BSTREAM_DIRNAME "stranded-bstreams"
 #define DBPF_GET_STRANDED_BSTREAM_DIRNAME(                       \
@@ -121,13 +124,13 @@ do {                                                                     \
     } while(0)
 
 /* arguments are: buf, path_max, base, collid, handle */
-#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __base, __cid, __handle) \
-do {                                                                  \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%s.bstream",                \
-           __base, __cid, BSTREAM_DIRNAME,                            \
-           llu(DBPF_BSTREAM_GET_BUCKET(__handle)),                    \
-           PVFS_OID_str(&(__handle)));                                \
-} while (0)
+#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __base, __cid, __handle)     \
+    do {                                                                  \
+      snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%s.bstream",                \
+               __base, __cid, BSTREAM_DIRNAME,                            \
+               llu(DBPF_BSTREAM_GET_BUCKET(__handle)),                    \
+               PVFS_OID_str(&(__handle)));                                \
+    } while (0)
 
 /* arguments are: buf, path_max, base, collid, handle */
 #define DBPF_GET_STRANDED_BSTREAM_FILENAME(                  \
@@ -140,11 +143,15 @@ do {                                                                  \
 
 /* arguments are: buf, path_max, base, collid */
 #define KEYVAL_DBNAME "keyval.db"
-#define DBPF_GET_KEYVAL_DBNAME(__buf,__path_max,__base,__collid)         \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
-           KEYVAL_DBNAME);                                               \
-} while (0)
+#define DBPF_GET_KEYVAL_DBNAME(__buf, __path_max, __base, __collid)      \
+    do {                                                                 \
+        snprintf(__buf,                                                  \
+                 __path_max,                                             \
+                 "/%s/%08x/%s",                                          \
+                 __base,                                                 \
+                 __collid,                                               \
+               KEYVAL_DBNAME);                                           \
+    } while (0)
 
 inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
 inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
@@ -169,20 +176,25 @@ extern int dbpf_pid;
 
 struct dbpf_aio_ops
 {
-    int (* aio_read) (struct aiocb * aiocbp);
-    int (* aio_write) (struct aiocb * aiocbp);
-    int (* lio_listio) (int mode, struct aiocb * const list[], int nent,
+    int (*aio_read) (struct aiocb *aiocbp);
+    int (*aio_write) (struct aiocb *aiocbp);
+    int (*lio_listio) (int mode,
+                        struct aiocb * const list[],
+                        int nent,
                         struct sigevent *sig);
-    int (* aio_error) (const struct aiocb *aiocbp);
-    ssize_t (* aio_return) (struct aiocb *aiocbp);
-    int (* aio_cancel) (int filedesc, struct aiocb * aiocbp);
-    int (* aio_suspend) (const struct aiocb * const list[], int nent,
-                         const struct timespec * timeout);
-    int (*aio_fsync) (int operation, struct aiocb * aiocbp);
+    int (*aio_error) (const struct aiocb *aiocbp);
+    ssize_t (*aio_return) (struct aiocb *aiocbp);
+    int (*aio_cancel) (int filedesc, struct aiocb *aiocbp);
+    int (*aio_suspend) (const struct aiocb * const list[],
+                        int nent,
+                        const struct timespec *timeout);
+    int (*aio_fsync) (int operation, struct aiocb *aiocbp);
 };
 
-typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    void *, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+typedef int (* PINT_dbpf_keyval_iterate_callback)(void *,
+                                                  TROVE_handle handle,
+                                                  TROVE_keyval_s *key,
+                                                  TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
@@ -204,6 +216,7 @@ struct dbpf_storage
     int refct;
     char *data_path;   /* path to data storage directory */
     char *meta_path;   /* path to metadata storage directory */
+    char *config_path; /* path to config storage directory */
     DB *sto_attr_db;
     DB *coll_db;
 };
@@ -212,8 +225,9 @@ struct dbpf_collection
 {
     int refct;
     char *name;
-    char *data_path;  /* path to data collection directory */
-    char *meta_path;  /* path to metadata collection directory */
+    char *data_path;   /* path to data collection directory */
+    char *meta_path;   /* path to metadata collection directory */
+    char *config_path; /* path to config collection directory */
     DB *coll_attr_db;
     DB *ds_db;
     DB *keyval_db;
@@ -248,12 +262,11 @@ struct dbpf_collection_db_entry
 #define DBPF_ENTRY_TYPE_CONST      0x01
 #define DBPF_ENTRY_TYPE_COMPONENT  0x02
 
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare(
-    DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare_reversed(
-    DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_ds_attr_compare_reversed(DB * dbp,
+                                             const DBT * a,
+                                             const DBT * b);
 
 int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
                          TROVE_object_ref ref,
@@ -420,8 +433,12 @@ enum
 struct dbpf_bstream_rw_list_op
 {
     struct open_cache_ref open_ref;
-    int fd, list_proc_state, opcode;
-    int aiocb_array_count, mem_array_count, stream_array_count;
+    int fd;
+    int list_proc_state;
+    int opcode;
+    int aiocb_array_count;
+    int mem_array_count;
+    int stream_array_count;
     char **mem_offset_array;
     TROVE_size *mem_size_array;
     TROVE_offset *stream_offset_array;
@@ -583,10 +600,8 @@ struct dbpf_op
 };
 
 /* collection registration functions implemented in dbpf-collection.c */
-void dbpf_collection_register(
-    struct dbpf_collection *coll_p);
-struct dbpf_collection *dbpf_collection_find_registered(
-    TROVE_coll_id coll_id);
+void dbpf_collection_register(struct dbpf_collection *coll_p);
+struct dbpf_collection *dbpf_collection_find_registered(TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 void dbpf_collection_deregister(struct dbpf_collection *entry);
 
@@ -656,25 +671,34 @@ do {                                                          \
                        db_strerror(tmp_ret));                 \
             ret = -dbpf_db_error_to_trove_error(tmp_ret);     \
         }                                                     \
-        gossip_debug(                                         \
-          GOSSIP_TROVE_DEBUG, "db SYNC called "               \
-          "servicing op type %s\n",                           \
-          dbpf_op_type_to_str(dbpf_op_ptr->type));            \
+        gossip_debug(GOSSIP_TROVE_DEBUG,                      \
+                     "db SYNC called servicing op type %s\n", \
+                     dbpf_op_type_to_str(dbpf_op_ptr->type)); \
     }                                                         \
 } while(0)
 
-#define DBPF_EVENT_START(__coll_p, __q_op_p, __event_type, __event_id, args...) \
-    if(__coll_p->immediate_completion)                                          \
-    {                                                                           \
-        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
-                         ## args);                                              \
-    }                                                                           \
-    else                                                                        \
-    {                                                                           \
-        __q_op_p->event_type = __event_type;                                    \
-        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
-                         ## args);                                              \
-        *(__event_id) = __q_op_p->event_id;                                     \
+#define DBPF_EVENT_START(__coll_p,               \
+                         __q_op_p,               \
+                         __event_type,           \
+                         __event_id,             \
+                         args...)                \
+    if(__coll_p->immediate_completion)           \
+    {                                            \
+        PINT_EVENT_START(__event_type,           \
+                         dbpf_pid,               \
+                         NULL,                   \
+                         (__event_id),           \
+                         ## args);               \
+    }                                            \
+    else                                         \
+    {                                            \
+        __q_op_p->event_type = __event_type;     \
+        PINT_EVENT_START(__event_type,           \
+                         dbpf_pid,               \
+                         NULL,                   \
+                         (__event_id),           \
+                         ## args);               \
+        *(__event_id) = __q_op_p->event_id;      \
     }
 
 #define DBPF_EVENT_END(__event_type, __event_id) \
@@ -683,35 +707,46 @@ do {                                                          \
 extern struct dbpf_storage *my_storage_p;
 
 extern int64_t s_dbpf_metadata_writes, s_dbpf_metadata_reads;
-#define UPDATE_PERF_METADATA_READ()                         \
-do {                                                        \
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_READ,\
-                    ++s_dbpf_metadata_reads, PINT_PERF_SET);\
+#define UPDATE_PERF_METADATA_READ()            \
+do {                                           \
+    PINT_perf_count(PINT_server_pc,            \
+                    PINT_PERF_METADATA_READ,   \
+                    ++s_dbpf_metadata_reads,   \
+                    PINT_PERF_SET);            \
 } while(0)
 
-#define UPDATE_PERF_METADATA_WRITE()                         \
-do {                                                         \
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_WRITE,\
-                    ++s_dbpf_metadata_writes, PINT_PERF_SET);\
+#define UPDATE_PERF_METADATA_WRITE()           \
+do {                                           \
+    PINT_perf_count(PINT_server_pc,            \
+                    PINT_PERF_METADATA_WRITE,  \
+                    ++s_dbpf_metadata_writes,  \
+                    PINT_PERF_SET);            \
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
+extern DB_ENV *dbpf_getdb_env(const char *path,
+                              unsigned int env_flags,
+                              int *err_p);
 extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
 
 int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
-struct dbpf_storage *dbpf_storage_lookup(
-    char *data_path, char *meta_path, int *error_p, TROVE_ds_flags flags);
+struct dbpf_storage *dbpf_storage_lookup(char *data_path,
+                                         char *meta_path,
+                                         char *config_path,
+                                         int *error_p,
+                                         TROVE_ds_flags flags);
 
 int dbpf_storage_create(char *data_path,
 			char *meta_path,
+			char *config_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p);
 
 int dbpf_storage_remove(char *data_path,
 			char *meta_path,
+			char *config_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p);
 

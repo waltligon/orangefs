@@ -48,7 +48,7 @@ PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
     {"user.pvfs2.dist_name"    , SPECIAL_DIST_NAME_KEYLEN},
     {"user.pvfs2.dist_params"  , SPECIAL_DIST_PARAMS_KEYLEN},
-    {"user.pvfs2.num_dfiles"   , SPECIAL_NUM_DFILES_KEYLEN},
+    {"user.pvfs2.num_dfiles"   , SPECIAL_DEFAULT_NUM_DFILES_KEYLEN},
     {"user.pvfs2.meta_hint"    , SPECIAL_METAFILE_HINT_KEYLEN},
     {"user.pvfs2.mirror.copies", SPECIAL_MIRROR_COPIES_KEYLEN},
     {"user.pvfs2.mirror.handles", SPECIAL_MIRROR_HANDLES_KEYLEN},
@@ -738,7 +738,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
     s_op->resp.u.getattr.attr.u.meta.dfile_array =
-        malloc(dfile_count * sizeof(PVFS_handle));
+                    malloc(dfile_count * sizeof(PVFS_handle));
     if (!s_op->resp.u.getattr.attr.u.meta.dfile_array)
     {
         gossip_err("Cannot allocate dfile array of count %d\n",
@@ -761,19 +761,18 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 		 s_op->key.buffer_sz, s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_read(
-        s_op->u.getattr.fs_id
-       ,s_op->u.getattr.handle
-       ,&s_op->key
-       ,&s_op->val
-       ,0
-       ,NULL
-       ,smcb
-       ,0
-       ,js_p
-       ,&i
-       ,server_job_context
-       ,s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->u.getattr.fs_id
+                               ,s_op->u.getattr.handle
+                               ,&s_op->key
+                               ,&s_op->val
+                               ,0
+                               ,NULL
+                               ,smcb
+                               ,0
+                               ,js_p
+                               ,&i
+                               ,server_job_context
+                               ,s_op->req->hints);
 
     return ret;
 }
@@ -1335,8 +1334,8 @@ static PINT_sm_action getattr_check_if_capability_required(
  * 
  * Reads any ACL data from Trove if a capability is requested.
  */
-static PINT_sm_action getattr_read_acl(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_read_acl(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
@@ -1364,19 +1363,18 @@ static PINT_sm_action getattr_read_acl(
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
                      "for handle %s\n", PVFS_OID_str(&s_op->target_handle));
 
-    ret = job_trove_keyval_read(
-        s_op->u.getattr.fs_id,
-        s_op->u.getattr.handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context,
-        s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->u.getattr.fs_id,
+                                s_op->u.getattr.handle,
+                                &s_op->key,
+                                &s_op->val,
+                                0,
+                                NULL,
+                                smcb,
+                                0,
+                                js_p,
+                                &tmp_id,
+                                server_job_context,
+                                s_op->req->hints);
 
     return ret;
 }
@@ -1386,8 +1384,8 @@ static PINT_sm_action getattr_read_acl(
  * Creates and fills in a capability object with the appropriate
  * operation mask for the given object.
  */
-static PINT_sm_action getattr_create_capability(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
@@ -1679,8 +1677,8 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
     return;
 }
 
-static PINT_sm_action getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1690,15 +1688,15 @@ static PINT_sm_action getattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-static PINT_sm_action getattr_with_prelude_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_with_prelude_init(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_setup_op(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1747,8 +1745,8 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_get_dist_dir_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_get_dist_dir_attr(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {   
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret; 
@@ -1772,16 +1770,18 @@ static PINT_sm_action getattr_get_dist_dir_attr(
     s_op->free_val = 0;
     
     js_p->error_code = 0;
-    ret = job_trove_keyval_read(
-        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &s_op->key, &s_op->val,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->u.getattr.fs_id,
+                                s_op->u.getattr.handle,
+                                &s_op->key,
+                                &s_op->val,
+                                0,
+                                NULL,
+                                smcb,
+                                0,
+                                js_p,
+                                &tmp_id,
+                                server_job_context,
+                                s_op->req->hints);
 
     return ret;
 }
@@ -1857,8 +1857,8 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[0].buffer_sz =
-        attr->u.dir.dist_dir_attr.bitmap_size *
-        sizeof(PVFS_dist_dir_bitmap_basetype);
+                    attr->u.dir.dist_dir_attr.bitmap_size *
+                    sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
@@ -1866,27 +1866,29 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
 
     s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
     s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.num_servers *
-        sizeof(PVFS_handle);
+                    sizeof(PVFS_handle);
 
     js_p->error_code = 0;
-    ret = job_trove_keyval_read_list(
-        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        s_op->key_a, s_op->val_a,
-        s_op->error_a,
-        s_op->keyval_count,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id,
+                                     s_op->u.getattr.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     s_op->keyval_count,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &tmp_id,
+                                     server_job_context,
+                                     s_op->req->hints);
 
     return ret;
 }
         
-static PINT_sm_action getattr_get_dirent_count(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -1957,8 +1959,8 @@ static PINT_sm_action getattr_get_dirent_count(
     return ret;
 }
 
-static PINT_sm_action getattr_interpret_dirent_count(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_interpret_dirent_count(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     switch(js_p->error_code)
@@ -1981,8 +1983,8 @@ static PINT_sm_action getattr_interpret_dirent_count(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_get_dir_hint(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i;
@@ -2043,19 +2045,19 @@ static PINT_sm_action getattr_get_dir_hint(
                  "of dir handle (coll_id = %d, handle = %s\n",
                  Trove_Special_Keys[DIST_NAME_KEY].key,
                  Trove_Special_Keys[DIST_PARAMS_KEY].key, 
-                 Trove_Special_Keys[NUM_DFILES_KEY].key,
+                 Trove_Special_Keys[DEFAULT_NUM_DFILES_KEY].key,
                  s_op->u.getattr.fs_id,
                  PVFS_OID_str(&s_op->u.getattr.handle));
 
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
-        (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
+                    (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
     if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_params)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
-        PVFS_REQ_LIMIT_DIST_BYTES;
+                    PVFS_REQ_LIMIT_DIST_BYTES;
 
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name = 
         (char *) calloc(1, PVFS_REQ_LIMIT_DIST_NAME);
@@ -2065,31 +2067,35 @@ static PINT_sm_action getattr_get_dir_hint(
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len   = 
-        PVFS_REQ_LIMIT_DIST_NAME;
+                    PVFS_REQ_LIMIT_DIST_NAME;
 
     free_keyval_buffers(s_op);
+
+    /* Note NUM Special Keys is the number of user space attributes we
+     * automatically read with get-attr - we know what they are so we
+     * set up specifically for them.  Note sure why this is done with a
+     * for loop below
+     */
         
-    s_op->key_a = 
-        (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_ds_keyval));
+    s_op->key_a = (PVFS_ds_keyval *)calloc(NUM_SPECIAL_KEYS,
+                                           sizeof(PVFS_ds_keyval));
     if (s_op->key_a == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    s_op->val_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS
-                                           ,sizeof(PVFS_ds_keyval));
+    s_op->val_a = (PVFS_ds_keyval *)calloc(NUM_SPECIAL_KEYS
+                                          ,sizeof(PVFS_ds_keyval));
     if (s_op->val_a == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS,
-        sizeof(PVFS_error));
+    s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_error));
     if(s_op->error_a == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
-
     }
 
     s_op->free_val = 0;
@@ -2098,7 +2104,7 @@ static PINT_sm_action getattr_get_dir_hint(
     {
         s_op->key_a[i].buffer = Trove_Special_Keys[i].key;
         s_op->key_a[i].buffer_sz = Trove_Special_Keys[i].size;
-        if (i == NUM_DFILES_KEY)
+        if (i == DEFAULT_NUM_DFILES_KEY)
         {
             s_op->val_a[i].buffer = (char *) calloc(1, 16);
             if(s_op->val_a[i].buffer == NULL)
@@ -2108,13 +2114,15 @@ static PINT_sm_action getattr_get_dir_hint(
             }
             s_op->val_a[i].buffer_sz = 16;
         }
-        else if (i == DIST_PARAMS_KEY) {
+        else if (i == DIST_PARAMS_KEY)
+        {
             s_op->val_a[i].buffer 
             = s_op->resp.u.getattr.attr.u.dir.hint.dist_params;
             s_op->val_a[i].buffer_sz 
             = s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len;
         }
-        else if (i == DIST_NAME_KEY) {
+        else if (i == DIST_NAME_KEY)
+        {
             s_op->val_a[i].buffer 
             = s_op->resp.u.getattr.attr.u.dir.hint.dist_name;
             s_op->val_a[i].buffer_sz 
@@ -2123,18 +2131,26 @@ static PINT_sm_action getattr_get_dir_hint(
     }
 
     js_p->error_code = 0;
-    ret = job_trove_keyval_read_list(
-        s_op->u.getattr.fs_id, 
-        s_op->u.getattr.handle,
-        s_op->key_a, s_op->val_a, s_op->error_a, NUM_SPECIAL_KEYS,
-        0, NULL, smcb, 0, js_p, &tmp_id,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id, 
+                                     s_op->u.getattr.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     NUM_SPECIAL_KEYS,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &tmp_id,
+                                     server_job_context,
+                                     s_op->req->hints);
 
     return ret;
 }
 
-static PINT_sm_action getattr_interpret_dir_hint(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
@@ -2187,34 +2203,37 @@ static PINT_sm_action getattr_interpret_dir_hint(
            s_op->val_a[DIST_PARAMS_KEY].buffer = NULL;
         }
 
-        if (s_op->error_a[NUM_DFILES_KEY] == 0)
+        if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
         {
             char *endptr = NULL;
-            gossip_debug(GOSSIP_SERVER_DEBUG, "val_a[NUM_DFILES_KEY] %p "
-                                              "read_sz = %d\n", 
-                s_op->val_a[NUM_DFILES_KEY].buffer, 
-                s_op->val_a[NUM_DFILES_KEY].read_sz);
-            dfile_count = strtol(s_op->val_a[NUM_DFILES_KEY].buffer
-                                , &endptr, 10);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "val_a[DEFAULT_NUM_DFILES_KEY] %p read_sz = %d\n", 
+                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer, 
+                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].read_sz);
+
+            dfile_count = strtol(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer,
+                                 &endptr,
+                                 10);
+
             if (*endptr != '\0' || dfile_count < 0)
             {
                 dfile_count = 0;
             }
         }
-        if(s_op->val_a[NUM_DFILES_KEY].buffer)
+        if(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer)
         {
-            free(s_op->val_a[NUM_DFILES_KEY].buffer);
-            s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
-            s_op->val_a[NUM_DFILES_KEY].buffer_sz = 0;
+            free(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer);
+            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer = NULL;
+            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer_sz = 0;
         }
         s_op->keyval_count = 0;
         s_op->free_val = 0;
 
-
         s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
-            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "getattr: dir hint dfile_count: %d\n",
+                     s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
 
         js_p->error_code = 0;
     }/* end if val_a and key_a */
@@ -2225,8 +2244,8 @@ static PINT_sm_action getattr_interpret_dir_hint(
  *
  * determine if a file is stuffed or not
  */
-static PINT_sm_action getattr_detect_stuffed(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_detect_stuffed(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
@@ -2241,15 +2260,18 @@ static PINT_sm_action getattr_detect_stuffed(
     s_op->val.buffer_sz =  sizeof(s_op->u.getattr.num_dfiles_req);
     s_op->free_val = 0;
 
-    return(job_trove_keyval_read(
-        s_op->u.getattr.fs_id, 
-        s_op->u.getattr.handle,
-        &(s_op->key), 
-        &(s_op->val), 
-        0, 
-        NULL, smcb, 0, js_p,
-        &tmp_id, server_job_context,
-        s_op->req->hints));
+    return(job_trove_keyval_read(s_op->u.getattr.fs_id, 
+                                 s_op->u.getattr.handle,
+                                 &(s_op->key), 
+                                 &(s_op->val), 
+                                 0, 
+                                 NULL,
+                                 smcb,
+                                 0,
+                                 js_p,
+                                 &tmp_id,
+                                 server_job_context,
+                                 s_op->req->hints));
 }
 
 static void free_keyval_buffers(struct PINT_server_op *s_op)

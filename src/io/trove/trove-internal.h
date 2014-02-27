@@ -11,8 +11,14 @@
 
 PVFS_error trove_errno_to_trove_error(int errno_value);
 
-int trove_get_version (TROVE_coll_id coll_id, int* major, int* minor, int* incremental);
-int trove_put_version (TROVE_coll_id coll_id, int major, int minor, int incremental);
+int trove_get_version (TROVE_coll_id coll_id,
+                       int* major,
+                       int* minor,
+                       int* incremental);
+int trove_put_version (TROVE_coll_id coll_id,
+                       int major,
+                       int minor,
+                       int incremental);
 
 /* These structures contains the function pointers that should be provided
  * by valid trove "method" implementations
@@ -361,17 +367,20 @@ struct TROVE_mgmt_ops
 {
     int (*initialize)(char *data_path,
 		      char *meta_path,
+		      char *config_path,
 		      TROVE_ds_flags flags);
     
     int (*finalize)(void);
     
     int (*storage_create)(char *data_path,
 			  char *meta_path,
+		          char *config_path,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     
     int (*storage_remove)(char *data_path,
 			  char *meta_path,
+		          char *config_path,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     

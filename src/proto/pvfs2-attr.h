@@ -152,34 +152,49 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 } while (0)
 #endif
 
-#define encode_PVFS_metafile_attr_dfiles(pptr,x) do {                   \
+#define encode_PVFS_metafile_attr_dfiles(pptr,x)                        \
+do {                                                                    \
     int dfiles_i;                                                       \
     encode_uint32_t(pptr, &(x)->mirror_mode);                           \
     encode_uint32_t(pptr, &(x)->dfile_count);                           \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)             \
+    {                                                                   \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
+    }                                                                   \
     encode_uint32_t(pptr, &(x)->sid_count);                             \
     encode_skip4(pptr,);                                                \
     for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)               \
+    {                                                                   \
 	encode_PVFS_SID(pptr, &(x)->sid_array[dfiles_i]);               \
+    }                                                                   \
     encode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
 } while (0)
 
-#define decode_PVFS_metafile_attr_dfiles(pptr,x) do {                     \
-    int dfiles_i;                                                         \
-    decode_uint32_t(pptr, &(x)->mirror_mode);                             \
-    decode_uint32_t(pptr, &(x)->dfile_count);                             \
-    (x)->dfile_array = decode_malloc((x)->dfile_count                     \
-                       * sizeof(*(x)->dfile_array));                      \
-    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)               \
-	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);            \
-    decode_uint32_t(pptr, &(x)->sid_count);                               \
-    decode_skip4(pptr,);                                                  \
-    (x)->sid_array = decode_malloc((x)->sid_count                         \
-                     * sizeof(*(x)->dfile_array));                        \
-    for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)                 \
-	decode_PVFS_handle(pptr, &(x)->sid_array[dfiles_i]);              \
-    decode_PVFS_metafile_hint(pptr, &(x)->hint);                          \
+/* This decodes OIDs and SIDs into a contiguous array to make it easier
+ * to write to the database
+ */
+#define decode_PVFS_metafile_attr_dfiles(pptr,x)                        \
+do {                                                                    \
+    int dfiles_i, sid_i;                                                \
+    decode_uint32_t(pptr, &(x)->mirror_mode);                           \
+    decode_uint32_t(pptr, &(x)->dfile_count);                           \
+    (x)->dfile_array = decode_malloc(                                   \
+                       ((x)->dfile_count                                \
+                        * sizeof(*(x)->dfile_array)) +                  \
+                       ((x)->sid_count                                  \
+                        * sizeof(*(x)->sid_array)));                    \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)             \
+    {                                                                   \
+	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
+    }                                                                   \
+    decode_uint32_t(pptr, &(x)->sid_count);                             \
+    decode_skip4(pptr,);                                                \
+    (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); \
+    for (sid_i=0; sid_i<(x)->sid_count; sid_i++)                        \
+    {                                                                   \
+	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
+    }                                                                   \
+    decode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
 } while (0)
 
 #endif
@@ -274,6 +289,16 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #endif
 
+/* attributes specific to dirdata objects */
+struct PVFS_dirdata_attr_s
+{
+    int32_t count;
+};
+typedef struct PVFS_dirdata_attr_s PVFS_dirdata_attr;
+endecode_fields_1(
+    PVFS_dirdata_attr,
+    int32_t, count);
+
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
 {
@@ -304,6 +329,7 @@ struct PVFS_object_attr
 	PVFS_metafile_attr meta;
 	PVFS_datafile_attr data;
 	PVFS_directory_attr dir;
+	PVFS_dirdata_attr dirdata;
 	PVFS_symlink_attr sym;
     }
     u;

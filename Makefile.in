@@ -1256,8 +1256,9 @@ endif
 src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
+ --ioservers localhost --metaservers localhost --rootservers localhost \
+ --logfile /tmp/pvfs2-server.log --storage /tmp/pvfs2-test-space \
+ --logging "server,network,storage,flow" \
  --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
@@ -1267,8 +1268,8 @@ all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space \
+ --ioservers localhost --metaservers localhost --rootservers localhost \
+ --logfile /tmp/pvfs2-server.log --storage /tmp/pvfs2-test-space \
  --quiet examples/fs.conf
 endif
 

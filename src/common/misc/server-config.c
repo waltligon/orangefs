@@ -72,6 +72,7 @@ static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_rootsrv);
 static DOTCONF_CB(get_root_handle);
+static DOTCONF_CB(get_root_dirdata_handle);
 static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
@@ -170,10 +171,13 @@ static int is_populated_filesystem_configuration(
 static int is_valid_filesystem_configuration(
                     struct server_configuration_s *config_s,
                     struct filesystem_configuration_s *fs);
+/* obsolete at least for me - seems useful */
+#if 0
 static host_alias_t *find_host_alias_ptr_by_alias(
                     struct server_configuration_s *config_s,
                     char *alias,
                     int *index);
+#endif
 static int compare_aliases(void* vkey,
                            void* valias2);
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -594,6 +598,19 @@ static const configoption_t options[] =
      * RootHandle value for the filesystem.
      */
     {"RootHandle", ARG_STR, get_root_handle, NULL,
+            CTX_ROOTSERVERS, NULL},
+
+    /* Specifies the handle value for the root of the Filesystem.  This
+     * is a required option in the Filesystem context.  The format is:
+     *
+     * RootHandle {OID}
+     *
+     * Where {OID} is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     *
+     * In general its best to let the pvfs-genconfig script specify a
+     * RootHandle value for the filesystem.
+     */
+    {"RootDirdataHandle", ARG_STR, get_root_dirdata_handle, NULL,
             CTX_ROOTSERVERS, NULL},
 
     /* This option specifies the name of the particular filesystem or
@@ -1185,16 +1202,19 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
-    if (server_alias_name)
-    {
-        config_s->server_alias = strdup(server_alias_name);
-    }
     if ((server_flag & PARSE_CONFIG_SERVER) && !server_alias_name)
     {
         gossip_err("Server alias not provided for server config\n");
         return 1;
     }
-    config_s->server_alias = server_alias_name;
+    if (server_alias_name)
+    {
+        config_s->server_alias = strdup(server_alias_name);
+    }
+    else
+    {
+        config_s->server_alias = NULL;
+    }
 
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
@@ -1247,10 +1267,19 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         return 1;
     }
 
+/* V3 replaced this with code during parse - exit-serverdef */
+#if 0
     /* set up reference to local server for client */
+    /* V3 probably more dlicate here since server nneds to find his
+     * address for lots of things - would be nice if we didn't need a
+     * commandline argument.  Should run if we have not already found
+     * the ME record, try to locate, and if found, set ME attribute and
+     * make sure we will write an updated config.
+     */
     if (server_alias_name) 
     {
         struct host_alias_s *halias;
+        /* V3 host index is probably obsolete */
         halias = find_host_alias_ptr_by_alias(config_s,
                                               server_alias_name,
                                               &config_s->host_index);
@@ -1268,8 +1297,11 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         {
             /* save alias bmi_address */
             config_s->host_id = strdup(halias->bmi_address);
+            /* save the host_sid */
+            config_s->host_sid = halias->host_sid;
         }
     }
+#endif
 
     /* check for errors */
     if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->data_path)
@@ -1546,10 +1578,23 @@ DOTCONF_CB(exit_serverdef_context)
                 config_s->new_host->bmi_address,
                 config_s->new_host->attributes);
 
+        if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
+        {
+            /* This is our address - save the information */
+            {
+                /* something already set as this host */
+                config_s->new_host = NULL;
+                return "Duplicate address found for this server\n";
+            }
+            config_s->host_sid = config_s->new_host->host_sid;
+            config_s->host_id = strdup(config_s->new_host->bmi_address);
+            config_s->new_host->server_type |= SID_SERVER_ME;
+        }
         SID_update_type(&config_s->new_host->host_sid,
                         config_s->new_host->server_type);
 
         /* add to config list of aliases */
+        /* create list if this is first one */
         if (!config_s->host_aliases)
         {
             config_s->host_aliases = PINT_llist_new();
@@ -2870,6 +2915,27 @@ DOTCONF_CB(get_root_handle)
     return NULL;
 }
 
+DOTCONF_CB(get_root_dirdata_handle)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    PVFS_OID tmp_var;
+    int ret = -1;
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+    assert(fs_conf); /* TODO: replace with error handling */
+
+    ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
+    if(ret != 1)
+    {
+        return("RootDirdataHandle required argument is not a uuid value.\n");
+    }
+    fs_conf->root_dirdata_handle = (PVFS_handle)tmp_var;
+    return NULL;
+}
+
 DOTCONF_CB(get_name)
 {
     struct server_configuration_s *config_s = 
@@ -2990,7 +3056,7 @@ DOTCONF_CB(get_sid)
 
     if (cmd->arg_count != 1)
     {
-        return "Error: SID must include a single OID\n";
+        return "Error: SID must include a single UUID\n";
     }
 
     if (config_s->new_host->host_sid_text)
@@ -4102,7 +4168,10 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
     }
 }
 
-
+/* V3 currently obsolete - seems like a useful func not sure why its
+ * static
+ */
+#if 0
 static host_alias_t *find_host_alias_ptr_by_alias(
         struct server_configuration_s *config_s,
         char *alias,
@@ -4138,6 +4207,7 @@ static host_alias_t *find_host_alias_ptr_by_alias(
     if(index) *index = ind - 1;
     return ret;
 }
+#endif
 
 #ifdef USE_TRUSTED
 /*
@@ -4266,9 +4336,8 @@ char *PINT_config_get_host_addr_ptr(struct server_configuration_s *config_s,
  * This is a linear search, should probably be a hash table
  *   
  */
-char *PINT_config_get_host_alias_ptr(
-        struct server_configuration_s *config_s,
-        char *bmi_url)
+char *PINT_config_get_host_alias_ptr(struct server_configuration_s *config_s,
+                                     char *bmi_url)
 {
     char *ret = (char *)0;
     PINT_llist *cur = NULL;
@@ -4427,10 +4496,10 @@ static int cache_config_files(struct server_configuration_s *config_s,
 
     return 0;
 
-  close_fd_fail:
+close_fd_fail:
     close(fd);
 
-  error_exit:
+error_exit:
     return 1;
 }
 
@@ -4438,15 +4507,14 @@ static int cache_config_files(struct server_configuration_s *config_s,
  * returns 1 if the specified configuration object is valid
  * (i.e. contains values that make sense); 0 otherwise
  */
-int PINT_config_is_valid_configuration(
-        struct server_configuration_s *config_s)
+int PINT_config_is_valid_configuration(struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s && config_s->bmi_modules && config_s->event_logging &&
-        config_s->logfile)
+    if (config_s && config_s->bmi_modules &&
+        config_s->event_logging && config_s->logfile)
     {
         cur = config_s->file_systems;
         while(cur)
@@ -4505,8 +4573,8 @@ int PINT_config_is_valid_collection_id(struct server_configuration_s *config_s,
  * the specified filesystem; NULL otherwise
  */
 struct filesystem_configuration_s* PINT_config_find_fs_name(
-        struct server_configuration_s *config_s,
-        char *fs_name)
+                struct server_configuration_s *config_s,
+                char *fs_name)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -4540,8 +4608,8 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
  * returns pointer to file system config struct on success, NULL on failure
  */
 struct filesystem_configuration_s* PINT_config_find_fs_id(
-        struct server_configuration_s* config_s,
-        PVFS_fs_id fs_id)
+                struct server_configuration_s* config_s,
+                PVFS_fs_id fs_id)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -4567,12 +4635,12 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
 }
 
 PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
-        struct server_configuration_s *config_s,
-        char *fs_name)
+                struct server_configuration_s *config_s,
+                char *fs_name)
 {
     PVFS_fs_id fs_id = 0;
     struct filesystem_configuration_s *fs =
-            PINT_config_find_fs_name(config_s, fs_name);
+                    PINT_config_find_fs_name(config_s, fs_name);
     if (fs)
     {
         fs_id = fs->coll_id;
@@ -4588,8 +4656,7 @@ PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
  * returns pointer to a list of file system config structs on success,
  * NULL on failure
  */
-PINT_llist *PINT_config_get_filesystems(
-        struct server_configuration_s *config_s)
+PINT_llist *PINT_config_get_filesystems(struct server_configuration_s *config_s)
 {
     return (config_s ? config_s->file_systems : NULL);
 }
@@ -4598,9 +4665,8 @@ PINT_llist *PINT_config_get_filesystems(
  * given a configuration object, weed out all information about other
  * filesystems if the fs_id does not match that of the specifed fs_id
  */
-int PINT_config_trim_filesystems_except(
-        struct server_configuration_s *config_s,
-        PVFS_fs_id fs_id)
+int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
+                                        PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL, *new_fs_list = NULL;
@@ -4724,15 +4790,22 @@ int PINT_config_get_fs_key(struct server_configuration_s *config,
  * create a storage space based on configuration settings object
  * with the particular host settings local to the caller
  */
-int PINT_config_pvfs2_mkspace(
-        struct server_configuration_s *config)
+int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
 {
     int ret = 1;
-    PVFS_handle root_handle = PVFS_HANDLE_NULL;
+    int s = 0;
     int create_collection_only = 0;
     PINT_llist *cur = NULL;
+    PVFS_handle root_handle = PVFS_HANDLE_NULL;
+    PVFS_handle root_dirdata_handle = PVFS_HANDLE_NULL;
+    PVFS_SID *root_sid_array = NULL;
+    int root_sid_count = 0;
+
     /* V3 obsolete - no more handle ranges */
+#if 0
     char *cur_meta_handle_range = NULL, *cur_data_handle_range = NULL;
+#endif
+
     filesystem_configuration_t *cur_fs = NULL;
 
     if (config)
@@ -4746,10 +4819,6 @@ int PINT_config_pvfs2_mkspace(
                 break;
             }
 
-            /* V3 this needs to check if the current
-             * server is listed in the root_servers list or
-             * root_sid_array
-             */
             /*
              * for the first fs/collection we encounter, create the
              * storage space if it doesn't exist.
@@ -4761,13 +4830,37 @@ int PINT_config_pvfs2_mkspace(
                 (create_collection_only ? "collection" :
                  "storage space"));
 
+            /* see if this is a root server and if not do not pass the
+             * handles
+             */
+
+            for(s = 0; s < cur_fs->root_sid_count; s++)
+            {
+                if (!PVFS_SID_cmp(&cur_fs->root_sid_array[s],
+                                  &config->host_sid))
+                {
+                    root_handle = cur_fs->root_handle;
+                    root_dirdata_handle = cur_fs->root_dirdata_handle;
+                    root_sid_array = &cur_fs->root_sid_array[s];
+                    root_sid_count = cur_fs->root_sid_count;
+                    break;
+                }
+            }
+
             ret = pvfs2_mkspace(config->data_path,
                                 config->meta_path,
+                                config->config_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 root_handle,
+                                root_dirdata_handle,
+                                root_sid_array,
+                                root_sid_count,
+/* V3 nolonger used */
+#if 0
                                 cur_meta_handle_range, /* V3 fix this */
                                 cur_data_handle_range, /* V3 fix this */
+#endif
                                 create_collection_only,
                                 1);
 
@@ -4823,6 +4916,7 @@ int PINT_config_pvfs2_rmspace(struct server_configuration_s *config)
                  "storage space"));
             ret = pvfs2_rmspace(config->data_path,
                                 config->meta_path,
+                                config->config_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,
@@ -4838,9 +4932,8 @@ int PINT_config_pvfs2_rmspace(struct server_configuration_s *config)
  * returns the metadata sync mode (storage hint) for the specified
  * fs_id if valid; TROVE_SYNC otherwise
  */
-int PINT_config_get_trove_sync_meta(
-        struct server_configuration_s *config,
-        PVFS_fs_id fs_id)
+int PINT_config_get_trove_sync_meta(struct server_configuration_s *config,
+                                    PVFS_fs_id fs_id)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
@@ -4855,9 +4948,8 @@ int PINT_config_get_trove_sync_meta(
  * returns the data sync mode (storage hint) for the specified
  * fs_id if valid; TROVE_SYNC otherwise
  */
-int PINT_config_get_trove_sync_data(
-        struct server_configuration_s *config,
-        PVFS_fs_id fs_id)
+int PINT_config_get_trove_sync_data(struct server_configuration_s *config,
+                                    PVFS_fs_id fs_id)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 

@@ -77,6 +77,7 @@ typedef struct filesystem_configuration_s
 
     /* root object and servers for this FS */
     PVFS_handle  root_handle;
+    PVFS_handle  root_dirdata_handle;
     int root_sid_count;
     PVFS_SID *root_sid_array; /* array of binary SIDs */
 
@@ -160,6 +161,7 @@ typedef struct server_configuration_s
 {
     PVFS_SID host_sid;              /* SID of this server */
     char *host_id;                  /* bmi_address of this server */
+    /* V3 host_index is probably obsolete */
     int host_index;
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;

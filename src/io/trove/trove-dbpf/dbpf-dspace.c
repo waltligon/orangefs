@@ -92,10 +92,9 @@ static inline void organize_post_op_statistics(
     }
 }
 
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle);
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);

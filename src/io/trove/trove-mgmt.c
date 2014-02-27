@@ -88,6 +88,7 @@ int trove_initialize(TROVE_method_id method_id,
                      TROVE_method_callback method_callback,
                      char *data_path,
                      char *meta_path,
+                     char *config_path,
                      TROVE_ds_flags flags)
 {
     int ret = -TROVE_EALREADY;
@@ -114,6 +115,7 @@ int trove_initialize(TROVE_method_id method_id,
     */
     ret = mgmt_method_table[method_id]->initialize(data_path,
                                                    meta_path,
+                                                   config_path,
                                                    flags);
     if (ret > -1)
     {
@@ -148,12 +150,14 @@ int trove_finalize(TROVE_method_id method_id)
 
 int trove_storage_create(TROVE_method_id method_id,
                          char *data_path,
-			 			 char *meta_path,
+                         char *meta_path,
+                         char *config_path,
                          void *user_ptr,
                          TROVE_op_id *out_op_id_p)
 {
     int ret = mgmt_method_table[method_id]->storage_create(data_path,
                                                            meta_path,
+                                                           config_path,
                                                            user_ptr,
                                                            out_op_id_p);
 
@@ -164,11 +168,13 @@ int trove_storage_create(TROVE_method_id method_id,
 int trove_storage_remove(TROVE_method_id method_id,
                          char *data_path,
                          char *meta_path,
+                         char *config_path,
                          void *user_ptr,
                          TROVE_op_id *out_op_id_p)
 {
     int ret = mgmt_method_table[method_id]->storage_remove(data_path,
                                                            meta_path,
+                                                           config_path,
                                                            user_ptr,
                                                            out_op_id_p);
 
