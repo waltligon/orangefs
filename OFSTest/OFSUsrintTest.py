@@ -184,7 +184,6 @@ def bonnie(testing_node,output=[]):
         if rc != 0:
             return rc
         
-    #testing_node.changeDirectory(testing_node.ofs_mount_point)
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
 
     rc = testing_node.runSingleCommand("export %s; cd %s; %s/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 2>&1" % (preload,testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location),output)
@@ -602,7 +601,6 @@ def usrint_cp(testing_node,output=[]):
 tests = [ 
 append,
 append2,
-bonnie,
 fdtree,
 fstest,
 fsx,
@@ -613,4 +611,5 @@ symlink_usrint,
 tail,
 usrint_cp,
 ltp,
-dbench ]
+dbench,
+bonnie ]

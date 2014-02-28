@@ -662,8 +662,7 @@ class OFSTestMain(object):
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
                     pass
-        
-                    
+
         # run miscellaneous tests after run.
         if True == True:
             
@@ -689,20 +688,21 @@ class OFSTestMain(object):
                     traceback.print_exc()
                     pass
         
-#         # Test runfunction group
-#         # TODO: Remove this.
-#         try:
-#             self.runFunctionGroup("OFSHadoopTest")
-#         except:
-#             "runFunctionGroup didn't work. Oh well"
-#             traceback.print_exc()
-# 
-# 
-#         if self.config.ec2_delete_after_test == True:
-#             print ""
-#             print "==================================================================="
-#             print "Terminating Nodes"
-#             self.ofs_network.terminateAllEC2Nodes()
+
+        # Test runfunction group
+        # TODO: Remove this.
+#        try:
+#            self.runFunctionGroup("OFSHadoopTest")
+#        except:
+#            "runFunctionGroup didn't work. Oh well"
+#            traceback.print_exc()
+#
+#
+#        if self.config.ec2_delete_after_test == True:
+#            print ""
+#            print "==================================================================="
+#            print "Terminating Nodes"
+#            self.ofs_network.terminateAllEC2Nodes()
 
     ##
     #
