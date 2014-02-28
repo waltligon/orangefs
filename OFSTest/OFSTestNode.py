@@ -2419,7 +2419,7 @@ class OFSTestNode(object):
     
     def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mount_point
-        self.runSingleCommandAsBatch("sudo umount %s" % self.ofs_mount_point)
+        self.runSingleCommandAsBatch("sudo umount -f -l %s" % self.ofs_mount_point)
         time.sleep(15)
 
     ##
