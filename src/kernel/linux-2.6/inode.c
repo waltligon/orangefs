@@ -327,12 +327,13 @@ int pvfs2_getattr(
          * precedence.  However, we don't want to mark the inode "bad" in this case; we want the 
          * getattr to be retried.
          */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d Received EINTR(%d)\n",__FILE__,__func__,__LINE__,ret);
         ret = -EAGAIN;
     }
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode with return code(%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -380,7 +381,7 @@ int pvfs2_getattr_lite(
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode (ret:%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;

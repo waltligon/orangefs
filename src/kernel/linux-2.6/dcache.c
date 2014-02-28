@@ -187,10 +187,13 @@ static int pvfs2_d_delete (
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_d_revalidate(struct dentry *dentry,
                               int flags)
-{
 #elif defined(PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA)
 static int pvfs2_d_revalidate(struct dentry *dentry,
                               struct nameidata *nd)
+#else
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              unsigned int flags)
+#endif
 {
 # ifdef LOOKUP_RCU
     if (nd->flags & LOOKUP_RCU)
@@ -198,32 +201,10 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
         return -ECHILD;
     }
 # endif
-
-    if (nd && (nd->flags & LOOKUP_FOLLOW) && (!(nd->flags & LOOKUP_CREATE)) )
-    {
-        gossip_debug(GOSSIP_DCACHE_DEBUG,
-                     "\n%s: Trusting intent; skipping getattr\n", __func__);
-        return 1;
-    }
-#else
-static int pvfs2_d_revalidate(struct dentry *dentry,
-                              unsigned int flags)
-{
-# ifdef LOOKUP_RCU
-    if (flags & LOOKUP_RCU)
-    {
-        return -ECHILD;
-    }
-# endif
-    if ((flags & LOOKUP_FOLLOW) &&
-        (!(flags & LOOKUP_CREATE)))
-    {
-        gossip_debug(GOSSIP_DCACHE_DEBUG,
-                     "\n%s: Trusting intent; skipping getattr\n", __func__);
-        return 1;
-    }
-#endif
     /* All 3 implementations call this */
+    /* NOTE: We should ALWAYS revalidate a directory entry.  If we don't, then stale information is kept in 
+     * Linux's directory cache, and, in some cases, causing the inode to be marked as "bad", resulting in an EIO error.
+     */  
     return(pvfs2_d_revalidate_common(dentry));
 }
 
