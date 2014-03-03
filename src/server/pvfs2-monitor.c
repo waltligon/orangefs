@@ -1,3 +1,9 @@
+/*
+ * (C) 2013 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

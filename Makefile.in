@@ -786,7 +786,7 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
-BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
+BGPROCOBJS := $(patsubst %.c,%.po, $(filter %.c,$(BGPROCSRC)))
 BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
 BGPROCAPPS := $(patsubst %.c,%, $(filter %.c, $(BGPROCAPPSRC)))
 
@@ -1210,21 +1210,16 @@ $(USERTOOLS): %: %.o $(LIBRARIES)
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
 
 # PVFS Background Processes (bgproc)
-bgproc: lib/libpvfs2-bgproc.a lib/libpvfs2-bgproc.so $(BGPROCAPPS)
+bgproc: lib/libpvfs2-bgproc.so $(BGPROCAPPS)
 
-lib/libpvfs2-bgproc.a: $(BGPROCOBJS)
-	$(Q) "  RANLIB	$@"
-	$(E)$(INSTALL) -d lib
-	$(E)ar rcs $@ $(BGPROCOBJS)
-
-lib/libpvfs2-bgproc.so: $(BGPROCOBJS) lib/libpvfs2.so
+lib/libpvfs2-bgproc.so: $(BGPROCOBJS) lib/libpvfs2.so lib/libofs.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-bgproc.so,-z,interpose,-Bsymbolic -o $@ $(BGPROCOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-bgproc.so,-z,interpose,-Bsymbolic -o $@ $(BGPROCOBJS) -lofs $(DEPLIBS)
 
 $(BGPROCAPPS): %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) -lpvfs2-bgproc $(call modldflags,$<)
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) -lpvfs2-bgproc -lofs $(call modldflags,$<)
 
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
