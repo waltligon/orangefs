@@ -17,11 +17,6 @@
 #include "pint-security.h"
 #include "dist-dir-utils.h"
 
-enum
-{
-    UPDATE_DIR_ATTR_REQUIRED = 133
-};
-
 %%
 
 machine pvfs2_rmdirent_sm
@@ -57,20 +52,13 @@ machine pvfs2_rmdirent_sm
     state remove_directory_entry
     {
         run rmdirent_remove_directory_entry;
-        success => check_for_req_dir_update;
+        success => update_directory_attr;
         default => remove_directory_entry_failure;
     }
 
     state remove_directory_entry_failure
     {
         run rmdirent_remove_directory_entry_failure;
-        default => setup_resp;
-    }
-
-    state check_for_req_dir_update
-    {
-        run rmdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
         default => setup_resp;
     }
 
@@ -366,23 +354,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
                                   server_job_context,
                                   s_op->req->hints);
 
-    /* 
-     * Removing an entry causes an update of directory timestamps
-     */
-    s_op->u.rmdirent.dir_attr_update_required = 1;
     return ret;
-}
-
-static PINT_sm_action rmdirent_check_for_req_dir_update(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if ((js_p->error_code == 0) &&
-        (s_op->u.rmdirent.dir_attr_update_required))
-    {
-        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
-    }
-    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
@@ -394,13 +366,6 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-
-    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
-    {
-        PVFS_perror_gossip("previous keyval remove failed",
-                           js_p->error_code);
-        return SM_ACTION_COMPLETE;
-    }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.rmdirent.dirdata_attr;
