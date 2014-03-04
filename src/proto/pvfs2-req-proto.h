@@ -1209,6 +1209,9 @@ endecode_fields_4a_struct(
 #define extra_size_PVFS_servreq_rmdirent \
                     roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
+/* V3: The state machine doesn't use handle so we can get
+       rid of it. The sid_count and sid_array we need will
+       be for the dirent_handle. */
 #define PINT_SERVREQ_RMDIRENT_FILL(__req,                \
                                    __cap,                \
                                    __fsid,               \
@@ -1273,6 +1276,8 @@ endecode_fields_5a1a_struct(
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
+/* V3: The state machine doesn't use handle so we can get
+       rid of it, sid_count, and sid_array. */
 #define PINT_SERVREQ_CHDIRENT_FILL(__req,                     \
                                    __cap,                     \
                                    __fsid,                    \

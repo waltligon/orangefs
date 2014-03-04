@@ -384,7 +384,6 @@ struct PINT_server_crdirent_op
     PVFS_size dirent_count;
     PVFS_size sid_count;
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 
@@ -414,7 +413,6 @@ struct PINT_server_rmdirent_op
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
     PVFS_size dirent_count;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -424,7 +422,6 @@ struct PINT_server_chdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle old_dirent_handle;
     PVFS_handle new_dirent_handle;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };

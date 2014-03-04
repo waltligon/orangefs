@@ -28,13 +28,8 @@ int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 enum
 {
-    INVALID_OBJECT = 131,
-    INVALID_DIRDATA,
-    UPDATE_DIR_ATTR_REQUIRED,
-    SPLIT_REQUIRED,
-    NO_SPLIT_REQUIRED,
+    SPLIT_REQUIRED = 131,
     SPLIT_FATAL_ERROR,
-    LOCAL_METAHANDLE,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
 };
@@ -76,34 +71,13 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_validate;
         success => write_directory_entry;
-        INVALID_OBJECT => validation_object_type_failure;
-        INVALID_DIRDATA => validation_dirdata_mismatch;
-        default => final_response;
-    }
-
-    state validation_object_type_failure
-    {
-        run validation_object_type_failure;
-        default => final_response;
-    }
-
-    state validation_dirdata_mismatch
-    {
-        run validation_dirdata_mismatch;
         default => final_response;
     }
 
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
-        success => check_for_req_dir_update;
-        default => final_response;
-    }
-
-    state check_for_req_dir_update
-    {
-        run crdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        success => update_directory_attr;
         default => final_response;
     }
 
@@ -124,7 +98,6 @@ machine pvfs2_crdirent_sm
     state check_for_split
     {
         run crdirent_check_for_split;
-/*        SPLIT_REQUIRED => activate_server_setup; */
         SPLIT_REQUIRED => retrieve_dir_entries;
         default => final_response;
     }
@@ -146,7 +119,6 @@ machine pvfs2_crdirent_sm
     state split_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-/*        success => remove_local_copies; */
         success => activate_server_setup;
         default => split_cleanup_msgpairarray;
     }
@@ -272,6 +244,10 @@ machine pvfs2_crdirent_sm
  * storing request structure fields in state machine so that nested
  * machines are not dependent on request type
  */
+/* ECQ: Not sure why it is necessary to copy fields from the request structure.
+ * This state machine is not itself nested and the only nested state machines
+ * it calls are prelude_sm, pvfs2_msgpairarray_sm, and pvfs2_final_response_sm.
+*/
 static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
@@ -291,7 +267,6 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
     s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
-    s_op->u.crdirent.dir_attr_update_required = 0;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
@@ -607,7 +582,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
 
-        js_p->error_code = INVALID_DIRDATA;
+        js_p->error_code = -PVFS_EAGAIN;
         return SM_ACTION_COMPLETE;
     }
     else
@@ -617,27 +592,6 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     }
 
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_object_type_failure(struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "crdirent: validation_object_type_failure called\n");
-
-    js_p->error_code = -PVFS_ENOTDIR;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_dirdata_mismatch(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_dirdata_"
-                 "mismatch called, let client try again!!\n");
-
-    /* using a new error code?? use the try again error code*/
-    js_p->error_code = -PVFS_EAGAIN;
     return SM_ACTION_COMPLETE;
 }
 
@@ -658,6 +612,8 @@ static PINT_sm_action validation_dirdata_mismatch(
  * Synopsis: We are now ready to store the name/handle pair in the k/v
  *           space for directory handles.
  */
+/* V3: Need to write backpointer to bucket.
+ * The handle is the key. Need to think about how to store related SIDs. */
 static PINT_sm_action crdirent_write_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -713,25 +669,9 @@ static PINT_sm_action crdirent_write_directory_entry(
                                  server_job_context,
                                  s_op->req->hints);
 
-    /*
-     * creating an entry will cause directory times to be updated.
-     */
-    s_op->u.crdirent.dir_attr_update_required = 1;
     return ret;
 }
 
-static PINT_sm_action crdirent_check_for_req_dir_update(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if ((js_p->error_code == 0) &&
-        (s_op->u.crdirent.dir_attr_update_required))
-    {
-        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
-    }
-    return SM_ACTION_COMPLETE;
-}
-    
 static PINT_sm_action crdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -744,15 +684,6 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_uid uid;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t num_groups;
-
-    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
-    {
-        PVFS_perror_gossip("previous keyval write failed",
-                           js_p->error_code);
-        return SM_ACTION_COMPLETE;
-    }
-
-    js_p->error_code = 0;
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.crdirent.dirdata_attr;
