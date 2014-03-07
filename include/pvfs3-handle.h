@@ -46,6 +46,17 @@ typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
     *(pptr) += OID_SZ; \
 } while (0)
 
+/** This union makes it easy to work with an array of mixed OID and SID
+ * items - they are the same size and format, but this helps keep the
+ * compiler happy and makes it clearer what we are doing in some spots.
+ * Mostly this is used when we write such lists to disk
+ */
+typedef union PVFS_ID_u
+{
+    PVFS_OID oid;
+    PVFS_SID sid;
+} PVFS_ID;
+
 #define PVFS_HANDLE_NULL_INIT {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
 static const PVFS_OID PVFS_HANDLE_NULL = PVFS_HANDLE_NULL_INIT;
 static const PVFS_OID PVFS_HANDLE_HIGH = {{255,255,255,255,255,
