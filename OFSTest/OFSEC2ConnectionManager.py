@@ -281,9 +281,9 @@ class OFSEC2ConnectionManager(object):
         #print image.__dict__
         
 
-        reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, user_data=None, instance_type=instance_type)
+        reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, user_data=None, instance_type=instance_type, network='42f48524-45d3-41fa-aee4-4e5ecf762f79')
 
-        print "Creating %d new %s %s instances." % (number_nodes,instance_type,image_system)
+        
 
         print "Waiting 120 seconds for all instances to start."
         time.sleep(120)
