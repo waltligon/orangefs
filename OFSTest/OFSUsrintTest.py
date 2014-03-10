@@ -599,6 +599,7 @@ def usrint_cp(testing_node,output=[]):
     return rc
 
 tests = [ 
+ltp,
 append,
 append2,
 fdtree,
@@ -610,6 +611,6 @@ shelltest,
 symlink_usrint,
 tail,
 usrint_cp,
-ltp,
+
 dbench,
 bonnie ]

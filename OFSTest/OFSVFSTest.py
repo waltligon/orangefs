@@ -639,9 +639,10 @@ def vfs_cp(testing_node,output=[]):
     return rc
 
 tests = [ 
+ltp,
 append,
 append2,
-bonnie,
+
 fdtree,
 fstest,
 fsx,
@@ -651,6 +652,6 @@ shelltest,
 symlink_vfs,
 tail,
 vfs_cp,
-ltp,
+bonnie,
 dbench
  ]
