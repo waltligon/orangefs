@@ -313,7 +313,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* also insert entry into attr cache */
@@ -472,8 +472,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     dirdata_server_index =
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.dist_dir_attr,
-            sm_p->getattr.attr.dist_dir_bitmap);
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
@@ -484,7 +484,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  sm_p->u.mkdir.object_name,
                  PVFS_OID_str(&sm_p->u.mkdir.metafile_handle),
                  PVFS_OID_str(&sm_p->object_ref.handle),
-                 PVFS_OID_str(&sm_p->getattr.attr.dirdata_handles[
+                 PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                                   dirdata_server_index]),
                  dirdata_server_index);
 
@@ -501,7 +501,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                sm_p->u.mkdir.object_name,
                sm_p->parent_ref.fs_id,
                sm_p->parent_ref.handle,
-               sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
+               sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
                sm_p->parent_ref.sid_count,
                sm_p->parent_ref.sid_array,
                sm_p->object_ref.handle,
@@ -510,7 +510,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle =
-        sm_p->getattr.attr.dirdata_handles[dirdata_server_index];
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->parent_ref.sid_array;
@@ -709,12 +709,12 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
         "parent owner: %d, group: %d, perms: %d, dirdata_server_count: %d\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms,
-        attr->dist_dir_attr.num_servers);
-    for (i = 0; i < attr->dist_dir_attr.num_servers; i++)
+        attr->u.dir.dist_dir_attr.num_servers);
+    for (i = 0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "                           dirdata_handle[%d] = %s\n",
-                     i, PVFS_OID_str(&attr->dirdata_handles[i]));
+                     i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
     }
 
     /* do we have a setgid bit? */

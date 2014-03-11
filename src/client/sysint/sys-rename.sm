@@ -145,10 +145,10 @@ machine pvfs2_client_rename_sm
 
     state rename_crdirent_retry_or_fail
     {
-	run rename_crdirent_retry_or_fail;
-	RENAME_CRDIRENT_RETRY => rename_crdirent_timer;
-	RENAME_CRDIRENT_RETRY_NEED_GETATTR => crdirent_getattr_setup;
-	default => cleanup;
+        run rename_crdirent_retry_or_fail;
+        RENAME_CRDIRENT_RETRY => rename_crdirent_timer;
+        RENAME_CRDIRENT_RETRY_NEED_GETATTR => crdirent_getattr_setup;
+        default => cleanup;
     }
 
     state crdirent_getattr_setup
@@ -172,8 +172,8 @@ machine pvfs2_client_rename_sm
 
     state rename_crdirent_timer
     {
-	run rename_generic_timer;
-	default => rename_crdirent_setup_msgpair;
+        run rename_generic_timer;
+        default => rename_crdirent_setup_msgpair;
     }
 
     state rename_rmdirent_setup_msgpair
@@ -192,10 +192,10 @@ machine pvfs2_client_rename_sm
 
     state rename_rmdirent_retry_or_fail
     {
-	run rename_rmdirent_retry_or_fail;
-	RENAME_RMDIRENT_RETRY => rename_rmdirent_timer;
-	RENAME_RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
-	default => rename_rmdirent_failure;
+        run rename_rmdirent_retry_or_fail;
+        RENAME_RMDIRENT_RETRY => rename_rmdirent_timer;
+        RENAME_RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
+        default => rename_rmdirent_failure;
     }
 
     state rmdirent_getattr_setup
@@ -219,15 +219,15 @@ machine pvfs2_client_rename_sm
 
     state rename_rmdirent_timer
     {
-	run rename_generic_timer;
-	default => rename_rmdirent_setup_msgpair;
+        run rename_generic_timer;
+        default => rename_rmdirent_setup_msgpair;
     }
 
     state rename_rmdirent_failure
     {
         run rename_rmdirent_failure;
         success => rename_rmdirent_setup_msgpair;
-	default => rename_warn_user_to_run_fsck;
+        default => rename_warn_user_to_run_fsck;
     }
 
     state rename_check_for_remove
@@ -267,7 +267,7 @@ machine pvfs2_client_rename_sm
     state rename_chdirent_retry_or_failure
     {
         run rename_chdirent_retry_or_failure;
-	RENAME_CHDIRENT_RETRY => rename_parent_getattr_setup_msgpair_array;
+        RENAME_CHDIRENT_RETRY => rename_parent_getattr_setup_msgpair_array;
         default => rename_chdirent_failure;
     }
 
@@ -475,20 +475,20 @@ static int rename_parent_getattr_comp_fn(void *v_p,
             "split_size=%d, server_no=%d and branch_level=%d\n",
             index,
             PVFS_OID_str(&sm_p->u.rename.parent_refns[index].handle),
-            attr->dist_dir_attr.tree_height,
-            attr->dist_dir_attr.num_servers,
-            attr->dist_dir_attr.bitmap_size,
-            attr->dist_dir_attr.split_size,
-            attr->dist_dir_attr.server_no,
-            attr->dist_dir_attr.branch_level);
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
 
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             " with dist_dir_bitmap as:\n");
 
-    for(i = attr->dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
-        c = (unsigned char *)(attr->dist_dir_bitmap + i);
+        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);
@@ -498,11 +498,11 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
             "\t dirdata handles array \n");
 
-    for(i=0; i < attr->dist_dir_attr.num_servers; i++)
+    for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "\t\tdirdata server %d: %s.\n",
-                i, PVFS_OID_str(&attr->dirdata_handles[i]));
+                i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
     }
 
     /* Copy capability */
@@ -511,7 +511,7 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     /*
       calculate the dirdata handle -- 'old' or 'new' based on index;
     */
-    assert(attr->dist_dir_attr.num_servers > 0);
+    assert(attr->u.dir.dist_dir_attr.num_servers > 0);
 
     hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[index]);
     /* gossip hash */
@@ -521,17 +521,17 @@ static int rename_parent_getattr_comp_fn(void *v_p,
             llu(hash));
 
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
-                                              &attr->dist_dir_attr,
-                                              attr->dist_dir_bitmap);
+                                              &attr->u.dir.dist_dir_attr,
+                                              attr->u.dir.dist_dir_bitmap);
     /* stash dirent_handle */
     sm_p->u.rename.dirent_handle[index] =
-                attr->dirdata_handles[dirdata_index];
+                attr->u.dir.dirdata_handles[dirdata_index];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
             " as the dirent_handle for dirent %s.\n",
             dirdata_index,
-            PVFS_OID_str(&attr->dirdata_handles[dirdata_index]),
+            PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[index]);
 
     return 0;
@@ -673,7 +673,7 @@ static int rename_rmdirent_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /*
@@ -699,7 +699,7 @@ static int rename_chdirent_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /*
@@ -1058,14 +1058,14 @@ static PINT_sm_action rename_rmdirent_failure(struct PINT_smcb *smcb,
             GOSSIP_CLIENT_DEBUG, "cleaning up new dirent because of "
             "previous failure.\n");
         sm_p->u.rename.rmdirent_index++;
-	sm_p->u.rename.stored_error_code = js_p->error_code;
-	js_p->error_code = 0;
+        sm_p->u.rename.stored_error_code = js_p->error_code;
+        js_p->error_code = 0;
     }
     else
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "failed to clean up created dirent!\n");
-	/* leave error code untouched, fall to next state */
+        /* leave error code untouched, fall to next state */
     }
     return SM_ACTION_COMPLETE;
 }
@@ -1196,9 +1196,9 @@ static PINT_sm_action rename_chdirent_retry_or_failure(struct PINT_smcb *smcb,
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
-	js_p->error_code = RENAME_CHDIRENT_RETRY;
+        js_p->error_code = RENAME_CHDIRENT_RETRY;
 
-	return  SM_ACTION_COMPLETE;
+        return  SM_ACTION_COMPLETE;
     }
 
     /* let other errors fall through to next state */
@@ -1307,29 +1307,29 @@ static PINT_sm_action rename_crdirent_retry_or_fail(struct PINT_smcb *smcb,
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
-	js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
+        js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
 
-	return  SM_ACTION_COMPLETE;
+        return  SM_ACTION_COMPLETE;
     }
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
+        (sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.rename.retry_count++;
-	js_p->error_code = RENAME_CRDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.rename.retry_count++;
+        js_p->error_code = RENAME_CRDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
         (sm_p->u.rename.retry_count > 0))
     {
-	/* assume everything worked out ok and we got the right
-	 * directory entry back.  there was just a transient network
-	 * problem along the way
-	 */
-	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
+        /* assume everything worked out ok and we got the right
+         * directory entry back.  there was just a transient network
+         * problem along the way
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
 
     /* let other errors fall through to next state */
@@ -1382,17 +1382,17 @@ static PINT_sm_action rename_crdirent_getattr_fill_dirent_handle(
                  llu(hash));
 
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
-                                              &attr->dist_dir_attr,
-                                              attr->dist_dir_bitmap);
+                                              &attr->u.dir.dist_dir_attr,
+                                              attr->u.dir.dist_dir_bitmap);
     /* stash dirent_handle */
     sm_p->u.rename.dirent_handle[1] =
-                    attr->dirdata_handles[dirdata_index];
+                    attr->u.dir.dirdata_handles[dirdata_index];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
             " as the dirent_handle for dirent %s.\n",
             dirdata_index,
-            PVFS_OID_str(&attr->dirdata_handles[dirdata_index]),
+            PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[1]);
 
     return SM_ACTION_COMPLETE;
@@ -1415,32 +1415,32 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
         PINT_acache_invalidate(sm_p->u.rename.parent_refns[
                                           sm_p->u.rename.rmdirent_index]);
 
-	js_p->error_code = RENAME_RMDIRENT_RETRY_NEED_GETATTR;
+        js_p->error_code = RENAME_RMDIRENT_RETRY_NEED_GETATTR;
 
-	return  SM_ACTION_COMPLETE;
+        return  SM_ACTION_COMPLETE;
     }
 
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
+        (sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.rename.retry_count++;
-	js_p->error_code = RENAME_RMDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.rename.retry_count++;
+        js_p->error_code = RENAME_RMDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
         (sm_p->u.rename.retry_count > 0))
     {
-	/* tricky error case.  The rmdirent failed, but it wasn't our
-	 * first try.  Assume that a previous one was successful and
-	 * we just didn't get the response.  This particular case
-	 * isn't as dangerous in rename as it is in remove.  Just let
-	 * it go without warning.
-	 */
-	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
+        /* tricky error case.  The rmdirent failed, but it wasn't our
+         * first try.  Assume that a previous one was successful and
+         * we just didn't get the response.  This particular case
+         * isn't as dangerous in rename as it is in remove.  Just let
+         * it go without warning.
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
 
     /* let other errors fall through to next state */
@@ -1494,17 +1494,17 @@ static PINT_sm_action rename_rmdirent_getattr_fill_dirent_handle(
             llu(hash));
 
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
-                                              &attr->dist_dir_attr,
-                                              attr->dist_dir_bitmap);
+                                              &attr->u.dir.dist_dir_attr,
+                                              attr->u.dir.dist_dir_bitmap);
     /* stash dirent_handle */
     sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index] =
-                    attr->dirdata_handles[dirdata_index];
+                    attr->u.dir.dirdata_handles[dirdata_index];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
             " as the dirent_handle for dirent %s.\n",
             dirdata_index,
-            PVFS_OID_str(&attr->dirdata_handles[dirdata_index]),
+            PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
 
     return SM_ACTION_COMPLETE;

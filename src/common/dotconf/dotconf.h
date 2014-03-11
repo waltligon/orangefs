@@ -196,6 +196,8 @@ extern "C"
 /* ------ PINT_dotconf_create() -
  * create the configfile_t needed for further dot.conf fun ------------ */
     configfile_t *PINT_dotconf_create(char *,
+                                      void *,
+                                      int,
                                       const configoption_t *,
                                       context_t *,
                                       unsigned long);

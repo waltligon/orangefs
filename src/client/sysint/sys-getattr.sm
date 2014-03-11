@@ -463,20 +463,20 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                         "sys-getattr: dist-dir-attr "
                         "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
                         "split_size=%d, server_no=%d and branch_level=%d\n",
-                        attr->dist_dir_attr.tree_height,
-                        attr->dist_dir_attr.num_servers,
-                        attr->dist_dir_attr.bitmap_size,
-                        attr->dist_dir_attr.split_size,
-                        attr->dist_dir_attr.server_no,
-                        attr->dist_dir_attr.branch_level);
+                        attr->u.dir.dist_dir_attr.tree_height,
+                        attr->u.dir.dist_dir_attr.num_servers,
+                        attr->u.dir.dist_dir_attr.bitmap_size,
+                        attr->u.dir.dist_dir_attr.split_size,
+                        attr->u.dir.dist_dir_attr.server_no,
+                        attr->u.dir.dist_dir_attr.branch_level);
 
                 /* gossip bitmap */
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                         "sys-getattr: dist_dir_bitmap as:\n");
-                for(tmp_i = attr->dist_dir_attr.bitmap_size - 1;
+                for(tmp_i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
                         tmp_i >= 0 ; tmp_i--)
                 {
-                    c = (unsigned char *)(attr->dist_dir_bitmap + tmp_i);
+                    c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + tmp_i);
                     gossip_debug(GOSSIP_MKDIR_DEBUG,
                             " i=%d : %02x %02x %02x %02x\n",
                             tmp_i, c[3], c[2], c[1], c[0]);
@@ -487,13 +487,13 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                         "sys-getattr: dirdata_handles as:\n");
                 for (dirent_file_count_i = 0;
-                     dirent_file_count_i < attr->dist_dir_attr.num_servers;
+                     dirent_file_count_i < attr->u.dir.dist_dir_attr.num_servers;
                      dirent_file_count_i++)
                 {
                     gossip_debug(GOSSIP_CLIENT_DEBUG,
                             "    dirdata_handle[%d] = %s\n",
                             dirent_file_count_i,
-                            PVFS_OID_str(&attr->dirdata_handles[
+                            PVFS_OID_str(&attr->u.dir.dirdata_handles[
                                                       dirent_file_count_i]));
                 }
             }
@@ -522,11 +522,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         case PVFS_TYPE_SYMLINK:
             return 0;
         case PVFS_TYPE_DATAFILE:
-	    return 0;
+            return 0;
         case PVFS_TYPE_DIRDATA:
-	    return 0;
+            return 0;
         case PVFS_TYPE_INTERNAL:
-	    return 0;
+            return 0;
         default:
             gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
@@ -1475,11 +1475,11 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
             
     /* initialize size_array, used to store the dirent_count of every dirdata handle */      
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
-            attr->dist_dir_attr.num_servers);
+            attr->u.dir.dist_dir_attr.num_servers);
             
     sm_p->getattr.active_dirdata_index = (int *)malloc(
             sizeof(*sm_p->getattr.active_dirdata_index) *
-            attr->dist_dir_attr.num_servers);
+            attr->u.dir.dist_dir_attr.num_servers);
 
     if(!sm_p->getattr.active_dirdata_index)
     {
@@ -1490,10 +1490,10 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
     /* find out active dirdata handles */
     tmp_index = 0;
-    for(i=0; i<attr->dist_dir_attr.num_servers; i++)
+    for(i=0; i<attr->u.dir.dist_dir_attr.num_servers; i++)
     {
-        if(PINT_is_dist_dir_bucket_active(&attr->dist_dir_attr,
-                    attr->dist_dir_bitmap, i))
+        if(PINT_is_dist_dir_bucket_active(&attr->u.dir.dist_dir_attr,
+                    attr->u.dir.dist_dir_bitmap, i))
         {
             sm_p->getattr.active_dirdata_index[tmp_index] = i;
             tmp_index++;
@@ -1520,7 +1520,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "getattr: posting dirdata getattr[%d] ([%d]:%s,%d)\n",
                      i, cur_index,
-                     PVFS_OID_str(&attr->dirdata_handles[cur_index]),
+                     PVFS_OID_str(&attr->u.dir.dirdata_handles[cur_index]),
                      sm_p->getattr.object_ref.fs_id);
             
         PINT_SERVREQ_GETATTR_FILL(
@@ -1528,7 +1528,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
                     capability,
                     *sm_p->cred_p,
                     sm_p->getattr.object_ref.fs_id,
-                    attr->dirdata_handles[cur_index],
+                    attr->u.dir.dirdata_handles[cur_index],
                     /* only interested in timestamp and dirent_count */
                     PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT,
                     sm_p->hints);
@@ -1537,7 +1537,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-        msg_p->handle = attr->dirdata_handles[cur_index];
+        msg_p->handle = attr->u.dir.dirdata_handles[cur_index];
         msg_p->sid_count = sm_p->getattr.object_ref.sid_count;
         msg_p->sid_index = 0;
         msg_p->sid_array = sm_p->getattr.object_ref.sid_array;
@@ -1594,7 +1594,7 @@ static int getattr_dirdata_getattr_comp_fn(
     /* also assert timestamp? */
     assert(resp_attr_p->mask & PVFS_ATTR_DIR_DIRENT_COUNT);
     assert( (cur_index >= 0) &&
-            (cur_index < attr_p->dist_dir_attr.num_servers));
+            (cur_index < attr_p->u.dir.dist_dir_attr.num_servers));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata getattr[%d] (#[%d]) returns attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
@@ -1920,7 +1920,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
         if (sm_p->getattr.req_attrmask & PVFS_ATTR_DISTDIR_ATTR)
         {
            sysresp->attr.distr_dir_servers_max =
-               attr->dist_dir_attr.num_servers;
+               attr->u.dir.dist_dir_attr.num_servers;
             sysresp->attr.mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
         }
     }

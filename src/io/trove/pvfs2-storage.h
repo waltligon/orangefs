@@ -47,6 +47,7 @@ typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
 struct PVFS_ds_metadata_attr_s
 {
     uint32_t dfile_count;
+    uint32_t sid_count;  /* total, must be even multiple of dfile_count */
     uint32_t dist_size;
 };
 
@@ -55,9 +56,25 @@ struct PVFS_ds_datafile_attr_s
     PVFS_size b_size; /* bstream size */
 };
 
+/* this is the same as the clien/memory side attr structure */
+struct PVFS_ds_directory_attr_s
+{
+    /* global info */
+    int32_t tree_height;   /* ceil(log2(num_servers)) */
+    int32_t dirdata_count; /* total number of servers */
+    int32_t sid_count;     /* number of SIDs total */
+    int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
+                           /* stored under the key DIST_DIR_BITMAP */
+    int32_t split_size;    /* maximum number of entries before a split */
+    /* local info */
+    int32_t server_no;     /* 0 to num_servers-1, indicates */
+                           /* which server is running this code */
+    int32_t branch_level;  /* level of branching on this server */
+};
+
 struct PVFS_ds_dirdata_attr_s
 {
-    uint64_t count;
+    uint64_t count; /* number of entries in the dirdata? */
 };
 
 /* dataspace attributes that are not explicitly stored within the
@@ -68,7 +85,8 @@ struct PVFS_ds_dirdata_attr_s
  * across the wire/to the user, so some translation is done.
  *
  * PVFS_object_attr attributes are what the users and the server deal
- * with.  Trove deals with TROVE_ds_attributes (trove on disk and in-memory format).
+ * with.  Trove deals with TROVE_ds_attributes
+ * (trove on disk and in-memory format).
  *
  * Trove version 0.0.1 and version 0.0.2 differ in this aspect, since
  * many members have been moved, added to make this structure friendlier
@@ -94,6 +112,7 @@ struct PVFS_ds_attributes_s
     {
         struct PVFS_ds_metadata_attr_s metafile;
         struct PVFS_ds_datafile_attr_s datafile;
+        struct PVFS_ds_directory_attr_s directory;
         struct PVFS_ds_dirdata_attr_s dirdata;
     } u;
 } ;
@@ -106,30 +125,90 @@ do {                                                    \
     (__dsa)->mtime = time(NULL);                        \
 } while (0)
 
-#define PVFS_ds_attr_to_object_attr(__dsa, __oa)                   \
-do {                                                               \
-    (__oa)->owner = (__dsa)->uid;                                  \
-    (__oa)->group = (__dsa)->gid;                                  \
-    (__oa)->perms = (__dsa)->mode;                                 \
-    (__oa)->ctime = (__dsa)->ctime;                                \
-    (__oa)->mtime = (__dsa)->mtime;                                \
-    (__oa)->atime = (__dsa)->atime;                                \
-    (__oa)->objtype = (__dsa)->type;                               \
-    (__oa)->u.meta.dfile_count = (__dsa)->u.metafile.dfile_count;  \
-    (__oa)->u.meta.dist_size = (__dsa)->u.metafile.dist_size;      \
+#define PVFS_ds_attr_to_object_attr(__dsa, __oa)                       \
+do {                                                                   \
+    (__oa)->owner = (__dsa)->uid;                                      \
+    (__oa)->group = (__dsa)->gid;                                      \
+    (__oa)->perms = (__dsa)->mode;                                     \
+    (__oa)->ctime = (__dsa)->ctime;                                    \
+    (__oa)->mtime = (__dsa)->mtime;                                    \
+    (__oa)->atime = (__dsa)->atime;                                    \
+    (__oa)->objtype = (__dsa)->type;                                   \
+    switch ((__dsa)->type)                                             \
+    {                                                                  \
+    case PVFS_TYPE_METAFILE :                                          \
+        (__oa)->u.meta.dfile_count = (__dsa)->u.metafile.dfile_count;  \
+        (__oa)->u.meta.sid_count = (__dsa)->u.metafile.sid_count;      \
+        (__oa)->u.meta.dist_size = (__dsa)->u.metafile.dist_size;      \
+        break;                                                         \
+    case PVFS_TYPE_DATAFILE :                                          \
+        (__oa)->u.data.size = (__dsa)->u.datafile.b_size;              \
+        break;                                                         \
+    case PVFS_TYPE_DIRECTORY :                                         \
+        (__oa)->u.dir.dist_dir_attr.tree_height =                      \
+                (__dsa)->u.directory.tree_height;                      \
+        (__oa)->u.dir.dist_dir_attr.num_servers =                      \
+                (__dsa)->u.directory.dirdata_count;                    \
+        (__oa)->u.dir.dist_dir_attr.num_copies =                       \
+                (__dsa)->u.directory.sid_count;                        \
+        (__oa)->u.dir.dist_dir_attr.bitmap_size =                      \
+                (__dsa)->u.directory.bitmap_size;                      \
+        (__oa)->u.dir.dist_dir_attr.split_size =                       \
+                (__dsa)->u.directory.split_size;                       \
+        (__oa)->u.dir.dist_dir_attr.server_no =                        \
+                (__dsa)->u.directory.server_no;                        \
+        (__oa)->u.dir.dist_dir_attr.branch_level =                     \
+                (__dsa)->u.directory.branch_level;                     \
+        break;                                                         \
+    case PVFS_TYPE_DIRDATA :                                           \
+        (__oa)->u.dirdata.count = (__dsa)->u.dirdata.count;            \
+        break;                                                         \
+    default :                                                          \
+        break;                                                         \
+    }                                                                  \
 } while(0)
 
-#define PVFS_object_attr_to_ds_attr(__oa, __dsa)                      \
-    do {                                                              \
-        (__dsa)->uid = (__oa)->owner;                                 \
-        (__dsa)->gid = (__oa)->group;                                 \
-        (__dsa)->mode = (__oa)->perms;                                \
-        (__dsa)->ctime = (__oa)->ctime;                               \
-        (__dsa)->mtime = (__oa)->mtime;                               \
-        (__dsa)->atime = (__oa)->atime;                               \
-        (__dsa)->type = (__oa)->objtype;                              \
-        (__dsa)->u.metafile.dfile_count = (__oa)->u.meta.dfile_count; \
-        (__dsa)->u.metafile.dist_size = (__oa)->u.meta.dist_size;     \
+#define PVFS_object_attr_to_ds_attr(__oa, __dsa)                       \
+do {                                                                   \
+    (__dsa)->uid = (__oa)->owner;                                      \
+    (__dsa)->gid = (__oa)->group;                                      \
+    (__dsa)->mode = (__oa)->perms;                                     \
+    (__dsa)->ctime = (__oa)->ctime;                                    \
+    (__dsa)->mtime = (__oa)->mtime;                                    \
+    (__dsa)->atime = (__oa)->atime;                                    \
+    (__dsa)->type = (__oa)->objtype;                                   \
+    switch ((__oa)->objtype)                                           \
+    {                                                                  \
+    case PVFS_TYPE_METAFILE :                                          \
+        (__dsa)->u.metafile.dfile_count = (__oa)->u.meta.dfile_count;  \
+        (__dsa)->u.metafile.sid_count = (__oa)->u.meta.sid_count;      \
+        (__dsa)->u.metafile.dist_size = (__oa)->u.meta.dist_size;      \
+        break;                                                         \
+    case PVFS_TYPE_DATAFILE :                                          \
+        (__dsa)->u.datafile.b_size = (__oa)->u.data.size;              \
+        break;                                                         \
+    case PVFS_TYPE_DIRECTORY :                                         \
+        (__dsa)->u.directory.tree_height =                             \
+                (__oa)->u.dir.dist_dir_attr.tree_height;               \
+        (__dsa)->u.directory.dirdata_count =                           \
+                (__oa)->u.dir.dist_dir_attr.num_servers;               \
+        (__dsa)->u.directory.sid_count =                               \
+                (__oa)->u.dir.dist_dir_attr.num_copies;                \
+        (__dsa)->u.directory.bitmap_size =                             \
+                (__oa)->u.dir.dist_dir_attr.bitmap_size;               \
+        (__dsa)->u.directory.split_size =                              \
+                (__oa)->u.dir.dist_dir_attr.split_size;                \
+        (__dsa)->u.directory.server_no =                               \
+                (__oa)->u.dir.dist_dir_attr.server_no;                 \
+        (__dsa)->u.directory.branch_level =                            \
+                (__oa)->u.dir.dist_dir_attr.branch_level;              \
+        break;                                                         \
+    case PVFS_TYPE_DIRDATA :                                           \
+        (__dsa)->u.dirdata.count = (__oa)->u.dirdata.count;            \
+        break;                                                         \
+    default :                                                          \
+        break;                                                         \
+    }                                                                  \
 } while(0)
 
 #define PVFS_object_attr_overwrite_setable(dest, src)          \

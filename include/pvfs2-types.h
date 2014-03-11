@@ -471,7 +471,7 @@ typedef struct
 #define PVFS_XATTR_REPLACE 0x2
 
 /** statfs and misc. server statistic information. */
-typedef struct
+typedef struct PVFS_statfs_s
 {
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
@@ -503,7 +503,7 @@ endecode_fields_12(
 /** object reference (uniquely refers to a single file, directory, or
     symlink).
 */
-typedef struct
+typedef struct PVFS_object_ref_s
 {
     PVFS_handle handle;
     PVFS_fs_id  fs_id;
@@ -539,7 +539,8 @@ typedef struct
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
-typedef struct {
+typedef struct PVFS_keyval_pair_s
+{
     char key[PVFS_MAX_XATTR_NAMELEN];
     int32_t  key_sz; /* int32_t for portable, fixed-size structures */
     int32_t  val_sz;
@@ -547,7 +548,7 @@ typedef struct {
 } PVFS_keyval_pair;
 
 /** Directory entry contents. */
-typedef struct
+typedef struct PVFS_dirent_s
 {
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
@@ -560,18 +561,19 @@ endecode_fields_2(
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
  */
-typedef struct {
+typedef struct PVFS_dist_dir_attr_s
+{
         /* global info */
-        int32_t tree_height; /* ceil(log2(num_servers)) */
-        int32_t num_servers; /* total number of servers */
-        int32_t num_copies;  /* number of copies of each bucket */
-        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype */
-                             /* stored under the key DIST_DIR_BITMAP */
-        int32_t split_size;  /* maximum number of entries before a split */
+        int32_t tree_height;  /* ceil(log2(num_servers)) */
+        int32_t num_servers;  /* total number of servers */
+        int32_t num_copies;   /* number of copies of each bucket */
+        int32_t bitmap_size;  /* number of PVFS_dist_dir_bitmap_basetype */
+                              /* stored under the key DIST_DIR_BITMAP */
+        int32_t split_size;   /* maximum number of entries before a split */
 
         /* local info */
-        int32_t server_no; /* 0 to num_servers-1, indicates */
-                           /* which server is running this code */
+        int32_t server_no;    /* 0 to num_servers-1, indicates */
+                              /* which server is running this code */
         int32_t branch_level; /* level of branching on this server */
 } PVFS_dist_dir_attr;
 endecode_fields_6(

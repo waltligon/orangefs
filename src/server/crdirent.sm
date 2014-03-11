@@ -34,8 +34,6 @@ enum
     REMOVE_ENTRIES_REQUIRED
 };
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
-
 %%
 
 machine pvfs2_crdirent_sm
@@ -316,7 +314,7 @@ static PINT_sm_action crdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
         free(s_op->val.buffer);
     }
     
-    s_op->val.buffer = &s_op->attr.dist_dir_attr;
+    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
     s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
     s_op->free_val = 0;
     
@@ -366,35 +364,35 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                   "crdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
-        attr_p->dist_dir_bitmap = NULL;
-        attr_p->dirdata_handles = NULL;
+        attr_p->u.dir.dist_dir_bitmap = NULL;
+        attr_p->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr_p->dist_dir_attr.num_servers > 0 &&
-           attr_p->dist_dir_attr.bitmap_size > 0);
+    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0 &&
+           attr_p->u.dir.dist_dir_attr.bitmap_size > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "crdirent: get dist-dir-attr for dirdata handle %s "
             "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->u.crdirent.dirent_handle),
-            attr_p->dist_dir_attr.tree_height,
-            attr_p->dist_dir_attr.num_servers,
-            attr_p->dist_dir_attr.bitmap_size,
-            attr_p->dist_dir_attr.split_size,
-            attr_p->dist_dir_attr.server_no,
-            attr_p->dist_dir_attr.branch_level);
+            attr_p->u.dir.dist_dir_attr.tree_height,
+            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.bitmap_size,
+            attr_p->u.dir.dist_dir_attr.split_size,
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
 
     /* allocate space for bitmap and dirdata handles */
-    attr_p->dist_dir_bitmap =
-        malloc(attr_p->dist_dir_attr.bitmap_size *
+    attr_p->u.dir.dist_dir_bitmap =
+        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype));
-    attr_p->dirdata_handles =
-        malloc(attr_p->dist_dir_attr.num_servers *
+    attr_p->u.dir.dirdata_handles =
+        malloc(attr_p->u.dir.dist_dir_attr.num_servers *
                 sizeof(PVFS_handle));
-    if(!attr_p->dist_dir_bitmap ||
-            !attr_p->dirdata_handles)
+    if(!attr_p->u.dir.dist_dir_bitmap ||
+            !attr_p->u.dir.dirdata_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -409,8 +407,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     {
        free(s_op->val.buffer);
     }
-    memset(&(s_op->key),0,sizeof(s_op->key));
-    memset(&(s_op->val),0,sizeof(s_op->val));
+    memset(&(s_op->key), 0, sizeof(s_op->key));
+    memset(&(s_op->val), 0, sizeof(s_op->val));
 
     for (i=0; i<s_op->keyval_count; i++)
     {
@@ -455,15 +453,15 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[0].buffer_sz =
-                 attr_p->dist_dir_attr.bitmap_size *
+                 attr_p->u.dir.dist_dir_attr.bitmap_size *
                  sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer = attr_p->dist_dir_bitmap;
+    s_op->val_a[0].buffer = attr_p->u.dir.dist_dir_bitmap;
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
-    s_op->val_a[1].buffer = attr_p->dirdata_handles;
-    s_op->val_a[1].buffer_sz = attr_p->dist_dir_attr.num_servers *
+    s_op->val_a[1].buffer = attr_p->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
                  sizeof(PVFS_handle);
 
     js_p->error_code = 0;
@@ -507,9 +505,9 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "crdirent: dist_dir_bitmap as:\n");
-    for(i = attr_p->dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
-        c = (unsigned char *)(attr_p->dist_dir_bitmap + i);
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);
@@ -519,11 +517,11 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "\t getattr: dirdata handles\n");
             
-    for(i=0; i < attr_p->dist_dir_attr.num_servers; i++)
+    for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "\t\tdirdata server %d: %s.\n",
-                i, PVFS_OID_str(&attr_p->dirdata_handles[i]));
+                i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
     }           
  
     if ((s_op->u.crdirent.name == NULL) ||
@@ -571,13 +569,13 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
             llu(dirdata_hash));
 
     dirdata_server_index = PINT_find_dist_dir_bucket(dirdata_hash,
-                                           &attr_p->dist_dir_attr,
-                                           attr_p->dist_dir_bitmap);
+                                           &attr_p->u.dir.dist_dir_attr,
+                                           attr_p->u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "crdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
                  dirdata_server_index);
 
-    if(dirdata_server_index != attr_p->dist_dir_attr.server_no)
+    if(dirdata_server_index != attr_p->u.dir.dist_dir_attr.server_no)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
@@ -783,18 +781,19 @@ static PINT_sm_action crdirent_check_for_split(
         GOSSIP_SERVER_DEBUG, " dirent count = %d "
         "split_size =%d, branch_level = %d\n",
         s_op->u.crdirent.keyval_handle_info.count,
-        s_op->attr.dist_dir_attr.split_size,
-        s_op->attr.dist_dir_attr.branch_level);
+        s_op->attr.u.dir.dist_dir_attr.split_size,
+        s_op->attr.u.dir.dist_dir_attr.branch_level);
 
     /* Save the current attrs in case we have to back out due to an error. */
     PINT_copy_object_attr(&s_op->u.crdirent.saved_attr, &s_op->attr);
 
     if (s_op->u.crdirent.keyval_handle_info.count >=
-         s_op->attr.dist_dir_attr.split_size)
+         s_op->attr.u.dir.dist_dir_attr.split_size)
     {
         /* Determine which node will get split entries. */
         s_op->u.crdirent.split_node = PINT_find_dist_dir_split_node(
-               &s_op->attr.dist_dir_attr, s_op->attr.dist_dir_bitmap);
+                                           &s_op->attr.u.dir.dist_dir_attr,
+                                           s_op->attr.u.dir.dist_dir_bitmap);
         if (s_op->u.crdirent.split_node < 0)
         {
             /* No new node can be found. No need to split. */
@@ -805,16 +804,18 @@ static PINT_sm_action crdirent_check_for_split(
 
         js_p->error_code = SPLIT_REQUIRED;
 
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, " split to node %d, new branch_level = %d\n",
-            s_op->u.crdirent.split_node, s_op->attr.dist_dir_attr.branch_level);
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                "crdirent: new dist_dir_bitmap as:\n");
+                     " split to node %d, new branch_level = %d\n",
+                     s_op->u.crdirent.split_node,
+                     s_op->attr.u.dir.dist_dir_attr.branch_level);
+                     gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "crdirent: new dist_dir_bitmap as:\n");
+
         attr_p = &s_op->attr;
-        for(i = attr_p->dist_dir_attr.bitmap_size - 1;
+        for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
                 i >= 0 ; i--)
         {
-            c = (unsigned char *)(attr_p->dist_dir_bitmap + i);
+            c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
             gossip_debug(GOSSIP_SERVER_DEBUG,
                     " i=%d : %02x %02x %02x %02x\n",
                     i, c[3], c[2], c[1], c[0]);
@@ -881,24 +882,24 @@ static PINT_sm_action crdirent_save_dirdata_attrs(
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
 
-    s_op->val_a[0].buffer = &attr_p->dist_dir_attr;
+    s_op->val_a[0].buffer = &attr_p->u.dir.dist_dir_attr;
     s_op->val_a[0].buffer_sz =
-         sizeof(attr_p->dist_dir_attr);
+         sizeof(attr_p->u.dir.dist_dir_attr);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[1].buffer_sz =
-        attr_p->dist_dir_attr.bitmap_size *
+        attr_p->u.dir.dist_dir_attr.bitmap_size *
         sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[1].buffer = attr_p->dist_dir_bitmap;
+    s_op->val_a[1].buffer = attr_p->u.dir.dist_dir_bitmap;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "  updating dist-dir-struct keyvals for handle: %s "
             "\t with server_no=%d and branch_level=%d \n",
             PVFS_OID_str(&handle),
-            attr_p->dist_dir_attr.server_no,
-            attr_p->dist_dir_attr.branch_level);
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
 
 
     ret = job_trove_keyval_write_list(s_op->req->u.crdirent.fs_id,
@@ -1017,7 +1018,7 @@ static PINT_sm_action crdirent_activate_server_setup(struct PINT_smcb *smcb,
     attr_p = &s_op->attr;
     ret = crdirent_send_server_attrs(smcb,
                                      js_p,
-                                     attr_p->dirdata_handles[
+                                     attr_p->u.dir.dirdata_handles[
                                                    s_op->u.crdirent.split_node],
                                      PVFS_TYPE_DIRDATA,
                                      attr_p);
@@ -1037,7 +1038,7 @@ static PINT_sm_action crdirent_deactivate_server_setup(struct PINT_smcb *smcb,
     attr_p = &s_op->u.crdirent.saved_attr;
     ret = crdirent_send_server_attrs(smcb,
                                      js_p,
-                                     attr_p->dirdata_handles[
+                                     attr_p->u.dir.dirdata_handles[
                                                    s_op->u.crdirent.split_node],
                                      PVFS_TYPE_DIRDATA,
                                      attr_p);
@@ -1118,26 +1119,26 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
        dirdata server that is the target of the split.      */
     attr_p = &s_op->attr;
     remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
-        attr_p->dist_dir_attr.num_servers);
-    for (i = 0; i < attr_p->dist_dir_attr.num_servers; i++)
+        attr_p->u.dir.dist_dir_attr.num_servers);
+    for (i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
     {
-        if (! PVFS_OID_cmp(&attr_p->dirdata_handles[i],
-              &s_op->attr.dirdata_handles[s_op->u.crdirent.split_node]))
+        if (! PVFS_OID_cmp(&attr_p->u.dir.dirdata_handles[i],
+              &s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node]))
         {
             continue;
         }
     /* V3 */
 #if 0
         PINT_cached_config_get_server_name(server_name, 1024,
-            attr_p->dirdata_handles[i], s_op->u.crdirent.fs_id);
+            attr_p->u.dir.dirdata_handles[i], s_op->u.crdirent.fs_id);
         if (strcmp(server_config->host_id, server_name))
 #endif
 
-    if (! PINT_cached_config_server_local(&attr_p->dirdata_sids[i]))
+    if (! PINT_cached_config_server_local(&attr_p->u.dir.dirdata_sids[i]))
         {
             /* remote */
             remote_dirdata_handles[num_remote_dirdata_handles] =
-                attr_p->dirdata_handles[i];
+                attr_p->u.dir.dirdata_handles[i];
             num_remote_dirdata_handles++;
         }
     }
@@ -1342,8 +1343,8 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         dirdata_hash = PINT_encrypt_dirdata(s_op->u.crdirent.entries_key_a[j].buffer);
         dirdata_server_index = PINT_find_dist_dir_bucket(
                                       dirdata_hash,
-                                      &s_op->attr.dist_dir_attr,
-                                      s_op->attr.dist_dir_bitmap);
+                                      &s_op->attr.u.dir.dist_dir_attr,
+                                      s_op->attr.u.dir.dist_dir_bitmap);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "crdirent: dirent %s target bucket No.%d.\n",
                      (char *) s_op->u.crdirent.entries_key_a[j].buffer,
@@ -1416,7 +1417,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         /* This memory will be freed in crdirent_cleanup
            by PINT_cleanup_capability. */
         capability_handles =
-              malloc((s_op->attr.dist_dir_attr.num_servers + 1) *
+              malloc((s_op->attr.u.dir.dist_dir_attr.num_servers + 1) *
                      sizeof(PVFS_handle));
         if (! capability_handles)
         {
@@ -1425,14 +1426,14 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         }
         capability_handles[0] = s_op->u.crdirent.parent_handle;
         memcpy(capability_handles + 1,
-               s_op->attr.dirdata_handles,
-               s_op->attr.dist_dir_attr.num_servers *
+               s_op->attr.u.dir.dirdata_handles,
+               s_op->attr.u.dir.dist_dir_attr.num_servers *
                    sizeof(PVFS_handle));
 
         ret = PINT_server_to_server_capability(
                                     &s_op->u.crdirent.capability,
                                     s_op->req->u.crdirent.fs_id,
-                                    s_op->attr.dist_dir_attr.num_servers + 1,
+                                    s_op->attr.u.dir.dist_dir_attr.num_servers + 1,
                                     capability_handles);
         if (ret != 0)
         {
@@ -1450,7 +1451,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
                      msg_p->req,
                      s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
-                     s_op->attr.dirdata_handles[s_op->u.crdirent.split_node],
+                     s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
                      0,     /* Not an "undo" message. */
                      s_op->u.crdirent.msg_boundaries[i].nentries,
@@ -1461,7 +1462,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
                      s_op->req->hints);
 
             msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-            msg_p->handle = s_op->attr.dirdata_handles[
+            msg_p->handle = s_op->attr.u.dir.dirdata_handles[
                                              s_op->u.crdirent.split_node];
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = split_comp_fn;
@@ -1647,7 +1648,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
                      msg_p->req,
                      s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
-                     s_op->attr.dirdata_handles[
+                     s_op->attr.u.dir.dirdata_handles[
                             s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
                      1,     /* This is an "undo" message. */
@@ -1659,7 +1660,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
                      s_op->req->hints);
 
             msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-            msg_p->handle = s_op->attr.dirdata_handles[
+            msg_p->handle = s_op->attr.u.dir.dirdata_handles[
                                    s_op->u.crdirent.split_node];
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = split_comp_fn;

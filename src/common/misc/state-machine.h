@@ -203,8 +203,8 @@ int PINT_state_machine_terminate(struct PINT_smcb *, job_status_s *);
 PINT_sm_action PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
 PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
 PINT_sm_action PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
-PINT_sm_action PINT_state_machine_continue(
-    struct PINT_smcb *smcb, job_status_s *r);
+PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
+                                           job_status_s *r);
 #ifdef WIN32
 int PINT_state_machine_locate(struct PINT_smcb *);
 #else
@@ -218,10 +218,13 @@ int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);
 void PINT_smcb_set_cancelled(struct PINT_smcb *smcb);
 int PINT_smcb_cancelled(struct PINT_smcb *smcb);
-int PINT_smcb_alloc(struct PINT_smcb **, int, int,
-        struct PINT_state_machine_s *(*getmach)(int),
-        int (*term_fn)(struct PINT_smcb *, job_status_s *),
-        job_context_id context_id);
+int PINT_smcb_alloc(struct PINT_smcb **,
+                    int,
+                    int,
+                    struct PINT_state_machine_s *(*getmach)(int),
+                    int (*term_fn)(struct PINT_smcb *,
+                    job_status_s *),
+                    job_context_id context_id);
 void PINT_smcb_free(struct PINT_smcb *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
 int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);

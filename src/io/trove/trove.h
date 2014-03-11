@@ -98,73 +98,67 @@ enum
 /** Initializes the Trove layer.  Must be called before any other Trove
  *  functions.
  */
-int trove_initialize(
-    TROVE_method_id method_id,
-    TROVE_method_callback method_callback,
-    char *data_path,
-    char *meta_path,
-    TROVE_ds_flags flags);
+int trove_initialize(TROVE_method_id method_id,
+                     TROVE_method_callback method_callback,
+                     char *data_path,
+                     char *meta_path,
+                     char *config_path,
+                     TROVE_ds_flags flags);
 
 int trove_finalize(TROVE_method_id method_id);
 
-int trove_migrate(TROVE_method_id method_id, const char* data_path,
+int trove_migrate(TROVE_method_id method_id,
+                  const char* data_path,
                   const char* meta_path);
 
-int trove_open_context(
-    TROVE_coll_id coll_id,
-    TROVE_context_id *context_id);
+int trove_open_context(TROVE_coll_id coll_id,
+                       TROVE_context_id *context_id);
 
-int trove_close_context(
-    TROVE_coll_id coll_id,
-    TROVE_context_id context_id);
+int trove_close_context(TROVE_coll_id coll_id,
+                        TROVE_context_id context_id);
 
-int trove_collection_clear(
-    TROVE_method_id method_id,
-    TROVE_coll_id coll_id);
+int trove_collection_clear(TROVE_method_id method_id,
+                           TROVE_coll_id coll_id);
 
-int trove_storage_create(
-    TROVE_method_id method_id,
-    char *data_path,
-    char *meta_path,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_storage_create(TROVE_method_id method_id,
+                         char *data_path,
+                         char *meta_path,
+                         char *config_path,
+                         void *user_ptr,
+                         TROVE_op_id *out_op_id_p);
 
-int trove_storage_remove(
-    TROVE_method_id method_id,
-    char *data_path,
-    char *meta_path,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_storage_remove(TROVE_method_id method_id,
+                         char *data_path,
+                         char *meta_path,
+                         char *config_path,
+                         void *user_ptr,
+                         TROVE_op_id *out_op_id_p);
 
-int trove_collection_create(
-    char *collname,
-    TROVE_coll_id new_coll_id,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_collection_create(char *collname,
+                            TROVE_coll_id new_coll_id,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p);
 
-int trove_collection_remove(
-    TROVE_method_id method_id,
-    char *collname,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_collection_remove(TROVE_method_id method_id,
+                            char *collname,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p);
 
-int trove_collection_lookup(
-    TROVE_method_id method_id,
-    char *collname,
-    TROVE_coll_id *out_coll_id_p,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_collection_lookup(TROVE_method_id method_id,
+                            char *collname,
+                            TROVE_coll_id *out_coll_id_p,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p);
 
-int trove_collection_iterate(
-    TROVE_method_id method_id,
-    TROVE_ds_position *inout_position_p,
-    TROVE_keyval_s *name_array,
-    TROVE_coll_id *coll_id_array,
-    int *inout_count_p,
-    TROVE_ds_flags flags,
-    TROVE_vtag_s *vtag,
-    void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+int trove_collection_iterate(TROVE_method_id method_id,
+                             TROVE_ds_position *inout_position_p,
+                             TROVE_keyval_s *name_array,
+                             TROVE_coll_id *coll_id_array,
+                             int *inout_count_p,
+                             TROVE_ds_flags flags,
+                             TROVE_vtag_s *vtag,
+                             void *user_ptr,
+                             TROVE_op_id *out_op_id_p);
 
 int trove_bstream_read_at(TROVE_coll_id coll_id,
                           TROVE_handle handle,

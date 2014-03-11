@@ -442,13 +442,27 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
  */
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op)
 {
-    smcb->op = op;
-    return PINT_state_machine_locate(smcb);
+    if (smcb)
+    {
+        smcb->op = op;
+        return PINT_state_machine_locate(smcb);
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 int PINT_smcb_immediate_completion(struct PINT_smcb *smcb)
 {
-    return smcb->immediate;
+    if (smcb)
+    {
+        return smcb->immediate;
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 /* Function: PINT_smcb_op
@@ -458,44 +472,79 @@ int PINT_smcb_immediate_completion(struct PINT_smcb *smcb)
  */
 int PINT_smcb_op(struct PINT_smcb *smcb)
 {
-    return smcb->op;
+    if (smcb)
+    {
+        return smcb->op;
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 static int PINT_smcb_sys_op(struct PINT_smcb *smcb)
 {
-    if (smcb->op > 0 && smcb->op < PVFS_OP_SYS_MAXVALID)
+    if (smcb)
     {
-        return 1;
+        if (smcb->op > 0 && smcb->op < PVFS_OP_SYS_MAXVALID)
+        {
+            return 1;
+        }
+        return 0;
     }
-    return 0;
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 static int PINT_smcb_mgmt_op(struct PINT_smcb *smcb)
 {
-    if (smcb->op > PVFS_OP_SYS_MAXVAL && smcb->op < PVFS_OP_MGMT_MAXVALID)
+    if (smcb)
     {
-        return 1;
+        if (smcb->op > PVFS_OP_SYS_MAXVAL && smcb->op < PVFS_OP_MGMT_MAXVALID)
+        {
+            return 1;
+        }
+        return 0;
     }
-    return 0;
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
 {
-    return smcb->op == PVFS_SERVER_GET_CONFIG 
-        || smcb->op == PVFS_CLIENT_JOB_TIMER 
-        || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
-        || smcb->op == PVFS_DEV_UNEXPECTED;
+    if (smcb)
+    {
+        return smcb->op == PVFS_SERVER_GET_CONFIG 
+            || smcb->op == PVFS_CLIENT_JOB_TIMER 
+            || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
+            || smcb->op == PVFS_DEV_UNEXPECTED;
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
 {
-    if (!PINT_smcb_sys_op(smcb) &&
-        !PINT_smcb_mgmt_op(smcb) &&
-        !PINT_smcb_misc_op(smcb))
+    if (smcb)
     {
-        return 1;
+        if (!PINT_smcb_sys_op(smcb) &&
+            !PINT_smcb_mgmt_op(smcb) &&
+            !PINT_smcb_misc_op(smcb))
+        {
+            return 1;
+        }
+        return 0;
     }
-    return 0;
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 /* Function: PINT_smcb_set_complete
@@ -505,7 +554,10 @@ int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
  */
 void PINT_smcb_set_complete(struct PINT_smcb *smcb)
 {
-    smcb->op_terminate = 1;
+    if (smcb)
+    {
+        smcb->op_terminate = 1;
+    }
 }
 
 /* Function: PINT_smcb_complete
@@ -515,7 +567,14 @@ void PINT_smcb_set_complete(struct PINT_smcb *smcb)
  */
 int PINT_smcb_complete(struct PINT_smcb *smcb)
 {
-    return smcb->op_terminate;
+    if (smcb)
+    {
+        return smcb->op_terminate;
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 /* Function: PINT_smcb_set_cancelled
@@ -525,7 +584,10 @@ int PINT_smcb_complete(struct PINT_smcb *smcb)
  */
 void PINT_smcb_set_cancelled(struct PINT_smcb *smcb)
 {
-    smcb->op_cancelled = 1;
+    if (smcb)
+    {
+        smcb->op_cancelled = 1;
+    }
 }
 
 /* Function: PINT_smcb_cancelled
@@ -535,7 +597,14 @@ void PINT_smcb_set_cancelled(struct PINT_smcb *smcb)
  */
 int PINT_smcb_cancelled(struct PINT_smcb *smcb)
 {
-    return smcb->op_cancelled;
+    if (smcb)
+    {
+        return smcb->op_cancelled;
+    }
+    else
+    {
+        return -PVFS_EINVAL;
+    }
 }
 
 /* Function: PINT_smcb_alloc
@@ -648,6 +717,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
  */
 static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 {
+    if (!smcb)
+    {
+        return NULL;
+    }
+
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                  "[SM pop_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
                  smcb, smcb->op, smcb->stackptr, smcb->base_frame);
@@ -674,6 +748,11 @@ static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 static void PINT_push_state(struct PINT_smcb *smcb,
                             struct PINT_state_s *p)
 {
+    if (!smcb)
+    {
+        return;
+    }
+
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                  "[SM push_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
                  smcb, smcb->op, smcb->stackptr, smcb->base_frame);

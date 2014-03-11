@@ -522,6 +522,12 @@ PVFS_error PINT_client_state_machine_post(
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    /* this checks sm_p and indirectly smcb */
+    if (!sm_p)
+    {
+        return -PVFS_EINVAL;
+    }
+
     PVFS_hint_add_internal(&sm_p->hints,
                            PINT_HINT_OP_ID,
                            sizeof(pvfs_sys_op),
@@ -543,6 +549,8 @@ PVFS_error PINT_client_state_machine_post(
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
+    /* V3 weird place for this check, moved it up */
+#if 0
     if (!smcb)
     {
         /* give back the hint added above */
@@ -550,6 +558,7 @@ PVFS_error PINT_client_state_machine_post(
         sm_p->hints = NULL;
         return ret;
     }
+#endif
 
     memset(&js, 0, sizeof(js));
 

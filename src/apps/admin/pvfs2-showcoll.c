@@ -23,6 +23,7 @@
 
 static char data_path[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char meta_path[PATH_MAX] = "/tmp/pvfs2-test-space";
+static char config_path[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char collection[PATH_MAX];
 static int verbose = 0, got_collection = 0, print_keyvals = 0, got_dspace_handle = 0;
 TROVE_handle dspace_handle;
@@ -69,8 +70,12 @@ int main(int argc, char **argv)
     }
 
     /* initialize trove, verifying storage space exists */
-    ret = trove_initialize(
-      TROVE_METHOD_DBPF, NULL, data_path, meta_path, 0);
+    ret = trove_initialize(TROVE_METHOD_DBPF,
+                           NULL,
+                           data_path,
+                           meta_path,
+                           config_path,
+                           0);
     if (ret < 0) 
     {
         printf("Error from trove_initialize is %d.\n",ret);
@@ -81,14 +86,16 @@ int main(int argc, char **argv)
     }
 
     if (verbose) fprintf(stderr,
-			 "%s: info: initialized with storage spaces '%s' and '%s'.\n",
+			 "%s: info: initialized with storage spaces '%s', '%s' and '%s'.\n",
 			 argv[0],
-			 data_path, meta_path);
+			 data_path, meta_path, config_path);
 
     /* if no collection was specified, simply print out the collections and exit */
-    if (!got_collection) {
+    if (!got_collection)
+    {
 	ret = print_collections();
-	if (ret != 0) {
+	if (ret != 0)
+        {
 	    fprintf(stderr,
 		    "%s: error: collection iterate failed; aborting!\n",
 		    argv[0]);
@@ -110,7 +117,8 @@ int main(int argc, char **argv)
 				  &coll_id,
 				  NULL,
 				  &op_id);
-    if (ret != 1) {
+    if (ret != 1)
+    {
 	fprintf(stderr,
 		"%s: error: collection lookup failed for collection '%s'; aborting!.\n",
 		argv[0],
@@ -119,11 +127,13 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    if (verbose) fprintf(stderr,
-			 "%s: info: found collection '%s'.\n",
-			 argv[0],
-			 collection);
-
+    if (verbose)
+    {
+       fprintf(stderr,
+               "%s: info: found collection '%s'.\n",
+	       argv[0],
+	       collection);
+    }
 
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
@@ -145,16 +155,26 @@ int main(int argc, char **argv)
                                     trove_context,
 				    &op_id);
 
-    while (ret == 0) {
-	ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
-            TROVE_DEFAULT_TEST_TIMEOUT);
+    while (ret == 0)
+    {
+	ret = trove_dspace_test(coll_id,
+                                op_id,
+                                trove_context,
+                                &count,
+                                NULL,
+                                NULL,
+                                &state,
+                                TROVE_DEFAULT_TEST_TIMEOUT);
     }
-    if (ret != 1) {
-	if (verbose) fprintf(stderr,
-			     "%s: warning: collection geteattr (for root handle) failed; aborting!\n",
-			     argv[0]);
-	no_root_handle = 1;
+    if (ret != 1)
+    {
+	if (verbose)
+        {
+            fprintf(stderr,
+	            "%s: warning: collection geteattr (for root handle) failed; aborting!\n",
+	            argv[0]);
+        }
+        no_root_handle = 1;
     }
 
     /* TODO: NEED ITERATE FOR EATTRS? */
@@ -162,7 +182,8 @@ int main(int argc, char **argv)
     /* TODO: GET A COUNT OF DATASPACES? */
 
     /* print basic stats on collection */
-    if (no_root_handle) {
+    if (no_root_handle)
+    {
 	fprintf(stdout,
 		"Storage space %s and %s, collection %s (coll_id = %d, "
                 "*** no root_handle found ***):\n",
@@ -171,7 +192,8 @@ int main(int argc, char **argv)
 		collection,
 		coll_id);
     }
-    else {
+    else
+    {
 	fprintf(stdout,
 		"Storage space %s and %s, collection %s (coll_id = %d, "
                 "root_handle = %s):\n",
@@ -188,8 +210,10 @@ int main(int argc, char **argv)
     }
     else
     {
-        ret = print_dspaces(coll_id, root_handle,
-                            trove_context, no_root_handle);
+        ret = print_dspaces(coll_id,
+                            root_handle,
+                            trove_context,
+                            no_root_handle);
     }
 
     trove_close_context(coll_id, trove_context);
@@ -203,7 +227,8 @@ static int parse_args(int argc, char **argv)
     int c;
 
     while ((c = getopt(argc, argv, "s:m:c:d:kvh")) != EOF) {
-	switch (c) {
+	switch (c)
+        {
 	    case 's':
 		strncpy(data_path, optarg, PATH_MAX);
 		break;
@@ -258,7 +283,8 @@ static int print_dspaces(TROVE_coll_id coll_id,
     pos = TROVE_ITERATE_START;
     count = 64;
 
-    while (count > 0) {
+    while (count > 0)
+    {
 	int opcount;
 
 	ret = trove_dspace_iterate_handles(coll_id,
@@ -270,14 +296,27 @@ static int print_dspaces(TROVE_coll_id coll_id,
 					   NULL /* user ptr */,
                                            trove_context,
 					   &op_id);
-	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
-            TROVE_DEFAULT_TEST_TIMEOUT);
-	if (ret != 1) return -1;
+	while (ret == 0)
+        {
+            ret = trove_dspace_test(coll_id,
+                                    op_id,
+                                    trove_context,
+                                    &opcount,
+                                    NULL,
+                                    NULL,
+                                    &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+	if (ret != 1)
+        {
+            return -1;
+        }
 
-	if (count > 0) {
+	if (count > 0)
+        {
 	    int i;
-	    for (i = 0; i < count; i++) {
+	    for (i = 0; i < count; i++)
+            {
 		ret = print_dspace(coll_id, harray[i], trove_context);
 	    }
 	}
@@ -301,12 +340,18 @@ static int print_dspace(TROVE_coll_id coll_id,
 			       0 /* flags */,
 			       NULL /* user ptr */,
                                trove_context,
-			       &op_id, NULL);
+			       &op_id,
+                               NULL);
     while (ret == 0)
     {
-	ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
-            TROVE_DEFAULT_TEST_TIMEOUT);
+	ret = trove_dspace_test(coll_id,
+                                op_id,
+                                trove_context,
+                                &opcount,
+                                NULL,
+                                NULL,
+                                &state,
+                                TROVE_DEFAULT_TEST_TIMEOUT);
     }
     if (ret != 1)
     {
@@ -322,8 +367,10 @@ static int print_dspace(TROVE_coll_id coll_id,
 
     if (print_keyvals)
     {
-	ret = print_dspace_keyvals(coll_id, handle,
-                                   trove_context, ds_attr.type);
+	ret = print_dspace_keyvals(coll_id,
+                                   handle,
+                                   trove_context,
+                                   ds_attr.type);
 	if (ret != 0)
         {
             return -1;
@@ -343,7 +390,8 @@ static char *type_to_string(TROVE_ds_type type)
     static char in[] = "internal";
     static char un[] = "unknown";
 
-    switch (type) {
+    switch (type)
+    {
 	case PVFS_TYPE_METAFILE:
 	    return mf;
 	case PVFS_TYPE_DATAFILE:
@@ -380,16 +428,24 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
     val.read_sz   = 0;
 
     if (key.buffer)
+    {
         memset(key.buffer,0,256);
+    }
     if (val.buffer)
+    {
         memset(val.buffer,0,65536);
+    }
 
     if ( !(key.buffer && val.buffer) )
     {
         if (key.buffer)
-           free(key.buffer);
+        {
+            free(key.buffer);
+        }
         if (val.buffer)
-           free(val.buffer);
+        {
+            free(val.buffer);
+        }
         printf("%s: Unable to allocate memory.\n", __func__);
         return -1;
     }
@@ -415,7 +471,8 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 				   NULL /* vtag */,
 				   NULL /* user ptr */,
                                    trove_context,
-				   &op_id, NULL);
+				   &op_id,
+                                   NULL);
 
 	while (ret == 0)
         {
@@ -491,8 +548,14 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 {
     int key_printable = 0, val_printable = 0;
 
-    if (isprint(((char *)key_p->buffer)[0])) key_printable = 1;
-    if (isprint(((char *)val_p->buffer)[0])) val_printable = 1;
+    if (isprint(((char *)key_p->buffer)[0]))
+    {
+        key_printable = 1;
+    }
+    if (isprint(((char *)val_p->buffer)[0]))
+    {
+        val_printable = 1;
+    }
 
     if (key_printable && key_p->buffer_sz >= 64)
     {
@@ -509,9 +572,9 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as PVFS_object_attr = ",
-		(char *) key_p->buffer,
+		(char *)key_p->buffer,
 		key_p->read_sz,
-		(char *) val_p->buffer,
+		(char *)val_p->buffer,
 		val_p->read_sz);
 	print_object_attributes((struct PVFS_object_attr *) val_p->buffer);
     }
@@ -520,11 +583,11 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as handles = ",
-		(char *) key_p->buffer,
+		(char *)key_p->buffer,
 		key_p->read_sz,
-		val_printable ? (char *) val_p->buffer : "",
+		val_printable ? (char *)val_p->buffer : "",
 		val_p->read_sz);
-	print_datafile_handles((PVFS_handle *) val_p->buffer,
+	print_datafile_handles((PVFS_handle *)val_p->buffer,
                               val_p->read_sz / sizeof(PVFS_handle));
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3))
@@ -533,8 +596,8 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		"\t\t'%s' (%d): '%s' (%d) as a handle = %s\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
-		val_printable ? (char *) val_p->buffer : "",
-		                val_p->read_sz,
+		val_printable ? (char *)val_p->buffer : "",
+		val_p->read_sz,
                 PVFS_OID_str((TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8)
@@ -545,7 +608,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		PVFS_OID_str((TROVE_handle *) val_p->buffer));
+		PVFS_OID_str((TROVE_handle *)val_p->buffer));
     }
     else if (key_printable && !strncmp((char *)key_p->buffer,
                                        "user.pvfs2.meta_hint",20))
@@ -637,7 +700,8 @@ static int print_collections(void)
     fprintf(stdout, "Storage space %s and %s collections:\n",
 	    data_path, meta_path);
 
-    while (count > 0) {
+    while (count > 0)
+    {
 	ret = trove_collection_iterate(TROVE_METHOD_DBPF,
                                        &pos,
 				       &name,
@@ -647,17 +711,18 @@ static int print_collections(void)
 				       0 /* vtag */,
 				       NULL /* user ptr */,
 				       &op_id);
-	if (ret != 1) {
+	if (ret != 1)
+        {
 	    free(coll_name);
 	    return -1;
 	}
 	
-	if (count > 0) fprintf(stdout,
-			       "\t%s (coll_id = %d)\n",
-			       coll_name,
-			       coll_id);
-        memset(coll_name,0,PATH_MAX);
-        memset(&name,0,sizeof(name));
+	if (count > 0)
+        {
+            fprintf(stdout, "\t%s (coll_id = %d)\n", coll_name, coll_id);
+        }
+        memset(coll_name, 0, PATH_MAX);
+        memset(&name, 0, sizeof(name));
         name.buffer    = coll_name;
         name.buffer_sz = PATH_MAX;
         name.read_sz   = 0;

@@ -44,20 +44,20 @@ int pint_client_pid;
 
 typedef enum
 {
-    CLIENT_NO_INIT         =      0,
-    CLIENT_ENCODER_INIT    = (1 << 0),
-    CLIENT_BMI_INIT        = (1 << 1),
-    CLIENT_FLOW_INIT       = (1 << 2),
-    CLIENT_JOB_INIT        = (1 << 3),
-    CLIENT_JOB_CTX_INIT    = (1 << 4),
-    CLIENT_ACACHE_INIT     = (1 << 5),
-    CLIENT_NCACHE_INIT     = (1 << 6),
-    CLIENT_CONFIG_MGR_INIT = (1 << 7),
-    CLIENT_REQ_SCHED_INIT  = (1 << 8),
+    CLIENT_NO_INIT           =      0,
+    CLIENT_ENCODER_INIT      = (1 << 0),
+    CLIENT_BMI_INIT          = (1 << 1),
+    CLIENT_FLOW_INIT         = (1 << 2),
+    CLIENT_JOB_INIT          = (1 << 3),
+    CLIENT_JOB_CTX_INIT      = (1 << 4),
+    CLIENT_ACACHE_INIT       = (1 << 5),
+    CLIENT_NCACHE_INIT       = (1 << 6),
+    CLIENT_CONFIG_MGR_INIT   = (1 << 7),
+    CLIENT_REQ_SCHED_INIT    = (1 << 8),
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
-    CLIENT_DIST_INIT       = (1 << 10),
-    CLIENT_SECURITY_INIT   = (1 << 11),
-    CLIENT_RCACHE_INIT     = (1 << 12)
+    CLIENT_DIST_INIT         = (1 << 10),
+    CLIENT_SECURITY_INIT     = (1 << 11),
+    CLIENT_RCACHE_INIT       = (1 << 12)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -184,7 +184,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     client_status_flag |= CLIENT_ENCODER_INIT;
     
     /* initialize bmi and the bmi session identifier */
-    ret = BMI_initialize(NULL,NULL,0);
+    ret = BMI_initialize(NULL, NULL, 0);
     if (ret < 0)
     {
         gossip_lerr("BMI initialize failure\n");
@@ -266,6 +266,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     client_status_flag |= CLIENT_RCACHE_INIT;
 
     /* initialize the server configuration manager */
+    /* hashes fsid to server config */
     ret = PINT_server_config_mgr_initialize();
     if (ret < 0)
     {
@@ -276,15 +277,14 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
 /* WBL V3 ADD SID INIT CALL */
 
-/* WBL V3 BEGIN REMOVE HANDLE MAPPING */
-    /* initialize the handle mapping interface */
+    /* initialize the cached config table */
+    /* hashes fsid to file system config */
     ret = PINT_cached_config_initialize();
     if (ret < 0)
     {
-        gossip_lerr("Error initializing handle mapping interface\n");
+        gossip_lerr("Error initializing cached config table\n");
         goto error_exit;
     }
-/* WBL V3 END REMOVE HANDLE MAPPING */
 
     /* start job timer */
     PINT_smcb_alloc(&smcb,

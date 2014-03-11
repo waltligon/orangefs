@@ -93,7 +93,7 @@ static void lebf_initialize(void)
         PVFS_hint_add(&req.hints, name, PVFS_HINT_MAX_LENGTH, val);
     }
 
-    for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
+    for (op_type = 0; op_type < PVFS_SERV_NUM_OPS; op_type++) {
         memset(&req.u, 0, sizeof(req.u));
         memset(&resp.u, 0, sizeof(resp.u));
         req.op = resp.op = op_type;
@@ -105,6 +105,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_GET_CONFIG:
                 /* never used, skip initialization */
                 continue;
             case PVFS_SERV_GETCONFIG:
@@ -544,6 +545,7 @@ static int lebf_encode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, req->op);
             ret = -PVFS_ENOSYS;
@@ -662,6 +664,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
@@ -776,6 +779,7 @@ static int lebf_decode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
@@ -885,6 +889,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
             ret = -PVFS_EPROTO;
@@ -1000,17 +1005,17 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.setattr.attr.mask
                         & PVFS_ATTR_DISTDIR_ATTR)
                 {
-                    if(req->u.setattr.attr.dist_dir_bitmap)
+                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
                     {
                         decode_free
-                            (req->u.setattr.attr.dist_dir_bitmap);
-                        req->u.setattr.attr.dist_dir_bitmap = NULL;
+                            (req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
                     }
-                    if(req->u.setattr.attr.dirdata_handles)
+                    if(req->u.setattr.attr.u.dir.dirdata_handles)
                     {
                         decode_free
-                            (req->u.setattr.attr.dirdata_handles);
-                        req->u.setattr.attr.dirdata_handles = NULL;
+                            (req->u.setattr.attr.u.dir.dirdata_handles);
+                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
                     }
                 }
                 break;
@@ -1103,7 +1108,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
-            case PVFS_SERV_PROTO_ERROR:            
+            case PVFS_SERV_GET_CONFIG:
+            case PVFS_SERV_PROTO_ERROR:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
                 gossip_lerr("%s: invalid request operation %d.\n",
                   __func__, req->op);
@@ -1168,9 +1174,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                          & PVFS_ATTR_DISTDIR_ATTR)
                     {
                        decode_free
-                        (resp->u.getattr.attr.dist_dir_bitmap);
+                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
                        decode_free
-                        (resp->u.getattr.attr.dirdata_handles);
+                        (resp->u.getattr.attr.u.dir.dirdata_handles);
                     }
                     break;
 
@@ -1316,6 +1322,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_PERF_UPDATE:
                 case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
+                case PVFS_SERV_GET_CONFIG:
                 case PVFS_SERV_NUM_OPS:  /* sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",
                                 __func__, resp->op);

@@ -622,12 +622,17 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
 
 static int dbpf_initialize(char *data_path,
 			   char *meta_path,
+			   char *config_path,
                            TROVE_ds_flags flags)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
 
     /* initialize events */
+/* V3 move all of this event def stuff into its own function
+ * suggest PINT_event_define_init
+ * just to clean this function up a bit
+ */
     PINT_event_define_group("trove_dbpf", &trove_dbpf_event_group);
 
     /* Define the read event:
@@ -732,7 +737,13 @@ static int dbpf_initialize(char *data_path,
 	return ret;
     }
 
-    sto_p = dbpf_storage_lookup(data_path, meta_path, &ret, flags);
+    if (!config_path)
+    {
+	gossip_err("dbpf_initialize failure: invalid config storage path\n");
+	return ret;
+    }
+
+    sto_p = dbpf_storage_lookup(data_path, meta_path, config_path, &ret, flags);
     if (sto_p == NULL)
     {
         gossip_debug(
@@ -827,12 +838,13 @@ static int stop_directio_threads(void)
 
 static int dbpf_direct_initialize(char *data_path,
 				  char *meta_path,
+				  char *config_path,
 				  TROVE_ds_flags flags)
 {
     int ret;
 
     /* some parts of initialization are shared with other methods */
-    ret = dbpf_initialize(data_path, meta_path, flags);
+    ret = dbpf_initialize(data_path, meta_path, config_path, flags);
     if(ret < 0)
     {
         return(ret);
@@ -928,12 +940,14 @@ int dbpf_finalize(void)
  */
 int dbpf_storage_create(char *data_path,
 			char *meta_path,
+			char *config_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     char data_dirname[PATH_MAX] = {0};
     char meta_dirname[PATH_MAX] = {0};
+    char config_dirname[PATH_MAX] = {0};
     char sto_attrib_dbname[PATH_MAX] = {0};
     char collections_dbname[PATH_MAX] = {0};
 
@@ -946,6 +960,13 @@ int dbpf_storage_create(char *data_path,
 
     DBPF_GET_META_DIRNAME(meta_dirname, PATH_MAX, meta_path);
     ret = dbpf_mkpath(meta_dirname, 0755);
+    if (ret != 0)
+    {
+	return ret;
+    }
+
+    DBPF_GET_CONFIG_DIRNAME(config_dirname, PATH_MAX, config_path);
+    ret = dbpf_mkpath(config_dirname, 0755);
     if (ret != 0)
     {
 	return ret;
@@ -971,18 +992,21 @@ int dbpf_storage_create(char *data_path,
 }
 
 int dbpf_storage_remove(char *data_path,
-			char *meta_path,
-            void *user_ptr,
-            TROVE_op_id *out_op_id_p)
+                        char *meta_path,
+                        char *config_path,
+                        void *user_ptr,
+                        TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     char path_name[PATH_MAX] = {0};
 
-    if (my_storage_p) {
+    if (my_storage_p)
+    {
         db_close(my_storage_p->sto_attr_db);
         db_close(my_storage_p->coll_db);
-		free(my_storage_p->meta_path);
-		free(my_storage_p->data_path);
+        free(my_storage_p->config_path);
+        free(my_storage_p->meta_path);
+        free(my_storage_p->data_path);
         free(my_storage_p);
         my_storage_p = NULL;
     }
@@ -1005,13 +1029,22 @@ int dbpf_storage_remove(char *data_path,
         goto storage_remove_failure;
     }
 
+    DBPF_GET_CONFIG_DIRNAME(path_name, PATH_MAX, config_path);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
+    if (rmdir(path_name) != 0)
+    {
+        perror("failure removing config directory");
+        ret = -trove_errno_to_trove_error(errno);
+        goto storage_remove_failure;
+    }
+
     DBPF_GET_META_DIRNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
     if (rmdir(path_name) != 0)
     {
-		perror("failure removing metadata directory");
-		ret = -trove_errno_to_trove_error(errno);
-		goto storage_remove_failure;
+        perror("failure removing metadata directory");
+        ret = -trove_errno_to_trove_error(errno);
+        goto storage_remove_failure;
     }
 
     DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, data_path);
@@ -1126,17 +1159,34 @@ int dbpf_collection_create(char *collname,
     ret = stat(path_name, &dirstat);
     if (ret < 0 && errno != ENOENT)
     {
-		gossip_err("stat failed on metadata directory %s\n", path_name);
-		return -trove_errno_to_trove_error(errno);
+        gossip_err("stat failed on metadata directory %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
     }
     else if (ret < 0)
     {
-		ret = mkdir(path_name, 0755);
-		if (ret != 0)
-		{
-	    	gossip_err("mkdir failed on metadata directory %s\n", path_name);
-	    	return -trove_errno_to_trove_error(errno);
-		}
+        ret = mkdir(path_name, 0755);
+        if (ret != 0)
+        {
+            gossip_err("mkdir failed on metadata directory %s\n", path_name);
+            return -trove_errno_to_trove_error(errno);
+        }
+    }
+
+    DBPF_GET_CONFIG_DIRNAME(path_name, PATH_MAX, sto_p->config_path);
+    ret = stat(path_name, &dirstat);
+    if (ret < 0 && errno != ENOENT)
+    {
+        gossip_err("stat failed on config directory %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    else if (ret < 0)
+    {
+        ret = mkdir(path_name, 0755);
+        if (ret != 0)
+        {
+            gossip_err("mkdir failed on config directory %s\n", path_name);
+            return -trove_errno_to_trove_error(errno);
+        }
     }
 
 
@@ -1158,8 +1208,10 @@ int dbpf_collection_create(char *collname,
 	return -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->meta_path, new_coll_id);
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name,
+                                PATH_MAX,
+                                sto_p->meta_path,
+                                new_coll_id);
 
     ret = stat(path_name, &dbstat);
     if(ret < 0 && errno != ENOENT)
@@ -1225,7 +1277,9 @@ int dbpf_collection_create(char *collname,
     db_p->sync(db_p, 0);
     db_close(db_p);
 
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->meta_path, 
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name,
+                              PATH_MAX,
+                              sto_p->meta_path, 
 			      new_coll_id);
     ret = stat(path_name, &dbstat);
     if(ret < 0 && errno != ENOENT)
@@ -1260,7 +1314,9 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->data_path,
+    DBPF_GET_BSTREAM_DIRNAME(path_name,
+                             PATH_MAX,
+                             sto_p->data_path,
 			     new_coll_id);
     ret = mkdir(path_name, 0755);
     if(ret != 0)
@@ -1280,7 +1336,9 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->data_path,
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name,
+                                      PATH_MAX,
+                                      sto_p->data_path,
                                       new_coll_id);
     ret = mkdir(path_name, 0755);
     if(ret != 0)
@@ -2050,8 +2108,11 @@ int dbpf_collection_lookup(char *collname,
  * structure will be found by following the link from the dbpf_coll
  * structure associated with that collection.
  */
-struct dbpf_storage *dbpf_storage_lookup(
-    char *data_path, char *meta_path, int *error_p, TROVE_ds_flags flags)
+struct dbpf_storage *dbpf_storage_lookup(char *data_path,
+                                         char *meta_path,
+                                         char *config_path,
+                                         int *error_p,
+                                         TROVE_ds_flags flags)
 {
     char path_name[PATH_MAX] = {0};
     struct dbpf_storage *sto_p = NULL;
@@ -2086,6 +2147,18 @@ struct dbpf_storage *dbpf_storage_lookup(
 	return NULL;
     }
 
+    if (stat(config_path, &sbuf) < 0)
+    {
+	*error_p = -TROVE_ENOENT;
+	return NULL;
+    }
+    if (!S_ISDIR(sbuf.st_mode))
+    {
+	*error_p = -TROVE_EINVAL;
+	gossip_err("%s is not a directory\n", config_path);
+	return NULL;
+    }
+
     sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
     if (sto_p == NULL)
     {
@@ -2101,6 +2174,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOMEM;
         return NULL;
     }
+
     sto_p->meta_path = strdup(meta_path);
     if (sto_p->meta_path == NULL)
     {
@@ -2109,6 +2183,17 @@ struct dbpf_storage *dbpf_storage_lookup(
 	*error_p = -TROVE_ENOMEM;
 	return NULL;
     }
+
+    sto_p->config_path = strdup(config_path);
+    if (sto_p->config_path == NULL)
+    {
+	free(sto_p->meta_path);
+	free(sto_p->data_path);
+	free(sto_p);
+	*error_p = -TROVE_ENOMEM;
+	return NULL;
+    }
+
     sto_p->refct = 0;
     sto_p->flags = flags;
 
@@ -2127,8 +2212,9 @@ struct dbpf_storage *dbpf_storage_lookup(
                                       error_p, NULL, 0);
     if (sto_p->sto_attr_db == NULL)
     {
+        free(sto_p->config_path);
         free(sto_p->meta_path);
-		free(sto_p->data_path);
+        free(sto_p->data_path);
         free(sto_p);
         gossip_err("Failure opening attribute database\n");
                    
@@ -2143,6 +2229,7 @@ struct dbpf_storage *dbpf_storage_lookup(
     if (sto_p->coll_db == NULL)
     {
         db_close(sto_p->sto_attr_db);
+        free(sto_p->config_path);
         free(sto_p->meta_path);
         free(sto_p->data_path);
         free(sto_p);

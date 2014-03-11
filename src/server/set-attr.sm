@@ -160,8 +160,8 @@ machine pvfs2_set_attr_sm
 
 %%
 
-static PINT_sm_action setattr_verify_attribs(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
@@ -308,42 +308,57 @@ static PINT_sm_action setattr_verify_attribs(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %s refers to a directory\n",
                      PVFS_OID_str(&s_op->req->u.setattr.handle));
+
         if((req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG,
                     "  It's changing dist dir attrs\n.");
-            PINT_dist_dir_attr_copyto(a_p->dist_dir_attr,
-                                      req_a_p->dist_dir_attr);
-            a_p->dist_dir_attr = req_a_p->dist_dir_attr;
-            if (a_p->dist_dir_bitmap)
-            {
-                free(a_p->dist_dir_bitmap);
-                a_p->dist_dir_bitmap = NULL;
-            }
-            a_p->dist_dir_bitmap = malloc(a_p->dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype));
-            if (! a_p->dist_dir_bitmap)
-            {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            memcpy(a_p->dist_dir_bitmap, req_a_p->dist_dir_bitmap,
-                a_p->dist_dir_attr.bitmap_size * sizeof(PVFS_dist_dir_bitmap_basetype));
 
-            if (a_p->dirdata_handles)
+            PINT_dist_dir_attr_copyto(a_p->u.dir.dist_dir_attr,
+                                      req_a_p->u.dir.dist_dir_attr);
+
+            a_p->u.dir.dist_dir_attr = req_a_p->u.dir.dist_dir_attr;
+
+            if (a_p->u.dir.dist_dir_bitmap)
             {
-                free(a_p->dirdata_handles);
-                a_p->dirdata_handles = NULL;
+                free(a_p->u.dir.dist_dir_bitmap);
+                a_p->u.dir.dist_dir_bitmap = NULL;
             }
-            a_p->dirdata_handles = malloc(a_p->dist_dir_attr.num_servers *
-                sizeof(PVFS_handle));
-            if (! a_p->dirdata_handles)
+
+            a_p->u.dir.dist_dir_bitmap =
+                        malloc(a_p->u.dir.dist_dir_attr.bitmap_size *
+                                    sizeof(PVFS_dist_dir_bitmap_basetype));
+
+            if (! a_p->u.dir.dist_dir_bitmap)
             {
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
             }
-            memcpy(a_p->dirdata_handles, req_a_p->dirdata_handles,
-                a_p->dist_dir_attr.num_servers * sizeof(PVFS_handle));
+
+            memcpy(a_p->u.dir.dist_dir_bitmap,
+                   req_a_p->u.dir.dist_dir_bitmap,
+                   a_p->u.dir.dist_dir_attr.bitmap_size *
+                             sizeof(PVFS_dist_dir_bitmap_basetype));
+
+            if (a_p->u.dir.dirdata_handles)
+            {
+                free(a_p->u.dir.dirdata_handles);
+                a_p->u.dir.dirdata_handles = NULL;
+            }
+
+            a_p->u.dir.dirdata_handles =
+                        malloc(a_p->u.dir.dist_dir_attr.num_servers *
+                                    sizeof(PVFS_handle));
+
+            if (! a_p->u.dir.dirdata_handles)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+
+            memcpy(a_p->u.dir.dirdata_handles,
+                   req_a_p->u.dir.dirdata_handles,
+                   a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRECTORY;
@@ -378,45 +393,60 @@ static PINT_sm_action setattr_verify_attribs(
                      "  handle %s refers to a dirdata object\n",
                      PVFS_OID_str(&s_op->req->u.setattr.handle));
         gossip_debug(
-            GOSSIP_SETATTR_DEBUG, " *** dirdata has dirent server count %d and "
+            GOSSIP_SETATTR_DEBUG,
+            " *** dirdata has dirent server count %d and "
             "req has dirent server count %d\n",
-            a_p->dist_dir_attr.num_servers, req_a_p->dist_dir_attr.num_servers);
+            a_p->u.dir.dist_dir_attr.num_servers,
+            req_a_p->u.dir.dist_dir_attr.num_servers);
 
         /* copy the distributed directory attributes before writing this object */
         if (req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
-            PINT_dist_dir_attr_copyto(a_p->dist_dir_attr,
-                                      req_a_p->dist_dir_attr);
-            a_p->dist_dir_attr = req_a_p->dist_dir_attr;
-            if (a_p->dist_dir_bitmap)
-            {
-                free(a_p->dist_dir_bitmap);
-                a_p->dist_dir_bitmap = NULL;
-            }
-            a_p->dist_dir_bitmap = malloc(a_p->dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype));
-            if (! a_p->dist_dir_bitmap)
-            {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            memcpy(a_p->dist_dir_bitmap, req_a_p->dist_dir_bitmap,
-                a_p->dist_dir_attr.bitmap_size * sizeof(PVFS_dist_dir_bitmap_basetype));
+            PINT_dist_dir_attr_copyto(a_p->u.dir.dist_dir_attr,
+                                      req_a_p->u.dir.dist_dir_attr);
 
-            if (a_p->dirdata_handles)
+            a_p->u.dir.dist_dir_attr = req_a_p->u.dir.dist_dir_attr;
+
+            if (a_p->u.dir.dist_dir_bitmap)
             {
-                free(a_p->dirdata_handles);
-                a_p->dirdata_handles = NULL;
+                free(a_p->u.dir.dist_dir_bitmap);
+                a_p->u.dir.dist_dir_bitmap = NULL;
             }
-            a_p->dirdata_handles = malloc(a_p->dist_dir_attr.num_servers *
-                sizeof(PVFS_handle));
-            if (! a_p->dirdata_handles)
+
+            a_p->u.dir.dist_dir_bitmap =
+                            malloc(a_p->u.dir.dist_dir_attr.bitmap_size *
+                                    sizeof(PVFS_dist_dir_bitmap_basetype));
+
+            if (! a_p->u.dir.dist_dir_bitmap)
             {
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
             }
-            memcpy(a_p->dirdata_handles, req_a_p->dirdata_handles,
-                a_p->dist_dir_attr.num_servers * sizeof(PVFS_handle));
+
+            memcpy(a_p->u.dir.dist_dir_bitmap,
+                   req_a_p->u.dir.dist_dir_bitmap,
+                   a_p->u.dir.dist_dir_attr.bitmap_size *
+                                sizeof(PVFS_dist_dir_bitmap_basetype));
+
+            if (a_p->u.dir.dirdata_handles)
+            {
+                free(a_p->u.dir.dirdata_handles);
+                a_p->u.dir.dirdata_handles = NULL;
+            }
+
+            a_p->u.dir.dirdata_handles =
+                            malloc(a_p->u.dir.dist_dir_attr.num_servers *
+                                         sizeof(PVFS_handle));
+
+            if (! a_p->u.dir.dirdata_handles)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+
+            memcpy(a_p->u.dir.dirdata_handles,
+                   req_a_p->u.dir.dirdata_handles,
+                   a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRDATA;
@@ -472,8 +502,8 @@ static PINT_sm_action setattr_verify_attribs(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action setattr_setobj_attribs(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -506,8 +536,8 @@ static PINT_sm_action setattr_setobj_attribs(
          PVFS_time orig_mtime = a_p->mtime;
          a_p->mtime = PINT_util_mktime_version(orig_mtime);
          gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
-                 "to %llu\n\tmtime is %llu\n",
-                 llu(a_p->mtime), llu(orig_mtime));
+                      "to %llu\n\tmtime is %llu\n",
+                      llu(a_p->mtime), llu(orig_mtime));
      }
 
     /* if the object is a symbolic link, check to make sure that the request
@@ -552,17 +582,23 @@ static PINT_sm_action setattr_setobj_attribs(
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
-    ret = job_trove_dspace_setattr(
-        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, 
-        TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_setattr(s_op->req->u.setattr.fs_id,
+                                   s_op->req->u.setattr.handle,
+                                   ds_attr, 
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
 
 static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                struct PINT_smcb *smcb,
+                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0, dfile_count = 0;
@@ -658,6 +694,7 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     
     PINT_dist_encode(s_op->val.buffer, 
                      s_op->req->u.setattr.attr.u.meta.dist);
+
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing %s [%s,%d,len %d]\n",
                  (char *)s_op->key.buffer,
                  PVFS_OID_str(&s_op->req->u.setattr.handle),
@@ -700,7 +737,7 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     }
 
     /* verify that the requested number of servers is sane */
-    num_servers = s_op->req->u.setattr.attr.dist_dir_attr.num_servers;
+    num_servers = s_op->req->u.setattr.attr.u.dir.dist_dir_attr.num_servers;
     if ((num_servers < 1) || (num_servers > PVFS_REQ_LIMIT_DIRENT_FILE_COUNT))
     {
         gossip_err("The requested number of servers (%d) is invalid; "
@@ -711,10 +748,10 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
 
     /* update the fields within the structures that are specific to this server. */
     ret = PINT_update_dist_dir_bitmap_from_bitmap(
-                &s_op->attr.dist_dir_attr,
-                s_op->attr.dist_dir_bitmap,
-                &s_op->req->u.setattr.attr.dist_dir_attr,
-                s_op->req->u.setattr.attr.dist_dir_bitmap);
+                &s_op->attr.u.dir.dist_dir_attr,
+                s_op->attr.u.dir.dist_dir_bitmap,
+                &s_op->req->u.setattr.attr.u.dir.dist_dir_attr,
+                s_op->req->u.setattr.attr.u.dir.dist_dir_bitmap);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
@@ -742,49 +779,58 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
 
-    s_op->val_a[0].buffer = &s_op->attr.dist_dir_attr;
+    s_op->val_a[0].buffer = &s_op->attr.u.dir.dist_dir_attr;
     s_op->val_a[0].buffer_sz = sizeof(PVFS_dist_dir_attr);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
-    s_op->val_a[1].buffer = s_op->attr.dist_dir_bitmap;
-    s_op->val_a[1].buffer_sz = sizeof(PVFS_dist_dir_bitmap_basetype) * s_op->attr.dist_dir_attr.bitmap_size;
+    s_op->val_a[1].buffer = s_op->attr.u.dir.dist_dir_bitmap;
+    s_op->val_a[1].buffer_sz = sizeof(PVFS_dist_dir_bitmap_basetype) *
+                               s_op->attr.u.dir.dist_dir_attr.bitmap_size;
 
     s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
-    s_op->val_a[2].buffer = s_op->attr.dirdata_handles;
-    s_op->val_a[2].buffer_sz = sizeof(PVFS_handle) * s_op->attr.dist_dir_attr.num_servers;
+    s_op->val_a[2].buffer = s_op->attr.u.dir.dirdata_handles;
+    s_op->val_a[2].buffer_sz = sizeof(PVFS_handle) *
+                               s_op->attr.u.dir.dist_dir_attr.num_servers;
 
-    for (i = 0; i < s_op->attr.dist_dir_attr.num_servers; i++)
+    for (i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
     {
-        if (!PVFS_OID_cmp(&s_op->attr.dirdata_handles[i],
+        if (!PVFS_OID_cmp(&s_op->attr.u.dir.dirdata_handles[i],
                           &s_op->req->u.setattr.handle))
         {
             break;
         }
     }
 
-    if (i < s_op->attr.dist_dir_attr.num_servers)
+    if (i < s_op->attr.u.dir.dist_dir_attr.num_servers)
     {
-        PINT_dist_dir_set_serverno(i, &s_op->attr.dist_dir_attr,
-                              s_op->attr.dist_dir_bitmap);
+        PINT_dist_dir_set_serverno(i,
+                                   &s_op->attr.u.dir.dist_dir_attr,
+                                   s_op->attr.u.dir.dist_dir_bitmap);
     }
-
     gossip_debug(GOSSIP_SETATTR_DEBUG,
             " setattr: writing dist-dir-struct keyvals for handle: %s,\n"
             "\t with server_no=%d and branch_level=%d \n",
             PVFS_OID_str(&s_op->req->u.setattr.handle),
-            s_op->attr.dist_dir_attr.server_no,
-            s_op->attr.dist_dir_attr.branch_level);
+            s_op->attr.u.dir.dist_dir_attr.server_no,
+            s_op->attr.u.dir.dist_dir_attr.branch_level);
 
-    ret = job_trove_keyval_write_list(
-        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        s_op->key_a, s_op->val_a,
-        keyval_count,
-        TROVE_SYNC,
-        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_write_list(s_op->req->u.setattr.fs_id,
+                                      s_op->req->u.setattr.handle,
+                                      s_op->key_a,
+                                      s_op->val_a,
+                                      keyval_count,
+                                      TROVE_SYNC,
+                                      NULL,
+                                      smcb,
+                                      0,
+                                      js_p,
+                                      &j_id,
+                                      server_job_context,
+                                      s_op->req->hints);
 
     return ret;
 }
@@ -798,14 +844,17 @@ static PINT_sm_action setattr_set_dirdata_attr_init(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(
+                struct PINT_smcb *smcb,
+                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr attr;
     int ret;
 
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "setattr state: setattr_remote_dirdata_attr_setup_msgpair\n");
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+                 "setattr state: setattr_remote_dirdata_attr_setup_msgpair\n");
 
     /* get attr from request. */
     memcpy(&attr, &s_op->req->u.setattr.attr, sizeof(attr));
@@ -825,14 +874,14 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
                                    s_op->req->u.setattr.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.dist_dir_attr.num_servers,
-                                   s_op->attr.dirdata_handles,
+                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dirdata_handles,
                                    0,    /* sid count V3 fixme */
                                    NULL, /* sid array V3 fixme */
                                    NULL);
 
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
-    msg_p->handle = s_op->attr.dirdata_handles[0];
+    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
 
@@ -855,8 +904,8 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
 }
 
 
-static PINT_sm_action setattr_set_dirdata_attr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_set_dirdata_attr_cleanup(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -868,7 +917,8 @@ static PINT_sm_action setattr_set_dirdata_attr_cleanup(
 /**   end of functions for pvfs2_set_dirdata_attr_work_sm     */
 
 static PINT_sm_action setattr_write_symlink_target_if_required(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                struct PINT_smcb *smcb,
+                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
@@ -930,8 +980,8 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
  * Synopsis: free memory and return
  *
  */
-static PINT_sm_action setattr_work_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_work_cleanup(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -965,8 +1015,8 @@ static PINT_sm_action setattr_work_cleanup(
  * Synopsis: free memory and return
  *           
  */
-static PINT_sm_action setattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
 }
