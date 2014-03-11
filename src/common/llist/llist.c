@@ -6,6 +6,7 @@
 
 
 #include "llist.h"
+#include "pvfs2-internal.h"
 
 /* PINT_llist_new() - returns a pointer to an empty list
  */
@@ -167,16 +168,16 @@ void *PINT_llist_rem(PINT_llist_p l_p,
 
     for (; l_p->next; l_p = l_p->next)
     {
-	/* NOTE: "comp" function must return _0_ if a match is made */
-	if (!(*comp) (key, l_p->next->item))
-	{
-	    void *i_p = l_p->next->item;
-	    PINT_llist_p rem_p = l_p->next;
+        /* NOTE: "comp" function must return _0_ if a match is made */
+        if (!(*comp) (key, l_p->next->item))
+        {
+            void *i_p = l_p->next->item;
+            PINT_llist_p rem_p = l_p->next;
 
-	    l_p->next = l_p->next->next;
-	    free(rem_p);
-	    return (i_p);
-	}
+            l_p->next = l_p->next->next;
+            free(rem_p);
+            return (i_p);
+        }
     }
     return (NULL);
 }
@@ -200,7 +201,7 @@ int PINT_llist_count(PINT_llist_p l_p)
 
     for (l_p = l_p->next; l_p; l_p = l_p->next)
     {
-	count++;
+        count++;
     }
 
     return (count);
@@ -221,12 +222,12 @@ int PINT_llist_doall(PINT_llist_p l_p, int (*fn) (void *))
     }
     for (l_p = l_p->next; l_p;)
     {
-	tmp_p = l_p->next;	/* save pointer to next element in case the
-				 * function destroys the element pointed to
-				 * by l_p...
-				 */
-	(*fn) (l_p->item);
-	l_p = tmp_p;
+        tmp_p = l_p->next;        /* save pointer to next element in case the
+                                 * function destroys the element pointed to
+                                 * by l_p...
+                                 */
+        (*fn) (l_p->item);
+        l_p = tmp_p;
     }
     return (0);
 }
@@ -249,12 +250,12 @@ int PINT_llist_doall_arg(PINT_llist_p l_p,
     }
     for (l_p = l_p->next; l_p;)
     {
-	tmp_p = l_p->next;	/* save pointer to next element in case the
-				 * function destroys the element pointed to
-				 * by l_p...
-				 */
-	(*fn) (l_p->item, arg);
-	l_p = tmp_p;
+        tmp_p = l_p->next;        /* save pointer to next element in case the
+                                 * function destroys the element pointed to
+                                 * by l_p...
+                                 */
+        (*fn) (l_p->item, arg);
+        l_p = tmp_p;
     }
     return (0);
 }
@@ -271,7 +272,7 @@ void PINT_llist_free(PINT_llist_p l_p, void (*fn) (void *))
 
     if (!l_p)
     {
-	return;
+        return;
     }
 
     /* There is never an item in first entry */
@@ -304,7 +305,7 @@ PINT_llist_p PINT_llist_next(PINT_llist_p entry)
 
     if (!entry)
     {
-	return (NULL);
+        return (NULL);
     }
 
     return (entry->next);

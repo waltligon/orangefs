@@ -7,6 +7,7 @@
 #ifndef __MKSPACE_H
 #define __MKSPACE_H
 
+#include "pvfs2-internal.h"
 #include "trove.h"
 
 #define PVFS2_MKSPACE_GOSSIP_VERBOSE 1

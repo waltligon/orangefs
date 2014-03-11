@@ -101,11 +101,12 @@ PVFS_error PVFS_isys_atomiceattr_list(PVFS_object_ref ref,
         for(i = 0; i < nkey; ++i)
         {
             char *valBuf = (char *)val_array[i].buffer;
+            int j;
+
             gossip_debug(GOSSIP_SETEATTR_DEBUG,"eattr[%d]: key=%s\n"
                                               , i
                                               ,(char *)key_array[i].buffer);
-            
-            int j;
+                        
             for (j=0; j<val_array[i].buffer_sz; j++)
                 gossip_debug(GOSSIP_SETEATTR_DEBUG,"          val[%d]=%#x\n"
                                                   ,j

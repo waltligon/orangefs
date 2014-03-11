@@ -531,11 +531,11 @@ populate_shared_memory:
         goto out;
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag(%d)\n"
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag (%llu)\n"
                                   ,__func__
                                   ,rw->fnstr
                                   ,llu(rw->pvfs2_inode->refn.handle)
-                                  ,(int)new_op->tag);
+                                  ,llu(new_op->tag));
 
     /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
@@ -2531,7 +2531,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
     else
     {
         pvfs2_kernel_op_t *op = NULL;
+#ifdef AIO_PUT_REQ_RETURNS_INT
         int ret;
+#endif
         /*
          * Do some sanity checks
          */
@@ -2547,7 +2549,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                     "pvfs2_kernel_op structure!\n");
             return -EINVAL;
         }
+#ifdef HAVE_KIOCBSETCANCELLED
         kiocbSetCancelled(iocb);
+#endif
         get_op(op);
         /*
          * This will essentially remove it from 
@@ -2555,7 +2559,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * as the case may be.
          */
         gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation aio_cancel "
-                     "(tag %lld, op %p)\n", __func__, lld(op->tag), op);
+                     "(tag %llu, op %p)\n", __func__, llu(op->tag), op);
         pvfs2_clean_up_interrupted_operation(op);
         /* 
          * However, we need to make sure that 
@@ -2623,7 +2627,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
             op->priv = NULL;
             spin_unlock(&op->lock);
             gossip_debug(GOSSIP_FILE_DEBUG, "Trying to cancel operation in "
-                    " progress %ld\n", (unsigned long) op->tag);
+                    " progress %llu\n", llu(op->tag));
             /* 
              * if operation is in progress we need to send 
              * a cancellation upcall for this tag 
@@ -2665,8 +2669,16 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * to manually decrement ki_users field!
          * before calling aio_put_req().
          */
+#ifdef KI_USERS_ATOMIC
+        atomic_dec(&iocb->ki_users);
+#else
         iocb->ki_users--;
+#endif
+#ifdef AIO_PUT_REQ_RETURNS_INT
         ret = aio_put_req(iocb);
+#else
+        aio_put_req(iocb);
+#endif
         /* x is itself deallocated by the destructor */
         return 0;
     }
@@ -2729,7 +2741,11 @@ fill_default_kiocb(pvfs2_kiocb *x,
     x->offset = offset;
     x->bytes_copied = 0;
     x->needs_cleanup = 1;
+#ifdef HAVE_KIOCB_SET_CANCEL_FN
+    kiocb_set_cancel_fn(iocb, aio_cancel);
+#else
     iocb->ki_cancel = aio_cancel;
+#endif
     /* Allocate a private pointer to store the
      * iovector since the caller could pass in a
      * local variable for the iovector.
@@ -3285,20 +3301,26 @@ int pvfs2_file_release(
 
 /** Push all data for a specific file onto permanent storage.
  */
-int pvfs2_fsync(
-    struct file *file,
+int pvfs2_fsync(struct file *file,
 #ifdef HAVE_FSYNC_LOFF_T_PARAMS
-    loff_t start,
-    loff_t end,
+                loff_t start,
+                loff_t end,
 #endif
 #ifdef HAVE_FSYNC_DENTRY_PARAM
-    struct dentry *dentry,
+                struct dentry *dentry,
 #endif
-    int datasync)
+                int datasync)
 {
     int ret = -EINVAL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(file->f_dentry->d_inode);
     pvfs2_kernel_op_t *new_op = NULL;
+
+    /* required call */
+#ifdef HAVE_FSYNC_LOFF_T_PARAMS
+    filemap_write_and_wait_range(file->f_mapping, start, end);
+#else
+    filemap_write_and_wait(file->f_mapping);
+#endif
 
     new_op = op_alloc(PVFS2_VFS_OP_FSYNC);
     if (!new_op)
@@ -3307,8 +3329,9 @@ int pvfs2_fsync(
     }
     new_op->upcall.req.fsync.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_fsync", 
-            get_interruptible_flag(file->f_dentry->d_inode));
+    ret = service_operation(new_op,
+                            "pvfs2_fsync", 
+                            get_interruptible_flag(file->f_dentry->d_inode));
 
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_fsync got return value of %d\n",ret);
 
@@ -3322,6 +3345,9 @@ int pvfs2_fsync(
  *
  *  \note If .llseek is overriden, we must acquire lock as described in
  *        Documentation/filesystems/Locking.
+ *
+ *  Future upgrade could support SEEK_DATA and SEEK_HOLE but would
+ *  require much changes to the FS
  */
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
@@ -3337,20 +3363,24 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
     if (origin == PVFS2_SEEK_END)
     {
         /* revalidate the inode's file size. 
-         * NOTE: We are only interested in file size here, so we set mask accordingly 
+         * NOTE: We are only interested in file size here,
+         * so we set mask accordingly 
          */
         ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
         if (ret)
         {
-            gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s:%s:%d calling make bad inode\n",
+                         __FILE__,  __func__, __LINE__);
             pvfs2_make_bad_inode(inode);
             return ret;
         }
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_llseek: offset is %ld | origin is %d | "
-                "inode size is %lu\n", (long)offset, origin,
-                (unsigned long)file->f_dentry->d_inode->i_size);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "pvfs2_file_llseek: offset is %ld | origin is %d | "
+                 "inode size is %lu\n", (long)offset, origin,
+                 (unsigned long)file->f_dentry->d_inode->i_size);
 
     return generic_file_llseek(file, offset, origin);
 }

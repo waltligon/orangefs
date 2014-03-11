@@ -13,7 +13,6 @@
 #include <malloc.h>
 #endif
 
-/* TODO: temp */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-types.h"
@@ -450,6 +449,12 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
                           num_groups,
                           group_array);
 
+#ifdef ENABLE_SECURITY_CERT
+    op_mask = 0;
+    /* no capabilities for unsigned credential */
+    if (!IS_UNSIGNED_CRED(cred))
+    {
+#endif
     /* retrieve the capabilities of the credential as a mask */
     ret = PINT_get_capabilities(NULL,
                                 0,
@@ -469,6 +474,9 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
+#ifdef ENABLE_SECURITY_CERT
+    } /* if */
+#endif
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  lookup_check_perms: op mask = %s\n",
                  PINT_print_op_mask(op_mask, mask_buf));
@@ -477,7 +485,12 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
     if ((op_mask & PINT_CAP_EXEC) == 0)
     {
         /* no file-mode permission--check ACLs */
+#ifdef ENABLE_SECURITY_CERT
+        /* don't check ACLs for unsigned cred */
+        js_p->error_code = IS_UNSIGNED_CRED(cred) ? 0 : LOOKUP_CHECK_DIR_ACLS;
+#else
         js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
+#endif
         return SM_ACTION_COMPLETE;
     }
 
@@ -861,7 +874,7 @@ static PINT_sm_action lookup_read_directory_entry(
     PINT_cached_config_get_server_name(
             dirdata_server_name,
             1024,
-            s_op->u.lookup.attr.u.dir.dirdata_handles[
+            s_op->u.lookup.attr.dirdata_handles[
                                 s_op->u.lookup.dirdata_server_index],
             s_op->req->u.lookup_path.fs_id);
 

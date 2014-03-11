@@ -47,7 +47,8 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred);
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred);
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred);
 int PVFS_util_refresh_credential(PVFS_credential *cred);
 
 /* NOTE: for backwards compatibility only. 

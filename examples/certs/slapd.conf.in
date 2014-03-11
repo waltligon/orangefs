@@ -2,10 +2,10 @@
 # See slapd.conf(5) for details on configuration options.
 # This file should NOT be world readable.
 #
-include		__PREFIX__/etc/openldap/schema/core.schema
-include		__PREFIX__/etc/openldap/schema/cosine.schema
-include		__PREFIX__/etc/openldap/schema/nis.schema
-include		__PREFIX__/etc/openldap/schema/inetorgperson.schema
+include		__CONFDIR__/schema/core.schema
+include		__CONFDIR__/schema/cosine.schema
+include		__CONFDIR__/schema/nis.schema
+include		__CONFDIR__/schema/inetorgperson.schema
 
 # Define global ACLs to disable default read access.
 
@@ -13,11 +13,11 @@ include		__PREFIX__/etc/openldap/schema/inetorgperson.schema
 # service AND an understanding of referrals.
 #referral	ldap://root.openldap.org
 
-pidfile		__PREFIX__/var/run/slapd.pid
-argsfile	__PREFIX__/var/run/slapd.args
+pidfile		__RUNDIR__/slapd.pid
+argsfile	__RUNDIR__/slapd.args
 
 # Load dynamic backend modules:
-# modulepath	__PREFIX__/libexec/openldap
+# modulepath	__MODDIR__
 # moduleload	back_bdb.la
 # moduleload	back_hdb.la
 # moduleload	back_ldap.la
@@ -64,7 +64,7 @@ rootpw		__ADMINPW__
 # The database directory MUST exist prior to running slapd AND 
 # should only be accessible by the slapd and slap tools.
 # Mode 700 recommended.
-directory	__PREFIX__/var/openldap-data
+directory	__DATADIR__
 # Indices to maintain
 index	objectClass	eq
 index	cn		eq

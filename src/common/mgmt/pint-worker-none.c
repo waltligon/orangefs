@@ -1,6 +1,7 @@
 
 #include "pint-worker-none.h"
 #include "pint-queue.h"
+#include "pvfs2-internal.h"
 
 static int PINT_worker_queues_init(PINT_worker_inst *inst,
                                    PINT_worker_attr_t *attr)

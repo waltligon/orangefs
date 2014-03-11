@@ -136,7 +136,9 @@ int main(int argc, char **argv)
         memset(&attr, 0, sizeof(PVFS_sys_attr));
         attr.owner = credentials.userid;
         attr.group = credentials.group_array[0];
-        attr.perms = 0777;
+        attr.perms = PVFS_util_translate_mode(
+                       (S_IROTH|S_IWOTH|S_IRGRP|S_IWGRP|S_IRUSR|S_IWUSR)
+                       & ~PVFS_util_get_umask(), 0);
         attr.atime = time(NULL);
         attr.mtime = attr.atime;
         attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;

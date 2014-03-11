@@ -12,6 +12,7 @@
 #include "src/io/flow/flowproto-support.h"
 #include "quicklist.h"
 #include "pvfs2-request.h"
+#include "pvfs2-internal.h"
 
 /**********************************************************
  * interface prototypes 

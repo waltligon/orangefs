@@ -3,6 +3,7 @@
 #include <errno.h>
 
 #include "ncac-interface.h"
+#include "pvfs2-internal.h"
 #include "internal.h"
 
 /* cache_read_post()

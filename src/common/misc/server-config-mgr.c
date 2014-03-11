@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "pvfs2-internal.h"
 #include "pvfs2.h"
 #include "server-config-mgr.h"
 #include "quickhash.h"
@@ -178,6 +179,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
                 cur_fs = PINT_llist_head(cur);
                 assert(cur_fs);
+                /* should this be error handling instead? */
                 assert(cur_fs->handle_recycle_timeout_sec.tv_sec > -1);
 
                 /* find the minimum handle recycle timeout here */
@@ -186,7 +188,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                     (s_min_handle_recycle_timeout_in_sec == -1))
                 {
                     s_min_handle_recycle_timeout_in_sec =
-                        cur_fs->handle_recycle_timeout_sec.tv_sec;
+                                cur_fs->handle_recycle_timeout_sec.tv_sec;
 
                     gossip_debug(GOSSIP_CLIENT_DEBUG, "Set min handle "
                                  "recycle time to %d seconds\n",
@@ -199,7 +201,9 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
 
-                ret = PINT_cached_config_handle_load_mapping(cur_fs);
+                ret = PINT_cached_config_handle_load_mapping(
+                                                     cur_fs,
+                                                     config->server_config);
                 if (ret)
                 {
                     PVFS_perror(

@@ -32,7 +32,7 @@
 #include "trove.h"
 #include "server-config.h"
 
-int PINT_server_get_config(struct server_configuration_s *config,
+int PINT_client_get_config(struct server_configuration_s *config,
                            struct PVFS_sys_mntent* mntent_p,
                            const PVFS_credential *credential,
                            PVFS_hint hints);

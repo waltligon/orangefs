@@ -1,0 +1,622 @@
+/* 
+ * (C) 2013 Clemson University and Omnibond Systems LLC
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 management interface routines for retrieving a user
+ *  certificate.
+ */
+
+#include <string.h>
+#include <sys/stat.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <assert.h>
+
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-internal.h"
+#include "gossip.h"
+#include "cert-util.h"
+
+#define PVFS_USER_CERT_KEY_SIZE    1024
+
+extern job_context_id pint_client_sm_context;
+
+static int public_key_comp_fn(void* v_p,
+				              struct PVFS_server_resp *resp_p,
+				              int i);
+
+static int userid_pwd_comp_fn(void* v_p,
+				              struct PVFS_server_resp *resp_p,
+				              int i);
+
+%%
+
+machine pvfs2_client_mgmt_get_user_cert_sm
+{
+    state public_key_setup_msgpair
+    {
+        run get_user_cert_public_key_setup_msgpair;
+        success => public_key_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state public_key_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => encrypt_pwd_and_key;
+        default => cleanup;
+    }
+
+    state encrypt_pwd_and_key
+    {
+        run get_user_cert_encrypt_pwd_and_key;
+        success => req_setup_msgpair;
+        default => cleanup;
+    }
+
+    state req_setup_msgpair
+    {
+        run get_user_cert_req_setup_msgpair;
+        success => req_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state req_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run get_user_cert_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static void get_user_cert_err(const char *fn, 
+                              const char *prefix, 
+                              int err)
+{
+    unsigned long sslerr;
+    char errstr[256];
+
+    switch (err) {    
+    case 0:
+        break;
+    case -1:
+        /* usually a parameter error */
+        gossip_err("%s: %s: parameter error\n", fn, prefix);
+        break;
+    case -PVFS_ESECURITY:
+        /* debug OpenSSL error queue */
+        gossip_err("%s: %s:\n", fn, prefix);
+        while ((sslerr = ERR_get_error()) != 0)
+        {
+            ERR_error_string_n(sslerr, errstr, 256);
+            errstr[255] = '\0';
+            gossip_err("%s: OpenSSL error: %s\n", fn, errstr);
+        }
+        break;
+    default:
+        /* debug PVFS/errno error */
+        PVFS_strerror_r((int) err, errstr, 256);
+        errstr[255] = '\0';
+        gossip_err("%s: %s: %s\n", fn, prefix, errstr);
+    }
+}
+
+#define GET_USER_CERT_ERR(pre, err)   get_user_cert_err(__func__, (pre), (err))
+
+PVFS_error PVFS_imgmt_get_user_cert(
+    PVFS_fs_id fs_id,
+    const char *userid,
+    const char *pwd,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    PVFS_certificate *cert,
+    PVFS_security_key *privkey,
+    uint32_t exp,
+    PVFS_mgmt_op_id *op_id)
+{
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+    int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                 "PVFS_imgmt_get_user_cert entered\n");
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_USER_CERT, 
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+
+    if (!smcb)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);           
+
+    PINT_init_msgarray_params(sm_p, fs_id);    
+
+    /* initialize state machine struct */
+    memset(&sm_p->u.mgmt_get_user_cert, 0, sizeof(sm_p->u.mgmt_get_user_cert));
+    sm_p->u.mgmt_get_user_cert.fs_id = fs_id;
+    sm_p->u.mgmt_get_user_cert.userid = userid;
+    sm_p->u.mgmt_get_user_cert.pwd = pwd;
+    sm_p->u.mgmt_get_user_cert.addr_count = addr_count;
+    sm_p->u.mgmt_get_user_cert.addr_array = addr_array;
+    sm_p->u.mgmt_get_user_cert.cert = cert;
+    sm_p->u.mgmt_get_user_cert.privkey = privkey;
+    sm_p->u.mgmt_get_user_cert.exp = exp;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, addr_count);
+    if (ret != 0)
+    {
+       PINT_smcb_free(smcb);
+       return ret;
+    }
+
+    return PINT_client_state_machine_post(
+        smcb, op_id, NULL); 
+}
+
+PVFS_error PVFS_mgmt_get_user_cert(
+    PVFS_fs_id fs_id,
+    const char *userid,
+    const char *pwd,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    PVFS_certificate *cert,
+    PVFS_security_key *privkey,
+    uint32_t exp)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_mgmt_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_get_user_cert entered\n");
+
+    if (userid == NULL || strlen(userid) == 0 ||
+        pwd == NULL || addr_count == 0 || addr_array == NULL ||
+        cert == NULL || privkey == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    ret = PVFS_imgmt_get_user_cert(fs_id, userid, pwd, 
+                                   addr_count, addr_array, 
+                                   cert, privkey, exp, &op_id);
+
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_imgmt_get_user_cert call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_mgmt_wait(op_id, "get_user_cert", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_get_user_cert completed\n");
+
+    PINT_mgmt_release(op_id);
+    return error;
+}
+
+/* get_user_cert_public_key_setup_msgpair()
+ *
+ * Request CA public key from server to use for encryption.
+ */
+static PINT_sm_action get_user_cert_public_key_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                 "%s: starting: fs_id: %llu   userid: %s\n",
+                 __func__,
+                 llu(sm_p->u.mgmt_get_user_cert.fs_id),
+                 sm_p->u.mgmt_get_user_cert.userid);
+
+    /* init cert / key */
+    sm_p->u.mgmt_get_user_cert.cert->buf =
+        sm_p->u.mgmt_get_user_cert.privkey->buf = NULL;
+    sm_p->u.mgmt_get_user_cert.cert->buf_size = 
+        sm_p->u.mgmt_get_user_cert.privkey->buf_size = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: requesting public key\n",
+                  __func__);
+
+    js_p->error_code = 0;
+
+    PINT_null_capability(&capability);
+
+    /* setup msgpair array */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_MGMT_GET_USER_CERT_KEYREQ_FILL(msg_p->req,
+            capability,
+            sm_p->u.mgmt_get_user_cert.fs_id);
+
+        msg_p->fs_id = sm_p->u.mgmt_get_user_cert.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = public_key_comp_fn;
+        msg_p->svr_addr = sm_p->u.mgmt_get_user_cert.addr_array[i];
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_key_data keybuf, pkeybuf;
+    RSA *rsa_pubkey, *rsa_privkey;
+    unsigned char pwddata[PVFS_REQ_LIMIT_USERID_PWD], *penc_key;
+    int flen, bufrem, maxflen, elen;
+    EVP_PKEY *keypair;
+
+    /* load public key from data received from the server */
+    keybuf = sm_p->u.mgmt_get_user_cert.public_key.buf;
+    rsa_pubkey = d2i_RSAPublicKey(NULL, (const unsigned char **) &keybuf,
+                     sm_p->u.mgmt_get_user_cert.public_key.buf_size);
+
+    if (rsa_pubkey == NULL)
+    {
+        GET_USER_CERT_ERR("could not load CA public key", -PVFS_ESECURITY);
+        js_p->error_code = -PVFS_ESECURITY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* copy password to buffer */
+    memset(pwddata, 0, PVFS_REQ_LIMIT_USERID_PWD);
+    strncpy((char *) pwddata, sm_p->u.mgmt_get_user_cert.pwd, 
+            PVFS_REQ_LIMIT_USERID_PWD);
+
+    flen = RSA_size(rsa_pubkey) - 12;
+    if (strlen((char *) pwddata)+1 > flen) {
+        GET_USER_CERT_ERR("password too long", -PVFS_EINVAL);
+        js_p->error_code = -PVFS_ESECURITY;
+        RSA_free(rsa_pubkey);
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* allocate encrypted data buffer */
+    sm_p->u.mgmt_get_user_cert.enc_pwd = 
+        (unsigned char *) malloc(flen + 12);
+    if (sm_p->u.mgmt_get_user_cert.enc_pwd == NULL)
+    {
+        GET_USER_CERT_ERR("could not allocate encrypted data buffer", 
+                          -PVFS_ENOMEM);
+        js_p->error_code = -PVFS_ENOMEM;
+        RSA_free(rsa_pubkey);
+        return SM_ACTION_COMPLETE;
+    }
+    memset(sm_p->u.mgmt_get_user_cert.enc_pwd, 0, flen + 12);
+
+    /* encrypt the password */
+    sm_p->u.mgmt_get_user_cert.enc_pwd_size = 
+        RSA_public_encrypt(flen, pwddata, 
+            sm_p->u.mgmt_get_user_cert.enc_pwd, rsa_pubkey, RSA_PKCS1_PADDING);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: RSA_public_encrypt => %llu\n", 
+                 __func__, llu(sm_p->u.mgmt_get_user_cert.enc_pwd_size));
+
+    /* check bytes written */
+    if (sm_p->u.mgmt_get_user_cert.enc_pwd_size != (flen+12))
+    {
+        GET_USER_CERT_ERR("could not encrypt password", -PVFS_ESECURITY);
+        js_p->error_code = -PVFS_ESECURITY;
+    }
+
+    /*** generate user private key ***/
+
+    /* allocate keypair object */
+    keypair = EVP_PKEY_new();
+    if (keypair == NULL)
+    {
+        GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
+                          "alloc keypair", -PVFS_ESECURITY);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* generate RSA keypair */
+    rsa_privkey = RSA_generate_key(PVFS_USER_CERT_KEY_SIZE, RSA_F4, NULL, NULL);
+    if (rsa_privkey == NULL || !EVP_PKEY_assign_RSA(keypair, rsa_privkey))
+    {
+        GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
+                          "assign keypair", -PVFS_ESECURITY);
+        js_p->error_code = -PVFS_EINVAL;
+        EVP_PKEY_free(keypair);
+        if (rsa_privkey != NULL)
+        {
+            RSA_free(rsa_privkey);
+        }
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* copy key to buffer */
+    keybuf = NULL;
+    bufrem = sm_p->u.mgmt_get_user_cert.privkey->buf_size = 
+        i2d_RSAPrivateKey(rsa_privkey, &keybuf);
+    if (bufrem <= 0)
+    {
+        GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
+                          "write user private key to buffer", -PVFS_ESECURITY);
+        js_p->error_code = -PVFS_ESECURITY;        
+        RSA_free(rsa_privkey);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* encrypt key... requires multiple blocks */
+    maxflen = RSA_size(rsa_pubkey) - 12;
+    sm_p->u.mgmt_get_user_cert.enc_key_size = 
+        ((bufrem / maxflen) + 1) * (maxflen + 12);
+    sm_p->u.mgmt_get_user_cert.enc_key = 
+        (unsigned char *) malloc(sm_p->u.mgmt_get_user_cert.enc_key_size);
+    if (sm_p->u.mgmt_get_user_cert.enc_key == NULL)
+    {
+        GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
+                          "allocate encrypted key buffer", -PVFS_ENOMEM);
+        js_p->error_code = -PVFS_ENOMEM;
+        OPENSSL_free(keybuf);
+        RSA_free(rsa_privkey);
+        RSA_free(rsa_pubkey);
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    penc_key = sm_p->u.mgmt_get_user_cert.enc_key;
+    pkeybuf = keybuf;
+    while (bufrem > 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: encrypting key: bufrem = %d\n",
+                      __func__, bufrem);
+        flen = bufrem < maxflen ? bufrem : maxflen;
+        elen = RSA_public_encrypt(flen, pkeybuf, penc_key, rsa_pubkey, 
+                                  RSA_PKCS1_PADDING);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: encrypting key: flen = %d   "
+                     "elen = %d\n", __func__, flen, elen);
+        if (elen <= 0)
+        {
+            GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: error "
+                              "encrypting private key", -PVFS_ESECURITY);
+            OPENSSL_free(keybuf);
+            RSA_free(rsa_privkey);
+            RSA_free(rsa_pubkey);
+
+            return SM_ACTION_COMPLETE;
+        }
+        pkeybuf += flen;
+        penc_key += elen;
+        bufrem -= flen;
+    }
+
+    /* copy key to be returned to caller */
+    sm_p->u.mgmt_get_user_cert.privkey->buf = keybuf;
+
+    RSA_free(rsa_privkey);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_userid_pwd_setup_msgpair()
+ * 
+ * Setup msgpair containing userid and encrypted password.
+ */
+static PINT_sm_action get_user_cert_req_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: requesting user cert\n", __func__);
+
+    js_p->error_code = 0;
+
+    PINT_null_capability(&capability);
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_MGMT_GET_USER_CERT_FILL(msg_p->req,
+        capability,
+        sm_p->u.mgmt_get_user_cert.fs_id,
+        (char *) sm_p->u.mgmt_get_user_cert.userid,
+        sm_p->u.mgmt_get_user_cert.enc_pwd_size,
+        sm_p->u.mgmt_get_user_cert.enc_pwd,
+        sm_p->u.mgmt_get_user_cert.enc_key_size,
+        sm_p->u.mgmt_get_user_cert.enc_key,
+        sm_p->u.mgmt_get_user_cert.exp);
+
+    msg_p->fs_id = sm_p->u.mgmt_get_user_cert.fs_id;
+    msg_p->handle = PVFS_HANDLE_NULL;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = userid_pwd_comp_fn;
+    msg_p->svr_addr = sm_p->u.mgmt_get_user_cert.pref_svr_addr;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_user_cert_cleanup()
+ * 
+ * Clean up allocated resources.
+ */
+static PINT_sm_action get_user_cert_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    sm_p->error_code  = js_p->error_code;
+
+    /* free resources */
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    if (sm_p->u.mgmt_get_user_cert.enc_pwd)
+    {
+        free(sm_p->u.mgmt_get_user_cert.enc_pwd);
+    }
+
+    PINT_cleanup_key(&sm_p->u.mgmt_get_user_cert.public_key);
+
+    free(sm_p->u.mgmt_get_user_cert.enc_key);
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/* public_key_comp_fn()
+ *
+ * completion function for public key request
+ */
+static int public_key_comp_fn(void* v_p,
+				              struct PVFS_server_resp *resp_p,
+				              int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int j, ret = 0;
+
+    /* if successful, copy public key */
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
+    {
+        /* only copy key once */
+        if (sm_p->u.mgmt_get_user_cert.public_key.buf == NULL)
+        {
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: copying public key\n",
+                         __func__);
+            if ((ret = PINT_copy_key(&resp_p->u.mgmt_get_user_cert_keyreq.public_key, 
+                          &sm_p->u.mgmt_get_user_cert.public_key)) != 0)
+            {
+                return ret;
+            }
+
+            /* set preferred server address */
+            sm_p->u.mgmt_get_user_cert.pref_svr_addr = 
+                sm_p->msgarray_op.msgarray[i].svr_addr;
+        }
+    }
+
+    /* if this is the last response, check all of the status values and 
+     * return error code if ALL requests failed 
+     */
+    if (i == (sm_p->msgarray_op.count - 1))
+    {
+	    for (j = 0; j < sm_p->msgarray_op.count; j++)
+	    {
+	        if (sm_p->msgarray_op.msgarray[j].op_status == 0)
+            { 
+                ret = 0;
+                break;
+            }
+            else if (ret != 0)
+            {
+                /* store first error code */
+                ret = sm_p->msgarray_op.msgarray[j].op_status;
+            }
+        }
+    }
+
+    return ret;
+}
+
+/* userid_pwd_comp_fn()
+ * 
+ * completion function for user cert request 
+ */
+static int userid_pwd_comp_fn(void* v_p,
+				              struct PVFS_server_resp *resp_p,
+				              int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PVFS_certificate *resp_cert, *sm_cert;
+    int ret;
+
+    /* check for error */
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: resp_p->status = %d\n",
+                     __func__, resp_p->status);
+
+        return resp_p->status;
+    }
+
+    /* copy certificate and private key */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: copying user cert\n",
+                 __func__);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: cert.buf_size = %d\n",
+                 __func__, resp_p->u.mgmt_get_user_cert.cert.buf_size);
+
+    resp_cert = &resp_p->u.mgmt_get_user_cert.cert;
+    sm_cert = sm_p->u.mgmt_get_user_cert.cert;
+    if ((ret = PINT_copy_cert(resp_cert, sm_cert)) != 0)
+    {
+        GET_USER_CERT_ERR("error copying response cert\n", ret);
+
+        return ret;
+    }
+
+    /* not needed 
+    resp_privkey = &resp_p->u.mgmt_get_user_cert.key;
+    sm_privkey = sm_p->u.mgmt_get_user_cert.key;
+    if ((ret = PINT_copy_key(resp_privkey, sm_privkey)) != 0)
+    {
+        GET_USER_CERT_ERR("error copying response key\n", ret);
+    }
+    */
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: exiting: ret = %d\n",
+                 __func__, ret);
+
+    return ret;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

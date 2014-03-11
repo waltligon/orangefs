@@ -6,6 +6,8 @@
 
 /* TCP/IP implementation of a BMI method */
 
+#include "pvfs2-internal.h"
+
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,9 +21,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "pint-mem.h"
+/* #include "pint-mem.h" obsolete */
 
-#include "pvfs2-config.h"
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
@@ -665,12 +666,15 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 void *BMI_tcp_memalloc(bmi_size_t size,
 		       enum bmi_op_type send_recv)
 {
+    void *ptr;
     /* we really don't care what flags the caller uses, TCP/IP has no
      * preferences about how the memory should be configured.
      */
 
-/*    return (calloc(1,(size_t) size)); */
-    return PINT_mem_aligned_alloc(size, 4096);
+    /* return (calloc(1,(size_t) size)); */
+    /* return PINT_mem_aligned_alloc(size, 4096); */
+    posix_memalign(&ptr, 4096, size);
+    return ptr;
 }
 
 
@@ -684,7 +688,8 @@ int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv)
 {
-    PINT_mem_aligned_free(buffer);
+    /*PINT_mem_aligned_free(buffer);*/
+    free(buffer);
     return (0);
 }
 

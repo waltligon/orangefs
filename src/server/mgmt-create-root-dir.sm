@@ -222,7 +222,7 @@ static PINT_sm_action mgmt_create_root_check_for_request(
 
 #ifdef ENABLE_SECURITY_CERT
     /* use CA certificate as cert in credential */
-    ret = PINT_load_cert_from_file(user_opts->ca_path, &xcert);
+    ret = PINT_load_cert_from_file(user_opts->ca_file, &xcert);
     if (ret != 0)
     {
         gossip_err("mgmt_create_root_dir: could not load CA "
@@ -307,7 +307,8 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
                                    &attr->u.dir.dist_dir_bitmap,
                                    num_total_dirdata_servers,
                                    0,
-                                   num_initial_dirdata_servers);
+                                   num_initial_dirdata_servers,
+                                   100);
 
     assert(ret == 0);
 
@@ -761,8 +762,6 @@ static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
     sys_attr.perms = 0777;
     sys_attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     sys_attr.objtype = PVFS_TYPE_DIRECTORY;
-    // use all dirdata servers
-    sys_attr.dirdata_count = s_op->attr.u.dir.dist_dir_attr.num_servers;
 
     memset(&layout, 0, sizeof(layout));
     layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
@@ -792,9 +791,11 @@ static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
                             PVFS_HANDLE_NULL, /* handle */
                             PVFS_HANDLE_NULL, /* parent */
                             PVFS_SID_NULL, /* parent sid */
-                            s_op->attr.u.dir.dist_dir_attr.num_servers,
-                            layout,
                             sys_attr,
+                            s_op->attr.u.dir.dist_dir_attr.num_servers,
+                            s_op->attr.u.dir.dist_dir_attr.num_servers,
+                            s_op->attr.u.dir.dist_dir_attr.split_size,
+                            layout,
                             NULL);
 
     msg_p->fs_id = s_op->target_fs_id;
@@ -819,7 +820,7 @@ static int mkdir_lost_found_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* otherwise, just stash the newly created meta handle */
@@ -843,6 +844,7 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    const struct server_configuration_s *config;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "mgmt-create-root-dir state: "
@@ -873,6 +875,17 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
                                             malloc(sizeof(PVFS_handle));
     s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
 
+    config = get_server_config_struct();
+    s_op->u.mgmt_create_root_dir.capability.issuer = 
+        (char *) malloc(strlen(config->server_alias) + 3);
+    if (s_op->u.mgmt_create_root_dir.capability.issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(s_op->u.mgmt_create_root_dir.capability.issuer, "S:");
+    strcat(s_op->u.mgmt_create_root_dir.capability.issuer, config->server_alias);
+
     /* Need to re-sign the capability since we added a target handle. */
     ret = PINT_sign_capability(&s_op->u.mgmt_create_root_dir.capability);
     if (ret < 0)
@@ -890,7 +903,8 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
            lost_and_found_string,
            PVFS_OID_str(&s_op->u.mgmt_create_root_dir.lost_and_found_handle),
            PVFS_OID_str(&s_op->target_handle),
-           PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[dirdata_server_index]),
+           PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[
+                                                  dirdata_server_index]),
            dirdata_server_index);
 
     PINT_msgpair_init(&s_op->msgarray_op);

@@ -141,8 +141,6 @@ machine pvfs2_mkdir_sm
  *
  * Synopsis: 
  *
- * NOTE: returned handle will pop out in js_p->handle (the job status
- * struct).
  */
 static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -160,7 +158,7 @@ static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
                                   s_op->u.mkdir.handle,
                                   PVFS_TYPE_DIRECTORY,
                                   NULL,
-                                  TROVE_SYNC, 
+                                  TROVE_SYNC,
                                   smcb,
                                   0,
                                   js_p,
@@ -217,13 +215,33 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* init dist_dir_struct in s_op->attr.u.dir and s_op->u.mkdir */
+/*
+ * Function: mkdir_create_dist_dir_struct
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Initialize dist_dir_struct in s_op->attr.u.dir and s_op->u.mkdir
+ *           
+ */
+/* V3
+ * For V3, this state may also be able to obtain the necessary OIDs and SIDs
+ * and format them correctly in the dist dir data structures.
+ * The SIDs for one OID should include the local server. The SIDs for all
+ * other OIDs should *not* include the local server (or only as a replica).
+ * (Need to think about overall strategy for choosing these SIDs.)
+*/
 static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
-    int num_total_dirdata_servers, num_initial_dirdata_servers;
+    int num_total_dirdata_servers=0,
+        num_initial_dirdata_servers=0,
+        num_meta=0,
+        split_size=0;
     server_configuration_t *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
@@ -231,9 +249,39 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 
     attr = (&s_op->attr);
 
-    /* use total # of meta servers as the num_total_dirdata_servers */
+    /* if received >0, use; else use config_file value,*/
+    if(s_op->req->u.mkdir.distr_dir_servers_max > 0)
+    {
+        num_total_dirdata_servers = s_op->req->u.mkdir.distr_dir_servers_max;
+    }
+    else
+    {
+        num_total_dirdata_servers = user_opts->distr_dir_servers_max;
+    }
+
+    /* if received >0, use; else use config_file value,*/
+    if(s_op->req->u.mkdir.distr_dir_servers_initial > 0)
+    {
+        num_initial_dirdata_servers = s_op->req->u.mkdir.distr_dir_servers_initial;
+    }
+    else
+    {
+        num_initial_dirdata_servers = user_opts->distr_dir_servers_initial;
+    }
+
+    /* if received >0, use; else use config_file value,*/
+    if(s_op->req->u.mkdir.distr_dir_split_size > 0)
+    {
+        split_size = s_op->req->u.mkdir.distr_dir_split_size;
+    }
+    else
+    {
+        split_size = user_opts->distr_dir_split_size;
+    }
+
+    /* Check to make sure too many dirdata servers were not requested. */
     ret = PINT_cached_config_get_num_meta(s_op->u.mkdir.fs_id,
-                                            &num_total_dirdata_servers);
+                                            &num_meta);
     if(ret < 0)
     {
         gossip_err("Error: failed to get number of metadata servers\n");
@@ -241,35 +289,31 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    if(num_initial_dirdata_servers > num_total_dirdata_servers)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+    if(num_initial_dirdata_servers > num_meta)
+    {
+        num_initial_dirdata_servers = num_meta;
+    }
+    if(num_total_dirdata_servers > num_meta)
+    {
+        num_total_dirdata_servers = num_meta;
+    }
+
     /* set num_dirdata_servers for pre-allocation of dirdata handles */
     s_op->u.mkdir.num_dirdata_servers = num_total_dirdata_servers;
 
-    /* if received >0, use; else use config_file value,*/
-    if(s_op->req->u.mkdir.num_dirent_files > 0)
-    {
-        num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files;
-    }
-    else
-    {
-        num_initial_dirdata_servers = user_opts->init_num_dirdata_handles;
-    }
-
-#if 0
-    /* will do the same check in PINT_init_dist_dir_state, 
-     * but can also add here */
-    if(num_initial_dirdata_servers > num_total_dirdata_servers)
-    {
-        num_initial_dirdata_servers = num_total_dirdata_servers;
-    }
-#endif
-    num_initial_dirdata_servers = 1;
 
     /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
                                    &attr->u.dir.dist_dir_bitmap,
                                    num_total_dirdata_servers,
                                    0,
-                                   num_initial_dirdata_servers);
+                                   num_initial_dirdata_servers,
+                                   split_size);
 
     assert(ret == 0);
 
@@ -321,17 +365,26 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 }
 
 /** Creates local dirdata dspace records for new directory
+ * Function: mkdir_create_local_dirdata_dspace
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Store local dirdata info.
+ *           
+ */
+/*
+ * V3 - May be able to incorporate into mkdir_create_dist_dir_struct 
  */
 static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
     PVFS_handle *handle_array = NULL;
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
-
-    attr = (&s_op->attr);
 
     assert(s_op->u.mkdir.num_dirdata_servers > 0);
 
@@ -354,6 +407,9 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
 
     /* where does handle_array come from? who allocates these OIDs, this
      * code or trove?
+     * from ECQ: This code (or above in mkdir_create_dist_dir_struct) should
+     * allocate these OIDs. If it were done by trove then choosing of
+     * local and remote OIDs would have to be handled differently.
      */
 
 /* no extents in V3 */

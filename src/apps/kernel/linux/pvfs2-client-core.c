@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <pthread.h>
 #include <signal.h>
 #include <getopt.h>
@@ -258,6 +259,10 @@ static void finalize_perf_items(int n, ... );
 inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_credential *lookup_credential(
+    PVFS_uid uid,
+    PVFS_gid gid);
+
+static void remove_credential(
     PVFS_uid uid,
     PVFS_gid gid);
 
@@ -1132,7 +1137,6 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
         hints, 
         (void *)vfs_request);
     vfs_request->hints = hints;
-
 
     if (credential)
     {
@@ -3093,8 +3097,15 @@ static inline void package_downcall_members(
             break;
     }
 
+    /* remove credential from cache on permission error */
+    if (*error_code == -PVFS_EPERM || *error_code == -PVFS_EACCES)
+    {
+        remove_credential(vfs_request->in_upcall.uid, vfs_request->in_upcall.gid);
+    }
+
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+
 }
 
 static inline PVFS_error repost_unexp_vfs_request(
@@ -3338,9 +3349,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             if(vfs_request->op_id == -1)
             {
                 /* This should be set to the return value of the isys_* call */
-                int error = ret; /* error code of the SM> */
+                int error = ret; /* error code of the SM */
                 vfs_request->num_incomplete_ops--;
-                package_downcall_members(vfs_request,  &error);
+                package_downcall_members(vfs_request, &error);
                 write_inlined_device_response(vfs_request); 
                 ret = repost_unexp_vfs_request(
                     vfs_request, "inlined completion");
@@ -4538,10 +4549,9 @@ static int credential_compare_fn(void *key, struct qhash_head *link)
     struct PINT_tcache_entry *tmp;
     struct credential_payload *cpayload;
 
-    tmp = qhash_entry(link, struct PINT_tcache_entry, hash_link);
-    assert(tmp);
+    tmp = qhash_entry(link, struct PINT_tcache_entry, hash_link);    
 
-    cpayload = (struct credential_payload*)tmp->payload;
+    cpayload = (struct credential_payload*) tmp->payload;
 
     return ((ckey->uid == cpayload->uid) &&
             (ckey->gid == cpayload->gid));
@@ -4811,10 +4821,7 @@ static int get_mac(void)
     }
 }
 
-/* calls the pvfs2-gencred app to generate a credential
- *
- * group id is currently ignored.
- */
+/* calls the pvfs2-gencred app to generate a credential */
 static PVFS_credential *generate_credential(
     PVFS_uid uid,
     PVFS_gid gid)
@@ -4853,6 +4860,7 @@ static PVFS_credential *generate_credential(
         group,
         timeout,
         s_opts.keypath,
+        NULL,
         credential);
     if (ret < 0)
     {
@@ -4881,40 +4889,45 @@ static PVFS_credential *lookup_credential(
     ckey.uid = uid;
     ckey.gid = gid;
 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "credential cache lookup for (%u, %u)"
+                 " num_entries: %d\n", uid, gid, credential_cache->num_entries);
     /* see if a fresh credential is in the cache */
     ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
     if (ret == 0 && status == 0)
     {
         /* cache hit -- return copy of cached credential 
            (cache operations may free credential) */
-        gossip_debug(
-            GOSSIP_SECURITY_DEBUG,
-            "credential cache HIT for (%u, %u)\n", uid, gid);
-        cpayload = (struct credential_payload*)entry->payload;
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "credential cache HIT for (%u, %u)\n", uid, gid);
+        cpayload = (struct credential_payload*) entry->payload;
         return (PVFS_credential*) PINT_dup_credential(cpayload->credential);
     }
     else if (ret == 0 && status == -PVFS_ETIME)
     {
         /* found expired cache entry -- remove */
-        gossip_debug(
-            GOSSIP_SECURITY_DEBUG, 
-            "deleting expired credential cache entry for (%u, %u)\n", uid, gid);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "deleting expired credential cache entry for (%u, %u)\n",
+                     uid, gid);
         PINT_tcache_delete(credential_cache, entry);
     }
 
     /* request a new credential and store it in the cache */
-    gossip_debug(
-        GOSSIP_SECURITY_DEBUG,
-        "credential cache MISS for (%u, %u)\n", uid, gid);
+    gossip_debug(GOSSIP_SECURITY_DEBUG,
+                 "credential cache MISS for (%u, %u)\n", uid, gid);
 
     credential = generate_credential(uid, gid);
     if (credential == NULL)
     {
-        gossip_err("unable to fetch client credential for uid, gid "
+        gossip_err("unable to generate client credential for uid, gid "
                    "(%u, %u)\n", uid, gid);
         return NULL;
     }
 
+#ifdef ENABLE_SECURITY_CERT
+    /* don't cache unsigned credential */
+    if (credential->sig_size != 0)
+    {
+#endif
     cpayload = malloc(sizeof(struct credential_payload));
     if (cpayload == NULL)
     {
@@ -4932,14 +4945,59 @@ static PVFS_credential *lookup_credential(
     tval.tv_sec = credential->timeout - CRED_TIMEOUT_BUFFER;
     tval.tv_usec = 0;
 
-    PINT_tcache_insert_entry_ex(
+    ret = PINT_tcache_insert_entry_ex(
         credential_cache,
         &ckey,
         cpayload,
         &tval,
         &status);
 
+    if (ret == 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "cached credential for (%u, %u)\n",
+                     uid, gid);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "cache insert returned %d\n", ret);
+    }
+
+#ifdef ENABLE_SECURITY_CERT
+    } /* if */
+#endif
     return credential;
+}
+
+/* remove credential from cache */
+void remove_credential(
+    PVFS_uid uid,
+    PVFS_gid gid)
+{
+    struct credential_key ckey;
+    struct PINT_tcache_entry *entry;
+    int status, ret;
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "removing credential (%u, %u) from "
+                 "cache...\n", uid, gid);
+
+    ckey.uid = uid;
+    ckey.gid = gid;
+
+    /* lookup credential */
+    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
+
+    if (ret == 0)
+    {
+        ret = PINT_tcache_delete(credential_cache, entry);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "... cache delete returned %d\n", 
+                     ret);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "... cache lookup returned %d\n", 
+                     ret);
+    }
+
 }
 
 /*

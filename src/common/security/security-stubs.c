@@ -42,9 +42,15 @@ int PINT_sign_capability(PVFS_capability *cap)
     const struct server_configuration_s *config;
 
     config = get_server_config_struct();
-    assert(config->server_alias);
+    assert(config && config->server_alias);
 
-    cap->issuer = strdup(config->server_alias);
+    cap->issuer = (char *) malloc(strlen(config->server_alias) + 3);
+    if (cap->issuer == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    strcpy(cap->issuer, "S:");
+    strcat(cap->issuer, config->server_alias);
 
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
@@ -69,9 +75,13 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     }
     capability->issuer =
         malloc(strlen(user_opts->server_alias) + 3);
-    capability->issuer[0] = 'S';
-    capability->issuer[1] = ':';
-    strcpy(capability->issuer+2, user_opts->server_alias);
+    if (capability->issuer == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    strcpy(capability->issuer, "S:");
+    strcat(capability->issuer, user_opts->server_alias);
+
     capability->fsid = fs_id;
     capability->timeout =
         PINT_util_get_current_time() + user_opts->security_timeout;
@@ -119,9 +129,14 @@ int PINT_sign_credential(PVFS_credential *cred)
     const struct server_configuration_s *config;
 
     config = get_server_config_struct();
-    assert(config->server_alias);
+    assert(config && config->server_alias);
     
-    cred->issuer = strdup(config->server_alias);
+    if (cred->issuer == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    strcpy(cred->issuer, "S:");
+    strcat(cred->issuer, config->server_alias);
 
     cred->timeout = PINT_util_get_current_time() + config->security_timeout;
 

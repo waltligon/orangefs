@@ -496,7 +496,7 @@ void print_stats(const PVFS_object_ref * ref,
    if( (attr->mask & PVFS_ATTR_SYS_DISTDIR_ATTR) &&
        (attr->objtype == PVFS_TYPE_DIRECTORY))
    {
-      fprintf(stdout, "  dirdata count : %d\n", attr->dirdata_count);
+      fprintf(stdout, "  dirdata count : %d\n", attr->distr_dir_servers_max);
    }
 
    if ((attr->mask & PVFS_ATTR_SYS_TYPE) && 

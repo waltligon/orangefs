@@ -39,6 +39,7 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 #SYSINT_SCRIPTS=~+/sysint-tests.d
 SYSINT_SCRIPTS=`pwd`/sysint-tests.d
 VFS_SCRIPTS=`pwd`/vfs-tests.d
+USERLIB_SCRIPTS=`pwd`/userint-tests.d
 #VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
@@ -57,7 +58,7 @@ TESTNAME="${HOSTNAME}-nightly"
 
 # before starting any client apps, we need to deal with the possiblity that we
 # might have built with shared libraries
-export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+#export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
 if [ ! "$VFS_HOSTS" ]
@@ -140,13 +141,13 @@ setup_vfs() {
 	if [ $ENABLE_SECURITY ] ; then
 		keypath="--keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/clientkey.pem"
 	fi
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/pvfs2-fs at mountpoint $PVFS2_MOUNTPOINT"
-	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	echo "Mounting pvfs2 service at tcp://${HOSTNAME}:3396/orangefs at mountpoint $PVFS2_MOUNTPOINT"
+	sudo mount -t pvfs2 tcp://${HOSTNAME}:3396/orangefs ${PVFS2_MOUNTPOINT}
 	
 		if [ $? -ne 0 ]
 	then
@@ -236,14 +237,15 @@ configure_pvfs2() {
 start_pvfs2() {
 
 	# clean up any artifacts from earlier runs
+	cd ${PVFS2_DEST}
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
 	for alias in `grep 'Alias ' fs.conf | grep ${HOSTNAME} | cut -d ' ' -f 2`; do
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid \
 			-f fs.conf -a $alias
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid  \
 			fs.conf $server_conf -a $alias
 	done
@@ -251,17 +253,19 @@ start_pvfs2() {
         # give the servers time to finish all their initialization tasks
         sleep 10
 
-		echo "tcp://${HOSTNAME}:3396/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+		echo "tcp://${HOSTNAME}:3396/orangefs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
 	#if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 	#	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	#fi
-	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-	echo "....setting server-side debug mask"
-	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
+	#turn on debugging on each server
+	if [ $SERVER_DEBUG_PARAMS ] ; then
+		echo "....setting server-side debug mask to $SERVER_DEBUG_PARAMS"
+		INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} $SERVER_DEBUG_PARAMS
+	fi
 }
 
 setup_pvfs2() {
@@ -320,19 +324,23 @@ testfail() {
 
 # idea stolen from debian: for a given directory, run every executable file
 run_parts() {
+	echo "Running $1 Starting from `pwd`"
 	cd $1
+	echo "Currently at `pwd`"
+	TESTS=$(basename `pwd`)
+	
 	for f in *; do
 		# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== `date` == running $f ..."
-			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+			./$f > ${PVFS2_DEST}/${TESTS}-${f}-${CVS_TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${CVS_TAG}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${TESTS}-${f}-${CVS_TAG}.log"
 				echo "FAILED"
 			fi
 		fi

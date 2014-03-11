@@ -26,10 +26,49 @@
  *
  * returns 0 on success, -1 and sets errno on failure.
  */
-int gen_posix_mutex_init(
-    pthread_mutex_t * mut)
+int gen_posix_mutex_init(pthread_mutex_t *mutex)
 {
-    return (pthread_mutex_init(mut, NULL));
+    return (pthread_mutex_init(mutex, NULL));
+}
+
+int gen_posix_recursive_mutex_init(pthread_mutex_t *mutex)
+{
+    int rc;
+    pthread_mutexattr_t mattr;
+    rc = pthread_mutexattr_init(&mattr);
+    if (rc < 0)
+    {
+        return rc;
+    }
+    rc = pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
+    if (rc < 0)
+    {
+        return rc;
+    }
+    rc = (pthread_mutex_init(mutex, &mattr));
+    pthread_mutexattr_destroy(&mattr);
+    /* if this fails it fails silently */
+    return rc;
+}
+
+int gen_posix_shared_mutex_init(pthread_mutex_t *mutex)
+{
+    int rc;
+    pthread_mutexattr_t mattr;
+    rc = pthread_mutexattr_init(&mattr);
+    if (rc < 0)
+    {
+        return rc;
+    }
+    rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+    if (rc < 0)
+    {
+        return rc;
+    }
+    rc = (pthread_mutex_init(mutex, &mattr));
+    pthread_mutexattr_destroy(&mattr);
+    /* if this fails it fails silently */
+    return rc;
 }
 
 /*
@@ -39,10 +78,9 @@ int gen_posix_mutex_init(
  *
  * returns 0 on success, -1 and sets errno on failure.
  */
-int gen_posix_mutex_lock(
-    pthread_mutex_t * mut)
+int gen_posix_mutex_lock(pthread_mutex_t *mutex)
 {
-    return (pthread_mutex_lock(mut));
+    return (pthread_mutex_lock(mutex));
 }
 
 
@@ -53,10 +91,9 @@ int gen_posix_mutex_lock(
  *
  * returns 0 on success, -1 and sets errno on failure
  */
-int gen_posix_mutex_unlock(
-    pthread_mutex_t * mut)
+int gen_posix_mutex_unlock(pthread_mutex_t *mutex)
 {
-    return (pthread_mutex_unlock(mut));
+    return (pthread_mutex_unlock(mutex));
 }
 
 
@@ -68,10 +105,9 @@ int gen_posix_mutex_unlock(
  * returns 0 on success, -1 and sets errno on failure, sets errno to EBUSY
  * if it cannot obtain the lock
  */
-int gen_posix_mutex_trylock(
-    pthread_mutex_t * mut)
+int gen_posix_mutex_trylock(pthread_mutex_t *mutex)
 {
-    return (pthread_mutex_trylock(mut));
+    return (pthread_mutex_trylock(mutex));
 }
 
 /*
@@ -81,15 +117,14 @@ int gen_posix_mutex_trylock(
  *
  * returns 0 on success, -errno on failure.
  */
-int gen_posix_mutex_destroy(
-    pthread_mutex_t * mut)
+int gen_posix_mutex_destroy(pthread_mutex_t *mutex)
 {
 
-    if (!mut)
+    if (!mutex)
     {
 	return (-EINVAL);
     }
-    pthread_mutex_destroy(mut);
+    pthread_mutex_destroy(mutex);
 
     return (0);
 }
@@ -133,6 +168,34 @@ int gen_posix_cond_broadcast(pthread_cond_t *cond)
 int gen_posix_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
 {
     return pthread_cond_init(cond, attr);
+}
+
+int gen_posix_shared_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
+{
+    int rc, destroy_attr = 0;
+    pthread_condattr_t cattr;
+    if (!attr)
+    {
+        rc = pthread_condattr_init(&cattr);
+        if (rc < 0)
+        {
+            return rc;
+        }
+        attr = &cattr;
+        destroy_attr = 1;
+    }
+    rc = pthread_condattr_setpshared(attr, PTHREAD_PROCESS_SHARED);
+    if (rc < 0)
+    {
+        return rc;
+    }
+    rc = pthread_cond_init(cond, attr);
+    if (destroy_attr)
+    {
+        pthread_condattr_destroy(&cattr);
+        /* if this fails it fails silently */
+    }
+    return rc;
 }
 
 #endif

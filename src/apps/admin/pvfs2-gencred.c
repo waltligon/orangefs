@@ -236,6 +236,15 @@ static int create_credential(const struct passwd *pwd,
     if (f == NULL)
     {
         int err = errno;
+
+        /* If no certificate is available, a credential with no
+           certificate will be created. This credential will allow 
+           basic file system ops such as statfs. */
+        if (err == ENOENT)
+        {
+            return EXIT_SUCCESS;
+        }
+        
         perror(certpath);
         return err;
     }
@@ -304,10 +313,21 @@ static int sign_credential(PVFS_credential *cred,
     EVP_MD_CTX mdctx;
     int ret;
 
+    /* set timeout */
+    cred->timeout = (PVFS_time)(time(NULL) + timeout);
+
     keyfile = fopen(keypath, "rb");
     if (keyfile == NULL)
     {
         int err = errno;
+#ifdef ENABLE_SECURITY_CERT
+        /* In certficate mode, an unsigned credential may be used 
+           if there is no key. It allows basic ops like statfs. */
+        if (err == ENOENT)
+        {
+            return EXIT_SUCCESS;
+        }
+#endif
         perror(keypath);
         return err;
     }
@@ -335,8 +355,7 @@ static int sign_credential(PVFS_credential *cred,
         ERR_print_errors_fp(stderr);
         return ENODATA;
     }
-
-    cred->timeout = (PVFS_time)(time(NULL) + timeout);
+    
     cred->signature = malloc(EVP_PKEY_size(privkey));
     if (cred->signature == NULL)
     {
@@ -344,8 +363,7 @@ static int sign_credential(PVFS_credential *cred,
         return ENOMEM;
     }
 
-    md = EVP_PKEY_type(privkey->type) == EVP_PKEY_DSA ? EVP_dss1() : 
-         EVP_sha1();
+    md = EVP_sha1();
     EVP_MD_CTX_init(&mdctx);
 
     ret = EVP_SignInit_ex(&mdctx, md, NULL);
@@ -410,16 +428,122 @@ static int write_credential(const PVFS_credential *cred,
     return EXIT_SUCCESS;
 }
 
+int allowed(const struct passwd *pwd, const struct group *grp)
+{
+    uid_t uid;
+    gid_t gid;
+    char *filepath;
+    struct stat st;
+    int fd;
+    unsigned long len;
+    char buf[129];
+    char *s, *user, *puser;
+    unsigned long offset;
+    struct passwd pwd_buf;
+    struct passwd *pwd2;
+    char pwd_data_buf[128];
+
+    /* Verify whether the current user is allowed to generate a
+       credential for pwd and grp. Return 0 if allowed.*/
+
+    uid = getuid();
+    gid = getgid();
+    filepath = PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS;
+
+    /* Pass root through. */
+    if (uid == 0 && gid == 0)
+    {
+        return 0;
+    }
+
+    /* Parse users out of the service user file if root owns it. */
+    if (stat(filepath, &st) == 0)
+    {
+        if (st.st_uid == 0)
+        {
+            if ((fd = open(filepath, O_RDONLY)) == -1)
+            {
+                return 1;
+            }
+            offset = 0;
+            while (1)
+            {
+                if ((len = read(fd, buf+offset, 128-offset)) < 0)
+                {
+                    close(fd);
+                    return 1;
+                }
+                if (len == 0)
+                {
+                    break;
+                }
+                buf[offset+len] = 0;
+                s = buf;
+                user = 0;
+                while (puser = user, user = strsep(&s, " \t\n"))
+                {
+                    if (*user == 0)
+                    {
+                        continue;
+                    }
+                    /* A user name has been parsed. */
+                    if (s != 0) {
+                        /* Call getpwnam_r to avoid trouble with
+                           previous call to getpwnam. */
+                        pwd2 = &pwd_buf;
+                        if (getpwnam_r(user, &pwd_buf, pwd_data_buf,
+                                       128, &pwd2) != 0)
+                        {
+                            fprintf(stderr, "error: with getpwnam_r\n");
+                            abort();
+                        }
+                        /* User does not exist. */
+                        if (pwd2 == 0)
+                        {
+                            continue;
+                        }
+                        if (pwd2->pw_uid == uid)
+                        {
+                            close(fd);
+                            return 0;
+                        }
+                    }
+                }
+                if (s == 0)
+                {
+                    strcpy(buf, puser);
+                    offset = strlen(puser);
+                }
+            }
+            close(fd);
+        }
+    }
+    /* Pass this user through. */
+    if (pwd->pw_uid == uid && grp->gr_gid == gid)
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     options_t opts;
     const struct passwd *pwd;
     const struct group *grp;
-    uid_t euid;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
     int ngroups;
     PVFS_credential credential;
     int ret = EXIT_SUCCESS;
+
+#if HAVE_GETGROUPLIST
+#   if HAVE_GETGROUPLIST_INT
+       int groups_int[PVFS_REQ_LIMIT_GROUPS];
+       int i;
+#   endif
+#endif
+
 
     memset(&opts, 0, sizeof(opts));
     ret = parse_options(argc, argv, &opts);
@@ -501,24 +625,40 @@ int main(int argc, char **argv)
         return EINVAL;
     }
 
-    euid = getuid();
-    if (euid && pwd->pw_uid != euid)
+    if (allowed(pwd, grp) != 0)
     {
-        fprintf(stderr, "error: only %s and root can generate a credential "
-                "for %s\n", pwd->pw_name, pwd->pw_name);
-        return EPERM;
-    }
-
-    if (euid && grp->gr_gid != getgid())
-    {
-        fprintf(stderr, "error: cannot generate a credential for group %s: "
-                "Permission denied\n", grp->gr_name);
+        fprintf(stderr, "error: cannot generate a credential for user "
+                "%s and group %s\n", pwd->pw_name, grp->gr_name);
         return EPERM;
     }
 
 #ifdef HAVE_GETGROUPLIST
 
     ngroups = sizeof(groups)/sizeof(*groups);
+
+#if HAVE_GETGROUPLIST_INT
+    /* The returned list of groups in groups_int is a list of signed integers; however,
+     * gid_t is defined as an unsigned 32-bit integer.  So, we take steps to convert the 
+     * signed integer into a proper uint32_t type.
+     */
+    ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups_int, &ngroups);
+    if (ret == -1)
+    {
+        fprintf(stderr, "error: unable to get group list for user %s\n",
+                pwd->pw_name);
+        return ENOENT;
+    }
+    for (i=0; i<ngroups; i++)
+    {
+        if (groups_int[i] > 0xffffffff || groups_int[i] < 0)
+        {
+           fprintf(stderr,"error: unable to convert group value (%d) for user %s\n"
+                         ,groups_int[i],pwd->pw_name);
+           return ENOENT;
+        } 
+        groups[i] = (gid_t)groups_int[i];
+    }
+#else
     ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
     if (ret == -1)
     {
@@ -526,6 +666,8 @@ int main(int argc, char **argv)
                 pwd->pw_name);
         return ENOENT;
     }
+#endif
+
     if (groups[0] != grp->gr_gid)
     {
         assert(groups[ngroups-1] == grp->gr_gid);
@@ -555,7 +697,9 @@ int main(int argc, char **argv)
 #endif
                             &credential);
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
+    }
 
 #ifdef ENABLE_SECURITY_CERT
     if (opts.keypath == NULL)
@@ -568,12 +712,15 @@ int main(int argc, char **argv)
                           PVFS2_DEFAULT_CREDENTIAL_TIMEOUT), (opts.keypath ?
                           opts.keypath : PVFS2_DEFAULT_CREDENTIAL_KEYPATH));
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
+    }
 
     ret = write_credential(&credential, pwd);
     if (ret != EXIT_SUCCESS)
+    {
         goto main_exit;
-
+    }
 main_exit:
 
     free(credential.issuer);

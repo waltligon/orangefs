@@ -31,6 +31,16 @@
 static char sccsid[] = "@(#)fts.c	8.6 (Berkeley) 8/14/94";
 #endif /* LIBC_SCCS and not lint */
 
+#if 0
+#ifdef _FORTIFY_SOURCE
+# undef _FORTIFY_SOURCE
+# define _FORTIFY_SOURCE 0
+#endif
+#endif
+
+#define USRINT_SOURCE 1
+#include "usrint.h"
+
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <fcntl.h>

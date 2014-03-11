@@ -581,7 +581,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     ret = match_dirdata(hl,
 			NULL /* optional second handle list */,
 			pref,
-                        getattr_resp.attr.dirdata_count,
+                        getattr_resp.attr.distr_dir_servers_max,
 			creds);
     if (ret != 0) {
 	assert(0);
@@ -783,7 +783,7 @@ int descend(PVFS_fs_id cur_fs,
                         ret = match_dirdata(hl,
                                             alt_hl,
                                             entry_ref,
-                                            getattr_resp.attr.dirdata_count,
+                                            getattr_resp.attr.distr_dir_servers_max,
                                             creds);
                         if (ret != 0)
                         {
@@ -1100,7 +1100,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 		if (match_dirdata(hl_all,
 				    alt_hl,
 				    handle_ref,
-                                    getattr_resp.attr.dirdata_count,
+                                    getattr_resp.attr.distr_dir_servers_max,
 				    creds)  != 0)
                 {
                     ret = remove_object(handle_ref, 

@@ -102,6 +102,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -125,6 +126,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

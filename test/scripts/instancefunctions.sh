@@ -4,12 +4,14 @@ check_instance() {
 
 	#$1 = ipaddress
 	
+	echo "ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null"
 	ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 
 	#is SSH responding?
 	until [ $? -eq 0 ]
 	do
 		sleep 10
+		echo "ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null"
 		ssh -i $KEYFILE ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no true 2> /dev/null
 	done
 }
@@ -73,7 +75,9 @@ prepare_instance() {
 	rsync -a -e "ssh -i ${KEYFILE} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" ${KEYFILE} ${VMUSER}@${i}:/home/${VMUSER}/
 	
 	#update the instance
-	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.sh 
+	# run scripted via bash -s to work around remote issues
+	(echo "script update-cloud.txt" && cat ./update-cloud.sh) > update-cloud.scr
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < update-cloud.scr 
 
 	# add sleep to fix timing issue on rhel6 based distros.
 	sleep 15
@@ -82,8 +86,11 @@ prepare_instance() {
 	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 'echo System rebooted. Test system is `uname -a`' 
 
 	echo "Preparing the image for testing..."
-	echo "ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"VMSYSTEM=${VMSYSTEM} bash -s\" < prepare-cloud.sh "
+
+	# run scripted via bash -s to work around remote issues
+	(echo "script prepare-cloud.txt" && cat ./prepare-cloud.sh) > prepare-cloud.scr
+	echo "ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"VMSYSTEM=${VMSYSTEM} bash -s\" < prepare-cloud.scr "
 	
 
-	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < ./prepare-cloud.sh 
+	ssh -i ${KEYFILE} ${VMUSER}@$1 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "VMSYSTEM=${VMSYSTEM} bash -s" < ./prepare-cloud.scr 
 }

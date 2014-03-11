@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+
+<!-- Put site-specific property overrides in this file. -->
+
+
+<configuration>
+<property>
+  <name>fs.default.name</name>
+  <value>ofs://localhost</value>
+</property>
+<property>
+  <name>fs.ofs.impl</name>
+  <value>org.orangefs.hadoop.fs.ofs.OrangeFileSystem</value>
+  <description>An extension of filesystem for OrangeFS URIs.</description>
+</property>
+<property>
+  <name>fs.ofs.mntLocation</name>
+  <value>__MNT_LOCATION__</value>
+  <description>Location of OrangeFS mount point.</description>
+</property>
+<property>
+ <name>io.file.buffer.size</name>
+ <value>3145728</value>
+</property>
+</configuration>
+

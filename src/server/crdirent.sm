@@ -9,7 +9,6 @@
 #include <assert.h>
 #include <math.h>
 
-/* TODO: temp */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -25,19 +24,15 @@
 #include "pint-uid-map.h"
 #include "sid.h"
 
+int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+
 enum
 {
-    INVALID_OBJECT = 131,
-    INVALID_DIRDATA,
-    UPDATE_DIR_ATTR_REQUIRED,
-    SPLIT_REQUIRED,
-    NO_SPLIT_REQUIRED,
+    SPLIT_REQUIRED = 131,
     SPLIT_FATAL_ERROR,
-    LOCAL_METAHANDLE,
-    REMOTE_METAHANDLE
+    REMOTE_METAHANDLE,
+    REMOVE_ENTRIES_REQUIRED
 };
-
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
@@ -74,34 +69,13 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_validate;
         success => write_directory_entry;
-        INVALID_OBJECT => validation_object_type_failure;
-        INVALID_DIRDATA => validation_dirdata_mismatch;
-        default => final_response;
-    }
-
-    state validation_object_type_failure
-    {
-        run validation_object_type_failure;
-        default => final_response;
-    }
-
-    state validation_dirdata_mismatch
-    {
-        run validation_dirdata_mismatch;
         default => final_response;
     }
 
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
-        success => check_for_req_dir_update;
-        default => final_response;
-    }
-
-    state check_for_req_dir_update
-    {
-        run crdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        success => update_directory_attr;
         default => final_response;
     }
 
@@ -122,7 +96,6 @@ machine pvfs2_crdirent_sm
     state check_for_split
     {
         run crdirent_check_for_split;
-/*        SPLIT_REQUIRED => activate_server_setup; */
         SPLIT_REQUIRED => retrieve_dir_entries;
         default => final_response;
     }
@@ -144,7 +117,6 @@ machine pvfs2_crdirent_sm
     state split_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-/*        success => remove_local_copies; */
         success => activate_server_setup;
         default => split_cleanup_msgpairarray;
     }
@@ -187,21 +159,34 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_update_metahandle_attrs;
         REMOTE_METAHANDLE => update_metahandle_xfer_msgpair;
-        success => remove_local_copies;
+        success => notify_dirdata_servers_setup;
         default => backout_dirdata_attrs;
     }
 
     state update_metahandle_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => remove_local_copies;
+        success => notify_dirdata_servers_setup;
         default => backout_dirdata_attrs;
+    }
+
+    state notify_dirdata_servers_setup
+    {
+        run crdirent_notify_dirdata_servers_setup;
+        success => notify_dirdata_servers_xfer;
+        default => backout_dirdata_attrs;
+    }
+
+    state notify_dirdata_servers_xfer
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => remove_local_copies;
     }
 
     state backout_dirdata_attrs
     {
         run crdirent_backout_dirdata_attrs;
-        default => deactivate_server;
+        default => deactivate_server_setup;
     }
 
     state remove_local_copies
@@ -220,14 +205,19 @@ machine pvfs2_crdirent_sm
     state split_remove_entries
     {
         run crdirent_split_remove_entries;
-        success => split_remove_entries_xfer_msgpair;
+        REMOVE_ENTRIES_REQUIRED => split_remove_entries_xfer_msgpair;
         default => final_response;
     }
 
     state split_remove_entries_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => deactivate_server_setup;
+        default => remove_entries_cleanup;
+    }
+
+    state remove_entries_cleanup
+    {
+        run crdirent_remove_entries_cleanup;
         default => final_response;
     }
 
@@ -252,6 +242,10 @@ machine pvfs2_crdirent_sm
  * storing request structure fields in state machine so that nested
  * machines are not dependent on request type
  */
+/* ECQ: Not sure why it is necessary to copy fields from the request structure.
+ * This state machine is not itself nested and the only nested state machines
+ * it calls are prelude_sm, pvfs2_msgpairarray_sm, and pvfs2_final_response_sm.
+*/
 static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
@@ -271,7 +265,6 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
     s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
-    s_op->u.crdirent.dir_attr_update_required = 0;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
@@ -414,8 +407,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     {
        free(s_op->val.buffer);
     }
-    memset(&(s_op->key),0,sizeof(s_op->key));
-    memset(&(s_op->val),0,sizeof(s_op->val));
+    memset(&(s_op->key), 0, sizeof(s_op->key));
+    memset(&(s_op->val), 0, sizeof(s_op->val));
 
     for (i=0; i<s_op->keyval_count; i++)
     {
@@ -587,7 +580,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
 
-        js_p->error_code = INVALID_DIRDATA;
+        js_p->error_code = -PVFS_EAGAIN;
         return SM_ACTION_COMPLETE;
     }
     else
@@ -597,27 +590,6 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     }
 
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_object_type_failure(struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "crdirent: validation_object_type_failure called\n");
-
-    js_p->error_code = -PVFS_ENOTDIR;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action validation_dirdata_mismatch(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_dirdata_"
-                 "mismatch called, let client try again!!\n");
-
-    /* using a new error code?? use the try again error code*/
-    js_p->error_code = -PVFS_EAGAIN;
     return SM_ACTION_COMPLETE;
 }
 
@@ -638,6 +610,8 @@ static PINT_sm_action validation_dirdata_mismatch(
  * Synopsis: We are now ready to store the name/handle pair in the k/v
  *           space for directory handles.
  */
+/* V3: Need to write backpointer to bucket.
+ * The handle is the key. Need to think about how to store related SIDs. */
 static PINT_sm_action crdirent_write_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -693,25 +667,9 @@ static PINT_sm_action crdirent_write_directory_entry(
                                  server_job_context,
                                  s_op->req->hints);
 
-    /*
-     * creating an entry will cause directory times to be updated.
-     */
-    s_op->u.crdirent.dir_attr_update_required = 1;
     return ret;
 }
 
-static PINT_sm_action crdirent_check_for_req_dir_update(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if ((js_p->error_code == 0) &&
-        (s_op->u.crdirent.dir_attr_update_required))
-    {
-        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
-    }
-    return SM_ACTION_COMPLETE;
-}
-    
 static PINT_sm_action crdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -724,15 +682,6 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_uid uid;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t num_groups;
-
-    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
-    {
-        PVFS_perror_gossip("previous keyval write failed",
-                           js_p->error_code);
-        return SM_ACTION_COMPLETE;
-    }
-
-    js_p->error_code = 0;
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.crdirent.dirdata_attr;
@@ -843,7 +792,8 @@ static PINT_sm_action crdirent_check_for_split(
     {
         /* Determine which node will get split entries. */
         s_op->u.crdirent.split_node = PINT_find_dist_dir_split_node(
-               &s_op->attr.u.dir.dist_dir_attr, s_op->attr.u.dir.dist_dir_bitmap);
+                                           &s_op->attr.u.dir.dist_dir_attr,
+                                           s_op->attr.u.dir.dist_dir_bitmap);
         if (s_op->u.crdirent.split_node < 0)
         {
             /* No new node can be found. No need to split. */
@@ -854,11 +804,13 @@ static PINT_sm_action crdirent_check_for_split(
 
         js_p->error_code = SPLIT_REQUIRED;
 
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, " split to node %d, new branch_level = %d\n",
-            s_op->u.crdirent.split_node, s_op->attr.u.dir.dist_dir_attr.branch_level);
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                "crdirent: new dist_dir_bitmap as:\n");
+                     " split to node %d, new branch_level = %d\n",
+                     s_op->u.crdirent.split_node,
+                     s_op->attr.u.dir.dist_dir_attr.branch_level);
+                     gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "crdirent: new dist_dir_bitmap as:\n");
+
         attr_p = &s_op->attr;
         for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
                 i >= 0 ; i--)
@@ -1023,14 +975,8 @@ static PINT_sm_action crdirent_send_server_attrs(struct PINT_smcb *smcb,
                               NULL, /* sid array V3 fixme */
                               type,
                               *attr_p,
-                              0,
+                              PVFS_ATTR_DISTDIR_ATTR,
                               s_op->req->hints);
-
-    PINT_dist_dir_attr_copyto(msg_p->req.u.setattr.attr.u.dir.dist_dir_attr,
-                              attr_p->u.dir.dist_dir_attr);
-    msg_p->req.u.setattr.attr.u.dir.dirdata_handles = attr_p->u.dir.dirdata_handles;
-    msg_p->req.u.setattr.attr.u.dir.dist_dir_bitmap = attr_p->u.dir.dist_dir_bitmap;
-    msg_p->req.u.setattr.attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     msg_p->fs_id = s_op->req->u.crdirent.fs_id;
     msg_p->handle = handle;
@@ -1080,8 +1026,8 @@ static PINT_sm_action crdirent_activate_server_setup(struct PINT_smcb *smcb,
 }
 
 
-/* Tell the other server he is no longer active. This is necessary
-   when an error occurs while sending directory entries. */
+/* Tell the other server he is no longer active.
+   This is necessary when an error occurs. */
 static PINT_sm_action crdirent_deactivate_server_setup(struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {
@@ -1143,6 +1089,97 @@ static PINT_sm_action crdirent_update_metahandle_attrs(struct PINT_smcb *smcb,
         js_p->error_code = REMOTE_METAHANDLE;
         return(ret);
     }
+}
+
+static PINT_sm_action crdirent_notify_dirdata_servers_setup(
+                                              struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_handle *remote_dirdata_handles = NULL;
+    int num_remote_dirdata_handles = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr *attr_p = NULL;
+    int i = 0;
+    int ret = 0;
+    /* V3 */
+#if 0
+    char server_name[1024];
+    struct server_configuration_s *server_config = get_server_config_struct();
+#endif
+
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+                 "setattr state: setattr_remote_dirdata_attr_setup_msgpair\n");
+
+    gossip_debug( GOSSIP_SETATTR_DEBUG,
+                 "  SENDING attrs to remote dirdata\n");
+
+    /* Determine whether a data handle is on the local server.
+       Don't want to send to it. Also no need to send to the
+       dirdata server that is the target of the split.      */
+    attr_p = &s_op->attr;
+    remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
+        attr_p->u.dir.dist_dir_attr.num_servers);
+    for (i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+    {
+        if (! PVFS_OID_cmp(&attr_p->u.dir.dirdata_handles[i],
+              &s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node]))
+        {
+            continue;
+        }
+    /* V3 */
+#if 0
+        PINT_cached_config_get_server_name(server_name, 1024,
+            attr_p->u.dir.dirdata_handles[i], s_op->u.crdirent.fs_id);
+        if (strcmp(server_config->host_id, server_name))
+#endif
+
+    if (! PINT_cached_config_server_local(&attr_p->u.dir.dirdata_sids[i]))
+        {
+            /* remote */
+            remote_dirdata_handles[num_remote_dirdata_handles] =
+                attr_p->u.dir.dirdata_handles[i];
+            num_remote_dirdata_handles++;
+        }
+    }
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
+
+    PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
+                                   s_op->u.crdirent.capability,
+                                   s_op->req->u.crdirent.credential,
+                                   s_op->req->u.crdirent.fs_id,
+                                   PVFS_TYPE_DIRDATA,
+                                   s_op->attr,
+                                   num_remote_dirdata_handles,
+                                   remote_dirdata_handles,
+                                   0,    /* V3 sid count */
+                                   NULL, /* V3 sid array */
+                                   NULL);
+
+    msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+    msg_p->handle = remote_dirdata_handles[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    /* V3 */
+#if 0
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+#endif
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action crdirent_retrieve_dir_entries(struct PINT_smcb *smcb,
@@ -1250,6 +1287,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     int cur_bytes = 0;
     int num_entries_needed = 0;
+    PVFS_handle *capability_handles = NULL;
 
     js_p->error_code = 0;
     /* Allocate memory to store entries that need to be sent.
@@ -1362,7 +1400,8 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         /*parameters are setup like a client except for job_context*/
         PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
 
-        /*allocate a mspair_state structure for each destination handle.*/
+        /* allocate a mspair_state structure for each
+           destination handle.*/
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "allocating space for %d msgpairs\n",
                      s_op->u.crdirent.num_msgs_required);
@@ -1375,11 +1414,27 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
 
+        /* This memory will be freed in crdirent_cleanup
+           by PINT_cleanup_capability. */
+        capability_handles =
+              malloc((s_op->attr.u.dir.dist_dir_attr.num_servers + 1) *
+                     sizeof(PVFS_handle));
+        if (! capability_handles)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        capability_handles[0] = s_op->u.crdirent.parent_handle;
+        memcpy(capability_handles + 1,
+               s_op->attr.u.dir.dirdata_handles,
+               s_op->attr.u.dir.dist_dir_attr.num_servers *
+                   sizeof(PVFS_handle));
+
         ret = PINT_server_to_server_capability(
                                     &s_op->u.crdirent.capability,
                                     s_op->req->u.crdirent.fs_id,
-                                    s_op->attr.u.dir.dist_dir_attr.num_servers,
-                                    s_op->attr.u.dir.dirdata_handles);
+                                    s_op->attr.u.dir.dist_dir_attr.num_servers + 1,
+                                    capability_handles);
         if (ret != 0)
         {
             js_p->error_code = ret;
@@ -1528,7 +1583,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
     /* Reuse the arrays for sending entries. We are guaranteed
        to send no more than the original number of split entries. */
 
-    s_op->u.crdirent.num_msgs_required = 0;
+    s_op->u.crdirent.num_msgs_required = 1;
     for (i = 0; i < s_op->u.crdirent.nentries; i++)
     {
         if (s_op->u.crdirent.split_status[i] == 0)
@@ -1573,14 +1628,20 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
         /*parameters are setup like a client except for job_context*/
         PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
 
-        /* mspair_state structures have already been allocated. */
+        /*allocate a mspair_state structure for each message to be sent.*/
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "allocating space for %d msgpairs\n", s_op->u.crdirent.num_msgs_required);
+        ret=PINT_msgpairarray_init(msgarray_op,s_op->u.crdirent.num_msgs_required);
+        if (ret)
+        {
+            gossip_lerr("Failed to allocate msgarray.\n");
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
 
         for (i = 0; i < s_op->u.crdirent.num_msgs_required; i++)
         {
             PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
-
-            msg_p = &s_op->msgarray_op.msgpair;
-            PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
 
             /* Capability was initialized earlier. */
             PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(
@@ -1589,7 +1650,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
                      s_op->req->u.crdirent.fs_id,
                      s_op->attr.u.dir.dirdata_handles[
                             s_op->u.crdirent.split_node],
-                     NULL,
+                     s_op->u.crdirent.dist,
                      1,     /* This is an "undo" message. */
                      num_undo_entries,
                      &s_op->u.crdirent.entry_handles[
@@ -1622,6 +1683,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
             }
 
         }
+        js_p->error_code = REMOVE_ENTRIES_REQUIRED;
         PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     }
     return SM_ACTION_COMPLETE;
@@ -1650,6 +1712,19 @@ static PINT_sm_action crdirent_split_cleanup_msgpairarray(struct PINT_smcb *smcb
     /*will free msgarray if necessary*/
     PINT_msgpairarray_destroy(msgarray_op);
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action crdirent_remove_entries_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* Only action needed is to reset the error_code. It was
+       set to REMOVE_ENTRIES_REQUIRED to direct the order of
+       execution, but we don't want that returned as an error code. */
+    if (js_p->error_code == REMOVE_ENTRIES_REQUIRED)
+    {
+        js_p->error_code = 0;
+    }
     return SM_ACTION_COMPLETE;
 }
 
@@ -1723,11 +1798,6 @@ static PINT_sm_action crdirent_cleanup(struct PINT_smcb *smcb, job_status_s *js_
         PINT_dist_free(s_op->u.crdirent.dist);
     }
 
-    /* Don't want PINT_cleanup_capability to free memory
-     * pointed to by handle_array because this was just
-     * a pointer to memory that is freed elsewhere.      
-     */
-    s_op->u.crdirent.capability.handle_array = NULL;
     PINT_cleanup_capability(&s_op->u.crdirent.capability);
 
     return(server_state_machine_complete(smcb));

@@ -150,7 +150,10 @@ typedef enum
     SERVER_SECURITY_INIT       = (1 << 20),
     SERVER_SID_INIT            = (1 << 21),
     SERVER_FILESYS_INIT        = (1 << 22),
-    SERVER_BMI_CLIENT_INIT     = (1 << 23)
+    SERVER_BMI_CLIENT_INIT     = (1 << 23),
+    SERVER_CAPCACHE_INIT       = (1 << 24),
+    SERVER_CREDCACHE_INIT      = (1 << 25),
+    SERVER_CERTCACHE_INIT      = (1 << 26),
 } PINT_server_status_flag;
 
 /* this combination of flags is used to control pre-init of the server
@@ -391,7 +394,6 @@ struct PINT_server_crdirent_op
     PVFS_size dirent_count;
     PVFS_size sid_count;
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 
@@ -421,7 +423,6 @@ struct PINT_server_rmdirent_op
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
     PVFS_size dirent_count;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -431,7 +432,6 @@ struct PINT_server_chdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle old_dirent_handle;
     PVFS_handle new_dirent_handle;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -449,11 +449,18 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    int local_dirdata_index;    /* holds the index into the 
+                                   attr.dirdata_handles array for
+                                   the local dirdata handle */
+    int *remote_dirdata_index;  /* hold indices into the
+                                   attr.dirdata_handles array for
+                                   remote dirdata handles*/
+    int num_remote_dirdata_indices; /* number of remote dirdata handles */
 
     /* for dirdata rebuild */
     int saved_error_code;
     int need_rebuild_dirdata_local;
-    int local_dirdata_index;
+    int rebuild_local_dirdata_index;
     int num_rebuild_dirdata_remote;
     int *rebuild_dirdata_index_array_remote;
     PVFS_handle handle_local;
@@ -517,14 +524,14 @@ struct PINT_server_small_io_op
 
 struct PINT_server_flush_op
 {
-    PVFS_handle handle;	    /* handle of data we want to flush to disk */
-    int flags;		    /* any special flags for flush */
+    PVFS_handle handle;        /* handle of data we want to flush to disk */
+    int flags;            /* any special flags for flush */
 };
 
 struct PINT_server_truncate_op
 {
-    PVFS_handle handle;	    /* handle of datafile we resize */
-    PVFS_offset size;	    /* new size of datafile */
+    PVFS_handle handle;        /* handle of datafile we resize */
+    PVFS_offset size;        /* new size of datafile */
 };
 
 struct PINT_server_mkdir_op
@@ -646,7 +653,7 @@ typedef struct PINT_server_op
 
     /* generic int for use by state machines that are accessing
      * PINT_server_op structs before pjumping to them. */
-    int local_index;
+    uint32_t local_index;
 
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
@@ -686,24 +693,24 @@ typedef struct PINT_server_op
 
     union
     {
-	/* request-specific scratch spaces for use during processing */
+        /* request-specific scratch spaces for use during processing */
         struct PINT_server_create_op create;
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
         struct PINT_server_listattr_op listattr;
-	struct PINT_server_getconfig_op getconfig;
-	struct PINT_server_lookup_op lookup;
-	struct PINT_server_crdirent_op crdirent;
-//	struct PINT_server_setattr_op setattr;
-	struct PINT_server_readdir_op readdir;
-	struct PINT_server_remove_op remove;
-	struct PINT_server_chdirent_op chdirent;
-	struct PINT_server_rmdirent_op rmdirent;
-	struct PINT_server_io_op io;
+        struct PINT_server_getconfig_op getconfig;
+        struct PINT_server_lookup_op lookup;
+        struct PINT_server_crdirent_op crdirent;
+        // struct PINT_server_setattr_op setattr;
+        struct PINT_server_readdir_op readdir;
+        struct PINT_server_remove_op remove;
+        struct PINT_server_chdirent_op chdirent;
+        struct PINT_server_rmdirent_op rmdirent;
+        struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
-	struct PINT_server_flush_op flush;
-	struct PINT_server_truncate_op truncate;
-	struct PINT_server_mkdir_op mkdir;
+        struct PINT_server_flush_op flush;
+        struct PINT_server_truncate_op truncate;
+        struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
 /*
@@ -935,6 +942,7 @@ extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 

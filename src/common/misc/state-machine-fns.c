@@ -11,6 +11,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "state-machine.h"

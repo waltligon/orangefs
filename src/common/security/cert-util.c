@@ -16,6 +16,9 @@
 
 #include "cert-util.h"
 
+#define KEY_TYPE_PUBLIC  0
+#define KEY_TYPE_PRIVATE 1
+
 /* load an X509 certificate from a file */
 int PINT_load_cert_from_file(const char *path,
                              X509 **cert)
@@ -24,7 +27,7 @@ int PINT_load_cert_from_file(const char *path,
 
     if (path == NULL || cert == NULL)
     {
-        return -1;
+        return -PVFS_EINVAL;
     }
 
     f = fopen(path, "r");
@@ -32,8 +35,6 @@ int PINT_load_cert_from_file(const char *path,
     {
         return errno;
     }
-
-    /* TODO: fstat permissions */
 
     *cert = PEM_read_X509(f, NULL, NULL, NULL);
 
@@ -55,7 +56,7 @@ int PINT_load_key_from_file(const char *path,
 
     if (path == NULL || key == NULL)
     {
-        return -1;
+        return -PVFS_EINVAL;
     }
 
     f = fopen(path, "r");
@@ -63,8 +64,6 @@ int PINT_load_key_from_file(const char *path,
     {
         return errno;
     }
-
-    /* TODO: fstat permissions */
 
     *key = PEM_read_PrivateKey(f, NULL, NULL, NULL);
 
@@ -78,6 +77,80 @@ int PINT_load_key_from_file(const char *path,
     return 0;
 }
 
+int PINT_save_cert_to_file(const char *path,
+                           X509 *cert)
+{
+    FILE *f;
+    int ret;
+
+    if (path == NULL || cert == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    f = fopen(path, "w");
+    if (f == NULL)
+    {
+        return errno;
+    }
+
+    ret = PEM_write_X509(f, cert);
+
+    fclose(f);
+
+    return ret ? 0 : -PVFS_ESECURITY;
+}
+
+/* save a key struct to disk */
+static int PINT_save_key_to_file(const char *path,
+                                 EVP_PKEY *key,
+                                 int key_type)
+{
+    FILE *f;
+    int ret;
+
+    if (path == NULL || key == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    f = fopen(path, "w");
+    if (f == NULL)
+    {
+        return errno;
+    }
+
+    if (key_type == KEY_TYPE_PUBLIC)
+    {
+        ret = PEM_write_PUBKEY(f, key);
+    }
+    else if (key_type == KEY_TYPE_PRIVATE)
+    {
+        ret = PEM_write_PrivateKey(f, key, NULL, NULL, 0, NULL, NULL);
+    }
+    else
+    {
+        fclose(f);
+        return -PVFS_EINVAL;
+    }
+
+    fclose(f);
+
+    return ret ? 0 : -PVFS_ESECURITY;
+}
+
+int PINT_save_pubkey_to_file(const char *path,
+                             EVP_PKEY *key)
+{
+    return PINT_save_key_to_file(path, key, KEY_TYPE_PUBLIC);
+}
+
+int PINT_save_privkey_to_file(const char *path,
+                              EVP_PKEY *key)
+{
+    return PINT_save_key_to_file(path, key, KEY_TYPE_PRIVATE);
+}
+
 int PINT_cert_to_X509(const PVFS_certificate *cert,
                       X509 **xcert)
 {
@@ -85,7 +158,7 @@ int PINT_cert_to_X509(const PVFS_certificate *cert,
 
     if (cert == NULL || xcert == NULL)
     {
-        return -1;
+        return -PVFS_EINVAL;
     }
 
     /* create new BIO (basic input/output handle) from memory */
@@ -113,7 +186,7 @@ int PINT_X509_to_cert(const X509 *xcert,
 
     if (xcert == NULL || cert == NULL)
     {
-        return -1;
+        return -PVFS_EINVAL;
     }
 
     /* init memory BIO */
@@ -198,6 +271,35 @@ int PINT_copy_cert(const PVFS_certificate *src,
    return 0;
 }
 
+int PINT_copy_key(const PVFS_security_key *src,
+                  PVFS_security_key *dest)
+{
+    if (src == NULL || dest == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* allocate dest buffer and copy */
+    if (src->buf != NULL && src->buf_size > 0)
+    {
+        dest->buf_size = src->buf_size;
+
+        dest->buf = (PVFS_key_data) malloc(dest->buf_size);
+        if (dest->buf == NULL)
+        {
+            return -PVFS_ENOMEM;
+        }
+        memcpy(dest->buf, src->buf, dest->buf_size);
+    }
+    else
+    {
+        dest->buf = NULL;
+        dest->buf_size = 0;
+    }
+
+    return 0;
+}
+
 void PINT_cleanup_cert(PVFS_certificate *cert)
 {
     if (cert)        
@@ -211,3 +313,15 @@ void PINT_cleanup_cert(PVFS_certificate *cert)
     }
 }
 
+void PINT_cleanup_key(PVFS_security_key *key)
+{
+    if (key)
+    {
+        if (key->buf)
+        {
+            free(key->buf);
+            key->buf = NULL;
+        }
+        key->buf_size = 0;
+    }
+}

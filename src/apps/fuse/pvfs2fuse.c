@@ -20,8 +20,8 @@ char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
 
-#include <fuse/fuse.h>
-#include <fuse/fuse_opt.h>
+#include <fuse.h>
+#include <fuse_opt.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -108,7 +108,7 @@ static int pvfs_fuse_gen_credential(
    ret = PVFS_util_gen_credential(uid, 
                                   gid, 
                                   PVFS2_DEFAULT_CREDENTIAL_TIMEOUT, 
-                                  NULL,
+                                  NULL, NULL,
                                   new_cred);
 
    if (ret == 0)
@@ -856,7 +856,7 @@ static int pvfs_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler
 		 if (filler(buf, cur_file, NULL, 0))
 			break;
 	  }
-	  token += rd_response.pvfs_dirent_outcount;
+	  token = rd_response.token;
 
 	  if (rd_response.pvfs_dirent_outcount)
 	  {
@@ -864,7 +864,7 @@ static int pvfs_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler
 		 rd_response.dirent_array = NULL;
 	  }
 
-   } while(rd_response.pvfs_dirent_outcount == pvfs_dirent_incount);
+   } while(token != PVFS_READDIR_END);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
@@ -1096,7 +1096,9 @@ enum {
    KEY_VERSION,
 };
 
+#ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
 #define PVFS2FUSE_OPT(t, p, v) { t, offsetof(struct pvfs2fuse, p), v }
 
 static struct fuse_opt pvfs2fuse_opts[] = {
@@ -1328,7 +1330,7 @@ int main(int argc, char *argv[])
    fuse_opt_insert_arg( &args, 1, "-odirect_io" );
    fuse_opt_insert_arg( &args, 1, "-oattr_timeout=0");
    fuse_opt_insert_arg( &args, 1, "-omax_write=524288");
-   if ( getpid() == 0 )
+   if ( getuid() == 0 )
 	  fuse_opt_insert_arg( &args, 1, "-oallow_other" );
    fuse_opt_insert_arg( &args, 1, "-s" );
     

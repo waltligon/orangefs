@@ -14,6 +14,10 @@ CSRC := \
 	$(DIR)/sys-dist.c \
 	$(DIR)/error-details.c
 
+#Removed from CLIENT_SMCGEN list for V3:
+#	$(DIR)/sys-small-io.c \
+
+
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \
 	$(DIR)/sys-getattr.c \
@@ -52,6 +56,10 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-get-dirdata-handle.c \
 	$(DIR)/mgmt-get-uid-list.c \
 	$(DIR)/mgmt-get-dirdata-array.c
+
+ifdef ENABLE_SECURITY_CERT
+	CLIENT_SMCGEN += $(DIR)/mgmt-get-user-cert.c
+endif
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

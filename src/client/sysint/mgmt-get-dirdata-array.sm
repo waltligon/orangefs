@@ -72,14 +72,15 @@ PVFS_error PVFS_imgmt_get_dirdata_array(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_DIRDATA_ARRAY,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_GET_DIRDATA_ARRAY,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (!smcb)
     {
-	return -PVFS_ENOMEM;
+        return -PVFS_ENOMEM;
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -94,12 +95,11 @@ PVFS_error PVFS_imgmt_get_dirdata_array(
 
     PINT_msgpair_init(&sm_p->msgarray_op);
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        ref,
-        PVFS_ATTR_DISTDIR_ATTR,
-        PVFS_TYPE_DIRECTORY, 
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               ref,
+                               PVFS_ATTR_DISTDIR_ATTR,
+                               PVFS_TYPE_DIRECTORY, 
+                               0);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);

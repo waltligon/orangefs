@@ -1012,9 +1012,6 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
             ret = PINT_dbpf_keyval_pcache_insert(
                                 op_p->coll_p->pcache, 
                                 op_p->handle,
-                                (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
-                                    DBPF_DIRECTORY_ENTRY_TYPE :
-                                    DBPF_ATTRIBUTE_TYPE),
                                 *op_p->u.k_iterate.position_p,
                                 op_p->u.k_iterate.key_array[count-1].buffer, 
                                 op_p->u.k_iterate.key_array[count-1].read_sz);
@@ -1183,9 +1180,6 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
             ret = PINT_dbpf_keyval_pcache_insert(
                         op_p->coll_p->pcache, 
                         op_p->handle, 
-                        (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
-                            DBPF_DIRECTORY_ENTRY_TYPE :
-                            DBPF_ATTRIBUTE_TYPE),
                         *op_p->u.k_iterate_keys.position_p,
                         op_p->u.k_iterate_keys.key_array[count-1].buffer,
                         op_p->u.k_iterate_keys.key_array[count-1].read_sz);
