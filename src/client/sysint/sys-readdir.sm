@@ -530,7 +530,7 @@ static PINT_sm_action readdir_finish_partial_read(
     msg_p->sid_array =
            &sm_p->getattr.attr.u.dir.dirdata_sids[
                   sm_p->readdir_state.dirdata_index *
-                        sm_p->getattr.attr.u.dir.dist_dir_attr.num_copies];
+                        sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
@@ -576,7 +576,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         sm_p->readdir.pos_token = PVFS_READDIR_START;
     }
     if( sm_p->readdir.dirdata_index >=
-        sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers)
+        sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count)
     {      
         gossip_debug(GOSSIP_READDIR_DEBUG, "readdir: "
                 "all dirdata servers have been traversed, setting pos and return.\n");
@@ -589,7 +589,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     assert(sm_p->getattr.size_array);
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir getattr: "
             "dirent_count of all dirdata handles\n");
-    for(i = 0; i < sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers; i++)
+    for(i = 0; i < sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {       
         gossip_debug(GOSSIP_READDIR_DEBUG, 
                 "dirent_count[%d]: %llu\n", i,
@@ -605,11 +605,11 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     /* allocate space */
     sm_p->readdir.num_dirdata_needed = 0;
     token_array = malloc( sizeof(PVFS_ds_position) *
-            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     tmp_dirent_limit_array = malloc( sizeof(int) *
-            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     tmp_dirdata_index_array = malloc( sizeof(int) *
-            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     if(!token_array || !tmp_dirent_limit_array || !tmp_dirdata_index_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -619,7 +619,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     /* fill in request parameters */
     while( (tmp_dirent_limit_needed > 0) &&
            (sm_p->readdir.dirdata_index <
-            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers) )
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count) )
     {
         int cur_index = sm_p->readdir.dirdata_index;
 

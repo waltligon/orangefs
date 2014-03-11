@@ -165,14 +165,14 @@ static PINT_sm_action mgmt_get_dirdata_array_cleanup(
         attr = &sm_p->getattr.attr;
         assert(attr);
         assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
-        assert(attr->u.dir.dist_dir_attr.num_servers > 0);
+        assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
 
         /* copy out going parameters */
         assert(sm_p->u.get_dirdata_array.dirdata_count ==
-                attr->u.dir.dist_dir_attr.num_servers); 
+                attr->u.dir.dist_dir_attr.dirdata_count); 
         memcpy(sm_p->u.get_dirdata_array.dirdata_array,
                attr->u.dir.dirdata_handles,
-               (attr->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle)));
+               (attr->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle)));
     }
     else
     {

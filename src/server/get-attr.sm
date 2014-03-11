@@ -1675,7 +1675,7 @@ static PINT_sm_action getattr_setup_resp(
             "dist_name_len    = %d "
             "dist_params_len  = %d\n",
             llu(resp_attr->u.dir.dirent_count),
-            resp_attr->u.dir.dist_dir_attr.num_servers,
+            resp_attr->u.dir.dist_dir_attr.dirdata_count,
             resp_attr->u.dir.hint.dfile_count,
             resp_attr->u.dir.hint.dist_name_len,
             resp_attr->u.dir.hint.dist_params_len);
@@ -1694,7 +1694,7 @@ static PINT_sm_action getattr_setup_resp(
         gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
         for (dirent_file_count_i = 0;
-             dirent_file_count_i < resp_attr->u.dir.dist_dir_attr.num_servers;
+             dirent_file_count_i < resp_attr->u.dir.dist_dir_attr.dirdata_count;
              dirent_file_count_i++) {
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                     "    dirdata_handle[%d] = %s\n",
@@ -1868,16 +1868,16 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr->u.dir.dist_dir_attr.num_servers > 0 &&
+    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0 &&
            attr->u.dir.dist_dir_attr.bitmap_size > 0);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "getattr: get dist-dir-attr for dir meta handle %s "
-                 "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
                  "split_size=%d, server_no=%d and branch_level=%d\n",
                  PVFS_OID_str(&s_op->u.getattr.handle),
                  attr->u.dir.dist_dir_attr.tree_height,
-                 attr->u.dir.dist_dir_attr.num_servers,
+                 attr->u.dir.dist_dir_attr.dirdata_count,
                  attr->u.dir.dist_dir_attr.bitmap_size,
                  attr->u.dir.dist_dir_attr.split_size,
                  attr->u.dir.dist_dir_attr.server_no,
@@ -1888,7 +1888,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
                 malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                              sizeof(PVFS_dist_dir_bitmap_basetype));
     attr->u.dir.dirdata_handles =
-                malloc(attr->u.dir.dist_dir_attr.num_servers *
+                malloc(attr->u.dir.dist_dir_attr.dirdata_count *
                              sizeof(PVFS_handle));
     if(!attr->u.dir.dist_dir_bitmap || !attr->u.dir.dirdata_handles)
     {
@@ -1928,7 +1928,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.num_servers *
+    s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.dirdata_count *
                     sizeof(PVFS_handle);
 
     js_p->error_code = 0;
@@ -1990,7 +1990,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                      "\t getattr: dirdata handles array of directory %s.\n",
                      PVFS_OID_str(&s_op->u.getattr.handle));
         
-        for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+        for(i=0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
         {   
             gossip_debug(GOSSIP_MKDIR_DEBUG, 
                          "\t\tdirdata server %d: %s.\n",
@@ -2084,7 +2084,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                      "\t getattr: dirdata handles array of directory %s.\n",
                      PVFS_OID_str(&s_op->u.getattr.handle));
 
-        for(i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+        for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "\t\tdirdata server %d: %s.\n",

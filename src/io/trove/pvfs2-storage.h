@@ -60,14 +60,14 @@ struct PVFS_ds_datafile_attr_s
 struct PVFS_ds_directory_attr_s
 {
     /* global info */
-    int32_t tree_height;   /* ceil(log2(num_servers)) */
+    int32_t tree_height;   /* ceil(log2(dirdata_count)) */
     int32_t dirdata_count; /* total number of servers */
     int32_t sid_count;     /* number of SIDs total */
     int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
                            /* stored under the key DIST_DIR_BITMAP */
     int32_t split_size;    /* maximum number of entries before a split */
     /* local info */
-    int32_t server_no;     /* 0 to num_servers-1, indicates */
+    int32_t server_no;     /* 0 to dirdata_count-1, indicates */
                            /* which server is running this code */
     int32_t branch_level;  /* level of branching on this server */
 };
@@ -147,9 +147,9 @@ do {                                                                   \
     case PVFS_TYPE_DIRECTORY :                                         \
         (__oa)->u.dir.dist_dir_attr.tree_height =                      \
                 (__dsa)->u.directory.tree_height;                      \
-        (__oa)->u.dir.dist_dir_attr.num_servers =                      \
+        (__oa)->u.dir.dist_dir_attr.dirdata_count =                    \
                 (__dsa)->u.directory.dirdata_count;                    \
-        (__oa)->u.dir.dist_dir_attr.num_copies =                       \
+        (__oa)->u.dir.dist_dir_attr.sid_count =                        \
                 (__dsa)->u.directory.sid_count;                        \
         (__oa)->u.dir.dist_dir_attr.bitmap_size =                      \
                 (__dsa)->u.directory.bitmap_size;                      \
@@ -191,9 +191,9 @@ do {                                                                   \
         (__dsa)->u.directory.tree_height =                             \
                 (__oa)->u.dir.dist_dir_attr.tree_height;               \
         (__dsa)->u.directory.dirdata_count =                           \
-                (__oa)->u.dir.dist_dir_attr.num_servers;               \
+                (__oa)->u.dir.dist_dir_attr.dirdata_count;             \
         (__dsa)->u.directory.sid_count =                               \
-                (__oa)->u.dir.dist_dir_attr.num_copies;                \
+                (__oa)->u.dir.dist_dir_attr.sid_count;                 \
         (__dsa)->u.directory.bitmap_size =                             \
                 (__oa)->u.dir.dist_dir_attr.bitmap_size;               \
         (__dsa)->u.directory.split_size =                              \

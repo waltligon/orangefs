@@ -30,13 +30,13 @@ static int dist_dir_calc_branch_level(
 		const PVFS_dist_dir_bitmap bitmap)
 {
 	int level = 0;
-	int server_no, num_servers;
+	int server_no, dirdata_count;
 
 	server_no = dist_dir_attr->server_no;
-	num_servers = dist_dir_attr->num_servers;
+	dirdata_count = dist_dir_attr->dirdata_count;
 
 	/* meta handle copy (server_no = -1) shall not reach here */
-	assert(server_no >= 0 && server_no < num_servers);
+	assert(server_no >= 0 && server_no < dirdata_count);
 	assert(bitmap != NULL);
 
 	if(!(TST_BIT(bitmap, server_no)))
@@ -64,14 +64,15 @@ static int dist_dir_calc_branch_level(
  * ***************************/
 
 /* init dir state function, set all parameters
- * server_no <- -1..(num_servers-1)
+ * server_no <- -1..(dirdata_count-1)
  * pre_dsg_num_server: pre-set a number of servers, used for known large directory. default value can be 1.
  */
 
 int PINT_init_dist_dir_state(
 		PVFS_dist_dir_attr *dist_dir_attr, 
 		PVFS_dist_dir_bitmap *bitmap_ptr,
-		const int num_servers, 
+		const int dirdata_count, 
+		const int sid_count, 
 		const int server_no, 
 		int pre_dsg_num_server,
                 const int split_size)
@@ -81,21 +82,22 @@ int PINT_init_dist_dir_state(
 
 	assert(dist_dir_attr != NULL);
 
-	/* -1 <= server_no < num_servers && 0 < pre_dsg_num_server <= num_servers */
-	assert(	(num_servers > 0) &&
+	/* -1 <= server_no < dirdata_count && 0 < pre_dsg_num_server <= dirdata_count */
+	assert(	(dirdata_count > 0) &&
 	 		(server_no >= -1) && /* metadata handle has server_no = -1 */
-			(server_no < num_servers));
+			(server_no < dirdata_count));
 
 	if ((pre_dsg_num_server <= 0) ||
-		(pre_dsg_num_server > num_servers))
+		(pre_dsg_num_server > dirdata_count))
 	{
-		pre_dsg_num_server = num_servers;	
+		pre_dsg_num_server = dirdata_count;	
 	}
 
-	dist_dir_attr->num_servers = num_servers;
+	dist_dir_attr->dirdata_count = dirdata_count;
+	dist_dir_attr->sid_count = sid_count;
 	dist_dir_attr->server_no = server_no;
 	/* tree_height start from 0 */
-        cval = ceil(my_log2((double)num_servers)); 
+        cval = ceil(my_log2((double)dirdata_count)); 
 	dist_dir_attr->tree_height = (int)cval;
 
 	/* increase bitmap_size if 2^tree_height > 32
@@ -114,8 +116,8 @@ int PINT_init_dist_dir_state(
 	}
 
 	*bitmap_ptr = (PVFS_dist_dir_bitmap) malloc(
-                                          dist_dir_attr->bitmap_size *
-                                          sizeof(PVFS_dist_dir_bitmap_basetype));
+                                       dist_dir_attr->bitmap_size *
+                                       sizeof(PVFS_dist_dir_bitmap_basetype));
 	if ((*bitmap_ptr) == NULL)
 	{
 		return -1;
@@ -155,7 +157,7 @@ int PINT_is_dist_dir_bucket_active(
 		const int server_no)
 {
     if((server_no < 0) ||
-            (server_no >= dist_dir_attr_p->num_servers))
+            (server_no >= dist_dir_attr_p->dirdata_count))
     {
         return 0;
     }
@@ -230,7 +232,7 @@ int PINT_find_dist_dir_split_node(
 	/* calculate new node value */
 	new_node_val = dist_dir_attr->server_no 
 				+ (1l << branch_level);
-	if(new_node_val >= dist_dir_attr->num_servers)
+	if(new_node_val >= dist_dir_attr->dirdata_count)
 	{
 		return -1;
 	}
@@ -238,7 +240,8 @@ int PINT_find_dist_dir_split_node(
 	/* new node must be unset, otherwise branch_level is messed up */
 	assert(!TST_BIT(bitmap, new_node_val));
         SET_BIT(bitmap, new_node_val);
-        dist_dir_attr->branch_level = dist_dir_calc_branch_level(dist_dir_attr, bitmap);
+        dist_dir_attr->branch_level =
+                       dist_dir_calc_branch_level(dist_dir_attr, bitmap);
 
 	return new_node_val;
 }
@@ -257,7 +260,7 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 	assert((to_dir_attr != NULL) && (from_dir_attr != NULL));
 	assert((to_dir_bitmap != NULL) && (from_dir_bitmap != NULL));
 
-	if( (to_dir_attr->num_servers != from_dir_attr->num_servers) ||
+	if( (to_dir_attr->dirdata_count != from_dir_attr->dirdata_count) ||
 		(to_dir_attr->server_no == from_dir_attr->server_no))
 	{
 		return -1; /* not in the same tree or update itself */
@@ -274,7 +277,8 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 	/* update branch level */
 	if(to_dir_attr->server_no > -1) /* dirdata server */
 	{
-	to_dir_attr->branch_level = dist_dir_calc_branch_level(to_dir_attr, to_dir_bitmap);
+	to_dir_attr->branch_level =
+                    dist_dir_calc_branch_level(to_dir_attr, to_dir_bitmap);
 	}
 
 	/* anything else to update? */
@@ -313,7 +317,7 @@ int PINT_dist_dir_set_serverno(const int server_no,
 	assert(ddattr != NULL && 
 			ddbitmap != NULL &&
 			server_no >= -1 &&
-			server_no < ddattr->num_servers);
+			server_no < ddattr->dirdata_count);
 
 	ddattr->server_no = server_no;
 	

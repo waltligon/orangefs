@@ -164,7 +164,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             if (dist_dir_bitmap_size)
             {
                 if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.num_servers > 0)
+                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
                 {
                     if (dest->u.dir.dist_dir_bitmap)
                     {
@@ -186,13 +186,13 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.dir.dist_dir_bitmap = NULL;
             }
 
-            dirent_handles_array_size = src->u.dir.dist_dir_attr.num_servers *
+            dirent_handles_array_size = src->u.dir.dist_dir_attr.dirdata_count *
                 sizeof(PVFS_handle);
 
             if (dirent_handles_array_size)
             {
                 if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.num_servers > 0)
+                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
                 {
                     if (dest->u.dir.dirdata_handles)
                     {
@@ -213,8 +213,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             {
                 dest->u.dir.dirdata_handles = NULL;
             }
-            dest->u.dir.dist_dir_attr.num_servers =
-                            src->u.dir.dist_dir_attr.num_servers;
+            dest->u.dir.dist_dir_attr.dirdata_count =
+                            src->u.dir.dist_dir_attr.dirdata_count;
         }
 
         if((src->objtype == PVFS_TYPE_METAFILE) &&

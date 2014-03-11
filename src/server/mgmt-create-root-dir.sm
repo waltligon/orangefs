@@ -270,10 +270,12 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    int num_total_dirdata_servers, num_initial_dirdata_servers;
+    PVFS_object_attr *attr = NULL;
+    int num_total_dirdata_servers = 0;
+    int num_total_dirdata_sids = 0;
+    int num_initial_dirdata_servers = 0;
     int ret = -1;
-    unsigned char *c;
+    unsigned char *c = NULL;
     int i;
 
     js_p->error_code = 0;
@@ -284,6 +286,8 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
      * servers for this fs?  Do Root dirs need to have so many buckets -
      * are they ever holding that many entries?  Should this be a config
      * file parameter?
+     * Also need to get the number of SIDs worked out - should be a
+     * default for the FS times number of servers.
      */
     /* use total # of meta servers as the num_total_dirdata_servers */
     ret = PINT_cached_config_get_num_meta(s_op->target_fs_id,
@@ -297,7 +301,7 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
 
     /* set num_dirdata_servers for pre-allocation of dirdata handles */
     s_op->u.mgmt_create_root_dir.num_dirdata_servers =
-            num_total_dirdata_servers;
+                                      num_total_dirdata_servers;
 
     /* for root dir, use all dirdata servers */
     num_initial_dirdata_servers = num_total_dirdata_servers;
@@ -306,6 +310,7 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
                                    &attr->u.dir.dist_dir_bitmap,
                                    num_total_dirdata_servers,
+                                   num_total_dirdata_sids, /* V3 is this set */
                                    0,
                                    num_initial_dirdata_servers,
                                    100);
@@ -314,11 +319,11 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "mgmt-create-root-dir: Init dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->target_handle),
             attr->u.dir.dist_dir_attr.tree_height,
-            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.dirdata_count,
             attr->u.dir.dist_dir_attr.bitmap_size,
             attr->u.dir.dist_dir_attr.split_size,
             attr->u.dir.dist_dir_attr.server_no,
@@ -595,7 +600,7 @@ static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(
                                    s_op->target_fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
@@ -677,7 +682,7 @@ static PINT_sm_action mgmt_create_root_write_keyval_meta_handle(
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
+    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.dirdata_count * 
                                sizeof(*attr->u.dir.dirdata_handles);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
@@ -792,8 +797,8 @@ static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
                             PVFS_HANDLE_NULL, /* parent */
                             PVFS_SID_NULL, /* parent sid */
                             sys_attr,
-                            s_op->attr.u.dir.dist_dir_attr.num_servers,
-                            s_op->attr.u.dir.dist_dir_attr.num_servers,
+                            s_op->attr.u.dir.dist_dir_attr.dirdata_count,
+                            s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                             s_op->attr.u.dir.dist_dir_attr.split_size,
                             layout,
                             NULL);
