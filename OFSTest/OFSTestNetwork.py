@@ -10,7 +10,7 @@
 # 1. At least one OFSTestNode in the network_nodes array.
 # 2. A local_master, which represents the local machine from which the tests are run.
 #
-# EC2/OpenStack based virtual networks will also have an ec2_connection_manager.
+# Cloud/OpenStack based virtual networks will also have an cloud_connection_manager.
 #
 
 
@@ -18,7 +18,9 @@ import os
 import OFSTestNode
 import OFSTestLocalNode 
 import OFSTestRemoteNode 
+import OFSCloudConnectionManager
 import OFSEC2ConnectionManager
+import OFSNovaConnectionManager
 import Queue
 import threading
 import time
@@ -37,8 +39,8 @@ class OFSTestNetwork(object):
 
     def __init__(self):
     
-        # Configuration for ec2 
-        self.ec2_connection_manager = None
+        # Configuration for cloud 
+        self.cloud_connection_manager = None
         # dictionary of instances
            
         self.network_nodes = []
@@ -83,7 +85,7 @@ class OFSTestNetwork(object):
             return None
 
     ##
-    #  @fn addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
+    #  @fn addRemoteNode(self,username,ip_address,key,is_cloud=False,ext_ip_address=None):
     #
     #    Creates a new OFSTestNode and adds it to the network_nodes list.
     #
@@ -91,18 +93,18 @@ class OFSTestNetwork(object):
     # @param username User login
     # @param ip_address IP address of node
     # @param key ssh key file location to access the node for username
-    # @param is_ec2 Is this an EC2/OpenStack node?
+    # @param is_cloud Is this an Cloud/OpenStack node?
     # @param ext_ip_address Externally accessible IP address
     #
     #  @returns the OFSTestNode
     #
 
         
-    def addRemoteNode(self,username,ip_address,key,is_ec2=False,ext_ip_address=None):
+    def addRemoteNode(self,username,ip_address,key,is_cloud=False,ext_ip_address=None):
         #This function adds a remote node
         
-        # Is this a remote machine or an existing ec2 node?
-        remote_node = OFSTestRemoteNode.OFSTestRemoteNode(username=username,ip_address=ip_address,key=key,local_node=self.local_master,is_ec2=is_ec2,ext_ip_address=ext_ip_address)
+        # Is this a remote machine or an existing cloud node?
+        remote_node = OFSTestRemoteNode.OFSTestRemoteNode(username=username,ip_address=ip_address,key=key,local_node=self.local_master,is_cloud=is_cloud,ext_ip_address=ext_ip_address)
                 
         # Add to the node dictionary
         self.network_nodes.append(remote_node)
@@ -176,98 +178,55 @@ class OFSTestNetwork(object):
           
 
     ##
-    # @fn   addEC2Connection(self,ec2_config_file,key_name,key_location)
+    # @fn   addCloudConnection(self,cloud_config_file,key_name,key_location)
     #
-    #    Initialize the EC2Connection
+    #    Initialize the CloudConnection
     #
     #    @param self The object pointer
-    #    @param ec2_config_file location of ec2rc.sh file 
-    #    @param key_name Name of EC2 key to access node
-    #    @param key_location Location of .pem file that contains the EC2 key
+    #    @param cloud_config_file location of cloudrc.sh file 
+    #    @param key_name Name of Cloud key to access node
+    #    @param key_location Location of .pem file that contains the Cloud key
     #
    
     
     
-    def addEC2Connection(self,ec2_config_file,key_name,key_location):
-        #This function initializes the ec2 connection
-        self.ec2_connection_manager = OFSEC2ConnectionManager.OFSEC2ConnectionManager(ec2_config_file)
-        self.ec2_connection_manager.setEC2Key(key_name,key_location)
+    def addCloudConnection(self,cloud_config_file,key_name,key_location,cloud_type="EC2",nova_password_file=None):
+        #This function initializes the cloud connection
+        self.cloud_type = cloud_type
+        if (cloud_type == 'EC2'):
+            self.cloud_connection_manager = OFSEC2ConnectionManager.OFSEC2ConnectionManager(cloud_config_file)
+        elif (cloud_type == 'nova'):
+            self.cloud_connection_manager = OFSNovaConnectionManager.OFSNovaConnectionManager(cloud_config_file,password_file=nova_password_file)
+        self.cloud_connection_manager.setCloudKey(key_name,key_location)
         
 
     ##
-    # @fn createNewEC2Nodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
+    # @fn createNewCloudNodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
     #
-    # Creates new ec2 nodes and adds them to network_nodes list.
+    # Creates new cloud nodes and adds them to network_nodes list.
     #
     #
     #    @param self The object pointer  
     #    @param number_nodes  number of nodes to be created
-    #    @param image_name  Name of EC2 image to launch
-    #    @param machine_type  EC2 "flavor" of virtual node
+    #    @param image_name  Name of Cloud image to launch
+    #    @param machine_type  Cloud "flavor" of virtual node
     #    @param associateip  Associate to external ip?
     #    @param domain Domain to associate with external ip
-    #	 @param ec2_subnet ec2 subnet id for primary network interface.
+    #	 @param cloud_subnet cloud subnet id for primary network interface.
     #
     #    @returns list of new nodes.
 
 
     
-    def createNewEC2Nodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None,ec2_subnet=None):
+    def createNewCloudNodes(self,number_nodes,image_name,machine_type,associateip=False,domain=None,cloud_subnet=None):
         
-        # This function creates number nodes on the ec2 system. 
+        # This function creates number nodes on the cloud system. 
         # It returns a list of nodes
+        new_ofs_test_nodes = self.cloud_connection_manager.createNewCloudNodes(number_nodes,image_name,machine_type,self.local_master,associateip,domain,cloud_subnet)
         
-        new_instances = self.ec2_connection_manager.createNewEC2Instances(number_nodes,image_name,machine_type,ec2_subnet)
-        # new instances should have a 60 second delay to make sure everything is running.
-
-        ip_addresses = []
-        new_ofs_test_nodes = []
-        
-        for idx,instance in enumerate(new_instances):
-            instance.update()
-            #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
-            
-            while instance.state_code == 0:
                 
-                time.sleep(10)
-                instance.update()
-                #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
-            
-            
-        
-        # now that the instances are up, check the external ip
-        if associateip == True:
-            # if we need to associate an external ip address, do so
-            ip_addresses = self.ec2_connection_manager.associateIPAddresses(new_instances,domain)
-        else:
-            #otherwise use the default internal address
-            
-            for i in new_instances:
-                i.update()
-                print "Instance %s using current IP %s" % (i.id,i.ip_address)
-                #(i.__dict__)
-                ip_addresses.append(i.ip_address)
-
-        print "===========================================================" 
-        print "Adding new nodes to OFS cluster"
- 
-        for idx,instance in enumerate(new_instances):
-            # Create the node and get the instance name
-            if "ubuntu" in image_name:
-                name = 'ubuntu'
-            elif "fedora" in image_name:
-                # fedora 18 = ec2-user, fedora 19 = fedora
-                
-                # fedora 18 = ec2-user, fedora 19 = fedora
-                name = 'fedora'
-            else:
-                name = 'ec2-user'
-            
-            new_node = OFSTestRemoteNode.OFSTestRemoteNode(username=name,ip_address=instance.ip_address,key=self.ec2_connection_manager.instance_key_location,local_node=self.local_master,is_ec2=True,ext_ip_address=ip_addresses[idx])
-
-            new_ofs_test_nodes.append(new_node)
-        
-            # Add the node to the created nodes list.
+        # Add the node to the created nodes list.
+        for new_node in new_ofs_test_nodes:
             self.network_nodes.append(new_node)
         
         # return the list of newly created nodes.
@@ -323,7 +282,7 @@ class OFSTestNetwork(object):
                 
 
     ##      
-    # @fn terminateEC2Node(self, remote_node)
+    # @fn terminateCloudNode(self, remote_node)
     #
     # Terminate the remote node and remove it from the created node list.
     #
@@ -331,13 +290,13 @@ class OFSTestNetwork(object):
     #    @param remote_node Node to be terminated.
 
 
-    def terminateEC2Node(self,remote_node):
+    def terminateCloudNode(self,remote_node):
                 
-        if remote_node.is_ec2 == False: 
-            print "Node at %s is not controlled by the ec2 manager." % remote_node.ip_address
+        if remote_node.is_cloud == False: 
+            print "Node at %s is not controlled by the cloud manager." % remote_node.ip_address
             return
         
-        rc = self.ec2_connection_manager.terminateEC2Instance(remote_node.ip_address)
+        rc = self.cloud_connection_manager.terminateCloudInstance(remote_node.ip_address)
         
         # if the node was terminated, remove it from the list.
         if rc == 0:
@@ -349,23 +308,23 @@ class OFSTestNetwork(object):
 
 
     ##      
-    # @fn updateEC2Nodes(self,node_list=None):
+    # @fn updateCloudNodes(self,node_list=None):
     #
-    #    Update only the EC2 Nodes
+    #    Update only the Cloud Nodes
     # 
     # @param self The object pointer
     # @param node_list List of nodes to update.
     #
 
         
-    def updateEC2Nodes(self,node_list=None):
-        # This only updates the EC2 controlled nodes
+    def updateCloudNodes(self,node_list=None):
+        # This only updates the Cloud controlled nodes
          
         if node_list == None:
             node_list = self.network_nodes
         
-        ec2_nodes = [node for node in self.network_nodes if node.is_ec2 == True]
-        self.updateNodes(ec2_nodes)   
+        cloud_nodes = [node for node in self.network_nodes if node.is_cloud == True]
+        self.updateNodes(cloud_nodes)   
 
 
     ##
@@ -394,7 +353,7 @@ class OFSTestNetwork(object):
                 rc = node.runSingleCommand("ping -c 1 %s" % n2.hostname)
                 # if not, add to the /etc/hosts file
                 if rc != 0:
-                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,n2.hostname)
+                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,node.hostname)
                     node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.hostname,n2.hostname))
                     # also create mpihosts files
                     node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.hostname,node.created_openmpihosts))
@@ -897,20 +856,20 @@ class OFSTestNetwork(object):
 
    
     ##    
-    #    @fn terminateAllEC2Nodes(self,node_list=None):
+    #    @fn terminateAllCloudNodes(self,node_list=None):
     #
-    #    Terminate all the ec2 nodes in a list
+    #    Terminate all the cloud nodes in a list
     #    @param self The object pointer
     #    @param node_list List of nodes in network.
 
 
 
-    def terminateAllEC2Nodes(self, node_list=None):
+    def terminateAllCloudNodes(self, node_list=None):
         if node_list == None:
             node_list = self.network_nodes
         for node in node_list:
-            if node.is_ec2 == True:
-                self.terminateEC2Node(node)
+            if node.is_cloud == True:
+                self.terminateCloudNode(node)
 
    
     ##    
@@ -1575,18 +1534,18 @@ class OFSTestNetwork(object):
     
 # def test_driver():
 #     my_node_manager = OFSTestNetwork()
-#     my_node_manager.addEC2Connection("ec2-cred/ec2rc.sh","Buildbot","/home/jburton/buildbot.pem")
+#     my_node_manager.addCloudConnection("cloud-cred/cloudrc.sh","Buildbot","/home/jburton/buildbot.pem")
 # 
-#     nodes  = my_node_manager.createNewEC2Nodes(4,"cloud-ubuntu-12.04","c1.small")
-#     #nodes  = my_node_manager.createNewEC2Nodes(6,"cloud-sl6","c1.small")
+#     nodes  = my_node_manager.createNewCloudNodes(4,"cloud-ubuntu-12.04","c1.small")
+#     #nodes  = my_node_manager.createNewCloudNodes(6,"cloud-sl6","c1.small")
 # 
 #     '''
-#     ec2_ip_addresses = ['10.20.102.98','10.20.102.97','10.20.102.99','10.20.102.100']
+#     cloud_ip_addresses = ['10.20.102.98','10.20.102.97','10.20.102.99','10.20.102.100']
 # 
 #     nodes = []
 # 
-#     for my_address in ec2_ip_addresses:
-#         nodes.append(my_node_manager.addRemoteNode(ip_address=my_address,username="ubuntu",key="/home/jburton/buildbot.pem",is_ec2=True))
+#     for my_address in cloud_ip_addresses:
+#         nodes.append(my_node_manager.addRemoteNode(ip_address=my_address,username="ubuntu",key="/home/jburton/buildbot.pem",is_cloud=True))
 #     for node in nodes:
 #         node.setEnvironmentVariable("VMSYSTEM","cloud-ubuntu-12.04")
 #     '''
@@ -1595,7 +1554,7 @@ class OFSTestNetwork(object):
 #     print "==================================================================="
 #     print "Updating New Nodes"
 #     
-#     my_node_manager.updateEC2Nodes()
+#     my_node_manager.updateCloudNodes()
 # 
 #     print ""
 #     print "==================================================================="
@@ -1753,7 +1712,7 @@ class OFSTestNetwork(object):
 #     print "==================================================================="
 #     print "Terminating Nodes"
 # 
-#   #  my_node_manager.terminateAllEC2Nodes()
+#   #  my_node_manager.terminateAllCloudNodes()
 #    
 #     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get update && sudo apt-get -y dist-upgrade < /dev/zero && sudo reboot"])
 #     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo reboot"])
@@ -1765,7 +1724,7 @@ class OFSTestNetwork(object):
 #     #my_node_manager.runSimultaneousCommands(node_list=nodes,node_function=OFSTestNode.copyOFSSource,kwargs={"resource_type": "SVN","resource": "http://orangefs.org/svn/orangefs/trunk","dest_dir": "/tmp/ubuntu"})
 # 
 #     #for n in nodes:
-#     #    my_node_manager.terminateEC2Node(n)
+#     #    my_node_manager.terminateCloudNode(n)
 # 
 #     #print my_node.runSingleCommand("whoami")
 # 

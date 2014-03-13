@@ -136,7 +136,7 @@ class OFSTestMain(object):
                     ext_ip_address = None
 
                 # Add the node to the virtual cluster.
-                self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_ec2=self.config.using_ec2,ext_ip_address=ext_ip_address)
+                self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_cloud=self.config.using_cloud,ext_ip_address=ext_ip_address)
         
         # Upload the access key to all the nodes in the cluster.
         print "===========================================================" 
@@ -173,8 +173,8 @@ class OFSTestMain(object):
     
     def checkOFS(self):
         
-        # if we need to create new EC2 nodes, then OFS not setup
-        if self.config.number_new_ec2_nodes > 0:        
+        # if we need to create new Cloud nodes, then OFS not setup
+        if self.config.number_new_cloud_nodes > 0:        
             return 1;
         
         # initialize the network
@@ -231,29 +231,30 @@ class OFSTestMain(object):
     def setupOFS(self):
         
     
-        if self.config.using_ec2 == True:
-            # First, if we're using EC2/Openstack, open the connection
+        if self.config.using_cloud == True:
+            # First, if we're using Cloud/Openstack, open the connection
             print "===========================================================" 
-            print "Connecting to EC2/OpenStack using information from " + self.config.ec2rc_sh
-            self.ofs_network.addEC2Connection(self.config.ec2rc_sh,self.config.ec2_key_name,self.config.ssh_key_filepath)
+            print "Connecting to EC2/OpenStack cloud using information from " + self.config.cloud_config
+            print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
+            self.ofs_network.addCloudConnection(self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
     
-            # if the configuration says that we need to create new EC2 nodes, 
+            # if the configuration says that we need to create new Cloud nodes, 
             # do it.
-            if self.config.number_new_ec2_nodes > 0:
+            if self.config.number_new_cloud_nodes > 0:
                 print "===========================================================" 
-                print "Creating %d new EC2/OpenStack Nodes" % self.config.number_new_ec2_nodes
-                self.ofs_network.createNewEC2Nodes(self.config.number_new_ec2_nodes,self.config.ec2_image,self.config.ec2_machine,self.config.ec2_associate_ip,self.config.ec2_domain,self.config.ec2_subnet)
+                print "Creating %d new EC2/OpenStack cloud nodes" % self.config.number_new_cloud_nodes
+                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet)
             
         # Setup the virtual cluster.
         self.initNetwork()
     
-        if self.config.using_ec2 == True:
-            # Update new ec2 nodes and reboot. We don't want to do this with real nodes 
+        if self.config.using_cloud == True:
+            # Update new cloud nodes and reboot. We don't want to do this with real nodes 
             # because we don't want to step on the admin's toes.
             print ""
             print "==================================================================="
             print "Updating New Nodes (This may take awhile...)"
-            self.ofs_network.updateEC2Nodes()
+            self.ofs_network.updateCloudNodes()
             
         # Install software required to compile and run OFS and all tests.
         print ""
@@ -698,11 +699,11 @@ class OFSTestMain(object):
 #            traceback.print_exc()
 #
 #
-#        if self.config.ec2_delete_after_test == True:
+#        if self.config.cloud_delete_after_test == True:
 #            print ""
 #            print "==================================================================="
 #            print "Terminating Nodes"
-#            self.ofs_network.terminateAllEC2Nodes()
+#            self.ofs_network.terminateAllCloudNodes()
 
     ##
     #

@@ -19,7 +19,7 @@ import OFSTestNode
 class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
  
     ##
-    # @fn __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
+    # @fn __init__(self,username,ip_address,key,local_node,is_cloud=False,ext_ip_address=None):
     #
     # Initialization routine.
     #
@@ -28,12 +28,12 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     # @param ip_address IP address of node on cluster network.
     # @param key Location on local machine of SSH key used to access node.
     # @param local_node OFSTestLocalNode object that represents the local machine
-    # @param is_ec2 Is this an ec2/OpenStack node?
+    # @param is_cloud Is this an cloud/OpenStack node?
     # @param ext_ip_address IP address of node accessible from local machine if different from cluster IP.
     # 
     # @return None, but will print ssh command used to access node.
  
-    def __init__(self,username,ip_address,key,local_node,is_ec2=False,ext_ip_address=None):
+    def __init__(self,username,ip_address,key,local_node,is_cloud=False,ext_ip_address=None):
 
         print "-----------------------------------------------------------"    
         super(OFSTestRemoteNode,self).__init__()
@@ -47,7 +47,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         else:
             self.ext_ip_address = ext_ip_address
         self.current_user = username
-        self.is_ec2 = is_ec2
+        self.is_cloud = is_cloud
         self.sshLocalKeyFile = key
         self.localnode = local_node
         self.ssh_command = "/usr/bin/ssh -i %s %s@%s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)

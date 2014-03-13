@@ -7,6 +7,8 @@ import re
 from boto import ec2
 from pprint import pprint
 from datetime import datetime, timedelta
+import OFSCloudConnectionManager
+import OFSTestRemoteNode
 
 ## 
 # @class OFSEC2ConnectionManager
@@ -14,7 +16,7 @@ from datetime import datetime, timedelta
 # @brief This class manages the EC2 connection. It has no awareness of OFSTestNodes or the OFSTestNetwork.
 #
 
-class OFSEC2ConnectionManager(object):
+class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManager):
   
     ##
     #
@@ -28,17 +30,10 @@ class OFSEC2ConnectionManager(object):
     #
 
     
-    def __init__(self,ec2_config_file=None,region_name=None):
+    def __init__(self,cloud_config_file=None,region_name=None):
         
+        super(OFSEC2ConnectionManager,self).__init__()
         ##
-        # @var self.ec2_instance_names
-        # @brief Dictionary of EC2 instance names
-        self.ec2_instance_names = {}
-        
-        # @var self.ec2_instance_list
-        # @brief Dictionary of EC2 instances
-        self.ec2_instance_list = {}
-        
         # @var self.ec2_access_key  
         # @brief EC2 Access key. In ec2rc.sh file.
         self.ec2_access_key = ""
@@ -67,27 +62,19 @@ class OFSEC2ConnectionManager(object):
         # @brief The ec2.connection.EC2Connection object.
         self.ec2_connection = None
         
-        # @var self.ec2_image_list
-        # @brief List of all available images
-        self.ec2_image_list = None
-        
-        # @var self.ec2_key_list
-        # @brief List of all available keys (not used)
-        self.ec2_key_list = None
-        
         # @var self.ec2_region_name
         # @brief EC2 region name. Required to connect.
         self.ec2_is_secure = False
         
         # @var self.ec2_is_secure
         # @brief Is this http or https?
-        self.instance_key = None
+        self.cloud_instance_key = None
                
-        # @var String self.instance_key
+        # @var String self.cloud_instance_key
         # @brief Name of key (in EC2) used to access instance via SSH
-        self.instance_key_location = None
+        self.cloud_instance_key_location = None
         
-        # @var String self.instance_key_location
+        # @var String self.cloud_instance_key_location
         # @brief  *.pem ssh key used to access instance.
         self.ec2_region_name = None
     
@@ -98,16 +85,16 @@ class OFSEC2ConnectionManager(object):
             self.ec2_region_name = region_name
         
        
-        if ec2_config_file is not None:
+        if cloud_config_file is not None:
             # Read the ec2rc.sh file if provided
-            self.readEC2ConfigFile(ec2_config_file)
+            self.readCloudConfigFile(cloud_config_file)
         else:
             # Otherwise, get the configuration from the environment.
-            self.getEC2ConfigFromEnvironment()
+            self.getCloudConfigFromEnvironment()
         
     ##
     #
-    # @fn readEC2ConfigFile(self,filename):
+    # @fn readConfigFile(self,filename):
     #
     # Reads relevant values from ec2rc.sh file.
     #
@@ -117,7 +104,7 @@ class OFSEC2ConnectionManager(object):
     #
             
     
-    def readEC2ConfigFile(self,filename):
+    def readCloudConfigFile(self,filename):
         
         #open ec2 file
         ec2conf_rc = open(filename,'r')
@@ -181,35 +168,22 @@ class OFSEC2ConnectionManager(object):
         if debug > 0:
             print "EC2 connection is %r" % self.ec2_connection
 
-    ##
-    #      
-    # @fn setEC2Key(self,keyname,keylocation):
-    # Sets key name (EC2) and key location (file) used to create and access EC2 instances.
-    # @param self  The object pointer
-    # @param keyname Name of key in EC2
-    # @param keylocation Location of .pem file in filesystem.
-    #
-    #
-
-    def setEC2Key(self,keyname,keylocation):
-        self.instance_key = keyname
-        self.instance_key_location = keylocation
 
     ##
-    # @fn getAllImages(self ):	
+    # @fn getAllCloudImages(self ):	
     # Get a list of all the EC2 images
     # @param self  The object pointer		
     # @return A list of available EC2 Images	
     #
 
-    def getAllImages(self):
+    def getAllCloudImages(self):
         self.checkEC2Connection()        
-        self.ec2_image_list = self.ec2_connection.get_all_images()
+        self.cloud_image_list = self.ec2_connection.get_all_images()
         
-        return self.ec2_image_list
+        return self.cloud_image_list
 
     ##
-    # @fn terminateEC2Instance(self,ip_address)
+    # @fn terminateCloudInstance(self,ip_address)
     # Terminates a running EC2 instance 
     #
     # @param self The object pointer
@@ -220,25 +194,25 @@ class OFSEC2ConnectionManager(object):
     #
     #
         
-    def terminateEC2Instance(self,ip_address):
+    def terminateCloudInstance(self,ip_address):
         
-        self.checkEC2Connection()
+        self.checkCloudConnection()
         
-        node_instance = next(( i for i in self.ec2_instance_list if i.ip_address == ip_address),None)
+        node_instance = next(( i for i in self.cloud_instance_list if i.ip_address == ip_address),None)
         
         if node_instance == None:
-            self.getAllEC2Instances()
-            node_instance = next(( i for i in self.ec2_instance_list if i.ip_address == ip_address),None)
+            self.getAllCloudInstances()
+            node_instance = next(( i for i in self.cloud_instance_list if i.ip_address == ip_address),None)
         if node_instance == None:
             print "Instance at %s not found." % ip_address
             return 1
             
         try: 
-        	print "Releasing external IP address %s" % node_instance.ext_ip_address
-        	self.ec2_connection.release_address(node_instance.ext_ip_address)
+            print "Releasing external IP address %s" % node_instance.ext_ip_address
+            self.ec2_connection.release_address(node_instance.ext_ip_address)
         except:
-        	print "Warning: Could not release external IP Address "+ node_instance.ext_ip_address
-        	
+            print "Warning: Could not release external IP Address "+ node_instance.ext_ip_address
+            
         print "Terminating node at %s" % ip_address
         
         try:
@@ -249,41 +223,41 @@ class OFSEC2ConnectionManager(object):
         return 0
     ##
     #
-    # @fn createNewEC2Instances(self,number_nodes,image_system,instance_type): 
+    # @fn createNewCloudInstances(self,number_nodes,image_name,flavor_name): 
     # Creates new EC2 instances and returns list of them.
     #
     # @param self The object pointer
     # @param number_nodes  Number of nodes to create
-    # @param image_system Image to run. (e.g. "cloud-ubuntu-12.04")
-    # @param instance_type Image "flavor" (e.g. "m1.medium")
+    # @param image_name Image to run. (e.g. "cloud-ubuntu-12.04")
+    # @param flavor_name Image "flavor" (e.g. "m1.medium")
 	# @param subnet_id Id of subnet instance should run on 
     #
     # @return	A list of new instances.
     #		
         
-    def createNewEC2Instances(self,number_nodes,image_system,instance_type,subnet_id=None):
+    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
         
         # get the image ID for the operating system
-        if self.ec2_image_list == None:
-            self.getAllImages()
+        if self.cloud_image_list == None:
+            self.getAllCloudImages()
         
         # now let's find the os name in the image list
-        image = next((i for i in self.ec2_image_list if i.name == image_system), None)
+        image = next((i for i in self.cloud_image_list if i.name == image_name), None)
         
         if image == None:
-            print "Image %s Not Found!" % image_system
+            print "Image %s Not Found!" % image_name
             return None
         
-        print "Creating %d new %s %s instances." % (number_nodes,instance_type,image_system)
+        print "Creating %d new %s %s instances." % (number_nodes,flavor_name,image_name)
         #print image.__dict__
         
 
-        reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.instance_key, user_data=None, instance_type=instance_type, network='42f48524-45d3-41fa-aee4-4e5ecf762f79')
+        reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.cloud_instance_key, user_data=None, instance_type=flavor_name)
 
-        
+        print "Creating %d new %s %s instances." % (number_nodes,flavor_name,image_name)
 
         print "Waiting 120 seconds for all instances to start."
         time.sleep(120)
@@ -335,12 +309,12 @@ class OFSEC2ConnectionManager(object):
         
     ##
     #
-    # @fn checkEC2Connection(self):	
+    # @fn checkCloudConnection(self):	
     # Checks to see if the EC2 connection is available.	Connects if it isn't.
     # @param self The object pointer
     #
 
-    def checkEC2Connection(self):
+    def checkCloudConnection(self):
         if self.ec2_connection == None:
             self.connect()
 
@@ -351,12 +325,13 @@ class OFSEC2ConnectionManager(object):
     # @param self The object pointer
     #
     
-    def getAllEC2Instances(self):
-        self.checkEC2Connection()
+    def getAllCloudInstances(self):
+        self.checkCloudConnection()
         
         reservation_v = self.ec2_connection.get_all_instances()
         
-        self.ec2_instance_list = [i for r in reservation_v for i in r.instances]
+        self.cloud_instance_list = [i for r in reservation_v for i in r.instances]
+        return self.cloud_instance_list
 
     ##
     #
@@ -366,8 +341,8 @@ class OFSEC2ConnectionManager(object):
     #
     
     def printAllInstanceStatus(self):
-        self.getAllEC2Instances()
-        for instance in self.ec2_instance_list:
+        self.getAllCloudInstances()
+        for instance in self.cloud_instance_list:
             print "Instance %s at %s has status %s" % (instance.id,instance.ip_address,instance.status)
 
     ##
@@ -409,9 +384,9 @@ class OFSEC2ConnectionManager(object):
     #
     def deleteOldInstances(self,days_old=7,name_filter="",key_filter=""):    
         
-        self.checkEC2Connection()
+        self.checkCloudConnection()
         
-        for i in self.ec2_instance_list:
+        for i in self.cloud_instance_list:
             #pprint(i.__dict__)
             
             if name_filter in i.public_dns_name and i.key_name.lower() == key_filter.lower():
@@ -423,7 +398,7 @@ class OFSEC2ConnectionManager(object):
                         # Terminate will throw an attribute error when it tries to set the status of a terminated instance. 
                         pass
         
-        self.getAllEC2Instances()
+        self.getAllCloudInstances()
         
     #
     #
@@ -431,32 +406,93 @@ class OFSEC2ConnectionManager(object):
     # 
     #
 
-    def getEC2ConfigFromEnvironment(self):
+    def getCloudConfigFromEnvironment(self):
         print "This should be implemented, but isn't."
+
+    ##
+    # @fn createNewCloudNodes(number_nodes,image_name,machine_type,associateip=False,domain=None):
+    #
+    # Creates new cloud nodes and adds them to network_nodes list.
+    #
+    #
+    #    @param self The object pointer  
+    #    @param number_nodes  number of nodes to be created
+    #    @param image_name  Name of Cloud image to launch
+    #    @param flavor_name  Cloud "flavor" of virtual node
+    #    @param associateip  Associate to external ip?
+    #    @param domain Domain to associate with external ip
+    #     @param cloud_subnet cloud subnet id for primary network interface.
+    #
+    #    @returns list of new nodes.
+
+
+    
+    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None):
         
-    def manageExistingEC2Instance(self,ec2_node):
-        pass
-    
-    def getEC2InstanceInformation(self,ec2_node):
-        # get the EC2 Information for the node
-        pass
-    
-    def deleteEC2Instance(self,ec2_node):
-        pass
-    
-    def hardRebootEC2Instance(self,ec2_node):
-        pass
-    
-    def deleteAllEC2Instances(self):
-        pass  
+        # This function creates number nodes on the cloud system. 
+        # It returns a list of nodes
         
+        new_instances = self.createNewCloudInstances(number_nodes,image_name,flavor_name,cloud_subnet)
+        # new instances should have a 60 second delay to make sure everything is running.
+
+        ip_addresses = []
+        new_ofs_test_nodes = []
+        
+        for idx,instance in enumerate(new_instances):
+            instance.update()
+            #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
+            
+            while instance.state_code == 0:
+                
+                time.sleep(10)
+                instance.update()
+                #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
+            
+            
+        
+        # now that the instances are up, check the external ip
+        if associateip == True:
+            # if we need to associate an external ip address, do so
+            ip_addresses = self.associateIPAddresses(new_instances,domain)
+        else:
+            #otherwise use the default internal address
+            
+            for i in new_instances:
+                i.update()
+                print "Instance %s using current IP %s" % (i.id,i.ip_address)
+                #(i.__dict__)
+                ip_addresses.append(i.ip_address)
+
+        print "===========================================================" 
+        print "Adding new nodes to OFS cluster"
+ 
+        for idx,instance in enumerate(new_instances):
+            # Create the node and get the instance name
+            if "ubuntu" in image_name:
+                name = 'ubuntu'
+            elif "fedora" in image_name:
+                # fedora 18 = cloud-user, fedora 19 = fedora
+                
+                # fedora 18 = cloud-user, fedora 19 = fedora
+                name = 'fedora'
+            else:
+                name = 'cloud-user'
+            
+            new_node = OFSTestRemoteNode.OFSTestRemoteNode(username=name,ip_address=instance.ip_address,key=self.cloud_instance_key_location,local_node=local_master,is_cloud=True,ext_ip_address=ip_addresses[idx])
+
+            new_ofs_test_nodes.append(new_node)
+
+        # return the list of newly created nodes.
+        
+        return new_ofs_test_nodes
+
 
 
 #     
 # def OFSEC2ConnectionManager_test_driver():
 #     
-#     # old_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
-#     my_mgr = OFSEC2ConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
+#     # old_mgr = OFSCloudConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
+#     my_mgr = OFSCloudConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
 #     print "Connect to EC2"
 #     #old_mgr.connect(debug=1)
 #     my_mgr.connect(debug=1)
@@ -464,7 +500,7 @@ class OFSEC2ConnectionManager(object):
 #     print "Testing connection"
 #     #old_mgr.printAllInstanceStatus()
 #     #my_mgr.printAllInstanceStatus()
-#     #my_mgr.getAllImages()
+#     #my_mgr.getAllCloudImages()
 #     #my_mgr.deleteOldInstances(days_old=3)
 #     #old_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
 #     my_mgr.setEC2Key("BuildBot2","/home/jburton/cuer1/buildbot2.pem")

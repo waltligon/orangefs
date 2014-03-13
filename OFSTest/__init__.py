@@ -1,1 +1,1 @@
-__all__ = ['OFSTestConfigMenu','OFSTestNode','OFSTestLocalNode','OFSTestRemoteNode','OFSVFSTest','OFSSysintTest','OFSTestConfig','OFSEC2ConnectionManager','OFSTestMain','OFSMpiioTest','OFSTestConfigFile','OFSTestNetwork','OFSUsrintTest','OFSHadoopTest']
+__all__ = ['OFSTestConfigMenu','OFSTestNode','OFSTestLocalNode','OFSTestRemoteNode','OFSVFSTest','OFSSysintTest','OFSTestConfig','OFSCloudConnectionManager','OFSTestMain','OFSMpiioTest','OFSTestConfigFile','OFSTestNetwork','OFSUsrintTest','OFSHadoopTest','OFSEC2ConnectionManager','OFSNovaConnectionManager']

@@ -34,11 +34,11 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         super(OFSTestLocalNode,self).__init__()
         
         ## @var is_remote
-        # Local nodes are neither remote nor EC2
+        # Local nodes are neither remote nor Cloud
         self.is_remote = False
-        ## @var is_ec2
-        # Is this node an ec2 node? Always false, even if it's true.
-        self.is_ec2 = False
+        ## @var is_cloud
+        # Is this node an cloud node? Always false, even if it's true.
+        self.is_cloud = False
         ## @var ip_address
         # set to local host
         self.ip_address = "127.0.0.1"

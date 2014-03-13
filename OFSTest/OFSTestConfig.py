@@ -27,17 +27,17 @@ class OFSTestConfig(object):
         
         #------------------------------
         #
-        # node control/ec2 variables
+        # node control/cloud variables
         #
         #------------------------------
        
-        ## @var using_ec2
-        # Are we using OpenStack/EC2?
-        self.using_ec2 = False
+        ## @var using_cloud
+        # Are we using OpenStack/Cloud?
+        self.using_cloud = False
         
-        ## @var ec2rc_sh
-        # Location of the ec2rc.sh file
-        self.ec2rc_sh = ""
+        ## @var cloud_config
+        # Location of the ec2rc.sh/openstack.sh file
+        self.cloud_config = ""
         
         ## @var ssh_key_filepath
         # Path of ssh key used to access all nodes
@@ -47,36 +47,36 @@ class OFSTestConfig(object):
         # List of differing keypaths, if applicable
         self.ssh_key_filepaths = []
         
-        ## @var ec2_key_name
-        # Internal ec2 key name. Must be consistant accross nodes.
-        self.ec2_key_name = ""
+        ## @var cloud_key_name
+        # Internal cloud key name. Must be consistant accross nodes.
+        self.cloud_key_name = ""
         
-        ## @var number_new_ec2_nodes
-        # Number of new ec2 nodes to be created. 
+        ## @var number_new_cloud_nodes
+        # Number of new cloud nodes to be created. 
         # If == 0, then using existing nodes.
-        self.number_new_ec2_nodes = 0
+        self.number_new_cloud_nodes = 0
         
-        ## @var ec2_image
-        # Image name to be launched for ec2 instance.
+        ## @var cloud_image
+        # Image name to be launched for cloud instance.
         # Must be consistant across nodes.
-        self.ec2_image = ""
+        self.cloud_image = ""
         
-        ## @var ec2_machine
-        # ec2 machine type (e.g. m1.medium)
+        ## @var cloud_machine
+        # cloud machine type (e.g. m1.medium)
         # Must be consistant across nodes.
-        self.ec2_machine = ""
+        self.cloud_machine = ""
         
-        ## @var ec2_delete_after_test
+        ## @var cloud_delete_after_test
         # Should the nodes be deleted after testing?
-        self.ec2_delete_after_test = False
+        self.cloud_delete_after_test = False
         
-        ## @var ec2_domain
-        # EC2 domain
-        self.ec2_domain=None
+        ## @var cloud_domain
+        # Cloud domain
+        self.cloud_domain=None
         
-        ## @var ec2_associate_ip
-        # Associate external ip address with EC2 nodes?
-        self.ec2_associate_ip=False
+        ## @var cloud_associate_ip
+        # Associate external ip address with Cloud nodes?
+        self.cloud_associate_ip=False
         
         ## @var node_ip_addresses
         # List of node ip addresses. If a private network is used, this is the
@@ -90,7 +90,7 @@ class OFSTestConfig(object):
         
         ## @var node_username
         # Single username to access all nodes
-        self.node_username = "ec2-user"
+        self.node_username = "cloud-user"
         
         ## @var node_usernames
         # usernames for login of individual nodes, if necessary
@@ -249,7 +249,7 @@ class OFSTestConfig(object):
         ## @var ofs_host_name_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
-        # a bug on some ec2 setups.
+        # a bug on some cloud setups.
         self.ofs_host_name_override = []
         
         ## @var start_client_on_all_nodes
@@ -287,13 +287,14 @@ class OFSTestConfig(object):
         # Run OrangeFS Hadoop tests
         self.run_hadoop_tests = False
         
-        ## @var ec2_subnet
-        # ec2 subnet ID for primary network interface
-        #self.ec2_subnet=None
+        ## @var cloud_subnet
+        # cloud subnet ID for primary network interface
+        #self.cloud_subnet=None
         #TODO: Remove hardcoded definition. 
-        self.ec2_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
+        self.cloud_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
         
-        
+        self.cloud_type = 'EC2'
+        self.nova_password_file=None
         
     
     ##
@@ -388,40 +389,40 @@ class OFSTestConfig(object):
         if temp != None:
             self.log_file = temp
         
-        temp = d.get('using_ec2')
+        temp = d.get('using_cloud')
         if temp != None:
-            self.using_ec2 = temp
+            self.using_cloud = temp
         
-        temp = d.get('ec2rc_sh')
+        temp = d.get('cloud_config')
         if temp != None:
-            self.ec2rc_sh = temp
+            self.cloud_config = temp
         
         temp = d.get('ssh_key_filepath')
         if temp != None:
             self.ssh_key_filepath = temp
 
-        temp = d.get('ec2_key_name')
+        temp = d.get('cloud_key_name')
         if temp != None:
-            self.ec2_key_name = temp
+            self.cloud_key_name = temp
         
-        temp = d.get('number_new_ec2_nodes')
+        temp = d.get('number_new_cloud_nodes')
         if temp != None:
-            self.number_new_ec2_nodes = temp
+            self.number_new_cloud_nodes = temp
         # sanity check
-        if self.number_new_ec2_nodes > 0:
-            self.using_ec2 = True
+        if self.number_new_cloud_nodes > 0:
+            self.using_cloud = True
 
-        temp = d.get('ec2_image')
+        temp = d.get('cloud_image')
         if temp != None:
-            self.ec2_image = temp
+            self.cloud_image = temp
 
-        temp = d.get('ec2_machine')
+        temp = d.get('cloud_machine')
         if temp != None:
-            self.ec2_machine = temp
+            self.cloud_machine = temp
             
-        temp = d.get('ec2_delete_after_test')
+        temp = d.get('cloud_delete_after_test')
         if temp != None:
-            self.ec2_delete_after_test = temp
+            self.cloud_delete_after_test = temp
         
         temp = d.get('node_ip_addresses')
         if temp != None:
@@ -513,12 +514,12 @@ class OFSTestConfig(object):
         if temp != None:
             self.run_fuse_tests = temp
 
-        temp = d.get('ec2_domain')
+        temp = d.get('cloud_domain')
         if temp != None:
-            self.ec2_domain = temp
-        temp = d.get('ec2_associate_ip')
+            self.cloud_domain = temp
+        temp = d.get('cloud_associate_ip')
         if temp != None:
-            self.ec2_associate_ip = temp
+            self.cloud_associate_ip = temp
 
         temp = d.get('ofs_mount_as_fuse')
         if temp != None:
@@ -627,9 +628,9 @@ class OFSTestConfig(object):
         if temp != None:
             self.start_client_on_all_nodes = temp
         
-        temp = d.get('ec2_subnet')
+        temp = d.get('cloud_subnet')
         if temp != None:
-            self.ec2_subnet = temp
+            self.cloud_subnet = temp
 
         temp = d.get('svn_password')
         if temp != None:
@@ -643,6 +644,12 @@ class OFSTestConfig(object):
         if temp != None:
             self.svn_options = temp
         
+        temp = d.get('cloud_type')
+        if temp != None:
+            self.cloud_type = temp
         
+        temp = d.get('nova_password_file')
+        if temp != None:
+            self.nova_password_file = temp
         
         

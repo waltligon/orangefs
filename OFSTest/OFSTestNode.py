@@ -11,7 +11,7 @@
 # subclass type.
 #
 # This class represents all machines that are part of the OFS process. This includes local, remote
-# and remote-ec2 based machines.
+# and remote-cloud based machines.
 #
 # This program assumes that the OFSTestNode is a *nix machine operating a bash shell. 
 # MacOSX functionality may be limited. Windows local nodes are not currently supported.
@@ -96,9 +96,9 @@ class OFSTestNode(object):
         # is this a remote machine?
         self.is_remote=True
         
-        ## @var is_ec2
-        # is this an ec2/openstack instance?
-        self.is_ec2=False
+        ## @var is_cloud
+        # is this an cloud/openstack instance?
+        self.is_cloud=False
         
         ## @var processor_type
         # type of processor (i386/x86_64)
@@ -111,7 +111,7 @@ class OFSTestNode(object):
         #-------
         
         ## @var current_user
-        # main user login. Usually ec2-user for ec2 instances.
+        # main user login. Usually cloud-user for cloud instances.
         self.current_user = ""
         
         ## @var current_directory
@@ -346,7 +346,7 @@ class OFSTestNode(object):
 
         # SuSE distros require a hostname kludge to get it to work. Otherwise all instances will be set to the same hostname
         # That's a better solution than what Openstack gives us. So why not? 
-        if self.is_ec2 == True:
+        if self.is_cloud == True:
             suse_host = "ofsnode-%d" % self.node_number
             print "Renaming %s based node to %s" % (self.distro,suse_host)
             self.runSingleCommandAsBatch("sudo hostname %s" % suse_host)
@@ -354,14 +354,14 @@ class OFSTestNode(object):
             self.hostname = suse_host
             
         # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
-        elif len(self.hostname) > 15 and self.is_ec2 == True:
+        elif len(self.hostname) > 15 and self.is_cloud == True:
             short_hostname = self.hostname[:15]
             self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_hostname)
             self.runSingleCommandAsBatch("sudo hostname %s" % short_hostname)
             print "Truncating hostname %s to %s" % (self.hostname,short_hostname)
             self.hostname = self.hostname[:15]
-        elif self.is_ec2 == False:
-            print "Not an EC2 Node!"
+        elif self.is_cloud == False:
+            print "Not an Cloud Node!"
         
         # print out node information
         print "Node: %s %s %s %s" % (self.hostname,self.distro,self.kernel_version,self.processor_type)
@@ -2504,7 +2504,7 @@ class OFSTestNode(object):
         # find the directory
         #find / -name pvfs2-config.h.in -print 2> /dev/null
         # grep directory/configure 
-        # grep -r 'prefix = /home/ec2-user/orangefs' /home/ec2-user/stable/Makefile
+        # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
         
         
@@ -2537,8 +2537,8 @@ class OFSTestNode(object):
 #     #local_machine.installOFSSource()
 #     '''
 #     
-#     remote_machine = OFSTestRemoteNode('ec2-user','10.20.102.54',"/home/jburton/buildbot.pem",local_machine)
-#     remote_machine1 = OFSTestRemoteNode('ec2-user','10.20.102.60', "/home/jburton/buildbot.pem",local_machine)
+#     remote_machine = OFSTestRemoteNode('cloud-user','10.20.102.54',"/home/jburton/buildbot.pem",local_machine)
+#     remote_machine1 = OFSTestRemoteNode('cloud-user','10.20.102.60', "/home/jburton/buildbot.pem",local_machine)
 # 
 # '''
 #     remote_machine.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
@@ -2549,24 +2549,24 @@ class OFSTestNode(object):
 #     remote_machine.uploadRemoteKeyFromLocal(local_machine,remote_machine1.ip_address)
 #     remote_machine1.uploadRemoteKeyFromLocal(local_machine,remote_machine.ip_address)
 #     
-#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/trunk","/tmp/ec2-user/")
+#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/trunk","/tmp/cloud-user/")
 #     print "Configuring remote source"
 #     remote_machine.configureOFSSource()
 #     remote_machine.makeOFSSource()
 #     remote_machine.installOFSSource()
 #     
 #     #remote_machine1.runSingleCommandAsBatch("sudo rm /tmp/mount/orangefs/touched")
-#     #remote_machine1.copyOFSSource("TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz","/tmp/ec2-user/")
+#     #remote_machine1.copyOFSSource("TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz","/tmp/cloud-user/")
 # 
 # 
 #     print ""
 #     print "-------------------------------------------------------------------------"
 #     print "Configuring remote source without shared libraries on " + remote_machine.hostname
 #     print ""
-#     remote_machine.runSingleCommand("rm -rf /tmp/ec2-user")
+#     remote_machine.runSingleCommand("rm -rf /tmp/cloud-user")
 #     remote_machine.runSingleCommand("rm -rf /tmp/orangefs")
-#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/benchmarks")
-#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
+#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/cloud-user/benchmarks")
+#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/cloud-user/")
 #     remote_machine.configureOFSSource()
 #     remote_machine.makeOFSSource()
 #     remote_machine.installOFSSource()
@@ -2612,9 +2612,9 @@ class OFSTestNode(object):
 #     print "Configuring remote source with shared libraries on " + remote_machine1.hostname
 #     print ""
 #     remote_machine1.runSingleCommand("rm -rf /tmp/orangefs")
-#     remote_machine1.runSingleCommand("rm -rf /tmp/ec2-user")
-#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/ec2-user/")
-#     remote_machine1.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/ec2-user/")
+#     remote_machine1.runSingleCommand("rm -rf /tmp/cloud-user")
+#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/cloud-user/")
+#     remote_machine1.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/cloud-user/")
 # 
 # 
 #     remote_machine1.configureOFSSource("--enable-strict --enable-shared --enable-ucache --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % remote_machine1.getKernelVersion())
