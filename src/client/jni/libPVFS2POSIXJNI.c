@@ -30,8 +30,6 @@
 /* Forward Declarations */
 static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst);
 //static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst);
-static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst);
-static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst);
 
 /* Convert allocated struct to an instance of our Stat Class */
 static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
@@ -157,95 +155,6 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
 }
 #endif
 
-/* fill_timeval */
-static int fill_timeval(JNIEnv *env, struct timeval *ptr, jobject *inst)
-{
-    int num_fields = 2;
-    char *field_names[] =
-    {
-        "tv_sec", "tv_usec" };
-    char *field_types[] =
-    {
-        "[J", "[J" };
-    jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/Timeval";
-    jclass cls = (*env)->FindClass(env, cls_name);
-    if (!cls)
-    {
-        JNI_ERROR("invalid class: %s\n", cls_name);
-        return -1;
-    }
-    int fid_index = 0;
-    for (; fid_index < num_fields; fid_index++)
-    {
-        fids[fid_index] = (*env)->GetFieldID(env, cls, field_names[fid_index],
-                field_types[fid_index]);
-        if (!fids[fid_index])
-        {
-            JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            return -1;
-        }
-    }
-    jmethodID mid = (*env)->GetMethodID(env, cls, "<init>", "()V");
-    *inst = (*env)->NewObject(env, cls, mid);
-    jlongArray ar;
-    jlongArray ar1;
-    int jval;
-    jlong cbuf[2];
-    jlong cbuf1[2];
-    for (jval = 0; jval < 2; jval++)
-    {
-        cbuf[jval] = ptr[jval].tv_sec;
-    }
-    for (jval = 0; jval < 2; jval++)
-    {
-        cbuf1[jval] = ptr[jval].tv_usec;
-    }
-    ar = (*env)->GetObjectField(env, *inst, fids[0]);
-    (*env)->SetLongArrayRegion(env, ar, 0, 2, cbuf);
-    ar1 = (*env)->GetObjectField(env, *inst, fids[1]);
-    (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
-    return 0;
-}
-
-/* fill_utimbuf */
-static int fill_utimbuf(JNIEnv *env, struct utimbuf *ptr, jobject *inst)
-{
-    int num_fields = 2;
-    char *field_names[] =
-    {
-        "actime", "modtime" };
-    char *field_types[] =
-    {
-        "J", "J" };
-    jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/Utimbuf";
-    jclass cls = (*env)->FindClass(env, cls_name);
-    if (!cls)
-    {
-        JNI_ERROR("invalid class: %s\n", cls_name);
-        return -1;
-    }
-    int fid_index = 0;
-    for (; fid_index < num_fields; fid_index++)
-    {
-        fids[fid_index] = (*env)->GetFieldID(env, cls, field_names[fid_index],
-                field_types[fid_index]);
-        if (!fids[fid_index])
-        {
-            JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            return -1;
-        }
-    }
-    *inst = (*env)->AllocObject(env, cls);
-    /* Load object with data from structure using
-     * constructor or set methods.
-     */
-    (*env)->SetLongField(env, *inst, fids[0], ptr->actime);
-    (*env)->SetLongField(env, *inst, fids[1], ptr->modtime);
-    return 0;
-}
-
 /* access */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_access(JNIEnv *env, jobject obj,
@@ -306,7 +215,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_chmod(JNIEnv *env, jobject obj,
 /* chown */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_chown(JNIEnv *env, jobject obj,
-        jstring path, jlong owner, jlong group)
+        jstring path, jint owner, jint group)
 {
     JNI_PFI();
     int ret = -1;
@@ -472,7 +381,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchmodat(JNIEnv *env, jobject obj,
 /* fchown */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_fchown(JNIEnv *env, jobject obj, int fd,
-        jlong owner, jlong group)
+        jint owner, jint group)
 {
     JNI_PFI();
     int ret = fchown(fd, (uid_t) owner, (gid_t) group);
@@ -487,7 +396,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fchown(JNIEnv *env, jobject obj, int fd,
 /* fchownat */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_fchownat(JNIEnv *env, jobject obj,
-        int fd, jstring path, jlong owner, jlong group, jlong flag)
+        int fd, jstring path, jint owner, jint group, jlong flag)
 {
     JNI_PFI();
     int ret = -1;
@@ -827,30 +736,39 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_ftruncate(JNIEnv *env, jobject obj,
 }
 
 /* futimes */
-JNIEXPORT jobject JNICALL
-Java_org_orangefs_usrint_PVFS2POSIXJNI_futimes(JNIEnv *env, jobject obj, int fd)
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2POSIXJNI_futimes(JNIEnv *env, jobject obj,
+		int fd, jlong actime_usec, jlong modtime_usec)
 {
     JNI_PFI();
     int ret = -1;
     struct timeval tv[2];
-    ret = futimes(fd, tv);
+    /* If either are invalid then, have utime set actime and modtime to
+     * current time. */
+    if (actime_usec == -1 || modtime_usec == -1)
+    {
+    	ret = futimes(fd, NULL);
+    }
+    else
+    {
+    	tv[0].tv_sec = actime_usec / 1000000L;
+    	tv[0].tv_usec = actime_usec % 1000000L;
+    	tv[1].tv_sec = modtime_usec / 1000000L;
+    	tv[1].tv_usec = modtime_usec % 1000000L;
+        ret = futimes(fd, tv);
+    }
     if (ret < 0)
     {
         JNI_PERROR();
-        return (jobject) 0;
+        return -1;
     }
-    jobject timeval_obj;
-    if (fill_timeval(env, tv, &timeval_obj) == 0)
-    {
-        return timeval_obj;
-    }
-    return (jobject) 0;
+    return 0;
 }
 
 /* futimesat */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_futimesat(JNIEnv *env, jobject obj,
-        int dirfd, jstring path)
+        int dirfd, jstring path, jlong actime_usec, jlong modtime_usec)
 {
     JNI_PFI();
     int ret = -1;
@@ -858,18 +776,27 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimesat(JNIEnv *env, jobject obj,
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = futimesat(dirfd, cpath, tv);
+
+    /* If either are invalid then, have utime set actime and modtime to
+     * current time. */
+    if (actime_usec == -1 || modtime_usec == -1)
+    {
+    	ret = futimesat(dirfd, cpath, NULL);
+    }
+    else
+    {
+    	tv[0].tv_sec = actime_usec / 1000000L;
+    	tv[0].tv_usec = actime_usec % 1000000L;
+    	tv[1].tv_sec = modtime_usec / 1000000L;
+    	tv[1].tv_usec = modtime_usec % 1000000L;
+        ret = futimesat(dirfd, cpath, tv);
+    }
     if (ret < 0)
     {
         JNI_PERROR();
-        return (jobject) 0;
+        return -1;
     }
-    jobject timeval_obj;
-    if (fill_timeval(env, tv, &timeval_obj) == 0)
-    {
-        return timeval_obj;
-    }
-    return (jobject) 0;
+    return 0;
 }
 
 /* getdtablesize */
@@ -1561,9 +1488,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_unlinkat(JNIEnv *env, jobject obj,
 }
 
 /* utime */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_utime(JNIEnv *env, jobject obj,
-        jstring path)
+        jstring path, jlong actime_sec, jlong modtime_sec)
 {
     JNI_PFI();
     int ret = -1;
@@ -1571,24 +1498,30 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utime(JNIEnv *env, jobject obj,
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = utime(cpath, &utb);
+    /* If either are invalid then, have utime set actime and modtime to
+     * current time. */
+    if (actime_sec == -1 || modtime_sec == -1)
+    {
+    	ret = utime(cpath, (const struct utimbuf *) NULL);
+    }
+    else
+    {
+        utb.actime = (time_t) actime_sec;
+        utb.modtime = (time_t) modtime_sec;
+        ret = utime(cpath, &utb);
+    }
     if (ret < 0)
     {
         JNI_PERROR();
-        return (jobject) 0;
+        return -1;
     }
-    jobject utimbuf_obj;
-    if (fill_utimbuf(env, &utb, &utimbuf_obj) == 0)
-    {
-        return utimbuf_obj;
-    }
-    return (jobject) 0;
+    return 0;
 }
 
 /* utimes */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_utimes(JNIEnv *env, jobject obj,
-        jstring path)
+        jstring path, jlong actime_usec, jlong modtime_usec)
 {
     JNI_PFI();
     int ret = -1;
@@ -1596,18 +1529,26 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utimes(JNIEnv *env, jobject obj,
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = utimes(cpath, tv);
+    /* If either are invalid then, have utime set actime and modtime to
+     * current time. */
+    if (actime_usec == -1 || modtime_usec == -1)
+    {
+    	ret = utimes(cpath, NULL);
+    }
+    else
+    {
+    	tv[0].tv_sec = actime_usec / 1000000L;
+    	tv[0].tv_usec = actime_usec % 1000000L;
+    	tv[1].tv_sec = modtime_usec / 1000000L;
+    	tv[1].tv_usec = modtime_usec % 1000000L;
+        ret = utimes(cpath, tv);
+    }
     if (ret < 0)
     {
         JNI_PERROR();
-        return (jobject) 0;
+        return -1;
     }
-    jobject timeval_obj;
-    if (fill_timeval(env, tv, &timeval_obj) == 0)
-    {
-        return timeval_obj;
-    }
-    return (jobject) 0;
+    return 0;
 }
 
 JNIEXPORT jlong JNICALL
@@ -1621,7 +1562,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_write(JNIEnv *env, jobject obj, int fd,
     buf_addr = (*env)->GetDirectBufferAddress(env, buf);
     if (!buf_addr)
     {
-        JNI_ERROR("buf_addr returned by " "GetDirectBufferAddress is NULL\n");
+        JNI_ERROR("buf_addr returned by GetDirectBufferAddress is NULL\n");
         ret = -1;
         return ret;
     }
