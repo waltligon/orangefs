@@ -1,13 +1,14 @@
 #!/usr/bin/python
 #
-#
+# @class OFSTestConfigMenu
 # This class implements a dialog for Python based testing
-#
+# Needs to be updated.
 #
 
 #
-from os.path import basename, isdir
+
 from OFSTestConfig import *
+import os
 
 
 
@@ -30,10 +31,10 @@ class OFSTestConfigMenu(OFSTestConfig):
     def yes_no_prompt(self,prompt):
 
         while True:
-            input = self.string_prompt(prompt+" [Y/N]:")
-            if input.lower() == 'y':
+            prompt_input = self.string_prompt(prompt+" [Y/N]:")
+            if prompt_input.lower() == 'y':
                 return True
-            elif input.lower() == 'n':
+            elif prompt_input.lower() == 'n':
                 return False
             else:
                 print "Invalid input. Please enter Y or N."
@@ -108,7 +109,7 @@ class OFSTestConfigMenu(OFSTestConfig):
 
     #======================================
     #
-    # def get_host_name
+    # def get_hostname
     #
     # This function asks the user for a hostname
     # Can also validate existance
@@ -153,7 +154,7 @@ class OFSTestConfigMenu(OFSTestConfig):
                 print "%s is not a valid value. Please enter an integer value. "
                 input = int(self.string_prompt(prompt,default))
 
-    def add_remote_nodes(self,keyfile,is_ec2=False):
+    def add_remote_nodes(self,keyfile,is_cloud=False):
         done = False
         
         while not done:
@@ -172,7 +173,7 @@ class OFSTestConfigMenu(OFSTestConfig):
                 ip_address = self.ip_prompt(prompt="Please enter the ip address of the next node:",validate=True)
                 self.node_ip_address.append(ip_address)
                 username = self.string_prompt(prompt="Please enter login userid for this node:")
-                my_node_manager.addRemoteNode(ip_address=ip_address,username=username,keyname=keyfile,is_ec2=is_ec2)
+                #my_node_manager.addRemoteNode(ip_address=ip_address,username=username,keyname=keyfile,is_cloud=is_cloud)
                 self.node_usernames.append(username)
                 print "Nodes are:"
                 for i in range(len(self.node_ip_address)):
@@ -190,44 +191,44 @@ class OFSTestConfigMenu(OFSTestConfig):
 
     def setConfig(self,kwargs={}):
         print "Welcome to OrangeFS Testing"
-        self.using_ec2 = self.yes_no_prompt(prompt="Will you be using an EC2/OpenStack connection?")
+        self.using_cloud = self.yes_no_prompt(prompt="Will you be using an Cloud/OpenStack connection?")
 
 
-        if self.using_ec2 == True:
+        if self.using_cloud == True:
 
             rc = -1
             
-            self.ec2rc_sh = self.filepath_prompt(prompt="Please enter the location of the ec2rc.sh file:",validate=True)
+            self.cloud_config = self.filepath_prompt(prompt="Please enter the location of the cloudrc.sh file:",validate=True)
             
-            self.ssh_key_filepath = self.filepath_prompt(prompt="Please enter the location of the ssh key for EC2 instances:",validate=True)
+            self.ssh_key_filepath = self.filepath_prompt(prompt="Please enter the location of the ssh key for Cloud instances:",validate=True)
             
-            self.ec2_key_name = self.string_prompt(prompt="Please enter the name of the EC2 key:")
+            self.cloud_key_name = self.string_prompt(prompt="Please enter the name of the Cloud key:")
          
-           # my_node_manager.addEC2Connection(ec2rc_sh,keyname,keyfile)
+           # my_node_manager.addCloudConnection(cloud_config,keyname,keyfile)
                 
-            # need to get system and machine types from EC2 here.
+            # need to get system and machine types from Cloud here.
             
-            new_instances = self.yes_no_prompt(prompt="Would you like to create new EC2 instances?")
+            new_instances = self.yes_no_prompt(prompt="Would you like to create new Cloud instances?")
             
             if new_instances:
             
-                self.number_new_ec2_nodes = self.int_prompt(prompt="How many EC2 instances would you like?")
-                self.ec2_image = self.string_prompt(prompt="Which image would you like to use?",default="cloud-ubuntu-12.04")
-                self.ec2_machine = self.string_prompt(prompt="Which machine type would you like to use?",default="c1.small")
+                self.number_new_cloud_nodes = self.int_prompt(prompt="How many Cloud instances would you like?")
+                self.cloud_image = self.string_prompt(prompt="Which image would you like to use?",default="cloud-ubuntu-12.04")
+                self.cloud_machine = self.string_prompt(prompt="Which machine type would you like to use?",default="c1.small")
             
-                #nodes  = my_node_manager.createNewEC2Nodes(number_nodes,image,machine)
+                #nodes  = my_node_manager.createNewCloudNodes(number_nodes,image,machine)
             
             else:
-                self.add_remote_nodes(keyfile=self.ssh_key_filepath,is_ec2=True)
+                self.add_remote_nodes(keyfile=self.ssh_key_filepath,is_cloud=True)
                 
             
 
                 
-            self.ec2_delete_after_test = self.yes_no_prompt("Would you like to delete the nodes after tests are complete?")
+            self.cloud_delete_after_test = self.yes_no_prompt("Would you like to delete the nodes after tests are complete?")
 
         else:
             self.ssh_key_filepath = self.filepath_prompt(prompt="Please enter the location of the ssh key for remote machines:",validate=True)
-            self.add_remote_nodes(keyfile=self.ssh_key_filepath,is_ec2=False)    
+            self.add_remote_nodes(keyfile=self.ssh_key_filepath,is_cloud=False)    
             print "NOTICE: Before running tests, be sure test machines are updated and have all required software installed:"
             
         self.ofs_resource_location = self.string_prompt("Please provide the location of the OrangeFS source tree or tarball:")

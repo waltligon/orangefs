@@ -1,6 +1,7 @@
-###############################################################################################'
+#!/usr/bin/python
+##
 #
-# class OFSTestLocalNode(OFSTestNode)
+# @class OFSTestLocalNode 
 #
 #
 # This class is for the local machine. 
@@ -14,9 +15,6 @@
 # This programs assumes that the OFSTestNode is a *nix machine operating a bash shell. 
 # MacOSX functionality may be limited. Windows local nodes are not currently supported.
 #
-#
-#
-################################################################################################
 
 import OFSTestNode
 import os
@@ -29,21 +27,36 @@ import xml.etree.ElementTree as ET
 
 class OFSTestLocalNode(OFSTestNode.OFSTestNode):
 
+    
 
     def __init__(self):
         print "-----------------------------------------------------------"    
         super(OFSTestLocalNode,self).__init__()
         
-        # Local nodes are neither remote nor EC2
+        ## @var is_remote
+        # Local nodes are neither remote nor Cloud
         self.is_remote = False
-        self.is_ec2 = False
+        ## @var is_cloud
+        # Is this node an cloud node? Always false, even if it's true.
+        self.is_cloud = False
+        ## @var ip_address
+        # set to local host
         self.ip_address = "127.0.0.1"
+        ## @var current_user 
+        # Current logged in user.
         self.current_user = self.runSingleCommandBacktick("whoami")
         #print self.current_user
         self.currentNodeInformation()
         print "Local machine"
         print "-----------------------------------------------------------"    
-      
+
+    ##       
+    # @fn currentNodeInformation(self):
+    #
+    # Gets the current node information, including external ip address.
+    # 
+    # @param self The object pointer
+    
     def currentNodeInformation(self):
         
         super(OFSTestLocalNode,self).currentNodeInformation()
@@ -55,15 +68,23 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         
 
-      #==========================================================================
-      # 
-      # Utility functions
-      #
-      # These functions implement basic functionality to operate the node
-      #
-      #==========================================================================
+    #==========================================================================
+    # 
+    # Utility functions
+    #
+    # These functions implement basic functionality to operate the node
+    #
+    #==========================================================================
+    
+    ##       
+    # @fn runAllBatchCommands(self,output=[]):
+    #
+    # Writes stored batch commands to a file, then runs them.
+    # 
+    # @param self The object pointer
+    # @param output Output of command
      
-    def runAllBatchCommands(self):
+    def runAllBatchCommands(self,output=[]):
      
         
         # Open file with mode 700
@@ -72,7 +93,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         script_file.write("#!/bin/bash\n")
         
         for element in self.current_environment:
-          script_file.write("export %s=%s\n" % (element, self.current_environment[element]))
+            script_file.write("export %s=%s\n" % (element, self.current_environment[element]))
         
         # change to current directory
         script_file.write("cd %s\n" % self.current_directory)
@@ -84,8 +105,8 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         # command
         for command in self.batch_commands:
-          script_file.write(command)
-          script_file.write('\n');
+            script_file.write(command)
+            script_file.write('\n');
         
         #error checking: Did command run correctly?
         #script_file.write("if [ $? -ne 0 ]\n")
@@ -104,7 +125,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
         del output[:]
-        output.append(command_line)
+        output.append(command)
         for i in p.communicate():
             output.append(i)
         
@@ -114,7 +135,21 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
 
         return p.returncode
         
-      
+    ##       
+    # @fn prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
+    #
+    # Formats the command line to run on this specific type of node with appropriate environment.
+    # 
+    # @param self The object pointer
+    # @param command Shell command to be run.
+    # @param outfile File to redirect stdout to.
+    # @param append_out Append outfile or overwrite?
+    # @param errfile File to redirect stderr to.
+    # @param append_err Append errfile or overwrite?
+    # @param remote_user Run command as this user
+    #
+    # @return String Formatted command line.
+
       
       
     def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
@@ -124,7 +159,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         if outfile != "":
             if append_out == True:
-                 outdirect = " >> "+outfile
+                outdirect = " >> "+outfile
             else:
                 outdirect = " >" + outfile
         
@@ -138,6 +173,10 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         if remote_user == None:
             remote_user = self.current_user
+        elif remote_user == "root":
+            # Really dumb idea to run commands as root on localhost. Easy way to mess up machine. 
+            print "You want to run this as root on localhost? I'm sorry, Dave, I'm afraid I can't do that."
+            remote_user = self.current_user
         
         #start with the ssh command and open quote
         command_chunks = ["/bin/bash -c \""]
@@ -146,7 +185,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         command_chunks.append("cd %s; " % self.current_directory)
         #now append each variable followed by a space
         for variable in self.current_environment:
-          command_chunks.append("%s=%s; " % (variable,self.current_environment[variable]))
+            command_chunks.append("%s=%s; " % (variable,self.current_environment[variable]))
         #now append the command
         command_chunks.append(command)
         command_chunks.append("\"")
@@ -156,22 +195,33 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         
         #Command chunks has the entire command, but not the way python likes it. Join the chunks into one string
         command_line = ''.join(command_chunks)
-        #print command_line
-        # now use shlex to get the right list for python
-        #return shlex.split(command_line)
+
         return command_line
-        
+
+    ##
+    #
+    # @fn copyToRemoteNode(self, source, destination_node, destination, recursive=False):
+    #
+    # This copies files from this node to the remote node via rsync.
+    #
+    # @param self The object pointer
+    # @param source Source file or directory
+    # @param destination_node Node to which files should be copied
+    # @param destination Destination file or directory on remote node.
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
     
-    def copyToRemoteNode(self, source, destinationNode, destination, recursive=False):
+    def copyToRemoteNode(self, source, destination_node, destination, recursive=False):
         # This runs the copy command remotely 
         rflag = ""
         # verify source file exists
         if recursive == True:
-          rflag = "-a "
+            rflag = "-a "
         else:
-          rflag = ""
+            rflag = ""
           
-        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destinationNode.ext_ip_address),source,destinationNode.current_user,destinationNode.ext_ip_address,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destination_node.ext_ip_address),source,destination_node.current_user,destination_node.ext_ip_address,destination)
         
         output = []
         rc = self.runSingleCommand(rsync_command,output)
@@ -179,15 +229,30 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             print "Could not copy to remote node"
             print output
         return rc
+    
+    ##
+    #
+    # @fn copyFromRemoteNode(self, source_node, source, destination, recursive=False):
+    #
+    # This copies files from the remote node to this node via rsync.
+    #
+    # @param self The object pointer
+    # @param source_node Node from which files should be copied
+    # @param source Source file or directory on remote node.
+    # @param destination Destination file or directory
+    # @param recursive Copy recursively?
+    #
+    # @return Return code of copy command.
+    
       
     def copyFromRemoteNode(self, source_node, source, destination, recursive=False):
         # This runs the copy command remotely 
         rflag = ""
         # verify source file exists
         if recursive == True:
-          rflag = "-a"
+            rflag = "-a"
         else:
-          rflag = ""
+            rflag = ""
           
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
         
@@ -198,6 +263,15 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             print output
         return rc
     
+    ##
+    # @fn def getAliasesFromConfigFile(self,config_file_name):
+    #
+    # Reads the OrangeFS alias from the configuration file.
+    #
+    # @param self The object pointer
+    # @param config_file_name Full path to the configuration file. (Usually orangefs.conf) 
+    #
+    # @return list of alias names
     def getAliasesFromConfigFile(self,config_file_name):
         
         #print "Examining "+config_file_name

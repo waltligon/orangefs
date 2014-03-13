@@ -5,6 +5,7 @@
 from OFSTest import OFSTestMain
 from OFSTest import OFSTestConfigMenu
 from OFSTest import OFSTestConfigFile
+from OFSTest import OFSTestConfig
 import sys
 import getopt
 import os, errno
@@ -32,9 +33,9 @@ for o, a  in optlist:
         output_dir = a
     if o == "-f":
         config_file = a
-	if o == "-h":
-		print "start_test -f <path to config file> -d <output directory> config1=value1 config2=value2...configN=valueN"
-		exit()
+    if o == "-h":
+        print "start_test -f <path to config file> -d <output directory> config1=value1 config2=value2...configN=valueN"
+        exit()
 
 # Convert arguments to a dictionary
 #argd = dict([my_arg.split('=') for my_arg in args])

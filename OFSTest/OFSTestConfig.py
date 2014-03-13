@@ -1,104 +1,103 @@
 #!/usr/bin/python
 
-###############################################################################
+##
 #
-# OFSTestConfig
+# @class OFSTestConfig
 # 
-# This class holds the configuration for OrangeFS
+# @brief This class holds the configuration for OrangeFS
 #
-################################################################################
-
-
-
-###############################################################################################'
+# These variables in this class control the configuration of OFSTest. OFSTest can 
+# setup an instance of OrangeFS on any real or virtual cluster with 
+# passwordless ssh access for one user and passwordless sudo access for
+# that user. 
 #
-# class OFSTestNode(object)
-#
-# OrangeFS is a complex file system with a wide variety of functionality that
-# can run on many different systems in many different configurations. This
-# class holds the variables that control OrangeFS setup and testing
-# 
-################################################################################################
+
+from pprint import pprint
+
 
 class OFSTestConfig(object):
     
-    #------------------------------------------------------------------
-    #
-    # setup variables
-    #
-    #
-    # These variables control the configuration of OFSTest. OFSTest can 
-    # setup an instance of OrangeFS on any real or virtual cluster with 
-    # passwordless ssh access for one user and passwordless sudo access for
-    # that user. 
-    #
-    #------------------------------------------------------------------
     
     
     def __init__(self):
         
-    
+        ## @var log_file
         # name of output logfile
         self.log_file = "OFSTest.log"
         
         #------------------------------
         #
-        # node control/ec2 variables
+        # node control/cloud variables
         #
         #------------------------------
        
-        # are we using OpenStack/EC2
-        self.using_ec2 = False
+        ## @var using_cloud
+        # Are we using OpenStack/Cloud?
+        self.using_cloud = False
         
-        # Location of the ec2rc.sh file
-        self.ec2rc_sh = ""
+        ## @var cloud_config
+        # Location of the ec2rc.sh/openstack.sh file
+        self.cloud_config = ""
         
-        # path of ssh key used to access all nodes
+        ## @var ssh_key_filepath
+        # Path of ssh key used to access all nodes
         self.ssh_key_filepath = ""
         
-        # list of differing keypaths if applicable
-        # TODO: Add multikey functionality.
+        ## @var ssh_key_filepaths 
+        # List of differing keypaths, if applicable
         self.ssh_key_filepaths = []
         
-        # Internal ec2 key name. Must be consistant accross nodes.
-        self.ec2_key_name = ""
+        ## @var cloud_key_name
+        # Internal cloud key name. Must be consistant accross nodes.
+        self.cloud_key_name = ""
         
-        # Number of new ec2 nodes to be created. 
+        ## @var number_new_cloud_nodes
+        # Number of new cloud nodes to be created. 
         # If == 0, then using existing nodes.
-        self.number_new_ec2_nodes = 0
+        self.number_new_cloud_nodes = 0
         
-        # Image name to be launched for ec2 instance.
+        ## @var cloud_image
+        # Image name to be launched for cloud instance.
         # Must be consistant across nodes.
-        self.ec2_image = ""
+        self.cloud_image = ""
         
-        # ec2 machine type (e.g. m1.medium)
+        ## @var cloud_machine
+        # cloud machine type (e.g. m1.medium)
         # Must be consistant across nodes.
-        self.ec2_machine = ""
+        self.cloud_machine = ""
         
+        ## @var cloud_delete_after_test
         # Should the nodes be deleted after testing?
-        self.ec2_delete_after_test = False
+        self.cloud_delete_after_test = False
         
-        # EC2 domain
-        self.ec2_domain=None
+        ## @var cloud_domain
+        # Cloud domain
+        self.cloud_domain=None
         
-        # Associate external ip address with EC2 nodes.
-        self.ec2_associate_ip=False
+        ## @var cloud_associate_ip
+        # Associate external ip address with Cloud nodes?
+        self.cloud_associate_ip=False
         
-        # list of node ip addresses. If a private network is used, this is the
+        ## @var node_ip_addresses
+        # List of node ip addresses. If a private network is used, this is the
         # Internal network.
         self.node_ip_addresses = []
         
-        # list of addresses accessible from the local machine.
+        ## @var node_ext_ip_addresses
+        # List of addresses accessible from the local machine.
         # if node_ip_addresses is accessible, this need not be set.
         self.node_ext_ip_addresses = []
         
-        # single username to access all nodes
-        self.node_username = "ec2-user"
+        ## @var node_username
+        # Single username to access all nodes
+        self.node_username = "cloud-user"
         
+        ## @var node_usernames
         # usernames for login of individual nodes, if necessary
         self.node_usernames = []
         
-        # no longer needed
+        ## @var ofs_fs_name
+        # Name of OrangeFS filesystem service in URL. No longer needed
         self.ofs_fs_name=None
         
         #------------------------------
@@ -107,13 +106,15 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
+        ## @var ofs_resource_location
         # location of OrangeFS source
         self.ofs_resource_location = ""
         
+        ## @var ofs_resource_type
         # What package is the OrangeFS source? SVN, TAR, Local Dir, Node? 
         self.ofs_resource_type = ""
         
-        
+        ## @var pvfs2genconfig_opts
         # Additional options for pvfs2genconfig to generate Orangefs.conf file
         self.pvfs2genconfig_opts = ""
         
@@ -123,40 +124,64 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
-        # --enable-fuse
+        ## @var install_fuse
+        # Build Fuse module
         self.install_fuse=False
             
-        # --prefix=
-        self.install_prefix = None
+        ## @var install_prefix
+        # Where to install OrangeFS.
+        self.install_prefix = "/opt/orangefs"
         
-        # --with-db=
+        ## @var db4_prefix
+        # Location of DB4
         self.db4_prefix = "/opt/db4"
 
-        # add --with-kernel option
+        ## @var install_OFS_client
+        # Install the OrangeFS client and add --with-kernel option
         self.install_OFS_client = True
 
-        # add --enable=shared
+        ## @var install_shared
+        # --enable-shared flag
         self.install_shared = False
         
-        # --enable-strict
+        ## @var enable_strict
+        # --enable-strict flag
         self.enable_strict = True
         
-        # disable security. Options are "Key" and "Cert"
+        ## @var ofs_security_mode
+        # Security Mode. Default is None. Options are "Key" and "Cert"
         self.ofs_security_mode = None
         
-        # build the kernel module?
+        ## @var ofs_build_kmod
+        # Build the kernel module?
         self.ofs_build_kmod = True
         
-        # compile with -g debugging option?
+        ## @var ofs_compile_debug
+        # Compile with -g debugging option?
         self.ofs_compile_debug = True
 
-        # list of patches to patch OrangeFS source
+        ## @var ofs_patch_files
+        # List of patches to patch OrangeFS source
         self.ofs_patch_files=[]
         
-        # username of svn user. Allows checkout instead of export
+        ## @var svn_username
+        # Username of svn user. Allows checkout instead of export
         self.svn_username = None
+        
+        ## @var svn_password
+        # Password of svn user. Allows checkout instead of export
+        self.svn_password = None
 
+        
+        ## @var svn_options
+        # Additional options for SVN
+        self.svn_options = None
+
+        ## @var install_hadoop
+        # Enable OrangeFS hadoop support
+        self.install_hadoop = False
+
+        ## @var configure_opts
         # Additional options for configure
         self.configure_opts = ""
 
@@ -166,23 +191,28 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
+        ## @var mount_OFS_after_setup
         # Mount the filesystem after setup
         self.mount_OFS_after_setup = True
         
+        ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
         self.ofs_mount_as_fuse = False
         
+        ## @var install_tests
         # Install OrangeFS tests
         self.install_tests = True
         
+        ## @var install_OFS_server
         # Install and start the OrangeFS server software
         self.install_OFS_server = True
         
+        ## @var install_MPI
         # Install MPI software, including Torque
         self.install_MPI = False
         
-        # Additional installation option
+        ## @var install_opts
+        # Additional installation options
         self.install_opts = ""
         
         
@@ -192,29 +222,39 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
-        
+        ## @var ofs_extra_tests_location
         # location of suite of testing benchmarks
         self.ofs_extra_tests_location = None
         
+        ## @var ofs_pvfs2tab_file
         # location of PVFS2TAB_FILE. Mountpoint will be read from file
         self.ofs_pvfs2tab_file = None
         
+        ## @var ofs_source_location
         # location of orangefs on the main node
         self.ofs_source_location = None
         
+        ## @var ofs_config_file
         #Location of OrangeFS.conf file
         self.ofs_config_file = None
         
+        ## @var delete_existing_data
         # Delete data on OrangeFS partition
         self.delete_existing_data = False
         
+        ## @var ofs_mount_point
         # OrangeFS mount point
         self.ofs_mount_point = None
         
+        ## @var ofs_host_name_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
-        # a bug on some ec2 setups.
+        # a bug on some cloud setups.
         self.ofs_host_name_override = []
+        
+        ## @var start_client_on_all_nodes
+        # Start the OrangeFS client on all nodes after installation?
+        self.start_client_on_all_nodes = False
         
         
         #------------------------------
@@ -223,37 +263,67 @@ class OFSTestConfig(object):
         #
         #------------------------------
         
+        ## @var run_sysint_tests
+        # Run the system integration tests?
         self.run_sysint_tests = False
+        
+        ## @var run_usrint_tests
+        # Run the user integration library tests?
         self.run_usrint_tests = False
+        
+        ## @var run_vfs_tests
+        # Run the kernel module vfs tests?
         self.run_vfs_tests = False
+        
+        ## @var run_fuse_tests
+        # Run the fuse vfs tests?
         self.run_fuse_tests = False
+        
+        ## @var run_mpi_tests
+        # Run OrangeFS ROM-IO tests.
         self.run_mpi_tests = False
         
+        ## @var run_hadoop_tests
+        # Run OrangeFS Hadoop tests
+        self.run_hadoop_tests = False
+        
+        ## @var cloud_subnet
+        # cloud subnet ID for primary network interface
+        #self.cloud_subnet=None
+        #TODO: Remove hardcoded definition. 
+        self.cloud_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
+        
+        self.cloud_type = 'EC2'
+        self.nova_password_file=None
         
     
-    #------------------------------------------------------------------
+    ##
     #
-    # setConfig
-    #
+    # @fn setConfig(self,kwargs={}):
     #
     # A universal method for setting the initial configuration. Overridden
     # in subclasses
     #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param kwargs Argument list with keywords.
+    
+    
 
     
     def setConfig(self,kwargs={}):
         pass
         
-    #------------------------------------------------------------------
+    ##
     #
-    # addConfig
+    # @fn addConfig(self,str_args=[]):
     #
     #
-    # This method can "override" existing values as specified in str_args
-    # str_args are an array of variable=value strings.
+    # This method can "override" existing values as specified in str_args. 
+    # This was implemented to add support for command line override of config files.
     #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param str_args An array of variable=value strings.
+    
 
     
     def addConfig(self,str_args=[]):
@@ -286,29 +356,30 @@ class OFSTestConfig(object):
         
         self.setConfigFromDict(d)
         
-    #------------------------------------------------------------------
+    ##
     #
-    # printDict
-    #
+    # @fn printDict(self):
     #
     # This prints all the setup variables. Used for debugging.
-    #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # 
 
     
     def printDict(self):
-        print self.__dict__
+        pprint(self.__dict__)
 
 
-    #------------------------------------------------------------------
+    ##
     #
-    # setConfigFromDict
-    #
+    # @fn setConfigFromDict(self,d={}):
     #
     # This method takes a formatted dictionary d and converts the values
-    # into the variables of this class.
+    # into the variables of this class. Every new variable added above will
+    # need an entry here.
     #
-    #------------------------------------------------------------------
+    # @param self The object pointer
+    # @param d Dictionary with varible names and values.
+    
     
     
     
@@ -318,40 +389,40 @@ class OFSTestConfig(object):
         if temp != None:
             self.log_file = temp
         
-        temp = d.get('using_ec2')
+        temp = d.get('using_cloud')
         if temp != None:
-            self.using_ec2 = temp
+            self.using_cloud = temp
         
-        temp = d.get('ec2rc_sh')
+        temp = d.get('cloud_config')
         if temp != None:
-            self.ec2rc_sh = temp
+            self.cloud_config = temp
         
         temp = d.get('ssh_key_filepath')
         if temp != None:
             self.ssh_key_filepath = temp
 
-        temp = d.get('ec2_key_name')
+        temp = d.get('cloud_key_name')
         if temp != None:
-            self.ec2_key_name = temp
+            self.cloud_key_name = temp
         
-        temp = d.get('number_new_ec2_nodes')
+        temp = d.get('number_new_cloud_nodes')
         if temp != None:
-            self.number_new_ec2_nodes = temp
+            self.number_new_cloud_nodes = temp
         # sanity check
-        if self.number_new_ec2_nodes > 0:
-            self.using_ec2 = True
+        if self.number_new_cloud_nodes > 0:
+            self.using_cloud = True
 
-        temp = d.get('ec2_image')
+        temp = d.get('cloud_image')
         if temp != None:
-            self.ec2_image = temp
+            self.cloud_image = temp
 
-        temp = d.get('ec2_machine')
+        temp = d.get('cloud_machine')
         if temp != None:
-            self.ec2_machine = temp
+            self.cloud_machine = temp
             
-        temp = d.get('ec2_delete_after_test')
+        temp = d.get('cloud_delete_after_test')
         if temp != None:
-            self.ec2_delete_after_test = temp
+            self.cloud_delete_after_test = temp
         
         temp = d.get('node_ip_addresses')
         if temp != None:
@@ -421,6 +492,10 @@ class OFSTestConfig(object):
         temp = d.get('run_usrint_tests')
         if temp != None:
             self.run_usrint_tests = temp
+        
+        temp = d.get('run_hadoop_tests')
+        if temp != None:
+            self.run_hadoop_tests = temp
             
         temp = d.get('ofs_fs_name')
         if temp != None:
@@ -439,12 +514,12 @@ class OFSTestConfig(object):
         if temp != None:
             self.run_fuse_tests = temp
 
-        temp = d.get('ec2_domain')
+        temp = d.get('cloud_domain')
         if temp != None:
-            self.ec2_domain = temp
-        temp = d.get('ec2_associate_ip')
+            self.cloud_domain = temp
+        temp = d.get('cloud_associate_ip')
         if temp != None:
-            self.ec2_associate_ip = temp
+            self.cloud_associate_ip = temp
 
         temp = d.get('ofs_mount_as_fuse')
         if temp != None:
@@ -477,6 +552,10 @@ class OFSTestConfig(object):
         temp = d.get('install_MPI')
         if temp != None:
             self.install_MPI = temp
+        
+        temp = d.get('install_hadoop')
+        if temp != None:
+            self.install_hadoop = temp
             
                 # --enable-fuse
         temp = d.get('install_fuse')
@@ -545,11 +624,32 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_mount_point = temp
         
+        temp = d.get('start_client_on_all_nodes')
+        if temp != None:
+            self.start_client_on_all_nodes = temp
         
+        temp = d.get('cloud_subnet')
+        if temp != None:
+            self.cloud_subnet = temp
+
+        temp = d.get('svn_password')
+        if temp != None:
+            self.svn_password = temp
+
+        temp = d.get('svn_username')
+        if temp != None:
+            self.svn_username = temp
+
+        temp = d.get('svn_options')
+        if temp != None:
+            self.svn_options = temp
         
+        temp = d.get('cloud_type')
+        if temp != None:
+            self.cloud_type = temp
         
-        
-        
-        
+        temp = d.get('nova_password_file')
+        if temp != None:
+            self.nova_password_file = temp
         
         

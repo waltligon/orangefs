@@ -1,10 +1,49 @@
 #!/usr/bin/python
-import OFSTestNode
+##
+#
+# @namespace OFSSysintTest
+#
+# @brief This class implements system integration tests to be run on the virtual file system.
+#
+#
+# @var  header 
+# Name of header printed in output file
+# @var  prefix  
+# Name of prefix for test name
+# @var  run_client  
+# False
+# @var  mount_fs  
+# Does the file system need to be mounted?
+# @var  mount_as_fuse
+# Do we mount it via fuse?
+# @var  tests  
+# List of test functions (at end of file)
 
+header = "OFS Sysint Test"
+prefix = "sysint"
+mount_fs =  False
+run_client = True
+mount_as_fuse = False
 
+##
+#
+# @fn cp(testing_node,output=[]):
+#
+#	This uses pvfs2_cp to copy file to OrangeFS mountpoint and back. 
+#   Copied file should be the same as the original.
+#
+#   pvfs2_cp is run with a series of argument combinations.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
 
 def cp(testing_node,output=[]):
 
+    # interior function that actually does the copying.
     def copy_test_pvt(testing_node,source,destination,local,args,output=[]):
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args)
         testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args),output)
@@ -28,6 +67,19 @@ def cp(testing_node,output=[]):
     
     return rc
     
+##
+#
+# @fn misc(testing_node,output=[]):
+#
+#	This tests a variety of pvfs2 utilities.
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+
 
 
 def misc(testing_node,output=[]):
@@ -57,6 +109,7 @@ def misc(testing_node,output=[]):
         #    print "pvfs2-chmod failed with code %d" % rc
         #    return 1
         #else:
+        # Meh, let's just pass it anyway. I shhould fix this.
         return 0
 
     def fsck(testing_node,output=[]):
@@ -115,7 +168,7 @@ def misc(testing_node,output=[]):
         rc = testing_node.runSingleCommand('%s/bin/pvfs2-statfs -m %s' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
         return rc
 
-    
+    # Add up the return codes of the interior functions and return it.
     rc = 0
     rc += touch(testing_node,output)
     rc += chown(testing_node,output)
@@ -137,11 +190,47 @@ def misc(testing_node,output=[]):
     rc += statfs(testing_node,output)
     return rc
 
+##
+#
+# @fn  mkdir_sysint(testing_node,output=[]):
+#
+#   This runs the test-mkdir utility
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
+    
+
 def mkdir_sysint(testing_node,output=[]):
-    #note update test programs to remove old directories first!
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    
+    # Note: Update test programs to remove old directories first!
+    #
+    # Note: There is a known issue with test-mkdir that causes it to fail. This
+    # is not a problem with OrangeFS.
+    
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+##
+#
+# @fn  ping(testing_node,output=[]):
+#
+#   This runs the pvfs2-ping utility
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
 
 def ping(testing_node,output=[]):
     
@@ -149,13 +238,46 @@ def ping(testing_node,output=[]):
     #print "RC = %d" % rc
     return rc
 
+##
+#
+# @fn  symlink_sysint(testing_node,output=[]):
+#
+#   This runs the test-symlink-perms utility
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#
+    
+
 def symlink_sysint(testing_node,output=[]):
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.host_name,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    
+    # Note: There is a known issue with test-mkdir that causes it to fail. This
+    # is not a problem with OrangeFS.
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
+
+##
+#
+# @fn  zerofill(testing_node,output=[]):
+#
+#   This runs the test-zero-fill utility
+#
+# @param testing_node OFSTestNode on which tests are run.
+# @param output Array that holds output from commands. Passed by reference. 
+#   
+# @return 0 Test ran successfully
+# @return Not 0 Test failed
+#
+#    
 
 def zerofill(testing_node,output=[]):
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
-tests = [ cp,misc,mkdir_sysint,ping,symlink_sysint,zerofill]
+tests = [ ping,cp,misc,zerofill,mkdir_sysint,symlink_sysint]
+
