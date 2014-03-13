@@ -111,7 +111,6 @@ static int get_groupname_by_gid(gid_t gid, char *groupname)
     }
     strcpy(groupname, groupp->gr_name);
     return 0;
-
 }
 
 static int get_username_by_uid(uid_t uid, char *username)
