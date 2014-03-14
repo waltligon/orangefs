@@ -3,15 +3,13 @@ OrangeFS Release ChangeLog
 -----------------------
 
 orangefs-2.8.8 (Subversion Tag v.2.8.8)
-* - 
-* - Updated kernel module to work with kernel versions up to 3.11
-* - Updated pvfs2-touch to respect umask
-* - Improved multi-fabric BMI support
-* - Fixed problem with FUSE readdir code.
+http://www.orangefs.org/svn/orangefs/tags/v.2.8.8
 
-Up to Rev 10730
+Up to Subversion Rev 10730
 
-* - JNI Layer:  Removed classes that are no longer used and minor bug fixes
+* - JNI Layer:  
+* -   Removed classes that are no longer used.
+* -   Minor bug fixes.
 * - USRINT libraries: 
 * -    Files created with a zero mode can now be truncated.
 * -    /dev/shm areas are automatically deleted.               
@@ -20,14 +18,20 @@ Up to Rev 10730
 * -    If interrupt occurs while issuing a pvfs2-getattr, EAGAIN is returned
 * -       instead of marking the inode bad.
 * - Admin Apps:
-* -    pvfs2-write allows users to run I/O tests without reading from local
-* -       disk.
+* -    pvfs2-write: allows users to run I/O tests without reading from local
+* -                 disk.
 * - Admin Scripts:
 * -    pvfs2-start-all and pvfs2-stop-all:  
 * -       Starts and stops servers.
 * -       Located in the sbin install directory
+* - 
+* - Updated kernel module to work with kernel versions up to 3.11
+* - Updated pvfs2-touch to respect umask
+* - Improved multi-fabric BMI support
+* - Fixed problem with FUSE readdir code.
 
-Rev 10349
+
+Up to Subversion Rev 10349
 
 * - Fixed bug in iocommon_open where the variable directory 
 *   was used instead of the argument path before calling iocommon_expand_path

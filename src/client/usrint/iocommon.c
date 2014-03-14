@@ -865,6 +865,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     char *directory = NULL;
     char *filename = NULL;
     char error_path[PVFS_NAME_MAX];
+    int defer_bits = 0; /* used when creating a file */
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
@@ -1133,6 +1134,20 @@ createfile:
     /* Now create the file relative to the directory */
     errno = orig_errno;
     errno = 0;
+    /* see if the mode provides bits allowing the user to access the
+     * file - it might not in some situations and we want to set those
+     * bits on until this fd is closed.
+     */
+    if ((((flags & O_RDONLY) || (flags & O_RDWR))) && !(mode & S_IRUSR))
+    {
+        defer_bits |= S_IRUSR;
+        mode |= S_IRUSR;
+    }
+    if (((flags & O_WRONLY) || (flags & O_RDWR)) && !(mode & S_IWUSR))
+    {
+        defer_bits |= S_IWUSR;
+        mode |= S_IWUSR;
+    }
     rc = iocommon_create_file(filename,
                               mode,
                               file_creation_param,
@@ -1215,6 +1230,7 @@ finish:
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
     pd->s->mode = attributes_resp.attr.perms; /* this may change */
+    pd->s->mode_deferred = defer_bits; /* save these until close */
 
     if (attributes_resp.attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -1303,7 +1319,7 @@ cleanup:
  * Implementation of truncate via PVFS
  *
  */
-int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
+int iocommon_truncate(pvfs_descriptor *pd, off64_t length)
 {
     int rc = 0;
     int orig_errno = errno;
@@ -1312,7 +1328,7 @@ int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
     PVFS_INIT(pvfs_sys_init);
     iocommon_cred(&credentials);
     errno = 0;
-    rc =  PVFS_sys_truncate(file_ref, length, credentials, NULL);
+    rc =  PVFS_sys_truncate(pd->s->pvfs_ref, length, credentials, NULL);
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:

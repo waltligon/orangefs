@@ -139,8 +139,7 @@ extern pvfs_descriptor *iocommon_open(const char *pathname, int flag,
                                mode_t file_permission,
                                pvfs_descriptor *pdir);
 
-extern int iocommon_truncate(PVFS_object_ref file_ref,
-                      off64_t length);
+extern int iocommon_truncate(pvfs_descriptor *pd, off64_t length);
 
 extern off64_t iocommon_lseek(pvfs_descriptor *pd,
                        off64_t offset,

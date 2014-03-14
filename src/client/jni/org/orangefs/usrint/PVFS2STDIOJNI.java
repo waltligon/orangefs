@@ -122,7 +122,7 @@ public class PVFS2STDIOJNI {
 
     public native int getcUnlocked(long stream);
 
-    public native ArrayList getEntriesInDir(String path);
+    public native ArrayList<String> getEntriesInDir(String path);
 
     public native String[] getUsernameGroupname(int uid, int gid);
 
