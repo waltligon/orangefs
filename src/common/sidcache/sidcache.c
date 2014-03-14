@@ -32,17 +32,30 @@ static int sids_in_cache = 0;
 
 
 /* Global database variables */
-DB *SID_db;                         /* Primary database (sid cache) */
-DB_ENV *SID_envp;                   /* Env for sid cache and secondary dbs */
+DB *SID_db = NULL;                  /* Primary database (sid cache) */
+DB_ENV *SID_envp = NULL;            /* Env for sid cache and secondary dbs */
 DB *SID_attr_index[SID_NUM_ATTR];   /* Array of secondary databases */
 DBC *SID_attr_cursor[SID_NUM_ATTR]; /* Array of secondary database cursors */
-DB_TXN *SID_txn;                    /* Main transaction variable */
+DB_TXN *SID_txn = NULL;             /* Main transaction variable */
                                     /* (transactions are currently not used */
                                     /*     with the sid cache) */
-DB  *SID_type_db;                   /* secondary db for server type */
-DBC *SID_type_cursor;               /* cursor for server type db */
-DB  *SID_type_sid_index;            /* index on sid for server type db */
-DBC *SID_type_sid_cursor;           /* cursor for server type sid index */
+DB  *SID_type_db = NULL;            /* secondary db for server type */
+DBC *SID_type_cursor = NULL;        /* cursor for server type db */
+DB  *SID_type_index = NULL;         /* index on sid for server type db */
+DBC *SID_index_cursor = NULL;       /* cursor for server type sid index */
+
+/* THese are the key structures for the type db */
+typedef struct SID_type_db_key_s
+{
+    uint32_t typeval;
+    PVFS_SID sid;
+} SID_type_db_key;
+
+typedef struct SID_type_index_key_s
+{
+    PVFS_SID sid;
+    uint32_t typeval;
+} SID_type_index_key;
 
 
 /* <========================= STATIC FUNCTIONS ============================> */
@@ -173,18 +186,18 @@ uint32_t SID_string_to_type(const char *typestring)
         return SID_SERVER_NULL;
     }
 
-    len = strnlen(typestring, MAX_TYPE_STR + 1);
+    len = strnlen(typestring, MAX_TYPE_STR) + 1;
 
-    if (len > MAX_TYPE_STR)
+    if (len > MAX_TYPE_STR + 1)
     {
         return SID_SERVER_NULL;
     }
 
-    mytype = (char *)malloc(len + 1);
+    mytype = (char *)malloc(len);
 
-    for (i = 0; i < len; i++);
+    for (i = 0; i < len; i++)
     {
-        mytype[i] = toupper(mytype[i]);
+        mytype[i] = toupper(typestring[i]);
     }
     mytype[len] = 0;
 
@@ -498,17 +511,15 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     char *lineptr = linebuff;
     char *saveptr = NULL;
     char *typeword;
-    uint32_t typebuff;
+    SID_type_db_key kbuf;
+
+    kbuf.sid = *sid;
 
     SID_zero_dbt(&type_key, &type_val, NULL);
 
-    type_val.data = (PVFS_SID *)sid; /* this is written to db, not modified */
-    type_val.size = sizeof(PVFS_SID);
-    type_val.ulen = sizeof(PVFS_SID);
-
-    type_key.data = &typebuff;
-    type_key.size = sizeof(uint32_t);
-    type_key.ulen = sizeof(uint32_t);
+    type_key.data = &kbuf;
+    type_key.size = sizeof(SID_type_db_key);
+    type_key.ulen = sizeof(SID_type_db_key);
 
     /* read a line */
     memset(linebuff, 0, TYPELINELEN);
@@ -547,7 +558,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
         /* move lineptr */
 #endif
 
-        if ((typebuff = SID_string_to_type(typeword)))
+        if ((kbuf.typeval = SID_string_to_type(typeword)))
         {
 
             /* insert into type database */
@@ -555,7 +566,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
                                    NULL,
                                    &type_key,
                                    &type_val,
-                                   DB_NODUPDATA);
+                                   0);
             if (!ret)
             {
                 break; /* DB error */
@@ -1000,9 +1011,9 @@ int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
 }
 
 /* Add a type to an existing server in the SIDcache
- * The DB_NODUPDATA flag suppresses and exxtra error message that would
- * occur if attempt to put a dup key/val pair (IOW the exact dame
- * record, not just the same key) wich could happen here.  We still get
+ * The DB_NODUPDATA flag suppresses an extra error message that would
+ * occur if attempt to put a dup key/val pair (IOW the exact same
+ * record, not just the same key) which could happen here.  We still get
  * an error code but we can test for that.
  */
 int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
@@ -1010,18 +1021,22 @@ int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
     int ret = 0;
     DBT type_key;
     DBT type_val;
-    uint32_t type_val_buff;
     uint32_t mask = 0;
+    SID_type_db_key kbuf;
+
+    kbuf.sid = *sid_server;
 
     SID_zero_dbt(&type_key, &type_val, NULL);
 
-    type_val.data = (PVFS_SID *)sid_server;
-    type_val.size = sizeof(PVFS_SID);
-    type_val.ulen = sizeof(PVFS_SID);
+    type_key.data = &kbuf;
+    type_key.size = sizeof(SID_type_db_key);
+    type_key.ulen = sizeof(SID_type_db_key);
 
-    type_key.data = &type_val_buff;
-    type_key.size = sizeof(uint32_t);
-    type_key.ulen = sizeof(uint32_t);
+#if 0
+    type_val.data = &(kbuf.typeval);
+    type_val.size = sizeof(uint32_t);
+    type_val.ulen = sizeof(uint32_t);
+#endif
 
     for(mask = 1; mask != 0 && new_type_val != 0; mask <<= 1)
     {
@@ -1029,12 +1044,12 @@ int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
         {
             if ((mask & SID_SERVER_VALID_TYPES))
             {
-                type_val_buff = mask;
+                kbuf.typeval = mask;
                 ret = SID_type_db->put(SID_type_db,
                                        NULL,
                                        &type_key,
                                        &type_val,
-                                       DB_NODUPDATA);
+                                       0);
                 /* if KEYEXIST it was just a duplicate - keep going */
                 if (!ret && ret != DB_KEYEXIST)
                 {
@@ -1275,20 +1290,18 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
     int ret = 0;
     DBT type_sid_key;
     DBT type_sid_val;
-    uint32_t type_val;
     char *buff;
+    SID_type_index_key kbuf;
+
+    kbuf.sid = *sid;
 
     SID_zero_dbt(&type_sid_key, &type_sid_val, NULL);
 
-    type_sid_key.data = sid;
+    type_sid_key.data = &kbuf;
     type_sid_key.size = sizeof(PVFS_SID);
-    type_sid_key.ulen = sizeof(PVFS_SID);
+    type_sid_key.ulen = sizeof(SID_type_index_key);
 
-    type_sid_val.data = &type_val;
-    type_sid_val.size = sizeof(uint32_t);
-    type_sid_val.ulen = sizeof(uint32_t);
-
-    ret = SID_type_sid_cursor->get(SID_type_sid_cursor,
+    ret = SID_index_cursor->get(SID_index_cursor,
                                    &type_sid_key,
                                    &type_sid_val,
                                    DB_SET);
@@ -1301,9 +1314,11 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
     while(ret == 0)
     {
         /* write type to file */
-        buff = SID_type_to_string(*(uint32_t *)type_sid_val.data);
+        buff = SID_type_to_string(kbuf.typeval);
         fprintf(outpfile, "%s ", buff);
-        ret = SID_type_sid_cursor->get(SID_type_sid_cursor,
+        /* should have been reset by get */
+        type_sid_key.size = sizeof(PVFS_SID);
+        ret = SID_index_cursor->get(SID_index_cursor,
                                        &type_sid_key,
                                        &type_sid_val,
                                        DB_NEXT);
@@ -1630,15 +1645,15 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
  * This function zeros out the DBT's and should be used before any
  * element is placed into the database
  */
-void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey)
+void SID_zero_dbt(DBT *key, DBT *val, DBT *pkey)
 {
     if(key != NULL)
     {
         memset(key, 0, sizeof(DBT));
     }
-    if(data != NULL)
+    if(val != NULL)
     {
-        memset(data, 0, sizeof(DBT));
+        memset(val, 0, sizeof(DBT));
     }
     if(pkey != NULL)
     {
@@ -1847,19 +1862,15 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     int ret = 0;
     DBT type_sid_key;
     DBT type_sid_val;
-    uint32_t type_val_buff;
+    SID_type_index_key kbuf;
 
     SID_zero_dbt(&type_sid_key, &type_sid_val, NULL);
 
-    type_sid_key.data = sid;
+    type_sid_key.data = &kbuf;
     type_sid_key.size = sizeof(PVFS_SID);
-    type_sid_key.ulen = sizeof(PVFS_SID);
+    type_sid_key.ulen = sizeof(SID_type_index_key);
 
-    type_sid_val.data = &type_val_buff;
-    type_sid_val.size = sizeof(uint32_t);
-    type_sid_val.ulen = sizeof(uint32_t);
-
-    ret = SID_type_sid_cursor->get(SID_type_sid_cursor,
+    ret = SID_index_cursor->get(SID_index_cursor,
                                    &type_sid_key,
                                    &type_sid_val,
                                    DB_SET);
@@ -1871,8 +1882,10 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     /* halt on error or DB_NOTFOUND */
     while(ret == 0)
     {
-        *typeval |= type_val_buff;
-        ret = SID_type_sid_cursor->get(SID_type_sid_cursor,
+        *typeval |= kbuf.typeval;
+        /* should have been reset byt get */
+        type_sid_key.size = sizeof(PVFS_SID);
+        ret = SID_index_cursor->get(SID_index_cursor,
                                        &type_sid_key,
                                        &type_sid_val,
                                        DB_NEXT);
@@ -1884,14 +1897,39 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     return 0;
 }
 
+/*-------------------------------------------------------------------
+ * The server type tables map SID to individual types (one bit set in a
+ * field).  There will often be multiple types for a given SID, and many
+ * SIDs with the same type.  We need to be able to look these up by SID,
+ * or by type so we have a main db (SID_type_db) and a secondary index
+ * (SID_type_index) which is associated with the main db.  The main
+ * db cannot be configured with dups, so we will make the key of
+ * these tables type concatenated with SID, which is unique, for the
+ * main db and SID concatenated with type, which is unique, for the
+ * secondary index.  Neither will have anything in the value field.
+ * Using this we can use a partial lookup to either find all types for a
+ * SID, or all SIDs for a type.
+ * ------------------------------------------------------------------
+ */
+
 /* Extractor for type database secondard index */
 static int SID_type_sid_extractor(DB *pri,
                                   const DBT *pkey,
-                                  const DBT *pdata,
+                                  const DBT *pval,
                                   DBT *skey)
 {
-    skey->data = pdata->data;
-    skey->size = pdata->size;
+    SID_type_index_key *sixbuf;
+    SID_type_db_key *dbbuf;
+
+    sixbuf = (SID_type_index_key *)malloc(sizeof(SID_type_index_key));
+    dbbuf = (SID_type_db_key *)pkey->data;
+
+    sixbuf->sid = dbbuf->sid;
+    sixbuf->typeval = dbbuf->typeval;
+
+    skey->data = sixbuf;
+    skey->size = sizeof(SID_type_index_key);
+    skey->flags = DB_DBT_APPMALLOC;
     return 0;
 }
 
@@ -1904,7 +1942,8 @@ static int SID_type_sid_extractor(DB *pri,
 static int SID_create_type_table(void)
 {
     int ret = 0;
-    int flags = 0;
+    u_int32_t flags = DB_CREATE;
+
     /* Create type database */
     ret = db_create(&SID_type_db, /* Database pointer */
                     SID_envp,    /* Environment pointer */
@@ -1916,6 +1955,7 @@ static int SID_create_type_table(void)
         return(ret);
     }
 
+#if 0
     /* Set open flags for type database to allow duplicates */
     ret = SID_type_db->set_flags(SID_type_db, DB_DUPSORT);
     if(ret)
@@ -1924,6 +1964,7 @@ static int SID_create_type_table(void)
                    db_strerror(ret));
         return(ret);
     }
+#endif
 
     /* Open type database */
     ret = SID_type_db->open(SID_type_db,   /* Database pointer */
@@ -1953,7 +1994,7 @@ static int SID_create_type_table(void)
     }
 
     /* Now create a secondary index for looking up types by SID */
-    ret = db_create(&SID_type_sid_index, /* SID index pointer */
+    ret = db_create(&SID_type_index, /* SID index pointer */
                     SID_envp,    /* Environment pointer */
                     0);          /* Create flags (Must be 0 or DB_XA_CREATE) */
     if(ret)
@@ -1963,17 +2004,19 @@ static int SID_create_type_table(void)
         return(ret);
     }
 
+#if 0
     /* Set open flags for type SID index to allow duplicates */
-    ret = SID_type_sid_index->set_flags(SID_type_sid_index, DB_DUPSORT);
+    ret = SID_type_index->set_flags(SID_type_index, DB_DUPSORT);
     if(ret)
     {
         gossip_err("Error setting duplicate flag for type SID index : %s\n",
                    db_strerror(ret));
         return(ret);
     }
+#endif
 
     /* Open type SID index database */
-    ret = SID_type_sid_index->open(SID_type_sid_index,   /* Database pointer */
+    ret = SID_type_index->open(SID_type_index,   /* Database pointer */
                             NULL,     /* Transaction pointer */
                             NULL,     /* On disk file that holds database */
                             NULL,     /* Optional logical database */
@@ -1988,9 +2031,9 @@ static int SID_create_type_table(void)
     }
 
     /* Associate the type database to the type SID index */
-    ret = SID_type_sid_index->associate(SID_type_db, /* Type db ptr */
+    ret = SID_type_index->associate(SID_type_db,   /* Type db ptr */
                          NULL,                     /* TXN id */
-                         SID_type_sid_index,       /* Secondary db ptr */
+                         SID_type_index,           /* Secondary db ptr */
                          SID_type_sid_extractor,   /* key extractor func */
                          0);                       /* Associate flags */
     if(ret)
@@ -2001,9 +2044,9 @@ static int SID_create_type_table(void)
     }
 
     /* Create cursor for type SID index */
-    ret = SID_type_sid_index->cursor(SID_type_sid_index,/* SID index pointer */
+    ret = SID_type_index->cursor(SID_type_index,    /* SID index pointer */
                               NULL,                 /* TXN id */
-                              &SID_type_sid_cursor, /* Cursor pointer */
+                              &SID_index_cursor,    /* Cursor pointer */
                               0);                   /* Cursor opening flags */
     if(ret)
     {
@@ -2455,7 +2498,7 @@ int SID_add(const PVFS_SID *sid,
         return -1;
     }
     /* load up the cval */
-    memset(&cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
+    memset(cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
     cval->bmi_addr = bmi_addr;
     /* if bmi_addr is zero, should be register with BMI? */
     strcpy(cval->url, url);

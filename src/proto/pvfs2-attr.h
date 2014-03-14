@@ -260,10 +260,10 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
         encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     encode_skip4(pptr,);\
-    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
-    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers * \
-                    (x)->dist_dir_attr.num_copies; index_i++)\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count * \
+                    (x)->dist_dir_attr.sid_count; index_i++)\
         encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 
@@ -277,14 +277,14 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     for(index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)\
         decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     decode_skip4(pptr,);\
-    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
+    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.dirdata_count * \
         sizeof(*(x)->dirdata_handles));\
-    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
-    (x)->dirdata_sids = decode_malloc((x)->dist_dir_attr.num_servers * \
-                                      (x)->dist_dir_attr.num_copies * \
+    (x)->dirdata_sids = decode_malloc((x)->dist_dir_attr.dirdata_count * \
+                                      (x)->dist_dir_attr.sid_count * \
                                       sizeof(*(x)->dirdata_handles));\
-    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 

@@ -347,7 +347,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
             }
 
             a_p->u.dir.dirdata_handles =
-                        malloc(a_p->u.dir.dist_dir_attr.num_servers *
+                        malloc(a_p->u.dir.dist_dir_attr.dirdata_count *
                                     sizeof(PVFS_handle));
 
             if (! a_p->u.dir.dirdata_handles)
@@ -358,7 +358,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
 
             memcpy(a_p->u.dir.dirdata_handles,
                    req_a_p->u.dir.dirdata_handles,
-                   a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
+                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRECTORY;
@@ -396,8 +396,8 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
             GOSSIP_SETATTR_DEBUG,
             " *** dirdata has dirent server count %d and "
             "req has dirent server count %d\n",
-            a_p->u.dir.dist_dir_attr.num_servers,
-            req_a_p->u.dir.dist_dir_attr.num_servers);
+            a_p->u.dir.dist_dir_attr.dirdata_count,
+            req_a_p->u.dir.dist_dir_attr.dirdata_count);
 
         /* copy the distributed directory attributes before writing this object */
         if (req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR)
@@ -435,7 +435,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
             }
 
             a_p->u.dir.dirdata_handles =
-                            malloc(a_p->u.dir.dist_dir_attr.num_servers *
+                            malloc(a_p->u.dir.dist_dir_attr.dirdata_count *
                                          sizeof(PVFS_handle));
 
             if (! a_p->u.dir.dirdata_handles)
@@ -446,7 +446,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
 
             memcpy(a_p->u.dir.dirdata_handles,
                    req_a_p->u.dir.dirdata_handles,
-                   a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
+                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRDATA;
@@ -721,7 +721,7 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0, num_servers = 0;
+    int ret = 0, dirdata_count = 0;
     job_id_t j_id;
     int i;
 
@@ -737,11 +737,12 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     }
 
     /* verify that the requested number of servers is sane */
-    num_servers = s_op->req->u.setattr.attr.u.dir.dist_dir_attr.num_servers;
-    if ((num_servers < 1) || (num_servers > PVFS_REQ_LIMIT_DIRENT_FILE_COUNT))
+    dirdata_count = s_op->req->u.setattr.attr.u.dir.dist_dir_attr.dirdata_count;
+    if ((dirdata_count < 1) ||
+        (dirdata_count > PVFS_REQ_LIMIT_DIRENT_FILE_COUNT))
     {
         gossip_err("The requested number of servers (%d) is invalid; "
-                   "aborting operation.\n", num_servers);
+                   "aborting operation.\n", dirdata_count);
         js_p->error_code = -PVFS_EOVERFLOW;
         return SM_ACTION_COMPLETE;
     }
@@ -794,9 +795,9 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
 
     s_op->val_a[2].buffer = s_op->attr.u.dir.dirdata_handles;
     s_op->val_a[2].buffer_sz = sizeof(PVFS_handle) *
-                               s_op->attr.u.dir.dist_dir_attr.num_servers;
+                               s_op->attr.u.dir.dist_dir_attr.dirdata_count;
 
-    for (i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
+    for (i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
         if (!PVFS_OID_cmp(&s_op->attr.u.dir.dirdata_handles[i],
                           &s_op->req->u.setattr.handle))
@@ -805,7 +806,7 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
         }
     }
 
-    if (i < s_op->attr.u.dir.dist_dir_attr.num_servers)
+    if (i < s_op->attr.u.dir.dist_dir_attr.dirdata_count)
     {
         PINT_dist_dir_set_serverno(i,
                                    &s_op->attr.u.dir.dist_dir_attr,
@@ -874,7 +875,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(
                                    s_op->req->u.setattr.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
                                    0,    /* sid count V3 fixme */
                                    NULL, /* sid array V3 fixme */

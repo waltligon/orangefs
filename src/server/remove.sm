@@ -499,15 +499,15 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "remove: get dist-dir-attr for dir meta handle %s "
-                 "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
                  "split_size=%d, server_no=%d and branch_level=%d\n",
                  PVFS_OID_str(&s_op->u.remove.handle),
                  attr_p->u.dir.dist_dir_attr.tree_height,
-                 attr_p->u.dir.dist_dir_attr.num_servers,
+                 attr_p->u.dir.dist_dir_attr.dirdata_count,
                  attr_p->u.dir.dist_dir_attr.bitmap_size,
                  attr_p->u.dir.dist_dir_attr.split_size,
                  attr_p->u.dir.dist_dir_attr.server_no,
@@ -518,7 +518,7 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
                 malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
                             sizeof(PVFS_dist_dir_bitmap_basetype));
     attr_p->u.dir.dirdata_handles = 
-                malloc(attr_p->u.dir.dist_dir_attr.num_servers *
+                malloc(attr_p->u.dir.dist_dir_attr.dirdata_count *
                          sizeof(PVFS_handle));
     if(!attr_p->u.dir.dirdata_handles || !attr_p->u.dir.dist_dir_bitmap)
     {
@@ -549,7 +549,7 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[0].buffer = attr_p->u.dir.dirdata_handles;
-    s_op->val_a[0].buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
+    s_op->val_a[0].buffer_sz = attr_p->u.dir.dist_dir_attr.dirdata_count *
                     sizeof(PVFS_handle);
 
     /* !!! set bitmap keyval field */
@@ -614,7 +614,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
         s_op->req->u.remove.credential,
         s_op->req->u.remove.fs_id,
         0,
-        attr_p->u.dir.dist_dir_attr.num_servers,
+        attr_p->u.dir.dist_dir_attr.dirdata_count,
         attr_p->u.dir.dirdata_handles,
         PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in dirent_count */
         0,
@@ -644,7 +644,7 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         js_p->error_code = error_code;
         return SM_ACTION_COMPLETE;
     }
-    for (i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+    for (i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         if (getattr_op->resp.u.tree_getattr.attr[i].u.dir.dirent_count > 0)
         {
@@ -659,7 +659,7 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
 
     /* initialize rebuild array */
     s_op->u.remove.rebuild_dirdata_index_array_remote = 
-                malloc(sizeof(int) * attr_p->u.dir.dist_dir_attr.num_servers);
+                malloc(sizeof(int) * attr_p->u.dir.dist_dir_attr.dirdata_count);
     if(!s_op->u.remove.rebuild_dirdata_index_array_remote )
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -677,7 +677,7 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         s_op->req->u.remove.credential,
         s_op->req->u.remove.fs_id,
         0,
-        attr_p->u.dir.dist_dir_attr.num_servers,
+        attr_p->u.dir.dist_dir_attr.dirdata_count,
         attr_p->u.dir.dirdata_handles,
         0,    /* V3 sid count */
         NULL, /* V3 sid array */
@@ -703,7 +703,7 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
         return SM_ACTION_COMPLETE;
     }
     attr_p = &s_op->attr;
-    for (i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+    for (i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         if (remove_op->resp.u.tree_remove.status != 0)
         {
@@ -891,7 +891,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                  "handles array of directory %s.\n",
                  PVFS_OID_str(&s_op->req->u.remove.handle));
 
-    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
+    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
                      "\t\tdirdata server [%d]: %s.\n",
@@ -916,7 +916,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                  "array of directory %s.\n",
                  PVFS_OID_str(&s_op->req->u.remove.handle));
 
-    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
+    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
                      "\t\tdirdata server [%d]: %s.\n",
@@ -951,7 +951,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                                    s_op->req->u.remove.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
@@ -1007,7 +1007,7 @@ static PINT_sm_action remove_rebuild_write_dirdata_keyval(
     }
 
     s_op->val.buffer = s_op->attr.u.dir.dirdata_handles;
-    s_op->val.buffer_sz = s_op->attr.u.dir.dist_dir_attr.num_servers *
+    s_op->val.buffer_sz = s_op->attr.u.dir.dist_dir_attr.dirdata_count *
                 sizeof(PVFS_handle);
     s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
 

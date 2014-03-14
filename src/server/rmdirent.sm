@@ -185,15 +185,15 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }   
     
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "rmdirent: get dist-dir-attr for dirdata handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
             attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.dirdata_count,
             attr_p->u.dir.dist_dir_attr.bitmap_size,
             attr_p->u.dir.dist_dir_attr.split_size,
             attr_p->u.dir.dist_dir_attr.server_no,

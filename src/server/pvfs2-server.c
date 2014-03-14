@@ -235,6 +235,18 @@ int main(int argc, char **argv)
                     "PVFS2 Server on node %s version %s starting...\n",
                     s_server_options.server_alias, PVFS2_VERSION);
 
+    /* Initialize SID cache */
+    /* This needs to happen before we parse the config so we can record
+     * server records in the config
+     */
+    ret = SID_initialize();
+    if(ret < 0)
+    {
+        PVFS_perror_gossip("Error: SID_initialize", ret);
+        return(ret);
+    }
+    server_status_flag |= SERVER_SID_INIT;
+
     /* read the local config file first to get initial settings */
     /* code to handle older two config file format */
     ret = PINT_parse_config(&server_config,
@@ -1301,21 +1313,6 @@ static int server_initialize_subsystems(
         *server_status_flag |= SERVER_FILESYS_INIT;
     }
     /********** END OF TROVE INIT ***********/
-
-    /* I think this needs to happen before reading the config file
-     * I'm not sure if it will placed here or not!
-     */
-    /* Initialize SID cache */
-    if(!(*server_status_flag & SERVER_SID_INIT))
-    {
-        ret = SID_initialize();
-        if(ret < 0)
-        {
-            PVFS_perror_gossip("Error: SID_initialize", ret);
-            return(ret);
-        }
-        *server_status_flag |= SERVER_SID_INIT;
-    }
 
     /* Initialize Job Timer */
     if(!(*server_status_flag & SERVER_JOB_TIME_MGR_INIT))

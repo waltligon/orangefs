@@ -471,12 +471,12 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     /* gossip attr */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "parent getattr[%d] for parent dir handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             index,
             PVFS_OID_str(&sm_p->u.rename.parent_refns[index].handle),
             attr->u.dir.dist_dir_attr.tree_height,
-            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.dirdata_count,
             attr->u.dir.dist_dir_attr.bitmap_size,
             attr->u.dir.dist_dir_attr.split_size,
             attr->u.dir.dist_dir_attr.server_no,
@@ -498,7 +498,7 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
             "\t dirdata handles array \n");
 
-    for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+    for(i=0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "\t\tdirdata server %d: %s.\n",
@@ -511,7 +511,7 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     /*
       calculate the dirdata handle -- 'old' or 'new' based on index;
     */
-    assert(attr->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
 
     hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[index]);
     /* gossip hash */

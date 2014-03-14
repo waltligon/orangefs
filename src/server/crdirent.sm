@@ -369,16 +369,16 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0 &&
+    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0 &&
            attr_p->u.dir.dist_dir_attr.bitmap_size > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "crdirent: get dist-dir-attr for dirdata handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->u.crdirent.dirent_handle),
             attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.dirdata_count,
             attr_p->u.dir.dist_dir_attr.bitmap_size,
             attr_p->u.dir.dist_dir_attr.split_size,
             attr_p->u.dir.dist_dir_attr.server_no,
@@ -389,7 +389,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
         malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype));
     attr_p->u.dir.dirdata_handles =
-        malloc(attr_p->u.dir.dist_dir_attr.num_servers *
+        malloc(attr_p->u.dir.dist_dir_attr.dirdata_count *
                 sizeof(PVFS_handle));
     if(!attr_p->u.dir.dist_dir_bitmap ||
             !attr_p->u.dir.dirdata_handles)
@@ -461,7 +461,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[1].buffer = attr_p->u.dir.dirdata_handles;
-    s_op->val_a[1].buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
+    s_op->val_a[1].buffer_sz = attr_p->u.dir.dist_dir_attr.dirdata_count *
                  sizeof(PVFS_handle);
 
     js_p->error_code = 0;
@@ -517,7 +517,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "\t getattr: dirdata handles\n");
             
-    for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+    for(i=0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "\t\tdirdata server %d: %s.\n",
@@ -1119,8 +1119,8 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
        dirdata server that is the target of the split.      */
     attr_p = &s_op->attr;
     remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
-        attr_p->u.dir.dist_dir_attr.num_servers);
-    for (i = 0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+        attr_p->u.dir.dist_dir_attr.dirdata_count);
+    for (i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         if (! PVFS_OID_cmp(&attr_p->u.dir.dirdata_handles[i],
               &s_op->attr.u.dir.dirdata_handles[s_op->u.crdirent.split_node]))
@@ -1417,7 +1417,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         /* This memory will be freed in crdirent_cleanup
            by PINT_cleanup_capability. */
         capability_handles =
-              malloc((s_op->attr.u.dir.dist_dir_attr.num_servers + 1) *
+              malloc((s_op->attr.u.dir.dist_dir_attr.dirdata_count + 1) *
                      sizeof(PVFS_handle));
         if (! capability_handles)
         {
@@ -1427,13 +1427,13 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         capability_handles[0] = s_op->u.crdirent.parent_handle;
         memcpy(capability_handles + 1,
                s_op->attr.u.dir.dirdata_handles,
-               s_op->attr.u.dir.dist_dir_attr.num_servers *
+               s_op->attr.u.dir.dist_dir_attr.dirdata_count *
                    sizeof(PVFS_handle));
 
         ret = PINT_server_to_server_capability(
                                     &s_op->u.crdirent.capability,
                                     s_op->req->u.crdirent.fs_id,
-                                    s_op->attr.u.dir.dist_dir_attr.num_servers + 1,
+                                    s_op->attr.u.dir.dist_dir_attr.dirdata_count + 1,
                                     capability_handles);
         if (ret != 0)
         {

@@ -165,6 +165,8 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     return ret;
 }
 
+/* These functions find servers of a give type
+ */
 static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t stype,
                                uint32_t flag)

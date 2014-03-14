@@ -1581,15 +1581,23 @@ DOTCONF_CB(exit_serverdef_context)
             return "Error: incomplete host definition\n";
         }
 
-        /* add to SID cache */
+        /* convert string SID to binary */
         PVFS_SID_str2bin(config_s->new_host->host_sid_text,
                          &config_s->new_host->host_sid);
 
+        /* add main record to SID cache */
         SID_add(&config_s->new_host->host_sid,
                 0, /* internal BMI ID */
                 config_s->new_host->bmi_address,
                 config_s->new_host->attributes);
 
+        /* add type reccords to SID cache */
+        SID_update_type(&config_s->new_host->host_sid,
+                        config_s->new_host->server_type);
+
+        /* see if this record refers to this server, and save config
+         * info if it does
+         */
         if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
         {
             /* This is our address - save the information */
@@ -1602,8 +1610,6 @@ DOTCONF_CB(exit_serverdef_context)
             config_s->host_id = strdup(config_s->new_host->bmi_address);
             config_s->new_host->server_type |= SID_SERVER_ME;
         }
-        SID_update_type(&config_s->new_host->host_sid,
-                        config_s->new_host->server_type);
 
         /* add to config list of aliases */
         /* create list if this is first one */
