@@ -140,7 +140,7 @@ build_symbolic = @build_symbolic@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools bgproc
 
 ################################################################
 # Find project subdirectories
@@ -627,6 +627,8 @@ JNISTREAMSCHANNELSJAVA :=
 # HADOOPJAVA represents OrangeFS/Hadoop related Java files
 # TODO: commit src to Apache Hadoop
 HADOOPJAVA :=
+BGAPPSSRC :=
+BGLIBSRC :=
 
 ################################################################
 # Top level (default) targets
@@ -682,7 +684,7 @@ LIBRARIES_THREADED_SHARED :=
 LIBRARIES_THREADED_STATIC :=
 endif
 
-LIBRARIES_SHARED := lib/libpvfs2-bgproc.so
+LIBRARIES_SHARED :=
 
 
 LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
@@ -786,10 +788,6 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
-BGPROCOBJS := $(patsubst %.c,%.po, $(filter %.c,$(BGPROCSRC)))
-BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
-BGPROCAPPS := $(patsubst %.c,%, $(filter %.c, $(BGPROCAPPSRC)))
-
 # KERNAPPOBJS is a list of kernel driver userland objects
 KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC))) \
                $(patsubst %.c,%-threaded.o, $(filter %.c,$(KERNAPPTHRSRC)))
@@ -874,6 +872,13 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(BGPROCDEPENDS)
 endif
 
+# BGLIBOBJ is a list of bgproc library objects
+BGLIBOBJ := $(patsubst %.c,%.o, $(filter %.c,$(BGLIBSRC)))
+# BGAPPSOBJ is a list of bgproc program objects
+BGAPPSOBJ := $(patsubst %.c,%.o, $(filter %.c,$(BGAPPSSRC)))
+# BGAPPSBIN is a list of bgproc program executables
+BGAPPSBIN := $(patsubst %.c,%, $(filter %.c, $(BGAPPSSRC)))
+
 ####################################################################
 # Rules and dependencies
 
@@ -901,6 +906,8 @@ statecompgen: $(STATECOMPGEN)
 
 # target for builging development tools
 develtools: $(DEVELTOOLS)
+
+bgproc: $(BGAPPSBIN)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -947,7 +954,7 @@ $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a
 
 $(MONITOR): $(MONITOROBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(MONITOROBJS) -o $@ $(LDFLAGS) $(LIBS) -lofs
+	$(E)$(LD) $(LDFLAGS) $(MONITOROBJS) -lofs $(LIBS) -o $@
 
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c
@@ -1067,9 +1074,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
+$(DEVELTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
 ifdef BUILD_HADOOP
 $(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
@@ -1118,6 +1125,8 @@ $(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
 #         BUILD_HADOOP is defined.
 $(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
 endif # BUILD_JNI
+
+
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -1209,22 +1218,19 @@ $(USERTOOLS): %: %.o $(LIBRARIES)
 
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
 
-# PVFS Background Processes (bgproc)
-bgproc: lib/libpvfs2-bgproc.so $(BGPROCAPPS)
-
-lib/libpvfs2-bgproc.so: $(BGPROCOBJS) lib/libpvfs2.so lib/libofs.so
-	$(Q) "  LDSO		$@"
-	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-bgproc.so,-z,interpose,-Bsymbolic -o $@ $(BGPROCOBJS) -lofs $(DEPLIBS)
-
-$(BGPROCAPPS): %: %.o $(LIBRARIES)
-	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) -lpvfs2-bgproc -lofs $(call modldflags,$<)
-
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
+
+lib/libofs-bgproc.a: $(BGLIBOBJ)
+	$(Q) "  RANLIB  $@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(BGLIBOBJ)
+
+$(BGAPPSBIN): %: %.o $(LIBRARIES) lib/libofs-bgproc.a
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< -lofs -lofs-bgproc $(LIBS) $(call modldflags,$<)
 
 # special rules to build state machine compiler using build host compiler
 $(STATECOMPOBJS): %.o: %.c
@@ -1289,7 +1295,7 @@ clean::
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
                 $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
@@ -1297,6 +1303,7 @@ clean::
                 $(BMILIBRARIES) $(FUSEOBJS) \
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) \
+                $(BGAPPSOBJ) $(BGAPPSBIN) $(BGLIBOBJ) \
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf \
@@ -1554,9 +1561,6 @@ ifdef BUILD_SERVER
     endif
 	install -d $(libdir)/pvfs2
 	install -m 755 $(MONITOR) $(libdir)/pvfs2/pvfs2-monitor
-	for i in $(notdir $(BGPROCAPPS)) ; do \
-	    install -m 755 src/client/bgproc/apps/$$i $(libdir)/pvfs2/$$i ; \
-	done
 endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)

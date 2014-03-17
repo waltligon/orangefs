@@ -1,0 +1,6 @@
+DIR := src/bgproc/lib
+
+BGLIBSRC := \
+	$(DIR)/bgproc-log.c \
+	$(DIR)/bgproc-prop.c \
+	$(DIR)/bgproc-start.c

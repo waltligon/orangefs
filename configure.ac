@@ -1876,6 +1876,8 @@ src/apps/fuse/module.mk
 src/apps/ucache/module.mk
 src/apps/kernel/linux/module.mk
 src/apps/user/module.mk
+src/bgproc/apps/module.mk
+src/bgproc/lib/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
@@ -1914,8 +1916,6 @@ src/server/request-scheduler/module.mk
 src/client/jni/module.mk
 src/client/sysint/module.mk
 src/client/usrint/module.mk
-src/client/bgproc/apps/module.mk
-src/client/bgproc/lib/module.mk
 src/kernel/linux-2.6/Makefile
 src/kernel/linux-2.4/Makefile
 doc/module.mk

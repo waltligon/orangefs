@@ -1,0 +1,4 @@
+DIR := src/bgproc/apps
+
+BGAPPSSRC := \
+	$(DIR)/bgproc-hello.c
