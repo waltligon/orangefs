@@ -1,4 +1,5 @@
 DIR := src/bgproc/apps
 
 BGAPPSSRC := \
+	$(DIR)/bgproc-count.c \
 	$(DIR)/bgproc-hello.c

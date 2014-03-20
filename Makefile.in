@@ -1561,6 +1561,10 @@ ifdef BUILD_SERVER
     endif
 	install -d $(libdir)/pvfs2
 	install -m 755 $(MONITOR) $(libdir)/pvfs2/pvfs2-monitor
+	install -m 644 lib/libofs-bgproc.a $(libdir)/libofs-bgproc.a
+	for i in $(BGAPPSBIN); do \
+		install -m 755 "$$i" $(libdir)/pvfs2/"`basename "$$i"`"; \
+	done
 endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)

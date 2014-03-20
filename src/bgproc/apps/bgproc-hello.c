@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 	if ((r = bgproc_start(argc, argv)) != 0) {
 		return r;
 	}
-	bgproc_printf("Hello, world!");
+	bgproc_log("Hello, world!");
 
 	bgproc_newprop("numfiles", BGPROC_TYPE_INT);
 	bgproc_newprop("numdirs", BGPROC_TYPE_INT);

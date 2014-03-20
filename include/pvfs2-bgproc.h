@@ -8,7 +8,8 @@
 #define PVFS2_BGPROC_H
 
 /* bgproc-log.h */
-int bgproc_printf(char *fmt, ...);
+int bgproc_err(char *fmt, ...);
+int bgproc_log(char *fmt, ...);
 
 /* bgproc-prop.h */
 struct bgproc_prop {
@@ -33,8 +34,15 @@ int bgproc_get_str(char *key, char **value);
 int bgproc_flushprop(void);
 
 /* bgproc-start.h */
+struct bgproc_arg {
+	char *key;
+	char *value;
+	struct bgproc_arg *next;
+};
+
 int bgproc_start(int argc, char *[]);
 char *bgproc_getdir(void);
 void bgproc_setdir(char *dir);
+char *bgproc_getarg(char *key);
 
 #endif

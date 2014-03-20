@@ -13,19 +13,19 @@
 #include <pvfs2-usrint.h>
 #include <pvfs2-bgproc.h>
 
-static FILE *bgproc_log = NULL;
+static FILE *log = NULL;
 
-int bgproc_printf(char *fmt, ...)
+int bgproc_err(char *fmt, ...)
 {
 	char path[PATH_MAX];
 	va_list ap;
 	time_t t;
 	char *s;
 	/* open the log if necessary */
-	if (bgproc_log == NULL) {
+	if (log == NULL) {
 		snprintf(path, PATH_MAX, "%s/log", bgproc_getdir());
-		bgproc_log = fopen(path, "a");
-		if (bgproc_log == NULL)
+		log = fopen(path, "a");
+		if (log == NULL)
 			return 1;
 	}
 	/* output time and message */
@@ -33,10 +33,36 @@ int bgproc_printf(char *fmt, ...)
 	t = time(NULL);
 	s = ctime(&t);
 	*(strrchr(s, '\n')) = 0;
-	fprintf(bgproc_log, "[%s] ", s);
-	vfprintf(bgproc_log, fmt, ap);
-	putc('\n', bgproc_log);
-	fflush(bgproc_log);
+	fprintf(log, "[%s] ERROR: ", s);
+	vfprintf(log, fmt, ap);
+	putc('\n', log);
+	fflush(log);
+	va_end(ap);
+	return 0;
+}
+
+int bgproc_log(char *fmt, ...)
+{
+	char path[PATH_MAX];
+	va_list ap;
+	time_t t;
+	char *s;
+	/* open the log if necessary */
+	if (log == NULL) {
+		snprintf(path, PATH_MAX, "%s/log", bgproc_getdir());
+		log = fopen(path, "a");
+		if (log == NULL)
+			return 1;
+	}
+	/* output time and message */
+	va_start(ap, fmt);
+	t = time(NULL);
+	s = ctime(&t);
+	*(strrchr(s, '\n')) = 0;
+	fprintf(log, "[%s] ", s);
+	vfprintf(log, fmt, ap);
+	putc('\n', log);
+	fflush(log);
 	va_end(ap);
 	return 0;
 }
