@@ -11,8 +11,6 @@ JNIPOSIXJAVA := \
 	$(ORGDIR)/PVFS2POSIXJNI.java \
 	$(ORGDIR)/PVFS2POSIXJNIFlags.java \
 	$(ORGDIR)/Stat.java \
-	$(ORGDIR)/Timeval.java \
-	$(ORGDIR)/Utimbuf.java
 # TODO
 #	$(ORGDIR)/Statfs.java \
 #	$(ORGDIR)/Statvfs.java \

@@ -234,6 +234,7 @@ static void pvfs2_destroy_inode(struct inode *inode)
 void pvfs2_read_inode(
     struct inode *inode)
 {
+    int ret;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %llu | ct = %d)\n",
@@ -255,11 +256,11 @@ void pvfs2_read_inode(
        called after a successful dentry lookup if the inode is not
        present in the inode cache already.  so this is our chance.
     */
-    if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
+    if ((ret=pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT)) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
-        gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
-                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+        gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %di | ct = %d)\n",
+                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count),ret);
         pvfs2_make_bad_inode(inode);
     }
 }

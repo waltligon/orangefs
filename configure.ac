@@ -382,7 +382,7 @@ if test "x$ENABLE_CERTCACHE" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([certificate cache can only be used in certificate-based security mode])
 fi
 
-dnl permission Revocation only valid if capability cache enabled
+dnl permission revocation only valid if capability cache enabled
 if test "x$ENABLE_CAPCACHE" = "x" -a "x$ENABLE_REVOCATION" = "x1"; then
     AC_MSG_ERROR([permission revocation can only be used if capability cache is enabled])
 fi

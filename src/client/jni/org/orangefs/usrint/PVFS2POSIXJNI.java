@@ -47,7 +47,7 @@ public class PVFS2POSIXJNI {
 
     public native int chmod(String path, long mode);
 
-    public native int chown(String path, long owner, long group);
+    public native int chown(String path, int owner, int group);
 
     public native int close(int fd);
 
@@ -69,9 +69,9 @@ public class PVFS2POSIXJNI {
 
     public native int fchmodat(int fd, String path, long mode, long flags);
 
-    public native int fchown(int fd, long owner, long group);
+    public native int fchown(int fd, int owner, int group);
 
-    public native int fchownat(int fd, String path, long owner, long group,
+    public native int fchownat(int fd, String path, int owner, int group,
             long flags);
 
     public native int fdatasync(int fd);
@@ -95,9 +95,10 @@ public class PVFS2POSIXJNI {
 
     public native int ftruncate(int fd, long length);
 
-    public native Timeval futimes(int fd);
+    public native int futimes(int fd, long actime_usec, long modtime_usec);
 
-    public native Timeval futimesat(int dirfd, String path);
+    public native int futimesat(int dirfd, String path, long actime_usec, 
+    		long modtime_usec);
 
     public native int getdtablesize();
 
@@ -105,7 +106,7 @@ public class PVFS2POSIXJNI {
 
     public native int isDir(int mode);
 
-    public native int lchown(String path, long owner, long group);
+    public native int lchown(String path, int owner, int group);
 
     public native int link(String oldpath, String newpath);
 
@@ -200,9 +201,9 @@ public class PVFS2POSIXJNI {
 
     public native int unlinkat(int dirfd, String path, long flags);
 
-    public native Utimbuf utime(String path);
+    public native int utime(String path, long actime_sec, long modtime_sec);
 
-    public native Timeval utimes(String path);
+    public native int utimes(String path, long actime_usec, long modtime_usec);
 
     public native long write(int fd, ByteBuffer buf, long count);
 }

@@ -202,6 +202,7 @@ public class OrangeFileSystem extends FileSystem {
     public boolean exists(Path f) {
         /* Stat file */
         try {
+            @SuppressWarnings("unused")
             FileStatus status = getFileStatus(f);
         }
         catch (FileNotFoundException e) {
@@ -372,7 +373,7 @@ public class OrangeFileSystem extends FileSystem {
     public FileStatus[] listStatus(Path f) throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + makeAbsolute(f).toString());
-        ArrayList arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
+        ArrayList<String> arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
         if(arrayList == null) {
             return null;
         }

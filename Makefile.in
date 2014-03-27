@@ -1053,9 +1053,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
+$(DEVELTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
 ifdef BUILD_HADOOP
 $(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
@@ -1263,7 +1263,7 @@ clean::
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
                 $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
