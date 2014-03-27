@@ -66,6 +66,13 @@
 */
 #define PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS 10
 
+/* 
+  default number of retries if PVFS_EAGAIN received
+ */
+#ifndef PVFS2_CLIENT_CORE_RETRIES
+#define PVFS2_CLIENT_CORE_RETRIES    1
+#endif
+
 /*
   uncomment for timing of individual operation information to be
   emitted to the pvfs2-client logging output
@@ -594,7 +601,7 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
         credential,
         &vfs_request->response.lookup,
         vfs_request->in_upcall.req.lookup.sym_follow,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);    
     vfs_request->hints = hints;
 
     if (credential)
@@ -1756,8 +1763,8 @@ static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
-    PVFS_credential *credential;
-    
+    PVFS_credential *credential;    
+
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
@@ -3141,6 +3148,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    uint32_t retries = 0;
 
     assert(vfs_request);
 
@@ -3372,6 +3380,16 @@ static inline PVFS_error handle_unexp_vfs_request(
             }
         }
         break;
+        case -PVFS_EAGAIN:
+            /* retry once up to the retry limit (default 1);
+               this may mean permission has been revoked and a 
+               new cap is needed */
+            if (retries++ < PVFS2_CLIENT_CORE_RETRIES)
+            {
+                ret = repost_unexp_vfs_request(
+                    vfs_request, "client retry");
+            }
+            break;
         case REMOUNT_PENDING:
             ret = repost_unexp_vfs_request(
                 vfs_request, "mount pending");
