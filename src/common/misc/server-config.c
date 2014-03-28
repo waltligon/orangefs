@@ -131,7 +131,8 @@ static DOTCONF_CB(directio_timeout);
 
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
-static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(get_credential_timeout);
+static DOTCONF_CB(get_capability_timeout);
 static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
@@ -324,13 +325,13 @@ static const configoption_t options[] =
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
-    /* Security timeout in seconds
-     * Note: May be in the Defaults section for backwards-compatibility.
-     * For newly-generated configuration files it should appear in the
-     * Security section.
-     */
-    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
+    /* Credential timeout in seconds */
+    {"CredentialTimeoutSecs", ARG_INT, get_credential_timeout, NULL,
+        CTX_SECURITY, "3600"},
+
+    /* Capability timeout in seconds */
+    {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
+        CTX_SECURITY, "60"},
 
     /* Path to CA certificate file in PEM format.
      * Note: May be in the Defaults section for backwards-compatibility.
@@ -3294,11 +3295,19 @@ DOTCONF_CB(get_server_key)
     return NULL;
 }
 
-DOTCONF_CB(get_security_timeout)
+DOTCONF_CB(get_credential_timeout)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->security_timeout = cmd->data.value;
+    config_s->credential_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_capability_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    config_s->capability_timeout = cmd->data.value;
     return NULL;
 }
 

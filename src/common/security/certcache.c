@@ -286,8 +286,8 @@ int PINT_certcache_init(void)
         return -PVFS_ENOMEM;
     }
 
-    /* Set properties */
-    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->security_timeout);
+    /* Set properties - use the credential timeout */
+    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->credential_timeout);
 
     return 0;
 }

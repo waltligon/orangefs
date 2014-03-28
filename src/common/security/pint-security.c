@@ -436,7 +436,7 @@ int PINT_sign_capability(PVFS_capability *cap)
     strcat(cap->issuer, config->server_alias);
     */
 
-    cap->timeout = PINT_util_get_current_time() + config->security_timeout;
+    cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
 
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
     {
@@ -535,7 +535,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
 
     capability->fsid = fs_id;
     capability->timeout =
-        PINT_util_get_current_time() + config->security_timeout;
+        PINT_util_get_current_time() + config->capability_timeout;
     capability->op_mask = ~((uint32_t)0);
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
@@ -780,7 +780,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     strcpy(cred->issuer, "S:");
     strcat(cred->issuer, config->server_alias);
     
-    cred->timeout = PINT_util_get_current_time() + config->security_timeout;
+    cred->timeout = PINT_util_get_current_time() + config->credential_timeout;
 
     /* If squashing is enabled, server will re-sign a credential with 
        translated uid/gid. In this case the signature must be reallocated. 
