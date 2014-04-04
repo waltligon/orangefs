@@ -264,8 +264,11 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
     s_op->u.crdirent.credential = s_op->req->u.crdirent.credential;
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
     s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
+    s_op->u.crdirent.new_sid = s_op->req->u.crdirent.new_sid_array;
     s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
+    s_op->u.crdirent.dirent_sid = s_op->req->u.crdirent.sid_array;
+    s_op->u.crdirent.sid_count = s_op->req->u.crdirent.sid_count;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
