@@ -114,13 +114,26 @@ static PINT_sm_action readdir_iterate_on_entries(
       calculate total memory needed:
       - 2 * dirent_count keyval structures to pass to iterate function
       - dirent_count dirent structures to hold the results
+      - dirent_count * metadata_sid_count SIDs
     */
+
+    /* TODO: make sure this is where we get the config for metadata replication */
+    ret = PINT_cached_config_get_num_io(s_op->req->u.readdir.fs_id, 
+                     &(s_op->resp->u.readdir.sid_count));
+
+    if (ret)
+   {
+      js_p->error_code = ret;
+      return SM_ACTION_COMPLETE;
+   }
+
     kv_array_size = (s_op->req->u.readdir.dirent_count *
                      sizeof(PVFS_ds_keyval));
 
     memory_size = (2 * kv_array_size +
                    s_op->req->u.readdir.dirent_count *
-                   sizeof(PVFS_dirent));
+                   sizeof(PVFS_dirent) + 
+                   s_op->resp->u.readdir.sid_count * sizeof(PVFS_SID));
 
     memory_buffer = malloc(memory_size);
     if (!memory_buffer)
@@ -137,6 +150,9 @@ static PINT_sm_action readdir_iterate_on_entries(
     memory_buffer += kv_array_size;
 
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;
+    memory_buffer += s_op->req->u.readdir.dirent_count *
+                   sizeof(PVFS_dirent);
+    s_op->resp.u.readdir.sid_array;
 
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
@@ -196,6 +212,12 @@ static PINT_sm_action readdir_setup_resp(
     s_op->resp.u.readdir.directory_version =
         s_op->u.readdir.directory_version;
     s_op->resp.u.readdir.dirent_count = js_p->count;
+
+    //TODO: figure out how to get stuff out of config to setup SID space
+    ret = PINT_cached_config_get_num_io(s_op->req->u.readdir.fs_id, 
+                                    &(s_op->resp->u.readdir.sid_count));
+
+    //s_op->resp.u.readdir.sid_count = 
 
     /*
      * Although, this is not as important to get ls
