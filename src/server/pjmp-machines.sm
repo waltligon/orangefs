@@ -48,6 +48,48 @@ machine pvfs2_pjmp_set_attr_work_sm
     }
 }
 
+machine pvfs2_pjmp_unexpected_local_sm
+{
+    state pjmp_unexpected_local_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_unexpected_local_sm;
+    }
+
+    state pjmp_call_unexpected_local_sm
+    {
+        jump pvfs2_unexpected_local_sm;
+        default => pjmp_unexpected_local_execute_terminate;
+    }
+
+    state pjmp_unexpected_local_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
+machine pvfs2_pjmp_unexpected_remote_sm
+{
+    state pjmp_unexpected_work_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_unexpected_work_sm;
+    }
+
+    state pjmp_call_unexpected_work_sm
+    {
+        jump pvfs2_unexpected_remote_sm;
+        default => pjmp_unexpected_work_execute_terminate;
+    }
+
+    state pjmp_unexpected_work_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
 machine pvfs2_pjmp_get_attr_work_sm
 {
     state pjmp_get_attr_work_initialize

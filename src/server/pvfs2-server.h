@@ -876,12 +876,16 @@ extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_unexpected_local_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_unexpected_remote_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_unexpected_local_sm;
+extern struct PINT_state_machine_s pvfs2_unexpected_remote_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;

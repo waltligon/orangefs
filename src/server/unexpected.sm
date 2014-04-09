@@ -12,23 +12,84 @@
 
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-debug.h"
 #include "quicklist.h"
+
+#define PFI()                                                                                              \
+    do                                                                                                     \
+    {                                                                                                      \
+        gossip_debug(GOSSIP_SERVER_DEBUG, "function called: {%s}\n", __PRETTY_FUNCTION__);                 \
+        fflush(stdout);                                                                                    \
+    } while(0)
+
+enum {
+    LOCAL_OPERATION = 2,
+    REMOTE_OPERATION = 3,
+    OP_CANCELLED = 4
+};
 
 %%
 
 machine pvfs2_unexpected_sm
 {
-	state post_unexpected
-	{
-		run unexpected_post;
-		default => map_request;
-	}
+    state unexpected_post
+    {
+        run unexpected_post;
+        default => unexpected_replace;
+    }
 
-	state map_request
-	{
-		run unexpected_map;
-		default => terminate;
-	}
+    state unexpected_replace
+    {
+        run unexpected_replace;
+        OP_CANCELLED => unexpected_terminate;
+        default => unexpected_pjmp;
+    }
+
+    state unexpected_pjmp
+    {
+        pjmp unexpected_pjmp_setup
+        {
+            LOCAL_OPERATION => pvfs2_pjmp_unexpected_local_sm;
+            REMOTE_OPERATION => pvfs2_pjmp_unexpected_remote_sm;
+        }
+        default => unexpected_pjmp_cleanup;
+    }
+
+    state unexpected_pjmp_cleanup
+    {
+        run unexpected_pjmp_cleanup;
+        default => unexpected_map;
+    }
+
+    state unexpected_map
+    {
+        run unexpected_map;
+        default => unexpected_terminate;
+    }
+
+    state unexpected_terminate
+    {
+        run unexpected_terminate;
+        default => terminate;
+    }
+}
+
+nested machine pvfs2_unexpected_local_sm
+{
+    state local_s1
+    {
+        run unexpected_work_do_nothing;
+        default => return;
+    }
+}
+
+nested machine pvfs2_unexpected_remote_sm
+{
+    state remote_s1
+    {
+        run unexpected_work_do_nothing;
+        default => return;
+    }
 }
 
 %%
@@ -40,15 +101,16 @@ machine pvfs2_unexpected_sm
 static PINT_sm_action unexpected_post(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    PFI();
     int ret = -PVFS_EINVAL;
     struct PINT_server_op *s_op =
-            (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+            (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
        TODO: Consider the optimization of enabling immediate
        completion in this part of the code (see the mailing list
        thread from Feb. 2003 on pvfs2-internal).
-                                                                                
+
        note: unexp_bmi_buff is really a struct that describes an
        unexpected message (it is an output parameter).
      */
@@ -60,30 +122,29 @@ static PINT_sm_action unexpected_post(
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
         return SM_ACTION_TERMINATE;
     }
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "DEFERRING!\n");
     return SM_ACTION_DEFERRED;
 }
 
-/* unexpected_map()
+/* unexpected_replace()
  *
- * Change the state machine OP to that of the received request
- * This instance will continue execution in another state machine
- * Set up another unexpected receive
+ * Starts a replacement unexpected request
  */
-static PINT_sm_action unexpected_map(
+static PINT_sm_action unexpected_replace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret = 0;
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PFI();
+    int ret = -PVFS_EINVAL;
+    struct PINT_server_op *s_op =
+            (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* Remove s_op from posted_sop_list */
-    qlist_del(&s_op->next);
-    /* If op was cancelled, kill the SM */
+    /* If op was cancelled, print WARNING */
     if (s_op->op_cancelled)
     {
-        return SM_ACTION_TERMINATE;
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "INFO: op_cancelled, terminating sm!\n");
+        js_p->error_code = OP_CANCELLED;
+        return SM_ACTION_COMPLETE;
     }
-    /* Else move it to the inprogress_sop_list */
-    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* start replacement unexpected recv */
     ret = server_post_unexpected_recv();
@@ -96,6 +157,82 @@ static PINT_sm_action unexpected_map(
          */
         PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_map: server_post_unexpected_recv() returned an error: ",ret);
     }
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexpected_pjmp_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+    int ret = -PVFS_EINVAL;
+    struct PINT_server_op *unexpected_op = (struct PINT_server_op *) NULL;
+    struct PINT_server_op *s_op =
+        (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    unexpected_op = 
+        (struct PINT_server_op *) malloc(sizeof(struct PINT_server_op));
+    if(!unexpected_op)
+    {
+        gossip_lerr("unexpected_pjmp_setup: failed to allocate memory for unexpected_op!\n");
+    }
+    memset(unexpected_op, 0, sizeof(struct PINT_server_op));
+    ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, unexpected_op);
+    if(ret < 0)
+    {
+        gossip_lerr("failed to setup nested sm for unexpected request!\n");
+    }
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexpected_pjmp_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+    int ret = -PVFS_EINVAL;
+    int task_id;
+    int remaining;
+    PVFS_error tmp_err;
+    struct PINT_server_op *unexpected_op = (struct PINT_server_op *) NULL;
+    struct PINT_server_op *s_op =
+            (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    unexpected_op = 
+        (struct PINT_server_op *) PINT_sm_pop_frame(smcb,
+                                                    &task_id,
+                                                    &tmp_err,
+                                                    &remaining);
+    //PRINT("unexpected_op is %s.\n",(unexpected_op ? "okay" : "NULL"));
+    gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                  "unexpected: nested sm returned error code: %d\n",
+                  tmp_err);
+    free(unexpected_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+/* unexpected_map()
+ *
+ * Change the state machine OP to that of the received request
+ * This instance will continue execution in another state machine
+ * Set up another unexpected receive
+ */
+static PINT_sm_action unexpected_map(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+    int ret = 0;
+    PINT_server_op *s_op = 
+        (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* Remove s_op from posted_sop_list */
+    qlist_del(&s_op->next);
+    /* If op was cancelled, kill the SM */
+    if (s_op->op_cancelled)
+    {
+        return SM_ACTION_TERMINATE;
+    }
+    /* Else move it to the inprogress_sop_list */
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* restart as new request state machine */
     memset(js_p, 0, sizeof(job_status_s));
@@ -112,6 +249,21 @@ static PINT_sm_action unexpected_map(
     return ret;
 }
 
+static PINT_sm_action unexpected_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+    return SM_ACTION_TERMINATE;
+}
+
+static PINT_sm_action unexpected_work_do_nothing(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
 
 /*
  * Local variables:
@@ -122,4 +274,3 @@ static PINT_sm_action unexpected_map(
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-
