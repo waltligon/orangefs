@@ -18,9 +18,15 @@
 /* used in stio.c and openfile-util.c */
 #define _P_IO_MAGIC 0xF0BD0000
 
-//Define success and error return values
+/*Define success and error return values */
 #define PVFS_FD_SUCCESS 0
 #define PVFS_FD_FAILURE -1
+
+/* Default attribute mask */
+#define PVFS_ATTR_DEFAULT_MASK \
+        (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE |\
+         PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET |\
+         PVFS_ATTR_SYS_DIRENT_COUNT)
 
 int pvfs_ucache_enabled(void);
 
