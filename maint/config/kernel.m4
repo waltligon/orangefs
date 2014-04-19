@@ -158,6 +158,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_CHECKING(for sanity of linux/fs.h include)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [],
 		AC_MSG_RESULT(yes),
@@ -175,6 +178,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
             extern int mycreate(struct inode *,
                                 struct dentry *,
@@ -202,6 +208,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
             extern int mymkdir(struct inode *,
                                 struct dentry *,
@@ -228,6 +237,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
             extern int mymknod(struct inode *,
                                 struct dentry *,
@@ -262,6 +274,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
             extern int mycreate(struct inode *,
                                 struct dentry *,
@@ -292,6 +307,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
             extern struct dentry *mylookup(struct inode *,
                                            struct dentry *,
@@ -317,6 +335,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
 		    #include <linux/dcache.h>
             extern int myreval(struct dentry *, struct nameidata *);
@@ -340,6 +361,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_TRY_COMPILE(
         [
 		    #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 		    #include <linux/fs.h>
         ], [
 			static struct inode_operations in_op = {
@@ -366,6 +390,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_TRY_COMPILE(
         [
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
         ], [
                 struct inode  *root_inode;
@@ -385,6 +412,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		void i_size_write(struct inode *inode,
 				loff_t i_size)
@@ -402,6 +432,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		loff_t i_size_read(struct inode *inode)
 		{
@@ -418,6 +451,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		loff_t iget_locked(struct inode *inode)
 		{
@@ -434,6 +470,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		loff_t iget4_locked(struct inode *inode)
 		{
@@ -450,6 +489,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		loff_t iget5_locked(struct inode *inode)
 		{
@@ -466,6 +508,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         dnl if this test fails, the kernel already defined it
         AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
                 loff_t d_set_d_op(struct dentry *dentry, const struct dentry_operations *op)
                 {
@@ -560,6 +605,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_CHECKING(for sendfile callback in struct file_operations in kernel)
 		AC_TRY_COMPILE([
 			#define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 			#include <linux/fs.h>
 			static struct file_operations fop = {
 				 .sendfile = NULL,
@@ -575,6 +623,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for readv callback in struct file_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct file_operations fop = {
 		    .readv = NULL,
@@ -588,6 +639,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for writev callback in struct file_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct file_operations fop = {
 		    .writev = NULL,
@@ -602,6 +656,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for find_inode_handle callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct super_operations sop = {
 		    .find_inode_handle = NULL,
@@ -616,6 +673,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for i_blksize in struct inode)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct inode i = {
 			.i_blksize = 0,
@@ -630,6 +690,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for i_sem in struct inode)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct inode i = {
 			.i_sem = {0},
@@ -644,6 +707,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct super_operations sop = {
 		    .statfs_lite = NULL,
@@ -658,6 +724,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for fill_handle callback in struct inode_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct inode_operations iop = {
 		    .fill_handle = NULL,
@@ -672,6 +741,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for getattr_lite callback in struct inode_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct inode_operations iop = {
 		    .getattr_lite = NULL,
@@ -686,6 +758,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for get_fs_key callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct super_operations sop = {
 		    .get_fs_key = NULL,
@@ -700,6 +775,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for readdir member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -715,6 +793,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -730,6 +811,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for readdirplus_lite member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -746,6 +830,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for readx member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -761,6 +848,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for writex member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -883,6 +973,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_CHECKING(for new prototype of aio_read callback of file_operations structure)
 		AC_TRY_COMPILE([
 			#define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
 			#include <linux/fs.h>
 			extern ssize_t my_aio_read(struct kiocb *, const struct iovec *, unsigned long, loff_t);
 			static struct file_operations fop = {
@@ -921,6 +1014,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         dnl throughout these checks
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct super_operations sop;
 		int s(struct dentry *de, struct kstatfs *kfs)
@@ -949,6 +1045,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl If this test fails, the kernel uses something else.
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		int get_sb_bdev(struct file_system_type *fs_type, int flags,
 				const char *dev_name, void *data,
@@ -967,6 +1066,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for get_sb_nodev)
 	AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
                 int v_fill_sb(struct super_block *sb, void *data, int s)
                 {
@@ -990,6 +1092,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for file_system_type get_sb)
 	AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
                 ],
                 [
@@ -1006,6 +1111,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for file_system_type mount exclusively)
 	AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
                 ],
                 [
@@ -1026,6 +1134,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test fails, the kernel does not have it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 			  static struct inode_operations in_op = {
 				  .getxattr = NULL
@@ -1044,6 +1155,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	   dnl if this test passes, there is a const void* argument
 	   AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		], 
 		[
@@ -1086,6 +1200,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for file argument to sysctl proc handlers)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 	    #include <linux/sysctl.h>
 	    ], [
@@ -1107,6 +1224,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl if this test passes, there is a ppos argument
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 	    #include <linux/sysctl.h>
 	    ], [
@@ -1203,6 +1323,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		int generic_file_readv(struct inode *inode)
 		{
@@ -1222,6 +1345,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		int generic_permission(struct inode *inode)
 		{
@@ -1239,6 +1365,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for three-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct inode *f;
 	], 
@@ -1256,6 +1385,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for four-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct inode *f;
 	], 
@@ -1273,6 +1405,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for two-param generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct inode *f;
 	], 
@@ -1290,6 +1425,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for set_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		struct inode *i;
 	], 
@@ -1307,6 +1445,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for inc_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		struct inode *i;
 	], 
@@ -1324,6 +1465,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for drop_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		struct inode *i;
 	], 
@@ -1341,6 +1485,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for clear_nlink)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		struct inode *i;
 	], 
@@ -1448,6 +1595,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for fsync with loff_t)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 
 		int my_fsync(struct file *, loff_t, loff_t, int);
@@ -1491,6 +1641,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for arg member in read_descriptor_t in kernel)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 	    ], [
 	    read_descriptor_t x;
@@ -1536,6 +1689,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING([if kernel export ops get inode from dentry])
         AC_TRY_COMPILE([
             #define __KERNEL__
+            #ifdef HAVE_KCONFIG
+            #include <linux/kconfig.h>
+            #endif
             #include <linux/fs.h>
             #include <linux/exportfs.h>
             extern int myencode(struct dentry *,
@@ -1580,6 +1736,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for int return in inode_operations follow_link)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 	    extern int page_follow_link_light(struct dentry *,
 	                                      struct nameidata *);
@@ -1613,6 +1772,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for older int return in invalidatepage)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		], 
                 [
@@ -1634,6 +1796,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for three argument invalidatepage function)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		], 
                 [
@@ -1667,6 +1832,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -1718,6 +1886,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for combined file_operations readv and aio_read)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 		 ], [
 		 struct file_operations filop = {
@@ -1768,6 +1939,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for generic FS_IOC ioctl flags)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 	    #include <linux/fs.h>
 	], [
 	    int flags = FS_IOC_GETFLAGS;
@@ -1916,6 +2090,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field named page_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct address_space as;
@@ -1931,6 +2108,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct address_space as;
@@ -1947,6 +2127,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(if kernel address_space struct has a spinlock_t field named tree_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct address_space as;
@@ -1961,6 +2144,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct address_space as;
@@ -1974,6 +2160,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel defines mapping_nrpages macro - from RT linux)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct address_space idata;
@@ -1988,6 +2177,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel super_operations contains read_inode field)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct super_operations sops;
@@ -2002,6 +2194,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel super_operations contains drop_inode field)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct super_operations sops;
@@ -2016,6 +2211,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(if kernel super_operations contains put_inode field)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 	], [
 		struct super_operations sops;
@@ -2058,6 +2256,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(for d_alloc_anon)
         AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/dcache.h>
         ], [
                 struct inode *i;
@@ -2072,6 +2273,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_CHECKING(for s_dirty in struct super_block)
         AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
         ], [
                 struct super_block *s;
@@ -2300,6 +2504,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for dentry argument in fsync)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct file_operations f;
 		static int local_fsync(struct file *f, struct dentry *d, int i)
@@ -2320,6 +2527,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for unlocked_ioctl in file_operations)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
 		static struct file_operations f;
 	], 
@@ -2338,6 +2548,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for inode_setattr)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct iattr *iattr;
                 struct inode *inode;
@@ -2359,6 +2572,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for three-param dentry_operations.d_hash)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 static struct dentry_operations d;
@@ -2385,6 +2601,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for two-param dentry_operations.d_hash with const)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 static struct dentry_operations d;
@@ -2409,6 +2628,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for seven-param dentry_operations.d_compare)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 static struct dentry_operations d;
@@ -2437,6 +2659,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for five-param dentry_operations.d_compare)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 static struct dentry_operations d;
@@ -2463,6 +2688,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for constified dentry_operations.d_delete)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 static struct dentry_operations d;
@@ -2485,6 +2713,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for dentry.d_count atomic_t type)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 struct dentry d;
@@ -2507,6 +2738,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for dentry with lockref struct)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 #include <linux/dcache.h>
                 struct dentry d;
@@ -2529,6 +2763,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for three-param inode_operations permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct inode_operations i;
                 int p(struct inode *i, int mode, unsigned int flags)
@@ -2550,6 +2787,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for three-param acl_check of generic_permission)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct inode *i;
                 int p(struct inode *i, int mode, unsigned int flags)
@@ -2587,6 +2827,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for get_sb )
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
 		#include <linux/fs.h>
                 struct file_system_type f;
 	], 
@@ -2604,6 +2847,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_CHECKING(for dirty_inode flag)
 	AC_TRY_COMPILE([
                 #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
                 #include <linux/fs.h>
                 void di(struct inode *i, int f)
                 {
