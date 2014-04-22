@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -172,7 +173,7 @@ public class OrangeFileSystem extends FileSystem {
             OFSLOG.error("File:" + makeAbsolute(f));
             return false;
         }
-        if(status.isDir()) {
+        if(status.isDirectory()) {
             if(!recursive) {
                 OFSLOG.debug("Couldn't delete Path f = " + f + " since it is "
                         + "a directory but recursive is false.");
@@ -227,6 +228,9 @@ public class OrangeFileSystem extends FileSystem {
         int intPermission = 0;
         String octal = null;
         FsPermission permission = null;
+        String username = null;
+        String groupname = null;
+        
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("f = " + makeAbsolute(f));
         stats = orange.posix.stat(fOFS.toString());
@@ -244,26 +248,31 @@ public class OrangeFileSystem extends FileSystem {
         OFSLOG.debug("octal perms: " + octal);
         permission = new FsPermission(octal);
         OFSLOG.debug(permission.toString());
-        String[] ug = orange.stdio.getUsernameGroupname((int) stats.st_uid,
-                (int) stats.st_gid);
-        if (ug == null) {
-            OFSLOG.debug("getUsernameGroupname returned null");
-            throw new IOException();
+        
+        username =  orange.stdio.getUsername((int) stats.st_uid);
+        if (username == null) {
+            throw new IOException("getUsername returned null");
+        }
+        groupname = orange.stdio.getGroupname((int) stats.st_gid);
+        if (groupname == null) {
+            throw new IOException("getGroupname returned null");       	
         }
         /**/
-        OFSLOG.debug("uid, username = <" + stats.st_uid + ", " + ug[0] + ">");
-        OFSLOG.debug("gid, groupname = <" + stats.st_gid + ", " + ug[1] + ">");
+        OFSLOG.debug("uid, username = <" + stats.st_uid + ", " + username + ">");
+        OFSLOG.debug("gid, groupname = <" + stats.st_gid + ", " + groupname + ">");
         /**/
         fileStatus = new FileStatus(stats.st_size, isdir, block_replication,
                 stats.st_blksize, stats.st_mtime * 1000, stats.st_atime * 1000,
-                permission, ug[0], ug[1], makeAbsolute(f).makeQualified(this));
+                permission, username, groupname, 
+                makeAbsolute(f).makeQualified(this.uri, 
+                		this.workingDirectory));
         return fileStatus;
     }
 
     @Override
     public Path getHomeDirectory() {
         return new Path("/user/" + System.getProperty("user.name"))
-                .makeQualified(this);
+                .makeQualified(this.uri, this.workingDirectory);
     }
 
     /*
@@ -334,10 +343,12 @@ public class OrangeFileSystem extends FileSystem {
         if (this.initialized == true) {
             return;
         }
+        /*
         if (uri.getHost() == null) {
             throw new IOException("Incomplete OrangeFS URI, no host: " + uri);
         }
-        this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
+        */
+        this.uri = URI.create(uri.getScheme() + ":///");
         OFSLOG.debug("uri: " + this.uri.toString());
         OFSLOG.debug("conf: " + conf.toString());
         setConf(conf);
@@ -352,7 +363,7 @@ public class OrangeFileSystem extends FileSystem {
         }
         this.localFS = FileSystem.getLocal(conf);
         workingDirectory = new Path("/user/" + System.getProperty("user.name"))
-                .makeQualified(this);
+                .makeQualified(this.uri, null);
         OFSLOG.debug("workingDirectory = " + workingDirectory.toString());
     }
 
@@ -428,12 +439,16 @@ public class OrangeFileSystem extends FileSystem {
             }
         }
         /*
-         * At this point, a directory should be created unless a parent already
-         * exists as a file.
+         * At this point, a directory should get created below unless a parent
+         * already exists as a file.
          */
         parents = getParentPaths(f);
+        
+        OFSLOG.debug(Arrays.toString(parents));
+        throw new IOException("MYBAD");
+        /*
         if (parents != null) {
-            /* Attempt creation of parent directories */
+            // Attempt creation of parent directories
             for (int i = 0; i < parents.length; i++) {
                 if (exists(parents[i])) {
                     if (!isDir(parents[i])) {
@@ -443,7 +458,7 @@ public class OrangeFileSystem extends FileSystem {
                     }
                 }
                 else {
-                    /* Create the missing parent and setPermission. */
+                    // Create the missing parent and setPermission.
                     ret = orange.posix.mkdir(getOFSPathName(parents[i]), mode);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
@@ -457,7 +472,7 @@ public class OrangeFileSystem extends FileSystem {
                 }
             }
         }
-        /* Now create the directory f */
+        // Now create the directory f
         ret = orange.posix.mkdir(getOFSPathName(f), mode);
         if (ret == 0) {
             setPermission(f, permission);
@@ -468,6 +483,7 @@ public class OrangeFileSystem extends FileSystem {
                     + ", permission = " + permission.toString());
             return false;
         }
+        */
     }
 
     /* Opens an FSDataInputStream at the indicated Path. */

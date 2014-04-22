@@ -41,6 +41,7 @@ HADOOP_ORGDIR := src/client/jni/org/orangefs/hadoop/fs/ofs
 
 HADOOPJAVA := \
 	$(HADOOP_ORGDIR)/OrangeFileSystem.java \
-	$(HADOOP_ORGDIR)/OrangeFileSystemFSInputStream.java
+	$(HADOOP_ORGDIR)/OrangeFileSystemFSInputStream.java \
+    $(HADOOP_ORGDIR)/OrangeFS.java
 
 endif #BUILD_HADOOP

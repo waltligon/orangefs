@@ -124,7 +124,13 @@ public class PVFS2STDIOJNI {
 
     public native ArrayList<String> getEntriesInDir(String path);
 
-    public native String[] getUsernameGroupname(int uid, int gid);
+    public native int getGid(String groupname);
+
+    public native String getGroupname(int gid);
+
+    public native int getUid(String username);
+
+    public native String getUsername(int uid);
 
     public native int getw(long stream);
 

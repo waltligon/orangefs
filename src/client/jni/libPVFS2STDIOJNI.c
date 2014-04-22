@@ -31,6 +31,8 @@ static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
 static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
+static int get_gid_by_groupname(gid_t *gid, char *groupname);
+static int get_uid_by_username(uid_t *uid, char *username);
 static inline int is_dot_dir(char * dirent_name);
 static inline int is_lostfound_dir(char * dirent_name);
 /* TODO: relocate recursive delete related functions so other utilities can
@@ -123,6 +125,64 @@ static int get_username_by_uid(uid_t uid, char *username)
         return -1;
     }
     strcpy(username, pwdp->pw_name);
+    return 0;
+}
+
+static int get_gid_by_groupname(gid_t *gid, char *groupname)
+{
+    JNI_PFI();
+    struct group *groupp = NULL;
+
+    /* Check for NULL ptr */
+    if (!gid)
+    {
+    	JNI_ERROR("gid is NULL!\n");
+    	return -1;
+    }
+
+    /* Get "struct group" using groupname */
+    groupp = getgrnam(groupname);
+    if (groupp == NULL )
+    {
+        JNI_PERROR();
+        return -1;
+    }
+
+    /* set value referenced by gid pointer equal to
+     * gr_gid of "struct group" */
+    *gid = groupp->gr_gid;
+    JNI_PRINT("gid of groupname(%s) = %d\n", groupname, (int) *gid);
+
+    /* Return 0 on success */
+    return 0;
+}
+
+static int get_uid_by_username(uid_t *uid, char *username)
+{
+    JNI_PFI();
+    struct passwd *pwdp = NULL;
+
+    /* Check for NULL ptr */
+    if(!uid)
+    {
+    	JNI_ERROR("uid is NULL!\n");
+    	return -1;
+    }
+
+    /* Get "struct passwd" using username */
+    pwdp = getpwnam(username);
+    if (pwdp == NULL )
+    {
+        JNI_PERROR();
+        return -1;
+    }
+
+    /* set value referenced by uid pointer equal to
+     * pw_uid of "struct passwd" */
+    *uid = pwdp->pw_uid;
+    JNI_PRINT("uid of username(%s) = %d\n", username, (int) *uid);
+
+    /* Return 0 on success */
     return 0;
 }
 
@@ -1181,39 +1241,78 @@ error_out:
     return objArrayList;
 }
 
-JNIEXPORT jobjectArray JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsernameGroupname(JNIEnv *env,
-        jobject obj, jint uid, jint gid)
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGroupname(JNIEnv *env,
+        jobject obj, jint gid)
 {
     JNI_PFI();
     int ret = 0;
-    jobjectArray obj_ret = (jobjectArray) (jobject) 0;
-    char username[MAX_USERNAME_LENGTH + 1];
     char groupname[MAX_GROUPNAME_LENGTH + 1];
-
-    ret = get_username_by_uid(uid, username);
-    if (ret != 0)
-    {
-        return obj_ret;
-    }
-    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
 
     ret = get_groupname_by_gid(gid, groupname);
     if (ret != 0)
     {
-        return obj_ret;
+        return NULL_JOBJECT;
     }
     JNI_PRINT("gid, groupname = <%u, %s>\n", gid, groupname);
+    return (*env)->NewStringUTF(env, groupname);
+}
 
-    obj_ret = (*env)->NewObjectArray(env, (jsize) 2,
-            (*env)->FindClass(env, "java/lang/String"),
-            (*env)->NewStringUTF(env, ""));
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsername(JNIEnv *env,
+        jobject obj, jint uid)
+{
+    JNI_PFI();
+    int ret = 0;
+    char username[MAX_USERNAME_LENGTH + 1];
 
-    (*env)->SetObjectArrayElement(env, obj_ret, 0,
-            (*env)->NewStringUTF(env, username));
-    (*env)->SetObjectArrayElement(env, obj_ret, 1,
-            (*env)->NewStringUTF(env, groupname));
-    return obj_ret;
+    ret = get_username_by_uid(uid, username);
+    if (ret != 0)
+    {
+        return NULL_JOBJECT;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
+    return (*env)->NewStringUTF(env, username);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGid(JNIEnv *env,
+        jobject obj, jstring groupname)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cgroupname[MAX_GROUPNAME_LENGTH + 1];
+    int cgroupname_len = (*env)->GetStringLength(env, groupname);
+    (*env)->GetStringUTFRegion(env, groupname, 0, cgroupname_len, cgroupname);
+
+    gid_t gid;
+    ret = get_gid_by_groupname(&gid, cgroupname);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("gid, groupname = <%u, %s>\n", gid, cgroupname);
+    return (jint) gid;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUid(JNIEnv *env,
+        jobject obj, jstring username)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cusername[MAX_USERNAME_LENGTH + 1];
+    int cusername_len = (*env)->GetStringLength(env, username);
+    (*env)->GetStringUTFRegion(env, username, 0, cusername_len, cusername);
+
+    uid_t uid;
+    ret = get_uid_by_username(&uid, cusername);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, cusername);
+    return (jint) 0;
 }
 
 /* getw */
