@@ -22,6 +22,7 @@
         fflush(stdout);                                                                                    \
     } while(0)
 
+/* TODO are these enum values okay? */
 enum {
     LOCAL_OPERATION = 2,
     REMOTE_OPERATION = 3,
@@ -94,6 +95,22 @@ nested machine pvfs2_unexpected_remote_sm
 
 %%
 
+/* TODO: determine if allocated memory must be zeroed or if instead every field will be set.
+ * Utility function to calloc memory for server op and store the address in the referenced s_op.
+ * Returns the ptr to allocated memory on success and NULL on failure.
+ */
+static struct PINT_server_op * init_op(struct PINT_server_op **s_op)
+{
+    *s_op = (struct PINT_server_op *) calloc(1, sizeof(struct PINT_server_op));
+    if(*s_op == NULL)
+    {
+        gossip_lerr("init_op: failed to allocate memory for server op\n");
+        /* TODO: WHAT TO RETURN HERE? */
+        return NULL;
+    }
+    return *s_op;
+}
+
 /* unexpected_post()
  *
  * Post an unexpected receive
@@ -133,11 +150,10 @@ static PINT_sm_action unexpected_post(
 static PINT_sm_action unexpected_replace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PFI();
+    struct PINT_server_op *s_op = (struct PINT_server_op *) NULL;
     int ret = -PVFS_EINVAL;
-    struct PINT_server_op *s_op =
-            (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
+    PFI();
+    s_op = (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* If op was cancelled, print WARNING */
     if (s_op->op_cancelled)
     {
@@ -164,22 +180,48 @@ static PINT_sm_action unexpected_replace(
 static PINT_sm_action unexpected_pjmp_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PFI();
+    struct PINT_server_op *s_op = (struct PINT_server_op *) NULL;
+    struct PINT_server_op *local_op = (struct PINT_server_op *) NULL;
+    struct PINT_server_op *remote_op = (struct PINT_server_op *) NULL;
     int ret = -PVFS_EINVAL;
-    struct PINT_server_op *unexpected_op = (struct PINT_server_op *) NULL;
-    struct PINT_server_op *s_op =
-        (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    unexpected_op = 
-        (struct PINT_server_op *) malloc(sizeof(struct PINT_server_op));
-    if(!unexpected_op)
+    int remote_op_count = 0;
+    int remote_op_counter = 0;
+
+    PFI();
+    s_op = (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* TODO Decode request */
+    /* TODO setup remote operations*/
+
+#if 0
+    remote_op_count = 0;
+    remote_op_count = 1;
+    remote_op_count = 2;
+#endif
+
+    /* Setup 1 local op and remote ops for every remaining SID (V3) */
+    init_op(&local_op);
+    if(remote_op_count > 0)
     {
-        gossip_lerr("unexpected_pjmp_setup: failed to allocate memory for unexpected_op!\n");
+        /* malloc for each remote_op and push frame*/
+        for(remote_op_counter = 0; remote_op_counter < remote_op_count; remote_op_counter++)
+        {
+            init_op(&remote_op);
+            ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op);
+            if(ret < 0)
+            {
+                gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+                            "remote_op where remote_op_counter = %d!\n",
+                            remote_op_counter);
+            }
+        }
     }
-    memset(unexpected_op, 0, sizeof(struct PINT_server_op));
-    ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, unexpected_op);
+    /* TODO Push local_op first or last or doesn't matter? */
+    ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op);
     if(ret < 0)
     {
-        gossip_lerr("failed to setup nested sm for unexpected request!\n");
+        gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+                    "local_op!\n");
     }
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -188,24 +230,29 @@ static PINT_sm_action unexpected_pjmp_setup(
 static PINT_sm_action unexpected_pjmp_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PFI();
+    struct PINT_server_op *s_op = (struct PINT_server_op *) NULL;
+    struct PINT_server_op *popped_op = (struct PINT_server_op *) NULL;
     int ret = -PVFS_EINVAL;
     int task_id;
-    int remaining;
+    int remaining = 1;
     PVFS_error tmp_err;
-    struct PINT_server_op *unexpected_op = (struct PINT_server_op *) NULL;
-    struct PINT_server_op *s_op =
-            (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    unexpected_op = 
-        (struct PINT_server_op *) PINT_sm_pop_frame(smcb,
-                                                    &task_id,
-                                                    &tmp_err,
-                                                    &remaining);
-    //PRINT("unexpected_op is %s.\n",(unexpected_op ? "okay" : "NULL"));
-    gossip_ldebug(GOSSIP_SERVER_DEBUG,
-                  "unexpected: nested sm returned error code: %d\n",
-                  tmp_err);
-    free(unexpected_op);
+    PFI();
+    s_op = (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    do {
+        popped_op = (struct PINT_server_op *) PINT_sm_pop_frame(smcb,
+                                                                &task_id,
+                                                                &tmp_err,
+                                                                &remaining);
+#if 0
+#endif
+        gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                      "unexpected_pjmp_cleanup: popping frame\n"
+                      "\ttask_id = %d\n"
+                      "\ttmp_err = %d\n"
+                      "\tremaining = %d\n",
+                      task_id, tmp_err, remaining);
+        free(popped_op);
+    } while(remaining > 1);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -219,11 +266,10 @@ static PINT_sm_action unexpected_pjmp_cleanup(
 static PINT_sm_action unexpected_map(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PFI();
+    PINT_server_op *s_op = (struct PINT_server_op *) NULL;
     int ret = 0;
-    PINT_server_op *s_op = 
-        (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
+    PFI();
+    s_op = (struct PINT_server_op *) PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* Remove s_op from posted_sop_list */
     qlist_del(&s_op->next);
     /* If op was cancelled, kill the SM */
@@ -260,7 +306,6 @@ static PINT_sm_action unexpected_work_do_nothing(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PFI();
-
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
