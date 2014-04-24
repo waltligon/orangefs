@@ -853,6 +853,12 @@ int pvfs_close(int fd)
         }
     }
 #endif
+/* This looks like an early attempt to get posixish behavior when
+ * creating a file without permissions for owner.  clrflags does not
+ * seem to be set anywhere, so this should never be invoked - there is
+ * now a similar implmentation in iocommon/openfile-util so I think this
+ * can be removed.  WBL
+ */
     /* see if we need to clear any mode bits */
     if (pd->s && pd->s->fsops == &pvfs_ops)
     {
