@@ -24,6 +24,7 @@ prefix = "sysint"
 mount_fs =  False
 run_client = True
 mount_as_fuse = False
+debug = True
 
 ##
 #
@@ -46,10 +47,10 @@ def cp(testing_node,output=[]):
     # interior function that actually does the copying.
     def copy_test_pvt(testing_node,source,destination,local,args,output=[]):
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args)
-        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args),output)
+        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,source,destination,args),output,debug=True)
         #print "%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args)
-        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args),output)
-        testing_node.runSingleCommand("diff %s %s" % (source,local),output)
+        testing_node.runSingleCommand("%s/bin/pvfs2-cp %s %s %s" % (testing_node.ofs_installation_location,destination,local,args),output,debug=True)
+        testing_node.runSingleCommand("diff %s %s" % (source,local),output,debug=True)
         #print "diff %s %s" % (source,local)
         #print "copy_test_pvt: Diff %s " % (result)
         return rc
@@ -88,22 +89,22 @@ def misc(testing_node,output=[]):
 
     def touch(testing_node,output=[]):
         #${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-touch $PVFS2_MOUNTPOINT/miscfile    
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-touch %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-touch %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def chown(testing_node,output=[]):
         #${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-touch $PVFS2_MOUNTPOINT/miscfile
         groups_v = testing_node.runSingleCommandBacktick("groups").split(' ')
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-chown %s %s %s/miscfile" % (testing_node.ofs_installation_location,testing_node.current_user,groups_v[0],testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-chown %s %s %s/miscfile" % (testing_node.ofs_installation_location,testing_node.current_user,groups_v[0],testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def chmod(testing_node,output=[]):
         #${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-touch $PVFS2_MOUNTPOINT/miscfile
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-chmod 777 %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-chmod 777 %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def drop_caches(testing_node,output=[]):
-        dc_out = testing_node.runSingleCommandBacktick("%s/bin/pvfs2-drop-caches -m %s 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        dc_out = testing_node.runSingleCommandBacktick("%s/bin/pvfs2-drop-caches -m %s 2>&1" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         #print "dc out = "+dc_out
         #if  != 0:
         #    print "pvfs2-chmod failed with code %d" % rc
@@ -113,59 +114,59 @@ def misc(testing_node,output=[]):
         return 0
 
     def fsck(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-fsck -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-fsck -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def validate(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-validate -d %s -c -f -s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-validate -d %s -c -f -s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc   
         
     def fs_dump(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-fs-dump -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-fs-dump -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def ls(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-ls %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-ls %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def perror(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-perror 0 2>&1" % testing_node.ofs_installation_location,output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-perror 0 2>&1" % testing_node.ofs_installation_location,output,debug=True)
         return rc
 
     def stat(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-stat %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-stat %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def viewdist(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-viewdist -f %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-viewdist -f %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def xattr(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-xattr -s -k user.foo -v bar %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-xattr -s -k user.foo -v bar %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def rm(testing_node,output=[]):
-        rc = testing_node.runSingleCommand("%s/bin/pvfs2-rm %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand("%s/bin/pvfs2-rm %s/miscfile" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def set_debugmask(testing_node,output=[]):
-        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-debugmask -m %s "none"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-debugmask -m %s "none"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def set_mode_admin(testing_node,output=[]):
-        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-mode -m %s "admin"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-mode -m %s "admin"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def set_mode_normal(testing_node,output=[]):
-        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-mode -m %s "normal"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-mode -m %s "normal"' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def set_sync(testing_node,output=[]):
-        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-sync -m %s -D 0 -M 1' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand('%s/bin/pvfs2-set-sync -m %s -D 0 -M 1' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     def statfs(testing_node,output=[]):
-        rc = testing_node.runSingleCommand('%s/bin/pvfs2-statfs -m %s' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+        rc = testing_node.runSingleCommand('%s/bin/pvfs2-statfs -m %s' % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
         return rc
 
     # Add up the return codes of the interior functions and return it.
@@ -214,7 +215,7 @@ def mkdir_sysint(testing_node,output=[]):
     # is not a problem with OrangeFS.
     
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
-    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
+    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output,debug=True)
     return rc
 
 ##
@@ -234,7 +235,7 @@ def mkdir_sysint(testing_node,output=[]):
 
 def ping(testing_node,output=[]):
     
-    rc = testing_node.runSingleCommand("%s/bin/pvfs2-ping -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output)
+    rc = testing_node.runSingleCommand("%s/bin/pvfs2-ping -m %s" % (testing_node.ofs_installation_location,testing_node.ofs_mount_point),output,debug=True)
     #print "RC = %d" % rc
     return rc
 
@@ -258,7 +259,7 @@ def symlink_sysint(testing_node,output=[]):
     # Note: There is a known issue with test-mkdir that causes it to fail. This
     # is not a problem with OrangeFS.
     options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
-    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
+    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s --use-lib %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output,debug=True)
     return rc
 
 ##
@@ -276,7 +277,7 @@ def symlink_sysint(testing_node,output=[]):
 #    
 
 def zerofill(testing_node,output=[]):
-    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
+    rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-zero-fill -v" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output,debug=True)
     return rc
 
 tests = [ ping,cp,misc,zerofill,mkdir_sysint,symlink_sysint]

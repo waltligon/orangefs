@@ -27,6 +27,7 @@ prefix = "mpiio"
 mount_fs = False
 run_client = False
 mount_as_fuse = False
+debug = True
 
 def functions(self,testing_network):
     pass
@@ -82,7 +83,7 @@ def romio_testsuite(testing_node,output=[]):
     
     rc = 0
     print "%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point)
-    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
+    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output,debug)
     
     #TODO: Compare actual results with expected.
     

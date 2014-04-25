@@ -1257,6 +1257,7 @@ class OFSTestNetwork(object):
     #    @param resource_location Location of OrangeFS source
     #    @param resource_type Form of source: TAR,SVN,LOCAL,BUILDNODE
     #    @param ofs_config_file Location of orangefs.conf file
+    #    @param ofs_tcp_port TCP port on which OrangeFS servers run
     #    @param ofs_fs_name Name of OrangeFS in filesystem url
     #    @param ofs_hostname_override Change hostname to this. Needed to work around an openstack issue
     #    @param ofs_mount_point Location of OrangeFS mount_point
@@ -1270,6 +1271,7 @@ class OFSTestNetwork(object):
             resource_location,
             resource_type,
             ofs_config_file,
+            ofs_tcp_port,
             ofs_fs_name,
             ofs_hostname_override = None,
             ofs_mount_point = None,
@@ -1312,6 +1314,9 @@ class OFSTestNetwork(object):
             
             if ofs_fs_name != None:
                 node.ofs_fs_name = ofs_fs_name
+            
+            if ofs_tcp_port != None:
+                node.ofs_tcp_port = ofs_tcp_port
             
             # Mount point. can be read from mount
             if ofs_mount_point != None:

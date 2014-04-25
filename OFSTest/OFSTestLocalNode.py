@@ -84,7 +84,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
     # @param self The object pointer
     # @param output Output of command
      
-    def runAllBatchCommands(self,output=[]):
+    def runAllBatchCommands(self,output=[],debug=False):
      
         
         # Open file with mode 700
@@ -117,10 +117,15 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         script_file.close()
         
         os.chmod(batchfile,0755)
-        
+
+        if (debug):
+            script_file = open(batchfile,'r')
+            for line in script_file:
+                print line
+            script_file.close()
+            
+                    
         # run the command and capture stdout and stderr
-        
-        
         p = subprocess.Popen(batchfile,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work

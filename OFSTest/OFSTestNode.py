@@ -340,7 +340,12 @@ class OFSTestNode(object):
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
             #print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
-
+        
+        # Disable GSSAPI authentication, because it slows EVERYTHING down.
+        # http://stackoverflow.com/questions/21498322/unexpected-behavior-of-ssh-in-centos-6-x
+        #self.runSingleCommandAsBatch("sudo sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd", output)
+        #self.runSingleCommandAsBatch("nohup sudo service sshd restart &", output)
+        #time.sleep(15)
         # get the hostname
         self.hostname = self.runSingleCommandBacktick("hostname")
 
@@ -472,7 +477,7 @@ class OFSTestNode(object):
     # @param output Output list
     # @param remote_user User to run as. Default is current user.
     
-    def runSingleCommand(self,command,output=[],remote_user=None):
+    def runSingleCommand(self,command,output=[],remote_user=None,debug=False):
         
         
         
@@ -483,6 +488,8 @@ class OFSTestNode(object):
         # get the correct format of the command line for the node we are running on.    
         command_line = self.prepareCommandLine(command=command,remote_user=remote_user)
         
+        if (debug):
+            print command_line
         # run via Popen
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
@@ -502,13 +509,13 @@ class OFSTestNode(object):
     # @param output Output list
     # @param remote_user User to run as. Default is current user.
           
-    def runSingleCommandBacktick(self,command,output=[],remote_user=None):
+    def runSingleCommandBacktick(self,command,output=[],remote_user=None,debug=False):
         
         if remote_user==None:
             remote_user = self.current_user
       
         
-        self.runSingleCommand(command=command,output=output,remote_user=remote_user)
+        self.runSingleCommand(command=command,output=output,remote_user=remote_user,debug=debug)
         if len(output) >= 2:
             return output[1].rstrip('\n')
         else:
@@ -591,7 +598,7 @@ class OFSTestNode(object):
     # @param output Output list
 
        
-    def runAllBatchCommands(self,output=[]):
+    def runAllBatchCommands(self,output=[],debug=False):
         # implemented in child class
         pass
     
@@ -603,9 +610,9 @@ class OFSTestNode(object):
     # @param output Output list
     
     
-    def runSingleCommandAsBatch(self,command,output=[]):
+    def runSingleCommandAsBatch(self,command,output=[],debug=False):
         self.addBatchCommand(command)
-        self.runAllBatchCommands(output)
+        self.runAllBatchCommands(output,debug)
     
     ##
     # @fn runBatchFile(self,filename,output=[]):
@@ -1025,17 +1032,17 @@ class OFSTestNode(object):
                 sudo apt-get clean
 
                 #prepare source
-                SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
-                cd /usr/src/${SOURCENAME}
-                sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
-                cd ${SOURCENAME}/
-                sudo cp /boot/config-`uname -r` .config
-                sudo make oldconfig &> /dev/null
-                sudo make prepare &>/dev/null
-                if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
-                then
-                sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
-                fi
+                #SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
+                #cd /usr/src/${SOURCENAME}
+                #sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
+                #cd ${SOURCENAME}/
+                #sudo cp /boot/config-`uname -r` .config
+                #sudo make oldconfig &> /dev/null
+                #sudo make prepare &>/dev/null
+                #if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
+                #then
+                #sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
+                #fi
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
                 sudo chmod a+r /etc/fuse.conf
@@ -1108,7 +1115,7 @@ class OFSTestNode(object):
             batch_commands = '''
                 sudo bash -c 'echo 0 > /selinux/enforce'
                 echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
+                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients 
                 sudo yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl 
                 sudo /sbin/modprobe -v fuse
                 sudo chmod a+x /bin/fusermount
@@ -1286,10 +1293,14 @@ class OFSTestNode(object):
         if build_location == None:
             build_location = install_location
         
+        
         self.openmpi_version = "openmpi-1.6.5"
         url_base = "http://devorange.clemson.edu/pvfs/"
         url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
-        
+
+        #self.openmpi_version = "openmpi-1.8"
+        #url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+        #url = url_base+self.openmpi_version+".tar.gz"
 
         patch_name = "openmpi.patch"
         patch_url = url_base+patch_name
@@ -1298,15 +1309,14 @@ class OFSTestNode(object):
         tempdir = self.current_directory
         self.changeDirectory(build_location)
         
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
         if rc != 0:
             print "Could not download %s from %s." % (self.openmpi_version,url)
             self.changeDirectory(tempdir)
             return rc
 
         output = []
+        self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
         self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
         
         self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
@@ -1331,7 +1341,7 @@ class OFSTestNode(object):
         '''
 
         
-        configure = './configure --prefix %s/openmpi --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
+        configure = './configure --prefix %s/openmpi --enable-shared --with-pic --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
         
 
         print "Configuring %s" % self.openmpi_version
@@ -2114,7 +2124,7 @@ class OFSTestNode(object):
         
         # Add each ofs host to the string of hosts.
         for ofs_host in ofs_hosts_v:
-            ofs_host_str = ofs_host_str + ofs_host.hostname + ":3396,"
+            ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -2245,7 +2255,7 @@ class OFSTestNode(object):
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.runSingleCommandAsBatch("sudo ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        

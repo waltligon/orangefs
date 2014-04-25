@@ -122,7 +122,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     # @param self The object pointer
     # @param output Output of command
 
-    def runAllBatchCommands(self,output=[]):
+    def runAllBatchCommands(self,output=[],debug=False):
         OFSTestNode.batch_count = OFSTestNode.batch_count+1
 
         
@@ -151,8 +151,18 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
 
         script_file.write("exit\n")
         script_file.close()
+        
+        if (debug):
+            script_file = open(batchfilename,'r')
+            for line in script_file:
+                print line
+            script_file.close()
+            
+
 
         command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < %s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address,batchfilename)
+        if (debug):
+            print command_line
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work

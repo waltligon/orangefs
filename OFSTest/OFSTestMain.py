@@ -198,8 +198,9 @@ class OFSTestMain(object):
             resource_location=self.config.ofs_resource_location,
             resource_type=self.config.ofs_resource_type,
             ofs_config_file=self.config.ofs_config_file,
+            ofs_tcp_port=self.config.ofs_tcp_port,
             ofs_fs_name=self.config.ofs_fs_name,
-            ofs_host_name_override=self.config.ofs_host_name_override,
+            ofs_hostname_override=self.config.ofs_hostname_override,
             ofs_mount_point=self.config.ofs_mount_point
             )
         
