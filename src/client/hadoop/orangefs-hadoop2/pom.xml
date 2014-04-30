@@ -1,0 +1,42 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <!-- 
+  maven can be used to build orangefs-hadoop2 using the pom.xml file.
+  First, configure/build/install OrangeFS with the JNI client enabled,
+  then run (from the src/client/hadoop/orangefs-hadoop2/ directory):
+
+    mvn -Djni.library.path=/opt/orangefs/lib package
+
+  # TODO install resulting jar to /opt/orangefs/lib
+  -->
+  <groupId>org.apache.hadoop.fs.orangefs</groupId>
+  <artifactId>orangefs-hadoop2</artifactId>
+  <packaging>jar</packaging>
+  <version>2.9</version>
+  <name>orangefs-hadoop2</name>
+  <url>http://maven.apache.org</url>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>2.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.orangefs.usrint</groupId>
+      <artifactId>orangefs-jni</artifactId>
+      <version>2.9</version>
+      <scope>system</scope>
+      <systemPath>${jni.library.path}/ofs_jni.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.9</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
