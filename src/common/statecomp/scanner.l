@@ -87,7 +87,8 @@ id          [_a-zA-Z][_0-9a-zA-Z]*
 <CODE>"machine"    {RETURNVAL(MACHINE);}
 <CODE>"nested" 	   {RETURNVAL(NESTED);}
 <CODE>"state"	   {RETURNVAL(STATE);}
-<CODE>"run"	   {RETURNVAL(RUN);}
+<CODE>"switch"     {RETURNVAL(SWITCH);}
+<CODE>"run"        {RETURNVAL(RUN);}
 <CODE>"pjmp"       {RETURNVAL(PJMP);}
 <CODE>"jump"	   {RETURNVAL(JUMP);}
 <CODE>"return"	   {RETURNVAL(STATE_RETURN);}

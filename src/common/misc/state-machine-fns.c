@@ -898,7 +898,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         PINT_smcb_alloc(&new_sm,
                         smcb->op,
                         0,
-                        NULL,
+                        smcb->op_get_state_machine,
                         child_sm_frame_terminate,
                         smcb->context);
 

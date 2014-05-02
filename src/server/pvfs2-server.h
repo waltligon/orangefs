@@ -679,7 +679,8 @@ typedef struct PINT_server_op
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
-    int num_pjmp_frames;
+    int num_pjmp_frames; /* Used by tree_communicate */
+    int unexpected_pjmp_frames; /* Used by unexpected sm */
 
     union
     {
