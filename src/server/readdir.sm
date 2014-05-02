@@ -100,7 +100,7 @@ static PINT_sm_action readdir_iterate_on_entries(
     */
     if (s_op->req->u.readdir.dirent_count == 0)
     {
-	js_p->error_code = 0;
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -118,17 +118,25 @@ static PINT_sm_action readdir_iterate_on_entries(
     */
 
     /* TODO: make sure this is where we get the config for metadata replication */
-    ret = PINT_cached_config_get_num_io(s_op->req->u.readdir.fs_id, 
+    metadata_sid_count = PINT_cached_config_get_num_io(s_op->req->u.readdir.fs_id, 
                      &(s_op->resp->u.readdir.sid_count));
 
-    if (ret)
-   {
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
-   }
+    if (metadata_sid_count)
+    {
+        js_p->error_code = metadata_sid_count;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->u.readdir.metadata_sid_count = metadata_sid_count;
+    s_op->resp.u.readdir.sid_count = metadata_sid_count * s_op->req->u.readdir.dirent_count;
+
 
     kv_array_size = (s_op->req->u.readdir.dirent_count *
                      sizeof(PVFS_ds_keyval));
+
+    s_op->u.readdir.keyval_db_entries = (PVFS_ID *) malloc(sizeof(PVFS_SID) * 
+                    metadata_sid_count + 
+                    sizeof(PVFS_handle) * 
+                    s_op->req->u.readdir.dirent_count);
 
     memory_size = (2 * kv_array_size +
                    s_op->req->u.readdir.dirent_count *
@@ -150,18 +158,24 @@ static PINT_sm_action readdir_iterate_on_entries(
     memory_buffer += kv_array_size;
 
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;
+
     memory_buffer += s_op->req->u.readdir.dirent_count *
                    sizeof(PVFS_dirent);
-    s_op->resp.u.readdir.sid_array;
+
+    s_op->resp.u.readdir.sid_array = memory_buffer;
+
+    PVFS_ID *buffer_location = s_op->u.readdir.keyval_db_entries;
 
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-	s_op->key_a[j].buffer =
-                s_op->resp.u.readdir.dirent_array[j].d_name;
-	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
-	s_op->val_a[j].buffer =
-                &(s_op->resp.u.readdir.dirent_array[j].handle);
-	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
+    	s_op->key_a[j].buffer =
+                    s_op->resp.u.readdir.dirent_array[j].d_name;
+    	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
+        //TODO: Change this to dump into the keyval_db_entries
+    	s_op->val_a[j].buffer =
+                    &(buffer_location);
+    	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle) + sizeof(PVFS_SID) * metadata_sid_count;
+        buffer_location += sizeof(PVFS_handle) + sizeof(PVFS_SID) * metadata_sid_count;
     }
 
     gossip_debug(
@@ -203,6 +217,22 @@ static PINT_sm_action readdir_setup_resp(
 	js_p->error_code = -PVFS_EINVAL;
 	return SM_ACTION_COMPLETE;
     }
+    PVFS_ID *db_entries = s_op->u.readdir.keyval_db_entries;
+    PVFS_dirent *resp_dirent_array = s_op->resp.u.readdir.dirent_array;
+    PVFS_ID *resp_sid_array = s_op->resp.u.readdir.sid_array;
+
+    //Iterates over entries retrieved from database and copies to appropriate locations in response struct
+    for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
+    {
+        memcpy(&(resp_dirent_array.handle), db_entries, sizeof(PVFS_handle));
+        db_entries += sizeof(PVFS_handle);
+        memcpy(resp_sid_array, db_entries, sizeof(PVFS_SID) * s_op->u.readdir.metadata_sid_count);
+        db_entries += sizeof(PVFS_SID) * s_op->u.readdir.metadata_sid_count;
+        resp_dirent_array += sizeof(PVFS_dirent);
+        resp_sid_array += sizeof(PVFS_SID) * s_op->u.readdir.metadata_sid_count;
+
+    }
+
     else if(js_p->error_code != 0)
     {
         PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
@@ -240,6 +270,9 @@ static PINT_sm_action readdir_cleanup(
         s_op->key_a = NULL;
         s_op->val_a = NULL;
         s_op->resp.u.readdir.dirent_array = NULL;
+    }
+    if(s_op->keyval_db_entries){
+        free(s_op->keyval_db_entries);
     }
     return(server_state_machine_complete(smcb));
 }
