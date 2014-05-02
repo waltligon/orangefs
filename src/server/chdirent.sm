@@ -18,11 +18,6 @@
 #include "pint-security.h"
 #include "dist-dir-utils.h"
 
-enum
-{
-    UPDATE_DIR_ATTR_REQUIRED = 135
-};
-
 %%
 
 machine pvfs2_chdirent_sm
@@ -71,20 +66,13 @@ machine pvfs2_chdirent_sm
     state change_directory_entry
     {
         run chdirent_change_directory_entry;
-        success => check_for_req_dir_update;
+        success => update_directory_attr;
         default => change_directory_entry_failure;
     }
 
     state change_directory_entry_failure
     {
         run chdirent_change_directory_entry_failure;
-        default => setup_resp;
-    }
-
-    state check_for_req_dir_update
-    {
-        run chdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
         default => setup_resp;
     }
 
@@ -212,15 +200,15 @@ static PINT_sm_action chdirent_get_bitmap(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "chdirent: get dist-dir-attr for dirdata handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
             attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.dirdata_count,
             attr_p->u.dir.dist_dir_attr.bitmap_size,
             attr_p->u.dir.dist_dir_attr.split_size,
             attr_p->u.dir.dist_dir_attr.server_no,
@@ -339,15 +327,15 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
     }           
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading from dirent handle = %s, name = %s\n",
-		 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
-		 s_op->req->u.chdirent.entry);
+                 "  reading from dirent handle = %s, name = %s\n",
+                 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
+                 s_op->req->u.chdirent.entry);
 
     s_op->key.buffer = s_op->req->u.chdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
     s_op->val.buffer = &s_op->u.chdirent.old_dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
-
+    s_op->u.chdirent.old_sid_array = s_op->u.chdirent.old_dirent_handle + sizeof(PVFS_handle);
+    s_op->val.buffer_sz = sizeof(PVFS_handle)) + s_op->req->u.chdirent.old_sid_count * sizeof(PVFS_SID);
     ret = job_trove_keyval_read(s_op->req->u.chdirent.fs_id,
                                 s_op->req->u.chdirent.dirent_handle,
                                 &s_op->key,
@@ -369,13 +357,13 @@ static PINT_sm_action chdirent_read_directory_entry_failure(
 {
     switch (js_p->error_code)
     {
-	case -TROVE_ENOENT:
-	    js_p->error_code = -PVFS_ENOENT;
-	    break;
-	default:
-	    gossip_err("chdirent_read_directory_entry_failure: "
+        case -TROVE_ENOENT:
+            js_p->error_code = -PVFS_ENOENT;
+            break;
+        default:
+            gossip_err("chdirent_read_directory_entry_failure: "
                        "unexpected error %d\n", js_p->error_code);
-	    break;
+            break;
     }
     return SM_ACTION_COMPLETE;
 }
@@ -391,6 +379,8 @@ static PINT_sm_action chdirent_change_directory_entry(
 
     s_op->u.chdirent.new_dirent_handle =
         s_op->req->u.chdirent.new_dirent_handle;
+    s_op->u.chdirent.new_sid_array = 
+        s_op->req->u.chdirent.new_sid_array;
 
     if (!PVFS_OID_cmp(&s_op->u.chdirent.old_dirent_handle,
                       &s_op->u.chdirent.new_dirent_handle))
@@ -403,7 +393,7 @@ static PINT_sm_action chdirent_change_directory_entry(
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
 
     s_op->val.buffer = &s_op->u.chdirent.new_dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->val.buffer_sz = sizeof(PVFS_handle) + sizeof(PVFS_SID) * s_op->req->u.chdirent.new_sid_count;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  changing dir entry for %s from handle value "
@@ -418,20 +408,7 @@ static PINT_sm_action chdirent_change_directory_entry(
         0,
         NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
-    s_op->u.chdirent.dir_attr_update_required = 1;
     return ret;
-}
-
-static PINT_sm_action chdirent_check_for_req_dir_update(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if ((js_p->error_code == 0) &&
-        (s_op->u.chdirent.dir_attr_update_required))
-    {
-        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
-    }
-    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action chdirent_update_directory_attr(
@@ -443,13 +420,6 @@ static PINT_sm_action chdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-
-    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
-    {
-        PVFS_perror_gossip("previous keyval write failed",
-                           js_p->error_code);
-        return SM_ACTION_COMPLETE;
-    }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.chdirent.dirdata_attr;
@@ -473,36 +443,39 @@ static PINT_sm_action chdirent_change_directory_entry_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     assert(js_p->error_code != -TROVE_ENOENT);
-	    
+            
     switch (js_p->error_code)
     {
-	case -TROVE_ENOENT:
-	    js_p->error_code = -PVFS_ENOENT;
-	    break;
-	default:
-	    break;
+        case -TROVE_ENOENT:
+            js_p->error_code = -PVFS_ENOENT;
+            break;
+        default:
+            break;
     }
     gossip_err("unexpected error %d\n", js_p->error_code);
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action chdirent_setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_setup_resp(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
-	/* return original dirent handle in the response */
-	s_op->resp.u.chdirent.old_dirent_handle =
-            s_op->u.chdirent.old_dirent_handle;
+        /* return original dirent handle in the response */
+        s_op->resp.u.chdirent.old_dirent_handle =
+                        s_op->u.chdirent.old_dirent_handle;
+        s_op->resp.u.chdirent.old_sid_count = s_op->req->u.chdirent.old_sid_count;
+        s_op->resp.u.chdirent.old_sid_array = s_op->u.chdirent.old_sid_array;
 
-	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  succeeded; returning handle %s in response\n",
-		     PVFS_OID_str(&s_op->resp.u.chdirent.old_dirent_handle));
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "  succeeded; returning handle %s in response, with sid_count %d\n",
+                     PVFS_OID_str(&s_op->resp.u.chdirent.old_dirent_handle),
+                     s_op->resp.u.chdirent.old_sid_count);
     }
     else
     {
-	gossip_debug(GOSSIP_SERVER_DEBUG, "  sending error response\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  sending error response\n");
     }
     return SM_ACTION_COMPLETE;
 }
