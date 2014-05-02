@@ -17,6 +17,98 @@
  *  Declarations and macros for the PVFS2 Linux kernel support.
  */
 
+/* khandle stuff  ***********************************************************/
+
+/*
+ * The 2.9 core will put 64 bit handles in here like this:
+ *    1234 0000 0000 5678
+ * The 3.0 and beyond cores will put 128 bit handles in here like this:
+ *    1234 5678 90AB CDEF
+ * The kernel module will always use the first four bytes and
+ * the last four bytes as an inum.
+ */
+typedef struct {unsigned char u[16];} PVFS_khandle \
+  __attribute__ (( __aligned__ (8)));
+
+/*
+ * kernel version of an object ref.
+ */
+typedef struct
+{
+  PVFS_khandle khandle;
+  int32_t fs_id;
+  int32_t __pad1;
+} PVFS_object_kref;
+
+/*
+ * The kernel module will put the appropriate bytes of the khandle
+ * into ihash.u and perceive them as an inode number through ihash.ino.
+ */
+struct ihash {
+  union {
+    unsigned char u[8];
+    uint64_t ino;
+  };
+};
+
+/*
+ * k2s is a function in pvfs2-utils whose job is to return a
+ * string representation of a khandle. k2s callers are responsible
+ * for allocating memory for the return string from k2s.
+ * HANDLESTRINGSIZE is a safe amount of space for the memory allocation.
+ */
+char *k2s(PVFS_khandle *, char *);
+#define HANDLESTRINGSIZE 40
+
+
+
+/*
+ * compare 2 khandles assumes little endian thus from large address to
+ * small address
+ */
+static __inline__ int PVFS_khandle_cmp(const PVFS_khandle *kh1,
+				       const PVFS_khandle *kh2)
+{
+  int i;
+
+  for (i = 15; i >= 0; i--) {
+    if (kh1->u[i] > kh2->u[i])
+      return 1;
+    if (kh1->u[i] < kh2->u[i])
+      return -1;
+  }
+
+  return 0;
+}
+
+/* copy a khandle to a field of arbitrary size */
+static __inline__ void PVFS_khandle_to(const PVFS_khandle *kh,
+                                       void *p, int size)
+{
+  int i;
+  unsigned char *c = p;
+
+  memset(p, 0, size);
+
+  for (i = 0; i < 16 && i < size; i++)
+    c[i] = kh->u[i];
+}
+
+/* copy a khandle from a field of arbitrary size */
+static __inline__ void PVFS_khandle_from(PVFS_khandle *kh,
+                                         void *p, int size)
+{
+  int i;
+  unsigned char *c = p;
+
+  memset(kh, 0, 16);
+
+  for (i = 0; i < 16 && i < size; i++)
+    kh->u[i] = c[i];
+}
+
+/* end khandle stuff  *******************************************************/
+
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
@@ -504,7 +596,7 @@ typedef struct
 /** per superblock private pvfs2 info */
 typedef struct
 {
-    PVFS_handle root_handle;
+    PVFS_khandle root_khandle;
     PVFS_fs_id fs_id;
     int id;
     pvfs2_mount_options_t mnt_options;
@@ -524,7 +616,7 @@ typedef struct
 typedef struct
 {
     void *data;
-    PVFS_handle root_handle;
+    PVFS_khandle root_khandle;
     PVFS_fs_id fs_id;
     int id;
 } pvfs2_mount_sb_info_t;
@@ -538,7 +630,7 @@ typedef struct
  */
 typedef struct 
 {
-    PVFS_handle handle;
+    PVFS_khandle khandle;
     PVFS_fs_id  fsid;
     int32_t     __pad1;
     PVFS_uid    owner;
@@ -580,7 +672,7 @@ typedef struct
 } while (0)
 
 #define encode_pvfs2_opaque_handle_t(pptr,x) do {\
-    encode_int64_t(pptr, &(x)->handle);\
+    PVFS_khandle_to(&(x)->khandle,*(pptr),16); \
     encode_int32_t(pptr, &(x)->fsid);\
     encode_skip4(pptr,);\
     encode_int32_t(pptr, &(x)->owner);\
@@ -595,7 +687,7 @@ typedef struct
     encode_int32_t(pptr, &(x)->mask);\
 } while (0)
 #define decode_pvfs2_opaque_handle_t(pptr,x) do {\
-    decode_int64_t(pptr, &(x)->handle);\
+    PVFS_khandle_from(&(x)->khandle,*(pptr),16); \
     decode_int32_t(pptr, &(x)->fsid);\
     decode_skip4(pptr,);\
     decode_int32_t(pptr, &(x)->owner);\
@@ -668,28 +760,26 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 #endif
 }
 
-static inline PVFS_handle ino_to_pvfs2_handle(ino_t ino)
+/* ino_t descends from "unsigned long", 8 bytes, 64 bits. */
+static inline ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
 {
-    return (PVFS_handle) ino;
+  struct ihash ihandle;
+
+  ihandle.u[0] = khandle->u[0];
+  ihandle.u[1] = khandle->u[1];
+  ihandle.u[2] = khandle->u[2];
+  ihandle.u[3] = khandle->u[3];
+  ihandle.u[4] = khandle->u[12];
+  ihandle.u[5] = khandle->u[13];
+  ihandle.u[6] = khandle->u[14];
+  ihandle.u[7] = khandle->u[15];
+
+  return ihandle.ino;
 }
 
-static inline ino_t pvfs2_handle_to_ino(PVFS_handle handle)
+static inline PVFS_khandle *get_khandle_from_ino(struct inode *inode)
 {
-    ino_t ino;
-
-    ino = (ino_t) handle;
-    if (sizeof(ino_t) < sizeof(PVFS_handle))
-        ino ^= handle >> (sizeof(PVFS_handle) - sizeof(ino_t)) * 8;
-    return ino;
-}
-
-static inline PVFS_handle get_handle_from_ino(struct inode *inode)
-{
-#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
-    return PVFS2_I(inode)->refn.handle;
-#else
-    return ino_to_pvfs2_handle(inode->i_ino);
-#endif
+    return &(PVFS2_I(inode)->refn.khandle);
 }
 
 static inline PVFS_fs_id get_fsid_from_ino(struct inode *inode)
@@ -697,29 +787,30 @@ static inline PVFS_fs_id get_fsid_from_ino(struct inode *inode)
     return PVFS2_I(inode)->refn.fs_id;
 }
 
-static inline ino_t get_ino_from_handle(struct inode *inode)
+static inline ino_t get_ino_from_khandle(struct inode *inode)
 {
-    PVFS_handle handle;
+    PVFS_khandle khandle;
     ino_t ino;
 
-    handle = get_handle_from_ino(inode);
-    ino = pvfs2_handle_to_ino(handle);
+    khandle = get_khandle_from_ino(inode);
+    ino = pvfs2_khandle_to_ino(khandle);
     return ino;
 }
 
 static inline ino_t get_parent_ino_from_dentry(struct dentry *dentry)
 {
-    return get_ino_from_handle(dentry->d_parent->d_inode);
+    return get_ino_from_khandle(dentry->d_parent->d_inode);
 }
 
 static inline int is_root_handle(struct inode *inode)
 {
-    return PVFS2_SB(inode->i_sb)->root_handle == get_handle_from_ino(inode);
+    return PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
+                            get_khandle_from_ino(inode));
 }
 
-static inline int match_handle(PVFS_handle resp_handle, struct inode *inode)
+static inline int match_handle(PVFS_khandle resp_handle, struct inode *inode)
 {
-    return resp_handle == get_handle_from_ino(inode);
+    return PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode));
 }
 
 /****************************
@@ -1130,12 +1221,15 @@ do {                                                      \
 (PVFS2_SB(inode->i_sb)->mnt_options.suid)
 
 #ifdef USE_MMAP_RA_CACHE
-#define clear_inode_mmap_ra_cache(inode)                  \
-do {                                                      \
-  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %llu\n",\
-              llu(get_handle_from_ino(inode)));                         \
-  pvfs2_flush_mmap_racache(inode);                        \
-  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n");    \
+#define clear_inode_mmap_ra_cache(inode) \
+do { \
+  char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL); \
+  gossip_debug(GOSSIP_INODE_DEBUG, \
+               "calling clear_inode_mmap_ra_cache on %s\n", \
+               k2s(get_khandle_from_ino(inode),s)); \
+  kfree(s); \
+  pvfs2_flush_mmap_racache(inode); \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n"); \
 } while(0)
 #else
 #define clear_inode_mmap_ra_cache(inode)

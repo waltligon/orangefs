@@ -177,11 +177,16 @@ struct address_space_operations pvfs2_address_operations =
 void pvfs2_truncate(struct inode *inode)
 {
     loff_t orig_size = pvfs2_i_size_read(inode);
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
         return;
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
-                "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
+    gossip_debug(GOSSIP_INODE_DEBUG,
+                 "pvfs2: pvfs2_truncate called on inode %s "
+                 "with size %ld\n",
+                 k2s(get_khandle_from_ino(inode),s),
+                 (long) orig_size);
+    kfree(s);
 
     /* successful truncate when size changes also requires mtime updates 
      * although the mtime updates are propagated lazily!
@@ -444,7 +449,7 @@ static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
 {
     if (!ref)
         return 0;
-    return pvfs2_handle_to_ino(ref->handle);
+    return pvfs2_khandle_to_ino(ref->khandle);
 }
 
 /* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
@@ -464,7 +469,7 @@ int pvfs2_set_inode(struct inode *inode, void *data)
         return 0;
     pvfs2_inode_initialize(pvfs2_inode);
     pvfs2_inode->refn.fs_id  = ref->fs_id;
-    pvfs2_inode->refn.handle = ref->handle;
+    pvfs2_inode->refn.khandle = ref->khandle;
     return 0;
 }
 
@@ -481,7 +486,9 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     pvfs2_inode = PVFS2_I(inode);
-    return (pvfs2_inode->refn.handle == ref->handle && pvfs2_inode->refn.fs_id == ref->fs_id);
+    return (PVFS_khandle_cmp(&(pvfs2_inode->refn.khandle), &(ref->khandle)) &&
+            pvfs2_inode->refn.fs_id == ref->fs_id);
+
 }
 #endif
 
@@ -506,6 +513,7 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
 {
     struct inode *inode = NULL;
     unsigned long hash;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
 #if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
     hash = pvfs2_handle_hash(ref);
@@ -515,7 +523,7 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
     inode = iget4_locked(sb, hash, pvfs2_test_inode, ref);
 #endif
 #else
-    hash = (unsigned long) ref->handle;
+    hash = pvfs2_khandle_to_ino(ref->khandle)
 #ifdef HAVE_IGET_LOCKED
     inode = iget_locked(sb, hash);
 #else
@@ -550,8 +558,13 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         }
 #endif
     }
-    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
-                 ref->handle, ref->fs_id, hash, inode->i_ino);
+    gossip_debug(GOSSIP_INODE_DEBUG,
+                 "iget handle %s, fsid %d hash %ld i_ino %lu\n",
+                 k2s(&(ref->khandle),s),
+                 ref->fs_id,
+                 hash,
+                 inode->i_ino);
+    kfree(s);
     return inode;
 }
 
@@ -568,6 +581,7 @@ struct inode *pvfs2_get_custom_inode_common(
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode_common: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
@@ -670,8 +684,10 @@ struct inode *pvfs2_get_custom_inode_common(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
-                llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "Initializing ACL's for inode %llu\n", 
+                     k2s(get_khandle_from_ino(inode),s));
+        kfree(s);
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

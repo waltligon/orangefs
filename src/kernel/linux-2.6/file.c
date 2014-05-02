@@ -95,9 +95,13 @@ int pvfs2_file_open(
     struct file *file)
 {
     int ret = -EINVAL;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %llu)\n",
-                file->f_dentry->d_name.name, llu(get_handle_from_ino(inode)));
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "pvfs2_file_open: called on %s (inode is %s)\n",
+                 file->f_dentry->d_name.name,
+                 k2s(get_khandle_from_ino(inode),s));
 
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
@@ -135,7 +139,7 @@ int pvfs2_file_open(
                 gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
                 pvfs2_make_bad_inode(inode);
                 gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning error: %d\n", ret);
-                return(ret);
+                goto out;
             }
         }
 
@@ -147,6 +151,9 @@ int pvfs2_file_open(
     }
 
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
+
+out;
+    kfree(s);
     return ret;
 }
 
@@ -471,6 +478,7 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
     ssize_t ret;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     if (!rw || !vec || nr_segs < 0 || total_size <= 0 
             || !rw->pvfs2_inode || !rw->inode || !rw->fnstr)
@@ -502,26 +510,31 @@ populate_shared_memory:
                 rw->fnstr, (long) ret);
         goto out;
     }
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): GET op %p -> buffer_index %d\n"
-                                  , __func__
-                                  ,rw->fnstr
-                                  , llu(rw->pvfs2_inode->refn.handle)
-                                  , new_op, buffer_index);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): GET op %p -> buffer_index %d\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(rw->pvfs2_inode->refn.khandle),s),
+                 new_op,
+                 buffer_index);
 
     new_op->uses_shared_memory = 1;
     new_op->upcall.req.io.buf_index = buffer_index;
     new_op->upcall.req.io.count = total_size;
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): copy_to_user %d nr_segs %lu, "
-                                    "offset: %llu total_size: %zd\n"
-                                   ,__func__
-                                   ,rw->fnstr
-                                   ,llu(rw->pvfs2_inode->refn.handle)
-                                   ,rw->copy_to_user_addresses
-                                   ,nr_segs
-                                   ,llu(*(rw->off.io.offset))
-                                   ,total_size);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): copy_to_user %d nr_segs %lu, "
+                 "offset: %llu total_size: %zd\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(rw->pvfs2_inode->refn.khandle),s),
+                 rw->copy_to_user_addresses,
+                 nr_segs,
+                 llu(*(rw->off.io.offset)),
+                 total_size);
 
 
     /* Stage 1: copy the buffers into client-core's address space */
@@ -531,11 +544,13 @@ populate_shared_memory:
         goto out;
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag (%llu)\n"
-                                  ,__func__
-                                  ,rw->fnstr
-                                  ,llu(rw->pvfs2_inode->refn.handle)
-                                  ,llu(new_op->tag));
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): Calling post_io_request with tag (%llu)\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(rw->pvfs2_inode->refn.khandle),s),
+                 llu(new_op->tag));
 
     /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
@@ -572,14 +587,20 @@ populate_shared_memory:
           }
           else
           {
+              memset(s,0,HANDLESTRINGSIZE);
               gossip_err(
-                    "%s: error in %s handle %llu, "
+                    "%s: error in %s handle %s, "
                     "FILE: %s, returning %ld\n",
                     rw->fnstr, 
-                    rw->type == IO_READV ? "vectored read from" : "vectored write to",
-                    llu(get_handle_from_ino(rw->inode)),
-                    (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
-                     (char *)rw->file->f_dentry->d_name.name : "UNKNOWN"),
+                    rw->type == IO_READV ?
+                      "vectored read from" :
+                      "vectored write to",
+                    k2s(get_khandle_from_ino(rw->inode),s),
+                    (rw->file &&
+                     rw->file->f_dentry &&
+                     rw->file->f_dentry->d_name.name ?
+                        (char *)rw->file->f_dentry->d_name.name :
+                        "UNKNOWN"),
                     (long) ret);
           }
           goto out;
@@ -597,11 +618,14 @@ populate_shared_memory:
         goto out;
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Amount written as returned by the sys-io call:%d\n"
-                                  ,__func__
-                                  ,rw->fnstr
-                                  ,llu(rw->pvfs2_inode->refn.handle)
-                                  ,(int)new_op->downcall.resp.io.amt_complete);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): "
+                 "Amount written as returned by the sys-io call:%d\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(rw->pvfs2_inode->refn.khandle),s),
+                 (int)new_op->downcall.resp.io.amt_complete);
 
     ret = new_op->downcall.resp.io.amt_complete;
     
@@ -617,10 +641,12 @@ out:
     if (buffer_index >= 0)
     {
         pvfs_bufmap_put(buffer_index);
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s(%llu): PUT buffer_index %d\n"
-                                      , rw->fnstr
-                                      , llu(rw->pvfs2_inode->refn.handle)
-                                      , buffer_index);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s(%s): PUT buffer_index %d\n",
+                     rw->fnstr,
+                     k2s(&(rw->pvfs2_inode->refn.khandle),s),
+                     buffer_index);
         buffer_index = -1;
     }
     if (new_op) 
@@ -628,6 +654,7 @@ out:
         op_release(new_op);
         new_op = NULL;
     }
+    kfree(s);
     return ret;
 }
 
@@ -1298,6 +1325,7 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     unsigned long *seg_array = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     total_count = 0;
     ret = -EINVAL;
@@ -1345,11 +1373,13 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         goto out;
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s-BEGIN/%s(%llu): count(%d) after estimate_max_iovecs.\n"
-                                  ,__func__
-                                  ,rw->fnstr
-                                  ,llu(pvfs2_inode->refn.handle)
-                                  ,(int)count);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s-BEGIN/%s(%s): count(%d) after estimate_max_iovecs.\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 (int)count);
 
     if (rw->type == IO_WRITEV)
     {
@@ -1376,11 +1406,15 @@ static ssize_t do_readv_writev(struct rw_options *rw)
             goto out;
         }
 
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): proceeding with offset : %llu, size %d\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,llu(*offset), (int)count);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s/%s(%s): proceeding with offset : %llu, size %d\n",
+                     __func__,
+                     rw->fnstr,
+                     k2s(&(pvfs2_inode->refn.khandle),s),
+                     llu(*offset),
+                     (int)count);
+
     } /*endif IO_WRITEV*/
 
     if (count == 0)
@@ -1444,16 +1478,22 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     }
     ptr = iovecptr;
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu) %d@%llu\n"
-                                  , __func__
-                                  , rw->fnstr
-                                  , llu(pvfs2_inode->refn.handle)
-                                  , (int)count, llu(*offset));
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): new_nr_segs: %lu, seg_count: %lu\n"
-                                  , __func__
-                                  , rw->fnstr
-                                  , llu(pvfs2_inode->refn.handle)
-                                  , new_nr_segs, seg_count);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s) %d@%llu\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 (int)count,
+                 llu(*offset));
+
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): new_nr_segs: %lu, seg_count: %lu\n",
+                 __func__,
+                rw->fnstr,
+                k2s(&(pvfs2_inode->refn.khandle),s),
+                new_nr_segs,
+                seg_count);
 
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -1494,24 +1534,30 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         //{
             /* push the I/O directly through to storage */
 
-        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): size of each_count(%d)\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,(int)each_count);
-        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): BEFORE wait_for_io: offset is %d\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,(int)*offset);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s/%s(%s): size of each_count(%d)\n",
+                     __func__,
+                     rw->fnstr,
+                     k2s(&(pvfs2_inode->refn.khandle),s),
+                     (int)each_count);
+
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s/%s(%s): BEFORE wait_for_io: offset is %d\n",
+                     __func__,
+                     rw->fnstr,
+                     k2s(&(pvfs2_inode->refn.khandle),s),
+                     (int)*offset);
 
         ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
 
-        gossip_debug(GOSSIP_FILE_DEBUG,"%s%s(%llu): return from wait_for_io:%d\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,(int)ret);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s%s(%s): return from wait_for_io:%d\n",
+                     __func__,
+                     rw->fnstr,
+                     k2s(&(pvfs2_inode->refn.khandle),s),
+                     (int)ret);
 
         if (ret < 0)
         {
@@ -1525,11 +1571,13 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         total_count += ret;
         amt_complete = ret;
 
-        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): AFTER wait_for_io: offset is %d\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,(int)*offset);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s/%s(%s): AFTER wait_for_io: offset is %d\n",
+                     __func__,
+                     rw->fnstr,
+                     k2s(&(pvfs2_inode->refn.khandle),s),
+                     (int)*offset);
 
         /* if we got a short I/O operations,
          * fall out and return what we got so far 
@@ -1565,12 +1613,15 @@ out:
         mark_inode_dirty_sync(inode);
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Value(%d) returned.\n"
-                                      ,__func__
-                                      ,rw->fnstr
-                                      ,llu(pvfs2_inode->refn.handle)
-                                      ,(int)ret);
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "%s/%s(%s): Value(%d) returned.\n",
+                 __func__,
+                 rw->fnstr,
+                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 (int)ret);
 
+    kfree(s);
     return ret;
 }
 
@@ -1946,6 +1997,7 @@ static ssize_t wait_for_iox(struct rw_options *rw,
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
     ssize_t ret;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     if (!rw || !vec || nr_segs < 0 || total_size <= 0
             || !xtvec || xtnr_segs < 0)
@@ -2023,15 +2075,20 @@ static ssize_t wait_for_iox(struct rw_options *rw,
           }
           else
           {
+              memset(s,0,HANDLESTRINGSIZE);
               gossip_err(
-                "%s: error in %s handle %llu, "
-                "FILE: %s\n  -- returning %ld\n",
+                "%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
                 rw->fnstr, 
-                rw->type == IO_READX ? "noncontig read from" : "noncontig write to",
-                llu(get_handle_from_ino(rw->inode)),
-                (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
-                     (char *) rw->file->f_dentry->d_name.name : "UNKNOWN"),
-                    (long) ret);
+                rw->type == IO_READX ?
+                  "noncontig read from" :
+                  "noncontig write to",
+                k2s(get_khandle_from_ino(rw->inode),s),
+                (rw->file &&
+                 rw->file->f_dentry &&
+                 rw->file->f_dentry->d_name.name ?
+                   (char *) rw->file->f_dentry->d_name.name :
+                   "UNKNOWN"),
+                (long) ret);
           }
           goto out;
     }
@@ -2070,6 +2127,7 @@ out:
         op_release(new_op);
         new_op = NULL;
     }
+    kfree(s);
     return ret;
 }
 

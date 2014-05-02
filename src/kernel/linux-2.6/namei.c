@@ -84,6 +84,8 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
+    struct dentry *res;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     /*
       in theory we could skip a lookup here (if the intent is to
@@ -98,12 +100,14 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 
     if (dentry->d_name.len > (PVFS2_NAME_LEN-1))
     {
+        kfree(s);
 	return ERR_PTR(-ENAMETOOLONG);
     }
 
     new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
     if (!new_op)
     {
+        kfree(s);
 	return ERR_PTR(-ENOMEM);
     }
 
@@ -128,11 +132,16 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
         sb = dir->i_sb;
         parent = PVFS2_I(dir);
         if (parent &&
-            parent->refn.handle != PVFS_HANDLE_NULL &&
+            parent->refn.khandle[0] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
-            gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d using parent %llu\n",
-              __FILE__, __func__, __LINE__, llu(parent->refn.handle));
+            memset(s,0,HANDLESTRINGSIZE);
+            gossip_debug(GOSSIP_NAME_DEBUG,
+                         "%s:%s:%d using parent %s\n",
+                         __FILE__,
+                         __func__,
+                         __LINE__,
+                         k2s(&(parent->refn.khandle),s));
             new_op->upcall.req.lookup.parent_refn = parent->refn;
         }
         else
@@ -140,11 +149,12 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 #if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
             gossip_lerr("Critical error: i_ino cannot be relied on "
                         "when using iget5/iget4\n");
-            op_release(new_op);
-            return ERR_PTR(-EINVAL);
+            res = ERR_PTR(-EINVAL);
+            goto out;
 #endif
-            new_op->upcall.req.lookup.parent_refn.handle =
-                            get_handle_from_ino(dir);
+            PVFS_khandle_from(&(new_op->upcall.req.lookup.parent_refn.khandle),
+                              get_khandle_from_ino(dir),
+                              16);
             new_op->upcall.req.lookup.parent_refn.fs_id =
                             PVFS2_SB(sb)->fs_id;
         }
@@ -157,8 +167,9 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
           block for the specified dentry's inode
         */
         sb = dentry->d_inode->i_sb;
-	new_op->upcall.req.lookup.parent_refn.handle =
-	                PVFS2_SB(sb)->root_handle;
+        PVFS_khandle_from(&(new_op->upcall.req.lookup.parent_refn.khandle),
+                          &(PVFS2_SB(sb)->root_khandle),
+                          16);
 	new_op->upcall.req.lookup.parent_refn.fs_id =
 	                PVFS2_SB(sb)->fs_id;
     }
@@ -166,10 +177,12 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 	    dentry->d_name.name,
             PVFS2_NAME_LEN);
 
+    memset(s,0,HANDLESTRINGSIZE);
     gossip_debug(GOSSIP_NAME_DEBUG,
-                 "pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
-                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
-                 llu(new_op->upcall.req.lookup.parent_refn.handle),
+                 "pvfs2_lookup: doing lookup on %s\n  under %s,%d "
+                 "(follow=%s)\n",
+                 new_op->upcall.req.lookup.d_name,
+                 k2s(&(new_op->upcall.req.lookup.parent_refn.khandle),s),
                  new_op->upcall.req.lookup.parent_refn.fs_id,
                  ((new_op->upcall.req.lookup.sym_follow ==
                    PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
@@ -178,8 +191,10 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                             "pvfs2_lookup", 
                             get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_NAME_DEBUG, "Lookup Got %llu, fsid %d (ret=%d)\n",
-                llu(new_op->downcall.resp.lookup.refn.handle),
+    memset(s,0,HANDLESTRINGSIZE);
+    gossip_debug(GOSSIP_NAME_DEBUG,
+                 "Lookup Got %s, fsid %d (ret=%d)\n",
+                k2s(&(new_op->downcall.resp.lookup.refn.khandle),s),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
     if(ret < 0)
@@ -214,20 +229,18 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 #endif
             d_add(dentry, inode);
 
-            op_release(new_op);
-            return NULL;
+            res = NULL;
+            goto out;
         }
 
-        op_release(new_op);
         /* must be a non-recoverable error */
-        return ERR_PTR(ret);
+        res = ERR_PTR(ret);
+        goto out;
     }
 
     inode = pvfs2_iget(sb, &new_op->downcall.resp.lookup.refn);
     if (inode && !is_bad_inode(inode))
     {
-        struct dentry *res;
-
         gossip_debug(GOSSIP_NAME_DEBUG,
                      "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
                      __FILE__, __func__, __LINE__, inode->i_ino,
@@ -253,12 +266,12 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 #endif
         }
 
-        op_release(new_op);
 #ifdef PVFS2_LINUX_KERNEL_2_4
-        return NULL;
+        res = NULL;
 #else
-        return res;
+        res = res;
 #endif
+        goto out;
     }
     else if (inode && is_bad_inode(inode))
     {
@@ -277,16 +290,20 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
             ret = found_pvfs2_inode->error_code;
         }
         iput(inode);
-        op_release(new_op);
-        return ERR_PTR(ret);
+        res = ERR_PTR(ret);
+        goto out;
     }
 
     /* no error was returned from service_operation, but the inode
      * from pvfs2_iget was null...just return EACCESS
      */
-    op_release(new_op);
+    res = ERR_PTR(-EACCES);
     gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES for NULL inode\n");
-    return ERR_PTR(-EACCES);
+
+out:
+    kfree(s);
+    op_release(new_op);
+    return res;
 }
 
 /* return 0 on success; non-zero otherwise */
@@ -449,7 +466,6 @@ static int pvfs2_rename(
     pvfs2_kernel_op_t *new_op = NULL;
     struct super_block *sb = NULL;
 
-
 #ifdef HAVE_DENTRY_D_COUNT_ATOMIC
     local_count = atomic_read(&new_dentry->d_count);
 #else
@@ -492,7 +508,7 @@ static int pvfs2_rename(
       inode's corresponding superblock
     */
     if (pvfs2_old_parent_inode &&
-            pvfs2_old_parent_inode->refn.handle != PVFS_HANDLE_NULL &&
+            pvfs2_old_parent_inode->refn.khandle.u[0] != 0 &&
             pvfs2_old_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.old_parent_refn =
@@ -501,15 +517,16 @@ static int pvfs2_rename(
     else
     {
         sb = old_dir->i_sb;
-        new_op->upcall.req.rename.old_parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
+        PVFS_khandle_from(&(new_op->upcall.req.rename.old_parent_refn.khandle),
+                          &(PVFS2_SB(sb)->root_khandle),
+                          16);
         new_op->upcall.req.rename.old_parent_refn.fs_id =
 	    PVFS2_SB(sb)->fs_id;
     }
 
     /* do the same for the new parent */
     if (pvfs2_new_parent_inode &&
-            pvfs2_new_parent_inode->refn.handle != PVFS_HANDLE_NULL &&
+            pvfs2_new_parent_inode->refn.khandle.u[0] != 0 &&
             pvfs2_new_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.new_parent_refn =
@@ -518,8 +535,9 @@ static int pvfs2_rename(
     else
     {
         sb = new_dir->i_sb;
-        new_op->upcall.req.rename.new_parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
+        PVFS_khandle_from(&(new_op->upcall.req.rename.new_parent_refn.khandle),
+                          &(PVFS2_SB(sb)->root_khandle),
+                          16);
         new_op->upcall.req.rename.new_parent_refn.fs_id =
 	    PVFS2_SB(sb)->fs_id;
     }

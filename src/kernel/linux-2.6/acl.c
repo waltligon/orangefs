@@ -195,6 +195,7 @@ struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     struct posix_acl *acl;
     int ret;
     char *key = NULL, *value = NULL;
+    char *s;
 
     /* Won't work if you don't mount with the right set of options */
     if (get_acl_flag(inode) == 0) 
@@ -229,8 +230,10 @@ struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
         gossip_err("pvfs2_get_acl: Could not allocate value ptr\n");
         return ERR_PTR(-ENOMEM);
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "inode %llu, key %s, type %d\n", 
-                 llu(get_handle_from_ino(inode)), key, type);
+    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    gossip_debug(GOSSIP_ACL_DEBUG, "inode %s, key %s, type %d\n", 
+                 k2s(get_khandle_from_ino(inode),s), key, type);
+    kfree(s);
     ret = pvfs2_inode_getxattr(inode, "", key, value, PVFS_MAX_XATTR_VALUELEN);
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
@@ -251,8 +254,10 @@ struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     }
     else
     {
-        gossip_err("inode %llu retrieving acl's failed with error %d\n",
-                   llu(get_handle_from_ino(inode)), ret);
+        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+        gossip_err("inode %s retrieving acl's failed with error %d\n",
+                   k2s(get_khandle_from_ino(inode),s), ret);
+        kfree(s);
         acl = ERR_PTR(ret);
     }
     if (value)
@@ -269,6 +274,7 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     size_t size = 0;
     const char *name = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    char *s;
 
     /* We dont't allow this on a symbolic link */
     if (S_ISLNK(inode->i_mode))
@@ -340,8 +346,9 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
         }
     }
     gossip_debug(GOSSIP_ACL_DEBUG,
-                 "pvfs2_set_acl: inode %llu, key %s type %d\n",
-                 llu(get_handle_from_ino(inode)), name, type);
+                 "pvfs2_set_acl: inode %s, key %s type %d\n",
+                 k2s(get_khandle_from_ino(inode),s), name, type);
+    kfree(s);
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
