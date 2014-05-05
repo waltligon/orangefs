@@ -367,6 +367,8 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
+    PVFS_ID *keyval_db_entries;
+    uint32_t metadata_sid_count;
     PVFS_size dirdata_size;
 };
 
@@ -381,9 +383,8 @@ struct PINT_server_crdirent_op
     PVFS_credential credential;
     PVFS_capability capability;
     char *name;
-    //PVFS_handle new_handle;
-    //PVFS_SID *new_sid;
-    PINT_handle_SID_s* packed_handle;
+    PVFS_handle new_handle;
+    PVFS_SID *new_sid;
     PVFS_handle parent_handle;
     PVFS_SID *parent_sid;
     PVFS_fs_id fs_id;
@@ -508,6 +509,8 @@ struct PINT_server_batch_remove_op
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
+    PVFS_SID *sid_array;
+    int sid_count;
 };
 
 struct PINT_server_getconfig_op
