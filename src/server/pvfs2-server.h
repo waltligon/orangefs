@@ -75,13 +75,21 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
                                       needs write and execute */
 };
-
+ 
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
     char *key;
     int size;
 } PINT_server_trove_keys_s;
+
+/* wrapper object that keeps track of all of the servers where a given OID is stored */
+typedef struct PINT_handle_SID_store_object
+{
+    int32_t count; /* This number should match the associated number of copies set for this OID */
+    PVFS_handle handle;
+    PVFS_SID *sids;
+} PINT_handle_SID_s;
 
 /* This is defined in src/server/pvfs2-server.c
  * These values index this table
@@ -369,6 +377,8 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
+    PVFS_ID *keyval_db_entries;
+    uint32_t metadata_sid_count;
     PVFS_size dirdata_size;
 };
 
@@ -431,7 +441,12 @@ struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
     PVFS_handle old_dirent_handle;
+    PVFS_SID *old_sid_array;
+    int32_t old_sid_count;
     PVFS_handle new_dirent_handle;
+    PVFS_SID *new_sid_array;
+    int32_t new_sid_count;
+    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -502,6 +517,8 @@ struct PINT_server_batch_remove_op
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
+    PVFS_SID *sid_array;
+    int sid_count;
 };
 
 struct PINT_server_getconfig_op

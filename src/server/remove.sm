@@ -519,7 +519,9 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
                             sizeof(PVFS_dist_dir_bitmap_basetype));
     attr_p->u.dir.dirdata_handles = 
                 malloc(attr_p->u.dir.dist_dir_attr.dirdata_count *
-                         sizeof(PVFS_handle));
+                         sizeof(PVFS_handle) + attr_p->u.dir.dist_dir_attr.sid_count * sizeof(PVFS_SID));
+    attr_p->u.dir.sid_array = attr_p->u.dir.dirdata_handles + attr_p->u.dir.dist_dir_attr.dirdata_count *
+                         sizeof(PVFS_handle);
     if(!attr_p->u.dir.dirdata_handles || !attr_p->u.dir.dist_dir_bitmap)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -550,7 +552,7 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     s_op->val_a[0].buffer = attr_p->u.dir.dirdata_handles;
     s_op->val_a[0].buffer_sz = attr_p->u.dir.dist_dir_attr.dirdata_count *
-                    sizeof(PVFS_handle);
+                    sizeof(PVFS_handle) + attr_p->u.dir.dist_dir_attr.sid_count * sizeof(PVFS_SID);
 
     /* !!! set bitmap keyval field */
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -1008,7 +1010,7 @@ static PINT_sm_action remove_rebuild_write_dirdata_keyval(
 
     s_op->val.buffer = s_op->attr.u.dir.dirdata_handles;
     s_op->val.buffer_sz = s_op->attr.u.dir.dist_dir_attr.dirdata_count *
-                sizeof(PVFS_handle);
+                sizeof(PVFS_handle) + s_op->attr.sid_count * sizeof(PVFS_SID);
     s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
 
     js_p->error_code = 0;
