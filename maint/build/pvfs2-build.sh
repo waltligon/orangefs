@@ -16,7 +16,7 @@ with_db_arg=""
 if [ $WITH_DB ] ; then
 	with_db_arg=--with-db=$WITH_DB
 fi
-configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma $with_db_arg"
+configureopts="$PVFS2_CONFIGOPTS --enable-shared --enable-ucache --enable-strict --disable-karma $with_db_arg"
 
 
 #
@@ -130,7 +130,8 @@ date=`date "+%Y-%m-%d-%H-%M"`
 host=`uname -n`
 
 srcdir=$rootdir/pvfs2-$cvs_tag
-builddir=$rootdir/BUILD-pvfs2-$cvs_tag
+#builddir=$rootdir/BUILD-pvfs2-$cvs_tag
+builddir=$srcdir
 installdir=$rootdir/INSTALL-pvfs2-$cvs_tag
 
 # clean up src, build, install directories
@@ -147,12 +148,13 @@ get_cvs $full_cvs_tag || exit 1
 
 
 # create build and install directories, configure
-mkdir $builddir
+#mkdir $builddir
 mkdir $installdir
 cd $srcdir
-$srcdir/prepare
-cd $builddir
+$srcdir/prepare > prepare.out
+#cd $builddir
 #ls $srcdir
+#$srcdir/prepare > prepare.out
 if [ $build_kernel = "true" ] ; then
 	$srcdir/configure $configureopts  --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"

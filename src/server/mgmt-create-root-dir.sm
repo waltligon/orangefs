@@ -222,7 +222,7 @@ static PINT_sm_action mgmt_create_root_check_for_request(
 
 #ifdef ENABLE_SECURITY_CERT
     /* use CA certificate as cert in credential */
-    ret = PINT_load_cert_from_file(user_opts->ca_path, &xcert);
+    ret = PINT_load_cert_from_file(user_opts->ca_file, &xcert);
     if (ret != 0)
     {
         gossip_err("mgmt_create_root_dir: could not load CA "
@@ -270,15 +270,25 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    int num_total_dirdata_servers, num_initial_dirdata_servers;
+    PVFS_object_attr *attr = NULL;
+    int num_total_dirdata_servers = 0;
+    int num_total_dirdata_sids = 0;
+    int num_initial_dirdata_servers = 0;
     int ret = -1;
-    unsigned char *c;
+    unsigned char *c = NULL;
     int i;
 
     js_p->error_code = 0;
     attr = (&s_op->attr);
 
+    /* V3 - Does this still make sense?  Can we even get the total
+     * number of meta servers? Maybe this should be total number of root
+     * servers for this fs?  Do Root dirs need to have so many buckets -
+     * are they ever holding that many entries?  Should this be a config
+     * file parameter?
+     * Also need to get the number of SIDs worked out - should be a
+     * default for the FS times number of servers.
+     */
     /* use total # of meta servers as the num_total_dirdata_servers */
     ret = PINT_cached_config_get_num_meta(s_op->target_fs_id,
                                             &num_total_dirdata_servers);
@@ -291,27 +301,29 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
 
     /* set num_dirdata_servers for pre-allocation of dirdata handles */
     s_op->u.mgmt_create_root_dir.num_dirdata_servers =
-        num_total_dirdata_servers;
+                                      num_total_dirdata_servers;
 
     /* for root dir, use all dirdata servers */
     num_initial_dirdata_servers = num_total_dirdata_servers;
 
     /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
-            &attr->u.dir.dist_dir_bitmap,
-            num_total_dirdata_servers,
-            0,
-            num_initial_dirdata_servers);
+                                   &attr->u.dir.dist_dir_bitmap,
+                                   num_total_dirdata_servers,
+                                   num_total_dirdata_sids, /* V3 is this set */
+                                   0,
+                                   num_initial_dirdata_servers,
+                                   100);
 
     assert(ret == 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "mgmt-create-root-dir: Init dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->target_handle),
             attr->u.dir.dist_dir_attr.tree_height,
-            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.dirdata_count,
             attr->u.dir.dist_dir_attr.bitmap_size,
             attr->u.dir.dist_dir_attr.split_size,
             attr->u.dir.dist_dir_attr.server_no,
@@ -320,8 +332,8 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "mgmt-create-root-dir: Init dist_dir_bitmap as:\n");
-    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
-            i >= 0 ; i--)
+    for (i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+         i >= 0; i--)
     {
         c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -341,9 +353,9 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
             sizeof(*s_op->u.mgmt_create_root_dir.handle_array_remote) *
             num_total_dirdata_servers);
 
-    if(!attr->u.dir.dirdata_handles ||
-            !s_op->u.mgmt_create_root_dir.handle_array_local ||
-            !s_op->u.mgmt_create_root_dir.handle_array_remote )
+    if (!attr->u.dir.dirdata_handles ||
+        !s_op->u.mgmt_create_root_dir.handle_array_local ||
+        !s_op->u.mgmt_create_root_dir.handle_array_remote )
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -352,12 +364,12 @@ static PINT_sm_action mgmt_create_root_create_dist_dir_struct(
     /* dirdata on every meta server */
     s_op->u.mgmt_create_root_dir.handle_array_local_count = 1;
     s_op->u.mgmt_create_root_dir.handle_array_remote_count = 
-        s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1;
+            s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d local dirdata files\n", 
-        s_op->u.mgmt_create_root_dir.handle_array_local_count);
+                 s_op->u.mgmt_create_root_dir.handle_array_local_count);
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d remote dirdata files\n", 
-        s_op->u.mgmt_create_root_dir.handle_array_remote_count);
+                 s_op->u.mgmt_create_root_dir.handle_array_remote_count);
 
     return SM_ACTION_COMPLETE; 
 }
@@ -368,6 +380,32 @@ static PINT_sm_action mgmt_create_root_request_remote_dirdata_dspace(
                                                       job_status_s *js_p)
 {
 /* V3 no longer pools or remote requests rewrite or remove */
+/* we should probably just fill in the  array with OIDs and include a
+ * list of SIDs as well
+ */
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+/* V3 remove with belwo section */
+#if 0
+    int ret = -1;
+#endif
+
+    if(s_op->u.mgmt_create_root_dir.handle_array_remote_count == 0)
+    {
+        js_p->error_code = 0;
+        return(SM_ACTION_COMPLETE);
+    }
+    for (i = 0;
+         i < s_op->u.mgmt_create_root_dir.handle_array_remote_count;
+         i++)
+    {
+        /* create an OID for each remote dir entry bucket */
+        PVFS_OID_gen(&s_op->u.mgmt_create_root_dir.handle_array_remote[i]);
+        /* need to do SIDs here too probably - or maybe in their own
+         * loop
+         */
+    }
+
 #if 0
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -397,11 +435,9 @@ static PINT_sm_action mgmt_create_root_request_remote_dirdata_dspace(
     return ret;
 #endif
 
-return SM_ACTION_COMPLETE;
+    return SM_ACTION_COMPLETE;
 
 }
-
-
 
 static PINT_sm_action mgmt_create_root_create_local_dirdata_dspace(
                                                      struct PINT_smcb *smcb,
@@ -441,9 +477,14 @@ static PINT_sm_action mgmt_create_root_create_local_dirdata_dspace(
                  PVFS_OID_str(&extent_array.extent_array[0].last));
  */
 
+    /* V3 assume this generates a handle as part of the job.
+     * either we need to update trove to generate handles the right way
+     * or just do them here in this code - not sure of the ramifications
+     * based on cost of generating UUIDs
+     */
     ret = job_trove_dspace_create_list(
                           s_op->target_fs_id,
-                          handle_array,
+                          handle_array, /* what is this vs next arg? */
                           s_op->u.mgmt_create_root_dir.handle_array_local,
                           s_op->u.mgmt_create_root_dir.handle_array_local_count,
                           PVFS_TYPE_DIRDATA, 
@@ -458,8 +499,6 @@ static PINT_sm_action mgmt_create_root_create_local_dirdata_dspace(
 
     return(ret);
 }
-
-
 
 static PINT_sm_action mgmt_create_root_fill_handles_dist_dir_struct(
                                                         struct PINT_smcb *smcb,
@@ -481,9 +520,11 @@ static PINT_sm_action mgmt_create_root_fill_handles_dist_dir_struct(
 
     for(i = 0; i < s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1; i++)
     {
-        attr->u.dir.dirdata_handles[i+1] =
+        attr->u.dir.dirdata_handles[i + 1] =
                          s_op->u.mgmt_create_root_dir.handle_array_remote[i];
     }
+
+    /* V3 add SID support here */
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "\t mgmt-create-root-dir: dirdata handles "
@@ -501,14 +542,16 @@ static PINT_sm_action mgmt_create_root_fill_handles_dist_dir_struct(
 }
 
 /* Seriously??? */
-static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(
+                                   struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr attr;
     int ret;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "s_op->attr.objtype = %d\n", s_op->attr.objtype);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "s_op->attr.objtype = %d\n",
+                 s_op->attr.objtype);
 
     /* set dirdata attr, set all the static component */
 /*
@@ -557,7 +600,7 @@ static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(struc
                                    s_op->target_fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.u.dir.dist_dir_attr.num_servers,
+                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
@@ -576,6 +619,7 @@ static PINT_sm_action mgmt_create_root_remote_dirdata_keyval_setup_msgpair(struc
 #endif
 
     /* V3 sid array needs checking */
+    /* Is this going to multiple servers? */
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
@@ -596,7 +640,8 @@ static PINT_sm_action mgmt_create_root_write_keyval_meta_handle(
     int ret = -1;
     job_id_t j_id;
 
-    /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
+    /* total 3 keyvals,
+     * PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
     int keyval_count = 3;
 
     /* !!!! this is to set meta handle keyval,
@@ -637,7 +682,7 @@ static PINT_sm_action mgmt_create_root_write_keyval_meta_handle(
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
     s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
+    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.dirdata_count * 
                                sizeof(*attr->u.dir.dirdata_handles);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
@@ -722,8 +767,6 @@ static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
     sys_attr.perms = 0777;
     sys_attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     sys_attr.objtype = PVFS_TYPE_DIRECTORY;
-    // use all dirdata servers
-    sys_attr.dirdata_count = s_op->attr.u.dir.dist_dir_attr.num_servers;
 
     memset(&layout, 0, sizeof(layout));
     layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
@@ -753,9 +796,11 @@ static PINT_sm_action mgmt_create_root_mkdir_lost_found_setup_msgpair(
                             PVFS_HANDLE_NULL, /* handle */
                             PVFS_HANDLE_NULL, /* parent */
                             PVFS_SID_NULL, /* parent sid */
-                            s_op->attr.u.dir.dist_dir_attr.num_servers,
-                            layout,
                             sys_attr,
+                            s_op->attr.u.dir.dist_dir_attr.dirdata_count,
+                            s_op->attr.u.dir.dist_dir_attr.dirdata_count,
+                            s_op->attr.u.dir.dist_dir_attr.split_size,
+                            layout,
                             NULL);
 
     msg_p->fs_id = s_op->target_fs_id;
@@ -780,7 +825,7 @@ static int mkdir_lost_found_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* otherwise, just stash the newly created meta handle */
@@ -804,6 +849,7 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    const struct server_configuration_s *config;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "mgmt-create-root-dir state: "
@@ -834,6 +880,17 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
                                             malloc(sizeof(PVFS_handle));
     s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
 
+    config = get_server_config_struct();
+    s_op->u.mgmt_create_root_dir.capability.issuer = 
+        (char *) malloc(strlen(config->server_alias) + 3);
+    if (s_op->u.mgmt_create_root_dir.capability.issuer == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    strcpy(s_op->u.mgmt_create_root_dir.capability.issuer, "S:");
+    strcat(s_op->u.mgmt_create_root_dir.capability.issuer, config->server_alias);
+
     /* Need to re-sign the capability since we added a target handle. */
     ret = PINT_sign_capability(&s_op->u.mgmt_create_root_dir.capability);
     if (ret < 0)
@@ -851,7 +908,8 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
            lost_and_found_string,
            PVFS_OID_str(&s_op->u.mgmt_create_root_dir.lost_and_found_handle),
            PVFS_OID_str(&s_op->target_handle),
-           PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[dirdata_server_index]),
+           PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[
+                                                  dirdata_server_index]),
            dirdata_server_index);
 
     PINT_msgpair_init(&s_op->msgarray_op);

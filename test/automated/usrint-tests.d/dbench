@@ -1,0 +1,67 @@
+#!/bin/sh
+
+#this script assumes that the benchmark tar file is already copied into $EXTRA_TESTS
+if [ ! $BENCHMARKS ]
+then
+   #this is the existing name of the tar file
+   BENCHMARKS=benchmarks-20121017.tar.gz
+fi
+
+#make directory, if it doesn't exist
+mkdir -p ${EXTRA_TESTS}/dbench-3.03
+
+#capture current working directory
+cwd=`pwd`
+
+#do we need to build dbench?
+if [ ! -f ${EXTRA_TESTS}/dbench-3.03/dbench ] 
+then
+	#goto benchmark directory and cleanup
+	cd ${EXTRA_TESTS}/dbench-3.03
+	make clean
+	sudo /bin/rm -rf dbench-3.03
+
+	#go back
+	cd ..
+
+
+	#untar the dbench directory
+	tar -xzf --wildcards ${BENCHMARKS} benchmarks/dbench-3.03/*
+
+	#goto the dbench directory
+	cd benchmarks/dbench-3.03
+
+	#configure the dbench software
+	./configure -q
+
+	#apply patches
+	patch -p3 < ${USERLIB_SCRIPTS}/dbench.patch
+
+#	if [ "${?}" != 0 ]
+#	then
+ #  		echo "Error: failed to apply patches to DBENCH."
+  # 		cd $cwd
+   #		exit 1;
+#	fi
+
+	#compile the system
+	make 2>&1
+fi
+
+#setup dbench test and execute.
+cp client.txt ${PVFS2_MOUNTPOINT}
+if [ $? != 0 ]
+then
+   echo "failed to copy client.txt to ${PVFS2_MOUNTPOINT}"
+   cd $cwd
+   exit 1
+fi
+cd ${PVFS2_MOUNTPOINT} &&  export ${PRELOAD} && ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
+if [ $? != 0 ]
+then
+   echo "dbench failed"
+   cd $cwd
+   exit 1
+fi
+
+cd $cwd

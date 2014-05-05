@@ -22,6 +22,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
 #include "pint-util.h"
@@ -102,11 +103,11 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
     /* increment the tag, don't use zero */
     if (current_tag + 1 == PINT_MSG_TAG_INVALID)
     {
-	current_tag = 1;
+        current_tag = 1;
     }
     else
     {
-	current_tag++;
+        current_tag++;
     }
     gen_mutex_unlock(&current_tag_lock);
 
@@ -119,23 +120,23 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
     if (dest && src)
     {
-	if (src->mask & PVFS_ATTR_COMMON_UID)
+        if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
         }
-	if (src->mask & PVFS_ATTR_COMMON_GID)
+        if (src->mask & PVFS_ATTR_COMMON_GID)
         {
             dest->group = src->group;
         }
-	if (src->mask & PVFS_ATTR_COMMON_PERM)
+        if (src->mask & PVFS_ATTR_COMMON_PERM)
         {
             dest->perms = src->perms;
         }
-	if (src->mask & PVFS_ATTR_COMMON_ATIME)
+        if (src->mask & PVFS_ATTR_COMMON_ATIME)
         {
             dest->atime = src->atime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_CTIME)
+        if (src->mask & PVFS_ATTR_COMMON_CTIME)
         {
             dest->ctime = src->ctime;
         }
@@ -143,7 +144,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             dest->mtime = src->mtime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_TYPE)
+        if (src->mask & PVFS_ATTR_COMMON_TYPE)
         {
             dest->objtype = src->objtype;
         }
@@ -153,14 +154,17 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         }
         if (src->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
-            PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr, src->u.dir.dist_dir_attr);
+            PVFS_size dist_dir_bitmap_size, dirent_handles_array_size;
 
-            PVFS_size dist_dir_bitmap_size = src->u.dir.dist_dir_attr.bitmap_size *
+            PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr,
+                                      src->u.dir.dist_dir_attr);
+
+            dist_dir_bitmap_size = src->u.dir.dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype);
             if (dist_dir_bitmap_size)
             {
                 if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.num_servers > 0)
+                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
                 {
                     if (dest->u.dir.dist_dir_bitmap)
                     {
@@ -174,20 +178,21 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                     return ret;
                 }
                 memcpy(dest->u.dir.dist_dir_bitmap,
-                       src->u.dir.dist_dir_bitmap, dist_dir_bitmap_size);
+                       src->u.dir.dist_dir_bitmap,
+                       dist_dir_bitmap_size);
             }
             else
             {
                 dest->u.dir.dist_dir_bitmap = NULL;
             }
 
-            PVFS_size dirent_handles_array_size = src->u.dir.dist_dir_attr.num_servers *
+            dirent_handles_array_size = src->u.dir.dist_dir_attr.dirdata_count *
                 sizeof(PVFS_handle);
 
             if (dirent_handles_array_size)
             {
                 if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.num_servers > 0)
+                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
                 {
                     if (dest->u.dir.dirdata_handles)
                     {
@@ -201,13 +206,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                     return ret;
                 }
                 memcpy(dest->u.dir.dirdata_handles,
-                       src->u.dir.dirdata_handles, dirent_handles_array_size);
+                       src->u.dir.dirdata_handles,
+                       dirent_handles_array_size);
             }
             else
             {
                 dest->u.dir.dirdata_handles = NULL;
             }
-            dest->u.dir.dist_dir_attr.num_servers = src->u.dir.dist_dir_attr.num_servers;
+            dest->u.dir.dist_dir_attr.dirdata_count =
+                            src->u.dir.dist_dir_attr.dirdata_count;
         }
 
         if((src->objtype == PVFS_TYPE_METAFILE) &&
@@ -266,7 +273,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             dest->u.data.size = src->u.data.size;
         }
 
-	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_METAFILE))
         {      
             if(src->mask & PVFS_ATTR_META_DFILES)
@@ -402,7 +409,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
-	dest->mask = src->mask;
+        dest->mask = src->mask;
         ret = 0;
     }
     return ret;

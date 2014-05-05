@@ -527,7 +527,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 
     verify_dirdatahandles(cur_fs,
                           pref,
-                          getattr_resp.attr.dirdata_count,
+                          getattr_resp.attr.distr_dir_servers_max,
                           creds,
                           opts_p);
 
@@ -617,7 +617,7 @@ int descend(PVFS_fs_id cur_fs,
                 case PVFS_TYPE_DIRECTORY:
                     verify_dirdatahandles(cur_fs,
                                      entry_ref,
-                                     getattr_resp.attr.dirdata_count,
+                                     getattr_resp.attr.distr_dir_servers_max,
                                      creds,
                                      opts_p);
                     descend(cur_fs, entry_ref, creds, opts_p);

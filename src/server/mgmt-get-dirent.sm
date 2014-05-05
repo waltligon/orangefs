@@ -93,12 +93,12 @@ static PINT_sm_action mgmt_get_dirent_get_dist_dir_attr(
 
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  trying to read dist_dir_attr (coll_id = %d, "
+                 "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.mgmt_get_dirent.fs_id,
+                 s_op->req->u.mgmt_get_dirent.fs_id,
                  PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
-		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
-		 s_op->val.buffer, s_op->val.buffer_sz);
+                 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+                 s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.mgmt_get_dirent.fs_id,
                                 s_op->req->u.mgmt_get_dirent.handle,
@@ -137,15 +137,15 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "mgmt_get_dirent: get dist-dir-attr for dirdata handle %s "
-                 "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
                  "split_size=%d, server_no=%d and branch_level=%d\n",
                  PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
                  attr_p->u.dir.dist_dir_attr.tree_height,
-                 attr_p->u.dir.dist_dir_attr.num_servers,
+                 attr_p->u.dir.dist_dir_attr.dirdata_count,
                  attr_p->u.dir.dist_dir_attr.bitmap_size,
                  attr_p->u.dir.dist_dir_attr.split_size,
                  attr_p->u.dir.dist_dir_attr.server_no,
@@ -180,12 +180,12 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
 
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  trying to read dirdata bitmap (coll_id = %d, "
+                 "  trying to read dirdata bitmap (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.mgmt_get_dirent.fs_id,
+                 s_op->req->u.mgmt_get_dirent.fs_id,
                  PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
-		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
-		 s_op->val.buffer, s_op->val.buffer_sz);
+                 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+                 s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.mgmt_get_dirent.fs_id,
                                 s_op->req->u.mgmt_get_dirent.handle,

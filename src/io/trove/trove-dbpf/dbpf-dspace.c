@@ -16,10 +16,12 @@
 #endif
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pint-perf-counter.h"
 #include "pint-event.h"
-#include "pint-mem.h"
+/* #include "pint-mem.h" obsolete */
+#include "trove.h"
 #include "trove-internal.h"
 #include "dbpf.h"
 #include "dbpf-op.h"
@@ -34,7 +36,6 @@
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
 #include "dbpf-thread.h"
-#include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
 #include <stdio.h>
@@ -92,10 +93,9 @@ static inline void organize_post_op_statistics(
     }
 }
 
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle);
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
@@ -789,7 +789,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     ret = op_p->coll_p->ds_db->get_pagesize(op_p->coll_p->ds_db, &dbpagesize);
 #endif
 
-    multiples_buffer = PINT_mem_aligned_alloc(start_size, dbpagesize);
+    /* multiples_buffer = PINT_mem_aligned_alloc(start_size, * dbpagesize); */
+    posix_memalign(&multiples_buffer, dbpagesize, start_size);
     if(!multiples_buffer)
     {
         ret = -TROVE_ENOMEM;
@@ -817,7 +818,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         {
             /* need to allocate more and try again */
             free(multiples_buffer);
-            multiples_buffer = PINT_mem_aligned_alloc(data.size, dbpagesize);
+            /* multiples_buffer = PINT_mem_aligned_alloc(data.size,
+             *                                           dbpagesize);
+             */
+            posix_memalign(&multiples_buffer, dbpagesize, start_size);
             if(!multiples_buffer)
             {
                 ret = -TROVE_ENOMEM;
@@ -1029,7 +1033,9 @@ return_ok:
 
     if(multiples_buffer)
     {
-        PINT_mem_aligned_free(multiples_buffer);
+        /* PINT_mem_aligned_free(multiples_buffer); */
+        free(multiples_buffer);
+
     }
 
     return 1;
@@ -1045,7 +1051,8 @@ return_error:
 
     if(multiples_buffer)
     {
-        PINT_mem_aligned_free(multiples_buffer);
+        /* PINT_mem_aligned_free(multiples_buffer); */
+        free(multiples_buffer);
     }
 
     return ret;

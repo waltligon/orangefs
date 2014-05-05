@@ -10,6 +10,7 @@
 #ifndef __PVFS2_ATTR_H
 #define __PVFS2_ATTR_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
@@ -60,6 +61,7 @@
 #define PVFS_ATTR_DIR_ALL \
 (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
 
+/* internal attribute mask for distributed directory information */
 #define PVFS_ATTR_DISTDIR_ATTR         (1 << 21)
 
 /* internal attribute mask for capability objects */
@@ -152,34 +154,49 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 } while (0)
 #endif
 
-#define encode_PVFS_metafile_attr_dfiles(pptr,x) do {                   \
+#define encode_PVFS_metafile_attr_dfiles(pptr,x)                        \
+do {                                                                    \
     int dfiles_i;                                                       \
     encode_uint32_t(pptr, &(x)->mirror_mode);                           \
     encode_uint32_t(pptr, &(x)->dfile_count);                           \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)             \
+    {                                                                   \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
+    }                                                                   \
     encode_uint32_t(pptr, &(x)->sid_count);                             \
     encode_skip4(pptr,);                                                \
     for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)               \
+    {                                                                   \
 	encode_PVFS_SID(pptr, &(x)->sid_array[dfiles_i]);               \
+    }                                                                   \
     encode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
 } while (0)
 
-#define decode_PVFS_metafile_attr_dfiles(pptr,x) do {                     \
-    int dfiles_i;                                                         \
-    decode_uint32_t(pptr, &(x)->mirror_mode);                             \
-    decode_uint32_t(pptr, &(x)->dfile_count);                             \
-    (x)->dfile_array = decode_malloc((x)->dfile_count                     \
-                       * sizeof(*(x)->dfile_array));                      \
-    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)               \
-	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);            \
-    decode_uint32_t(pptr, &(x)->sid_count);                               \
-    decode_skip4(pptr,);                                                  \
-    (x)->sid_array = decode_malloc((x)->sid_count                         \
-                     * sizeof(*(x)->dfile_array));                        \
-    for (dfiles_i=0; dfiles_i<(x)->sid_count; dfiles_i++)                 \
-	decode_PVFS_handle(pptr, &(x)->sid_array[dfiles_i]);              \
-    decode_PVFS_metafile_hint(pptr, &(x)->hint);                          \
+/* This decodes OIDs and SIDs into a contiguous array to make it easier
+ * to write to the database
+ */
+#define decode_PVFS_metafile_attr_dfiles(pptr,x)                        \
+do {                                                                    \
+    int dfiles_i, sid_i;                                                \
+    decode_uint32_t(pptr, &(x)->mirror_mode);                           \
+    decode_uint32_t(pptr, &(x)->dfile_count);                           \
+    (x)->dfile_array = decode_malloc(                                   \
+                       ((x)->dfile_count                                \
+                        * sizeof(*(x)->dfile_array)) +                  \
+                       ((x)->sid_count                                  \
+                        * sizeof(*(x)->sid_array)));                    \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)             \
+    {                                                                   \
+	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
+    }                                                                   \
+    decode_uint32_t(pptr, &(x)->sid_count);                             \
+    decode_skip4(pptr,);                                                \
+    (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); \
+    for (sid_i=0; sid_i<(x)->sid_count; sid_i++)                        \
+    {                                                                   \
+	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
+    }                                                                   \
+    decode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
 } while (0)
 
 #endif
@@ -226,9 +243,8 @@ struct PVFS_directory_attr_s
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
 
-    /* distributed directory parameters */
     PVFS_dist_dir_attr dist_dir_attr;
-    PVFS_dist_dir_bitmap dist_dir_bitmap; 
+    PVFS_dist_dir_bitmap dist_dir_bitmap;
     PVFS_handle *dirdata_handles;
     PVFS_SID *dirdata_sids;
 };
@@ -244,10 +260,10 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
         encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     encode_skip4(pptr,);\
-    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
-    for (index_i = 0; index_i < (x)->dist_dir_attr.num_servers * \
-                    (x)->dist_dir_attr.num_copies; index_i++)\
+    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count * \
+                    (x)->dist_dir_attr.sid_count; index_i++)\
         encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 
@@ -261,18 +277,29 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     for(index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)\
         decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
     decode_skip4(pptr,);\
-    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
+    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.dirdata_count * \
         sizeof(*(x)->dirdata_handles));\
-    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
-    (x)->dirdata_sids = decode_malloc((x)->dist_dir_attr.num_servers * \
-                                      (x)->dist_dir_attr.num_copies * \
+    (x)->dirdata_sids = decode_malloc((x)->dist_dir_attr.dirdata_count * \
+                                      (x)->dist_dir_attr.sid_count * \
                                       sizeof(*(x)->dirdata_handles));\
-    for(index_i = 0; index_i < (x)->dist_dir_attr.num_servers; index_i++)\
+    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)\
         decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);\
 } while(0)
 
+
 #endif
+
+/* attributes specific to dirdata objects */
+struct PVFS_dirdata_attr_s
+{
+    int32_t count;
+};
+typedef struct PVFS_dirdata_attr_s PVFS_dirdata_attr;
+endecode_fields_1(
+    PVFS_dirdata_attr,
+    int32_t, count);
 
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
@@ -299,12 +326,24 @@ struct PVFS_object_attr
     uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype; /* defined in pvfs2-types.h */
     PVFS_capability capability;
+
+/* V3 remove */
+#if 0
+    /* distributed directory parameters */
+    PVFS_dist_dir_attr dist_dir_attr;
+    PVFS_dist_dir_bitmap dist_dir_bitmap; 
+    PVFS_handle *dirdata_handles;
+    int32_t sid_count;
+    PVFS_SID *dirdata_sids;
+#endif
+
     union
     {
-	PVFS_metafile_attr meta;
-	PVFS_datafile_attr data;
-	PVFS_directory_attr dir;
-	PVFS_symlink_attr sym;
+        PVFS_metafile_attr meta;
+        PVFS_datafile_attr data;
+        PVFS_directory_attr dir;
+        PVFS_dirdata_attr dirdata;
+        PVFS_symlink_attr sym;
     }
     u;
 };
@@ -342,7 +381,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DISTDIR_ATTR) || \
+        ((x)->mask & PVFS_ATTR_DISTDIR_ATTR)  || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -389,8 +428,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
  * than a symlink or a metafile or a dir object 
 */
 #define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)) + \
-  PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
+
+#define extra_size_PVFS_distdir \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 /*TODO: PVFS_REQ_LIMIT_HANDLES_COUNT really needs to change to something
         indicating the max number of servers */
 
@@ -406,6 +447,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr \
         (extra_size_PVFS_object_attr_capability + \
+        extra_size_PVFS_distdir + \
         max(max(extra_size_PVFS_object_attr_meta, \
         extra_size_PVFS_object_attr_symlink), \
         extra_size_PVFS_object_attr_dir))

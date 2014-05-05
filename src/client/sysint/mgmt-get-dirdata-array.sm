@@ -72,14 +72,15 @@ PVFS_error PVFS_imgmt_get_dirdata_array(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_DIRDATA_ARRAY,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_GET_DIRDATA_ARRAY,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (!smcb)
     {
-	return -PVFS_ENOMEM;
+        return -PVFS_ENOMEM;
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -94,12 +95,11 @@ PVFS_error PVFS_imgmt_get_dirdata_array(
 
     PINT_msgpair_init(&sm_p->msgarray_op);
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        ref,
-        PVFS_ATTR_DISTDIR_ATTR,
-        PVFS_TYPE_DIRECTORY, 
-        0);
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               ref,
+                               PVFS_ATTR_DISTDIR_ATTR,
+                               PVFS_TYPE_DIRECTORY, 
+                               0);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -165,14 +165,14 @@ static PINT_sm_action mgmt_get_dirdata_array_cleanup(
         attr = &sm_p->getattr.attr;
         assert(attr);
         assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
-        assert(attr->u.dir.dist_dir_attr.num_servers > 0);
+        assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
 
         /* copy out going parameters */
         assert(sm_p->u.get_dirdata_array.dirdata_count ==
-                attr->u.dir.dist_dir_attr.num_servers); 
+                attr->u.dir.dist_dir_attr.dirdata_count); 
         memcpy(sm_p->u.get_dirdata_array.dirdata_array,
                attr->u.dir.dirdata_handles,
-               (attr->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle)));
+               (attr->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle)));
     }
     else
     {

@@ -177,7 +177,7 @@ static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Writes the ds_attr to the new directory dspace record
  *           
  */
 static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
@@ -238,10 +238,11 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
-    int num_total_dirdata_servers=0,
-        num_initial_dirdata_servers=0,
-        num_meta=0,
-        split_size=0;
+    int num_total_dirdata_servers=0;
+    int num_total_dirdata_sids=0;   /* This needs to be set properly */
+    int num_initial_dirdata_servers=0;
+    int num_meta=0;
+    int split_size=0;
     server_configuration_t *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
@@ -308,26 +309,27 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 
 
     /* init meta handle dist_dir_struct */
-    ret = PINT_init_dist_dir_state(&attr->dist_dir_attr,
-            &attr->dist_dir_bitmap,
-            num_total_dirdata_servers,
-            0,
-            num_initial_dirdata_servers,
-            split_size);
+    ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
+                                   &attr->u.dir.dist_dir_bitmap,
+                                   num_total_dirdata_servers,
+                                   num_total_dirdata_sids,
+                                   0,
+                                   num_initial_dirdata_servers,
+                                   split_size);
 
     assert(ret == 0);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "mkdir: Init dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&s_op->resp.u.mkdir.handle),
-            attr->dist_dir_attr.tree_height,
-            attr->dist_dir_attr.num_servers,
-            attr->dist_dir_attr.bitmap_size,
-            attr->dist_dir_attr.split_size,
-            attr->dist_dir_attr.server_no,
-            attr->dist_dir_attr.branch_level);
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.dirdata_count,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
 
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_MKDIR_DEBUG,
@@ -364,7 +366,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE; 
 }
 
-/*
+/** Creates local dirdata dspace records for new directory
  * Function: mkdir_create_local_dirdata_dspace
  *
  * Params:   server_op *s_op, 
@@ -376,7 +378,8 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
  *           
  */
 /*
- * V3 - May be able to incorporate into mkdir_create_dist_dir_struct */
+ * V3 - May be able to incorporate into mkdir_create_dist_dir_struct 
+ */
 static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
@@ -390,12 +393,12 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
     /* dirdata on every meta server */
     s_op->u.mkdir.handle_array_local_count = 1;
     s_op->u.mkdir.handle_array_remote_count = 
-        s_op->u.mkdir.num_dirdata_servers - 1;
+                    s_op->u.mkdir.num_dirdata_servers - 1;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d local dirdata files\n", 
-        s_op->u.mkdir.handle_array_local_count);
+                    s_op->u.mkdir.handle_array_local_count);
     gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d remote dirdata files\n", 
-        s_op->u.mkdir.handle_array_remote_count);
+                    s_op->u.mkdir.handle_array_remote_count);
 
     if(s_op->u.mkdir.handle_array_local_count == 0)
     {
@@ -481,7 +484,7 @@ static PINT_sm_action mkdir_request_remote_dirdata_dspace(
 
 }
 
-/* V3 this nolonger needs a reqyest - we generate OIDs and SIDs locally */
+/* V3 this nolonger needs a request - we generate OIDs and SIDs locally */
 static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
                                                      struct PINT_smcb *smcb,
                                                      job_status_s *js_p)
@@ -505,7 +508,7 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
                  "\t mkdir: dirdata handles array of directory %s.\n",
                  PVFS_OID_str(&s_op->resp.u.mkdir.handle));
 
-    for(i=0; i<s_op->u.mkdir.num_dirdata_servers; i++)
+    for(i = 0; i < s_op->u.mkdir.num_dirdata_servers; i++)
     {
         gossip_debug(GOSSIP_MKDIR_DEBUG, 
                      "\t\tdirdata server %d: %s.\n",
@@ -515,6 +518,8 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
+/** Sets up msgpairarray to create dirdata objects on remote servers
+ */
 static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                                       struct PINT_smcb *smcb,
                                                       job_status_s *js_p)
@@ -537,13 +542,13 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     gossip_debug(
-        GOSSIP_MKDIR_DEBUG,
-        "  SENDING attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu ]\n",
-        attr.owner, attr.group, attr.perms,
-        attr.objtype, llu(attr.atime),
-        llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
+            GOSSIP_MKDIR_DEBUG,
+            "  SENDING attrs: [owner = %d, group = %d\n\t"
+            "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+            "ctime = %llu ]\n",
+            attr.owner, attr.group, attr.perms,
+            attr.objtype, llu(attr.atime),
+            llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -556,10 +561,10 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                    s_op->u.mkdir.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
-                                   s_op->attr.dist_dir_attr.num_servers,
-                                   s_op->attr.dirdata_handles,
-                                   s_op->attr.dist_dir_attr.num_copies,
-                                   s_op->attr.dirdata_sids,
+                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
+                                   s_op->attr.u.dir.dirdata_handles,
+                                   s_op->attr.u.dir.dist_dir_attr.sid_count,
+                                   s_op->attr.u.dir.dirdata_sids,
                                    NULL);
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
@@ -586,6 +591,12 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+/* V3 SIDs will get added to the handles, possibly the bitmap too, and
+ * the attr should be moved into the dspace record
+ */
+/** writes 3 keyvals for the new directory - the distdir attributes, the
+ * bitmap, and the handles of the dirdata objects
+ */
 static PINT_sm_action mkdir_write_keyval_to_meta_handle(
                                             struct PINT_smcb *smcb,
                                             job_status_s *js_p)
@@ -651,12 +662,19 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
 
 
     ret = job_trove_keyval_write_list(
-            s_op->req->u.mkdir.fs_id,
-            s_op->resp.u.mkdir.handle, /* meta handle */
-            s_op->key_a, s_op->val_a,
-            keyval_count, TROVE_SYNC, NULL, smcb,
-            0, js_p, &j_id, server_job_context,
-            s_op->req->hints);
+                                  s_op->req->u.mkdir.fs_id,
+                                  s_op->resp.u.mkdir.handle, /* meta handle */
+                                  s_op->key_a,
+                                  s_op->val_a,
+                                  keyval_count,
+                                  TROVE_SYNC,
+                                  NULL,
+                                  smcb,
+                                  0,
+                                  js_p,
+                                  &j_id,
+                                  server_job_context,
+                                  s_op->req->hints);
 
     return ret;
 }

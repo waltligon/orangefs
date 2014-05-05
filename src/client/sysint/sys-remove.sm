@@ -100,7 +100,7 @@ machine pvfs2_client_remove_sm
     state rmdirent_retry_or_fail
     {
         run remove_rmdirent_retry_or_fail;
-	RMDIRENT_RETRY => rmdirent_timer;
+        RMDIRENT_RETRY => rmdirent_timer;
         RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
         default => cleanup;
     }
@@ -122,7 +122,7 @@ machine pvfs2_client_remove_sm
         run remove_check_error_code;
         success => cleanup;
         RETURN_STORED_ERROR_CODE => cleanup;
-        default => crdirent_setup_msgpair;
+        default => getattr_setup;
     }
 
     state crdirent_timer
@@ -364,7 +364,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     /* keep a copy of the parent's capability */
     PINT_copy_capability(&sm_p->getattr.attr.capability,
-                         &sm_p->u.remove.parent_capability);
+                         &sm_p->parent_capability);
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
@@ -384,7 +384,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     PINT_SERVREQ_RMDIRENT_FILL(
                  msg_p->req,
-                 sm_p->u.remove.parent_capability,
+                 sm_p->parent_capability,
                  sm_p->parent_ref.fs_id,
                  sm_p->parent_ref.handle,
                  sm_p->parent_ref.sid_count,
@@ -399,7 +399,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           PVFS_OID_str(&sm_p->parent_ref.handle),
           sm_p->parent_ref.fs_id,
           PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                     dirdata_server_index])
+                                           dirdata_server_index])
           );
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -418,7 +418,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     if (ret)
     {
         gossip_err("Failed to map directory server address\n");
-	js_p->error_code = ret;
+        js_p->error_code = ret;
     }
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
@@ -468,10 +468,6 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
 
-    sm_p->u.remove.stored_error_code = js_p->error_code;
-
-    js_p->error_code = 0;
-
     attr = &sm_p->getattr.attr;
     assert(attr);
     
@@ -496,7 +492,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     PINT_SERVREQ_CRDIRENT_FILL(
                           msg_p->req,
-                          sm_p->u.remove.parent_capability,
+                          sm_p->parent_capability,
                           *sm_p->cred_p,
                           sm_p->u.remove.object_name,
                           sm_p->parent_ref.fs_id,
@@ -587,7 +583,7 @@ static PINT_sm_action remove_cleanup(struct PINT_smcb *smcb,
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
 
-    PINT_cleanup_capability(&sm_p->u.remove.parent_capability);
+    PINT_cleanup_capability(&sm_p->parent_capability);
 
     /* NOTE: acache is invalidated by remove_helper now */
     
@@ -618,7 +614,7 @@ static PINT_sm_action remove_generic_timer(struct PINT_smcb *smcb,
                                    0,
                                    js_p,
                                    &tmp_id,
-	                           pint_client_sm_context);
+                                   pint_client_sm_context);
 
     return ret;
 }
@@ -647,20 +643,20 @@ static PINT_sm_action remove_crdirent_retry_or_fail(struct PINT_smcb *smcb,
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
         (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.remove.retry_count++;
-	js_p->error_code = CRDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = CRDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
         (sm_p->u.remove.retry_count > 0))
     {
-	/* assume everything worked out ok and we got the right
-	 * directory entry back.  there was just a transient network
-	 * problem along the way
-	 */
-	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
+        /* assume everything worked out ok and we got the right
+         * directory entry back.  there was just a transient network
+         * problem along the way
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
@@ -698,24 +694,24 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
+        (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.remove.retry_count++;
-	js_p->error_code = RMDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = RMDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
         (sm_p->u.remove.retry_count > 0))
     {
-	/* this is a tricky error case.  Server reports ENOENT, but
-	 * this is not the first time we attempted the rmdirent.  It
-	 * may be the case that it is reporting ENOENT because one of
-	 * the earlier retries possibly completed.  We will treat this
-	 * as success, but put out an error message.  This could
-	 * strand objects, or remove non-empty directories, for
-	 * example.
-	 */
+        /* this is a tricky error case.  Server reports ENOENT, but
+         * this is not the first time we attempted the rmdirent.  It
+         * may be the case that it is reporting ENOENT because one of
+         * the earlier retries possibly completed.  We will treat this
+         * as success, but put out an error message.  This could
+         * strand objects, or remove non-empty directories, for
+         * example.
+         */
         gossip_err("Warning: Received ENOENT on retry to remove entry %s.\n",
                    sm_p->u.remove.object_name);
 

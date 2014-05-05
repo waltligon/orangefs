@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <sys/epoll.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "socket-collection-epoll.h"
 #include "bmi-method-support.h"
@@ -148,6 +149,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     if(ret < 0)
     {
+        perror("error returned from epoll_wait ");
 	return(-old_errno);
     }
 

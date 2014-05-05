@@ -1,0 +1,61 @@
+#!/bin/bash 
+#
+#
+# runalltestslocal
+# 
+# This is the local version of the runalltests script.
+#
+#	This sets the following variables
+# 
+WITH_DB=/opt/db4
+RUN_VFS_TEST=
+RUN_USERLIB_TEST=
+RUN_MPI_TEST=
+
+while getopts hvumd:s: arguments
+do
+	case $arguments in
+	s)	
+		SVNBRANCH=$OPTARG
+		;;
+
+	v)
+		#echo "Running VFS tests"
+		RUN_VFS_TEST=1
+		;;
+	u)
+		#echo "Running VFS tests"
+		RUN_USERLIB_TEST=1
+		;;
+
+	m)
+		#echo "Running MPI tests"
+		RUN_MPI_TEST=1
+		;;
+	d)
+		WITH_DB=$OPTARG
+		;;
+	h)
+		echo "runalltestslocal [-v][-m][-u][-d path-to-db4][-s SVNBRANCH]"
+		echo ""
+		echo "To run on multiple servers, start OrangeFS on remote servers and set VFSHOSTS environment variable to list of hosts."
+		exit 1
+		;;
+	
+	esac
+done
+
+if [ ! ${VFSHOSTS} ] 
+then
+	VFSHOSTS=`hostname -s`
+fi
+
+export VFSHOSTS
+export HOSTNAME=`hostname -s`
+export SVNBRANCH
+export RUN_VFS_TEST
+export RUN_MPI_TEST
+export RUN_USERLIB_TEST
+export WITH_DB
+echo "Running local tests on $VFSHOSTS for $SVNBRANCH"
+./run-test.sh

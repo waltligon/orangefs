@@ -382,6 +382,9 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
     {&pvfs2_client_mgmt_get_dirdata_array_sm}
+#ifdef ENABLE_SECURITY_CERT
+    ,{&pvfs2_client_mgmt_get_user_cert_sm}
+#endif
 };
 
 
@@ -420,7 +423,7 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
         }
         else
         {
-            /* now checjk range for mgmt functions */
+            /* now check range for mgmt functions */
             if (op <= PVFS_OP_MGMT_MAXVAL)
             {
                 return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
@@ -519,6 +522,12 @@ PVFS_error PINT_client_state_machine_post(
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    /* this checks sm_p and indirectly smcb */
+    if (!sm_p)
+    {
+        return -PVFS_EINVAL;
+    }
+
     PVFS_hint_add_internal(&sm_p->hints,
                            PINT_HINT_OP_ID,
                            sizeof(pvfs_sys_op),
@@ -540,6 +549,8 @@ PVFS_error PINT_client_state_machine_post(
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
+    /* V3 weird place for this check, moved it up */
+#if 0
     if (!smcb)
     {
         /* give back the hint added above */
@@ -547,6 +558,7 @@ PVFS_error PINT_client_state_machine_post(
         sm_p->hints = NULL;
         return ret;
     }
+#endif
 
     memset(&js, 0, sizeof(js));
 
@@ -1237,6 +1249,9 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_MGMT_GET_UID_LIST, "PVFS_MGMT_GET_UID_LIST" },
         { PVFS_MGMT_GET_DIRDATA_ARRAY,
           "PVFS_MGMT_GET_DIRDATA_ARRAY" },
+#ifdef ENABLE_SECURITY_CERT
+        { PVFS_MGMT_GET_USER_CERT, "PVFS_MGMT_GET_USER_CERT" },
+#endif
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_ATOMICEATTR, "PVFS_SYS_ATOMICEATTR" },

@@ -10,6 +10,7 @@
 
 #include <string.h>
 
+#include "pvfs2-internal.h"
 #include "bmi-types.h"
 #include "bmi-method-support.h"
 #include "id-generator.h"

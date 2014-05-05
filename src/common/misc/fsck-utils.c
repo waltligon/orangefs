@@ -3,6 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
+
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -12,6 +13,7 @@
 #include <ctype.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "fsck-utils.h"
 #include "security-util.h"
 
@@ -926,7 +928,7 @@ int PVFS_fsck_validate_dir(
     set_return_code(&ret, err);
 
     /* get the dirdata handles and validate */
-    dirdata_count = attributes->attr.dirdata_count;
+    dirdata_count = attributes->attr.distr_dir_servers_max;
     dirdata_handles = (PVFS_handle *) malloc(dirdata_count * sizeof(PVFS_handle));
     if(!dirdata_handles)
     {

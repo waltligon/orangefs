@@ -320,6 +320,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     /* layout may have adjusted number of datafiles */
     s_op->req->u.create.attr.u.meta.dfile_count = s_op->u.create.num_io_servers;
     s_op->resp.u.create.datafile_count = s_op->u.create.num_io_servers;
+
     for(i=0; i<s_op->u.create.num_io_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 

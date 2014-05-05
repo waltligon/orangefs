@@ -313,7 +313,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* also insert entry into attr cache */
@@ -395,7 +395,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req, "
-            "[num_dirent_files=%d]\n", sm_p->u.mkdir.num_dirent_files);
+            "[distr_dir_servers_initial=%d]\n", sm_p->u.mkdir.distr_dir_servers_initial);
 
     /* V3 add the OID and SIDs for this create 
      * this also sets the correct number of replicants
@@ -415,9 +415,11 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                                 sm_p->object_ref.handle, /* object */
                                 sm_p->parent_ref.handle, /* back ptr */
                                 sm_p->parent_ref.sid_array[0],
-                                sm_p->u.mkdir.num_dirent_files,
-                                sm_p->u.mkdir.layout,
                                 sm_p->u.mkdir.sys_attr,
+                                sm_p->u.mkdir.distr_dir_servers_initial,
+                                sm_p->u.mkdir.distr_dir_servers_max,
+                                sm_p->u.mkdir.distr_dir_split_size,
+                                sm_p->u.mkdir.layout,
                                 sm_p->hints);
 
         msg_p->msgclass = PVFS_IO_METADATA;
@@ -483,7 +485,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  PVFS_OID_str(&sm_p->u.mkdir.metafile_handle),
                  PVFS_OID_str(&sm_p->object_ref.handle),
                  PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                     dirdata_server_index]),
+                                                  dirdata_server_index]),
                  dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
@@ -705,10 +707,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
 
     /* !!! change later */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "parent owner: %d, group: %d, perms: %d, dirdata_server_count: %d\n",
+        "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms,
-        attr->u.dir.dist_dir_attr.num_servers);
-    for (i = 0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+        attr->u.dir.dist_dir_attr.dirdata_count);
+    for (i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "                           dirdata_handle[%d] = %s\n",
@@ -733,7 +735,12 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
      * otherwise use user set value   */
 
     /* get command line value of NumDirdata from sys_attr */
-    sm_p->u.mkdir.num_dirent_files = sm_p->u.mkdir.sys_attr.dirdata_count;
+    sm_p->u.mkdir.distr_dir_servers_initial =
+        sm_p->u.mkdir.sys_attr.distr_dir_servers_initial;
+    sm_p->u.mkdir.distr_dir_servers_max = 
+        sm_p->u.mkdir.sys_attr.distr_dir_servers_max;
+    sm_p->u.mkdir.distr_dir_split_size =
+        sm_p->u.mkdir.sys_attr.distr_dir_split_size;
 
 
     /* note: if select less # of dirdata servers, need to modify getattr, etc. to contact only active servers, not all dirdata servers */

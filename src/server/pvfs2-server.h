@@ -35,6 +35,7 @@
 #include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+#include "server-config.h"
 
 
 extern job_context_id server_job_context;
@@ -97,15 +98,15 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
 {
-    ROOT_HANDLE_KEY      = 0,
-    DIR_ENT_KEY          = 1,
-    METAFILE_HANDLES_KEY = 2,
-    METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6,       
-    DIST_DIR_ATTR_KEY    = 7,
-    DIST_DIRDATA_BITMAP_KEY      = 8,
+    ROOT_HANDLE_KEY          = 0,
+    DIR_ENT_KEY              = 1,
+    METAFILE_HANDLES_KEY     = 2,
+    METAFILE_DIST_KEY        = 3,
+    SYMLINK_TARGET_KEY       = 4,
+    METAFILE_LAYOUT_KEY      = 5,
+    NUM_DFILES_REQ_KEY       = 6,       
+    DIST_DIR_ATTR_KEY        = 7,
+    DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9
 
 };
@@ -121,14 +122,14 @@ enum
 /* optional; user-settable keys */
 enum 
 {
-    DIST_NAME_KEY        = 0,
-    DIST_PARAMS_KEY      = 1,
-    NUM_DFILES_KEY       = 2,
-    NUM_SPECIAL_KEYS     = 3, /* not an index */
-    METAFILE_HINT_KEY    = 3,
-    MIRROR_COPIES_KEY    = 4,
-    MIRROR_HANDLES_KEY   = 5,
-    MIRROR_STATUS_KEY    = 6,
+    DIST_NAME_KEY          = 0,
+    DIST_PARAMS_KEY        = 1,
+    DEFAULT_NUM_DFILES_KEY = 2,
+    NUM_SPECIAL_KEYS       = 3, /* not an index */
+    METAFILE_HINT_KEY      = 3,
+    MIRROR_COPIES_KEY      = 4,
+    MIRROR_HANDLES_KEY     = 5,
+    MIRROR_STATUS_KEY      = 6,
 };
 
 typedef enum
@@ -155,11 +156,20 @@ typedef enum
     SERVER_PRECREATE_INIT      = (1 << 18),
     SERVER_UID_MGMT_INIT       = (1 << 19), 
     SERVER_SECURITY_INIT       = (1 << 20),
-    SERVER_CAPCACHE_INIT       = (1 << 21),
-    SERVER_CREDCACHE_INIT      = (1 << 22),
-    SERVER_CERTCACHE_INIT      = (1 << 23),
-    SERVER_SID_INIT            = (1 << 24)
+    SERVER_SID_INIT            = (1 << 21),
+    SERVER_FILESYS_INIT        = (1 << 22),
+    SERVER_BMI_CLIENT_INIT     = (1 << 23),
+    SERVER_CAPCACHE_INIT       = (1 << 24),
+    SERVER_CREDCACHE_INIT      = (1 << 25),
+    SERVER_CERTCACHE_INIT      = (1 << 26),
 } PINT_server_status_flag;
+
+/* this combination of flags is used to control pre-init of the server
+ * when reading a remove config file
+ */
+#define SERVER_CLIENT_INIT \
+            SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
+            SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
 
 typedef enum
 {   
@@ -394,7 +404,6 @@ struct PINT_server_crdirent_op
     PVFS_size dirent_count;
     PVFS_size sid_count;
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 
@@ -424,7 +433,6 @@ struct PINT_server_rmdirent_op
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
     PVFS_size dirent_count;
-    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -960,17 +968,21 @@ int server_post_unexpected_recv(void);
 int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
+int server_state_machine_wait(void);
 
 /* lists of server ops */
 extern struct qlist_head posted_sop_list;
 extern struct qlist_head inprogress_sop_list;
 
 /* starts state machines not associated with an incoming request */
-int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op, struct PINT_smcb ** new_op);
-int server_state_machine_start_noreq(
-    struct PINT_smcb *new_op);
+int server_state_machine_alloc_noreq(enum PVFS_server_op op,
+                                     struct PINT_smcb ** new_op);
+int server_state_machine_start_noreq(struct PINT_smcb *new_op);
 int server_state_machine_complete_noreq(PINT_smcb *smcb);
+int PINT_server_get_config(struct server_configuration_s *config,
+                           struct PVFS_sys_mntent *mntent_p,
+                           const PVFS_credential *credential,
+                           PVFS_hint hints);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0

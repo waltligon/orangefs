@@ -1,12 +1,11 @@
 #!/bin/bash
-#script call needed to workaround requirement for tty for sudo
-script run-test.txt
 export VFS_HOSTS
 export RUN_MPI_TEST
 export RUN_VFS_TEST
 export SVNBRANCH
 export WITH_DB=/opt/db4
 export LD_LIBRARY_PATH=$WITH_DB/lib
+export SERVER_DEBUG_PARAMS
 mkdir ~/test2
 cd ~/test2
 echo svn export --force -q http://www.orangefs.org/svn/orangefs/${SVNBRANCH}/test/run-nightly-setup

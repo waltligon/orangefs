@@ -226,7 +226,10 @@ enum PVFS_sys_layout_algorithm
     PVFS_SYS_LAYOUT_RANDOM = 3,
 
     /* order the datafiles based on the list specified */
-    PVFS_SYS_LAYOUT_LIST = 4
+    PVFS_SYS_LAYOUT_LIST = 4,
+
+    /* order the datafiles based on the list specified */
+    PVFS_SYS_LAYOUT_LOCAL = 5
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
@@ -468,7 +471,7 @@ typedef struct
 #define PVFS_XATTR_REPLACE 0x2
 
 /** statfs and misc. server statistic information. */
-typedef struct
+typedef struct PVFS_statfs_s
 {
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
@@ -500,7 +503,7 @@ endecode_fields_12(
 /** object reference (uniquely refers to a single file, directory, or
     symlink).
 */
-typedef struct
+typedef struct PVFS_object_ref_s
 {
     PVFS_handle handle;
     PVFS_fs_id  fs_id;
@@ -536,7 +539,8 @@ typedef struct
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
-typedef struct {
+typedef struct PVFS_keyval_pair_s
+{
     char key[PVFS_MAX_XATTR_NAMELEN];
     int32_t  key_sz; /* int32_t for portable, fixed-size structures */
     int32_t  val_sz;
@@ -544,7 +548,7 @@ typedef struct {
 } PVFS_keyval_pair;
 
 /** Directory entry contents. */
-typedef struct
+typedef struct PVFS_dirent_s
 {
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
@@ -557,24 +561,26 @@ endecode_fields_2(
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
  */
-typedef struct {
+typedef struct PVFS_dist_dir_attr_s
+{
         /* global info */
-        int32_t tree_height; /* ceil(log2(num_servers)) */
-        int32_t num_servers; /* total number of servers */
-        int32_t num_copies;  /* number of copies of each bucket */
-        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype */
-                             /* stored under the key DIST_DIR_BITMAP */
-        int32_t split_size;  /* maximum number of entries before a split */
+        int32_t tree_height;    /* ceil(log2(dirdata_count)) */
+        int32_t dirdata_count;  /* total number of servers */
+        int32_t sid_count;      /* number of copies of each bucket */
+        int32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
+                                /* stored under the key DIST_DIR_BITMAP */
+        int32_t split_size;     /* maximum number of entries before a split */
 
         /* local info */
-        int32_t server_no; /* 0 to num_servers-1, indicates */
-                           /* which server is running this code */
-        int32_t branch_level; /* level of branching on this server */
+        int32_t server_no;      /* 0 to dirdata_count-1, indicates */
+                                /* which server is running this code */
+        int32_t branch_level;   /* level of branching on this server */
 } PVFS_dist_dir_attr;
-endecode_fields_6(
+endecode_fields_7(
     PVFS_dist_dir_attr,
     int32_t, tree_height,
-    int32_t, num_servers,
+    int32_t, dirdata_count,
+    int32_t, sid_count,
     int32_t, bitmap_size,
     int32_t, split_size,
     int32_t, server_no,
@@ -1029,42 +1035,78 @@ typedef enum PVFS_io_class
  */
 #define PVFS_MGMT_RESERVED 1
 
+/* Note: in a C file which uses profiling, include pvfs2-config.h before
+ * pvfs2-types.h so ENABLE_PROFILING is declared.
+ */
+#ifdef ENABLE_PROFILING
 /*
  * Structure and macros for timing things for profile-like output.
  *
  */
 struct profiler
 {
-    struct  timeval  start;
-    struct  timeval  finish;
-    uint64_t  save_timing;
+    struct timeval start;
+    struct timeval finish;
+    double save_timing;
 };
 
-#define INIT_PROFILER(prof_struct) prof_struct.cumulative_diff = 0;
+#define DECLARE_PROFILER(prof_struct) \
+    struct profiler prof_struct
+
+#define DECLARE_PROFILER_EXTERN(prof_struct) \
+    extern struct profiler prof_struct
+
+#define INIT_PROFILER(prof_struct) \
+    do { \
+        prof_struct.save_timing = 0; \
+    } while (0)
 
 #define START_PROFILER(prof_struct) \
-    gettimeofday(&prof_struct.start, NULL);
+    do { \
+        gettimeofday(&prof_struct.start, NULL); \
+    } while (0)
 
 #define FINISH_PROFILER(label, prof_struct, print_timing) \
-{ \
-    double t_start, t_finish; \
-    gettimeofday(&prof_struct.finish, NULL); \
-    t_start = prof_struct.start.tv_sec + (prof_struct.start.tv_usec/1000000.0); \
-    t_finish = prof_struct.finish.tv_sec + (prof_struct.finish.tv_usec/1000000.0); \
-    prof_struct.save_timing = t_finish - t_start * 1000000.0; \
-    if (print_timing) { \
-      gossip_err("PROFILING %s: %f\n", label, t_finish - t_start); \
-    } \
-}
+    do { \
+        double t_start, t_finish; \
+        gettimeofday(&prof_struct.finish, NULL); \
+        t_start = prof_struct.start.tv_sec + \
+                  (prof_struct.start.tv_usec / 1000000.0); \
+        t_finish = prof_struct.finish.tv_sec + \
+                   (prof_struct.finish.tv_usec / 1000000.0); \
+        prof_struct.save_timing = t_finish - t_start; \
+        if (print_timing) { \
+            gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
+        } \
+    } while (0)
 
 #define PRINT_PROFILER(label, prof_struct) \
-      gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
+    do { \
+        gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
+    } while (0)
 
+#else /* ENABLE_PROFILING */
+
+#define DECLARE_PROFILER(prof_struct)
+
+#define DECLARE_PROFILER_EXTERN(prof_struct)
+
+#define INIT_PROFILER(prof_struct)
+
+#define START_PROFILER(prof_struct)
+
+#define FINISH_PROFILER(label, prof_struct, print_timing)
+
+#define PRINT_PROFILER(label, prof_struct)
+
+#endif /* ENABLE_PROFILING */
 /*
  * New types for robust security implementation.
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
 #define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
+#define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
+        "/orangefs-service-users"
 
 typedef unsigned char *PVFS_cert_data;
 
@@ -1082,6 +1124,22 @@ endecode_fields_1a_struct (
     uint32_t, buf_size,
     PVFS_cert_data, buf);
 #define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
+
+/* Buffer and structure for certificate private key */
+typedef unsigned char *PVFS_key_data;
+
+typedef struct PVFS_security_key PVFS_security_key;
+struct PVFS_security_key
+{
+    uint32_t buf_size;
+    PVFS_key_data buf;
+};
+endecode_fields_1a_struct (
+    PVFS_security_key,
+    skip4,,
+    uint32_t, buf_size,
+    PVFS_key_data, buf);
+#define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
 
 typedef unsigned char *PVFS_signature;
 

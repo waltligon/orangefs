@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# description: orangefs-client is the client component of OrangeFS
+#
+# chkconfig: 345 99 35 
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+OFSINSTALL=@prefix@
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OFSINSTALL}/lib
+
+OFSTABFILE=${OFSINSTALL}/etc/pvfs2tab
+OFSCLIENT=${OFSINSTALL}/sbin/pvfs2-client
+OFSCLIENTCORE=${OFSINSTALL}/sbin/pvfs2-client-core
+OFSURL=`cat ${OFSTABFILE} | awk '{print $1}'`
+OFSMOUNT=`cat ${OFSTABFILE} | awk '{print $2}'`
+OFSOPTIONS=""
+OFSCLIENT_LOGFILE="--logfile /var/log/orangefs-client.log"
+OFSCLIENT_LOGFILE_TIMESTAMP="--logstamp=datetime"
+
+# verify presence of client binary
+if ! [ -x ${OFSCLIENT} ]; then
+	echo "Error: could not find ${OFSCLIENT}"
+	exit 1
+fi
+
+# verify presence of the pvfs2tab file 
+if ! [ -r ${OFSTABFILE} ]; then
+	echo "Error: could not find ${OFSTABFILE}"
+	exit 1
+fi
+
+
+# See how we were called.
+case "$1" in
+  start)
+	echo -n "Starting OrangeFS client: "
+	if grep -q ${OFSMOUNT} /etc/mtab ; then
+	  failure 
+	  echo 
+	  echo "Error: OrangeFS is already mounted on ${OFSMOUNT}"
+	  exit 0
+	fi
+	
+	# load the pvfs2 kernel module if it's not already loaded
+	if ! grep -q pvfs2 /proc/modules ; then
+	  /sbin/insmod ${OFSINSTALL}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
+	fi
+	sleep 1
+	daemon ${OFSCLIENT} -p ${OFSCLIENTCORE} ${OFSCLIENT_LOGFILE} ${OFSCLIENT_LOGFILE_TIMESTAMP} ${OFSOPTIONS} 
+	echo
+	sleep 2
+	touch /var/lock/subsys/pvfs2-client
+
+	echo -n "Mounting OrangeFS on ${OFSMOUNT}: "
+	if mount -t pvfs2 ${OFSURL} ${OFSMOUNT} ; then
+	  success
+	  echo
+        else
+	  failure
+          echo
+	fi
+	exit 0
+	;;
+  stop)
+	# unmount OFS
+	if [ "`grep ${OFSURL} /etc/mtab | awk '{print $1}'`" = "${OFSURL}" ]; then
+		umount -fl ${OFSMOUNT} 2>&1 > /dev/null
+	fi
+	# tell the OFS daemons to stop gracefully
+	killall -q pvfs2-client pvfs2-client-core  2>&1 > /dev/null
+	sleep 2
+	PS_CLIENT=`/bin/ps -eaf | grep pvfs2-client | grep -v pvfs2-client-mount | grep -v grep | awk '{print $2}'`
+	for i in $PS_CLIENT
+	do
+		kill -9 $i 2>&1 > /dev/null
+	done
+        sleep 3
+	OFSKMOD=`/sbin/lsmod | grep pvfs2 | awk '{print $1}'`
+	# unload the pvfs2 kernel module if necessary 
+	if [ "$OFSKMOD" = "pvfs2" ]; then
+		/sbin/rmmod pvfs2 2>&1 > /dev/null
+	fi
+	rm -f /var/lock/subsys/pvfs2-client
+	echo -n "Stopping OrangeFS client: "
+	success
+	echo
+	exit 0
+	;;
+  status)
+        status pvfs2-client
+	exit 0
+	;;
+  restart)
+	$0 stop
+	# give client time to die cleanly
+	sleep 2
+	$0 start
+	exit 0
+	;;
+  *)
+	echo "Usage: $0 {start|stop|status|restart}"
+	exit 1
+esac
+
+exit 0
+

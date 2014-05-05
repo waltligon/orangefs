@@ -16,6 +16,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pint-util.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
@@ -205,8 +206,13 @@ static int server_parse_config(struct server_configuration_s *config,
         return ret;
     }
 
-    hFile = CreateFile(temp_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                       FILE_ATTRIBUTE_NORMAL, NULL);
+    hFile = CreateFile(temp_file,
+                       GENERIC_WRITE,
+                       0,
+                       NULL,
+                       CREATE_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
 
     if (hFile == INVALID_HANDLE_VALUE)
     {

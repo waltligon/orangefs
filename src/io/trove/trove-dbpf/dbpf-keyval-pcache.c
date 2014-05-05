@@ -22,7 +22,7 @@
 struct dbpf_keyval_pcache_key
 {
     TROVE_handle handle;
-    char type;
+//    char type;
     TROVE_ds_position pos;
 };
 
@@ -45,6 +45,7 @@ PINT_dbpf_keyval_pcache * PINT_dbpf_keyval_pcache_initialize(void)
 {
     PINT_dbpf_keyval_pcache * cache;
 
+gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "dbpf_keyval_pcache_initialize");
     cache = malloc(sizeof(PINT_dbpf_keyval_pcache));
     if(!cache)
     {
@@ -77,6 +78,7 @@ PINT_dbpf_keyval_pcache * PINT_dbpf_keyval_pcache_initialize(void)
 void PINT_dbpf_keyval_pcache_finalize(
     PINT_dbpf_keyval_pcache * cache)
 {
+gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "dbpf_keyval_pcache_finalize");
     PINT_tcache_finalize(cache->tcache);
     gen_mutex_destroy(&cache->mutex);
     free(cache);
@@ -93,6 +95,13 @@ static int dbpf_keyval_pcache_compare(void * key, struct qhash_head * link)
     if(!PVFS_OID_cmp(&key_entry->handle, &link_entry->handle) &&
             key_entry->pos == link_entry->pos) 
     {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "dbpf_keyval_pcache_compare: "
+                     "looking for handle: %s, pos: %llu, "
+                     "examining handle: %s, pos: %llu\n",
+                     PVFS_OID_str(&key_entry->handle), llu(key_entry->pos),
+                     PVFS_OID_str(&link_entry->handle), llu(link_entry->pos));
+
         return 1;
     }
     return 0;
@@ -129,6 +138,7 @@ static int dbpf_keyval_pcache_hash(void * key, int size)
 
 static int dbpf_keyval_pcache_entry_free(void * entry)
 {
+gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "dbpf_keyval_pcache_entry_free");
     free(entry);
     return 0;
 }
@@ -185,7 +195,7 @@ int PINT_dbpf_keyval_pcache_lookup(
 int PINT_dbpf_keyval_pcache_insert( 
     PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
-    char type,
+//    char type,
     TROVE_ds_position pos,
     const char * keyname,
     int length)
@@ -204,7 +214,7 @@ int PINT_dbpf_keyval_pcache_insert(
     }
 
     key.handle = handle;
-    key.type = type;
+//    key.type = type;
     key.pos = pos;
 
     gen_mutex_lock(&pcache->mutex);

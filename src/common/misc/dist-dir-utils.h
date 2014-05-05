@@ -8,6 +8,44 @@
 #define __DIST_DIR_UTILS_H
 
 #include "pvfs2-types.h"
+#include "gossip.h"
+
+#define PINT_debug_dist_dir_attr(debugmask,dist_dir_attr) \
+    do {gossip_debug(debugmask, \
+        "dist_dir_attr: tree_height=%d, dirdata_count=%d, bitmap_size=%d, "\
+        "split_size=%d, server_no=%d and branch_level=%d\n", \
+        dist_dir_attr.tree_height, dist_dir_attr.dirdata_count, \
+        dist_dir_attr.bitmap_size, dist_dir_attr.split_size, \
+        dist_dir_attr.server_no, dist_dir_attr.branch_level); } while (0)
+
+#define PINT_debug_dist_dir_bitmap(debugmask,dist_dir_attr,dist_dir_bitmap) \
+    do { int i; \
+         unsigned char *c = NULL; \
+        gossip_debug(debugmask, "dist_dir_bitmap:\n"); \
+        for(i = dist_dir_attr.bitmap_size - 1; i >= 0 ; i--) \
+        { \
+            c = (unsigned char *)(dist_dir_bitmap + i); \
+            gossip_debug(debugmask, \
+                    " i=%d : %02x %02x %02x %02x\n", \
+                    i, c[3], c[2], c[1], c[0]); \
+        } \
+    } while (0)
+
+#define PINT_debug_dist_dir_handles(debugmask,dist_dir_attr, dist_dir_handles) \
+    do { int i; \
+        gossip_debug(debugmask, "dist_dir_handles:\n"); \
+        for(i = 0; i < dist_dir_attr.dirdata_count ; i++) \
+        { \
+            gossip_debug(debugmask, \
+                    "\t\tdirdata server %d: %llu.\n", \
+                    i, llu(dist_dir_handles[i])); \
+        } \
+    } while (0)
+
+#define PINT_debug_dist_dir(debugmask,dist_dir_attr,dist_dir_bitmap,dist_dir_handles) \
+    PINT_debug_dist_dir_attr(debugmask,dist_dir_attr); \
+    PINT_debug_dist_dir_bitmap(debugmask,dist_dir_attr,dist_dir_bitmap); \
+    PINT_debug_dist_dir_handles(debugmask,dist_dir_attr,dist_dir_handles);
 
 
 /* changes to original prototype
@@ -34,15 +72,14 @@
     ( i_bitfield[(bitnum) >> 5] & (1 << ((bitnum) & 0x1f)) )
 
 
-/* dummy value of split size for now */
-#define PVFS_DIST_DIR_MAX_ENTRIES 16000
-
 int PINT_init_dist_dir_state(
 		PVFS_dist_dir_attr *dist_dir_attr, 
 		PVFS_dist_dir_bitmap *bitmap_ptr,
-		const int num_servers, 
+		const int distdir_count, 
+		const int sid_count, 
 		const int server_no, 
-		const int pre_dsg_num_server);
+		int pre_dsg_num_server,
+                const int split_size);
 int PINT_is_dist_dir_bucket_active(
 		const PVFS_dist_dir_attr *dist_dir_attr_p, 
 		const PVFS_dist_dir_bitmap bitmap,
@@ -67,7 +104,8 @@ int PINT_dist_dir_set_serverno(const int server_no,
 #define PINT_dist_dir_attr_copyto(to_attr, from_attr) \
 do { \
 	to_attr.tree_height = from_attr.tree_height; \
-	to_attr.num_servers = from_attr.num_servers; \
+	to_attr.dirdata_count = from_attr.dirdata_count; \
+	to_attr.sid_count = from_attr.sid_count; \
 	to_attr.bitmap_size = from_attr.bitmap_size; \
 	to_attr.split_size = from_attr.split_size; \
 	to_attr.server_no = from_attr.server_no; \

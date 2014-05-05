@@ -92,6 +92,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -103,6 +104,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -115,6 +117,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -126,6 +129,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -140,6 +144,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -155,6 +160,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

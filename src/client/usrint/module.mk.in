@@ -1,4 +1,4 @@
-ifdef BUILD_USRINT
+ifeq ($(build_usrint),yes)
 
 DIR := src/client/usrint
 
@@ -8,11 +8,11 @@ SRC := \
 	$(DIR)/iocommon.c \
 	$(DIR)/openfile-util.c \
 	$(DIR)/ucache.c \
-        $(DIR)/mmap.c \
+	$(DIR)/mmap.c \
 	$(DIR)/aiocommon.c \
 	$(DIR)/aio-pvfs.c \
-        $(DIR)/pvfs-path.c \
-        $(DIR)/pvfs-qualify-path.c
+	$(DIR)/pvfs-path.c \
+	$(DIR)/pvfs-qualify-path.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed
@@ -21,14 +21,11 @@ SRC := \
 USRC := \
 	$(DIR)/posix.c \
 	$(DIR)/stdio.c \
+	$(DIR)/selinux.c \
+	$(DIR)/overunder.c \
 	$(DIR)/fts.c \
-	$(DIR)/glob.c
-
-ifdef BUILD_JNI
-USRC += \
-    $(DIR)/jni_posix.c \
-    $(DIR)/jni_stdio.c 
-endif # BUILD_JNI
+	$(DIR)/glob.c \
+	$(DIR)/error.c
 
 #   these routines do no need to use the pvfs descriptor
 #   and will probably be removed
@@ -45,4 +42,4 @@ SRC := \
 
 LIBSRC += $(SRC)
 
-endif # BUILD_USRINT
+endif # build_usrint

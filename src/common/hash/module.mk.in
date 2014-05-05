@@ -1,0 +1,3 @@
+DIR := src/common/hash
+SERVERSRC += $(DIR)/murmur3.c
+LIBSRC += $(DIR)/murmur3.c

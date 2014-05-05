@@ -11,6 +11,9 @@
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 #include <ldap.h>
 
@@ -26,7 +29,7 @@
 #include "cert-util.h"
 
 /* global LDAP connection handle */
-static LDAP *ldap;
+static LDAP *ldap = NULL;
 
 /* LDAP handle mutex */
 static gen_mutex_t ldap_mutex = GEN_MUTEX_INITIALIZER;
@@ -46,8 +49,21 @@ static char *get_ldap_password(const char *path)
 {
     FILE *f;
     char *buf;
+    struct stat statbuf;
 
-    /* TODO: check permissions */
+    /* check permissions */
+    if (stat(path, &statbuf) != 0)
+    {
+        gossip_err("Could not stat LDAP password file %s: %s\n", path,
+                   strerror(errno));
+        return NULL;
+    }
+    /* check if group or other modes are set */
+    if (statbuf.st_mode & (S_IRWXG|S_IRWXO))
+    {
+        gossip_err("Warning: LDAP password file %s has Group or Other "
+                   "permissions enabled\n", path);
+    }
 
     f = fopen(path, "r");
     if (f == NULL)
@@ -295,19 +311,21 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
 
     /* read subject from cert */
     ret = PINT_cert_to_X509(&cred->certificate, &xcert);
-    PINT_SECURITY_CHECK_RET(ret);
+    PINT_SECURITY_CHECK_RET(ret, "could not convert internal cert\n");
 
     xsubject = X509_get_subject_name(xcert);
-    PINT_SECURITY_CHECK_NULL(xsubject, PINT_ldap_map_user_exit);
+    PINT_SECURITY_CHECK_NULL(xsubject, PINT_ldap_map_user_exit,
+                             "could not retrieve cert subject\n");
 
     X509_NAME_oneline(xsubject, subject, sizeof(subject));
     subject[sizeof(subject) - 1] = '\0';
 
     if (subject[0] == '\0')
     {
-        gossip_err("%s: no certificate subject\n", __func__);
+        
         ret = -PVFS_ESECURITY;
-        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit, 
+                            "no certificate subject\n");
     }
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: using subject %s\n", __func__,
@@ -317,13 +335,10 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
     {
         /* parse the CN */
         ret = parse_subject_cn(subject, name, sizeof(name));
-        if (ret != 0)
-        {
-            gossip_err("%s: cannot parse CN from certificate %s\n", 
-                       __func__, subject);
-            PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
-        }
-
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit,
+                            "cannot parse CN from certificate %s\n",
+                            subject);
+        
         /* set LDAP search parameters */
         scope = config->ldap_search_scope;
 
@@ -344,20 +359,16 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
     {
         /* allocate the base */
         base = (char *) malloc(strlen(subject) + 1);
-        if (base == NULL)
-        {
-            PINT_SECURITY_CHECK(-PVFS_ENOMEM, PINT_ldap_map_user_exit);
+        if (base == NULL){
+            PINT_SECURITY_CHECK(-PVFS_ENOMEM, PINT_ldap_map_user_exit,
+                                "out of memory\n");
         }
         free_flag = 1;
 
         /* convert the DN */
         ret = convert_dn(subject, base, strlen(subject) + 1);
-        if (ret != 0)
-        {
-            gossip_err("%s: cannot convert certificate DN: %d\n", __func__,
-                       ret);
-            PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit);
-        }
+        PINT_SECURITY_CHECK(ret, PINT_ldap_map_user_exit,
+                            "cannot convert certificate DN: %d\n", ret);        
 
         scope = LDAP_SCOPE_BASE;
 
@@ -543,13 +554,148 @@ PINT_ldap_map_user_exit:
     return ret;
 }
 
+int PINT_ldap_authenticate(const char *userid,
+                           const char *password)
+{
+    struct server_configuration_s *config = get_server_config_struct();
+    LDAP *ldap2 = NULL;
+    char *base = NULL, filter[512], *dn = NULL;
+    int ldapret, ret = -PVFS_EINVAL, scope = LDAP_SCOPE_SUBTREE, version;
+    struct timeval timeout = { 15, 0 };
+    LDAPMessage *res, *entry;
+
+    if (userid == NULL || strlen(userid) == 0 ||
+        password == NULL || strlen(password) == 0)
+    {
+        gossip_err("%s: userid and/or password is NULL or blank\n", __func__);
+        return -PVFS_EINVAL;
+    }
+
+    /* set LDAP search parameters */
+    scope = config->ldap_search_scope;
+
+    /* root container of search -- may be null */
+    base = config->ldap_search_root;
+
+    /* construct the filter in the form 
+     (&(objectClass={search-class})({naming-attr}={userid})) */
+    snprintf(filter, sizeof(filter), "(&(objectClass=%s)(%s=%s))",
+             config->ldap_search_class,
+             config->ldap_search_attr,
+             userid);
+    filter[sizeof(filter) - 1] = '\0';
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
+                 "ldap_search_ext_s(ldap, \"%s\", %d, "
+                 "\"%s\", NULL, 0, NULL, NULL, "
+                 "%lu, 0, ...)\n",
+                 __func__,
+                 base,
+                 scope,
+                 filter,
+                 timeout.tv_sec);
+
+    /* search LDAP with the specified values */
+    ldapret = ldap_search_ext_s(ldap, base, scope, filter, NULL, 0,
+                            NULL, NULL, &timeout, 0, &res);
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: ldap_search_ext returned %d\n",
+                 __func__, ldapret);
+
+    if (ldapret == LDAP_SUCCESS)
+    {
+        if (res != NULL)
+        {
+            int count = ldap_count_entries(ldap, res);
+            if (count > 1)
+            {
+                gossip_err("%s: LDAP warning: multiple entries for user %s\n",
+                           __func__, userid);
+            }
+
+            /* note: we only check the first entry */
+            entry = ldap_first_entry(ldap, res);
+            if (entry != NULL)
+            {
+                dn = ldap_get_dn(ldap, entry);
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: found LDAP user %s\n",
+                             __func__, dn);
+            }
+            else
+            {
+                /* no entries... return -PVFS_ENOENT */
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: no users found for "
+                             "username %s\n", __func__, userid);
+                ret = -PVFS_ENOENT;
+            }
+            ldap_msgfree(res);
+        }
+        else
+        {
+            gossip_err("%s: LDAP result buffer is null\n", __func__);
+            ret = -PVFS_ESECURITY;
+        }
+    }
+    else
+    {
+        PINT_ldap_error("LDAP_authenticate failed", ldapret);
+        ret = -PVFS_ESECURITY;
+    }
+
+    /* login with dn / password */
+    if (dn != NULL)
+    {
+        ldapret = ldap_initialize(&ldap2, config->ldap_hosts);
+        if (ldapret == LDAP_SUCCESS)
+        {
+            /* set the version */
+            version = LDAP_VERSION3;
+            ldap_set_option(ldap2, LDAP_OPT_PROTOCOL_VERSION, &version);
+
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: authenticating to LDAP "
+                         "using server list \"%s\", user \"%s\"\n",
+                         __func__, config->ldap_hosts, dn);
+
+            ldapret = ldap_simple_bind_s(ldap2,
+                                     dn,
+                                     password);
+
+            if (ldapret == 0)
+            {
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: password ok\n",
+                             __func__);
+
+                ldap_unbind_ext_s(ldap2, NULL, NULL);
+                ret = 0;                
+            }
+            else
+            {
+                PINT_ldap_error("ldap_simple_bind_s", ldapret);
+                ret = -PVFS_EACCES;
+            }
+        }
+        else
+        {
+            PINT_ldap_error("ldap_initialize", ldapret);
+            ret = -PVFS_ESECURITY;
+        }
+
+        ldap_memfree(dn);
+    }
+
+    return ret;
+}
+
 /* close LDAP connection */
 void PINT_ldap_finalize(void)
 {
     gen_mutex_lock(&ldap_mutex);
 
     /* disconnect from the LDAP server */
-    ldap_unbind_ext_s(ldap, NULL, NULL);
+    if (ldap != NULL)
+    {
+        ldap_unbind_ext_s(ldap, NULL, NULL);
+    }
 
     ldap = NULL;
 

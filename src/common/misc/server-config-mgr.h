@@ -7,6 +7,7 @@
 #ifndef __SERVER_CONFIG_MGR_H
 #define __SERVER_CONFIG_MGR_H
 
+#include "pvfs2-internal.h"
 #include "server-config.h"
 
 int PINT_server_config_mgr_initialize(void);
@@ -29,7 +30,9 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
 void __PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s);
 
+/*
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void);
+*/
 
 /* client and server retrieve fs configuration from different sources */
 #if defined(__PVFS2_CLIENT__)

@@ -32,12 +32,15 @@ void gen_finalize()
 
 /*
  * produce array with pointer to func to extract each attribute
- * next produce and array with the string rep of each attribute
+ * next produce an array with the string rep of each attribute
  */
 void gen_attrib_table()
 {
     int i = 0;
+    int maxlen = 0;
+    int attrlen = 0;
     list_item_t *attr;
+
     /* produce SID_extract_key and SID_attr_e */
     fprintf(code, "int (* SID_extract_key[])(DB *pri, "
             "const DBT *pkey, const DBT *pdata, DBT *skey) =\n{\n");
@@ -51,6 +54,11 @@ void gen_attrib_table()
         }
         fprintf(code, "    SID_get_%s", attr->name);
         fprintf(header, "    SID_attr_%s = %d", attr->name, i++);
+        attrlen = strlen(attr->name);
+        if (attrlen > maxlen)
+        {
+            maxlen = attrlen;
+        }
     }
     fprintf(code, "\n};\n\n");
     fprintf(header, "\n} SID_attr_t;\n\n");
@@ -59,6 +67,7 @@ void gen_attrib_table()
             "(DB *pri, const DBT *pkey, const DBT *pdata, DBT *skey);\n\n");
     /* produce SID_NUM_ATTR */
     fprintf(header, "#define SID_NUM_ATTR %d\n\n", i);
+    fprintf(header, "#define MAX_ATTR_STR %d\n\n", maxlen);
     /* produce SID_attr_map */
     i = 0;
     fprintf(code, "char * SID_attr_map[] =\n{\n");

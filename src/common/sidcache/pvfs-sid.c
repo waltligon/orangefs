@@ -11,6 +11,8 @@
 
 
 
+#include "gossip.h"
+#include "pvfs2-debug.h"
 #include "pvfs3-handle.h"
 #include "pvfs2-types.h"
 #include "quicklist.h"
@@ -137,7 +139,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    ret = SID_cache_lookup_server(&SID_db, sid, &temp_cacheval);
+    ret = SID_cache_lookup_server(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;
@@ -163,7 +165,47 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     return ret;
 }
 
+static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
+                               uint32_t stype,
+                               uint32_t flag)
+{
+    int ret = 0;
+    DBT key, data;
+    SID_cacheval_t *temp_cacheval;
 
+    SID_zero_dbt(&key, &data, NULL);
+
+    key.data = &stype;
+    key.size = sizeof(uint32_t);
+   
+    ret = SID_type_cursor->get(SID_type_cursor, /* type index */
+                               &key,            /* Sid_sid_t sid */
+                               &data,           /* SID_cacheval_t struct ptr */
+                               flag);           /* get flags */
+    if(ret)
+    {
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error getting sid from sid cache : %s\n",
+                     db_strerror(ret));
+        return(ret);
+    }
+
+    /* Unmarshalling the data */
+    SID_cacheval_unpack(&temp_cacheval, &data);
+    *bmi_addr = temp_cacheval->bmi_addr;
+    free(temp_cacheval);
+    return(ret);
+}
+
+int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
+{
+    return PVFS_SID_get_server(bmi_addr, stype, DB_SET);
+}
+
+int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
+{
+    return PVFS_SID_get_server(bmi_addr, stype, DB_NEXT);
+}
 
 /*
  * Local variables:
