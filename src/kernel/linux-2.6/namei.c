@@ -132,7 +132,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
         sb = dir->i_sb;
         parent = PVFS2_I(dir);
         if (parent &&
-            parent->refn.khandle[0] != 0 &&
+            parent->refn.khandle.u[0] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             memset(s,0,HANDLESTRINGSIZE);

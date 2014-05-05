@@ -1011,7 +1011,7 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     pvfs2_kernel_op_t *new_op = NULL;
     char *dev_name = NULL;
     int ret = -EINVAL;
-    PVFS_object_ref root_object;
+    PVFS_object_kref root_object;
     char *s;
 
     if (!data || !sb)
@@ -1171,7 +1171,7 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
                                   struct fid *fid,
                                   int fh_len, int fh_type)
 {
-   PVFS_object_ref refn;
+   PVFS_object_kref refn;
    struct inode *inode;
    struct dentry *dentry;
    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
@@ -1186,7 +1186,7 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
 
    gossip_debug(GOSSIP_SUPER_DEBUG,
                 "fh_to_dentry: handle %s, fs_id %d\n",
-                k2s(&(refn.khandle,s),
+                k2s(&(refn.khandle),s),
                 refn.fs_id);
    kfree(s);
 
@@ -1234,7 +1234,7 @@ int pvfs2_encode_fh(struct dentry *dentry,
    struct inode *inode = dentry->d_inode;
    int len = *max_len;
    int type = 1;
-   PVFS_object_ref refn;
+   PVFS_object_kref refn;
    u32 generation;
    char *s;
 
@@ -1254,7 +1254,7 @@ int pvfs2_encode_fh(struct dentry *dentry,
    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
    gossip_debug(GOSSIP_SUPER_DEBUG,
                 "Encoding fh: handle %s, gen %u, fsid %u\n",
-                k2s(&(refn.khandle,s)),
+                k2s(&(refn.khandle),s),
                 generation,
                 refn.fs_id);
    kfree(s);
@@ -1299,7 +1299,7 @@ int pvfs2_encode_fh(struct inode *inode,
 {
    int len = parent ? 10 : 5;
    int type = 1;
-   PVFS_object_ref refn;
+   PVFS_object_kref refn;
    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
    if (*max_len < len) {
@@ -1359,7 +1359,7 @@ int pvfs2_fill_sb(struct super_block *sb,
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
     pvfs2_mount_sb_info_t *mount_sb_info = (pvfs2_mount_sb_info_t *)data;
-    PVFS_object_ref root_object;
+    PVFS_object_kref root_object;
     char *s;
 
     /* alloc and init our private pvfs2 sb info */

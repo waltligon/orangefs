@@ -152,7 +152,7 @@ int pvfs2_file_open(
 
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
 
-out;
+out:
     kfree(s);
     return ret;
 }

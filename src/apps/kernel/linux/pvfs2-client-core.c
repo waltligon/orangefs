@@ -41,6 +41,9 @@
 #include "pvfs2-encode-stubs.h"
 #include "pint-event.h"
 
+#include "khandle.h"
+#include "khandle-util.h"
+
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
 #define MMAP_RA_MIN_THRESHOLD     76800
@@ -572,13 +575,17 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s; 
+    PVFS_object_ref refn;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a lookup request for %s (fsid %d | parent %llu)\n",
+        "Got a lookup request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.lookup.d_name,
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.lookup.parent_refn.handle));
+        k2s(&(vfs_request->in_upcall.req.lookup.parent_refn.khandle),s));
+    free(s);
 
     /* get rank from pid */
     fill_hints(&hints, vfs_request);
@@ -587,14 +594,23 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.lookup.parent_refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.lookup.parent_refn.fs_id;
+
     ret = PVFS_isys_ref_lookup(
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         vfs_request->in_upcall.req.lookup.d_name,
-        vfs_request->in_upcall.req.lookup.parent_refn,
+//        vfs_request->in_upcall.req.lookup.parent_refn,
+        refn,
         credential,
         &vfs_request->response.lookup,
         vfs_request->in_upcall.req.lookup.sym_follow,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id,
+        hints,
+        (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -619,13 +635,17 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
     
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a create request for %s (fsid %d | parent %llu)\n",
+        "Got a create request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.create.parent_refn.handle));
+        k2s(&(vfs_request->in_upcall.req.create.parent_refn.khandle),s));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -633,9 +653,16 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.create.parent_refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.create.parent_refn.fs_id;
+
     ret = PVFS_isys_create(
         vfs_request->in_upcall.req.create.d_name,
-        vfs_request->in_upcall.req.create.parent_refn,
+        refn,
+//        vfs_request->in_upcall.req.create.parent_refn,
         vfs_request->in_upcall.req.create.attributes,
         credential, NULL, NULL,
         &vfs_request->response.create,
@@ -660,14 +687,18 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a symlink request from %s (fsid %d | parent %llu) to %s\n",
+        "Got a symlink request from %s (fsid %d | parent %s) to %s\n",
         vfs_request->in_upcall.req.sym.entry_name,
         vfs_request->in_upcall.req.sym.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.sym.parent_refn.handle),
+        k2s(&(vfs_request->in_upcall.req.sym.parent_refn.khandle),s),
         vfs_request->in_upcall.req.sym.target);
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -675,14 +706,23 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.sym.parent_refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.sym.parent_refn.fs_id;
+
     ret = PVFS_isys_symlink(
         vfs_request->in_upcall.req.sym.entry_name,
-        vfs_request->in_upcall.req.sym.parent_refn,
+        refn,
+//        vfs_request->in_upcall.req.sym.parent_refn,
         vfs_request->in_upcall.req.sym.target,
         vfs_request->in_upcall.req.sym.attributes,
         credential,
         &vfs_request->response.symlink,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id,
+        hints,
+        (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -703,12 +743,16 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
     
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a getattr request for fsid %d | handle %llu\n",
+        "got a getattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.getattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.getattr.refn.handle));
+        k2s(&(vfs_request->in_upcall.req.getattr.refn.khandle),s));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -716,12 +760,21 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.getattr.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.getattr.refn.fs_id;
+
     ret = PVFS_isys_getattr(
-        vfs_request->in_upcall.req.getattr.refn,
+        refn,
+//        vfs_request->in_upcall.req.getattr.refn,
         vfs_request->in_upcall.req.getattr.mask,
         credential,
         &vfs_request->response.getattr,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id,
+        hints,
+        (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -742,13 +795,17 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a setattr request for fsid %d | handle %llu [mask %d]\n",
+        "got a setattr request for fsid %d | handle %s [mask %d]\n",
         vfs_request->in_upcall.req.setattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.setattr.refn.handle),
+        k2s(&(vfs_request->in_upcall.req.setattr.refn.khandle),s),
         vfs_request->in_upcall.req.setattr.attributes.mask);
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -756,11 +813,20 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.setattr.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.setattr.refn.fs_id;
+
     ret = PVFS_isys_setattr(
-        vfs_request->in_upcall.req.setattr.refn,
+        refn,
+//        vfs_request->in_upcall.req.setattr.refn,
         vfs_request->in_upcall.req.setattr.attributes,
         credential,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id,
+        hints,
+        (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -781,13 +847,17 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
     
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a remove request for %s under fsid %d and "
-        "handle %llu\n", vfs_request->in_upcall.req.remove.d_name,
+        "handle %s\n", vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.remove.parent_refn.handle));
+        k2s(&(vfs_request->in_upcall.req.remove.parent_refn.khandle),s));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -795,9 +865,16 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.remove.parent_refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.remove.parent_refn.fs_id;
+
     ret = PVFS_isys_remove(
         vfs_request->in_upcall.req.remove.d_name,
-        vfs_request->in_upcall.req.remove.parent_refn,
+        refn,
+//        vfs_request->in_upcall.req.remove.parent_refn,
         credential,
         &vfs_request->op_id, hints, (void *)vfs_request);
     vfs_request->hints = hints;
@@ -820,13 +897,17 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a mkdir request for %s (fsid %d | parent %llu)\n",
+        "Got a mkdir request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.mkdir.d_name,
         vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.mkdir.parent_refn.handle));
+        k2s(&(vfs_request->in_upcall.req.mkdir.parent_refn.khandle),s));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -834,13 +915,22 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.mkdir.parent_refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.mkdir.parent_refn.fs_id;
+
     ret = PVFS_isys_mkdir(
         vfs_request->in_upcall.req.mkdir.d_name,
-        vfs_request->in_upcall.req.mkdir.parent_refn,
+        refn,
+//        vfs_request->in_upcall.req.mkdir.parent_refn,
         vfs_request->in_upcall.req.mkdir.attributes,
         credential,
         &vfs_request->response.mkdir,
-        &vfs_request->op_id, hints, (void *)vfs_request);
+        &vfs_request->op_id,
+        hints,
+        (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -861,12 +951,16 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
-                 "for %llu,%d (token %llu)\n",
-                 llu(vfs_request->in_upcall.req.readdir.refn.handle),
+                 "for %s,%d (token %llu)\n",
+                 k2s(&(vfs_request->in_upcall.req.readdir.refn.khandle),s),
                  vfs_request->in_upcall.req.readdir.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdir.token));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -874,8 +968,15 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.readdir.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.readdir.refn.fs_id;
+
     ret = PVFS_isys_readdir(
-        vfs_request->in_upcall.req.readdir.refn,
+        refn,
+//        vfs_request->in_upcall.req.readdir.refn,
         vfs_request->in_upcall.req.readdir.token,
         vfs_request->in_upcall.req.readdir.max_dirent_count,
         credential,
@@ -901,12 +1002,16 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
     PVFS_hint hints;
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
 
+    s = calloc(1,HANDLESTRINGSIZE);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
-                 "for %llu,%d (token %llu)\n",
-                 llu(vfs_request->in_upcall.req.readdirplus.refn.handle),
+                 "for %s,%d (token %llu)\n",
+                 k2s(&(vfs_request->in_upcall.req.readdirplus.refn.khandle),s),
                  vfs_request->in_upcall.req.readdirplus.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdirplus.token));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -914,8 +1019,15 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.readdirplus.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.readdirplus.refn.fs_id;
+
     ret = PVFS_isys_readdirplus(
-        vfs_request->in_upcall.req.readdirplus.refn,
+        refn,
+//        vfs_request->in_upcall.req.readdirplus.refn,
         vfs_request->in_upcall.req.readdirplus.token,
         vfs_request->in_upcall.req.readdirplus.max_dirent_count,
         credential,
@@ -941,17 +1053,25 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s1;
+    char *s2;
+    PVFS_object_ref refn1;
+    PVFS_object_ref refn2;
 
+    s1 = calloc(1,HANDLESTRINGSIZE);
+    s2 = calloc(1,HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a rename request for %s under fsid %d and "
-        "handle %llu to be %s under fsid %d and handle %llu\n",
+        "handle %s to be %s under fsid %d and handle %s\n",
         vfs_request->in_upcall.req.rename.d_old_name,
         vfs_request->in_upcall.req.rename.old_parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.rename.old_parent_refn.handle),
+        k2s(&(vfs_request->in_upcall.req.rename.old_parent_refn.khandle),s1),
         vfs_request->in_upcall.req.rename.d_new_name,
         vfs_request->in_upcall.req.rename.new_parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.rename.new_parent_refn.handle));
+        k2s(&(vfs_request->in_upcall.req.rename.new_parent_refn.khandle),s2));
+    free(s1);
+    free(s2);
 
     fill_hints(&hints, vfs_request);
 
@@ -959,11 +1079,24 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn1.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.rename.old_parent_refn.khandle));
+    refn1.fs_id = vfs_request->in_upcall.req.rename.old_parent_refn.fs_id;
+
+    refn2.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.rename.new_parent_refn.khandle));
+    refn2.fs_id = vfs_request->in_upcall.req.rename.new_parent_refn.fs_id;
+
     ret = PVFS_isys_rename(
         vfs_request->in_upcall.req.rename.d_old_name,
-        vfs_request->in_upcall.req.rename.old_parent_refn,
+        refn1,
+//        vfs_request->in_upcall.req.rename.old_parent_refn,
         vfs_request->in_upcall.req.rename.d_new_name,
-        vfs_request->in_upcall.req.rename.new_parent_refn,
+        refn2,
+//        vfs_request->in_upcall.req.rename.new_parent_refn,
         credential,
         &vfs_request->op_id, hints, (void *)vfs_request);
     vfs_request->hints = hints;
@@ -986,13 +1119,17 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
     
+    s = calloc(1,HANDLESTRINGSIZE);
     gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %llu under "
+        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %s under "
         "fsid %d to be size %lld\n",
-        llu(vfs_request->in_upcall.req.truncate.refn.handle),
+        k2s(&(vfs_request->in_upcall.req.truncate.refn.khandle),s),
         vfs_request->in_upcall.req.truncate.refn.fs_id,
         lld(vfs_request->in_upcall.req.truncate.size));
+    free(s);
 
     fill_hints(&hints, vfs_request);
 
@@ -1000,8 +1137,15 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.truncate.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.truncate.refn.fs_id;
+
     ret = PVFS_isys_truncate(
-        vfs_request->in_upcall.req.truncate.refn,
+        refn,
+//        vfs_request->in_upcall.req.truncate.refn,
         vfs_request->in_upcall.req.truncate.size,
         credential,
         &vfs_request->op_id, hints, (void *)vfs_request);
@@ -1025,12 +1169,16 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
     PVFS_credential *credential;
+    char *s;
+    PVFS_object_ref refn;
     
+    s = calloc(1,HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a getxattr request for fsid %d | handle %llu\n",
+        "got a getxattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.getxattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.getxattr.refn.handle));
+        k2s(&(vfs_request->in_upcall.req.getxattr.refn.khandle),s));
+    free(s);
 
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.getxattr.key;
@@ -1071,9 +1219,16 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
 
+    /* compat */
+    refn.handle =
+      pvfs2_khandle_to_ino(
+        &(vfs_request->in_upcall.req.getxattr.refn.khandle));
+    refn.fs_id = vfs_request->in_upcall.req.getxattr.refn.fs_id;
+
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
-        vfs_request->in_upcall.req.getxattr.refn,
+        refn,
+//        vfs_request->in_upcall.req.getxattr.refn,
         credential,
         1,
         &vfs_request->key,

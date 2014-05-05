@@ -445,11 +445,11 @@ struct inode_operations pvfs2_file_inode_operations =
  * that will be used as a hash-index from where the handle will
  * be searched for in the VFS hash table of inodes.
  */
-static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
+static inline ino_t pvfs2_handle_hash(PVFS_object_kref *ref)
 {
     if (!ref)
         return 0;
-    return pvfs2_khandle_to_ino(ref->khandle);
+    return pvfs2_khandle_to_ino(&(ref->khandle));
 }
 
 /* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
@@ -458,7 +458,7 @@ static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
 int pvfs2_set_inode(struct inode *inode, void *data)
 {
     /* callbacks to set inode number handle */
-    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    PVFS_object_kref *ref = (PVFS_object_kref *) data;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     /* Make sure that we have sane parameters */
@@ -482,7 +482,7 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
 #endif
 {
     /* callbacks to determine if handles match */
-    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    PVFS_object_kref *ref = (PVFS_object_kref *) data;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     pvfs2_inode = PVFS2_I(inode);
@@ -509,7 +509,7 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
  * Boy, this function is so ugly with all these macros. I wish I could find a better
  * way to reduce the macro clutter.
  */
-struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, int keep_locked)
+struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_kref *ref, int keep_locked)
 {
     struct inode *inode = NULL;
     unsigned long hash;
@@ -576,7 +576,7 @@ struct inode *pvfs2_get_custom_inode_common(
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref object,
+    PVFS_object_kref object,
     int from_create)
 {
     struct inode *inode = NULL;
@@ -685,7 +685,7 @@ struct inode *pvfs2_get_custom_inode_common(
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
         gossip_debug(GOSSIP_ACL_DEBUG,
-                     "Initializing ACL's for inode %llu\n", 
+                     "Initializing ACL's for inode %s\n", 
                      k2s(get_khandle_from_ino(inode),s));
         kfree(s);
         /* Initialize the ACLs of the new inode */

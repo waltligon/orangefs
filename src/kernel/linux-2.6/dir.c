@@ -177,8 +177,9 @@ static int pvfs2_readdir(
 
     new_op->uses_shared_memory = 1;
 
-    if (pvfs2_inode && (pvfs2_inode->refn.khandle[0] != 0)
-                    && ( pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)  )
+    if (pvfs2_inode &&
+       (pvfs2_inode->refn.khandle.u[0] != 0) &&
+       (pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL))
     {
         new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
         memset(s,0,HANDLESTRINGSIZE);
@@ -642,7 +643,7 @@ static int pvfs2_readdirplus_common(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
     filldirplus_t filldirplus = NULL;
     filldirpluslite_t filldirplus_lite = NULL;
-    PVFS_object_ref ref;
+    PVFS_object_kref ref;
     int filldirplus_error = 0;
     char *s;
 

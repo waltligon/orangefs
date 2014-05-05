@@ -32,17 +32,17 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_lookup_response_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_create_response_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_symlink_response_t;
 
 typedef struct
@@ -63,7 +63,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_mkdir_response_t;
 
 /* duplication of some system interface structures so that I don't have to allocate extra memory */

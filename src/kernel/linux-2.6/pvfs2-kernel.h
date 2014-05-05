@@ -17,98 +17,6 @@
  *  Declarations and macros for the PVFS2 Linux kernel support.
  */
 
-/* khandle stuff  ***********************************************************/
-
-/*
- * The 2.9 core will put 64 bit handles in here like this:
- *    1234 0000 0000 5678
- * The 3.0 and beyond cores will put 128 bit handles in here like this:
- *    1234 5678 90AB CDEF
- * The kernel module will always use the first four bytes and
- * the last four bytes as an inum.
- */
-typedef struct {unsigned char u[16];} PVFS_khandle \
-  __attribute__ (( __aligned__ (8)));
-
-/*
- * kernel version of an object ref.
- */
-typedef struct
-{
-  PVFS_khandle khandle;
-  int32_t fs_id;
-  int32_t __pad1;
-} PVFS_object_kref;
-
-/*
- * The kernel module will put the appropriate bytes of the khandle
- * into ihash.u and perceive them as an inode number through ihash.ino.
- */
-struct ihash {
-  union {
-    unsigned char u[8];
-    uint64_t ino;
-  };
-};
-
-/*
- * k2s is a function in pvfs2-utils whose job is to return a
- * string representation of a khandle. k2s callers are responsible
- * for allocating memory for the return string from k2s.
- * HANDLESTRINGSIZE is a safe amount of space for the memory allocation.
- */
-char *k2s(PVFS_khandle *, char *);
-#define HANDLESTRINGSIZE 40
-
-
-
-/*
- * compare 2 khandles assumes little endian thus from large address to
- * small address
- */
-static __inline__ int PVFS_khandle_cmp(const PVFS_khandle *kh1,
-				       const PVFS_khandle *kh2)
-{
-  int i;
-
-  for (i = 15; i >= 0; i--) {
-    if (kh1->u[i] > kh2->u[i])
-      return 1;
-    if (kh1->u[i] < kh2->u[i])
-      return -1;
-  }
-
-  return 0;
-}
-
-/* copy a khandle to a field of arbitrary size */
-static __inline__ void PVFS_khandle_to(const PVFS_khandle *kh,
-                                       void *p, int size)
-{
-  int i;
-  unsigned char *c = p;
-
-  memset(p, 0, size);
-
-  for (i = 0; i < 16 && i < size; i++)
-    c[i] = kh->u[i];
-}
-
-/* copy a khandle from a field of arbitrary size */
-static __inline__ void PVFS_khandle_from(PVFS_khandle *kh,
-                                         void *p, int size)
-{
-  int i;
-  unsigned char *c = p;
-
-  memset(kh, 0, 16);
-
-  for (i = 0; i < 16 && i < size; i++)
-    kh->u[i] = c[i];
-}
-
-/* end khandle stuff  *******************************************************/
-
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
@@ -212,6 +120,11 @@ typedef unsigned long sector_t;
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
 #include "pvfs2-internal.h"
+
+/* khandle stuff  ***********************************************************/
+#include "khandle.h"
+/* end khandle stuff  *******************************************************/
+
 
 /*
   this attempts to disable the annotations used by the 'sparse' kernel
@@ -513,7 +426,7 @@ typedef struct
 /** per inode private pvfs2 info */
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     char link_target[PVFS_NAME_MAX];
     PVFS_size blksize;
     /*
@@ -761,6 +674,7 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 }
 
 /* ino_t descends from "unsigned long", 8 bytes, 64 bits. */
+/*
 static inline ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
 {
   struct ihash ihandle;
@@ -776,6 +690,7 @@ static inline ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
 
   return ihandle.ino;
 }
+*/
 
 static inline PVFS_khandle *get_khandle_from_ino(struct inode *inode)
 {
@@ -789,7 +704,7 @@ static inline PVFS_fs_id get_fsid_from_ino(struct inode *inode)
 
 static inline ino_t get_ino_from_khandle(struct inode *inode)
 {
-    PVFS_khandle khandle;
+    PVFS_khandle *khandle;
     ino_t ino;
 
     khandle = get_khandle_from_ino(inode);
@@ -917,7 +832,7 @@ struct inode *pvfs2_get_custom_inode_common(struct super_block *sb,
                                             struct inode *dir,
                                             int mode,
                                             dev_t dev,
-                                            PVFS_object_ref ref,
+                                            PVFS_object_kref ref,
                                             int from_create);
 
 /* In-core inodes are not being created on-disk */
@@ -965,7 +880,7 @@ int pvfs2_removexattr(struct dentry *dentry, const char *name);
  * defined in namei.c
  ****************************/
 struct inode *pvfs2_iget_common(struct super_block *sb,
-                                PVFS_object_ref *ref,
+                                PVFS_object_kref *ref,
                                 int keep_locked);
 #define pvfs2_iget(sb, ref)        pvfs2_iget_common(sb, ref, 0)
 #define pvfs2_iget_locked(sb, ref) pvfs2_iget_common(sb, ref, 1)

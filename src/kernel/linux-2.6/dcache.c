@@ -75,8 +75,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             op_release(new_op);
             goto invalid_exit;
 #endif
-            new_op->upcall.req.lookup.parent_refn.khandle =
-                            get_khandle_from_ino(parent_inode);
+            PVFS_khandle_from(&(new_op->upcall.req.lookup.parent_refn.khandle),
+                              get_khandle_from_ino(parent_inode),
+                              16);
             new_op->upcall.req.lookup.parent_refn.fs_id =
                             PVFS2_SB(parent_inode->i_sb)->fs_id;
         }

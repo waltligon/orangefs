@@ -274,7 +274,7 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     size_t size = 0;
     const char *name = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    char *s;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     /* We dont't allow this on a symbolic link */
     if (S_ISLNK(inode->i_mode))
@@ -850,9 +850,13 @@ static int pvfs2_check_acl(struct inode *inode, int mask
                            )
 {
     struct posix_acl *acl = NULL;
+    char *s;
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: called on inode %llu\n",
-                 llu(get_handle_from_ino(inode)));
+    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    gossip_debug(GOSSIP_ACL_DEBUG,
+                 "pvfs2_check_acl: called on inode %s\n",
+                 k2s(get_khandle_from_ino(inode),s));
+    kfree(s);
 
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
 
@@ -868,9 +872,15 @@ static int pvfs2_check_acl(struct inode *inode, int mask
     {
         int error = posix_acl_permission(inode, acl, mask);
         posix_acl_release(acl);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: posix_acl_permission "
-                     " (inode %llu, acl %p, mask %x) returned %d\n",
-                     llu(get_handle_from_ino(inode)), acl, mask, error);
+        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "pvfs2_check_acl: posix_acl_permission "
+                     "(inode %s, acl %p, mask %x) returned %d\n",
+                     k2s(get_khandle_from_ino(inode),s),
+                     acl,
+                     mask,
+                     error);
+        kfree(s);
         return error;
     }
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl returning EAGAIN\n");
@@ -891,6 +901,7 @@ int pvfs2_permission(struct inode *inode,
 # endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
 #endif /* HAVE_TWO_PARAM_PERMISSION */
 {
+    char *s;
 #ifdef HAVE_FROM_KUID
     int fsuid = from_kuid(&init_user_ns, current_fsuid());
 #elif defined(HAVE_CURRENT_FSUID)
@@ -913,13 +924,16 @@ int pvfs2_permission(struct inode *inode,
 # endif
     if (ret != 0)
     {
+        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_ACL_DEBUG,
-                     "pvfs2_permission failed: inode: %llu mask = %o"
+                     "pvfs2_permission failed: inode: %s mask = %o"
                      "mode = %o current->fsuid = %d "
                      "inode->i_uid = %d, inode->i_gid = %d "
                      "in_group_p = %d "
                      "(ret = %d)\n",
-                     llu(get_handle_from_ino(inode)), mask, inode->i_mode,
+                     k2s(get_khandle_from_ino(inode),s),
+                     mask,
+                     inode->i_mode,
                      fsuid,
 #ifdef HAVE_FROM_KUID
                      from_kuid(&init_user_ns,inode->i_uid),
@@ -930,6 +944,7 @@ int pvfs2_permission(struct inode *inode,
 #endif
                      in_group_p(inode->i_gid),
                      ret);
+        kfree(s);
         gossip_debug(GOSSIP_ACL_DEBUG,
                      "pvfs2_permission: mode [%o] & mask [%o] "
                      " & S_IRWXO [%o] = %o == mask [%o]?\n", 
@@ -942,9 +957,11 @@ int pvfs2_permission(struct inode *inode,
     }
     else
     {
+        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_ACL_DEBUG,
-                     "pvfs2_permission succeeded on inode %llu\n",
-                     llu(get_handle_from_ino(inode)));
+                     "pvfs2_permission succeeded on inode %s\n",
+                     k2s(get_khandle_from_ino(inode),s));
+        kfree(s);
     }
     return ret;
 #else 
@@ -952,13 +969,19 @@ int pvfs2_permission(struct inode *inode,
     int mode = inode->i_mode;
     int error;
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %llu mask = %o"
+    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %s mask = %o"
                  "mode = %o current->fsuid = %d "
                  "inode->i_uid = %d, inode->i_gid = %d"
                  "in_group_p = %d\n", 
-                 llu(get_handle_from_ino(inode)), mask, mode, fsuid,
-                 inode->i_uid, inode->i_gid,
+                 k2s(get_handle_from_ino(inode),s),
+                 mask,
+                 mode,
+                 fsuid,
+                 inode->i_uid,
+                 inode->i_gid,
                  in_group_p(inode->i_gid));
+    kfree(s);
 
     /* No write access on a rdonly FS */
     if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
