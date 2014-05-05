@@ -835,13 +835,20 @@ static PINT_sm_action crdirent_save_dirdata_attrs(
     int i = 0;
 
     if (s_op->free_val)
+    {
        free(s_op->val.buffer);
+    }
+
     memset(&(s_op->key),0,sizeof(s_op->key));
     memset(&(s_op->val),0,sizeof(s_op->val));
 
-    for (i=0; i<s_op->keyval_count; i++)
+    for (i = 0; i < s_op->keyval_count; i++)
+    {
         if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+        {
             free(s_op->val_a[i].buffer);
+        }
+    }
     if (s_op->val_a)
     {
         free(s_op->val_a);
@@ -860,7 +867,8 @@ static PINT_sm_action crdirent_save_dirdata_attrs(
     s_op->free_val = 0;
 
     /* total 2 keyvals, PVFS_DIST_DIR_ATTR and PVFS_DIRDATA_BITMAP
-           (PVFS_DIRDATA_HANDLES does not change) */
+     *     (PVFS_DIRDATA_HANDLES does not change)
+     */
     int keyval_count = 2;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
@@ -883,23 +891,23 @@ static PINT_sm_action crdirent_save_dirdata_attrs(
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
 
     s_op->val_a[0].buffer = &attr_p->u.dir.dist_dir_attr;
-    s_op->val_a[0].buffer_sz =
-         sizeof(attr_p->u.dir.dist_dir_attr);
+    s_op->val_a[0].buffer_sz = sizeof(attr_p->u.dir.dist_dir_attr);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[1].buffer_sz =
-        attr_p->u.dir.dist_dir_attr.bitmap_size *
-        sizeof(PVFS_dist_dir_bitmap_basetype);
+            attr_p->u.dir.dist_dir_attr.bitmap_size *
+            sizeof(PVFS_dist_dir_bitmap_basetype);
+
     s_op->val_a[1].buffer = attr_p->u.dir.dist_dir_bitmap;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-            "  updating dist-dir-struct keyvals for handle: %s "
-            "\t with server_no=%d and branch_level=%d \n",
-            PVFS_OID_str(&handle),
-            attr_p->u.dir.dist_dir_attr.server_no,
-            attr_p->u.dir.dist_dir_attr.branch_level);
+                 "  updating dist-dir-struct keyvals for handle: %s "
+                 "\t with server_no=%d and branch_level=%d \n",
+                 PVFS_OID_str(&handle),
+                 attr_p->u.dir.dist_dir_attr.server_no,
+                 attr_p->u.dir.dist_dir_attr.branch_level);
 
 
     ret = job_trove_keyval_write_list(s_op->req->u.crdirent.fs_id,
@@ -1138,7 +1146,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         {
             /* remote */
             remote_dirdata_handles[num_remote_dirdata_handles] =
-                attr_p->u.dir.dirdata_handles[i];
+                    attr_p->u.dir.dirdata_handles[i];
             num_remote_dirdata_handles++;
         }
     }
@@ -1167,7 +1175,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
     /* V3 */
 #if 0
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 #endif
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 

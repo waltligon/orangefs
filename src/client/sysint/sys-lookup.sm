@@ -53,7 +53,7 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
                                          int index);
 
 /* helper function prototypes */
-static int initialize_context(struct PINT_client_lookup_sm * lookup_sm,
+static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
                               char *pathname,
                               PVFS_object_ref ctx_starting_refn);
 
@@ -166,7 +166,7 @@ machine pvfs2_client_lookup_sm
 
 %%
 
-static int initialize_context(struct PINT_client_lookup_sm * lookup_sm,
+static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
                               char *pathname,
                               PVFS_object_ref ctx_starting_refn)
 {
@@ -259,6 +259,7 @@ static int initialize_context(struct PINT_client_lookup_sm * lookup_sm,
     orig_pathname = strdup(pathname);
     gossip_debug(GOSSIP_LOOKUP_DEBUG, " original pathname is: %s\n",
                  orig_pathname);
+
     while (!PINT_string_next_segment(pathname, &cur_seg_name, &state))
     {
         /* grab the next segment in the context to fill in */
@@ -647,8 +648,16 @@ PVFS_error PVFS_sys_ref_lookup(PVFS_fs_id fs_id,
 }
 
 /** Dereference a path string relative to the root directory.
+ *
+ *  This code expects to be passed the target path relative to the PVFS
+ *  directory - iow without the mountpoint path included.  Early
+ *  versions assumed this would start with a "/" later we expect no
+ *  leading "/" but remove it if we find it.  Looking up the PVFS root
+ *  currently expects the path to be "/" but should probably also work
+ *  for "" since the new PVFS_path code does not provide the "/"
  */
-PVFS_error PVFS_sys_lookup(PVFS_fs_id fs_id, char *name,
+PVFS_error PVFS_sys_lookup(PVFS_fs_id fs_id,
+                           char *name,
                            const PVFS_credential *credential,
                            PVFS_sysresp_lookup *resp,
                            int32_t follow_link,
@@ -668,21 +677,26 @@ PVFS_error PVFS_sys_lookup(PVFS_fs_id fs_id, char *name,
             return ret;
         }
 
-        /* special case root handle lookup, since we already know it */
-        if (strcmp(name, "/") == 0)
+        /*
+         * strip off leading slash (if any) and lookup the rest
+         * of the path.
+         */
+        char *path = ((name[0] == '/') ? &name[1] : name);
+
+        /* Special case root handle lookup, since we already know it.
+         * Since development of usrint, this is supposed to be done
+         * before calling this function so this case should never
+         * happen.  For now we are leaving this in to support old code
+         * that calls sysint directly
+         */
+        if (strnlen(path, 1) == 0)
         {
             resp->ref = parent;
             ret = 0;
         }
         else
         {
-            /*
-              strip off leading slash (if any) and lookup the rest
-              of the path.  NOTE: If it's always an error to not
-              have a leading slash, we should check that above
-              without doing this function call.
-            */
-            char *path = ((name[0] == '/') ? &name[1] : name);
+            /* this expects a non-empty path without a leading "/" */
             ret = PVFS_sys_ref_lookup(fs_id, 
                                       path,
                                       parent,

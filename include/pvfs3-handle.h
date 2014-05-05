@@ -98,6 +98,13 @@ static __inline__ int PVFS_OID_cmp(const PVFS_OID *oid1, const PVFS_OID *oid2)
     return uuid_compare(oid1->u, oid2->u);
 }
 
+#define PVFS_OID_EQ(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) == 0)
+#define PVFS_OID_NE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) != 0)
+#define PVFS_OID_GT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) > 0)
+#define PVFS_OID_GE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) >= 0)
+#define PVFS_OID_LT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) < 0)
+#define PVFS_OID_LE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <=0)
+
 static __inline__ void PVFS_OID_cpy(PVFS_OID *dst, const PVFS_OID *src)
 {
     return uuid_copy(dst->u, src->u);
@@ -188,6 +195,13 @@ static __inline__ int PVFS_SID_cmp(const PVFS_SID *sid1, const PVFS_SID *sid2)
 {
     return uuid_compare(sid1->u, sid2->u);
 }
+
+#define PVFS_SID_EQ(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) == 0)
+#define PVFS_SID_NE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) != 0)
+#define PVFS_SID_GT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) > 0)
+#define PVFS_SID_GE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) >= 0)
+#define PVFS_SID_LT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) < 0)
+#define PVFS_SID_LE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) <=0)
 
 static __inline__ void PVFS_SID_cpy(PVFS_SID *dst, const PVFS_SID *src)
 {

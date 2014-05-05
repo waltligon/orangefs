@@ -49,10 +49,9 @@ ref_list_p ref_list_new(void)
      */
     assert(str_table == NULL);
 
-    str_table = qhash_init(
-        ref_list_compare_key_entry,
-        quickhash_string_hash, 
-        STR_TABLE_SIZE);
+    str_table = qhash_init(ref_list_compare_key_entry,
+                           quickhash_string_hash, 
+                           STR_TABLE_SIZE);
 
     if(!str_table)
     {
@@ -78,8 +77,7 @@ ref_list_p ref_list_new(void)
  *
  * no return value
  */
-void ref_list_add(ref_list_p rlp,
-		  ref_st_p rsp)
+void ref_list_add(ref_list_p rlp, ref_st_p rsp)
 {
     if(rsp->id_string)
     {
@@ -97,8 +95,7 @@ void ref_list_add(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_addr(ref_list_p rlp,
-			      BMI_addr_t my_addr)
+ref_st_p ref_list_search_addr(ref_list_p rlp, BMI_addr_t my_addr)
 {
     return(id_gen_safe_lookup(my_addr));
 }
@@ -112,8 +109,7 @@ ref_st_p ref_list_search_addr(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, NULL on failure.
  */
-ref_st_p ref_list_search_method_addr(ref_list_p rlp,
-				     bmi_method_addr_p map)
+ref_st_p ref_list_search_method_addr(ref_list_p rlp, bmi_method_addr_p map)
 {
     return(map->parent);
 }
@@ -126,8 +122,7 @@ ref_st_p ref_list_search_method_addr(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_str(ref_list_p rlp,
-			     const char *idstring)
+ref_st_p ref_list_search_str(ref_list_p rlp, const char *idstring)
 {
 
     struct qhash_head* tmp_link;
@@ -148,8 +143,7 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_rem(ref_list_p rlp,
-		      BMI_addr_t my_addr)
+ref_st_p ref_list_rem(ref_list_p rlp, BMI_addr_t my_addr)
 {
     ref_st_p tmp_entry;
     
@@ -184,8 +178,7 @@ void ref_list_cleanup(ref_list_p rlp)
 
     qlist_for_each_safe(tmp_link, scratch, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
+	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
         dealloc_ref_st(tmp_entry);
     }
 

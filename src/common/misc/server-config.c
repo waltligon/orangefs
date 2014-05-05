@@ -596,12 +596,12 @@ static const configoption_t options[] =
 
     /* Opens a context for describing the root metadata
      */
-    {"RootServers", ARG_NONE, enter_rootsrvs_context, NULL,
+    {"<RootServers>", ARG_NONE, enter_rootsrvs_context, NULL,
             CTX_FILESYSTEM, NULL},
 
     /* Closes a context for describing the root metadata
      */
-    {"/RootServers", ARG_NONE, exit_rootsrvs_context, NULL,
+    {"</RootServers>", ARG_NONE, exit_rootsrvs_context, NULL,
             CTX_ROOTSERVERS, NULL},
 
     /* Specifies the SID of a server that holds a copy of the
@@ -1275,7 +1275,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
      */
     if (!(server_flag & PARSE_CONFIG_INIT))
     {
-        return 1;
+        return 0;
     }
 
 /* V3 replaced this with code during parse - exit-serverdef */
@@ -1327,6 +1327,14 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     {
         gossip_err("Configuration file error. "
                    "No metadata storage path specified for alias %s.\n",
+                   server_alias_name);
+        return 1;
+    }
+
+    if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->config_path)
+    {
+        gossip_err("Configuration file error. "
+                   "No configuration storage path specified for alias %s.\n",
                    server_alias_name);
         return 1;
     }
@@ -1564,6 +1572,7 @@ DOTCONF_CB(enter_serverdef_context)
 
 DOTCONF_CB(exit_serverdef_context)
 {
+    int ret;
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER;
@@ -1572,57 +1581,67 @@ DOTCONF_CB(exit_serverdef_context)
     {
         return "Error: missing host definition\n";
     }
-    else
+    if (!is_valid_host(config_s->new_host))
     {
-        if (!is_valid_host(config_s->new_host))
-        {
-            free_host_alias(config_s->new_host);
-            config_s->new_host = NULL;
-            return "Error: incomplete host definition\n";
-        }
-
-        /* convert string SID to binary */
-        PVFS_SID_str2bin(config_s->new_host->host_sid_text,
-                         &config_s->new_host->host_sid);
-
-        /* add main record to SID cache */
-        SID_add(&config_s->new_host->host_sid,
-                0, /* internal BMI ID */
-                config_s->new_host->bmi_address,
-                config_s->new_host->attributes);
-
-        /* add type reccords to SID cache */
-        SID_update_type(&config_s->new_host->host_sid,
-                        config_s->new_host->server_type);
-
-        /* see if this record refers to this server, and save config
-         * info if it does
-         */
-        if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
-        {
-            /* This is our address - save the information */
-            {
-                /* something already set as this host */
-                config_s->new_host = NULL;
-                return "Duplicate address found for this server\n";
-            }
-            config_s->host_sid = config_s->new_host->host_sid;
-            config_s->host_id = strdup(config_s->new_host->bmi_address);
-            config_s->new_host->server_type |= SID_SERVER_ME;
-        }
-
-        /* add to config list of aliases */
-        /* create list if this is first one */
-        if (!config_s->host_aliases)
-        {
-            config_s->host_aliases = PINT_llist_new();
-        }
-
-        PINT_llist_add_to_tail(config_s->host_aliases,
-                               (void *)config_s->new_host);
-
+        free_host_alias(config_s->new_host);
         config_s->new_host = NULL;
+        return "Error: incomplete host definition\n";
     }
+
+    /* convert string SID to binary */
+    ret = PVFS_SID_str2bin(config_s->new_host->host_sid_text,
+                           &config_s->new_host->host_sid);
+    if (ret != 0)
+    {
+        return "Error: server SID is not a propoer UUID\n";
+    }
+
+    /* add main record to SID cache */
+    ret = SID_add(&config_s->new_host->host_sid,
+                  0, /* internal BMI ID */
+                  config_s->new_host->bmi_address,
+                  config_s->new_host->attributes);
+    if (ret != 0)
+    {
+        return "Error: server not added to SID cache\n";
+    }
+
+    /* add type reccords to SID cache */
+    ret = SID_update_type(&config_s->new_host->host_sid,
+                          config_s->new_host->server_type);
+    if (ret != 0)
+    {
+        return "Error: server type records not added to SID cache\n";
+    }
+
+    /* see if this record refers to this server, and save config
+     * info if it does
+     */
+    if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
+    {
+        /* This is our address - save the information */
+        if (config_s->host_id != NULL)
+        {
+            /* something already set as this host */
+            config_s->new_host = NULL;
+            return "Duplicate address found for this server\n";
+        }
+        config_s->host_sid = config_s->new_host->host_sid;
+        config_s->host_id = strdup(config_s->new_host->bmi_address);
+        config_s->new_host->server_type |= SID_SERVER_ME;
+    }
+
+    /* add to config list of aliases */
+    /* create list if this is first one */
+    if (!config_s->host_aliases)
+    {
+        config_s->host_aliases = PINT_llist_new();
+    }
+
+    PINT_llist_add_to_tail(config_s->host_aliases,
+                           (void *)config_s->new_host);
+
+    config_s->new_host = NULL;
     return NULL;
 }
 
@@ -1742,19 +1761,25 @@ DOTCONF_CB(exit_rootsrvs_context)
         cur_root_server = (struct host_alias_s *)PINT_llist_head(cur);
         if (!cur_root_server)
         {
-            break;
+            return("Error, no server record for this root server\n");
         }
-        if (PVFS_SID_cmp(&cur_root_server->host_sid, &PVFS_SID_NULL))
+        if (PVFS_SID_EQ(&cur_root_server->host_sid, &PVFS_SID_NULL))
         {
+            /* we dont have a binary SID - convert from text */
+            /* should have done this previously and not need this */
             if (!cur_root_server->host_sid_text)
             {
                 return "Error, host_alias has no SID";
             }
-            /* convert SID into bin - should not have to do this */
+            /* convert SID into bin */
             PVFS_SID_str2bin(cur_root_server->host_sid_text,
                              &fs_conf->root_sid_array[i]);
         }
-        fs_conf->root_sid_array[i] = cur_root_server->host_sid;
+        else
+        {
+            /* we have a binary, just copy it */
+            fs_conf->root_sid_array[i] = cur_root_server->host_sid;
+        }
         
         cur = PINT_llist_next(cur);
     }
@@ -2902,6 +2927,9 @@ DOTCONF_CB(get_rootsrv)
         fs_conf->root_servers = PINT_llist_new();
     }
 
+    /* The SIDs here will later be copied into the root_sid_array of
+     * the fs_config
+     */
     PINT_llist_add_to_tail(fs_conf->root_servers, (void *)root_alias);
 
     /* increment the root_sid_count so we know how many there are */
@@ -2922,7 +2950,7 @@ DOTCONF_CB(get_root_handle)
     assert(fs_conf); /* TODO: replace with error handling */
 
     ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
-    if(ret != 1)
+    if(ret != 0)
     {
         return("RootHandle required argument is not a uuid value.\n");
     }
@@ -2943,7 +2971,7 @@ DOTCONF_CB(get_root_dirdata_handle)
     assert(fs_conf); /* TODO: replace with error handling */
 
     ret = PVFS_OID_str2bin(cmd->data.str, &tmp_var);
-    if(ret != 1)
+    if(ret != 0)
     {
         return("RootDirdataHandle required argument is not a uuid value.\n");
     }
@@ -3937,8 +3965,9 @@ static int is_populated_filesystem_configuration(
         struct filesystem_configuration_s *fs)
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
-             PVFS_OID_cmp(&fs->root_handle, &PVFS_HANDLE_NULL)) ? 1 : 0);
+             PVFS_OID_NE(&fs->root_handle, &PVFS_HANDLE_NULL)) ? 1 : 0);
 }
+
 static int is_valid_filesystem_configuration(
         struct server_configuration_s *config,
         struct filesystem_configuration_s *fs)
@@ -4047,6 +4076,18 @@ static void free_filesystem(void *ptr)
     }
 }
 
+/** copy_filesystem - an exercise in bad code!
+ *
+ * I HATE this code - poorly documented and called from an obscure
+ * place in the confguration processing, it has the effect of making
+ * important information in the configuration disappear for no
+ * particular reason.  IF there is a GOOD reason to copy rather than
+ * edit a linked list (which is, afterall why we have linked lists, so
+ * we can edit them) then this good reason must be well documented!
+ * And for the most part, the scalr data can be copied with memcpy!
+ * FOr now this code still exists but should be removed as soon as
+ * feasible!!!    WBL V3
+ */
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs)
 {
@@ -4061,8 +4102,9 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
 
         dest_fs->coll_id = src_fs->coll_id;
         dest_fs->root_handle = src_fs->root_handle;
+        dest_fs->root_dirdata_handle = src_fs->root_dirdata_handle;
         dest_fs->root_sid_count = src_fs->root_sid_count;
-        if (dest_fs->root_sid_array)
+        if (src_fs->root_sid_array)
         {
             dest_fs->root_sid_array = (PVFS_SID *)malloc(
                                    dest_fs->root_sid_count * sizeof(PVFS_SID));
@@ -4124,6 +4166,12 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
             cur = PINT_llist_next(cur);
         }
 
+/* V3 */
+#if 0
+        dest_fs->handle_recycle_timeout_sec =
+                src_fs->handle_recycle_timeout_sec;
+#endif
+
         /* if the optional hints are used, copy them too */
         if (src_fs->attr_cache_keywords)
         {
@@ -4131,11 +4179,9 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
             assert(dest_fs->attr_cache_keywords);
         }
 
-        dest_fs->handle_recycle_timeout_sec =
-                src_fs->handle_recycle_timeout_sec;
         dest_fs->attr_cache_size = src_fs->attr_cache_size;
-        dest_fs->attr_cache_max_num_elems =
-                src_fs->attr_cache_max_num_elems;
+        dest_fs->attr_cache_max_num_elems = src_fs->attr_cache_max_num_elems;
+
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
  
@@ -4859,17 +4905,19 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
                  "storage space"));
 
             /* see if this is a root server and if not do not pass the
-             * handles
+             * handles.  Look through the root SIDs if one matches that
+             * of the current host, then this is a root server and we
+             * pass the handles and such
              */
 
             for(s = 0; s < cur_fs->root_sid_count; s++)
             {
-                if (!PVFS_SID_cmp(&cur_fs->root_sid_array[s],
+                if (PVFS_SID_EQ(&cur_fs->root_sid_array[s],
                                   &config->host_sid))
                 {
                     root_handle = cur_fs->root_handle;
                     root_dirdata_handle = cur_fs->root_dirdata_handle;
-                    root_sid_array = &cur_fs->root_sid_array[s];
+                    root_sid_array = cur_fs->root_sid_array;
                     root_sid_count = cur_fs->root_sid_count;
                     break;
                 }

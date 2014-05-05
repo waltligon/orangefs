@@ -1247,27 +1247,28 @@ endecode_fields_1a_struct(
     int32_t, sid_count,
     PVFS_SID, sid_array);
 
-/* chdirent ****************************************************/
-/* - modifies an existing directory entry on a particular file system */
+/* chdirent *******************************************************/
+/* - modifies an existing directory entry in a particular dirdata */
+/*   by writing a new handle and associated SIDs to that dirent   */
 
 struct PVFS_servreq_chdirent
 {
     char *entry;                   /* name of entry to change */
-    PVFS_handle handle;            /* metadataa for split */
-    PVFS_handle new_dirent_handle; /* handle of new bucket */
-    PVFS_handle dirent_handle;     /* handle of old bucket */
+    PVFS_handle directory_handle;  /* metadataa for split */
+    PVFS_handle new_dirent_handle; /* new handle for dirent */
+    PVFS_handle dirdata_handle;    /* handle of bucket */
     PVFS_fs_id fs_id;              /* file system */
-    uint32_t sid_count;            /* reflexive - old bucket */
-    PVFS_SID *sid_array;           /* reflexive - old bucket */
-    uint32_t new_sid_count;        /* reflexive - new bucket */
-    PVFS_SID *new_sid_array;       /* reflexive - new bucket */
+    uint32_t sid_count;            /* reflexive - bucket */
+    PVFS_SID *sid_array;           /* reflexive - bucket */
+    uint32_t new_sid_count;        /* new sid for dirent */
+    PVFS_SID *new_sid_array;       /* new sid for dirent */
 };
 endecode_fields_5a1a_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
-    PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
+    PVFS_handle, directory_handle,
+    PVFS_handle, dirdata_handle,
     PVFS_fs_id, fs_id,
     uint32_t, sid_count,
     PVFS_SID, sid_array,
@@ -1279,32 +1280,32 @@ endecode_fields_5a1a_struct(
 
 /* V3: The state machine doesn't use handle so we can get
        rid of it, sid_count, and sid_array. */
-#define PINT_SERVREQ_CHDIRENT_FILL(__req,                     \
-                                   __cap,                     \
-                                   __fsid,                    \
-                                   __handle,                  \
-                                   __sid_count,               \
-                                   __sid_array,               \
-                                   __dirent_handle,           \
-                                   __new_handle,              \
-                                   __new_sid_count,           \
-                                   __new_sid_array,           \
-                                   __entry,                   \
-                                   __hints)                   \
-do {                                                          \
-    memset(&(__req), 0, sizeof(__req));                       \
-    (__req).op = PVFS_SERV_CHDIRENT;                          \
-    (__req).capability = (__cap);                             \
-    (__req).hints = (__hints);                                \
-    (__req).u.chdirent.fs_id = (__fsid);                      \
-    (__req).u.chdirent.handle = (__handle);                   \
-    (__req).u.chdirent.sid_count = (__sid_count);             \
-    (__req).u.chdirent.sid_array = (__sid_array);             \
-    (__req).u.chdirent.new_dirent_handle = (__new_handle);    \
-    (__req).u.chdirent.dirent_handle = (__dirent_handle);     \
-    (__req).u.chdirent.new_sid_count = (__new_sid_count);     \
-    (__req).u.chdirent.new_sid_array = (__new_sid_array);     \
-    (__req).u.chdirent.entry = (__entry);                     \
+#define PINT_SERVREQ_CHDIRENT_FILL(__req,                            \
+                                   __cap,                            \
+                                   __fsid,                           \
+                                   __directory_handle,               \
+                                   __sid_count,                      \
+                                   __sid_array,                      \
+                                   __dirdata_handle,                 \
+                                   __new_dirent_handle,              \
+                                   __new_sid_count,                  \
+                                   __new_sid_array,                  \
+                                   __entry,                          \
+                                   __hints)                          \
+do {                                                                 \
+    memset(&(__req), 0, sizeof(__req));                              \
+    (__req).op = PVFS_SERV_CHDIRENT;                                 \
+    (__req).capability = (__cap);                                    \
+    (__req).hints = (__hints);                                       \
+    (__req).u.chdirent.fs_id = (__fsid);                             \
+    (__req).u.chdirent.directory_handle = (__directory_handle);      \
+    (__req).u.chdirent.sid_count = (__sid_count);                    \
+    (__req).u.chdirent.sid_array = (__sid_array);                    \
+    (__req).u.chdirent.new_dirent_handle = (__new_dirent_handle);    \
+    (__req).u.chdirent.dirdata_handle = (__dirdata_handle);          \
+    (__req).u.chdirent.new_sid_count = (__new_sid_count);            \
+    (__req).u.chdirent.new_sid_array = (__new_sid_array);            \
+    (__req).u.chdirent.entry = (__entry);                            \
 } while (0);
 
 struct PVFS_servresp_chdirent

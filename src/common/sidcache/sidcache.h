@@ -130,10 +130,10 @@ extern int SID_cache_store(DBC *cursorp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_add_server(DB *dbp,
-                                const PVFS_SID *sid_server,
-                                const SID_cacheval_t *cacheval_t, 
-                                int *db_records);
+extern int SID_cache_put(DB *dbp,
+                         const PVFS_SID *sid_server,
+                         const SID_cacheval_t *cacheval_t, 
+                         int *db_records);
 
 /*
  * This function searches for a sid in the sid cache. The sid  value
@@ -143,9 +143,9 @@ extern int SID_cache_add_server(DB *dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-extern int SID_cache_lookup_server(DB *dbp,
-                                   const PVFS_SID *sid_server,
-                                   SID_cacheval_t **cacheval_t);
+extern int SID_cache_get(DB *dbp,
+                         const PVFS_SID *sid_server,
+                         SID_cacheval_t **cacheval_t);
 
 /*
  * This function searches for a sid in the sid cache, retrieves the struct,

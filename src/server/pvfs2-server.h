@@ -430,8 +430,8 @@ struct PINT_server_rmdirent_op
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
-    PVFS_handle old_dirent_handle;
-    PVFS_handle new_dirent_handle;
+    PVFS_handle old_dirent_handle;      /* buffer for old info from dirent */
+    PVFS_handle new_dirent_handle;      /* buffer for new info to dirent */
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -667,7 +667,7 @@ typedef struct PINT_server_op
     PVFS_object_attr attr;
 
     PVFS_BMI_addr_t addr;   /* address of client that contacted us */
-    bmi_msg_tag_t tag; /* operation tag */
+    bmi_msg_tag_t tag;      /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
 

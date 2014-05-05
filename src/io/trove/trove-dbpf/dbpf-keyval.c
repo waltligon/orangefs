@@ -1403,6 +1403,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
+    /* used only in adding to dbpr attr cache */
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     int k;
     char tmpdata[PVFS_NAME_MAX];
@@ -1466,9 +1467,11 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         }
     }
 
+    /* write reccords */
     for (k = 0; k < op_p->u.k_write_list.count; k++)
     {
-        memcpy(key_entry.key, op_p->u.k_write_list.key_array[k].buffer,
+        memcpy(key_entry.key,
+               op_p->u.k_write_list.key_array[k].buffer,
                op_p->u.k_write_list.key_array[k].buffer_sz);
 
         memset(&key, 0, sizeof(key));
@@ -1502,8 +1505,11 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                          key.size);
         }
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->put(op_p->coll_p->keyval_db,
+                                           NULL,
+                                           &key,
+                                           &data,
+                                           0);
         if (ret != 0)
         {
             op_p->coll_p->keyval_db->err(op_p->coll_p->keyval_db,
@@ -1532,9 +1538,9 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         }
 
         /*
-           now that the data is written to disk, update the cache if it's
-           an attr keyval we manage.
-           */
+         * now that the data is written to disk, update the cache if it's
+         * an attr keyval we manage.
+         */
         if(!(op_p->flags & TROVE_BINARY_KEY))
         {
             gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -1550,17 +1556,15 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                      * NOTE: this can happen if the keyword isn't registered,
                      * or if there is no associated cache_elem for this key
                      */
-                    gossip_debug(
-                        GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
-                        "(key is %s)\n", 
-                        (char *)key_entry.key);
+                    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                                 "** CANNOT cache data written (key is %s)\n", 
+                                 (char *)key_entry.key);
                 }
                 else
                 {
-                    gossip_debug(
-                        GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-                        "written (key is %s)\n",
-                        (char *)key_entry.key);
+                    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                                 "** cached keyval data written (key is %s)\n",
+                                 (char *)key_entry.key);
                 }
             }
             gen_mutex_unlock(&dbpf_attr_cache_mutex);

@@ -221,15 +221,6 @@ int iocommon_lookup_absolute(const char *abs_path,
     /* let's try to do the lookup */
 
     errno = 0;
-/* what was this? it was in working ??? */
-#if 0
-    rc = PVFS_sys_lookup(lookup_fs_id,
-                         pvfs_path,
-                         credential,
-                         &resp_lookup,
-                         PVFS2_LOOKUP_LINK_FOLLOW,
-                         NULL);
-#endif
     rc = PVFS_sys_lookup(Ppath->fs_id,
                          Ppath->pvfs_path,
                          credential,

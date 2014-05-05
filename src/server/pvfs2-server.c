@@ -160,7 +160,11 @@ static int server_initialize(
 static int server_initialize_subsystems(
                 PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
+/* V3 removed
+ */
+#if 0
 static int server_check_if_root_directory_created(void);
+#endif
 static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
 static int server_shutdown(PINT_server_status_flag status, int ret, int sig);
@@ -177,18 +181,6 @@ static void remove_pidfile(void);
 static int generate_shm_key_hint(int* server_index);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
-
-/* V3 */
-/* this appears to be deprecated and should probably be removed
- * another version of this is get_server_config_struct defined in this
- * same file.
- */
-#if 0
-struct server_configuration_s *PINT_get_server_config(void)
-{
-    return &server_config;
-}
-#endif
 
 int main(int argc, char **argv)
 {
@@ -311,7 +303,8 @@ int main(int argc, char **argv)
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "PVFS2 Server: storage space removed. Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
-        return(0);
+        goto server_shutdown;
+        /* return(0); */
     }
 
     /* create storage space and exit if requested */
@@ -326,7 +319,8 @@ int main(int argc, char **argv)
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "PVFS2 Server: storage space created. Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
-        return(0);
+        goto server_shutdown;
+        /* return(0); */
     }
 
     server_job_id_array = (job_id_t *)
@@ -400,6 +394,12 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+/* This was added with dist dir but in V3 this can be done in the
+ * earlier block and not with a state machine
+ *
+ * V3 lost+found still needs to be created - will do later
+ */
+#if 0
     /* we have to take care of creating the distributed root
      * directory and making the lost+found directory if needed */
     ret = server_check_if_root_directory_created();
@@ -408,6 +408,7 @@ int main(int argc, char **argv)
         PVFS_perror_gossip("Error: failed to create root handle! It needs to communicate with all servers. Please try again when all servers are up!!\n", ret);
         goto server_shutdown;
     }
+#endif
 
     gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
                     "PVFS2 Server ready.\n");
@@ -490,7 +491,7 @@ int main(int argc, char **argv)
         }
     }
 
-  server_shutdown:
+server_shutdown:
     server_shutdown(server_status_flag, ret, siglevel);
     /* NOTE: the server_shutdown() function does not return; it always ends
      * by calling exit.  This point in the code should never be reached.
@@ -546,8 +547,8 @@ static int server_get_remote_config(
 {
     int ret = 0;
     PVFS_BMI_addr_t bmi_addr;
-    struct PVFS_sys_mntent *mntent;
-    PVFS_credential *credential;
+    struct PVFS_sys_mntent *mntent = NULL;
+    PVFS_credential *credential = NULL;
 
     /* Initialize the bmi and job interfaces */
     *server_status_flag |= SERVER_CLIENT_INIT;
@@ -1061,15 +1062,13 @@ static int server_initialize_subsystems(
                 break;
             }
 
-        /* V3 no longer map handles */
-#if 0
-        ret = PINT_cached_config_handle_load_mapping(cur_fs);
-        if(ret)
-        {
-            PVFS_perror("Error: PINT_handle_load_mapping", ret);
-            return(ret);
-        }
-#endif
+            ret = PINT_cached_config_handle_load_mapping(cur_fs,
+                                                         &server_config);
+            if(ret)
+            {
+                PVFS_perror("Error: PINT_handle_load_mapping", ret);
+                return(ret);
+            }
 
             /*
              * set storage hints if any.  if any of these fail, we
@@ -1468,6 +1467,9 @@ static int server_setup_signal_handlers(void)
     return 0;
 }
 
+/* V3 nolonger needed
+ */
+#if 0
 /* checks if the server is the owner of the root handles. if so, ensures that
  * DIST_DIR_STRUCT exists. if it doesn't, puts the server in
  * admin mode and submits a create_root_dir state machine to take care of it
@@ -1598,6 +1600,7 @@ static int server_check_if_root_directory_created( void )
     }
     return 0;
 }
+#endif
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 

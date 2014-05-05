@@ -278,23 +278,21 @@ int PINT_cached_config_reinitialize(struct server_configuration_s *config)
                 break;
             }
 
-            /* V3 */
-#if 0
-            ret = PINT_cached_config_handle_load_mapping(cur_fs);
+            ret = PINT_cached_config_handle_load_mapping(cur_fs, config);
             if (ret)
             {
                 break;
             }
-#endif
             cur = PINT_llist_next(cur);
         }
     }
     return 0;
 }
 
-/* V3 handles are no longer mapped to servers, but this might be relevant */
-#if 0
 /* PINT_cached_config_handle_load_mapping()
+ *
+ * this function now just adds an FS to its hash table for fast lookup
+ * handle mapping is lo longer needed.
  *
  * loads a new mapping of servers to handle into this interface.  This
  * function may be called multiple times in order to add new file
@@ -303,11 +301,13 @@ int PINT_cached_config_reinitialize(struct server_configuration_s *config)
  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_handle_load_mapping(
-        struct filesystem_configuration_s *fs,
-        struct server_configuration_s *config)
+               struct filesystem_configuration_s *fs,
+                struct server_configuration_s *config)
 {
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
+#if 0
     int ret;
+#endif
 
     if (fs)
     {
@@ -318,7 +318,10 @@ int PINT_cached_config_handle_load_mapping(
 
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
 
-        /* V3 obsolete */
+/* V3 partially obsolete  - might like to cache servers but handle
+ * ranges are no more - maybe this translates to SID_cache quesry
+ */
+#if 0
         cur_config_fs_cache->meta_server_cursor =
                         cur_config_fs_cache->fs->meta_handle_ranges;
         cur_config_fs_cache->data_server_cursor =
@@ -348,6 +351,7 @@ int PINT_cached_config_handle_load_mapping(
             gossip_err("Error: failed to load handle lookup table.\n");
             return(ret);
         }
+#endif
 
         qhash_add(PINT_fsid_config_cache_table,
                   &(cur_config_fs_cache->fs->coll_id),
@@ -358,6 +362,7 @@ int PINT_cached_config_handle_load_mapping(
 }
 
 /* V3 no more handle ranges this may be on call path */
+#if 0
 
 static struct host_handle_mapping_s * PINT_cached_config_find_server(
                                                   PINT_llist *handle_ranges,

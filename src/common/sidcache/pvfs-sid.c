@@ -139,26 +139,25 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    ret = SID_cache_lookup_server(SID_db, sid, &temp_cacheval);
+    ret = SID_cache_get(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;
     }
     if (temp_cacheval->bmi_addr == 0);
     {
-#if 0
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&temp_cacheval->bmi_addr, temp_cacheval->url);
         if (ret != 0)
         {
             return ret;
         }
-        ret = SID_cache_update_server(&SID_db, sid, temp_cacheval);
+        /* NULL enables overwrite of the record just looked up */
+        ret = SID_cache_put(SID_db, sid, temp_cacheval, NULL);
         if (ret != 0)
         {
             return ret;
         }
-#endif
     }
     *bmi_addr = temp_cacheval->bmi_addr;
     free(temp_cacheval);

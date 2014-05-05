@@ -29,8 +29,7 @@
  *   stored in s_op->scheduled_id
  */
 
-static void PINT_gossip_err_server_resp(
-    struct PVFS_server_resp *resp);
+static void PINT_gossip_err_server_resp(struct PVFS_server_resp *resp);
 
 %%
 
@@ -61,8 +60,8 @@ nested machine pvfs2_final_response_sm
  *
  * releases the operation from the request scheduler
  */
-static PINT_sm_action final_response_release(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -89,8 +88,12 @@ static PINT_sm_action final_response_release(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = job_req_sched_release(
-        s_op->scheduled_id, smcb, 0, js_p, &tmp_id, server_job_context);
+    ret = job_req_sched_release(s_op->scheduled_id,
+                                smcb,
+                                0,
+                                js_p,
+                                &tmp_id,
+                                server_job_context);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
 
@@ -101,27 +104,29 @@ static PINT_sm_action final_response_release(
  *
  * encodes and sends a response to the client
  */
-static PINT_sm_action final_response_send_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, 
-	"(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
-	s_op, PINT_map_server_op_to_string(s_op->req->op),
-	s_op->resp.status);
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+	         "(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
+	         s_op, PINT_map_server_op_to_string(s_op->req->op),
+	         s_op->resp.status);
 
     if (js_p->error_code != 0)
     {
         gossip_lerr("Error: req_sched_release() failure; continuing...\n");
     }
 
-    ret = PINT_encode(&s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
-                      s_op->addr, s_op->decoded.enc_type);
+    ret = PINT_encode(&s_op->resp,
+                      PINT_ENCODE_RESP,
+                      &(s_op->encoded),
+                      s_op->addr,
+                      s_op->decoded.enc_type);
     if (ret < 0)
     {
         gossip_lerr("Error: PINT_encode() failure.\n");
@@ -132,12 +137,21 @@ static PINT_sm_action final_response_send_resp(
     }
 
     /* send the response */
-    ret = job_bmi_send_list(
-        s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
-        s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
-        s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
-        server_job_context, user_opts->server_job_bmi_timeout,
-        s_op->req->hints);
+    ret = job_bmi_send_list(s_op->addr,
+                            s_op->encoded.buffer_list,
+                            s_op->encoded.size_list,
+                            s_op->encoded.list_count,
+                            s_op->encoded.total_size,
+                            s_op->tag,
+                            s_op->encoded.buffer_type,
+                            0,
+                            smcb,
+                            0,
+                            js_p,
+                            &tmp_id,
+                            server_job_context,
+                            user_opts->server_job_bmi_timeout,
+                            s_op->req->hints);
 
     return ret;
 }
@@ -148,8 +162,8 @@ static PINT_sm_action final_response_send_resp(
  * cleans up resources allocated while in this nested machine.  Right now 
  * that just means releasing the encoding of the response
  */
-static PINT_sm_action final_response_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action final_response_cleanup(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
@@ -159,7 +173,10 @@ static PINT_sm_action final_response_cleanup(
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
+    PINT_ACCESS_DEBUG(s_op,
+                      GOSSIP_ACCESS_DEBUG,
+                      "finish (%s)\n",
+                      status_string);
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
@@ -167,8 +184,7 @@ static PINT_sm_action final_response_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static void PINT_gossip_err_server_resp(
-    struct PVFS_server_resp *resp)
+static void PINT_gossip_err_server_resp(struct PVFS_server_resp *resp)
 {
     if (resp)
     {
@@ -215,10 +231,9 @@ static void PINT_gossip_err_server_resp(
                                    lld(attr->u.data.size));
                         break;
                     case PVFS_TYPE_SYMLINK:
-                        gossip_err(
-                            "SYMLINK [ target is %s ; len is %d ]\n",
-                            attr->u.sym.target_path,
-                            attr->u.sym.target_path_len);
+                        gossip_err("SYMLINK [ target is %s ; len is %d ]\n",
+                                   attr->u.sym.target_path,
+                                   attr->u.sym.target_path_len);
                         break;
                     case PVFS_TYPE_DIRECTORY:
                         gossip_err("DIRECTORY [ n/a ]\n");

@@ -699,11 +699,11 @@ void BMI_close_context(bmi_context_id context_id)
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_post_recv(bmi_op_id_t * id,
+int BMI_post_recv(bmi_op_id_t *id,
                   BMI_addr_t src,
                   void *buffer,
                   bmi_size_t expected_size,
-                  bmi_size_t * actual_size,
+                  bmi_size_t *actual_size,
                   enum bmi_buffer_type buffer_type,
                   bmi_msg_tag_t tag,
                   void *user_ptr,
@@ -714,8 +714,8 @@ int BMI_post_recv(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
-                 (long)src, (long)buffer, (long)expected_size, (int)tag);
+               "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
+               (long)src, (long)buffer, (long)expected_size, (int)tag);
 
     *id = 0;
 
@@ -1294,7 +1294,7 @@ int BMI_testcontext(int incount,
 /** Performs a reverse lookup, returning the string (URL style)
  *  address for a given opaque address.
  *
- *  NOTE: caller must not free or modify returned string
+ *  NOT: caller must not free or modify returned string
  *
  *  \return Pointer to string on success, NULL on failure.
  */
@@ -1778,6 +1778,11 @@ int BMI_addr_lookup(BMI_addr_t *new_addr,
     int ret = -1;
     int i = 0;
     int failed;
+
+    if (bmi_initialized_count == 0)
+    {
+        return(-BMI_NOTINITIALIZED);
+    }
 
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
