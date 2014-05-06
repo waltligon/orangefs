@@ -270,6 +270,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
                 GOSSIP_SETATTR_DEBUG," *** using dfile_count of %d\n",
                 req_a_p->u.meta.dfile_count);
             a_p->u.meta.dfile_count = req_a_p->u.meta.dfile_count;
+            a_p->u.meta.sid_count = req_a_p->u.meta.sid_count;
             js_p->error_code = STATE_METAFILE;
         }
         else
@@ -346,19 +347,30 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
                 a_p->u.dir.dirdata_handles = NULL;
             }
 
+            //Alocate enough space to copy SIDs into buffer too
             a_p->u.dir.dirdata_handles =
                         malloc(a_p->u.dir.dist_dir_attr.dirdata_count *
-                                    sizeof(PVFS_handle));
+                                    sizeof(PVFS_handle) +
+                                    a_p->u.dir.dist_dir_attr.sid_count *
+                                    sizeof(PVFS_SID));
 
             if (! a_p->u.dir.dirdata_handles)
             {
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
             }
-
+            //Copy the SID buffer along with the dirdata handles
+            if(req_a_p->u.dir.dirdata_handles != req_a_p->u.dir.sid_array - 
+                                                 (sizeof(PVFS_handle) * 
+                                                    req_a_p->u.dir.dist_dir_attr.dirdata_count)){
+                gossip_debug(GOSSIP_SETATTR_DEBUG,
+                    "  Received attr.dist_dir_attr doesn't have a contiguous \
+                        handles/sid_array. \n.");
+            }
             memcpy(a_p->u.dir.dirdata_handles,
                    req_a_p->u.dir.dirdata_handles,
-                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle));
+                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle) +
+                   a_p->u.dir.dist_dir_attr.sid_count * sizeof(PVFS_SID));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRECTORY;
