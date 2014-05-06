@@ -673,25 +673,6 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 #endif
 }
 
-/* ino_t descends from "unsigned long", 8 bytes, 64 bits. */
-/*
-static inline ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
-{
-  struct ihash ihandle;
-
-  ihandle.u[0] = khandle->u[0];
-  ihandle.u[1] = khandle->u[1];
-  ihandle.u[2] = khandle->u[2];
-  ihandle.u[3] = khandle->u[3];
-  ihandle.u[4] = khandle->u[12];
-  ihandle.u[5] = khandle->u[13];
-  ihandle.u[6] = khandle->u[14];
-  ihandle.u[7] = khandle->u[15];
-
-  return ihandle.ino;
-}
-*/
-
 static inline PVFS_khandle *get_khandle_from_ino(struct inode *inode)
 {
     return &(PVFS2_I(inode)->refn.khandle);

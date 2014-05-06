@@ -68,7 +68,7 @@ static __inline__ void PVFS_khandle_from(PVFS_khandle *kh,
 }
 
 /* ino_t descends from "unsigned long", 8 bytes, 64 bits. */
-static inline ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
+static ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
 {
   struct ihash ihandle;
 
