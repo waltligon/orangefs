@@ -96,7 +96,7 @@ static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
-    /* TJS: fix this with the right call */
+    /* TJS: Figure out where fs_id lives in this s_op */
     ret = PINT_cached_config_get_metadata_sid_count(
                                          s_op->req->u.readdir.fs_id, 
                                          &(s_op->metasidcnt));
