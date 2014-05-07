@@ -15,6 +15,7 @@
 
 #include "pvfs2-config.h"
 #include "server-config.h"
+#include "pint-cached-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-server.h"
 #include "state-machine.h"
@@ -751,14 +752,16 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     attr->u.dir.dist_dir_bitmap =
             malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                     sizeof(PVFS_dist_dir_bitmap_basetype));
+
     attr->u.dir.dirdata_handles =
             malloc(attr->u.dir.dist_dir_attr.dirdata_count *
                    sizeof(PVFS_handle) +
                    attr->u.dir.dist_dir_attr.sid_count *
                    sizeof(PVFS_handle));
-    attr->u.dir.sid_array = attr->u.dir.dirdata_handles + 
-                            attr->u.dir.dist_dir_attr.dirdata_count *
-                            sizeof(PVFS_handle);
+
+    attr->u.dir.dirdata_sids = (PVFS_SID *)attr->u.dir.dirdata_handles + 
+                               attr->u.dir.dist_dir_attr.dirdata_count;
+
     if(!attr->u.dir.dist_dir_bitmap ||
             !attr->u.dir.dirdata_handles)
     {
@@ -925,11 +928,13 @@ static PINT_sm_action lookup_read_directory_entry_local(
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
     s_op->val.buffer =
         &s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
-    int metafile_count;
-    metafile_count = PVFS_get_metadata_sid_count(, &metafile_count);
-    s_op->val.buffer_sz = sizeof(PVFS_handle + 
-                                 metafile_count * 
-                                 sizeof(PVFS_SID));
+
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                          s_op->req->u.lookup_path.fs_id,
+                                          &s_op->metasidcnt);
+
+    s_op->val.buffer_sz = sizeof(PVFS_handle) + 
+                          (s_op->metasidcnt * sizeof(PVFS_SID));
 
     /*
       NOTE: if this operation fails, seg_nr will indicate one too many

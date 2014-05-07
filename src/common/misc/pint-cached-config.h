@@ -112,6 +112,10 @@ int PINT_cached_config_get_num_io(
                 PVFS_fs_id fsid,
                 int *num_io);
 
+int PINT_cached_config_get_metadata_sid_count(
+                PVFS_fs_id fsid,
+                uint32_t *num_sid);
+
 #if 0
 int PINT_cached_config_get_server_name(
                 char *server_name,
@@ -128,7 +132,7 @@ int PINT_cached_config_get_server_handle_count(
 int PINT_cached_config_check_type(
                 PVFS_fs_id fsid,
                 const char *server_addr_str,
-                int* server_type);
+                int *server_type);
 
 int PINT_cached_config_get_root_ref(
                 PVFS_fs_id fsid,

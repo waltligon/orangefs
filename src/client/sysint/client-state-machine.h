@@ -744,59 +744,50 @@ typedef struct PINT_client_sm
 } PINT_client_sm;
 
 /* sysint post/test functions */
-PVFS_error PINT_client_state_machine_post(
-    PINT_smcb *smcb,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
+PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
+                                          PVFS_sys_op_id *op_id,
+                                          void *user_ptr);
 
-PVFS_error PINT_client_state_machine_release(
-    PINT_smcb * smcb);
+PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb);
 
-PVFS_error PINT_sys_dev_unexp(
-    struct PINT_dev_unexp_info *info,
-    job_status_s *jstat,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
+PVFS_error PINT_sys_dev_unexp(struct PINT_dev_unexp_info *info,
+                              job_status_s *jstat,
+                              PVFS_sys_op_id *op_id,
+                              void *user_ptr);
 
-PVFS_error PINT_client_state_machine_test(
-    PVFS_sys_op_id op_id,
-    int *error_code);
+PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
+                                          int *error_code);
 
-PVFS_error PINT_client_state_machine_testany(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms);
+PVFS_error PINT_client_state_machine_testany(PVFS_sys_op_id *op_id_array,
+                                             int *op_count, /* in/out */
+                                             void **user_ptr_array,
+                                             int *error_code_array,
+                                             int timeout_ms);
 
-PVFS_error PINT_client_state_machine_testsome(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms);
+PVFS_error PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
+                                              int *op_count, /* in/out */
+                                              void **user_ptr_array,
+                                              int *error_code_array,
+                                              int timeout_ms);
 
 /* exposed wrappers around the id-generator code */
-static inline int PINT_id_gen_safe_register(
-    PVFS_sys_op_id *new_id,
-    void *item)
+static inline int PINT_id_gen_safe_register(PVFS_sys_op_id *new_id,
+                                            void *item)
 {
     return id_gen_safe_register(new_id, item);
 }
 
-static inline void *PINT_id_gen_safe_lookup(
-    PVFS_sys_op_id id)
+static inline void *PINT_id_gen_safe_lookup(PVFS_sys_op_id id)
 {
     return id_gen_safe_lookup(id);
 }
 
-static inline int PINT_id_gen_safe_unregister(
-    PVFS_sys_op_id id)
+static inline int PINT_id_gen_safe_unregister(PVFS_sys_op_id id)
 {
     return id_gen_safe_unregister(id);
 }
 
-/* debugging method for getting a string macthing the op_type */
+/* debugging method for getting a string matching the op_type */
 const char *PINT_client_get_name_str(int op_type);
 
 /* used with post call to tell the system what state machine to use

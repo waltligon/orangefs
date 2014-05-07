@@ -334,8 +334,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_MKDIR_DEBUG,
             "mkdir: Init dist_dir_bitmap as:\n");
-    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
-            i >= 0 ; i--)
+    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
         c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_MKDIR_DEBUG,
@@ -632,28 +631,29 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         return SM_ACTION_COMPLETE;
     }
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-
+//TODO: make sure this stuff is right
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
 
     s_op->val_a[0].buffer = &attr->u.dir.dist_dir_attr;
-    s_op->val_a[0].buffer_sz =
-         sizeof(attr->u.dir.dist_dir_attr);
+    s_op->val_a[0].buffer_sz = sizeof(attr->u.dir.dist_dir_attr);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
-    s_op->val_a[1].buffer_sz =
-        attr->u.dir.dist_dir_attr.bitmap_size * 
-        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size * 
+                               sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
 
     s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-
+//Make sure this attr fields get allocated contiguously
     s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
     s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.dirdata_count * 
-        sizeof(*attr->u.dir.dirdata_handles);
+                               (sizeof(*attr->u.dir.dirdata_handles) +
+// V3 IS THIS RIGHT? - is sid_count total or per handle?
+                                      (attr->u.dir.dist_dir_attr.sid_count *
+                                       sizeof(PVFS_SID)));
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "  writing dist-dir-struct keyvals for meta handle: %s "

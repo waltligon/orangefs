@@ -1473,6 +1473,38 @@ int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int *num_io)
     return ret;
 }
 
+/* PINT_cached_config_get_metadata_sid_count()
+ *
+ * discovers the number of io servers available for a given file
+ * system
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fs_id,
+                                              uint32_t *num_sids)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    if (num_sids)
+    {
+        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
+        if (hash_link)
+        {
+            cur_config_cache = qlist_entry(hash_link,
+                                           struct config_fs_cache_s,
+                                           hash_link);
+
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            *num_sids = cur_config_cache->fs->metadata_replication_factor;
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
 /* V3 this won't make sense */
 #if 0
 /* PINT_cached_config_get_server_handle_count()

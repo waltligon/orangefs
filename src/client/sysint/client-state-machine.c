@@ -521,10 +521,9 @@ int client_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
 /** Adds a state machine into the list of machines that are being
  *  actively serviced.
  */
-PVFS_error PINT_client_state_machine_post(
-    PINT_smcb *smcb,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr /* in */)
+PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
+                                          PVFS_sys_op_id *op_id,
+                                          void *user_ptr /* in */)
 {
     PINT_sm_action sm_ret;
     PVFS_error ret = -PVFS_EINVAL;
@@ -1354,9 +1353,8 @@ int PVFS_mgmt_wait(PVFS_mgmt_op_id op_id,
     return PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt");
 }
 
-PVFS_error PVFS_sys_set_info(
-    enum PVFS_sys_setinfo_opt option,
-    unsigned int arg)
+PVFS_error PVFS_sys_set_info(enum PVFS_sys_setinfo_opt option,
+                             unsigned int arg)
 {
     PVFS_error ret = -PVFS_ENOSYS;
 
@@ -1393,9 +1391,8 @@ PVFS_error PVFS_sys_set_info(
     return(ret);
 }
 
-PVFS_error PVFS_sys_get_info(
-    enum PVFS_sys_setinfo_opt option,
-    unsigned int* arg)
+PVFS_error PVFS_sys_get_info(enum PVFS_sys_setinfo_opt option,
+                             unsigned int* arg)
 {
     PVFS_error ret = -PVFS_ENOSYS;
 
