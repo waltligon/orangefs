@@ -778,7 +778,10 @@ do {                                                       \
 
 struct PVFS_servresp_mgmt_get_dirdata_handle
 {
+    /* TJS: figure out how to change the encode thing with WBL */
     PVFS_handle handle;
+    PVFS_SID *sid_array;
+    int sid_count;
 };
 endecode_fields_1_struct(
     PVFS_servresp_mgmt_get_dirdata_handle,
@@ -2513,6 +2516,8 @@ do {                                                       \
 struct PVFS_servresp_mgmt_get_dirent
 {   
     PVFS_handle handle;
+    PVFS_SID *sid_array;
+    int sid_count;
     PVFS_error  error;
 };
 endecode_fields_2_struct(

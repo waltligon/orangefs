@@ -1,4 +1,4 @@
-/* 
+ /* 
  * (C) 2001 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
@@ -96,7 +96,8 @@ static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
-    
+    /* TJS: fix this with the right call */
+    s_op->metadatacnt = PINT_get_metadata_sid_count();
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for dirdata handle %s\n",
                  PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle));         
@@ -326,8 +327,17 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
 
+
+    /* TJS: remove returns data from db, so need to take metadata-size 
+     * This buffer doesn't actually get allocated anywhere in this 
+     * state machine, so not sure how to make it contiguous with 
+     * sid array */
+
     s_op->val.buffer = &s_op->u.rmdirent.entry_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    s_op->val.buffer_sz = sizeof(PVFS_handle) +
+                          sizeof(PVFS_SID) * 
+                          s_op->metadatacnt;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
                  "object (handle = %s)\n", s_op->req->u.rmdirent.entry,

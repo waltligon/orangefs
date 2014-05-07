@@ -368,6 +368,8 @@ struct PINT_server_lookup_op
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
 
+    PVFS_ID *keyval_temp_store;
+
     int dirdata_server_index;
     int dirdata_sid_index;
 };
@@ -431,6 +433,7 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
+    PVFS_SID *sid_array;
     PVFS_size dirent_count;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -515,7 +518,8 @@ struct PINT_server_batch_remove_op
 
 struct PINT_server_mgmt_get_dirdata_op
 {
-    PVFS_handle dirdata_handle;
+    PVFS_ID *keyval_temp_array;
+
     PVFS_SID *sid_array;
     int sid_count;
 };
@@ -625,6 +629,7 @@ struct PINT_server_tree_communicate_op
 struct PINT_server_mgmt_get_dirent_op
 {
     PVFS_handle handle;
+    PVFS_ID *keyval_temp_store;
 };
 
 struct PINT_server_mgmt_create_root_dir_op
