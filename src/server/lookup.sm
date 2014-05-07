@@ -274,8 +274,8 @@ static PINT_sm_action lookup_read_object_metadata(
      
     s_op->resp.u.lookup_path.handle_array[
                             s_op->u.lookup.seg_nr - 1] =
-            (PVFS_handle) s_op->u.lookup.keyval_temp_store[0];
-    s_op->resp.u.lookup_path.sid_
+            (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
+    /*s_op->resp.u.lookup_path.sid_*/
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
@@ -769,7 +769,7 @@ static PINT_sm_action lookup_read_directory_entry_handles(
                     attr->u.dir.dist_dir_attr.dirdata_count *
                     sizeof(PVFS_handle)));
 
-    attr->u.dir.sid_array = (PVFS_SID *)(attr->u.dir.dirdata_handles + 
+    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles + 
                                 (attr->u.dir.dist_dir_attr.dirdata_count *
                                 sizeof(PVFS_handle)));
     
@@ -944,15 +944,18 @@ static PINT_sm_action lookup_read_directory_entry_local(
      * response array in next state */
 
 
-    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
-                                                sizeof(PVFS_handle) +
-                                                (sizeof(PVFS_SID) * 
-                                                 metafile_count));
-    s_op->val.buffer = s_op->u.lookup.keyval_temp_store;
-
     ret = PINT_cached_config_get_metadata_sid_count(
                                           s_op->req->u.lookup_path.fs_id,
                                           &s_op->metasidcnt);
+
+    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
+                                                sizeof(PVFS_handle) +
+                                                (sizeof(PVFS_SID) * 
+                                                 s_op->metasidcnt));
+
+
+    
+    s_op->val.buffer = s_op->u.lookup.keyval_temp_store;
 
     s_op->val.buffer_sz = sizeof(PVFS_handle) + 
                           (s_op->metasidcnt * sizeof(PVFS_SID));
