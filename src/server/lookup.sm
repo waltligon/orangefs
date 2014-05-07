@@ -946,7 +946,7 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     ret = PINT_cached_config_get_metadata_sid_count(
                                           s_op->req->u.lookup_path.fs_id,
-                                          &s_op->metasidcnt);
+                                          &(s_op->metasidcnt));
 
     s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
                                                 sizeof(PVFS_handle) +

@@ -97,7 +97,9 @@ static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
     job_id_t tmp_id;
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     /* TJS: fix this with the right call */
-    s_op->metadatacnt = PINT_get_metadata_sid_count();
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.readdir.fs_id, 
+                                         &(s_op->metasidcnt));
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for dirdata handle %s\n",
                  PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle));         
@@ -337,7 +339,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
 
     s_op->val.buffer_sz = sizeof(PVFS_handle) +
                           sizeof(PVFS_SID) * 
-                          s_op->metadatacnt;
+                          s_op->metasidcnt;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
                  "object (handle = %s)\n", s_op->req->u.rmdirent.entry,
