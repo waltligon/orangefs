@@ -3789,14 +3789,13 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
 
-    if(PINT_EVENT_ENABLED)
+#if PINT_EVENT_ENABLED
+    int i = 0;
+    for(; i < list_count; ++i)
     {
-        int i = 0;
-        for(; i < list_count; ++i)
-        {
-            total_size += size_list[i];
-        }
+        total_size += size_list[i];
     }
+#endif
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
