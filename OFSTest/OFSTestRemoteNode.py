@@ -376,8 +376,19 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         
         return 0
+
+    ##
+    #
+    # @fn allowRootSshAccess(self)
+    #
+    # This function copies the user's .ssh key to root's .ssh directory. Assumes passwordless sudo already enabled. 
+    #
+    # @param self The object pointer        
         
-        
+    def allowRootSshAccess(self):
+        # This one we activate! 
+        print "Allowing root SSH access with user %s's credentials" % self.current_user
+        self.runSingleCommandAsBatch(command="sudo cp -r /home/%s/.ssh /root/ " % self.current_user)
         
         #============================================================================
         #

@@ -155,6 +155,8 @@ class OFSTestMain(object):
         print "===========================================================" 
         print "Enabling Passwordless SSH access"
         self.ofs_network.enablePasswordlessSSH()
+        #print "Enabling Passwordless SSH access for root"
+        #self.ofs_network.enablePasswordlessSSH(user="root")
         
         # TODO: Make this smart enough to return success or failure.
         return 0

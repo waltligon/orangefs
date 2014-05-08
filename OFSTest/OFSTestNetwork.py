@@ -263,22 +263,33 @@ class OFSTestNetwork(object):
     #    @param node_list List of nodes to enable passwordless ssh
             
 
-    def enablePasswordlessSSH(self,node_list=None):
+    def enablePasswordlessSSH(self,node_list=None,user=None):
         
         if node_list == None:
             node_list = self.network_nodes
         
+
+        
         for src_node in node_list:
+            
+            if user == None:
+                user = src_node.current_user
+        
+            if user == "root":
+                home_dir = "/root"
+            else:
+                home_dir = "/home/"+user
+            
             # passwordless access to localhost
-            src_node.runSingleCommand("/usr/bin/ssh-keyscan localhost >> /home/%s/.ssh/known_hosts" % src_node.current_user)
-            src_node.runSingleCommand("/usr/bin/ssh-keyscan 127.0.0.1 >> /home/%s/.ssh/known_hosts" % src_node.current_user)
+            src_node.runSingleCommand("/usr/bin/ssh-keyscan localhost >> %s/.ssh/known_hosts" % home_dir)
+            src_node.runSingleCommand("/usr/bin/ssh-keyscan 127.0.0.1 >> %s/.ssh/known_hosts" % home_dir)
             
             for dest_node in node_list:
                 # passwordless access to all other nodes
                 print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.hostname,dest_node.hostname,dest_node.ip_address,dest_node.ext_ip_address)
-                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.hostname,src_node.current_user))
-                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ext_ip_address,src_node.current_user))
-                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> /home/%s/.ssh/known_hosts" % (dest_node.ip_address,src_node.current_user))
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.hostname,home_dir))
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.ext_ip_address,home_dir))
+                src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.ip_address,home_dir))
                 
 
     ##      
