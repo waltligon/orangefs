@@ -281,7 +281,7 @@ class OFSTestNode(object):
 
         print "Current group is "+self.current_group
 
-        # Direct access as root not good. Need to get the actual user in
+        # Try to get in as root. If we can get in, we need to get the actual user in
         # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
                     
         if self.current_group.rstrip() == "":
@@ -291,7 +291,6 @@ class OFSTestNode(object):
             if self.current_group.rstrip() == "":
                 print "Could not access node at "+self.ext_ip_address+" via ssh"
                 exit(-1)
-            
             
             # copy the ssh key to the user's directory
             rc = self.runSingleCommand(command="cp -r /root/.ssh /home/%s/" % self.current_user,remote_user="root")
@@ -306,8 +305,13 @@ class OFSTestNode(object):
             if rc != 0:
                 print "Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group)
                 exit(rc)
-            
 
+        # We got in. Now copy the key from user directoy to /root. If user has passwordless sudo access, might as well.          
+        else:
+            # only implement this when we want to implement it.
+            self.allowRootSshAccess();
+                
+        
 
         # get kernel version and processor type
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
@@ -370,6 +374,18 @@ class OFSTestNode(object):
         
         # print out node information
         print "Node: %s %s %s %s" % (self.hostname,self.distro,self.kernel_version,self.processor_type)
+        
+    ##
+    #
+    # @fn allowRootSshAccess(self)
+    #
+    # This function copies the user's .ssh key to root's .ssh directory. Assumes passwordless sudo already enabled.
+    # Superclass assumes you really don't want to do this unless part of a subclass that implements this function. 
+    #
+    # @param self The object pointer        
+        
+    def allowRootSshAccess(self):
+        print "Cannot allow root ssh access on this machine."
         
         
        
@@ -500,6 +516,18 @@ class OFSTestNode(object):
             output.append(i)
 
         return p.returncode
+    
+    ##
+    # @fn runSingleCommandAsRoot(self,command,output=[]):
+    # This runs a single command as root and returns the return code of that command
+    #
+    # command, stdout, and stderr are in the output list
+    # @param self The object pointer
+    # @param command The command to run
+    # @param output Output list
+    
+    def runSingleCommandAsRoot(self,command,output=[],debug=False):
+        self.runSingleCommand(command,output,"root",debug)
      
     ##
     # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
@@ -761,21 +789,21 @@ class OFSTestNode(object):
     def updateNode(self):
         #print "Distro is " + self.distro
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y update")
-            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade < /dev/zero")
-            self.addBatchCommand("sudo /sbin/reboot ")
+            self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y update")
+            self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade")
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "suse" in self.distro.lower():
-            self.addBatchCommand("sudo zypper --non-interactive update")
-            self.addBatchCommand("sudo /sbin/reboot &")
+            self.runSingleCommandAsRoot("sudo zypper --non-interactive update")
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            self.addBatchCommand("sudo yum update --disableexcludes=main -y")
+            self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
             # Uninstall the old kernel
-            self.addBatchCommand("sudo rpm -e kernel-`uname -r`")
+            self.runSingleCommandAsRoot("rpm -e kernel-`uname -r`")
             #Update grub from current kernel to installed kernel
-            self.addBatchCommand('sudo perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
-            self.addBatchCommand("sudo /sbin/reboot ")
+            self.runSingleCommandAsRoot('perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         
-        self.runAllBatchCommands()
+        #self.runAllBatchCommands()
         print "Node "+self.hostname+" at "+self.ip_address+" updated."
         
         print "Node "+self.hostname+" at "+self.ip_address+" Rebooting."
@@ -796,7 +824,7 @@ class OFSTestNode(object):
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom  
                 sudo bash -c "echo %s > /etc/torque/server_name"
                 sudo bash -c "echo %s > /var/spool/torque/server_name"
                 
@@ -890,8 +918,8 @@ class OFSTestNode(object):
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom  < /dev/null 
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libtorque2 libtorque2-dev  < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom   
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libtorque2 libtorque2-dev 
                 sudo bash -c 'echo \$pbsserver %s > /var/spool/torque/mom_priv/config' 
                 sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config'
                 sudo bash -c 'echo %s > /etc/torque/server_name' 
@@ -1017,20 +1045,21 @@ class OFSTestNode(object):
         
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            batch_commands = '''
-                sudo bash -c 'echo 0 > /selinux/enforce'
-                sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
+            
+            install_commands = [
+                " bash -c 'echo 0 > /selinux/enforce'",
+                "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server < /dev/null
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
                 # will fail on Ubuntu 10.04. Run separately to not break anything
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse < /dev/null
-                #sudo DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
-                sudo apt-get clean
-
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse",
+                #"DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils", 
+                "apt-get clean",
+    
                 #prepare source
                 #SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
                 #cd /usr/src/${SOURCENAME}
@@ -1043,27 +1072,34 @@ class OFSTestNode(object):
                 #then
                 #sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
                 #fi
-                sudo /sbin/modprobe -v fuse
-                sudo chmod a+x /bin/fusermount
-                sudo chmod a+r /etc/fuse.conf
-                sudo rm -rf /opt
-                sudo ln -s /mnt /opt
-                sudo chmod -R a+w /mnt
-                sudo service cups stop
-                sudo service sendmail stop
-                sudo service rpcbind restart
-                sudo service nfs-kernel-server restart
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind restart",
+                "service nfs-kernel-server restart",
 
                 # install Sun Java6 for hadoop via webupd8
-                sudo add-apt-repository ppa:webupd8team/java < /dev/null
-                sudo apt-get update 
-                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'
-                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer < /dev/null
-                
+                "add-apt-repository ppa:webupd8team/java < /dev/null",
+                "apt-get update ",
+                "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'",
+                "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
+            ]
+            
+            output = []
+            
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+                if rc != 0:
+                    print output
+                    return rc
+            
 
-            '''
-            self.addBatchCommand(batch_commands)
             
             # ubuntu installs java to a different location than RHEL and SuSE 
             self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
@@ -1111,36 +1147,49 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+
+            # download Java 6
+            rc = self.runSingleCommand("wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin")
+            if rc != 0:
+                   print output
+                   return rc
             
-            batch_commands = '''
-                sudo bash -c 'echo 0 > /selinux/enforce'
-                echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients 
-                sudo yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl 
-                sudo /sbin/modprobe -v fuse
-                sudo chmod a+x /bin/fusermount
-                sudo chmod a+r /etc/fuse.conf
-                #sudo mkdir -p /opt
+            install_commands = [
+                "bash -c 'echo 0 > /selinux/enforce'",
+                
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients", 
+                "yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
+                # install java
+                "yes y | bash ./jdk-6u45-linux-x64-rpm.bin"
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                
+
                 #link to use additional space in /mnt drive
-                sudo rm -rf /opt
-                sudo ln -s /mnt /opt
-                sudo chmod -R a+w /mnt
-                sudo chmod -R a+w /opt
-                sudo service cups stop
-                sudo service sendmail stop
-                sudo service rpcbind start
-                sudo service nfs restart
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "chmod -R a+w /opt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind start",
+                "service nfs restart",
                 
-                # install java 6
-                cd /tmp
-                wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
-                yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
+                
+                ]
             
+            output = []
+        
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+                if rc != 0:
+                    print output
+                    return rc
+
+                # install java 6
                 
 
-
-            '''
-            self.addBatchCommand(batch_commands)
             
             # RPM installs to default location
             self.jdk6_location = "/usr/java/default"
