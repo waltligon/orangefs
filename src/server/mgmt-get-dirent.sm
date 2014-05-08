@@ -11,10 +11,12 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-server.h"
 #include "pint-util.h"
-//#include "pvfs2-attr.h"
+/*#include "pvfs2-attr.h" */
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
+#include "pint-util.h"
+
 
 %%
 
