@@ -878,14 +878,6 @@ do {                                                                \
     PINT_put_server_config_struct(server_config);                   \
 } while(0)
 
-struct PINT_client_op_entry_s
-{
-    struct PINT_state_machine_s * sm;
-};
-
-extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
-extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
-
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;

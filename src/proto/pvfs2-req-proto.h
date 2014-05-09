@@ -45,7 +45,6 @@
 
 enum PVFS_server_op
 {
-    PVFS_SERV_INVALID = 0,
     PVFS_SERV_CREATE = 1,
     PVFS_SERV_REMOVE = 2,
     PVFS_SERV_IO = 3,
@@ -99,8 +98,6 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
 #endif
-
-    /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
 

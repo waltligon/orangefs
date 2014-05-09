@@ -342,49 +342,49 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
-struct PINT_client_op_entry_s PINT_client_sm_table[] =
+struct PINT_state_machine_s *PINT_client_sm_table[] =
 {
-    {&pvfs2_client_remove_sm},
-    {&pvfs2_client_create_sm},
-    {&pvfs2_client_mkdir_sm},
-    {&pvfs2_client_symlink_sm},
-    {&pvfs2_client_sysint_getattr_sm},
-    {&pvfs2_client_io_sm},
-    {&pvfs2_client_flush_sm},
-    {&pvfs2_client_truncate_sm},
-    {&pvfs2_client_sysint_readdir_sm},
-    {&pvfs2_client_setattr_sm},
-    {&pvfs2_client_lookup_sm},
-    {&pvfs2_client_rename_sm},
-    {&pvfs2_client_get_eattr_sm},
-    {&pvfs2_client_set_eattr_sm},
-    {&pvfs2_client_del_eattr_sm},
-    {&pvfs2_client_list_eattr_sm},
-    {&pvfs2_client_small_io_sm},
-    {&pvfs2_client_statfs_sm},
-    {&pvfs2_fs_add_sm},
-    {&pvfs2_client_readdirplus_sm},
-    {&pvfs2_client_atomic_eattr_sm},
-    {&pvfs2_client_mgmt_setparam_list_sm},
-    {&pvfs2_client_mgmt_noop_sm},
-    {&pvfs2_client_mgmt_statfs_list_sm},
-    {&pvfs2_client_mgmt_perf_mon_list_sm},
-    {&pvfs2_client_mgmt_iterate_handles_list_sm},
-    {&pvfs2_client_mgmt_get_dfile_array_sm},
-    {&pvfs2_client_mgmt_event_mon_list_sm},
-    {&pvfs2_client_mgmt_remove_object_sm},
-    {&pvfs2_client_mgmt_remove_dirent_sm},
-    {&pvfs2_client_mgmt_create_dirent_sm},
-    {&pvfs2_client_mgmt_get_dirdata_handle_sm},
-    {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm},
+    &pvfs2_client_remove_sm,
+    &pvfs2_client_create_sm,
+    &pvfs2_client_mkdir_sm,
+    &pvfs2_client_symlink_sm,
+    &pvfs2_client_sysint_getattr_sm,
+    &pvfs2_client_io_sm,
+    &pvfs2_client_flush_sm,
+    &pvfs2_client_truncate_sm,
+    &pvfs2_client_sysint_readdir_sm,
+    &pvfs2_client_setattr_sm,
+    &pvfs2_client_lookup_sm,
+    &pvfs2_client_rename_sm,
+    &pvfs2_client_get_eattr_sm,
+    &pvfs2_client_set_eattr_sm,
+    &pvfs2_client_del_eattr_sm,
+    &pvfs2_client_list_eattr_sm,
+    &pvfs2_client_small_io_sm,
+    &pvfs2_client_statfs_sm,
+    &pvfs2_fs_add_sm,
+    &pvfs2_client_readdirplus_sm,
+    &pvfs2_client_atomic_eattr_sm,
+    &pvfs2_client_mgmt_setparam_list_sm,
+    &pvfs2_client_mgmt_noop_sm,
+    &pvfs2_client_mgmt_statfs_list_sm,
+    &pvfs2_client_mgmt_perf_mon_list_sm,
+    &pvfs2_client_mgmt_iterate_handles_list_sm,
+    &pvfs2_client_mgmt_get_dfile_array_sm,
+    &pvfs2_client_mgmt_event_mon_list_sm,
+    &pvfs2_client_mgmt_remove_object_sm,
+    &pvfs2_client_mgmt_remove_dirent_sm,
+    &pvfs2_client_mgmt_create_dirent_sm,
+    &pvfs2_client_mgmt_get_dirdata_handle_sm,
+    &pvfs2_client_mgmt_get_uid_list_sm,
+    &pvfs2_client_mgmt_get_dirdata_array_sm,
 #ifdef ENABLE_SECURITY_CERT
-    {&pvfs2_client_mgmt_get_user_cert_sm},
+    &pvfs2_client_mgmt_get_user_cert_sm,
 #endif
-    {&pvfs2_server_get_config_sm},
-    {&pvfs2_client_job_timer_sm},
-    {&pvfs2_client_perf_count_timer_sm},
-    {&pvfs2_sysdev_unexp_sm},
+    &pvfs2_server_get_config_sm,
+    &pvfs2_client_job_timer_sm,
+    &pvfs2_client_perf_count_timer_sm,
+    &pvfs2_sysdev_unexp_sm,
 };
 
 
@@ -397,7 +397,7 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_op_state_get_machine %d\n",op);
     if (op >= 0 && op < PVFS_CLIENT_NUM_OPS)
-        return PINT_client_sm_table[op].sm;
+        return PINT_client_sm_table[op];
     else
         return NULL;
 }

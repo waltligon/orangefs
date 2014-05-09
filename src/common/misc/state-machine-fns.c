@@ -369,7 +369,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     const char *machine_name;
 
     /* check for valid inputs */
-    if (!smcb || smcb->op < 0 || !smcb->op_get_state_machine)
+    if (!smcb || smcb->op <= 0 || !smcb->op_get_state_machine)
     {
 	gossip_err("State machine requested not valid\n");
 	return -PVFS_EINVAL;
@@ -489,8 +489,9 @@ int PINT_smcb_alloc(
         int (*term_fn)(struct PINT_smcb *, job_status_s *),
         job_context_id context_id)
 {
+    void *new_frame;
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
-    if (!(*smcb))
+    if (*smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
@@ -504,8 +505,8 @@ int PINT_smcb_alloc(
     /* if frame_size given, allocate a frame */
     if (frame_size > 0)
     {
-        void *new_frame = malloc(frame_size);
-        if (!new_frame)
+        new_frame = malloc(frame_size);
+        if (new_frame == NULL)
         {
             free(*smcb);
             *smcb = NULL;
@@ -516,13 +517,17 @@ int PINT_smcb_alloc(
         PINT_sm_push_frame(*smcb, 0, new_frame);
         (*smcb)->base_frame = 0;
     }
+
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
     (*smcb)->terminate_fn = term_fn;
     (*smcb)->context = context_id;
-    /* if a getmach given, lookup state machine */
-    if (getmach)
-        return PINT_state_machine_locate(*smcb);
+    if (!PINT_state_machine_locate(*smcb)) {
+        if (frame_size > 0)
+            free(new_frame);
+        free(*smcb);
+        return -PVFS_EINVAL;
+    }
     return 0; /* success */
 }
 
