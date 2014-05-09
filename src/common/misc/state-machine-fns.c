@@ -489,7 +489,7 @@ int PINT_smcb_alloc(
         int (*term_fn)(struct PINT_smcb *, job_status_s *),
         job_context_id context_id)
 {
-    void *new_frame;
+    void *new_frame = NULL;
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
     if (*smcb == NULL)
     {
@@ -523,8 +523,7 @@ int PINT_smcb_alloc(
     (*smcb)->terminate_fn = term_fn;
     (*smcb)->context = context_id;
     if (!PINT_state_machine_locate(*smcb)) {
-        if (frame_size > 0)
-            free(new_frame);
+        free(new_frame);
         free(*smcb);
         return -PVFS_EINVAL;
     }
@@ -822,7 +821,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
             break;
         }
         /* allocate smcb */
-        PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
+        PINT_smcb_alloc(&new_sm, smcb->op, 0, smcb->op_get_state_machine,
                 child_sm_frame_terminate, smcb->context);
         /* set parent smcb pointer */
         new_sm->parent_smcb = smcb;
