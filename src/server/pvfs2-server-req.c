@@ -66,7 +66,9 @@ extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
 #endif
 
-/* table of incoming request types and associated parameters */
+/* Table of incoming request types and associated parameters.
+ * THIS MUST BE IN THE SAME ORDER AS enum PVFS_server_op in
+ * src/proto/pvfs2-req-proto.h. */
 struct PINT_server_req_entry PINT_server_req_table[] =
 {
     /* 0 */ {PVFS_SERV_INVALID, NULL},
@@ -118,14 +120,15 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
     /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
     /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
-    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params}
+    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
 #ifdef ENABLE_SECURITY_CERT    
-    /* 50 */ ,{PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
-    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params}
+    /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
+    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params},
+#else
+    /* 50 */ {PVFS_SERV_INVALID, NULL},
+    /* 51 */ {PVFS_SERV_INVALID, NULL},
 #endif
 };
-
-#define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
 
 enum PINT_server_req_access_type PINT_server_req_readonly(
                                     struct PVFS_server_req *req)
@@ -142,15 +145,14 @@ enum PINT_server_req_access_type PINT_server_req_modify(
 PINT_server_req_perm_fun
 PINT_server_req_get_perm_fun(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
+    assert (req->op < PVFS_SERV_NUM_OPS);
     return PINT_server_req_table[req->op].params->perm;
 }
 
 enum PINT_server_req_access_type
 PINT_server_req_get_access_type(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
-
+    assert (req->op < PVFS_SERV_NUM_OPS);
     if(!PINT_server_req_table[req->op].params->access_type)
     {
         return PINT_SERVER_REQ_READONLY;
@@ -161,15 +163,14 @@ PINT_server_req_get_access_type(struct PVFS_server_req *req)
 enum PINT_server_sched_policy
 PINT_server_req_get_sched_policy(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
+    assert (req->op < PVFS_SERV_NUM_OPS);
     return PINT_server_req_table[req->op].params->sched_policy;
 }
 
 int PINT_server_req_get_object_ref(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
-    CHECK_OP(req->op);
-
+    assert (req->op < PVFS_SERV_NUM_OPS);
     if(!PINT_server_req_table[req->op].params->get_object_ref)
     {
         *fs_id = 0;
@@ -187,8 +188,7 @@ int PINT_server_req_get_credential(
     struct PVFS_server_req *req, PVFS_credential **cred)
 {
     int ret;
-    CHECK_OP(req->op);
-
+    assert (req->op < PVFS_SERV_NUM_OPS);
     if (!PINT_server_req_table[req->op].params->get_credential)
     {
         *cred = NULL;
@@ -199,7 +199,6 @@ int PINT_server_req_get_credential(
         ret = PINT_server_req_table[req->op].params->get_credential(
             req, cred);
     }
-
     return ret;
 }
 
@@ -213,7 +212,7 @@ int PINT_server_req_get_credential(
  */
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    CHECK_OP(op);
+    assert (op < PVFS_SERV_NUM_OPS);
     return PINT_server_req_table[op].params->string_name;
 }
 

@@ -342,7 +342,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
-struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
+struct PINT_client_op_entry_s PINT_client_sm_table[] =
 {
     {&pvfs2_client_remove_sm},
     {&pvfs2_client_create_sm},
@@ -364,11 +364,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
-    {&pvfs2_client_atomic_eattr_sm}
-};
-
-struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
-{
+    {&pvfs2_client_atomic_eattr_sm},
     {&pvfs2_client_mgmt_setparam_list_sm},
     {&pvfs2_client_mgmt_noop_sm},
     {&pvfs2_client_mgmt_statfs_list_sm},
@@ -381,60 +377,29 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm}
+    {&pvfs2_client_mgmt_get_dirdata_array_sm},
 #ifdef ENABLE_SECURITY_CERT
-    ,{&pvfs2_client_mgmt_get_user_cert_sm}
+    {&pvfs2_client_mgmt_get_user_cert_sm},
 #endif
+    {&pvfs2_server_get_config_sm},
+    {&pvfs2_client_job_timer_sm},
+    {&pvfs2_client_perf_count_timer_sm},
+    {&pvfs2_sysdev_unexp_sm},
 };
 
 
 /* This function allows the generic state-machine-fns.c locate function
  * to access the appropriate sm struct based on the client operation index
- * from the above enum.  Because the enum starts management operations at
- * 70, the management table was separated out from the sys table and the
- * necessary checks and subtractions are made in this macro.
- * Pointer to this func is put in SM control block for client SMs.
- */
-/* NOTE; appears to be a latent bug that does not catch op values
- * between largest sys op and lowest mgmt op - need to check on this
- * WBL
- */
+ * from the above enum. Pointer to this func is put in SM control block
+ * for client SMs. */
 struct PINT_state_machine_s *client_op_state_get_machine(int op)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_op_state_get_machine %d\n",op);
-
-    switch (op)
-    {
-    /* special cases first */
-    case PVFS_SERVER_GET_CONFIG :
-        return &pvfs2_server_get_config_sm;
-    case PVFS_CLIENT_JOB_TIMER :
-        return &pvfs2_client_job_timer_sm;
-    case PVFS_CLIENT_PERF_COUNT_TIMER :
-        return &pvfs2_client_perf_count_timer_sm;
-    case PVFS_DEV_UNEXPECTED :
-        return &pvfs2_sysdev_unexp_sm;
-    default:
-        /* now check range for sys functions */
-        if (op <= PVFS_OP_SYS_MAXVAL)
-        {
-            return PINT_client_sm_sys_table[op-1].sm;
-        }
-        else
-        {
-            /* now check range for mgmt functions */
-            if (op <= PVFS_OP_MGMT_MAXVAL)
-            {
-                return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
-            }
-            else
-            {
-                /* otherwise its out of range */
-                return NULL;
-            }
-        }
-    }
+    if (op >= 0 && op < PVFS_CLIENT_NUM_OPS)
+        return PINT_client_sm_table[op].sm;
+    else
+        return NULL;
 }
 
 /* callback for a terminating state machine
@@ -848,7 +813,7 @@ PVFS_error PINT_client_state_machine_test(
 	tmp_smcb = (PINT_smcb *)smcb_p_array[i];
         assert(tmp_smcb);
 
-        if (PINT_smcb_invalid_op(tmp_smcb))
+        if (tmp_smcb->op < 0 && tmp_smcb->op >= PVFS_CLIENT_NUM_OPS)
         {
             gossip_err("Invalid sm control block op %d\n", PINT_smcb_op(tmp_smcb));
             continue;
