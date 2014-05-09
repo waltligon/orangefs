@@ -3781,7 +3781,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     struct tcp_addr *tcp_addr_data = dest->method_data;
     method_op_p query_op = NULL;
     int ret = -1;
-    bmi_size_t total_size = 0;
     bmi_size_t amt_complete = 0;
     bmi_size_t env_amt_complete = 0;
     struct op_list_search_key key;

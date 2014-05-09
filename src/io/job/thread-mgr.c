@@ -126,8 +126,9 @@ static void *trove_thread_function(void *ptr)
 #ifdef __PVFS2_JOB_THREADED__
             gossip_err("trove_thread_function thread terminating\n");
             break;
-#endif
+#else
             return NULL;
+#endif
 	}
 
 	for(i=0; i<trove_test_count; i++)
@@ -192,9 +193,10 @@ static void *bmi_thread_function(void *ptr)
                 PVFS_perror_gossip("critical BMI failure", ret);
 #ifdef __PVFS2_JOB_THREADED__
                 continue;
+#else
+                return NULL;
 #endif
 
-                return NULL;
 	    }
 
 	    /* execute callback for each completed unexpected message */
@@ -268,9 +270,9 @@ static void *bmi_thread_function(void *ptr)
 #ifdef __PVFS2_JOB_THREADED__
             gossip_err("bmi_thread_function thread terminating\n");
             break;
-#endif
-
+#else
             return NULL;
+#endif
 	}
 
 	for(i=0; i<bmi_test_count; i++)
@@ -350,11 +352,6 @@ static void *dev_thread_function(void *ptr)
              * pvfs2-client-core
              */
             exit(-PVFS_ENODEV);
-#ifdef __PVFS2_JOB_THREADED__
-            gossip_err("dev_thread_function thread terminating\n");
-            break;
-#endif
-            return NULL;
 	}
 
 	/* execute callback for each completed unexpected message */
