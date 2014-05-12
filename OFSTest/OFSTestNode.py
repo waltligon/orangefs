@@ -358,15 +358,15 @@ class OFSTestNode(object):
         if self.is_cloud == True:
             suse_host = "ofsnode-%d" % self.node_number
             print "Renaming %s based node to %s" % (self.distro,suse_host)
-            self.runSingleCommandAsBatch("sudo hostname %s" % suse_host)
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
+            self.runSingleCommandAsRoot("hostname %s" % suse_host)
+            self.runSingleCommandAsRoot("bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
             self.hostname = suse_host
             
         # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
         elif len(self.hostname) > 15 and self.is_cloud == True:
             short_hostname = self.hostname[:15]
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_hostname)
-            self.runSingleCommandAsBatch("sudo hostname %s" % short_hostname)
+            self.runSingleCommandAsRoot("bash -c 'echo %s > /etc/hostname'" % short_hostname)
+            self.runSingleCommandAsRoot("hostname %s" % short_hostname)
             print "Truncating hostname %s to %s" % (self.hostname,short_hostname)
             self.hostname = self.hostname[:15]
         elif self.is_cloud == False:
@@ -793,16 +793,27 @@ class OFSTestNode(object):
             self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade")
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "suse" in self.distro.lower():
-            self.runSingleCommandAsRoot("sudo zypper --non-interactive update")
+            self.runSingleCommandAsRoot("zypper --non-interactive update")
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
             # Uninstall the old kernel
-            self.runSingleCommandAsRoot("rpm -e kernel-`uname -r`")
+            output = []
+            rc = self.runSingleCommandAsRoot("rpm -e kernel-\\`uname -r\\`",output)
             #Update grub from current kernel to installed kernel
-            self.runSingleCommandAsRoot('perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
-            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
-        
+            print output
+            rc = self.runSingleCommandAsRoot("echo \\\"\\`uname -r\\`\\\"",output)
+            print output
+            rc = self.runSingleCommandAsRoot("echo \\\"\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`\\\"",output)
+            print output            
+            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p /boot/grub/grub.conf",output)
+            print output
+            
+            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p -i /boot/grub/grub.conf",output)
+            print output
+
+            rc = self.runSingleCommandAsRoot("nohup /sbin/reboot &")
+
         #self.runAllBatchCommands()
         print "Node "+self.hostname+" at "+self.ip_address+" updated."
         
@@ -820,84 +831,83 @@ class OFSTestNode(object):
         #Each distro handles torque slightly differently.
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            batch_commands = '''
+            batch_commands = [
 
                 #install torque
-                echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom  
-                sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name"
                 
-
-            ''' % (self.hostname,self.hostname)
-            self.addBatchCommand(batch_commands)
-
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom",  
+                'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                'bash -c "echo %s > /var/spool/torque/server_name"' % self.hostname
+                
+            ]
+        
         elif "suse" in self.distro.lower():
             
             # Torque should already have been installed via SuSE studio, but it needs to be setup.
 
-            batch_commands = '''
-                sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name"
-            ''' % (self.hostname,self.hostname)
-           
-            
+            batch_commands = [
 
-            self.addBatchCommand(batch_commands)
+                #install torque
+                'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                'bash -c "echo %s > /var/spool/torque/server_name"' % self.hostname
+                
+            ]
+        
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             if "6." in self.distro:
-                batch_commands = '''
+                self.runSingleCommand("wget http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm" % self.processor_type)
+                
+                batch_commands = [
                    
 
-                    echo "Adding epel repository"
-                    wget http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm
-                    sudo rpm -Uvh epel-release-6*.noarch.rpm
-                    echo "Installing TORQUE from rpm: "
-                    sudo yum -y update
-                    sudo yum -y install torque-server torque-client torque-mom torque-scheduler munge
-                    sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
-                    sudo bash -c "echo %s > /etc/torque/server_name"
-                    sudo bash -c "echo %s > /var/lib/torque/server_name"
+                
+                    "rpm -Uvh epel-release-6*.noarch.rpm",
+                    "yum -y update",
+                    "yum -y install torque-server torque-client torque-mom torque-scheduler munge",
+                    "bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'",
+                    'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                    'bash -c "echo %s > /var/lib/torque/server_name"' % self.hostname
 
-                ''' % (self.processor_type,self.hostname,self.hostname)
+                ]
             elif "5." in self.distro:
-                batch_commands = '''
-                   
+                self.runSingleCommand("wget http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm" % self.processor_type)
+                
+                batch_commands = [
+                
+                    "rpm -Uvh epel-release-5*.noarch.rpm",
+                    "yum -y update",
+                    "yum -y install torque-server torque-client torque-mom torque-scheduler munge",
+                    "bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'",
+                    'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                    'bash -c "echo %s > /var/lib/torque/server_name"' % self.hostname
 
-                    echo "Adding epel repository"
-                    wget http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm
-                    sudo rpm -Uvh epel-release-5*.noarch.rpm
-                    echo "Installing TORQUE from rpm: "
-                    sudo yum -y update
-                    sudo yum -y install torque-server torque-client torque-mom torque-scheduler munge
-                    sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
-                    sudo bash -c "echo %s > /etc/torque/server_name"
-                    sudo bash -c "echo %s > /var/lib/torque/server_name"
-
-                ''' % (self.processor_type,self.hostname,self.hostname)
+                ]
+                
             else:
                 print "TODO: Torque for "+self.distro
                 batch_commands = ""
-            #print batch_commands
-            self.addBatchCommand(batch_commands)
-            
-            # The following commands setup the Torque queue for OrangeFS on all systems.
-            qmgr_commands = '''            
-                sudo qmgr -c "set server scheduling=true"
-                sudo qmgr -c "create queue orangefs_q queue_type=execution"
-                sudo qmgr -c "set queue orangefs_q started=true"
-                sudo qmgr -c "set queue orangefs_q enabled=true"
-                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
-                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
-                sudo qmgr -c "set server default_queue=orangefs_q"
-                sudo qmgr -c "set server operators += %s@%s"
-                sudo qmgr -c "set server managers += %s@%s"
-                ''' % (self.current_user,self.hostname,self.current_user,self.hostname)
-
-            self.addBatchCommand(batch_commands)
         
-        self.runAllBatchCommands()
+        #print batch_commands
+        for command in batch_commands:
+            self.runSingleCommandAsRoot(command)
+        
+        # The following commands setup the Torque queue for OrangeFS on all systems.
+        qmgr_commands = [
+            'qmgr -c "set server scheduling=true"',
+            'qmgr -c "create queue orangefs_q queue_type=execution"',
+            'qmgr -c "set queue orangefs_q started=true"',
+            'qmgr -c "set queue orangefs_q enabled=true"',
+            'qmgr -c "set queue orangefs_q resources_default.nodes=1"',
+            'qmgr -c "set queue orangefs_q resources_default.walltime=3600"',
+            'qmgr -c "set server default_queue=orangefs_q"',
+            'qmgr -c "set server operators += %s@%s"'  % (self.current_user,self.hostname),
+            'qmgr -c "set server managers += %s@%s"' % (self.current_user,self.hostname)
+            ] 
+        for command in qmgr_commands:
+           self.runSingleCommandAsRoot(command)
+
+
         
     ##
     # @fn installTorqueClient(self,pbsserver):
@@ -1023,10 +1033,10 @@ class OFSTestNode(object):
     
     def restartTorqueMom(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.runSingleCommandAsBatch("sudo /etc/init.d/torque-mom restart")
+            self.runSingleCommandAsRoot("/etc/init.d/torque-mom restart")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower() or "suse" in self.distro.lower():
               
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
+            self.runSingleCommandAsRoot("/etc/init.d/pbs_mom restart")
 
 
     
@@ -1050,7 +1060,7 @@ class OFSTestNode(object):
                 " bash -c 'echo 0 > /selinux/enforce'",
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime", 
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
@@ -1095,9 +1105,6 @@ class OFSTestNode(object):
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
-                if rc != 0:
-                    print output
-                    return rc
             
 
             
@@ -1106,50 +1113,50 @@ class OFSTestNode(object):
             
             
         elif "suse" in self.distro.lower():
-            batch_commands = '''
-            sudo bash -c 'echo 0 > /selinux/enforce'
-            sudo /sbin/SuSEfirewall2 off
-            # prereqs should be installed as part of the image. Thanx SuseStudio!
-            #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
-            sudo zypper --non-interactive patch libuuid1 uuid-devel
+            batch_commands = [
+                "bash -c 'echo 0 > /selinux/enforce'",
+                "/sbin/SuSEfirewall2 off",
+                # prereqs should be installed as part of the image. Thanx SuseStudio!
+                #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
+                "zypper --non-interactive patch libuuid1 uuid-devel",
+                
+    
+                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`",
+                "cp /boot/config-\\`uname -r\\` .config",
+                "make oldconfig &> /dev/null",
+                "make modules_prepare &>/dev/null",
+                "make prepare &>/dev/null",
+                "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
+                "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
+                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                
 
-            cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
-            sudo cp /boot/config-`uname -r` .config
-            sudo make oldconfig &> /dev/null
-            sudo make modules_prepare &>/dev/null
-            sudo make prepare &>/dev/null
-            sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
-            if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
-            then
-            sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
-            fi
-            sudo modprobe -v fuse
-            sudo chmod a+x /bin/fusermount
-            sudo chmod a+r /etc/fuse.conf
-            #sudo mkdir -p /opt
-            sudo rm -rf /opt
-            sudo ln -s /mnt /opt
-            sudo chmod -R a+w /opt
-            cd /tmp
-            #### Install Java 6 #####
-            wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
-            yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
-            
-            # start rpcbind to work around a bug in OpenSuse
-            sudo /sbin/rpcbind
-            
-
-            '''
-            self.addBatchCommand(batch_commands)
+                #link to use additional space in /mnt drive
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "chmod -R a+w /opt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind start",
+                "service nfs restart",
+                "/sbin/rpcbind"
+            ]
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+    
             
             # RPM installs to default location
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-
+            output = []
             # download Java 6
-            rc = self.runSingleCommand("wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin")
+            rc = self.runSingleCommand("wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
                    print output
                    return rc
@@ -1157,10 +1164,10 @@ class OFSTestNode(object):
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
-                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients", 
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients", 
                 "yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
                 # install java
-                "yes y | bash ./jdk-6u45-linux-x64-rpm.bin"
+                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
                 "chmod a+x /bin/fusermount",
                 "chmod a+r /etc/fuse.conf",
@@ -1179,13 +1186,11 @@ class OFSTestNode(object):
                 
                 ]
             
-            output = []
+
         
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
-                if rc != 0:
-                    print output
-                    return rc
+                    #return rc
 
                 # install java 6
                 
@@ -1973,7 +1978,7 @@ class OFSTestNode(object):
         self.changeDirectory(self.ofs_source_location)
         output = []
         if install_as_root == True:
-            rc = self.runSingleCommandAsBatch("sudo make install",output)
+            rc = self.runSingleCommandAsRoot("make install",output)
         else:
             rc = self.runSingleCommand("make install",output)
         
@@ -2047,28 +2052,32 @@ class OFSTestNode(object):
         
         self.runSingleCommand("mkdir -p %s" % directory_name)
         if "suse" in self.distro.lower():
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
-            sudo /sbin/rpcbind 
-            sleep 3
-            sudo /etc/init.d/nfs restart
-            sudo /etc/init.d/nfsserver restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
+            commands = [
+            "bash -c 'echo \"%s %s/%r(%s)\" >> /etc/exports'" % (directory_name,self.ip_address,netmask,options),
+            
+            " /sbin/rpcbind", 
+            
+            " sleep 3",
+            " /etc/init.d/nfs restart"
+            " /etc/init.d/nfsserver restart"
+            " exportfs -a"
+             ] 
         else:
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            commands = [
+            "bash -c 'echo \"%s %s/%r(%s)\" >> /etc/exports'" % (directory_name,self.ip_address,netmask,options),
             #sudo service cups stop
             #sudo service sendmail stop
-            sudo service rpcbind restart
-            sudo service nfs restart
-            sudo service nfs-kernel-server restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
+            "service rpcbind restart",
+            "service nfs restart",
+            "service nfs-kernel-server restart",
+            "exportfs -a"
+            ]
+            
         
+        for command in commands:
+            self.runSingleCommandAsRoot(command)
         
-        
-        self.runSingleCommandAsBatch(commands)
+
         time.sleep(30)
         
         return "%s:%s" % (self.ip_address,directory_name)
@@ -2086,15 +2095,15 @@ class OFSTestNode(object):
     def mountNFSDirectory(self,nfs_share,mount_point,options=""):
         self.changeDirectory("/home/%s" % self.current_user)
         self.runSingleCommand("mkdir -p %s" % mount_point)
-        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mount_point)
+        commands = 'mount -t nfs -o %s %s %s' % (options,nfs_share,mount_point)
         print commands
-        self.runSingleCommandAsBatch(commands)
+        self.runSingleCommandAsRoot(commands)
         output = []
         rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
         count = 0
         while rc != 0 and count < 10 :
             time.sleep(15)
-            self.runSingleCommandAsBatch(commands)
+            self.runSingleCommandAsRoot(commands)
             rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
             print output
             count = count + 1
@@ -2107,7 +2116,7 @@ class OFSTestNode(object):
     # @param self The object pointer
 
     def clearSHM(self):
-        self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
+        self.runSingleCommandAsRoot("rm /dev/shm/pvfs\*")
    
    
 
@@ -2289,12 +2298,12 @@ class OFSTestNode(object):
                 # Are we running this as root? 
                 prefix = "" 
                 if run_as_root == True:
-                    prefix = "sudo LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
+                    prefix = "LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
                     
                     
                 server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias)
                 print server_start
-                rc = self.runSingleCommandAsBatch(server_start,output)
+                rc = self.runSingleCommandAsRoot(server_start,output)
                 
                 # give the servers 15 seconds to get running
                 print "Starting OrangeFS servers..."
@@ -2305,7 +2314,7 @@ class OFSTestNode(object):
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
-        self.runSingleCommandAsBatch("sudo ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
+        self.runSingleCommandAsRoot("ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
         # set the debug mask
@@ -2478,7 +2487,7 @@ class OFSTestNode(object):
     
     def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mount_point
-        self.runSingleCommandAsBatch("sudo umount -f -l %s" % self.ofs_mount_point)
+        self.runSingleCommandAsRoot("umount -f -l %s" % self.ofs_mount_point)
         time.sleep(15)
 
     ##

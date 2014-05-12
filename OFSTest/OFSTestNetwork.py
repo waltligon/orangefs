@@ -365,13 +365,12 @@ class OFSTestNetwork(object):
                 # if not, add to the /etc/hosts file
                 if rc != 0:
                     print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,node.hostname)
-                    node.addBatchCommand('sudo bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.hostname,n2.hostname))
+                    node.runSingleCommandAsRoot('bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.hostname,n2.hostname))
                     # also create mpihosts files
                     node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.hostname,node.created_openmpihosts))
                     node.runSingleCommand('echo "%s:2" >> %s' % (n2.hostname,node.created_mpichhosts))
 
                     
-            node.runAllBatchCommands()
             node.hostname = node.runSingleCommandBacktick("hostname")
 
     ##
@@ -396,7 +395,8 @@ class OFSTestNetwork(object):
             tmp_hostname = node.runSingleCommandBacktick("hostname")
             if tmp_hostname != node.hostname:
                 print "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname)
-                node.runSingleCommandAsBatch("sudo hostname %s" % node.hostname)
+                node.runSingleCommandAsRoot("hostname %s" % node.hostname)
+                
     
     ##
     # @fn installRequiredSoftware(self,node_list=None):
@@ -913,9 +913,9 @@ class OFSTestNetwork(object):
                 
                 torque_node_cpu = node_list[i].runSingleCommandBacktick('grep proc /proc/cpuinfo | wc -l')
                 if "ubuntu" in head_node.distro.lower() or "mint" in head_node.distro.lower() or "debian" in head_node.distro.lower():
-                    head_node.runSingleCommand("sudo bash -c 'echo \"%s np=%s\" >> /var/spool/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
+                    head_node.runSingleCommandAsRoot("bash -c 'echo \\\"%s np=%s\\\" >> /var/spool/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
                 elif "centos" in head_node.distro.lower() or "scientific linux" in head_node.distro.lower() or "redhat" in head_node.distro.lower() or "fedora" in head_node.distro.lower():
-                    head_node.runSingleCommandAsBatch("sudo bash -c 'echo \"%s np=%s\" >> /var/lib/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
+                    head_node.runSingleCommandAsRoot("bash -c 'echo \\\"%s np=%s\\\" >> /var/lib/torque/server_priv/nodes'" % (node_list[i].hostname,torque_node_cpu))
         head_node.restartTorqueServer()    
 
         # wait for the server to start
@@ -1337,7 +1337,7 @@ class OFSTestNetwork(object):
             if len(ofs_hostname_override) > 0:
                 try:
                     node.hostname = ofs_hostname_override[i]
-                    node.runSingleCommandAsBatch("sudo hostname "+node.hostname)
+                    node.runSingleCommandAsRoot("hostname "+node.hostname)
                 except:
                     # if not, ignore the error
                     pass
