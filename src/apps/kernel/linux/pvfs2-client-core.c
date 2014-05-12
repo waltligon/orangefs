@@ -2722,6 +2722,7 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     int i; 
     char *buf = (char *) ptr;
     char **pptr = &buf;
+    struct ihash s;
 
     ptr->token = readdir->token;
     ptr->directory_version = readdir->directory_version;
@@ -2735,8 +2736,14 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
-        *(int64_t *) *pptr = readdir->dirent_array[i].handle;
+        /* format the handle as a khandle */
+        s.ino = readdir->dirent_array[i].handle; 
+        *(unsigned int *) *pptr = s.slice[0];
+        *pptr += 4;
+	memset((void *)*pptr,0,8);
         *pptr += 8;
+        *(unsigned int *) *pptr = s.slice[1];
+        *pptr += 4;
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);
 }

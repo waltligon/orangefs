@@ -32,16 +32,18 @@ static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir)
 
     readdir->token = rd->token;
     readdir->pvfs_dirent_outcount = rd->pvfs_dirent_outcount;
-    readdir->dirent_array = kmalloc(readdir->pvfs_dirent_outcount *
-                                    sizeof(*readdir->dirent_array), GFP_KERNEL);
+    readdir->dirent_array =
+      kmalloc(readdir->pvfs_dirent_outcount * sizeof(*readdir->dirent_array),
+              GFP_KERNEL);
     if (readdir->dirent_array == NULL)
-    {
         return -ENOMEM;
-    }
+
     *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
     for (i = 0; i < readdir->pvfs_dirent_outcount; i++)
     {
-        dec_string(pptr, &readdir->dirent_array[i].d_name, &readdir->dirent_array[i].d_length);
+        dec_string(pptr,
+                   &readdir->dirent_array[i].d_name,
+                   &readdir->dirent_array[i].d_length);
         readdir->dirent_array[i].khandle = *(PVFS_khandle *) *pptr;
         *pptr += 16;
     }
@@ -178,8 +180,9 @@ static int pvfs2_readdir(
     new_op->uses_shared_memory = 1;
 
     if (pvfs2_inode &&
-       (pvfs2_inode->refn.khandle.u[0] != 0) &&
-       (pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL))
+       pvfs2_inode->refn.khandle.slice[0] +
+         pvfs2_inode->refn.khandle.slice[3] != 0 &&
+       pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
         memset(s,0,HANDLESTRINGSIZE);
@@ -790,7 +793,8 @@ static int pvfs2_readdirplus_common(
                     return -ENOMEM;
                 }
                 if (pvfs2_inode &&
-                    pvfs2_inode->refn.khandle.u[0] != 0 &&
+                    pvfs2_inode->refn.khandle.slice[0] +
+                      pvfs2_inode->refn.khandle.slice[0] != 0 &&
                     pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
                 {
                     new_op->upcall.req.readdirplus.refn = pvfs2_inode->refn;

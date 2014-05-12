@@ -132,7 +132,8 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
         sb = dir->i_sb;
         parent = PVFS2_I(dir);
         if (parent &&
-            parent->refn.khandle.u[0] != 0 &&
+            parent->refn.khandle.slice[0] +
+              parent->refn.khandle.slice[3] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             memset(s,0,HANDLESTRINGSIZE);
@@ -508,7 +509,8 @@ static int pvfs2_rename(
       inode's corresponding superblock
     */
     if (pvfs2_old_parent_inode &&
-            pvfs2_old_parent_inode->refn.khandle.u[0] != 0 &&
+            pvfs2_old_parent_inode->refn.khandle.slice[0] +
+              pvfs2_old_parent_inode->refn.khandle.slice[3] != 0 &&
             pvfs2_old_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.old_parent_refn =
@@ -526,7 +528,8 @@ static int pvfs2_rename(
 
     /* do the same for the new parent */
     if (pvfs2_new_parent_inode &&
-            pvfs2_new_parent_inode->refn.khandle.u[0] != 0 &&
+            pvfs2_new_parent_inode->refn.khandle.slice[0] +
+              pvfs2_new_parent_inode->refn.khandle.slice[3] != 0 &&
             pvfs2_new_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.new_parent_refn =

@@ -1071,9 +1071,10 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     }
 
     if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
-        (new_op->downcall.resp.fs_mount.root_khandle.u[0] == 0))
+        (new_op->downcall.resp.fs_mount.root_khandle.slice[0] +
+         new_op->downcall.resp.fs_mount.root_khandle.slice[3] == 0))
     {
-        gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
+        gossip_err("ERROR: retrieved null fs_id or root_handle\n");
         ret = -EINVAL;
         goto error_exit;
     }
@@ -1511,7 +1512,8 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
         }
 
         if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
-            (new_op->downcall.resp.fs_mount.root_khandle.u[0] == 0))
+            (new_op->downcall.resp.fs_mount.root_khandle.slice[0] +
+             new_op->downcall.resp.fs_mount.root_khandle.slice[3] == 0))
         {
             gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
             ret = -EINVAL;

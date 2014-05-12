@@ -62,7 +62,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
         parent = PVFS2_I(parent_inode);
         if (parent &&
-            parent->refn.khandle.u[0] != 0 &&
+            parent->refn.khandle.slice[0] +
+              parent->refn.khandle.slice[3] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             new_op->upcall.req.lookup.parent_refn = parent->refn;

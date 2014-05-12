@@ -468,7 +468,8 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
            if the inode were already in the inode cache, it looks like:
            lookup --> revalidate --> here
         */
-        if (pvfs2_inode->refn.khandle.u[0] == 0)
+        if (pvfs2_inode->refn.khandle.slice[0] +
+               pvfs2_inode->refn.khandle.slice[3] == 0)
         {
 #if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
             gossip_lerr("Critical error: Invalid handle despite using iget4/iget5\n");
@@ -579,7 +580,8 @@ int pvfs2_inode_setattr(
         }
 
         new_op->upcall.req.setattr.refn = pvfs2_inode->refn;
-        if ((new_op->upcall.req.setattr.refn.khandle.u[0] == 0) &&
+        if ((new_op->upcall.req.setattr.refn.khandle.slice[0] == 0) &&
+            (new_op->upcall.req.setattr.refn.khandle.slice[3] == 0) &&
             (new_op->upcall.req.setattr.refn.fs_id == PVFS_FS_ID_NULL))
         {
             struct super_block *sb = inode->i_sb;
@@ -1245,7 +1247,7 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
     }
 
     if (parent &&
-        parent->refn.khandle.u[0] != 0 &&
+        parent->refn.khandle.slice[0] + parent->refn.khandle.slice[3] != 0 &&
         parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.create.parent_refn = parent->refn;
@@ -1358,7 +1360,7 @@ static inline struct inode *pvfs2_create_dir(struct inode *dir,
     }
 
     if (parent &&
-        parent->refn.khandle.u[0] != 0 &&
+        parent->refn.khandle.slice[0] + parent->refn.khandle.slice[3] != 0 &&
         parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.mkdir.parent_refn = parent->refn;
@@ -1472,7 +1474,7 @@ static inline struct inode *pvfs2_create_symlink(
     }
 
     if (parent &&
-        parent->refn.khandle.u[0] != 0 &&
+        parent->refn.khandle.slice[0] + parent->refn.khandle.slice[3] != 0 &&
         parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.sym.parent_refn = parent->refn;
@@ -1647,7 +1649,8 @@ int pvfs2_remove_entry(
         }
 
         if (parent &&
-            parent->refn.khandle.u[0] != 0 &&
+            parent->refn.khandle.slice[0] +
+              parent->refn.khandle.slice[3] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             new_op->upcall.req.remove.parent_refn = parent->refn;

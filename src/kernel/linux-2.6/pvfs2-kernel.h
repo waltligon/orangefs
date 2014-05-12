@@ -700,13 +700,37 @@ static inline ino_t get_parent_ino_from_dentry(struct dentry *dentry)
 
 static inline int is_root_handle(struct inode *inode)
 {
-    return PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
-                            get_khandle_from_ino(inode));
+  char *s1 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);   
+  char *s2 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);   
+
+  gossip_debug(GOSSIP_INODE_DEBUG,
+               "%s: root handle:%s:   this handle:%s:\n",
+               __func__,
+               k2s(&(PVFS2_SB(inode->i_sb)->root_khandle),s1),
+               k2s(get_khandle_from_ino(inode),s2));
+
+  if (PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
+                       get_khandle_from_ino(inode)))
+    return 0;
+  else
+    return 1;
 }
 
 static inline int match_handle(PVFS_khandle resp_handle, struct inode *inode)
 {
-    return PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode));
+  char *s1 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);   
+  char *s2 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);   
+
+  gossip_debug(GOSSIP_INODE_DEBUG,
+               "%s: one handle:%s:   another handle:%s:\n",
+               __func__,
+               k2s(&resp_handle,s1),
+               k2s(get_khandle_from_ino(inode),s2));
+
+  if (PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode)))
+    return 0;
+  else
+    return 1;
 }
 
 /****************************

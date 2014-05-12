@@ -505,8 +505,13 @@ typedef struct
 } PVFS_object_ref;
 
 /* kernel compatibility version of a PVFS_handle */
-typedef struct {unsigned char u[16];} PVFS_khandle \
-  __attribute__ (( __aligned__ (8)));
+typedef struct {
+   union {
+     unsigned char u[16];
+     unsigned int slice[4];
+   };
+} PVFS_khandle __attribute__ (( __aligned__ (8)));
+
 
 /*
  * kernel version of an object ref.
@@ -521,11 +526,13 @@ typedef struct
 /*
  * The kernel module will put the appropriate bytes of the khandle
  * into ihash.u and perceive them as an inode number through ihash.ino.
+ * The slices are handy in encode and decode dirents...
  */
 struct ihash {
   union {
     unsigned char u[8];
     uint64_t ino;
+    unsigned int slice[2];
   };
 };
 

@@ -66,12 +66,14 @@ char *k2s(PVFS_khandle *khandle, char *s) {
      * in the dashes.
      *
      * They have added a function to lib/vsprintf.c
-     * which can probably replace this home-grown
+     * which could probably replace this home-grown
      * code with a single sprintf line... something
      * like this:
      *
      *     snprintf(s, 39, "%pUL", khandle->u);
      *
+     * However, we need to use k2s from the client-core,
+     * so we'll stick with this home-grown code for now.
      */
     for (i = 0; i < 16; i++) {
       left = hex_lookup[khandle->u[i] >> 4];
