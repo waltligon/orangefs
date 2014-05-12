@@ -148,17 +148,14 @@ static struct options* parse_args(int argc, char* argv[])
 {
     char flags[] = "vm:s:";
     int one_opt = 0;
-    int len = 0;
-
     struct options* tmp_opts = NULL;
-    int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
+    tmp_opts = malloc(sizeof *tmp_opts);
+    if(tmp_opts == NULL){
 	return(NULL);
     }
-    memset(tmp_opts, 0, sizeof(struct options));
+    memset(tmp_opts, 0, sizeof *tmp_opts);
 
     /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF){
@@ -168,26 +165,24 @@ static struct options* parse_args(int argc, char* argv[])
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	    case('m'):
-		len = strlen(optarg)+1;
-		tmp_opts->mnt_point = (char*)malloc(len+1);
-		if(!tmp_opts->mnt_point)
-		{
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		memset(tmp_opts->mnt_point, 0, len+1);
-		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
-		if(ret < 1){
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
-		 * function expects some trailing segments or at least
-		 * a slash off of the mount point
-		 */
-		strcat(tmp_opts->mnt_point, "/");
-		tmp_opts->mnt_point_set = 1;
-		break;
+            {
+                size_t len;
+                len = strlen(optarg)+2;
+                tmp_opts->mnt_point = malloc(len);
+                if (tmp_opts->mnt_point == NULL)
+                {
+                    free(tmp_opts);
+                    return NULL;
+                }
+                (void)strncpy(tmp_opts->mnt_point, optarg, len);
+                /* TODO: dirty hack... fix later.  The remove_dir_prefix()
+                 * function expects some trailing segments or at least
+                 * a slash off of the mount point
+                 */
+                strncat(tmp_opts->mnt_point, "/", 1);
+                tmp_opts->mnt_point_set = 1;
+                break;
+            }
             case('s'):
                 tmp_opts->server = strdup(optarg);
                 break;

@@ -140,9 +140,7 @@ int main(int argc, char **argv)
     printf("to look for problematic servers.\n");
 
     /* now call mgmt functions to determine per-server statistics */
-    stat_array = (struct PVFS_mgmt_server_stat *)
-        malloc(resp_statfs.server_count *
-               sizeof(struct PVFS_mgmt_server_stat));
+    stat_array = calloc(resp_statfs.server_count, sizeof(*stat_array));
     if (stat_array == NULL)
     {
         perror("malloc");
@@ -265,17 +263,14 @@ static struct options* parse_args(int argc, char *argv[])
 {
     char flags[] = "hHvm:";
     int one_opt = 0;
-    int len = 0;
-
     struct options *tmp_opts = NULL;
-    int ret = -1;
 
-    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    tmp_opts = malloc(sizeof *tmp_opts);
     if (tmp_opts == NULL)
     {
         return NULL;
     }
-    memset(tmp_opts, 0, sizeof(struct options));
+    memset(tmp_opts, 0, sizeof *tmp_opts);
 
     while ((one_opt = getopt(argc, argv, flags)) != EOF)
     {
@@ -292,28 +287,24 @@ static struct options* parse_args(int argc, char *argv[])
                 tmp_opts->use_si_units = 1;
                 break;
             case('m'):
-                len = strlen(optarg)+1;
-                tmp_opts->mnt_point = (char *)malloc(len + 1);
+            {
+                size_t len;
+                len = strlen(optarg)+2;
+                tmp_opts->mnt_point = malloc(len);
                 if (tmp_opts->mnt_point == NULL)
                 {
                     free(tmp_opts);
                     return NULL;
                 }
-                memset(tmp_opts->mnt_point, 0, len+1);
-                ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
-                if (ret < 1)
-                {
-                    free(tmp_opts->mnt_point);
-                    free(tmp_opts);
-                    return NULL;
-                }
+                (void)strncpy(tmp_opts->mnt_point, optarg, len);
                 /* TODO: dirty hack... fix later.  The remove_dir_prefix()
                  * function expects some trailing segments or at least
                  * a slash off of the mount point
                  */
-                strcat(tmp_opts->mnt_point, "/");
+                strncat(tmp_opts->mnt_point, "/", 1);
                 tmp_opts->mnt_point_set = 1;
                 break;
+            }
             case('?'):
                 usage(argc, argv);
                 exit(EXIT_FAILURE);

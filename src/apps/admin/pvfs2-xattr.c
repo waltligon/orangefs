@@ -443,21 +443,20 @@ static int pvfs2_eattr(int get
           ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, key_p, val_p, NULL);
       } else if (get == 1 && key_count == 2)
       {
-          PVFS_sysresp_geteattr *resp = malloc(sizeof(*resp));
-          if (!resp)
+          PVFS_sysresp_geteattr *resp = malloc(sizeof *resp);
+          if (resp == NULL)
           {
              fprintf(stderr,"Unable to allocate resp structure.\n");
              exit(EXIT_FAILURE);
           }
-          memset(resp,0,sizeof(*resp));
+          memset(resp,0,sizeof *resp);
           resp->val_array = val_p;
-          resp->err_array = malloc(2 * sizeof(PVFS_error));
-          if (!resp->err_array)
+          resp->err_array = calloc(2, sizeof *resp->err_array);
+          if (resp->err_array == NULL)
           {
              fprintf(stderr,"Unable to allocate err_array.\n");
              exit(EXIT_FAILURE);
           }
-          memset(resp->err_array,0,sizeof(2 * sizeof(PVFS_error)));
           
           ret = PVFS_sys_geteattr_list(obj->u.pvfs2.ref
                                       ,creds
@@ -489,29 +488,29 @@ static struct options* parse_args(int argc, char* argv[])
     struct options* tmp_opts = NULL;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
+    tmp_opts = malloc(sizeof *tmp_opts);
+    if(tmp_opts == NULL){
 	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /*create one key structure*/
-    tmp_opts->key = malloc(sizeof(PVFS_ds_keyval));
+    tmp_opts->key = malloc(sizeof *tmp_opts->key);
     if (!tmp_opts->key)
     {
         fprintf(stderr,"Unable to allocate tmp_opts->key.\n");
         exit(EXIT_FAILURE);
     }
-    memset(tmp_opts->key,0,sizeof(PVFS_ds_keyval));
+    memset(tmp_opts->key,0,sizeof *tmp_opts->key);
 
     /*create one val structure*/
-    tmp_opts->val = malloc(sizeof(PVFS_ds_keyval));
+    tmp_opts->val = malloc(sizeof *tmp_opts->val);
     if (!tmp_opts->val)
     {
         fprintf(stderr,"Unable to allocate tmp_opts->val.\n");
         exit(EXIT_FAILURE);
     }
-    memset(tmp_opts->val,0,sizeof(PVFS_ds_keyval));
+    memset(tmp_opts->val,0,sizeof *tmp_opts->val);
 
     /*set default key_count*/
     tmp_opts->key_count = 1;
@@ -543,7 +542,7 @@ static struct options* parse_args(int argc, char* argv[])
                            ,tmp_opts->key[0].buffer_sz) == 0)
                 { /*convert string argument into numeric argument*/
                   tmp_opts->val[0].buffer = malloc(sizeof(int));
-                  if (!tmp_opts->val[0].buffer)
+                  if (tmp_opts->val[0].buffer == NULL)
                   {
                      printf("Unable to allocate memory for key value.\n");
                      exit(EXIT_FAILURE);
@@ -554,6 +553,11 @@ static struct options* parse_args(int argc, char* argv[])
                   break;
                 } else {
                   tmp_opts->val[0].buffer = strdup(optarg);
+                  if (tmp_opts->val[0].buffer == NULL)
+                  {
+                     printf("Unable to allocate memory for key value.\n");
+                     exit(EXIT_FAILURE);
+                  }
                   tmp_opts->val[0].buffer_sz = strlen(tmp_opts->val[0].buffer);
                   break;
                 }
@@ -597,15 +601,14 @@ static struct options* parse_args(int argc, char* argv[])
                     ,"user.pvfs2.mirror.status"
                     ,tmp_opts->key[0].buffer_sz) == 0 )
         {
+           PVFS_ds_keyval *myKeys;
            tmp_opts->key_count = 2;
-           PVFS_ds_keyval *myKeys = malloc(tmp_opts->key_count * 
-                                           sizeof(PVFS_ds_keyval));
-           if (!myKeys)
+           myKeys = calloc(tmp_opts->key_count, sizeof *myKeys);
+           if (myKeys == NULL)
            {
                fprintf(stderr,"Unable to allocate myKeys.\n");
                exit(EXIT_FAILURE);
            }
-           memset(myKeys,0,tmp_opts->key_count*sizeof(PVFS_ds_keyval));
            myKeys[0] = *tmp_opts->key;
            myKeys[1].buffer = strdup("user.pvfs2.mirror.copies");
            myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.copies");
@@ -625,14 +628,13 @@ static struct options* parse_args(int argc, char* argv[])
         
         if (tmp_opts->key_count == 2)
         {
-           PVFS_ds_keyval *myVals = malloc(tmp_opts->key_count * 
-                                           sizeof(PVFS_ds_keyval));
-           if (!myVals)
+           PVFS_ds_keyval *myVals = calloc(tmp_opts->key_count,
+                                           sizeof *myVals);
+           if (myVals == NULL)
            {
                fprintf(stderr,"Unable to allocate myVals.\n");
                exit(EXIT_FAILURE);
            }
-           memset(myVals,0,tmp_opts->key_count*sizeof(PVFS_ds_keyval));
            myVals[0] = *tmp_opts->val;
            free(tmp_opts->val);
 
