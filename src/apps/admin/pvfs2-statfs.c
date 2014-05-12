@@ -311,7 +311,7 @@ static struct options* parse_args(int argc, char *argv[])
         }
     }
 
-    if (tmp_opts->mnt_point_set == NULL)
+    if (!tmp_opts->mnt_point_set)
     {
         free(tmp_opts);
         return NULL;
