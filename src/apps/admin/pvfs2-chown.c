@@ -253,12 +253,20 @@ static struct options* parse_args(int argc, char* argv[])
 
     optind = optind + 1;
     tmp_opts->target_count = argc-optind;
-    tmp_opts->destfiles=(char **)malloc(sizeof(char *)*(tmp_opts->target_count));
+    tmp_opts->destfiles=calloc(tmp_opts->target_count, tmp_opts->target_count);
+    if (tmp_opts->destfiles == NULL) {
+        fprintf(stderr, "out of memory\n");
+        exit(EXIT_FAILURE);
+    }
     for (i = 0; i < tmp_opts->target_count; i++) {
-      char *cur_arg_str = argv[optind+i];
-      int length = strlen(cur_arg_str);
-      tmp_opts->destfiles[i] = (char *)malloc(sizeof(char)*(length+1));
-      strncpy(tmp_opts->destfiles[i],cur_arg_str,length+1);
+        char *cur_arg_str = argv[optind+i];
+        int length = strlen(cur_arg_str);
+        tmp_opts->destfiles[i] = malloc(length+1);
+        if (tmp_opts->destfiles == NULL) {
+            fprintf(stderr, "out of memory\n");
+            exit(EXIT_FAILURE);
+        }
+        strncpy(tmp_opts->destfiles[i],cur_arg_str,length+1);
     }
    
     return(tmp_opts);

@@ -174,7 +174,7 @@ static struct options* parse_args(int argc, char* argv[])
                     free(tmp_opts);
                     return NULL;
                 }
-                (void)strncpy(tmp_opts->mnt_point, optarg, len);
+                strncpy(tmp_opts->mnt_point, optarg, len);
                 /* TODO: dirty hack... fix later.  The remove_dir_prefix()
                  * function expects some trailing segments or at least
                  * a slash off of the mount point
