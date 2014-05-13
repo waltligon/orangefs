@@ -1215,7 +1215,7 @@ static int init_usrint_internal(void)
 #endif
 
     /* create handlers to run cleanup before aborting */
-    init_signal_handlers();
+    //init_signal_handlers();
 
     init_debug("finished with initialization\n");
 

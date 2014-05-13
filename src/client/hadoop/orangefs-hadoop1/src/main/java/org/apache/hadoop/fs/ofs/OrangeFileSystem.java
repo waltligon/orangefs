@@ -9,7 +9,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -439,10 +438,6 @@ public class OrangeFileSystem extends FileSystem {
          * already exists as a file.
          */
         parents = getParentPaths(f);
-        
-        OFSLOG.debug(Arrays.toString(parents));
-        throw new IOException("MYBAD");
-        /*
         if (parents != null) {
             /* Attempt creation of parent directories */
             for (int i = 0; i < parents.length; i++) {
