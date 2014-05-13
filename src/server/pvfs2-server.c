@@ -59,6 +59,7 @@
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
+#include "server-config-mgr.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -256,6 +257,13 @@ int main(int argc, char **argv)
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
+
+    if ((ret = PINT_server_config_mgr_initialize()) < 0) {
+        PVFS_perror_gossip("Error: failed to initialize config_mgr.\n", ret);
+        ret = -PVFS_EINVAL;
+        goto server_shutdown;
+    }
+    PINT_server_config_mgr_put_config(&server_config);
 
     /* reset gossip debug mask based on configuration settings */
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
