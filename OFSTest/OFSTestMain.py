@@ -35,6 +35,7 @@ import time
 import sys
 import traceback
 from pprint import pprint
+import logging
 
 class OFSTestMain(object):
     
@@ -59,7 +60,12 @@ class OFSTestMain(object):
         
         # @var self.network 
         # OFSTestNework Virtual cluster.
+
         self.ofs_network = OFSTestNetwork.OFSTestNetwork()
+        
+        #Add logging
+        logging.basicConfig(filename="ofsnode-commands.log",level=logging.DEBUG)
+
         
         
 
@@ -600,7 +606,7 @@ class OFSTestMain(object):
 
             # TODO: Check to see if usrint and fuse are compatible.
             if False == True:
-                self.writeOutputHeader("Usrint Tests not compatible with fuse=====================================\n")
+                self.writeOutputHeader(filename,"Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
                 head_node.unmountOFSFilesystem()

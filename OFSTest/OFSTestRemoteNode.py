@@ -13,8 +13,9 @@ import shlex
 import cmd
 import time
 import sys
-import xml.etree.ElementTree as ET
 import OFSTestNode
+import logging
+
 
 class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
  
@@ -56,9 +57,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         self.getKeyFileFromLocal(local_node)
         
         
-        print "SSH: "+self.ssh_command
-         
-        #print "Host,kernel:  %s,%s" % (self.hostname,self.kernel_version)
+        msg = "SSH: "+self.ssh_command
+        logging.info(msg)
         
     ##
     #
@@ -87,13 +87,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def getAliasesFromConfigFile(self,config_file_name):
         
         # read the file from the server
-        #print "examining "+config_file_name
-        #alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
-        #print alias
-        #alias = self.runSingleCommandBacktick('cat '+config_file_name)
-        #print alias
+
         alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        #print "Alias is "+ alias
+        logging.debug("Alias is "+ alias)
         
         alias_lines = alias.split('\n')
         
@@ -108,8 +104,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
                 aliases.append(element[1].rstrip())
                 
             
-        #print "OrangeFS Aliases: "
-        #print aliases    
+        logging.info( "OrangeFS Aliases: "+aliases)    
         return aliases
          
         
@@ -152,17 +147,17 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         script_file.write("exit\n")
         script_file.close()
         
-        if (debug):
-            script_file = open(batchfilename,'r')
-            for line in script_file:
-                print line
-            script_file.close()
-            
+        logging.debug("----- Start generated batchfile: %s -----------------------" % batchfilename)
+        script_file = open(batchfilename,'r')
+        for line in script_file:
+            logging.debug(line)
+        script_file.close()
+        logging.debug("---- End generated batchfile: %s -------------------------" % batchfilename)            
 
 
         command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < %s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address,batchfilename)
-        if (debug):
-            print command_line
+        
+        logging.debug("Command:" + command_line)
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
@@ -171,6 +166,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         for i in p.communicate():
             output.append(i)
         
+        logging.debug("RC: %r" % p.returncode)
+        logging.debug("STDOUT: %s" % output[1] )
+        logging.debug("STDERR: %s" % output[2] )
         # now clear out the batch commands list
         self.batch_commands = []    
 
@@ -272,8 +270,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         output = []
         rc = self.runSingleCommand(rsync_command,output)
         if rc != 0:
-            print "Could not copy to remote node"
-            print output
+            logging.exception( "Could not copy to remote node")
+            logging.exception( output)
         return rc
     
     ##
@@ -306,8 +304,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         output = []
         rc = self.runSingleCommand(rsync_command,output)
         if rc != 0:
-            print "Could not copy to remote node"
-            print output
+            logging.exception( "Could not copy to remote node")
+            logging.exception( output)
         return rc
       
     ##
@@ -331,7 +329,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         keybasename = os.path.basename(self.sshLocalKeyFile)
         
         if rc != 0:
-            print "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address)
+            logging.exception( "Upload of key %s from local to %s failed!" % (local_node.getRemoteKeyFile(self.ext_ip_address), self.ext_ip_address))
             return rc
  
         #set the ssh key file to the uploaded location.
@@ -340,7 +338,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         #symlink to id_rsa
         
         #self.runSingleCommand("bash -c 'cat %s >> /home/%s/.ssh/authorized_keys'" % (self.sshNodeKeyFile,self.current_user))
-        print "ln -s %s /home/%s/.ssh/id_rsa" % (self.sshNodeKeyFile,self.current_user)
+        
         self.runSingleCommand("ln -s %s /home/%s/.ssh/id_rsa" % (self.sshNodeKeyFile,self.current_user))
     
 

@@ -25,6 +25,7 @@ import Queue
 import threading
 import time
 from pprint import pprint
+import logging
 
 class OFSTestNetwork(object):
 
@@ -75,8 +76,8 @@ class OFSTestNetwork(object):
             else:
                 return next((i for i in self.network_nodes if i.ip_address == ip_address), None) 
         elif hostname != "":
-            print "Available host names"
-            print [i.hostname for i in self.network_nodes]
+            logging.info("Available host names")
+            logging.info([i.hostname for i in self.network_nodes])
             if hostname == self.local_master.hostname:
                 return self.local_master
             else:
@@ -286,7 +287,7 @@ class OFSTestNetwork(object):
             
             for dest_node in node_list:
                 # passwordless access to all other nodes
-                print "Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.hostname,dest_node.hostname,dest_node.ip_address,dest_node.ext_ip_address)
+                logging.info("Enabling passwordless SSH from %s to %s/%s/%s" % (src_node.hostname,dest_node.hostname,dest_node.ip_address,dest_node.ext_ip_address))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.hostname,home_dir))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.ext_ip_address,home_dir))
                 src_node.runSingleCommand("/usr/bin/ssh-keyscan %s >> %s/.ssh/known_hosts" % (dest_node.ip_address,home_dir))
@@ -304,7 +305,7 @@ class OFSTestNetwork(object):
     def terminateCloudNode(self,remote_node):
                 
         if remote_node.is_cloud == False: 
-            print "Node at %s is not controlled by the cloud manager." % remote_node.ip_address
+            logging.exception("Node at %s is not controlled by the cloud manager." % remote_node.ip_address)
             return
         
         rc = self.cloud_connection_manager.terminateCloudInstance(remote_node.ip_address)
@@ -313,7 +314,7 @@ class OFSTestNetwork(object):
         if rc == 0:
             self.network_nodes = [ x for x in self.network_nodes if x.ip_address != remote_node.ip_address]
         else:
-            print "Could not delete node at %s, error code %d" % (remote_node.ip_address,rc)
+            logging.exception( "Could not delete node at %s, error code %d" % (remote_node.ip_address,rc))
             
         return rc
 
@@ -364,7 +365,7 @@ class OFSTestNetwork(object):
                 rc = node.runSingleCommand("ping -c 1 %s" % n2.hostname)
                 # if not, add to the /etc/hosts file
                 if rc != 0:
-                    print "Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,node.hostname)
+                    logging.info("Could not ping %s at %s from %s. Manually adding to /etc/hosts" % (n2.hostname,n2.ip_address,node.hostname))
                     node.runSingleCommandAsRoot('bash -c \'echo -e "%s     %s     %s" >> /etc/hosts\'' % (n2.ip_address,n2.hostname,n2.hostname))
                     # also create mpihosts files
                     node.runSingleCommand('echo "%s   slots=2" >> %s' % (n2.hostname,node.created_openmpihosts))
@@ -394,7 +395,7 @@ class OFSTestNetwork(object):
         for node in node_list:
             tmp_hostname = node.runSingleCommandBacktick("hostname")
             if tmp_hostname != node.hostname:
-                print "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname)
+                logging.info( "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname))
                 node.runSingleCommandAsRoot("hostname %s" % node.hostname)
                 
     
@@ -481,7 +482,9 @@ class OFSTestNetwork(object):
         output = []
         dir_list = ""
         
-        print "Resource type is "+resource_type+" location is "+resource_location
+        msg = "Resource type is "+resource_type+" location is "+resource_location
+        print msg
+        logging.info(msg)
         
         if node_list == None:
             node_list = self.network_nodes
@@ -506,7 +509,7 @@ class OFSTestNetwork(object):
             #print "Copying source from %s to %s" % (resource_location,build_node.hostname)
             rc = self.local_master.copyToRemoteNode(resource_location,build_node,download_location,True)
             if rc != 0:
-                print "Could not copy source from %s to %s" % (resource_location,build_node.hostname)
+                logging.exception("Could not copy source from %s to %s" % (resource_location,build_node.hostname))
                 return rc
             #rc = build_node.runSingleCommand("ls -l "+download_location+dir_list,output)
             #print output
@@ -525,7 +528,8 @@ class OFSTestNetwork(object):
             
             rc = self.local_master.copyToRemoteNode(patch,build_node,patch,False)
             if rc != 0:
-                print "Could not upload patch at %s to buildnode %s" % (patch,build_node.hostname)
+                logging.exception("Could not upload patch at %s to buildnode %s" % (patch,build_node.hostname))
+                return rc
 
 
         rc = build_node.configureOFSSource(build_kmod=build_kmod,enable_strict=enable_strict,enable_shared=enable_shared,ofs_prefix=ofs_prefix,db4_prefix=db4_prefix,ofs_patch_files=ofs_patch_files,configure_opts=configure_opts,security_mode=security_mode,enable_hadoop=enable_hadoop)
@@ -659,7 +663,9 @@ class OFSTestNetwork(object):
             return 
         
         #copy from list[0] to list[list_length/2]
-        print "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
+        msg = "Copying from %s to %s" % (destination_list[0].ip_address,destination_list[list_length/2].ip_address)
+        print msg
+        logging.info(msg)
         #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
         rc = node_function(destination_list[0],destination_list[list_length/2])
         
@@ -794,6 +800,7 @@ class OFSTestNetwork(object):
         print "Checking mount"
         mount_res=client_node.runSingleCommandBacktick("mount | grep -i pvfs")
         print mount_res
+        logging.info("Checking Mount: "+mount_res)
         #client_node.runSingleCommand("touch %s/myfile" % client_node.ofs_mount_point)
         #client_node.runSingleCommand("ls %s/myfile" % client_node.ofs_mount_point)
 
@@ -1089,13 +1096,12 @@ class OFSTestNetwork(object):
             keyname = "orangefs-serverkey-%s.pem" % node.hostname
             rc = security_node.runSingleCommand("openssl genrsa -out %s 2048" % keyname,output)
             if rc != 0:
-                print "Could not create server security key for "+node.hostname
-                print output 
+                logging.exception("Could not create server security key for "+node.hostname)
+                logging.exception(output) 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/orangefs-serverkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy server security key %s for %s " % (keyname,node.hostname)
-                print output 
+                logging.exception("Could not copy server security key %s for %s " % (keyname,node.hostname))
                 return rc
             
             
@@ -1136,13 +1142,13 @@ class OFSTestNetwork(object):
             keyname = "pvfs2-clientkey-%s.pem" % node.hostname
             rc = security_node.runSingleCommand("openssl genrsa -out %s 1024" % keyname,output)
             if rc != 0:
-                print "Could not create client security key for "+node.hostname
-                print output 
+                logging.exception("Could not create client security key for "+node.hostname)
+                logging.exception(output) 
                 return rc
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/%s" % (security_node.current_user,keyname), destination_node=node, destination="%s/etc/pvfs2-clientkey.pem" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy client security key %s for %s " % (keyname,node.hostname)
-                print output 
+                logging.exception("Could not copy client security key %s for %s " % (keyname,node.hostname))
+                logging.exception(output) 
                 return rc
 
 
@@ -1194,7 +1200,7 @@ class OFSTestNetwork(object):
             if node.alias_list == None:
                 node.alias_list = node.getAliasesFromConfigFile(node.ofs_installation_location + "/etc/orangefs.conf")
             if len(node.alias_list) == 0:
-                print "Could not get aliases"
+                logging.exception( "Could not get aliases")
                 return -1
             for alias in node.alias_list:
                 if node.hostname in alias:
@@ -1208,14 +1214,14 @@ class OFSTestNetwork(object):
 
             rc = security_node.copyToRemoteNode(source="/tmp/%s/security/orangefs-keystore" % security_node.current_user, destination_node=node, destination="%s/etc/" % node.ofs_installation_location, recursive=False)
             if rc != 0:
-                print "Could not copy keystore for %s " % (node.hostname)
-                print output 
+                logging.exception( "Could not copy keystore for %s " % (node.hostname))
+                logging.exception( output) 
                 return rc
             #now protect the files
             rc = node.runSingleCommand("chmod 400 %s/etc/*.pem" % node.ofs_installation_location)
             if rc != 0:
-                print "Could not protect keys on %s " % (node.hostname)
-                print output 
+                logging.exception("Could not protect keys on %s " % (node.hostname))
+                logging.exception( output) 
                 return rc
 
         
@@ -1391,7 +1397,7 @@ class OFSTestNetwork(object):
         for nfs_client in nfs_client_list:
             rc = nfs_client.mountNFSDirectory(nfs_share,mount_point,options)
             if rc != 0:
-                print "Mounting %s at %s with options %s on %s failed with RC=%d" %(nfs_share,mount_point,options,nfs_client.ip_address,rc)
+                logging.exception( "Mounting %s at %s with options %s on %s failed with RC=%d" %(nfs_share,mount_point,options,nfs_client.ip_address,rc))
                 fail = fail+1
             
         
@@ -1467,9 +1473,8 @@ class OFSTestNetwork(object):
             
         else:
             #print 'grep -v localhost /etc/hosts | awk \'{print \\\$2 "\tslots=%r"}\' > %s/openmpihosts' % (slots,self.mpi_nfs_directory)
-            output = []
-            build_node.runSingleCommand("grep -v localhost /etc/hosts | awk '{print \$2 \"\\tslots=%r\"}' > %s/openmpihosts" % (slots,self.mpi_nfs_directory),output)
-            print output
+            build_node.runSingleCommand("grep -v localhost /etc/hosts | awk '{print \$2 \"\\tslots=%r\"}' > %s/openmpihosts" % (slots,self.mpi_nfs_directory))
+
         # update runtest to use openmpihosts file - should be done in patched openmpi
         #print 'sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version)
         #build_node.runSingleCommand('sed -i s,"mpirun -np","mpirun --hostfile %s/openmpihosts -np",g %s/%s/ompi/mca/io/romio/test/runtests' % (self.mpi_nfs_directory,self.mpi_nfs_directory,build_node.openmpi_version))
@@ -1481,7 +1486,6 @@ class OFSTestNetwork(object):
             #done = node.runSingleCommand("grep -v %s /home/%s/.bashrc" % (node.openmpi_installation_location,node.current_user))
             #done = 0
             #if done == 0:
-            print "echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user)
             node.runSingleCommand("echo 'export PATH=%s/openmpi/bin:%s/bin:\$PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.current_user))
             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/openmpi/lib:%s/lib:%s/lib:\$LD_LIBRARY_PATH' >> /home/%s/.bashrc" % (self.mpi_nfs_directory,node.ofs_installation_location,node.db4_dir,node.current_user))
             node.runSingleCommand("echo 'export PVFS2TAB_FILE=%s/etc/orangefstab' >> /home/%s/.bashrc" % (node.ofs_installation_location,node.current_user))
@@ -1532,218 +1536,15 @@ class OFSTestNetwork(object):
             # notify master of new slave
             master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.hostname,master_node.hadoop_location))
             
-        output = []
-        master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location,output)
-        print output
+        master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location)
         time.sleep(20)
         # hadoop dfs -ls is our "ping" for hadoop. 
-        rc = master_node.runSingleCommand("%s/bin/hadoop dfs -ls /" % master_node.hadoop_location,output)
+        rc = master_node.runSingleCommand("%s/bin/hadoop dfs -ls /" % master_node.hadoop_location)
         if rc != 0:
-            print "========Hadoop dfs -ls output==========="
-            print output
+            print "Hadoop setup failed. See logs for more information."
         else:
             print "Hadoop setup successfully"
             master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
             
         return rc
         
-    
-# def test_driver():
-#     my_node_manager = OFSTestNetwork()
-#     my_node_manager.addCloudConnection("cloud-cred/cloudrc.sh","Buildbot","/home/jburton/buildbot.pem")
-# 
-#     nodes  = my_node_manager.createNewCloudNodes(4,"cloud-ubuntu-12.04","c1.small")
-#     #nodes  = my_node_manager.createNewCloudNodes(6,"cloud-sl6","c1.small")
-# 
-#     '''
-#     cloud_ip_addresses = ['10.20.102.98','10.20.102.97','10.20.102.99','10.20.102.100']
-# 
-#     nodes = []
-# 
-#     for my_address in cloud_ip_addresses:
-#         nodes.append(my_node_manager.addRemoteNode(ip_address=my_address,username="ubuntu",key="/home/jburton/buildbot.pem",is_cloud=True))
-#     for node in nodes:
-#         node.setEnvironmentVariable("VMSYSTEM","cloud-ubuntu-12.04")
-#     '''
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Updating New Nodes"
-#     
-#     my_node_manager.updateCloudNodes()
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Installing Required Software"
-#     my_node_manager.installRequiredSoftware()
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Installing Torque"
-#     my_node_manager.installTorque()
-# 
-#     print ""
-#     print "==================================================================="
-#     
-#     print "Check Torque"
-#     my_node_manager.checkTorque()
-#      
-#     print ""
-#     print "==================================================================="
-#     print "Downloading and Installing OrangeFS"
-# 
-#     my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/branches/stable")
-#     #my_node_manager.buildAndInstallOFSFromSource(resource_type="SVN",resource_location="http://orangefs.org/svn/orangefs/trunk")
-#     #my_node_manager.buildAndInstallOFSFromSource(resource_type="TAR",resource_location="http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz")
-#     #for node in my_node_manager.network_nodes:
-#     #    node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
-#     #    node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
-#     print ""
-#     print "==================================================================="
-#     print "Installing Benchmarks"
-# 
-# 
-#     my_node_manager.installBenchmarks()
-# 
-# 
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Copy installation to all nodes"
-# 
-#     my_node_manager.configureOFSServer()
-#     my_node_manager.copyOFSToNodeList()
-# 
-# 
-#         
-#     print ""
-#     print "==================================================================="
-#     print "Start OFS Server"
-#     my_node_manager.startOFSServers()
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Start Client"
-#     my_node_manager.startOFSClient()
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Mount Filesystem"
-#     my_node_manager.mountOFSFilesystem()
-# 
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Run Tests"
-#     communicate = []
-#     rc = nodes[0].runSingleCommand(command="ps aux | grep pvfs",output=communicate)
-#     print "RC = %d" % rc
-#     print "STDOUT = "+communicate[1]
-#     print "STDERR = "+communicate[2]
-#     nodes[0].runSingleCommand("mount")
-#     nodes[0].runSingleCommand("dmesg")
-# 
-# 
-#     import OFSSysintTest
-#     import OFSVFSTest
-#     import OFSUsrintTest
-# 
-#     rc = 0
-# 
-# 
-#     def write_output(filename,function,rc):
-#         output = open(filename,'a+')
-#         if rc != 0:
-#             output.write("%s........................................FAIL: RC = %d\n" % (function.__name__,rc))
-#         else:
-#             output.write("%s........................................PASS.\n" % function.__name__)
-#         output.close()
-# 
-#     #filename = "OFSTestNetwork.log"    
-#     output = open(filename,'w+')
-#     output.write("Sysint Tests ==================================================\n")
-#     output.close()
-# 
-#     for callable in OFSSysintTest.__dict__.values():
-#         try:
-#             #print "Running %s" % callable.__name__
-#             rc = nodes[0].runOFSTest(callable)
-#             write_output(filename,callable,rc)
-#         except AttributeError:
-#             pass
-#         except TypeError:
-#             pass
-# 
-#     output = open(filename,'a+')
-#     nodes[0].runSingleCommandBacktick("dmesg")
-#     output.write("VFS Tests ==================================================\n")
-#     output.close()
-# 
-#     for callable in OFSVFSTest.__dict__.values():
-#         try:
-#             rc = nodes[0].runOFSTest(callable)
-#             write_output(filename,callable,rc)
-#         except AttributeError:
-#             pass
-#         except TypeError:
-#             pass
-#    
-#     #my_node_manager.stopOFSServers()
-#     #my_node_manager.stopOFSClient()
-# 
-#     #for node in my_node_manager.network_nodes:
-# 
-#      #   node.setEnvironmentVariable("LD_PRELOAD","%s/lib/libofs.so:%s/lib/libpvfs2.so" % (node.ofs_installation_location,node.ofs_installation_location))
-#         #node.setEnvironmentVariable("LD_LIBRARY_PATH","%s/lib:/opt/db4/lib:$LD_LIBRARY_PATH" % (node.ofs_installation_location))
-#     
-#     #my_node_manager.startOFSServers()
-#     ''' 
-#     output = open(filename,'a+')
-#     nodes[0].runSingleCommandBacktick("dmesg")
-#     output.write("Userint Tests ==================================================\n")
-#     output.close()
-# 
-#     for callable in OFSUsrintTest.__dict__.values():
-#         try:
-#             rc = nodes[0].runOFSTest(callable)
-#             write_output("OFSTestNetwork.log",callable,rc)
-#         except AttributeError:
-#             pass
-#         except TypeError:
-#             pass
-# 
-#     '''
-# 
-# 
-# 
-#       
-#     print ""
-#     print "==================================================================="
-#     print "Stop Client"
-#     my_node_manager.stopOFSServers()
-# 
-# 
-# 
-#     print ""
-#     print "==================================================================="
-#     print "Terminating Nodes"
-# 
-#   #  my_node_manager.terminateAllCloudNodes()
-#    
-#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get update && sudo apt-get -y dist-upgrade < /dev/zero && sudo reboot"])
-#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo reboot"])
-# 
-# 
-# 
-#     #print "Getting source"
-#     #my_node_manager.runSimultaneousCommands(node_list=nodes,args=["sudo apt-get -y install subversion"])
-#     #my_node_manager.runSimultaneousCommands(node_list=nodes,node_function=OFSTestNode.copyOFSSource,kwargs={"resource_type": "SVN","resource": "http://orangefs.org/svn/orangefs/trunk","dest_dir": "/tmp/ubuntu"})
-# 
-#     #for n in nodes:
-#     #    my_node_manager.terminateCloudNode(n)
-# 
-#     #print my_node.runSingleCommand("whoami")
-# 
-# #Call script with -t to test
-# if len(sys.argv) > 1 and sys.argv[1] == "-t":
-#     test_driver()

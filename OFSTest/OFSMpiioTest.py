@@ -29,37 +29,37 @@ run_client = False
 mount_as_fuse = False
 debug = True
 
-def functions(self,testing_network):
+def functions(testing_network):
     pass
-def heidleberg_IO(self,testing_network):
+def heidleberg_IO(testing_network):
     pass
-def ior_mpiio(self,testing_network):
+def ior_mpiio(testing_network):
     pass
-def ior_mpiio_3(self,testing_network):
+def ior_mpiio_3(testing_network):
     pass
-def noncontig(self,testing_network):
+def noncontig(testing_network):
     pass
-def romio_async(self,testing_network):
+def romio_async(testing_network):
     pass
-def romio_coll_test(self,testing_network):
+def romio_coll_test(testing_network):
     pass
-def romio_error(self,testing_network):
+def romio_error(testing_network):
     pass
-def romio_excl(self,testing_network):
+def romio_excl(testing_network):
     pass
-def romio_file_info(self,testing_network):
+def romio_file_info(testing_network):
     pass
-def romio_noncontig_coll2(self,testing_network):
+def romio_noncontig_coll2(testing_network):
     pass
-def romio_psimple(self,testing_network):
+def romio_psimple(testing_network):
     pass
-def romio_simple(self,testing_network):
+def romio_simple(testing_network):
     pass
-def romio_split_coll(self,testing_network):
+def romio_split_coll(testing_network):
     pass
-def romio_status(self,testing_network):
+def romio_status(testing_network):
     pass
-def stadler_file_view_test(self,testing_network):
+def stadler_file_view_test(testing_network):
     pass
     
 ##

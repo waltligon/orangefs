@@ -12,7 +12,8 @@
 # that user. 
 #
 
-from pprint import pprint
+import pprint
+import logging
 
 
 class OFSTestConfig(object):
@@ -370,7 +371,7 @@ class OFSTestConfig(object):
 
     
     def printDict(self):
-        pprint(self.__dict__)
+        logging.debug(pprint.pformat(self.__dict__))
 
 
     ##
