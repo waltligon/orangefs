@@ -157,13 +157,7 @@ struct timespec PINT_util_get_abs_timespec(int microsecs);
 
 char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count);
 
-void PINT_util_digest_init(void);
-void PINT_util_digest_finalize(void);
-
 int PINT_util_digest_sha1(const void *input_message, size_t input_length,
-		char **output, size_t *output_length);
-
-int PINT_util_digest_md5(const void *input_message, size_t input_length,
 		char **output, size_t *output_length);
 
 char *PINT_util_guess_alias(void);

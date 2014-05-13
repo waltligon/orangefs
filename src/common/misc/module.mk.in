@@ -1,8 +1,10 @@
 DIR := src/common/misc
+COMMONSRC += \
+	$(DIR)/digest.c
+
 LIBSRC += $(DIR)/server-config.c \
           $(DIR)/server-config-mgr.c \
           $(DIR)/str-utils.c \
-          $(DIR)/digest.c \
           $(DIR)/xattr-utils.c \
           $(DIR)/mmap-ra-cache.c \
           $(DIR)/extent-utils.c \
