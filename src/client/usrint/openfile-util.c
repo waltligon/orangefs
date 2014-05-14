@@ -900,7 +900,7 @@ static int init_usrint_internal(void)
     int i;
 
     /* The recursive mutex */
-    static gen_mutex_t rec_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP; 
+    static gen_mutex_t rec_mutex;
 
     /* only one initialize happens */
     if(pvfs_lib_init_flag)
@@ -918,7 +918,7 @@ static int init_usrint_internal(void)
         gen_mutex_unlock(&rec_mutex);
         /* make sure errors in here don't carry out */
         errno = errno_in;
-        return 1;
+        abort();
     }
 
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
@@ -927,6 +927,12 @@ static int init_usrint_internal(void)
     /**************************************/
     /*       BEGIN INITIALIZATION         */
     /**************************************/
+
+    if (gen_posix_recursive_mutex_init(&rec_mutex) < 0)
+    {
+        gossip_err("init_usrint_internal: could not init recursive mutex\n");
+        return -1;
+    }
 
     /* this allows system calls to be run */
     /* init_glibc_malloc(); */

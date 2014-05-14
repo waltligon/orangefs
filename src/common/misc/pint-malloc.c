@@ -584,8 +584,7 @@ void init_glibc_malloc(void)
 {
     static int init_flag = 0;
     static int recurse_flag = 0;
-    static gen_mutex_t init_mutex = 
-                       (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+    static gen_mutex_t init_mutex;
     void *libc_handle;
 
     /* prevent multiple threads from running this */
@@ -603,6 +602,12 @@ void init_glibc_malloc(void)
     /* running init_glibc_malloc */
     recurse_flag = 1;
     memdebug(stderr, "init_glibc_malloc running\n");
+
+    if (gen_posix_recursive_mutex_init(&init_mutex) < 0)
+    {
+        gossip_err("init_glibc_malloc: could not init recursive mutex\n");
+        abort();
+    }
 
     libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)

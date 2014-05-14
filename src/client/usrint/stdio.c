@@ -3228,7 +3228,8 @@ static void cleanup_stdio_internal(void)
 static void init_stdio_internal(void)
 {
     static int recurse_flag = 0;
-    static gen_mutex_t initlock = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+    static gen_mutex_t initlock;
+
     /* don't let more than one thread initialize */
     gen_mutex_lock(&initlock);
     if (init_flag || recurse_flag)
@@ -3238,6 +3239,12 @@ static void init_stdio_internal(void)
     }
     /* init stdio is running */
     recurse_flag = 1;
+
+    if (gen_posix_recursive_mutex_init(&initlock) < 0)
+    {
+        gossip_err("init_stdio_internal: could not init recursive mutex\n");
+        abort();
+    }
 
     /* init open file chain - must do before setting up stdin etc */
     lock_init_stream(&open_files);
