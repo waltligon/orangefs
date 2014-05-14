@@ -158,8 +158,17 @@ static PINT_sm_action final_response_cleanup(
                  "(s_op %p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
-    PVFS_strerror_r(s_op->resp.status, status_string, 64);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
+    if (s_op->resp.status < 0)
+    {
+        PVFS_strerror_r(s_op->resp.status, status_string, 64);
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                "finish (%d: %s)\n", s_op->resp.status, status_string);
+    }
+    else
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%d)\n",
+                s_op->resp.status);
+    }
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
