@@ -135,7 +135,7 @@ int main(int argc, char **argv)
                 (BMI_addr_lookup (&server_addr, user_opts->server_addr) == 0))
         {
             /* set up single server */
-            addr_array = malloc(sizeof *addr_array);
+            addr_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t));
             addr_array[0] = server_addr;
             io_server_count = 1;
         }
@@ -169,7 +169,8 @@ int main(int argc, char **argv)
         }
     
         /* build a list of servers to talk to */
-        addr_array = calloc(io_server_count, sizeof *addr_array);
+        addr_array = (PVFS_BMI_addr_t *)
+	    malloc(io_server_count * sizeof(PVFS_BMI_addr_t));
         if (addr_array == NULL)
         {
 	        perror("malloc");
@@ -190,15 +191,16 @@ int main(int argc, char **argv)
     for (max_keys = 0; key_table[max_keys].key_number >= 0; max_keys++);
 
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = calloc(io_server_count, sizeof *perf_matrix);
-    if(perf_matrix == NULL)
+    perf_matrix = (int64_t **)malloc(io_server_count * sizeof(int64_t *));
+    if (!perf_matrix)
     {
         perror("malloc");
         return(-1);
     }
     for(i=0; i<io_server_count; i++)
     {
-        perf_matrix[i] = calloc(HISTORY*(max_keys+2), sizeof *perf_matrix[i]);
+	    perf_matrix[i] = (int64_t *)malloc(HISTORY * (max_keys + 2)
+                                        * sizeof(int64_t));
 	    if (perf_matrix[i] == NULL)
 	    {
 	        perror("malloc");
@@ -209,15 +211,16 @@ int main(int argc, char **argv)
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
      */
-    next_id_array = calloc(io_server_count, sizeof *next_id_array);
+    next_id_array = (uint32_t *) malloc(io_server_count * sizeof(uint32_t));
     if (next_id_array == NULL)
     {
 	     perror("malloc");
 	     return -1;
     }
+    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
 
     /* allocate an array to keep up with end times from each server */
-    end_time_ms_array = calloc(io_server_count, sizeof *end_time_ms_array);
+    end_time_ms_array = (uint64_t *)malloc(io_server_count * sizeof(uint64_t));
     if (end_time_ms_array == NULL)
     {
 	    perror("malloc");
@@ -342,7 +345,10 @@ static struct options* parse_args(int argc, char* argv[])
 {
     char flags[] = "vm:s:";
     int one_opt = 0;
+    int len = 0;
+
     struct options *tmp_opts = NULL;
+    int ret = -1;
 
     /* create storage for the command line options */
     tmp_opts = (struct options *) malloc(sizeof(struct options));
@@ -361,22 +367,28 @@ static struct options* parse_args(int argc, char* argv[])
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	        case('m'):
-            {
-                size_t len;
-                len = strlen(optarg)+2;
-                tmp_opts->mnt_point = malloc(len);
-                if (tmp_opts->mnt_point == NULL) {
-                    free(tmp_opts);
-                    return NULL;
-                }
-                strncpy(tmp_opts->mnt_point, optarg, len);
-                /* TODO: dirty hack... fix later.  The remove_dir_prefix()
-                 * function expects some trailing segments or at least
-                 * a slash off of the mount point
-                 */
-                strncat(tmp_opts->mnt_point, "/", 1);
-                break;
-            }
+                /* we need to add a '/' to the end so cannot strdup */
+		        len = strlen(optarg)+1;
+		        tmp_opts->mnt_point = (char*)malloc(len+1);
+		        if(!tmp_opts->mnt_point)
+		        {
+		            free(tmp_opts);
+		            return(NULL);
+		        }
+		        memset(tmp_opts->mnt_point, 0, len+1);
+		        ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
+		        if(ret < 1)
+                {
+		            free(tmp_opts);
+		            return(NULL);
+		        }
+		        /* TODO: dirty hack... fix later.  The remove_dir_prefix()
+		        * function expects some trailing segments or at least
+		        * a slash off of the mount point
+		        */
+		        strcat(tmp_opts->mnt_point, "/");
+		        tmp_opts->mnt_point_set = 1;
+		        break;
 	        case('s'):
                 tmp_opts->server_addr = strdup(optarg);
                 if (!tmp_opts->server_addr)

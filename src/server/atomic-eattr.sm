@@ -39,6 +39,8 @@ enum {
  *         not. -- ADP
  */
 
+/* TODO: Find out when the key/val/valsz arrays get malloc'd and when they get freed? */
+
 %%
 
 machine pvfs2_atomic_eattr_sm
@@ -188,15 +190,15 @@ static PINT_sm_action atomiceattr_setup_resp(
     }
 
     s_op->resp.u.atomiceattr.val =
-        calloc(s_op->req->u.atomiceattr.nkey, sizeof *s_op->resp.u.atomiceattr.val);
-    if (s_op->resp.u.atomiceattr.val == NULL)
+        malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.atomiceattr.val)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.atomiceattr.err =
-        calloc(s_op->req->u.atomiceattr.nkey, sizeof *s_op->resp.u.atomiceattr.err);
-    if (s_op->resp.u.atomiceattr.err == NULL)
+        malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_error));
+    if (!s_op->resp.u.atomiceattr.err)
     {
         free(s_op->resp.u.atomiceattr.val);
         js_p->error_code = -PVFS_ENOMEM;
@@ -207,7 +209,7 @@ static PINT_sm_action atomiceattr_setup_resp(
     {
         s_op->resp.u.atomiceattr.val[i].buffer = malloc(
             s_op->req->u.atomiceattr.valsz[i]);
-        if (s_op->resp.u.atomiceattr.val[i].buffer == NULL)
+        if (!s_op->resp.u.atomiceattr.val[i].buffer)
         {
             for(--i; i >= 0; --i)
             {
@@ -329,8 +331,8 @@ static int atomiceattr_modify_eattrib(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
     
-    char *error = malloc(s_op->req->u.atomiceattr.nkey);
-    if(error == NULL)
+    char *error = (char *)malloc(s_op->req->u.atomiceattr.nkey * sizeof(char));
+    if(!error)
     {
         gossip_lerr("Cannot allocate memory for temporary error array\n");
         js_p->error_code = -PVFS_ENOMEM;
@@ -625,7 +627,7 @@ static PINT_sm_action atomiceattr_get_metahint_flag(
 
     /*setup key for user.pvfs2.meta_hint*/
     s_op->key.buffer = malloc(strlen(meta_hint_key) + 1);
-    if (s_op->key.buffer == NULL)
+    if (!s_op->key.buffer)
     {
         gossip_lerr("Cannot allocation memory for key.buffer\n");
         js_p->error_code = -PVFS_ENOMEM;
@@ -720,9 +722,9 @@ static PINT_sm_action atomiceattr_set_metahint_flag(
     init_keyval_structs(s_op,s_op->free_val);
     s_op->keyval_count = 1;
 
-    s_op->key_a = calloc(s_op->keyval_count, sizeof *s_op->key_a);
-    s_op->val_a = calloc(s_op->keyval_count, sizeof *s_op->val_a);
-    if (s_op->key_a == NULL || s_op->val_a == NULL)
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+    if (!(s_op->key_a && s_op->val_a))
     {
         gossip_lerr("Cannot allocate memory for key_a and/or val_a\n");
         js_p->error_code = -PVFS_ENOMEM;
@@ -731,23 +733,25 @@ static PINT_sm_action atomiceattr_set_metahint_flag(
 
     i=0; /*setup key user.pvfs2.meta_hint*/
     s_op->key_a[i].buffer = malloc(strlen(meta_hint_key) + 1);
-    if (s_op->key_a[i].buffer == NULL)
+    if (!s_op->key_a[i].buffer)
     {
         gossip_lerr("Cannot allocation memory for key_a[%d].buffer\n",i);
         js_p->error_code = -PVFS_ENOMEM;
         goto error_exit;
     }
+    memset(s_op->key_a[i].buffer,0,strlen(meta_hint_key) + 1);
     memcpy(s_op->key_a[i].buffer,meta_hint_key,strlen(meta_hint_key));
     s_op->key_a[i].buffer_sz = strlen(meta_hint_key) + 1;
 
     /*add/remove PVFS_MIRROR_FL from user.pvfs2.meta_hint*/
     s_op->val_a[i].buffer = malloc(sizeof(PVFS_flags));
-    if (s_op->val_a[i].buffer == NULL)
+    if (!s_op->val_a[i].buffer)
     {
         gossip_lerr("Cannot allocate memory for val_a[%d].buffer\n",i);
         js_p->error_code = -PVFS_ENOMEM;
         goto error_exit;
     }
+    memset(s_op->val_a[i].buffer,0,sizeof(PVFS_flags));
     memcpy(s_op->val_a[i].buffer,&flags,sizeof(PVFS_flags));
     s_op->val_a[i].buffer_sz = sizeof(PVFS_flags);
 
@@ -790,8 +794,8 @@ static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
   
     js_p->error_code = 0;
 
-    struct PINT_server_op *new_op = malloc(sizeof *new_op);
-    if (new_op == NULL)
+    struct PINT_server_op *new_op = malloc(sizeof(struct PINT_server_op));
+    if (!new_op)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -870,6 +874,9 @@ static PINT_sm_action inspect_imm_copies(struct PINT_smcb *smcb
     return SM_ACTION_COMPLETE;
 }/*end action inspect_imm_copies*/
 
+
+
+
 /*
  * Function: check_immutable
  *
@@ -936,6 +943,9 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
 
     return SM_ACTION_COMPLETE;
 }/*end action check_immutable*/
+
+
+
 
 /*
  * Function: atomiceattr_cleanup

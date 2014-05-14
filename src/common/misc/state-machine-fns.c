@@ -369,7 +369,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     const char *machine_name;
 
     /* check for valid inputs */
-    if (!smcb || smcb->op <= 0 || !smcb->op_get_state_machine)
+    if (!smcb || smcb->op < 0 || !smcb->op_get_state_machine)
     {
 	gossip_err("State machine requested not valid\n");
 	return -PVFS_EINVAL;
@@ -434,6 +434,35 @@ int PINT_smcb_op(struct PINT_smcb *smcb)
     return smcb->op;
 }
 
+static int PINT_smcb_sys_op(struct PINT_smcb *smcb)
+{
+    if (smcb->op > 0 && smcb->op < PVFS_OP_SYS_MAXVALID)
+        return 1;
+    return 0;
+}
+
+static int PINT_smcb_mgmt_op(struct PINT_smcb *smcb)
+{
+    if (smcb->op > PVFS_OP_SYS_MAXVAL && smcb->op < PVFS_OP_MGMT_MAXVALID)
+        return 1;
+    return 0;
+}
+
+static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
+{
+    return smcb->op == PVFS_SERVER_GET_CONFIG 
+        || smcb->op == PVFS_CLIENT_JOB_TIMER 
+        || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
+        || smcb->op == PVFS_DEV_UNEXPECTED;
+}
+
+int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
+{
+    if (!PINT_smcb_sys_op(smcb) && !PINT_smcb_mgmt_op(smcb) && !PINT_smcb_misc_op(smcb))
+        return 1;
+    return 0;
+}
+
 /* Function: PINT_smcb_set_complete
    Params: pointer to an smcb pointer
    Returns: nothing
@@ -489,9 +518,8 @@ int PINT_smcb_alloc(
         int (*term_fn)(struct PINT_smcb *, job_status_s *),
         job_context_id context_id)
 {
-    void *new_frame = NULL;
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
-    if (*smcb == NULL)
+    if (!(*smcb))
     {
         return -PVFS_ENOMEM;
     }
@@ -505,8 +533,8 @@ int PINT_smcb_alloc(
     /* if frame_size given, allocate a frame */
     if (frame_size > 0)
     {
-        new_frame = malloc(frame_size);
-        if (new_frame == NULL)
+        void *new_frame = malloc(frame_size);
+        if (!new_frame)
         {
             free(*smcb);
             *smcb = NULL;
@@ -517,16 +545,13 @@ int PINT_smcb_alloc(
         PINT_sm_push_frame(*smcb, 0, new_frame);
         (*smcb)->base_frame = 0;
     }
-
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
     (*smcb)->terminate_fn = term_fn;
     (*smcb)->context = context_id;
-    if (!PINT_state_machine_locate(*smcb)) {
-        free(new_frame);
-        free(*smcb);
-        return -PVFS_EINVAL;
-    }
+    /* if a getmach given, lookup state machine */
+    if (getmach)
+        return PINT_state_machine_locate(*smcb);
     return 0; /* success */
 }
 
@@ -821,7 +846,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
             break;
         }
         /* allocate smcb */
-        PINT_smcb_alloc(&new_sm, smcb->op, 0, smcb->op_get_state_machine,
+        PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
                 child_sm_frame_terminate, smcb->context);
         /* set parent smcb pointer */
         new_sm->parent_smcb = smcb;

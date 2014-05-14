@@ -2541,7 +2541,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
     default :
         {
             if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-                return PINT_server_req_table[op]->state_machine;
+                return PINT_server_req_table[op].params->state_machine;
             else
                 return NULL;
             break;

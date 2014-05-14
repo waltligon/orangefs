@@ -213,6 +213,7 @@ int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
 int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
+int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);
 void PINT_smcb_set_cancelled(struct PINT_smcb *smcb);
 int PINT_smcb_cancelled(struct PINT_smcb *smcb);

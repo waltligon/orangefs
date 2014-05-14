@@ -243,7 +243,7 @@ int validate_pvfs_object(
     int j = 0;
     PVFS_sysresp_getattr attributes;
     PVFS_dirent *directory_entries = NULL;
-    char err_string[128];
+    char* err_string = NULL;
 
     memset(&attributes, 0, sizeof(attributes));
     
@@ -319,9 +319,19 @@ int validate_pvfs_object(
     }
     else
     {
-        PVFS_strerror_r(ret, err_string, 128);
-        fprintf(stderr, "Error: [%s] object is invalid (%s)\n", 
-            current_path, err_string);
+        err_string = (char*)malloc(128*sizeof(char));
+        if(err_string)
+        {
+            PVFS_strerror_r(ret, err_string, 128);
+            fprintf(stderr, "Error: [%s] object is invalid (%s)\n", 
+                current_path, err_string);
+            free(err_string);
+        }
+        else
+        {
+            fprintf(stderr, "Error: [%s] object is invalid (%d)\n", 
+                current_path, ret);
+        }
     }
 
     /* Return 0, rather than "ret", too keep from propogating errors

@@ -809,7 +809,13 @@ struct PINT_server_req_params
     struct PINT_state_machine_s *state_machine;
 };
 
-extern struct PINT_server_req_params *PINT_server_req_table[];
+struct PINT_server_req_entry
+{
+    enum PVFS_server_op op_type;
+    struct PINT_server_req_params *params;
+};
+
+extern struct PINT_server_req_entry PINT_server_req_table[];
 
 int PINT_server_req_get_object_ref(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
