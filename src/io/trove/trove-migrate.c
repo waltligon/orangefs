@@ -762,8 +762,7 @@ static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
     PVFS_BMI_addr_t* addr_array = NULL;
     PVFS_handle handle = PVFS_HANDLE_NULL;
 
-    struct server_configuration_s *user_opts;
-    user_opts = PINT_server_config_mgr_get_config(coll_id);
+    struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %d, %s, %s\n", 

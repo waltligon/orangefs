@@ -1,2 +1,4 @@
 DIR := src/common/dotconf
-COMMONSRC += $(DIR)/dotconf.c
+LIBSRC += $(DIR)/dotconf.c
+SERVERSRC += $(DIR)/dotconf.c
+

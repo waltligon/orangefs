@@ -265,11 +265,6 @@ AC_SUBST(BUILD_SERVER)
 dnl locate OpenSSL libraries
 AX_OPENSSL
 
-dnl OpenSSL is required
-if test "x$OPENSSL_CPPFLAGS" = "x"; then
-    AC_MSG_ERROR([OpenSSL is required (use --with-ssl)])
-fi
-
 dnl check to see if the "fast" getgrouplist function is available
 AX_GETGROUPLIST
 
@@ -356,6 +351,11 @@ AC_SUBST(ENABLE_CERTCACHE)
 
 if test "x$ENABLE_SECURITY_KEY" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x1"; then
     AC_MSG_ERROR([only one of --enable-security-key and --enable-security-cert may be used])
+fi
+
+dnl OpenSSL is required for robust security
+if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) -a "x$OPENSSL_CPPFLAGS" = "x"; then
+    AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
 fi
 
 dnl Capability cache only valid in security modes

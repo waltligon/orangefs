@@ -1,3 +1,4 @@
 DIR := src/common/id-generator
-COMMONSRC += $(DIR)/id-generator.c
+LIBSRC += $(DIR)/id-generator.c
+SERVERSRC += $(DIR)/id-generator.c
 LIBBMISRC += $(DIR)/id-generator.c

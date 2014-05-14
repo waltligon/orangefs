@@ -101,6 +101,7 @@ static void lebf_initialize(void)
         respsize = 0;
         noreq = 0;
         switch (op_type) {
+            case PVFS_SERV_INVALID:
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
@@ -542,6 +543,7 @@ static int lebf_encode_req(
             /* nothing else */
             break;
 
+        case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
@@ -661,6 +663,7 @@ static int lebf_encode_resp(
             /* nothing else */
             break;
 
+        case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -772,6 +775,7 @@ static int lebf_decode_req(
             /* nothing else */
             break;
 
+        case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
@@ -881,6 +885,7 @@ static int lebf_decode_resp(
             /* nothing else */
             break;
 
+        case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -1098,6 +1103,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 #endif
               /*nothing to free*/
                   break;
+            case PVFS_SERV_INVALID:
             case PVFS_SERV_WRITE_COMPLETION:
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
@@ -1311,6 +1317,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
                   /*nothing to free */
                    break;
+                case PVFS_SERV_INVALID:
                 case PVFS_SERV_PERF_UPDATE:
                 case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:

@@ -1,3 +1,4 @@
 DIR := src/common/gen-locks
-COMMONSRC += $(DIR)/gen-locks.c
+LIBSRC += $(DIR)/gen-locks.c
+SERVERSRC += $(DIR)/gen-locks.c
 LIBBMISRC += $(DIR)/gen-locks.c

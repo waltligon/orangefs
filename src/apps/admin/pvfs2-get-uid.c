@@ -81,8 +81,9 @@ int main(int argc, char *argv[])
     if (prog_opts->server_count)
     {
         /* allocate memory for our BMI addresses and fill them in */
-        addr_array = calloc(prog_opts->server_count, sizeof *addr_array);
-        if (addr_array == NULL)
+        addr_array = (PVFS_BMI_addr_t *)malloc(prog_opts->server_count *
+                                           sizeof(PVFS_BMI_addr_t));
+        if (!addr_array)
         {
             fprintf(stderr, "Unable to allocate memory for BMI addrs\n");
             exit(EXIT_FAILURE);
@@ -111,8 +112,9 @@ int main(int argc, char *argv[])
         }
 
         /* allocate memory for the number of BMI addrs found */
-        addr_array = calloc(prog_opts->server_count, sizeof *addr_array);
-        if (addr_array == NULL)
+        addr_array = (PVFS_BMI_addr_t *)malloc(prog_opts->server_count *
+                                           sizeof(PVFS_BMI_addr_t));
+        if (!addr_array)
         {
             fprintf(stderr, "Unable to allocate memory for BMI addrs\n");
             exit(EXIT_FAILURE);
@@ -136,24 +138,26 @@ int main(int argc, char *argv[])
     }
 
     /* allocate memory to store the uid statistics from the given servers */
-    uid_info_array = calloc(prog_opts->server_count, sizeof *uid_info_array);
-    if (uid_info_array == NULL)
+    uid_info_array = (PVFS_uid_info_s **)malloc(prog_opts->server_count *
+                                          sizeof(PVFS_uid_info_s *));
+    if (!uid_info_array)
     {
         fprintf(stderr, "Unable to allocate memory for uid stats array\n");
         exit(EXIT_FAILURE);
     }
     for (i = 0; i < prog_opts->server_count; i++)
     {
-        uid_info_array[i] = calloc(UID_MGMT_MAX_HISTORY, sizeof *uid_info_array[i]);
-        if(uid_info_array[i] == NULL)
+        uid_info_array[i] = (PVFS_uid_info_s *)malloc(UID_MGMT_MAX_HISTORY *
+                                                sizeof(PVFS_uid_info_s));
+        if(!uid_info_array[i])
         {
             fprintf(stderr, "Unable to allocate memory for uid stats array\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    uid_info_count = malloc(prog_opts->server_count, sizeof *uid_info_count);
-    if (uid_info_count == NULL)
+    uid_info_count = (uint32_t *)malloc(prog_opts->server_count * sizeof(uint32_t));
+    if (!uid_info_count)
     {
         fprintf(stderr, "Memory allocation error, out of memory\n");
     }
@@ -209,15 +213,15 @@ static struct options *parse_args(int argc, char *argv[])
     int i;
 
     /* allocate memory for the program options */
-    tmp_opts = malloc(sizeof *tmp_opts);
-    if (tmp_opts == NULL)
+    tmp_opts = (struct options *)malloc(sizeof(struct options));
+    if (!tmp_opts)
     {
         return NULL;
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* allocate memory for storing pointers to server addrs */
-    tmp_opts->server_list = calloc(UID_SERV_LIST_SIZE, sizeof *tmp_opts->server_list);
+    tmp_opts->server_list = (char **)malloc(UID_SERV_LIST_SIZE * sizeof(char *));
     for (i = 0; i < UID_SERV_LIST_SIZE; i++)
     {
         tmp_opts->server_list[i] = NULL;

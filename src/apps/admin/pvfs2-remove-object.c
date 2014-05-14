@@ -74,8 +74,8 @@ static options_t *parse_args(int argc, char **argv)
         return NULL;
     }
 
-    tmp_opts = malloc(sizeof *tmp_opts);
-    if (tmp_opts != NULL)
+    tmp_opts = (options_t *)malloc(sizeof(options_t));
+    if (!tmp_opts)
     {
 	return NULL;
     }
