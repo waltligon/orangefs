@@ -1,4 +1,4 @@
-package org.orangefs.hadoop.fs.ofs;
+package org.apache.hadoop.fs.ofs;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

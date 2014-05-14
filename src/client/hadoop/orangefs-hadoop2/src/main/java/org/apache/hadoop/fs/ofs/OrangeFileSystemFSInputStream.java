@@ -3,7 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
-package org.orangefs.hadoop.fs.ofs;
+package org.apache.hadoop.fs.ofs;
 
 import java.io.Closeable;
 import java.io.IOException;
