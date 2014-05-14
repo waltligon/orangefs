@@ -114,13 +114,13 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
         s_op->resp.u.mgmt_get_dirdata_handle.sid_count = s_op->metasidcnt;
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "  Found dirdata handle %s of parent %s\n",
-            PVFS_OID_str(&s_op->u.mgmt_get_dirdata_handle.dirdata_handle),
+            PVFS_OID_str(&s_op->resp.u.mgmt_get_dirdata_handle.handle),
             PVFS_OID_str(&s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
     else
     {
         s_op->resp.u.mgmt_get_dirdata_handle.handle = PVFS_HANDLE_NULL;
-        s_op->resp.u.mgmt_get_dirdata_handle.sid_array = PVFS_SID_NULL);
+        s_op->resp.u.mgmt_get_dirdata_handle.sid_array = NULL;
         s_op->resp.u.mgmt_get_dirdata_handle.sid_count = 0;
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to retrieve dirdata "

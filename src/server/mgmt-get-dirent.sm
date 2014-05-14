@@ -271,7 +271,7 @@ static int mgmt_get_dirent(
     /* TJS: probably need to always allocate by sizeof(PVFS_ID) when
      * using these temporary storage locations */
     s_op->u.mgmt_get_dirent.keyval_temp_store = malloc(
-                (sizeof(PVFS_SID) * s_op->metadatacnt) + sizeof(PVFS_handle));
+                (sizeof(PVFS_SID) * s_op->metasidcnt) + sizeof(PVFS_handle));
 
     s_op->key.buffer = s_op->req->u.mgmt_get_dirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.mgmt_get_dirent.entry) + 1;
@@ -279,7 +279,7 @@ static int mgmt_get_dirent(
     s_op->val.buffer = s_op->u.mgmt_get_dirent.keyval_temp_store;
     s_op->val.buffer_sz = sizeof(PVFS_handle) +
                                  (sizeof(PVFS_SID) * 
-                                  s_op->metadatacnt);
+                                  s_op->metasidcnt);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  reading dirent handle (coll_id = %d, handle = %s\n\t"
@@ -319,7 +319,7 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
                 (PVFS_handle) s_op->u.mgmt_get_dirent.keyval_temp_store[0].oid;
         s_op->resp.u.mgmt_get_dirent.sid_array = 
                 (PVFS_SID) &s_op->u.mgmt_get_dirent.keyval_temp_store[1];
-        s_op->resp.u.mgmt_get_dirent.sid_count = s_op->metadatacnt;
+        s_op->resp.u.mgmt_get_dirent.sid_count = s_op->metasidcnt;
         gossip_debug(GOSSIP_SERVER_DEBUG, "  Found dirent handle %s\n",
                      PVFS_OID_str(&s_op->u.mgmt_get_dirent.handle));
     }
