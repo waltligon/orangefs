@@ -12,6 +12,8 @@
 #include "pvfs2-server.h"
 #include "pint-util.h"
 /*#include "pvfs2-attr.h" */
+#include "pint-cached-config.h"
+
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
@@ -316,9 +318,9 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
         /* TJS: make sure that we free the temp_keyval_store somewhere.
         */
         s_op->resp.u.mgmt_get_dirent.handle = 
-                (PVFS_handle) s_op->u.mgmt_get_dirent.keyval_temp_store[0].oid;
+                s_op->u.mgmt_get_dirent.keyval_temp_store[0].oid;
         s_op->resp.u.mgmt_get_dirent.sid_array = 
-                (PVFS_SID) &s_op->u.mgmt_get_dirent.keyval_temp_store[1];
+                (PVFS_SID *) &(s_op->u.mgmt_get_dirent.keyval_temp_store[1]);
         s_op->resp.u.mgmt_get_dirent.sid_count = s_op->metasidcnt;
         gossip_debug(GOSSIP_SERVER_DEBUG, "  Found dirent handle %s\n",
                      PVFS_OID_str(&s_op->u.mgmt_get_dirent.handle));

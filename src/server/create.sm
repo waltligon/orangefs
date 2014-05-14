@@ -263,6 +263,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.datafile_count = 1;
+        /* TJS: */
         s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
         s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
         if(!s_op->resp.u.create.datafile_handles ||
@@ -279,7 +280,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* file will not be stuffed; need to allocate all datafiles */
     s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
-
+    /* TJS: */
     s_op->resp.u.create.datafile_handles = malloc(
                     sizeof(*s_op->resp.u.create.datafile_handles) *
                     s_op->u.create.num_io_servers);
@@ -643,7 +644,9 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 
     s_op->val_a[0].buffer = s_op->resp.u.create.datafile_handles;
     s_op->val_a[0].buffer_sz =
-            s_op->resp.u.create.datafile_count * sizeof(PVFS_handle);
+            (s_op->resp.u.create.datafile_count * sizeof(PVFS_handle)) +
+            (s_op->resp.u.sid_count * s_op->resp.u.datafile_count *
+                sizeof(PVFS_SID));
 
     s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
