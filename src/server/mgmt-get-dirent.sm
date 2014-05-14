@@ -328,7 +328,7 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
     else
     {
         s_op->resp.u.mgmt_get_dirent.handle = PVFS_HANDLE_NULL;
-        s_op->resp.u.mgmt_get_dirent.sid_array = PVFS_SID_NULL;
+        s_op->resp.u.mgmt_get_dirent.sid_array = null;
         s_op->resp.u.mgmt_get_dirent.sid_count = 0;
         s_op->resp.u.mgmt_get_dirent.error = js_p->error_code;
         js_p->error_code = 0;
