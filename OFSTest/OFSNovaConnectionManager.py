@@ -491,7 +491,8 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
             new_ofs_test_nodes.append(new_node)
 
         # return the list of newly created nodes.
-        logging.debug("New Node IP Addresses: "+ ip_addresses)
+        logging.debug("New Node IP Addresses: ")
+        logging.debug(ip_addresses)
         return new_ofs_test_nodes
 
 

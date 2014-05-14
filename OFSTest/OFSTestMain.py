@@ -63,8 +63,7 @@ class OFSTestMain(object):
 
         self.ofs_network = OFSTestNetwork.OFSTestNetwork()
         
-        #Add logging
-        logging.basicConfig(filename="ofsnode-commands.log",level=logging.DEBUG)
+        
 
         
         

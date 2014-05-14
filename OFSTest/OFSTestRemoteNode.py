@@ -59,7 +59,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
         msg = "SSH: "+self.ssh_command
         logging.info(msg)
-        
+        print msg
     ##
     #
     # @fn getKeyFileFromLocal(self,local_node):
@@ -104,7 +104,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
                 aliases.append(element[1].rstrip())
                 
             
-        logging.info( "OrangeFS Aliases: "+aliases)    
+        logging.info( "OrangeFS Aliases: ")
+        logging.info(aliases)    
         return aliases
          
         
