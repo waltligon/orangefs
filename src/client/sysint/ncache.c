@@ -62,8 +62,8 @@ struct ncache_key
 static struct PINT_tcache* ncache = NULL;
 static gen_mutex_t ncache_mutex = GEN_MUTEX_INITIALIZER;
   
-static int ncache_compare_key_entry(void* key, struct qhash_head* link);
-static int ncache_hash_key(void* key, int table_size);
+static int ncache_compare_key_entry(const void* key, struct qhash_head* link);
+static int ncache_hash_key(const void* key, int table_size);
 static int ncache_free_payload(void* payload);
 static struct PINT_perf_counter* ncache_pc = NULL;
 
@@ -458,9 +458,9 @@ int PINT_ncache_update(
  *
  * returns 1 on match, 0 otherwise
  */
-static int ncache_compare_key_entry(void* key, struct qhash_head* link)
+static int ncache_compare_key_entry(const void* key, struct qhash_head* link)
 {
-    struct ncache_key* real_key = (struct ncache_key*)key;
+    const struct ncache_key* real_key = (const struct ncache_key*)key;
     struct ncache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
@@ -497,9 +497,9 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
  *
  * returns hash index 
  */
-static int ncache_hash_key(void* key, int table_size)
+static int ncache_hash_key(const void* key, int table_size)
 {
-    struct ncache_key* real_key = (struct ncache_key*) key;
+    const struct ncache_key* real_key = (const struct ncache_key*) key;
     int tmp_ret = 0;
     unsigned int sum = 0, i = 0;
 
