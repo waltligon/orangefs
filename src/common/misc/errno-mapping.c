@@ -50,8 +50,13 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     {
         r = snprintf(buf+i, n-i,
                 "%s", PINT_non_errno_strerror_mapping[map_err]);
-        if (i+r <= n) {
+        if (r <= n-i)
+        {
             i += r;
+        }
+        else
+        {
+            i = n;
         }
     }
     else
@@ -70,20 +75,20 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         else
         {
             strncpy(buf+i, tmp, n-i);
-            if (tmplen >= n-i)
+            if (tmplen <= n-i)
             {
-                i += n-i;
+                i += tmplen;
             }
             else
             {
-                i += tmplen;
+                i += n-i;
             }
         }
 #elif defined(WIN32)
         if (strerror_s(buf, (size_t)limit, map_err) != 0)
         {
             r = snprintf(buf+i, n-i, "could not lookup system error message");
-            if (i+r <= n) {
+            if (r <= n-i) {
                 i += r;
             }
         }
@@ -91,10 +96,14 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         if (strerror_r(map_err, buf+i, n-i) != 0)
         {
             r = snprintf(buf+i, n-i, "could not lookup system error message");
-            if (i+r <= n) {
+            if (r <= n-i)
+            {
                 i += r;
             }
-        }
+            else
+            {
+                i = n;
+            }
 #endif
     }
 
@@ -126,8 +135,13 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         r = snprintf(buf+i, n-i, " (no class)");
         break;
     }
-    if (i+r <= n) {
+    if (r <= n-i)
+    {
         i += r;
+    }
+    else
+    {
+        i = n;
     }
 
     return 0;
