@@ -27,7 +27,6 @@
 
 /* Forward declarations of non-native functions */
 static char *combine(char* s1, char* s2, char* dest);
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
 static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
@@ -49,49 +48,6 @@ static char *combine(char* s1, char* s2, char* dest)
     strcat(dest, s1);
     strcat(dest, "/");
     return strcat(dest, s2);
-}
-
-/* Convert allocated struct DIR to an instance of our Dirent Class */
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
-{
-    int num_fields = 5;
-    char *field_names[] =
-    {
-        "d_ino", "d_off", "d_reclen", "d_type", "d_name" };
-    char *field_types[] =
-    {
-        "J", "J", "I", "Ljava/lang/String;", "Ljava/lang/String;" };
-    jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/Dirent";
-    jclass cls = (*env)->FindClass(env, cls_name);
-    if (!cls)
-    {
-        JNI_ERROR("invalid class: %s\n", cls_name);
-        return -1;
-    }
-    int fid_index = 0;
-    for (; fid_index < num_fields; fid_index++)
-    {
-        fids[fid_index] = (*env)->GetFieldID(env, cls, field_names[fid_index],
-                field_types[fid_index]);
-        if (!fids[fid_index])
-        {
-            JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            return -1;
-        }
-    }
-    *inst = (*env)->AllocObject(env, cls);
-
-    /* Load object with data from structure using
-     * constructor or set methods.
-     */
-    (*env)->SetLongField(env, *inst, fids[0], ptr->d_ino);
-    (*env)->SetLongField(env, *inst, fids[1], ptr->d_off);
-    (*env)->SetIntField(env, *inst, fids[2], ptr->d_reclen);
-    (*env)->SetCharField(env, *inst, fids[3], (char) ptr->d_type);
-    jstring d_name_string = (*env)->NewStringUTF(env, ptr->d_name);
-    (*env)->SetObjectField(env, *inst, fids[4], d_name_string);
-    return 0;
 }
 
 /** Return the length of the resulting string assuming s1 and s2 will be
@@ -443,29 +399,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopen(JNIEnv *env, jobject obj, jint fd,
 }
 
 /* fdopendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopendir(JNIEnv *env, jobject obj,
         jint fd)
 {
     JNI_PFI();
-    JNI_PRINT("fd = %d\n", (int) fd);
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
-    dir = (struct dirent *) fdopendir((int) fd);
+    DIR *dir = fdopendir(fd);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    if(dir)
-    {
-        free(dir);
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* feof */
@@ -1369,32 +1314,23 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj,
 }
 
 /* opendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_opendir(JNIEnv *env, jobject obj,
         jstring name)
 {
     JNI_PFI();
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
+    DIR *dir;
     char cname[PVFS_NAME_MAX];
     int cname_len = (*env)->GetStringLength(env, name);
     (*env)->GetStringUTFRegion(env, name, 0, cname_len, cname);
     JNI_PRINT("name = %s\n", cname);
-    dir = (struct dirent *) opendir(cname);
+    dir = opendir(cname);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    if(dir)
-    {
-        free(dir);
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* putc */

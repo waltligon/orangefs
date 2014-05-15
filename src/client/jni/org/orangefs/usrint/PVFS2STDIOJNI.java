@@ -52,7 +52,7 @@ public class PVFS2STDIOJNI {
 
     public native long fdopen(int fd, String mode);
 
-    public native Dirent fdopendir(int fd);
+    public native long fdopendir(int fd);
 
     public native int feof(long stream);
 
@@ -138,7 +138,7 @@ public class PVFS2STDIOJNI {
 
     public native int mkstemp(String tmplate);
 
-    public native Dirent opendir(String name);
+    public native long opendir(String name);
 
     public native int putc(int c, long stream);
 
@@ -167,6 +167,7 @@ public class PVFS2STDIOJNI {
     /* public native void setbuffer(long stream, String buf, long size); */
     /* public native void setlinebuf(long stream); */
     /* public native int setvbuf(long stream, long buf, long mode, long size); */
+    
     public native long telldir(long dir);
 
     public native long tmpfile();
