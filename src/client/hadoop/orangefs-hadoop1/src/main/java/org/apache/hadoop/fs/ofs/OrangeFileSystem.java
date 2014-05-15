@@ -254,7 +254,7 @@ public class OrangeFileSystem extends FileSystem {
         }
         groupname = orange.stdio.getGroupname((int) stats.st_gid);
         if (groupname == null) {
-            throw new IOException("getGroupname returned null");        
+            throw new IOException("getGroupname returned null");
         }
         /**/
         OFSLOG.debug("uid, username = <" + stats.st_uid + ", " + username + ">");

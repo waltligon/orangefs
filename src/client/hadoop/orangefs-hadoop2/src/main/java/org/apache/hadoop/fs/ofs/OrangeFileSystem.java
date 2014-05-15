@@ -255,7 +255,7 @@ public class OrangeFileSystem extends FileSystem {
         }
         groupname = orange.stdio.getGroupname((int) stats.st_gid);
         if (groupname == null) {
-            throw new IOException("getGroupname returned null");       	
+            throw new IOException("getGroupname returned null");
         }
         /**/
         OFSLOG.debug("uid, username = <" + stats.st_uid + ", " + username + ">");
@@ -334,33 +334,89 @@ public class OrangeFileSystem extends FileSystem {
      */
     @Override
     public void initialize(URI uri, Configuration conf) throws IOException {
+        if (this.initialized == true) {
+            return;
+        }
         if (uri == null) {
             throw new IOException("uri is null");
         }
         if (conf == null) {
             throw new IOException("conf is null");
         }
-        if (this.initialized == true) {
-            return;
+        if (uri.getAuthority() == null) {
+            throw new IOException("Incomplete OrangeFS URI, no authority: "
+            		+ uri);
         }
-        /*
-        if (uri.getHost() == null) {
-            throw new IOException("Incomplete OrangeFS URI, no host: " + uri);
+
+        int index = 0;
+        boolean uriAuthorityMatchFound = false; 
+        String uriAuthority = uri.getAuthority();
+        String ofsSystems[] = conf.getStrings("fs.ofs.systems");
+        String ofsMounts[] = conf.getStrings("fs.ofs.mntLocations");
+        
+        if(ofsSystems == null || ofsMounts == null) {
+            throw new IOException("Configuration value fs.ofs.systems or"
+                    + " fs.ofs.mntLocations is null. These configuration values"
+                    + " must be defined and have at least one entry each.");
         }
-        */
-        this.uri = URI.create(uri.getScheme() + ":///");
+        
+        OFSLOG.debug("Number of specified OrangeFS systems: " +
+                ofsSystems.length);
+        OFSLOG.debug("Number of specified OrangeFS mounts: " +
+                ofsMounts.length);
+        
+        if(ofsSystems.length < 1) {
+            throw new IOException("Configuration value fs.ofs.systems must"
+                    + "contain at least one entry!");
+        }
+        
+        if(ofsMounts.length < 1) {
+            throw new IOException("Configuration value fs.ofs.mntLocations"
+                    + " must contain at least one entry!");
+        }
+        
+        if(ofsSystems.length != ofsMounts.length) {
+            throw new IOException("Configuration values fs.ofs.systems and"
+                    + " fs.ofs.mntLocations must contain the same number of"
+                    + " comma-separated elements.");
+        }
+
+        OFSLOG.debug("Determining file system associated with URI authority.");
+        for(index = 0; index < ofsSystems.length; index++) {
+            OFSLOG.debug("{ofsSystems[" + index +"], ofsMounts["
+                    + index + "]} = {"
+                    + ofsSystems[index] + ", "
+                    + ofsMounts[index] + "}");
+            if(uriAuthority.equals(ofsSystems[index])) {
+                OFSLOG.debug("Match found. Continuing with fs initialization.");
+                uriAuthorityMatchFound = true;
+                break;
+            }
+        }
+        
+        if(uriAuthorityMatchFound == true) {
+            this.ofsMount = ofsMounts[index];
+            OFSLOG.debug("Matching uri authority found at index = " + index);
+        }
+        else {
+            OFSLOG.error("No OrangeFS file system found matching the "
+                    + "following authority: " + uriAuthority);
+            throw new IOException(
+                        "There was no matching authority found in"
+                        + " fs.ofs.systems. Check your configuration.");
+        }
+        
+        OFSLOG.debug("URI authority = " + uriAuthority);
+        this.uri = URI.create(uri.getScheme() + "://" + uriAuthority);
+     
         OFSLOG.debug("uri: " + this.uri.toString());
         OFSLOG.debug("conf: " + conf.toString());
-        setConf(conf);
+        
         /* Get OFS statistics */
         statistics = getStatistics(uri.getScheme(), getClass());
         OFSLOG.debug("OrangeFileSystem.statistics: "
                 + this.statistics.toString());
-        this.ofsMount = conf.get("fs.ofs.mntLocation", null);
-        if (this.ofsMount == null || this.ofsMount.length() == 0) {
-            throw new IOException(
-                    "Missing fs.ofs.mntLocation. Check your configuration.");
-        }
+        
         this.localFS = FileSystem.getLocal(conf);
         workingDirectory = new Path("/user/" + System.getProperty("user.name"))
                 .makeQualified(this.uri, null);
