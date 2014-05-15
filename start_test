@@ -9,7 +9,7 @@ from OFSTest import OFSTestConfig
 import sys
 import getopt
 import os, errno
-
+import logging
 
 def mkdir_p(path):
     try:
@@ -41,12 +41,18 @@ for o, a  in optlist:
 #argd = dict([my_arg.split('=') for my_arg in args])
 
 #print "Output dir is %s, config file is %s" % (output_dir,config_file)
+mkdir_p(output_dir)
+
+
+#Add logging
+logging.basicConfig(filename=output_dir+"/ofsnode-commands.log",level=logging.DEBUG)
+
 print "==================================================================="
 print "Welcome to the OrangeFS Setup and Testing System"
 
 
 if config_file != None:
-    try:
+   #try:
         #print "Using configuration from "+ config_file
         test_driver = OFSTestMain.OFSTestMain(OFSTestConfigFile.OFSTestConfigFile())
         #print "setting config"
@@ -55,11 +61,11 @@ if config_file != None:
         
         #test_driver.printConfig()
         #print "done"
-    except ValueError:
-        print "File %s could not be read or invalid format." % config_file
+    #except ValueError:
+     #   print "File %s could not be read or invalid format." % config_file
         #test_driver = OFSTestMain.OFSTestMain(OFSTestConfigMenu.OFSTestConfigMenu())
         #test_driver.setConfig()
-        exit(-1)
+      #  exit(-1)
 else:
     test_driver = OFSTestMain.OFSTestMain(OFSTestConfig.OFSTestConfig())
 
@@ -67,9 +73,13 @@ else:
 test_driver.config.addConfig(args)
 test_driver.printConfig()
 
-#exit()
-mkdir_p(output_dir)
+if test_driver.config.instance_suffix == "" and output_dir != ".":
+    test_driver.config.instance_suffix = "-"+output_dir
+
 os.chdir(output_dir)
+#exit()
+
+
 
 # if nodes exist, then check to see if OrangeFS is already installed
 rc = test_driver.checkOFS()

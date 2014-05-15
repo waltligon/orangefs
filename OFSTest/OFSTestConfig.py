@@ -301,6 +301,12 @@ class OFSTestConfig(object):
         self.cloud_type = 'EC2'
         self.nova_password_file=None
         
+        ## @var instance_suffix
+        #
+        # Suffix to add to instance name.
+        # usually the same as the output directory.
+        self.instance_suffix = ""
+        
     
     ##
     #

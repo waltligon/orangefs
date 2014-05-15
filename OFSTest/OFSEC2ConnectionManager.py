@@ -236,7 +236,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     # @return	A list of new instances.
     #		
         
-    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None):
+    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -432,7 +432,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
 
 
     
-    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None):
+    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None,instance_suffix=""):
         
         # This function creates number nodes on the cloud system. 
         # It returns a list of nodes

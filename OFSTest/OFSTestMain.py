@@ -251,7 +251,7 @@ class OFSTestMain(object):
             if self.config.number_new_cloud_nodes > 0:
                 print "===========================================================" 
                 print "Creating %d new EC2/OpenStack cloud nodes" % self.config.number_new_cloud_nodes
-                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet)
+                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet,self.config.instance_suffix)
             
         # Setup the virtual cluster.
         self.initNetwork()

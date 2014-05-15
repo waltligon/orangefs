@@ -200,7 +200,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     # @return    A list of new instances.
     #        
         
-    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None):
+    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
         self.checkCloudConnection()  
         
         # This creates a new instance for the system of a given machine type
@@ -229,7 +229,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         new_instances = []
 
         for index in range(0,number_nodes):
-            instance = self.novaapi.servers.create("ofsnode-%d"%(index+1), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
+            instance = self.novaapi.servers.create("ofsnode-%d%s"%(index+1,instance_suffix), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
             msg = "Created new Cloud instance %s " % instance.name
             logging.info(msg)
             print msg
@@ -428,12 +428,12 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
 
 
     
-    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None):
+    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None, instance_suffix=""):
         
         # This function creates number nodes on the cloud system. 
         # It returns a list of nodes
         
-        new_instances = self.createNewCloudInstances(number_nodes,image_name,flavor_name,cloud_subnet)
+        new_instances = self.createNewCloudInstances(number_nodes,image_name,flavor_name,cloud_subnet,instance_suffix)
         # new instances should have a 60 second delay to make sure everything is running.
 
         ip_addresses = []
