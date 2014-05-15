@@ -1071,8 +1071,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.unstuff.credential.signature);
                 break;
 
-            case PVFS_SERV_GETCONFIG:
             case PVFS_SERV_LOOKUP_PATH:
+                decode_free(req->u.lookup_path.credential.group_array);
+                decode_free(req->u.lookup_path.credential.signature);
+                break;
+
+            case PVFS_SERV_GETCONFIG:
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
