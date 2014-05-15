@@ -695,6 +695,7 @@ typedef struct PINT_server_op
     /* decoded request and response structures */
     struct PVFS_server_req *req; 
     struct PVFS_server_resp resp; 
+
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
