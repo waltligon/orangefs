@@ -53,49 +53,88 @@ public class OrangeFS extends AbstractFileSystem {
      * @throws IOException
      */
     public OrangeFS(final URI uri, final Configuration conf)
-    		throws IOException, URISyntaxException {
-    	/* TODO authorityNeeded? */
-    	super(URI.create(uri.getScheme()), uri.getScheme(), false, uri.getPort());
-    	
-    	OFSLOG.info("uri components:\n" +
-    			"\turi = " + uri.toString() +
-    			"\n\turi.getScheme() = " + uri.getScheme() +
-    			"\n\turi.getAuthority = " + uri.getAuthority() +
-    			"\n\turi.getHost = " + uri.getHost() +
-    			"\n\turi.getPort = " + uri.getPort() +
-    			"\n\turi.getPath = " + uri.getPath());
-    	
-    	OFSLOG.info("fs.ofs.mntLocation = " + conf.get("fs.ofs.mntLocation",
-    			null));
-    	
-    	OFSLOG.info("conf:\n\t" + conf.toString());
-    	
-    	OFSLOG.info("args to superclass of OrangeFS:\n" 
-    			+ "\turi = " + uri.toString() +
-    			"\n\tsupportedScheme = " + uri.getScheme() +
-    			"\n\tauthorityNeeded = " + "true" + 
-    			"\n\tdefaultPort = " + uri.getPort());
+		throws IOException, URISyntaxException {
+	super(URI.create(uri.getScheme() + "://" + uri.getAuthority()),
+			uri.getScheme(), true, 3334);
 
-    	orange = Orange.getInstance();
-		pf = orange.posix.f;
+	OFSLOG.debug("args to superclass of OrangeFS:\n" 
+			+ "\turi = "
+			+ URI.create(uri.getScheme() + "://" + uri.getAuthority())
+			+ "\n\tsupportedScheme = " + uri.getScheme()
+			+ "\n\tauthorityNeeded = " + "true" 
+			+ "\n\tdefaultPort = " + 3334);
+	
+	OFSLOG.debug("uri components:\n" +
+			"\turi = " + uri.toString() +
+			"\n\turi.getScheme() = " + uri.getScheme() +
+			"\n\turi.getAuthority = " + uri.getAuthority() +
+			"\n\turi.getHost = " + uri.getHost() +
+			"\n\turi.getPort = " + uri.getPort() +
+			"\n\turi.getPath = " + uri.getPath());
+    
+        int index = 0;
+        boolean uriAuthorityMatchFound = false; 
+        String uriAuthority = uri.getAuthority();
+        String ofsSystems[] = conf.getStrings("fs.ofs.systems");
+        String ofsMounts[] = conf.getStrings("fs.ofs.mntLocations");
+        
+        if(ofsSystems == null || ofsMounts == null) {
+            throw new IOException("Configuration value fs.ofs.systems or"
+                    + " fs.ofs.mntLocations is null. These configuration values"
+                    + " must be defined and have at least one entry each.");
+        }
+        
+        OFSLOG.debug("Number of specified OrangeFS systems: " +
+                ofsSystems.length);
+        OFSLOG.debug("Number of specified OrangeFS mounts: " +
+                ofsMounts.length);
+        
+        if(ofsSystems.length < 1) {
+            throw new IOException("Configuration value fs.ofs.systems must"
+                    + "contain at least one entry!");
+        }
+        
+        if(ofsMounts.length < 1) {
+            throw new IOException("Configuration value fs.ofs.mntLocations"
+                    + " must contain at least one entry!");
+        }
+        
+        if(ofsSystems.length != ofsMounts.length) {
+            throw new IOException("Configuration values fs.ofs.systems and"
+                    + " fs.ofs.mntLocations must contain the same number of"
+                    + " comma-separated elements.");
+        }
+
+        OFSLOG.debug("Determining file system associated with URI authority.");
+        for(index = 0; index < ofsSystems.length; index++) {
+            OFSLOG.debug("{ofsSystems[" + index +"], ofsMounts["
+                    + index + "]} = {"
+                    + ofsSystems[index] + ", "
+                    + ofsMounts[index] + "}");
+            if(uriAuthority.equals(ofsSystems[index])) {
+                OFSLOG.debug("Match found. Continuing with fs initialization.");
+                uriAuthorityMatchFound = true;
+                break;
+            }
+        }
+        
+        if(uriAuthorityMatchFound == true) {
+            this.ofsMount = ofsMounts[index];
+            OFSLOG.debug("Matching uri authority found at index = " + index);
+        }
+        else {
+            OFSLOG.error("No OrangeFS file system found matching the "
+                    + "following authority: " + uriAuthority);
+            throw new IOException(
+                        "There was no matching authority found in"
+                        + " fs.ofs.systems. Check your configuration.");
+        }    
+
+        orange = Orange.getInstance();
+        pf = orange.posix.f;
         sf = orange.stdio.f;
         workingDirectory = new Path("/user/" + System.getProperty("user.name")); 
         OFSLOG.debug("workingDirectory = " + workingDirectory.toString());
-
-        /* TODO: add capability to parse multiple OrangeFS mounts, to enable
-         * the use of multiple OrangeFS file systems with Hadoop.
-         * 
-         * potentially use Configuration.iterator()
-         * 
-         * This would follow the registry-based model of hierarchical URIs.
-         * The authority could be used as a key to the associated OrangeFS
-         * mount prefix. When a path is supplied to any OrangeFS native method
-         * it should be an OrangeFS path (ie. matching the pvfs2tab entry. */
-        this.ofsMount = conf.get("fs.ofs.mntLocation", null);
-        if (this.ofsMount == null || this.ofsMount.length() == 0) {
-            throw new IOException(
-                    "Missing fs.ofs.mntLocation. Check your configuration.");
-        }
     }
 	
     /*
@@ -119,12 +158,12 @@ public class OrangeFS extends AbstractFileSystem {
 			Progressable progress,
 			org.apache.hadoop.fs.Options.ChecksumOpt checksumOpt,
 			boolean createParent) throws AccessControlException,
-			                             FileAlreadyExistsException,
-			                             FileNotFoundException,
-			                             ParentNotDirectoryException,
-			                             UnsupportedFileSystemException,
-			                             UnresolvedLinkException,
-			                             IOException {
+						     FileAlreadyExistsException,
+						     FileNotFoundException,
+						     ParentNotDirectoryException,
+						     UnsupportedFileSystemException,
+						     UnresolvedLinkException,
+						     IOException {
         Path fOFS = null;
         Path fParent = null;
         FSDataOutputStream fsdos = null;
@@ -132,7 +171,7 @@ public class OrangeFS extends AbstractFileSystem {
        
         fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("create parameters: {\n\tPath f= " + f.toString()
-        		+ "\n\tEnumSet<CreateFlag> flag = " + flag.toString()
+			+ "\n\tEnumSet<CreateFlag> flag = " + flag.toString()
                 + "\n\tFsPermission permission= " + absolutePermission.toString()
                 + "\n\tint bufferSize= " + bufferSize
                 + "\n\tshort replication= " + replication
@@ -146,7 +185,7 @@ public class OrangeFS extends AbstractFileSystem {
         
         /* Does this path exist? */
         if (exists(f)) {
-        	exists = true;
+		exists = true;
         }
         
         CreateFlag.validate(f, exists,flag);
@@ -281,7 +320,7 @@ public class OrangeFS extends AbstractFileSystem {
         }
         groupname = orange.stdio.getGroupname((int) stats.st_gid);
         if (groupname == null) {
-            throw new IOException("getGroupname returned null");       	
+            throw new IOException("getGroupname returned null");	
         }
         /**/
         OFSLOG.debug("uid, username = <" + stats.st_uid + ", " + username + ">");
@@ -402,9 +441,9 @@ public class OrangeFS extends AbstractFileSystem {
             FsPermission permission,
             boolean createParent) throws AccessControlException,
                                          FileAlreadyExistsException,
-			                             FileNotFoundException,
-			                             UnresolvedLinkException,
-			                             IOException {
+						     FileNotFoundException,
+						     UnresolvedLinkException,
+						     IOException {
 		OFSLOG.debug("mkdir: dir = " + dir.toString());
         int ret = 0;
         long mode = 0;
@@ -420,15 +459,15 @@ public class OrangeFS extends AbstractFileSystem {
                         + " already exists");
                 //setPermission(dir, permission); //TODO
                 throw new FileAlreadyExistsException(
-                		"dir already exists: " + makeAbsolute(dir).toString());
+				"dir already exists: " + makeAbsolute(dir).toString());
             }
             else {
                 OFSLOG.warn("path exists but is not a directory: "
                         + makeAbsolute(dir));
                 /* TODO consider throwing different exception! */
                 throw new FileAlreadyExistsException(
-                		"path exists but is not a directory: " +
-            			makeAbsolute(dir).toString());
+				"path exists but is not a directory: " +
+				makeAbsolute(dir).toString());
             }
         }
         parents = getParentPaths(dir);
@@ -440,8 +479,8 @@ public class OrangeFS extends AbstractFileSystem {
                         OFSLOG.warn("parent path is not a directory: "
                                 + parents[i]);
                         throw new ParentNotDirectoryException(
-                        		"Parent path exists already as a file! "
-                        		+ "Parent directory cannot be created: "
+					"Parent path exists already as a file! "
+					+ "Parent directory cannot be created: "
                                 + parents[i]);
                     }
                 }
@@ -458,9 +497,9 @@ public class OrangeFS extends AbstractFileSystem {
                         /* TODO Need to distinguish between different types of
                          * errors in order to throw the proper exception. */
                         throw new org.apache.hadoop.security.AccessControlException(
-                    			"mkdir failed (ret = " + ret 
-                    			+ ") on parent directory = "
-            					+ parents[i] + ", permission = "
+					"mkdir failed (ret = " + ret 
+					+ ") on parent directory = "
+						+ parents[i] + ", permission = "
                                 + permission.toString());
                     }
                 }
@@ -472,16 +511,16 @@ public class OrangeFS extends AbstractFileSystem {
             setPermission(dir, permission);
         }
         else {
-        	/*
+		/*
             OFSLOG.error("mkdir failed on parent path f =" + makeAbsolute(dir)
                     + ", permission = " + permission.toString());
             */
-        	
+		
             /* TODO Need to distinguish between different types of
              * errors in order to throw the proper exception. */
             throw new IOException(
-        			"mkdir failed (ret = " + ret 
-        			+ ") on target directory = "
+				"mkdir failed (ret = " + ret 
+				+ ") on target directory = "
 					+ dir + ", permission = "
                     + permission.toString());
         }		
@@ -509,9 +548,9 @@ public class OrangeFS extends AbstractFileSystem {
         /* TODO do a better job relaying OrangeFS error code so we can
          * throw the proper exception here. */
         if(ret != 0) {
-        	throw new IOException("Rename operation {" + getOFSPathName(src)
-        			+ ", " + getOFSPathName(dst)
-        			+ "} failed with ret = " + ret);
+		throw new IOException("Rename operation {" + getOFSPathName(src)
+				+ ", " + getOFSPathName(dst)
+				+ "} failed with ret = " + ret);
         }
 	}
 
@@ -563,15 +602,15 @@ public class OrangeFS extends AbstractFileSystem {
         int mode = 0;
         Path fOFS = null;
         if (permission == null) {
-        	throw new org.apache.hadoop.security.AccessControlException(
-        			"FsPermission permission is null");
+		throw new org.apache.hadoop.security.AccessControlException(
+				"FsPermission permission is null");
         }
         fOFS = new Path(getOFSPathName(f));
         mode = permission.toShort();
         OFSLOG.debug("permission (symbolic) = " + permission.toString());
         if (orange.posix.chmod(fOFS.toString(), mode) < 0) {
-        	/* TODO Determine the OrangeFS error code so that the appropriate
-        	 * exception may be thrown. */
+		/* TODO Determine the OrangeFS error code so that the appropriate
+		 * exception may be thrown. */
             throw new IOException("Failed to set permissions on path = "
                     + makeAbsolute(f) + ", mode = " + mode);
         }
