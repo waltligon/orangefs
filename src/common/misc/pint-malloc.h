@@ -125,7 +125,7 @@ extern void  PINT_free(void *mem);
 # ifdef malloc
 #  undef malloc
 # endif
-# ifndef PVFS_MALLOC_REDEF_OVERRIDE
+# if !defined(PVFS_MALLOC_REDEF_OVERRIDE) && !WITH_MTRACE
 #  define malloc PINT_malloc_minimum
 # endif
 

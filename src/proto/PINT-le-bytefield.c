@@ -1038,6 +1038,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
             case PVFS_SERV_TREE_SETATTR:
                 decode_free(req->u.tree_setattr.handle_array);
+                decode_free(req->u.tree_setattr.credential.group_array);
+                decode_free(req->u.tree_setattr.credential.signature);
                 break;
 
             case PVFS_SERV_LISTATTR:
@@ -1076,12 +1078,20 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.lookup_path.credential.signature);
                 break;
 
-            case PVFS_SERV_GETCONFIG:
+            case PVFS_SERV_CRDIRENT:
+                decode_free(req->u.crdirent.credential.group_array);
+                decode_free(req->u.crdirent.credential.signature);
+                break;
+
             case PVFS_SERV_REMOVE:
+                decode_free(req->u.remove.credential.group_array);
+                decode_free(req->u.remove.credential.signature);
+                break;
+
+            case PVFS_SERV_GETCONFIG:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
             case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-            case PVFS_SERV_CRDIRENT:
             case PVFS_SERV_RMDIRENT:
             case PVFS_SERV_CHDIRENT:
             case PVFS_SERV_TRUNCATE:
