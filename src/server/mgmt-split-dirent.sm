@@ -96,7 +96,18 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
 
     assert(PVFS_OID_cmp(&s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
                         &PVFS_HANDLE_NULL));
-
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.mgmt_split_dirent.fs_id, 
+                                         &(s_op->metasidcnt));
+    s_op->u.mgmt_split_dirent.keyval_temp_store = malloc(sizeof(PVFS_ID) * 
+                                (s_op->req->u.mgmt_split_dirent.nentries +
+                                 (s_op->req->u.mgmt_split_dirent.nentries *
+                                  s_op->metasidcnt)
+                                 )
+                                );
+    PVFS_ID *val_buffer_entry_point = 
+                            s_op->u.mgmt_split_dirent.keyval_temp_store;
+    PVFS_SID *sid_array_entry_point = s_op->req->u.mgmt_split_dirent.sid_array;
     js_p->error_code = 0;
 
     if (s_op->req->u.mgmt_split_dirent.nentries < 1)
@@ -150,8 +161,24 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
         s_op->key_a[j].buffer_sz =
                     strlen(s_op->req->u.mgmt_split_dirent.entry_names[j]) + 1;
 
-        s_op->val_a[j].buffer = &s_op->req->u.mgmt_split_dirent.entry_handles[j];
-        s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
+        s_op->val_a[j].buffer = val_buffer_entry_point;
+        /* TJS: make sure to grab SIDs and Handles to put in case we don't undo */
+        if(! s_op->req->u.mgmt_split_dirent.undo){
+            memcpy(val_buffer_entry_point, 
+                   s_op->req->u.mgmt_split_dirent.entry_handles[j], 
+                   sizeof(PVFS_HANDLE));
+            memcpy(++val_buffer_entry_point, 
+                   sid_array_entry_point, 
+                   sizeof(PVFS_HANDLE));
+            sid_array_entry_point += s_op->metasidcnt;
+            val_buffer_entry_point += s_op->metasidcnt;
+
+        } else {
+            val_buffer_entry_point += s_op->metasidcnt + 1;
+        }
+        s_op->val_a[j].buffer_sz = sizeof(PVFS_handle) + 
+                                   sizeof(PVFS_SID) *
+                                   s_op->metasidcnt;
     }
 
     if (! s_op->req->u.mgmt_split_dirent.undo)
@@ -300,6 +327,9 @@ static PINT_sm_action mgmt_split_dirent_release(
 static PINT_sm_action mgmt_split_dirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    if(s_op->u.mgmt_split_dirent.keyval_temp_store){
+        free(s_op->u.mgmt_split_dirent.keyval_temp_store);
+    }
     return(server_state_machine_complete(smcb));
 }
 

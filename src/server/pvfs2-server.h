@@ -489,6 +489,11 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_mgmt_split_dirent_op
+{
+    PVFS_ID *keyval_temp_store;
+};
+
 /* WBL V# removing precreate */
 #if 0
 struct PINT_server_precreate_pool_refiller_op
@@ -737,6 +742,7 @@ typedef struct PINT_server_op
         struct PINT_server_truncate_op truncate;
         struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
+        struct PINT_server_mgmt_split_dirent_op mgmt_split_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
 /*
         struct PINT_server_precreate_pool_refiller_op
