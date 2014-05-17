@@ -747,14 +747,14 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimes(JNIEnv *env, jobject obj,
      * current time. */
     if (actime_usec == -1 || modtime_usec == -1)
     {
-    	ret = futimes(fd, NULL);
+	ret = futimes(fd, NULL);
     }
     else
     {
-    	tv[0].tv_sec = actime_usec / 1000000L;
-    	tv[0].tv_usec = actime_usec % 1000000L;
-    	tv[1].tv_sec = modtime_usec / 1000000L;
-    	tv[1].tv_usec = modtime_usec % 1000000L;
+	tv[0].tv_sec = actime_usec / 1000000L;
+	tv[0].tv_usec = actime_usec % 1000000L;
+	tv[1].tv_sec = modtime_usec / 1000000L;
+	tv[1].tv_usec = modtime_usec % 1000000L;
         ret = futimes(fd, tv);
     }
     if (ret < 0)
@@ -781,14 +781,14 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_futimesat(JNIEnv *env, jobject obj,
      * current time. */
     if (actime_usec == -1 || modtime_usec == -1)
     {
-    	ret = futimesat(dirfd, cpath, NULL);
+	ret = futimesat(dirfd, cpath, NULL);
     }
     else
     {
-    	tv[0].tv_sec = actime_usec / 1000000L;
-    	tv[0].tv_usec = actime_usec % 1000000L;
-    	tv[1].tv_sec = modtime_usec / 1000000L;
-    	tv[1].tv_usec = modtime_usec % 1000000L;
+	tv[0].tv_sec = actime_usec / 1000000L;
+	tv[0].tv_usec = actime_usec % 1000000L;
+	tv[1].tv_sec = modtime_usec / 1000000L;
+	tv[1].tv_usec = modtime_usec % 1000000L;
         ret = futimesat(dirfd, cpath, tv);
     }
     if (ret < 0)
@@ -988,7 +988,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdir(JNIEnv *env, jobject obj,
     int cpath_len = (*env)->GetStringLength(env, path);
     char cpath[cpath_len + 1];
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
+    JNI_PRINT("cpath = %s\n", cpath);
     ret = mkdir(cpath, (mode_t) mode);
+    JNI_PRINT("mkdir returned %d\n", ret);
     if (ret < 0)
     {
         JNI_PERROR();
@@ -1502,7 +1504,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utime(JNIEnv *env, jobject obj,
      * current time. */
     if (actime_sec == -1 || modtime_sec == -1)
     {
-    	ret = utime(cpath, (const struct utimbuf *) NULL);
+	ret = utime(cpath, (const struct utimbuf *) NULL);
     }
     else
     {
@@ -1533,14 +1535,14 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_utimes(JNIEnv *env, jobject obj,
      * current time. */
     if (actime_usec == -1 || modtime_usec == -1)
     {
-    	ret = utimes(cpath, NULL);
+	ret = utimes(cpath, NULL);
     }
     else
     {
-    	tv[0].tv_sec = actime_usec / 1000000L;
-    	tv[0].tv_usec = actime_usec % 1000000L;
-    	tv[1].tv_sec = modtime_usec / 1000000L;
-    	tv[1].tv_usec = modtime_usec % 1000000L;
+	tv[0].tv_sec = actime_usec / 1000000L;
+	tv[0].tv_usec = actime_usec % 1000000L;
+	tv[1].tv_sec = modtime_usec / 1000000L;
+	tv[1].tv_usec = modtime_usec % 1000000L;
         ret = utimes(cpath, tv);
     }
     if (ret < 0)

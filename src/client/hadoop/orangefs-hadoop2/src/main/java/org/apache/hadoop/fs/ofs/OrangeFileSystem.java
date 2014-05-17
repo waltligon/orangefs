@@ -123,8 +123,10 @@ public class OrangeFileSystem extends FileSystem {
             fParent = f.getParent();
             OFSLOG.debug("fParent = " + fParent);
             if (fParent != null && !exists(fParent)) {
+		OFSLOG.debug("missing fParent = " + fParent);
                 /* Try to create the directories. */
                 if (!mkdirs(fParent, permission)) {
+			OFSLOG.debug("mkdir on fParent failed = " + fParent);
                     /* mkdirs could fail if another task creates the parent 
                      * directory after we checked to see if the parent exists.
                      * So, check if the parent exists again to make sure
@@ -265,7 +267,7 @@ public class OrangeFileSystem extends FileSystem {
                 stats.st_blksize, stats.st_mtime * 1000, stats.st_atime * 1000,
                 permission, username, groupname, 
                 makeAbsolute(f).makeQualified(this.uri, 
-                		this.workingDirectory));
+				this.workingDirectory));
         return fileStatus;
     }
 
@@ -345,7 +347,7 @@ public class OrangeFileSystem extends FileSystem {
         }
         if (uri.getAuthority() == null) {
             throw new IOException("Incomplete OrangeFS URI, no authority: "
-            		+ uri);
+			+ uri);
         }
 
         int index = 0;
@@ -500,9 +502,8 @@ public class OrangeFileSystem extends FileSystem {
          */
         parents = getParentPaths(f);
         
-        OFSLOG.debug(Arrays.toString(parents));
-        throw new IOException("MYBAD");
-        /*
+        OFSLOG.debug("Parent directories: " + Arrays.toString(parents));
+        
         if (parents != null) {
             // Attempt creation of parent directories
             for (int i = 0; i < parents.length; i++) {
@@ -535,11 +536,11 @@ public class OrangeFileSystem extends FileSystem {
             return true;
         }
         else {
-            OFSLOG.error("mkdir failed on parent path f =" + makeAbsolute(f)
+            OFSLOG.error("mkdir failed on path f =" + makeAbsolute(f)
                     + ", permission = " + permission.toString());
             return false;
         }
-        */
+        
     }
 
     /* Opens an FSDataInputStream at the indicated Path. */
