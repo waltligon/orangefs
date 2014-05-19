@@ -21,8 +21,8 @@
 static gen_mutex_t s_id_gen_safe_mutex = GEN_MUTEX_INITIALIZER;
 static int s_id_gen_safe_init_count = 0;
 
-static int hash_key(void *key, int table_size);
-static int hash_key_compare(void *key, struct qlist_head *link);
+static int hash_key(const void *key, int table_size);
+static int hash_key_compare(const void *key, struct qlist_head *link);
 
 static BMI_id_gen_t s_id_gen_safe_tag = 0;
 
@@ -155,10 +155,10 @@ int id_gen_safe_unregister(BMI_id_gen_t new_id)
     return ret;
 }
 
-static int hash_key(void *key, int table_size)
+static int hash_key(const void *key, int table_size)
 {
     unsigned long tmp = 0;
-    BMI_id_gen_t *id = (BMI_id_gen_t *)key;
+    const BMI_id_gen_t *id = key;
 
     tmp += *id;
     tmp = tmp % table_size;
@@ -166,10 +166,10 @@ static int hash_key(void *key, int table_size)
     return ((int) tmp);
 }
 
-static int hash_key_compare(void *key, struct qlist_head *link)
+static int hash_key_compare(const void *key, struct qlist_head *link)
 {
     id_gen_safe_t *id_elem = NULL;
-    BMI_id_gen_t id = *((BMI_id_gen_t *)key);
+    BMI_id_gen_t id = *((const BMI_id_gen_t *)key);
 
     id_elem = qlist_entry(link, id_gen_safe_t, hash_link);
     assert(id_elem);
