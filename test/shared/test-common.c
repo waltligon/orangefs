@@ -1526,12 +1526,13 @@ int create_symlink(
         snprintf(cmd, sizeof(cmd), "%spvfs2-ln",pvfsEXELocation);
         *ptr++ = cmd;
         *ptr++ = "-s";
-        *ptr++ = (char*)linkName;
         *ptr++ = (char*)linkTarget;
+        *ptr++ = (char*)linkName;
+
 
         if(verbose)
         {
-            printf("\nRUNNING->%s -s %s %s ", cmd, linkName, linkTarget);
+            printf("\nRUNNING->%s -s %s %s ", cmd,  linkTarget, linkName);
         }
         else
         {
