@@ -218,7 +218,8 @@ static int queues_do_work(struct PINT_manager_s *manager,
     if(op->id != 0)
     {
         /* find the op in one of the queues */
-        qlist_for_each_entry(queue, &w->queues, link)
+        qlist_for_each_entry(queue, &w->queues, link,
+                struct PINT_queue_s)
         {
             ret = PINT_queue_search_and_remove(
                 queue->id,

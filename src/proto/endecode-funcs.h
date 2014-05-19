@@ -17,9 +17,6 @@
 #ifdef WIN32
 typedef uint32_t u_int32_t;
 typedef uint64_t u_int64_t;
-
-/* typeof not available on Windows */
-#define typeof(t)   t
 #endif
 #include <assert.h>
 
@@ -613,13 +610,13 @@ static inline void decode_##name(char **pptr, struct name *x) { \
 
 /* one field then one array */
 #define endecode_fields_1a_generic(name, sname, t1, x1, tn1, n1, ta1, a1) \
-static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
+static inline void encode_##name(char **pptr, const sname *x) { tn1 i; \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
 } \
-static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
+static inline void decode_##name(char **pptr, sname *x) { tn1 i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
@@ -629,7 +626,7 @@ static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
 
 /* one field then two arrays */
 #define endecode_fields_1aa_generic(name, sname, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
-static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
+static inline void encode_##name(char **pptr, const sname *x) { tn1 i; \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
@@ -637,7 +634,7 @@ static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
     for (i=0; i<x->n1; i++) \
 	encode_##ta2(pptr, &(x)->a2[i]); \
 } \
-static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
+static inline void decode_##name(char **pptr, sname *x) { tn1 i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \

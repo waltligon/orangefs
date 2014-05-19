@@ -231,7 +231,8 @@ int PINT_manager_destroy(PINT_manager_t manager)
 
     qhash_finalize(manager->ops);
 
-    qlist_for_each_entry_safe(worker, tmp, &manager->workers, link)
+    qlist_for_each_entry_safe(worker, tmp, &manager->workers, link,
+            struct PINT_worker_s, struct PINT_worker_s)
     {
         qlist_del(&worker->link);
         PINT_worker_destroy(manager, worker);
@@ -423,7 +424,8 @@ int PINT_manager_queue_add(PINT_manager_t manager,
     gen_mutex_lock(&manager->mutex);
 
     /* verify that worker has been added to manager */
-    qlist_for_each_entry(worker, &manager->workers, link)
+    qlist_for_each_entry(worker, &manager->workers, link,
+            struct PINT_worker_s)
     {
         if(worker->id == worker_id)
         {
@@ -729,7 +731,8 @@ static int PINT_manager_find_worker(PINT_manager_t manager,
         struct PINT_worker_id_mapper_entry_s *map;
 
         /* get queue/worker from mapper functions */
-        qlist_for_each_entry(map, &manager->op_maps, link)
+        qlist_for_each_entry(map, &manager->op_maps, link,
+                struct PINT_worker_id_mapper_entry_s)
         {
             /* try each mapping function to see if it returns
              * a queue or worker id that this operation should be added to
@@ -766,7 +769,8 @@ static int PINT_manager_find_worker(PINT_manager_t manager,
      * manages.  Otherwise assume its a queue id and look for
      * the associated worker in the queue-to-worker map.
      */
-    qlist_for_each_entry(w, &manager->workers, link)
+    qlist_for_each_entry(w, &manager->workers, link,
+            struct PINT_worker_s)
     {
         if(w->id == result_worker_id)
         {
@@ -906,7 +910,8 @@ int PINT_manager_test_context(PINT_manager_t manager,
     {
         gen_mutex_lock(&manager->mutex);
         /* try to do work if the op is in that type of worker */
-        qlist_for_each_entry(worker, &manager->workers, link)
+        qlist_for_each_entry(worker, &manager->workers, link,
+                struct PINT_worker_s)
         {
             gen_mutex_unlock(&manager->mutex);
             if(worker->impl->do_work)
@@ -1070,7 +1075,8 @@ int PINT_manager_test_op(PINT_manager_t manager,
      * so we try to service if its in a worker that
      * doesn't service operations separately
      */
-    qlist_for_each_entry(worker, &manager->workers, link)
+    qlist_for_each_entry(worker, &manager->workers, link,
+            struct PINT_worker_s)
     {
         gen_mutex_unlock(&manager->mutex);
         if(worker->impl->do_work)
@@ -1184,7 +1190,8 @@ int PINT_manager_wait_context(PINT_manager_t manager,
     assert(PINT_context_is_callback(context));
 
     gen_mutex_lock(&manager->mutex);
-    qlist_for_each_entry(worker, &manager->workers, link)
+    qlist_for_each_entry(worker, &manager->workers, link,
+            struct PINT_worker_s)
     {
         gen_mutex_unlock(&manager->mutex);
         if(worker->impl->do_work)
@@ -1227,7 +1234,8 @@ int PINT_manager_wait_op(PINT_manager_t manager,
     gettimeofday(&last, NULL);
 
     gen_mutex_lock(&manager->mutex);
-    qlist_for_each_entry(worker, &manager->workers, link)
+    qlist_for_each_entry(worker, &manager->workers, link,
+            struct PINT_worker_s)
     {
         gen_mutex_unlock(&manager->mutex);
         if(worker->impl->do_work)
@@ -1316,7 +1324,8 @@ static void PINT_manager_op_start(PINT_manager_t manager, PINT_operation_t *op)
     struct PINT_manager_event_handler_entry_s *handler;
 
     /* invoke the event callbacks for this manager */
-    qlist_for_each_entry(handler, &manager->event_handlers, link)
+    qlist_for_each_entry(handler, &manager->event_handlers, link,
+            struct PINT_manager_event_handler_entry_s)
     {
         handler->callback(
             PINT_OP_EVENT_START, handler->event_ptr, op->id, op->hint);
@@ -1327,7 +1336,8 @@ static void PINT_manager_op_end(PINT_manager_t manager, PINT_operation_t *op)
 {
     struct PINT_manager_event_handler_entry_s *handler;
 
-    qlist_for_each_entry(handler, &manager->event_handlers, link)
+    qlist_for_each_entry(handler, &manager->event_handlers, link,
+            struct PINT_manager_event_handler_entry_s)
     {
         handler->callback(
             PINT_OP_EVENT_END, handler->event_ptr, op->id, op->hint);
