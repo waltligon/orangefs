@@ -2564,6 +2564,8 @@ struct PVFS_servreq_mgmt_split_dirent
     int32_t     nentries;
     PVFS_handle *entry_handles;
     char **entry_names;
+    PVFS_SID *sid_array;
+    int sid_count;
 };
 endecode_fields_5aa_struct(
     PVFS_servreq_mgmt_split_dirent,

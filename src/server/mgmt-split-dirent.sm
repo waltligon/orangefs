@@ -15,6 +15,8 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "dist-dir-utils.h"
+#include "pint-cached-config.h"
+
 
 enum
 {
@@ -165,11 +167,11 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
         /* TJS: make sure to grab SIDs and Handles to put in case we don't undo */
         if(! s_op->req->u.mgmt_split_dirent.undo){
             memcpy(val_buffer_entry_point, 
-                   s_op->req->u.mgmt_split_dirent.entry_handles[j], 
-                   sizeof(PVFS_HANDLE));
+                   &s_op->req->u.mgmt_split_dirent.entry_handles[j], 
+                   sizeof(PVFS_handle));
             memcpy(++val_buffer_entry_point, 
                    sid_array_entry_point, 
-                   sizeof(PVFS_HANDLE));
+                   sizeof(PVFS_handle));
             sid_array_entry_point += s_op->metasidcnt;
             val_buffer_entry_point += s_op->metasidcnt;
 
@@ -327,6 +329,7 @@ static PINT_sm_action mgmt_split_dirent_release(
 static PINT_sm_action mgmt_split_dirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->u.mgmt_split_dirent.keyval_temp_store){
         free(s_op->u.mgmt_split_dirent.keyval_temp_store);
     }
