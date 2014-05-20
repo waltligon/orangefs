@@ -1083,7 +1083,7 @@ class OFSTestNode(object):
                 " bash -c 'echo 0 > /selinux/enforce'",
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb", 
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
@@ -1141,7 +1141,7 @@ class OFSTestNode(object):
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive patch libuuid1 uuid-devel",
+                "zypper --non-interactive patch libuuid1 uuid-devel gdb",
                 
     
                 "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`",
@@ -1181,14 +1181,13 @@ class OFSTestNode(object):
             # download Java 6
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
-                   logging.exception(output)
-                   return rc
+                logging.exception(output)
+                return rc
             
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
-                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients", 
-                "yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
                 # install java
                 "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
@@ -1847,15 +1846,16 @@ class OFSTestNode(object):
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
-        if enable_strict == True:
-            # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
-            # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
-            
-            # won't work for rhel 5 based distros, gcc is too old.
-            if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
-                pass
-            else:
-                configure_opts = configure_opts+" --enable-strict"
+        # No reason to do this. We want debug info
+#         if enable_strict == True:
+#             # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
+#             # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
+#             
+#             # won't work for rhel 5 based distros, gcc is too old.
+#             if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
+#                 pass
+#             else:
+#                 configure_opts = configure_opts+" --enable-strict"
 
         if enable_hadoop == True:
             configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
