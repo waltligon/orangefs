@@ -2318,7 +2318,7 @@ class OFSTestNode(object):
                     
                 server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias)
                 print server_start
-                rc = self.runSingleCommandAsRoot(server_start,output)
+                rc = self.runSingleCommand(server_start,output)
                 
                 # give the servers 15 seconds to get running
                 print "Starting OrangeFS servers..."
