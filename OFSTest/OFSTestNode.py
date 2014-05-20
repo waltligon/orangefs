@@ -2026,7 +2026,8 @@ class OFSTestNode(object):
         
         
         self.changeDirectory("%s/test" % self.ofs_source_location)
-        rc = self.runSingleCommand("./configure %s"% configure_options)
+        #Turn off optimizations and turn on debug symbols.
+        rc = self.runSingleCommand("CFLAGS='-g -O0' ./configure %s"% configure_options)
         if rc != 0:
             logging.exception("Could not configure OrangeFS tests")
             return rc
@@ -2591,7 +2592,3 @@ class OFSTestNode(object):
         # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
         
-        
-
-
- 
