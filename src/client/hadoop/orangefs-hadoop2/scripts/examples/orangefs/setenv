@@ -1,0 +1,8 @@
+export ORANGEFS_PREFIX="/opt/orangefs-denton.hadoop2.trunk"
+export DB_DIR="/opt/db4"
+export PATH="${ORANGEFS_PREFIX}/bin:${ORANGEFS_PREFIX}/sbin:${PATH}"
+export JNI_LIBRARY_PATH="${ORANGEFS_PREFIX}/lib"
+export LD_LIBRARY_PATH="${ORANGEFS_PREFIX}/lib:${DB_DIR}/lib"
+export PVFS2TAB_FILE="${ORANGEFS_PREFIX}/etc/pvfs2tab"
+ORANGEFS_CONF_FILE="/home/denton/projects/orangefs-configs/denton.hadoop2.trunk/server.conf"
+ORANGEFS_STORAGE_DIR="/home/denton/storage/denton.hadoop2.trunk"

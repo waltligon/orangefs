@@ -423,6 +423,7 @@ public class OrangeFileSystem extends FileSystem {
         workingDirectory = new Path("/user/" + System.getProperty("user.name"))
                 .makeQualified(this.uri, null);
         OFSLOG.debug("workingDirectory = " + workingDirectory.toString());
+        this.initialized = true;
     }
 
     public boolean isDir(Path f) throws FileNotFoundException {
@@ -433,6 +434,10 @@ public class OrangeFileSystem extends FileSystem {
             throw new FileNotFoundException();
         }
         return orange.posix.isDir(stats.st_mode) != 0 ? true : false;
+    }
+    
+    public boolean isInitialized() {
+    	return this.initialized;
     }
 
     /* List the statuses of the files/directories in the given path if the path

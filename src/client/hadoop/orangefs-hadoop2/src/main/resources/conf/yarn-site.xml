@@ -61,12 +61,12 @@
 
   <property>
     <name>yarn.nodemanager.local-dirs</name>
-    <value>/home/denton/hadoop2local</value>
+    <value>/home/${user.name}/hadoop2local</value>
     <description>directory for intermediate data</description>
   </property>
   <property>
     <name>yarn.nodemanager.log-dirs</name>
-    <value>/home/denton/hadoop2logs</value>
+    <value>/home/${user.name}/hadoop2logs</value>
     <description>directory for logs</description>
   </property>
   <property>
