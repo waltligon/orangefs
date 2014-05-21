@@ -528,8 +528,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 #ifdef ENABLE_CAPCACHE
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
-        capcache_ret = PINT_capcache_lookup(&s_op->req->capability, 
-                                            &cap_flags);
+        capcache_ret = PINT_capcache_lookup_by_cap(&s_op->req->capability, 
+                                                   &cap_flags);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s\n", __func__,
                  (capcache_ret > 0) ? "hit" : "miss");
 

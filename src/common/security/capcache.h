@@ -34,8 +34,10 @@
 #define CAPCACHE_LOOKUP_FOUND      1
 #define CAPCACHE_LOOKUP_REVOKED    2
 
-/* capcache entry structure */
+/* capcache data structure */
 typedef struct capcache_data_s {
+    PVFS_capability_id cap_id;
+    PVFS_handle handle;
     int flags;
     PVFS_capability *cap;
 } capcache_data_t;
@@ -45,8 +47,20 @@ int PINT_capcache_init(void);
 
 int PINT_capcache_finalize(void);
 
-int PINT_capcache_lookup(PVFS_capability *cap,
-                         int *cap_flags);
+int PINT_capcache_lookup_by_cap(PVFS_capability *cap,
+                                int *cap_flags);
+
+int PINT_capcache_lookup_by_id(PVFS_capability_id cap_id,
+                               PVFS_handle handle,
+                               PVFS_capability **cap,
+                               int *cap_flags);
+
+int PINT_capcache_lookup_by_handle(PVFS_handle handle,
+                                   PVFS_capability **cap_array[],
+                                   uint32_t *num_caps);
+
+void PINT_capcache_free_cap_array(PVFS_capability *cap_array[],
+                                  uint64_t num_caps);
 
 int PINT_capcache_insert(PVFS_capability *cap,
                          int cap_flags);
@@ -56,10 +70,7 @@ int PINT_capcache_quick_sign(PVFS_capability *cap);
 #endif
 
 #ifdef ENABLE_REVOCATION
-int PINT_capcache_lookup_by_handle(PVFS_handle handle,
-                                   PVFS_capability **cap);
-
-int PINT_capcache_revoke_cap(const char *server,
+int PINT_capcache_revoke_cap(PVFS_handle handle,
                              PVFS_capability_id cap_id);
 #endif
 

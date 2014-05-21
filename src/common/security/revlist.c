@@ -82,17 +82,8 @@ static uint16_t PINT_revlist_get_index(void *data,
     uint16_t index = 0;
 
     /* What to hash:
-        server
         cap_id
     */
-	if (rev_data->server != NULL)
-	{
-        MurmurHash3_x64_128((const void *) rev_data->server,
-            strlen(rev_data->server), seed, hash2);
-        hash1[0] += hash2[0];
-        hash1[1] += hash2[1];
-	}
-
     MurmurHash3_x64_128((const void *) &rev_data->cap_id,
         sizeof(PVFS_capability_id), seed, hash2);
     hash1[0] += hash2[0];
@@ -138,11 +129,6 @@ void PINT_revlist_cleanup(void *entry)
     revocation_data_t *rev_data = REVLIST_ENTRY_DATA(entry);
     if (rev_data != NULL)
     {
-        if (rev_data->server != NULL)
-        {
-            free(rev_data->server);
-        }
-
         free(rev_data);
     }
 }
@@ -158,8 +144,6 @@ static void PINT_revlist_debug(const char *prefix,
     revocation_data_t *rev_data = REVLIST_DATA(data);
 
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s revocation data:\n", prefix);
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tserver: %s\n", 
-                 rev_data->server ? rev_data->server : "(none)");
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "\tid: %llu\n", llu(rev_data->cap_id));
 
 }
@@ -204,18 +188,15 @@ int PINT_revlist_finalize(void)
  * 
  * return seccache_entry_t if found, NULL otherwise
  */
-seccache_entry_t *PINT_revlist_lookup(const char *server,
-									  PVFS_capability_id cap_id)
+seccache_entry_t *PINT_revlist_lookup(PVFS_capability_id cap_id)
 {
     revocation_data_t cmp_data;
 
     /* set up comparison entry */
-    cmp_data.server = (char *) server;
     cmp_data.cap_id = cap_id;
 
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: looking up cap %llx for "
-                                        "server %s\n", __func__, llu(cap_id),
-                                        (server != NULL) ? server : "(null)");
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: looking up cap %llx\n", __func__, 
+                 llu(cap_id));
 
     return PINT_seccache_lookup(revlist, &cmp_data);
 }
@@ -226,22 +207,13 @@ seccache_entry_t *PINT_revlist_lookup(const char *server,
  * 
  * return 0 on success, -PVFS_ERROR otherwise
  */
-int PINT_revlist_insert(const char *server, 
-                        PVFS_capability_id cap_id)
+int PINT_revlist_insert(PVFS_capability_id cap_id)
 {
     revocation_data_t *rev_data;
     int ret;
 
-    /* TODO
-    if (server == NULL)
-    {
-        return -PVFS_EINVAL;
-    }
-    */
-
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: inserting cap %llx for "
-                                        "server %s\n", __func__, llu(cap_id),
-                                        (server != NULL) ? server : "(null)");
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: inserting cap %llx\n", __func__,
+                 llu(cap_id));
 
 
     /* allocate data and fields */
@@ -249,19 +221,6 @@ int PINT_revlist_insert(const char *server,
     if (rev_data == NULL)
     {
         return -PVFS_ENOMEM;
-    }
-
-    /* copy server (TODO) */
-    if (server != NULL)
-    {
-        rev_data->server = (char *) malloc(strlen(server) + 1);
-        if (rev_data->server == NULL)
-        {
-            free(rev_data);
-
-            return -PVFS_ENOMEM;
-        }
-        strcpy(rev_data->server, server);
     }
 
     rev_data->cap_id = cap_id;

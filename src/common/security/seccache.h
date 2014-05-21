@@ -26,7 +26,7 @@
 /*** seccache default property values ***/
 /* number of entries cache can hold */
 #define SECCACHE_ENTRY_LIMIT_DEFAULT     256
-/* the total certificate cache size 64 MB */
+/* the total security cache size (64 MB) */
 #define SECCACHE_SIZE_LIMIT_DEFAULT      (1024 * 1024 * 64)
 /* number of indexes in our chained hash-table */
 #define SECCACHE_HASH_LIMIT_DEFAULT      128
@@ -100,8 +100,8 @@ typedef struct seccache_s {
 
 /* returns a new security cache structure */
 seccache_t *PINT_seccache_new(const char *desc,
-                               seccache_methods_t *methods,
-                               uint64_t hash_limit);
+                              seccache_methods_t *methods,
+                              uint64_t hash_limit);
 /* set a security cache property (entry max etc.) */
 int PINT_seccache_set(seccache_t *cache,
                       seccache_prop_t prop,
@@ -124,9 +124,14 @@ void PINT_seccache_reset_stats(seccache_t *cache);
 /* deletes cache, freeing all memory */
 void PINT_seccache_cleanup(seccache_t *cache);
 
-/* locates an entry */
+/* locates an entry using default compare method */
 seccache_entry_t *PINT_seccache_lookup(seccache_t *cache, 
                                        void *data);
+
+/* locates an entry using specified compare function */
+seccache_entry_t *PINT_seccache_lookup_cmp(seccache_t *cache,
+                                           int (*compare)(void *, void *),
+                                           void *data);
 
 /* inserts an entry with the given data */
 int PINT_seccache_insert(seccache_t *cache,

@@ -331,7 +331,7 @@ static const configoption_t options[] =
 
     /* Capability timeout in seconds */
     {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
-        CTX_SECURITY, "60"},
+        CTX_SECURITY, "600"},
 
     /* Path to CA certificate file in PEM format.
      * Note: May be in the Defaults section for backwards-compatibility.
@@ -423,7 +423,7 @@ static const configoption_t options[] =
 
     /* LDAP server timeout for searches (in seconds) 
      */
-    {"SearchTimeout", ARG_INT, get_ldap_search_timeout, NULL,
+    {"SearchTimeoutSecs", ARG_INT, get_ldap_search_timeout, NULL,
         CTX_LDAP, "15"},
 
     /* This groups the Alias mapping options.

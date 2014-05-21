@@ -365,7 +365,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         *req,
                         s_op->req->capability,
                         fs_id,
-                        s_op->req->u.tree_revoke_cap.cap_id,
+                        this_req->u.tree_revoke_cap.cap_handle,
+                        this_req->u.tree_revoke_cap.num_caps,
+                        this_req->u.tree_revoke_cap.cap_id_array,
                         s_op->req->hints);
                     break;
                 }
@@ -546,7 +548,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         msg_p->req,
                         s_op->req->capability,
                         fs_id,
-                        this_req->u.tree_revoke_cap.cap_id,
+                        this_req->u.tree_revoke_cap.num_caps,
+                        this_req->u.tree_revoke_cap.cap_id_array,
+                        this_req->u.tree_revoke_cap.cap_handle,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
                         s_op->req->hints);

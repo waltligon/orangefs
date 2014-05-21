@@ -968,7 +968,11 @@ static PINT_sm_action setattr_check_revoke_cap(
 static PINT_sm_action setattr_revoke_cap_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     js_p->error_code = 0;
+
+    s_op->u.setattr.rev_cap_ids = NULL;
 
     return SM_ACTION_COMPLETE;
 }
@@ -1045,8 +1049,9 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = &s_op->attr;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability cap, *rev_cap;
+    PVFS_capability cap, **rev_caps;    
     PVFS_handle cap_handle[1];
+    uint32_t num_caps;
     int ret, i;
 
     /* exit on error */
@@ -1082,35 +1087,32 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    /* locate the capability to be revoked */
-    ret = PINT_capcache_lookup_by_handle(cap_handle[0], &rev_cap);
+    /* locate the capabilities to be revoked */
+    ret = PINT_capcache_lookup_by_handle(cap_handle[0], &rev_caps, &num_caps);
 
     /* capability not found or error */
-    if (ret <= 0)
+    if (ret != 0)
     {        
-        if (ret == CAPCACHE_LOOKUP_NOT_FOUND)
-        {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: Could not locate cap for "
-                         "handle %llu - exiting SM\n", __func__, 
-                         llu(cap_handle[0]));
-            js_p->error_code = STATE_REVOKE_NOT_NEEDED;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: Error %d looking up cap "
-                         "for handle %llu - exiting SM\n", __func__, ret,
-                         llu(cap_handle[0]));
-            js_p->error_code = ret;
-        }
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: Error %d looking up caps "
+                     "for handle %llu - exiting SM\n", __func__, ret,
+                     llu(cap_handle[0]));
+        js_p->error_code = ret;
+
+        return SM_ACTION_COMPLETE;
+    }
+    else if (num_caps == 0)
+    {   
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: No caps for "
+                     "handle %llu - exiting SM\n", __func__, 
+                     llu(cap_handle[0]));
+        js_p->error_code = STATE_REVOKE_NOT_NEEDED;
 
         return SM_ACTION_COMPLETE;
     }
 
     /* debug message */
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: building revocation message:\n",
-                 __func__);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tCapability ID: %llx\n",
-                 llu(rev_cap->cap_id));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: revoking capabilities for "
+                 "object: ", __func__);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tPrimary handle: %llu\n", 
                  llu(cap_handle[0]));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tData handles:\n");
@@ -1120,11 +1122,31 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
                      llu(a_p->u.meta.dfile_array[i]));
     }
 
+    /* allocate cap id array */
+    s_op->u.setattr.rev_cap_ids = (PVFS_capability_id *) 
+        calloc(num_caps, sizeof(PVFS_capability_id));
+    if (s_op->u.setattr.rev_cap_ids == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capabilities:\n", __func__);    
+    for (i = 0; i < num_caps; i++)
+    {
+        s_op->u.setattr.rev_cap_ids[i] = rev_caps[i]->cap_id;
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\t%llx\n", 
+                     llu(s_op->u.setattr.rev_cap_ids[i]));
+    }
+
     PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
         msg_p->req,
         cap,
         s_op->req->u.setattr.fs_id,
-        rev_cap->cap_id,
+        num_caps,
+        s_op->u.setattr.rev_cap_ids,
+        cap_handle[0],
         a_p->u.meta.dfile_count,
         a_p->u.meta.dfile_array,
         s_op->req->hints);
@@ -1137,16 +1159,16 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 
-    if (ret)
+    if (ret != 0)
     {
-        gossip_err("Failed to map dirdata server address\n");
+        PVFS_perror_gossip("Failed to map handle to server address", ret);
         js_p->error_code = ret;
 
         return SM_ACTION_COMPLETE;
     }
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
-
+ 
     return SM_ACTION_COMPLETE;
 }
 
@@ -1164,6 +1186,11 @@ static PINT_sm_action setattr_revoke_cap_cleanup(
     if (a_p->u.meta.dfile_array != NULL)
     {
         free(a_p->u.meta.dfile_array);
+    }
+
+    if (s_op->u.setattr.rev_cap_ids != NULL)
+    {
+        free(s_op->u.setattr.rev_cap_ids);
     }
 
     PINT_cleanup_capability(&s_op->msgarray_op.msgpair.req.capability);

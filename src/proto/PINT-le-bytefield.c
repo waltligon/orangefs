@@ -195,7 +195,9 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_setattr;
                 break;
             case PVFS_SERV_REVOKE_CAP:
-                req.u.revoke_cap.cap_id = 0;
+                req.u.revoke_cap.num_caps = 0;
+                req.u.revoke_cap.cap_id_array = NULL;
+                reqsize = extra_size_PVFS_servreq_revoke_cap;
                 break;
             case PVFS_SERV_CRDIRENT:
                 req.u.crdirent.name = tmp_name;
@@ -329,7 +331,8 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_tree_setattr;
                 break;
             case PVFS_SERV_TREE_REVOKE_CAP:                
-                req.u.tree_revoke_cap.cap_id = 0;
+                req.u.tree_revoke_cap.num_caps = 0;
+                req.u.tree_revoke_cap.cap_id_array = NULL;
                 req.u.tree_revoke_cap.num_servers = 0;
                 req.u.tree_revoke_cap.handle_array = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_revoke_cap;

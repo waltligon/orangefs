@@ -81,10 +81,22 @@ static PINT_sm_action revoke_cap_set_revocation(struct PINT_smcb *smcb,
 {
 #ifdef ENABLE_REVOCATION
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    const char *server = ""; /* TODO */
+    int i;
 
-    js_p->error_code = PINT_capcache_revoke_cap(server,
-        s_op->req->u.revoke_cap.cap_id);
+    /* revoke each capability in message */
+    for (i = 0; 
+         (i < s_op->req->u.revoke_cap.num_caps) && (js_p->error_code == 0);
+         i++)
+    {
+        js_p->error_code = PINT_capcache_revoke_cap(
+                              s_op->req->u.revoke_cap.cap_handle,
+                              s_op->req->u.revoke_cap.cap_id_array[i]);
+    }
+
+    if (js_p->error_code != 0)
+    {
+        PVFS_perror_gossip("Error revoking cap", js_p->error_code);
+    }
 #endif
 
     return SM_ACTION_COMPLETE;

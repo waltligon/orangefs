@@ -25,7 +25,6 @@
 
 /* revocation list entry */
 typedef struct revocation_data_s {
-    char *server;
     PVFS_capability_id cap_id;
     PVFS_time expiration;
 } revocation_data_t;
@@ -36,11 +35,9 @@ int PINT_revlist_init(void);
 
 int PINT_revlist_finalize(void);
 
-seccache_entry_t *PINT_revlist_lookup(const char *server,
-									  PVFS_capability_id cap_id);
+seccache_entry_t *PINT_revlist_lookup(PVFS_capability_id cap_id);
 
-int PINT_revlist_insert(const char *server, 
-                        PVFS_capability_id cap_id);
+int PINT_revlist_insert(PVFS_capability_id cap_id);
 
 int PINT_revlist_remove(seccache_entry_t *entry);
 

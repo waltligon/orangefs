@@ -414,6 +414,7 @@ struct PINT_server_setattr_op
 {
     PVFS_ds_keyval revoke_cap_key;
     PVFS_ds_keyval revoke_cap_val;
+    PVFS_capability_id *rev_cap_ids;
 };
 
 struct PINT_server_rmdirent_op
