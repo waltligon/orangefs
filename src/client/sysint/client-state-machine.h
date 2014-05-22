@@ -347,11 +347,10 @@ struct PINT_client_io_sm
     int small_io;
 };
 
+/* Empty struct; field does nothing! */
 struct PINT_client_flush_sm
 {
-#ifdef WIN32
     int field;
-#endif
 };
 
 struct PINT_client_readdir_sm
@@ -690,7 +689,6 @@ typedef struct PINT_client_sm
         struct PINT_client_getattr_sm getattr;
         struct PINT_client_setattr_sm setattr;
         struct PINT_client_io_sm io;
-        struct PINT_client_flush_sm flush;
         struct PINT_client_readdirplus_sm readdirplus;
         struct PINT_client_lookup_sm lookup;
         struct PINT_client_rename_sm rename;

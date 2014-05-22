@@ -53,7 +53,7 @@ struct job_desc *alloc_job_desc(int type)
 #endif
 
     return (jd);
-};
+}
 
 /* dealloc_job_desc()
  *

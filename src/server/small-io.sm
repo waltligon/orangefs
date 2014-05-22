@@ -311,7 +311,7 @@ static inline enum PINT_server_req_access_type PINT_server_req_access_small_io(
     return PINT_SERVER_REQ_MODIFY;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(small_io);
+PINT_GET_OBJECT_REF_DEFINE(small_io)
 
 struct PINT_server_req_params pvfs2_small_io_params =
 {

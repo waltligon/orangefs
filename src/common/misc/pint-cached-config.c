@@ -609,21 +609,21 @@ int PINT_cached_config_map_servers(
     {
     case PVFS_SYS_LAYOUT_LIST:
 
-        if(*inout_num_datafiles < layout->server_list.count)
+        if(*inout_num_datafiles < layout->count)
         {
             gossip_err("The specified datafile layout is larger"
                        " than the number of requested datafiles\n");
             return -PVFS_EINVAL;
         }
 
-        *inout_num_datafiles = layout->server_list.count;
-        for(i = 0; i < layout->server_list.count; ++i)
+        *inout_num_datafiles = layout->count;
+        for(i = 0; i < layout->count; ++i)
         {
             if(handle_extent_array)
             {
                 ret = PINT_cached_config_get_extents(
                                          fsid,
-                                         &layout->server_list.servers[i],
+                                         &layout->servers[i],
                                          &handle_extent_array[i]);
                 if(ret < 0)
                 {
@@ -633,7 +633,7 @@ int PINT_cached_config_map_servers(
                 }
             }
 
-            addr_array[i] = layout->server_list.servers[i];
+            addr_array[i] = layout->servers[i];
         }
         break;
 

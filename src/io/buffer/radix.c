@@ -91,62 +91,62 @@ void *rst_insert(rst_t *t, unsigned long key, void *item)
     /* Locate the insertion position. */
     p = t->root;    
     for(;;) {
-	/* Traverse left or right branch, depending on the current key bit, j.
-	 * If the branch does not exist, then the insertion position has
-	 * been located.  Note that the (j+1)th bit in p->child_links
-	 * indicates the kind of pointer for p->a[j].
-	 */
-	j = (key & mask) >> i;
-	if(!(p->child_links & (j+1))) break;
-	p = p->a[j];
+    /* Traverse left or right branch, depending on the current key bit, j.
+     * If the branch does not exist, then the insertion position has
+     * been located.  Note that the (j+1)th bit in p->child_links
+     * indicates the kind of pointer for p->a[j].
+     */
+    j = (key & mask) >> i;
+    if(!(p->child_links & (j+1))) break;
+    p = p->a[j];
 
-	/* Move to the next bit. */
-	mask >>= 1;
-	i--;
+    /* Move to the next bit. */
+    mask >>= 1;
+    i--;
     }
 
     if((item2 = p->a[j])) {
-	/* Check that the same item does not already exist in the tree. */
-	key2 = t->get_value(item2);
-	if(key2 == key) {
-	    fprintf(stderr, "rst_insert: error, key2=key=%ld (item=%p, exist=%p)\n", key, item, item2);
-	    return p->a[j];  /* Insert failed. */
+    /* Check that the same item does not already exist in the tree. */
+    key2 = t->get_value(item2);
+    if(key2 == key) {
+        fprintf(stderr, "rst_insert: error, key2=key=%ld (item=%p, exist=%p)\n", key, item, item2);
+        return p->a[j];  /* Insert failed. */
         }
 
-	/* Create new nodes as necessary, in order to distinguish the key of
-	 * the inserted item from the key of the existing item.
-	 * The variable stop_mask is used for determining where the 
-	 * bits of the two mkeys differ.
-	 */
-	stop_mask = key ^ key2;  /* Exclusive OR */
-	x = malloc(sizeof(rst_node_t));
-	p->a[j] = x;
-	p->child_links = p->child_links | (j+1);  /* Set bit j. */
-	for(;;) {
-	    p = x;
-	    
-	    /* Move to the next bit. */
-	    mask >>= 1;
-	    i--;
-	    j = (key & mask) >> i;
+    /* Create new nodes as necessary, in order to distinguish the key of
+     * the inserted item from the key of the existing item.
+     * The variable stop_mask is used for determining where the 
+     * bits of the two mkeys differ.
+     */
+    stop_mask = key ^ key2;  /* Exclusive OR */
+    x = malloc(sizeof(rst_node_t));
+    p->a[j] = x;
+    p->child_links = p->child_links | (j+1);  /* Set bit j. */
+    for(;;) {
+        p = x;
+        
+        /* Move to the next bit. */
+        mask >>= 1;
+        i--;
+        j = (key & mask) >> i;
 
-	    /* If the current bit value is different in key and key2, then
-	     * no more new nodes need to be created.
-	     */
-	    if(mask & stop_mask) break;
+        /* If the current bit value is different in key and key2, then
+         * no more new nodes need to be created.
+         */
+        if(mask & stop_mask) break;
 
-	    x = malloc(sizeof(rst_node_t));
-	    p->a[j] = x;
-	    p->a[!j] = NULL;
-	    p->child_links = (j+1);  /* Only bit j is set. */
-	}
+        x = malloc(sizeof(rst_node_t));
+        p->a[j] = x;
+        p->a[!j] = NULL;
+        p->child_links = (j+1);  /* Only bit j is set. */
+    }
 
-	p->a[j] = item;
-	p->a[!j] = item2;
+    p->a[j] = item;
+    p->a[!j] = item2;
         p->child_links = 0;
     }
     else {
-	p->a[j] = item;
+    p->a[j] = item;
     }
 
     t->n++;
@@ -170,14 +170,14 @@ void *rst_find(rst_t *t, unsigned long index)
     /* Search for the item with key `key'. */
     p = t->root;
     for(;;) {
-	/* Traverse left or right branch, depending on the current bit. */
-	j = (index & mask) >> i;
-	if(!(p->child_links & (j+1))) break;
-	p = p->a[j];
+    /* Traverse left or right branch, depending on the current bit. */
+    j = (index & mask) >> i;
+    if(!(p->child_links & (j+1))) break;
+    p = p->a[j];
 
-	/* Move to the next bit. */
-	mask >>= 1;
-	i--;
+    /* Move to the next bit. */
+    mask >>= 1;
+    i--;
     }
 
     if(!p->a[j] || t->get_value(p->a[j]) != index ) return NULL;
@@ -198,9 +198,9 @@ static void *rst_find_min(rst_t *t)
 
     p = t->root;
     for(;;) {
-	j = p->a[0] ? 0 : 1;
-	if(!(p->child_links & (j+1))) break;
-	p = p->a[j];
+    j = p->a[0] ? 0 : 1;
+    if(!(p->child_links & (j+1))) break;
+    p = p->a[j];
     }
 
     return p->a[j];
@@ -230,18 +230,18 @@ void *rst_delete(rst_t *t, unsigned long key)
     /* Search for the item with key `key'. */
     p = t->root;
     for(;;) {
-	
-	/* Traverse left or right branch, depending on the current bit. */
-	j = (key & mask) >> i;
-	stack[tos] = p;
-	path_info[tos] = j;
-	tos++;
-	if(!(p->child_links & (j+1))) break;
-	p = p->a[j];
+    
+    /* Traverse left or right branch, depending on the current bit. */
+    j = (key & mask) >> i;
+    stack[tos] = p;
+    path_info[tos] = j;
+    tos++;
+    if(!(p->child_links & (j+1))) break;
+    p = p->a[j];
 
-	/* Move to the next bit. */
-	mask >>= 1;
-	i--;
+    /* Move to the next bit. */
+    mask >>= 1;
+    i--;
     }
 
     /* The delete operation fails if the tree contains no items, or no mathcing
@@ -257,17 +257,17 @@ void *rst_delete(rst_t *t, unsigned long key)
      */
     tos--;
     for(;;) {
-	if(tos == 0) {  /* Special case: deleteing a child of the root node. */
-	    p->a[j] = NULL;
-	    p->child_links = p->child_links & ~(j+1);  /* Clear bit j. */
-	    return return_item;
-	}
-	
+    if(tos == 0) {  /* Special case: deleteing a child of the root node. */
+        p->a[j] = NULL;
+        p->child_links = p->child_links & ~(j+1);  /* Clear bit j. */
+        return return_item;
+    }
+    
         if(p->a[!j]) break;
-	
-	free(p);
+    
+    free(p);
         p = stack[--tos];
-	j = path_info[tos];
+    j = path_info[tos];
     }
     
     /* For the current node, p, the child pointer p->a[!j] is not NULL.
@@ -281,20 +281,20 @@ void *rst_delete(rst_t *t, unsigned long key)
     else {  /* p->a[!j] points to an item. */
 
         /* Delete p, and parent nodes for which the other child pointer is
-	 * NULL.
-	 */
+     * NULL.
+     */
         y = p->a[!j];
         do {
-	    free(p);
+        free(p);
             p = stack[--tos];
-	    j = path_info[tos];
-	    if(p->a[!j]) break;
+        j = path_info[tos];
+        if(p->a[!j]) break;
         } while(tos != 0);
 
         /* For the current node, p, p->a[!j] is not NULL.  We assign item y to
-	 * p->a[j].
-	 */
-	p->a[j] = y;
+     * p->a[j].
+     */
+    p->a[j] = y;
     }
     p->child_links = p->child_links & ~(j+1);  /* Clear bit j. */
 

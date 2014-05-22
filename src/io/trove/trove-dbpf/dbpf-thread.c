@@ -177,7 +177,7 @@ int dbpf_do_one_work_cycle(int *out_count)
             if (cur_op->op.state != OP_QUEUED)
             {
                 gossip_err("INVALID OP STATE FOUND %d (op is %p)\n",
-                           cur_op->op.state, cur_op);
+                           cur_op->op.state, (void *)cur_op);
                 assert(cur_op->op.state == OP_QUEUED);
             }
 

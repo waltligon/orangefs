@@ -4729,7 +4729,8 @@ static void precreate_pool_fill_thread_mgr_callback(
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
             qlist_del(&jd_checker->job_desc_q_link);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Pushing get_handles() sleeper for jd: %p.\n", jd_checker);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Pushing get_handles() sleeper "
+                    "for jd: %p.\n", (void *)jd_checker);
             precreate_pool_get_handles_try_post(jd_checker);
         }
     }
@@ -5685,7 +5686,7 @@ int job_precreate_pool_register_server(
         for( i=0; i < PVFS_DS_TYPE_COUNT; i++ )
         {
             gossip_debug(GOSSIP_JOB_DEBUG, "%s: fs_pool %p, storing batch "
-                         "count at index %d: %u\n", __func__, fs, i, 
+                         "count at index %d: %u\n", __func__, (void *)fs, i, 
                          fs->type_batch_count[i]);
         }
 

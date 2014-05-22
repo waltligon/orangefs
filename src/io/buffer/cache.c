@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "quicklist.h"
 #include "pvfs2-internal.h"
 #include "internal.h"
 #include "state.h"
@@ -40,16 +41,16 @@ struct extent * lookup_cache_item(struct inode *mapping, unsigned long index)
 static inline int add_cache_item_no_policy(struct extent *extent, 
          struct inode *mapping, unsigned long index)
 {
-	int error;
+    int error;
 
-	error = radix_tree_insert(&mapping->page_tree, index, extent); 
-	if ( !error ) {
-	    list_add(&extent->list, &mapping->clean_pages);
-	    extent->mapping = mapping;
-	    extent->index = index;
-	    mapping->nrpages++;
-	}
-	return error;
+    error = radix_tree_insert(&mapping->page_tree, index, extent); 
+    if ( !error ) {
+        qlist_add(&extent->list, &mapping->clean_pages);
+        extent->mapping = mapping;
+        extent->index = index;
+        mapping->nrpages++;
+    }
+    return error;
 }
 
 /* add an item into a cache list with certain policy.
@@ -68,7 +69,7 @@ static inline void add_cache_item_with_policy(struct extent *extent, int cache_p
             break;
 
         default:
-		    NCAC_error("unknown cache policy");
+            NCAC_error("unknown cache policy");
             break;
     }
 }
@@ -81,18 +82,18 @@ int add_cache_item(struct extent *extent, struct inode *mapping,
     int ret = add_cache_item_no_policy(extent, mapping, index);
 
     /* 2. put into cache list with respect to the cache policy */ 
-	if (ret == 0){
-		add_cache_item_with_policy(extent, policy);
-		return ret;
-	}
+    if (ret == 0){
+        add_cache_item_with_policy(extent, policy);
+        return ret;
+    }
     return ret;    
 }
 
 /* ==================================================================
- *                remove an item from the cache:					*
+ *                remove an item from the cache:                    *
  * (1) remove it from the radix tree (remove_cache_item_no_policy). *
  * (2) remove it from its cache list.(remove_cache_item_with_policy)*
- * (3) add this item into the free extent list (add_free_extent_list_item	*
+ * (3) add this item into the free extent list (add_free_extent_list_item    *
  * ================================================================== 
  */
 
@@ -121,7 +122,7 @@ static void remove_cache_item_with_policy(struct extent *victim, int policy)
             LRU_remove_cache_item(cache, victim);
             break;
         default:
-		    NCAC_error("unknown cache policy");
+            NCAC_error("unknown cache policy");
             break;
     }
 }
@@ -133,17 +134,17 @@ void remove_cache_item(struct extent *extent, int policy)
     remove_cache_item_no_policy(extent);
 }
 
-struct extent * get_free_extent_list_item(struct list_head *list)
+struct extent * get_free_extent_list_item(struct qlist_head *list)
 {
     struct extent *new;
-    struct list_head *delete;
+    struct qlist_head *delete;
 
-    if ( list_empty(list) ) return NULL;
+    if ( qlist_empty(list) ) return NULL;
 
     delete = list->next;
-    list_del_init(delete);
+    qlist_del_init(delete);
 
-    new = list_entry(delete->prev, struct extent, list);
+    new = qlist_entry(delete->prev, struct extent, list);
 
     return new;
 }
@@ -172,7 +173,7 @@ int shrink_cache(struct cache_stack *cache_stack,
             break;
         
         default:
-		    NCAC_error("unknown cache policy");
+            NCAC_error("unknown cache policy");
             break;
     }
     return ret;

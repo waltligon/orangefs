@@ -3228,7 +3228,8 @@ static void cleanup_stdio_internal(void)
 static void init_stdio_internal(void)
 {
     static int recurse_flag = 0;
-    static gen_mutex_t initlock = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+    static gen_mutex_t initlock;
+
     /* don't let more than one thread initialize */
     gen_mutex_lock(&initlock);
     if (init_flag || recurse_flag)
@@ -3239,84 +3240,90 @@ static void init_stdio_internal(void)
     /* init stdio is running */
     recurse_flag = 1;
 
+    if (gen_posix_recursive_mutex_init(&initlock) < 0)
+    {
+        gossip_err("init_stdio_internal: could not init recursive mutex\n");
+        abort();
+    }
+
     /* init open file chain - must do before setting up stdin etc */
     lock_init_stream(&open_files);
 
     /* init pointers to glibc stdio calls */
-    stdio_ops.fopen = dlsym(RTLD_NEXT, "fopen" );
-    stdio_ops.fdopen = dlsym(RTLD_NEXT, "fdopen" );
-    stdio_ops.freopen = dlsym(RTLD_NEXT, "freopen" );
-    stdio_ops.fwrite = dlsym(RTLD_NEXT, "fwrite" );
-    stdio_ops.fwrite_unlocked = dlsym(RTLD_NEXT, "fwrite_unlocked" );
-    stdio_ops.fread  = dlsym(RTLD_NEXT, "fread" );
-    stdio_ops.fread_unlocked = dlsym(RTLD_NEXT, "fread_unlocked" );
-    stdio_ops.fclose = dlsym(RTLD_NEXT, "fclose" );
-    stdio_ops.fseek = dlsym(RTLD_NEXT, "fseek" );
-    stdio_ops.fseek64 = dlsym(RTLD_NEXT, "fseek64" );
-    stdio_ops.fsetpos = dlsym(RTLD_NEXT, "fsetpos" );
-    stdio_ops.rewind = dlsym(RTLD_NEXT, "rewind" );
-    stdio_ops.ftell = dlsym(RTLD_NEXT, "ftell" );
-    stdio_ops.ftell64 = dlsym(RTLD_NEXT, "ftell64" );
-    stdio_ops.fgetpos = dlsym(RTLD_NEXT, "fgetpos" );
-    stdio_ops.fflush  = dlsym(RTLD_NEXT, "fflush" );
-    stdio_ops.fflush_unlocked = dlsym(RTLD_NEXT, "fflush_unlocked" );
-    stdio_ops.fputc  = dlsym(RTLD_NEXT, "fputc" );
-    stdio_ops.fputc_unlocked = dlsym(RTLD_NEXT, "fputc_unlocked" );
-    stdio_ops.fputs  = dlsym(RTLD_NEXT, "fputs" );
-    stdio_ops.fputs_unlocked = dlsym(RTLD_NEXT, "fputs_unlocked" );
-    stdio_ops.putc  = dlsym(RTLD_NEXT, "putc" );
-    stdio_ops.putc_unlocked = dlsym(RTLD_NEXT, "putc_unlocked" );
-    stdio_ops.putchar  = dlsym(RTLD_NEXT, "putchar" );
-    stdio_ops.putchar_unlocked = dlsym(RTLD_NEXT, "putchar_unlocked" );
-    stdio_ops.puts = dlsym(RTLD_NEXT, "puts" );
-    stdio_ops.putw = dlsym(RTLD_NEXT, "putw" );
-    stdio_ops.fgets = dlsym(RTLD_NEXT, "fgets" );
-    stdio_ops.fgetc = dlsym(RTLD_NEXT, "fgetc" );
-    stdio_ops.getc = dlsym(RTLD_NEXT, "getc" );
-    stdio_ops.getc_unlocked = dlsym(RTLD_NEXT, "getc_unlocked" );
-    stdio_ops.getchar = dlsym(RTLD_NEXT, "getchar" );
-    stdio_ops.getchar_unlocked = dlsym(RTLD_NEXT, "getchar_unlocked" );
-    stdio_ops.getw = dlsym(RTLD_NEXT, "getw" );
-    stdio_ops.gets = dlsym(RTLD_NEXT, "gets" );
-    stdio_ops.getdelim = dlsym(RTLD_NEXT, "getdelim" );
-    stdio_ops.ungetc = dlsym(RTLD_NEXT, "ungetc" );
-    stdio_ops.vfprintf = dlsym(RTLD_NEXT, "vfprintf" );
-    stdio_ops.vprintf = dlsym(RTLD_NEXT, "vprintf" );
-    stdio_ops.fprintf = dlsym(RTLD_NEXT, "fprintf" );
-    stdio_ops.printf = dlsym(RTLD_NEXT, "printf" );
-    stdio_ops.perror = dlsym(RTLD_NEXT, "perror" );
-    stdio_ops.fscanf = dlsym(RTLD_NEXT, "fscanf" );
-    stdio_ops.scanf = dlsym(RTLD_NEXT, "scanf" );
-    stdio_ops.clearerr  = dlsym(RTLD_NEXT, "clearerr" );
-    stdio_ops.clearerr_unlocked  = dlsym(RTLD_NEXT, "clearerr_unlocked" );
-    stdio_ops.feof  = dlsym(RTLD_NEXT, "feof" );
-    stdio_ops.feof_unlocked  = dlsym(RTLD_NEXT, "feof_unlocked" );
-    stdio_ops.ferror  = dlsym(RTLD_NEXT, "ferror" );
-    stdio_ops.ferror_unlocked  = dlsym(RTLD_NEXT, "ferror_unlocked" );
-    stdio_ops.fileno  = dlsym(RTLD_NEXT, "fileno" );
-    stdio_ops.fileno_unlocked  = dlsym(RTLD_NEXT, "fileno_unlocked" );
-    stdio_ops.remove  = dlsym(RTLD_NEXT, "remove" );
-    stdio_ops.setbuf  = dlsym(RTLD_NEXT, "setbuf" );
-    stdio_ops.setbuffer  = dlsym(RTLD_NEXT, "setbuffer" );
-    stdio_ops.setlinebuf  = dlsym(RTLD_NEXT, "setlinebuf" );
-    stdio_ops.setvbuf  = dlsym(RTLD_NEXT, "setvbuf" );
-    stdio_ops.mkdtemp = dlsym(RTLD_NEXT, "mkdtemp" );
-    stdio_ops.mkstemp = dlsym(RTLD_NEXT, "mkstemp" );
-    stdio_ops.tmpfile = dlsym(RTLD_NEXT, "tmpfile" );
-    stdio_ops.opendir  = dlsym(RTLD_NEXT, "opendir" );
-    stdio_ops.fdopendir  = dlsym(RTLD_NEXT, "fdopendir" );
-    stdio_ops.dirfd  = dlsym(RTLD_NEXT, "dirfd" );
-    stdio_ops.readdir  = dlsym(RTLD_NEXT, "readdir" );
-    stdio_ops.readdir64  = dlsym(RTLD_NEXT, "readdir64" );
-    stdio_ops.rewinddir  = dlsym(RTLD_NEXT, "rewinddir" );
-    stdio_ops.seekdir  = dlsym(RTLD_NEXT, "seekdir" );
-    stdio_ops.telldir  = dlsym(RTLD_NEXT, "telldir" );
-    stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
-    stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
-    stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
-    stdio_ops.flockfile  = dlsym(RTLD_NEXT, "flockfile" );
-    stdio_ops.ftrylockfile  = dlsym(RTLD_NEXT, "ftrylockfile" );
-    stdio_ops.funlockfile  = dlsym(RTLD_NEXT, "funlockfile" );
+    *(void **)(&stdio_ops.fopen) = dlsym(RTLD_NEXT, "fopen" );
+    *(void **)(&stdio_ops.fdopen) = dlsym(RTLD_NEXT, "fdopen" );
+    *(void **)(&stdio_ops.freopen) = dlsym(RTLD_NEXT, "freopen" );
+    *(void **)(&stdio_ops.fwrite) = dlsym(RTLD_NEXT, "fwrite" );
+    *(void **)(&stdio_ops.fwrite_unlocked) = dlsym(RTLD_NEXT, "fwrite_unlocked" );
+    *(void **)(&stdio_ops.fread) = dlsym(RTLD_NEXT, "fread" );
+    *(void **)(&stdio_ops.fread_unlocked) = dlsym(RTLD_NEXT, "fread_unlocked" );
+    *(void **)(&stdio_ops.fclose) = dlsym(RTLD_NEXT, "fclose" );
+    *(void **)(&stdio_ops.fseek) = dlsym(RTLD_NEXT, "fseek" );
+    *(void **)(&stdio_ops.fseek64) = dlsym(RTLD_NEXT, "fseek64" );
+    *(void **)(&stdio_ops.fsetpos) = dlsym(RTLD_NEXT, "fsetpos" );
+    *(void **)(&stdio_ops.rewind) = dlsym(RTLD_NEXT, "rewind" );
+    *(void **)(&stdio_ops.ftell) = dlsym(RTLD_NEXT, "ftell" );
+    *(void **)(&stdio_ops.ftell64) = dlsym(RTLD_NEXT, "ftell64" );
+    *(void **)(&stdio_ops.fgetpos) = dlsym(RTLD_NEXT, "fgetpos" );
+    *(void **)(&stdio_ops.fflush) = dlsym(RTLD_NEXT, "fflush" );
+    *(void **)(&stdio_ops.fflush_unlocked) = dlsym(RTLD_NEXT, "fflush_unlocked" );
+    *(void **)(&stdio_ops.fputc) = dlsym(RTLD_NEXT, "fputc" );
+    *(void **)(&stdio_ops.fputc_unlocked) = dlsym(RTLD_NEXT, "fputc_unlocked" );
+    *(void **)(&stdio_ops.fputs) = dlsym(RTLD_NEXT, "fputs" );
+    *(void **)(&stdio_ops.fputs_unlocked) = dlsym(RTLD_NEXT, "fputs_unlocked" );
+    *(void **)(&stdio_ops.putc) = dlsym(RTLD_NEXT, "putc" );
+    *(void **)(&stdio_ops.putc_unlocked) = dlsym(RTLD_NEXT, "putc_unlocked" );
+    *(void **)(&stdio_ops.putchar) = dlsym(RTLD_NEXT, "putchar" );
+    *(void **)(&stdio_ops.putchar_unlocked) = dlsym(RTLD_NEXT, "putchar_unlocked" );
+    *(void **)(&stdio_ops.puts) = dlsym(RTLD_NEXT, "puts" );
+    *(void **)(&stdio_ops.putw) = dlsym(RTLD_NEXT, "putw" );
+    *(void **)(&stdio_ops.fgets) = dlsym(RTLD_NEXT, "fgets" );
+    *(void **)(&stdio_ops.fgetc) = dlsym(RTLD_NEXT, "fgetc" );
+    *(void **)(&stdio_ops.getc) = dlsym(RTLD_NEXT, "getc" );
+    *(void **)(&stdio_ops.getc_unlocked) = dlsym(RTLD_NEXT, "getc_unlocked" );
+    *(void **)(&stdio_ops.getchar) = dlsym(RTLD_NEXT, "getchar" );
+    *(void **)(&stdio_ops.getchar_unlocked) = dlsym(RTLD_NEXT, "getchar_unlocked" );
+    *(void **)(&stdio_ops.getw) = dlsym(RTLD_NEXT, "getw" );
+    *(void **)(&stdio_ops.gets) = dlsym(RTLD_NEXT, "gets" );
+    *(void **)(&stdio_ops.getdelim) = dlsym(RTLD_NEXT, "getdelim" );
+    *(void **)(&stdio_ops.ungetc) = dlsym(RTLD_NEXT, "ungetc" );
+    *(void **)(&stdio_ops.vfprintf) = dlsym(RTLD_NEXT, "vfprintf" );
+    *(void **)(&stdio_ops.vprintf) = dlsym(RTLD_NEXT, "vprintf" );
+    *(void **)(&stdio_ops.fprintf) = dlsym(RTLD_NEXT, "fprintf" );
+    *(void **)(&stdio_ops.printf) = dlsym(RTLD_NEXT, "printf" );
+    *(void **)(&stdio_ops.perror) = dlsym(RTLD_NEXT, "perror" );
+    *(void **)(&stdio_ops.fscanf) = dlsym(RTLD_NEXT, "fscanf" );
+    *(void **)(&stdio_ops.scanf) = dlsym(RTLD_NEXT, "scanf" );
+    *(void **)(&stdio_ops.clearerr) = dlsym(RTLD_NEXT, "clearerr" );
+    *(void **)(&stdio_ops.clearerr_unlocked) = dlsym(RTLD_NEXT, "clearerr_unlocked" );
+    *(void **)(&stdio_ops.feof) = dlsym(RTLD_NEXT, "feof" );
+    *(void **)(&stdio_ops.feof_unlocked) = dlsym(RTLD_NEXT, "feof_unlocked" );
+    *(void **)(&stdio_ops.ferror) = dlsym(RTLD_NEXT, "ferror" );
+    *(void **)(&stdio_ops.ferror_unlocked) = dlsym(RTLD_NEXT, "ferror_unlocked" );
+    *(void **)(&stdio_ops.fileno) = dlsym(RTLD_NEXT, "fileno" );
+    *(void **)(&stdio_ops.fileno_unlocked) = dlsym(RTLD_NEXT, "fileno_unlocked" );
+    *(void **)(&stdio_ops.remove) = dlsym(RTLD_NEXT, "remove" );
+    *(void **)(&stdio_ops.setbuf) = dlsym(RTLD_NEXT, "setbuf" );
+    *(void **)(&stdio_ops.setbuffer) = dlsym(RTLD_NEXT, "setbuffer" );
+    *(void **)(&stdio_ops.setlinebuf) = dlsym(RTLD_NEXT, "setlinebuf" );
+    *(void **)(&stdio_ops.setvbuf) = dlsym(RTLD_NEXT, "setvbuf" );
+    *(void **)(&stdio_ops.mkdtemp) = dlsym(RTLD_NEXT, "mkdtemp" );
+    *(void **)(&stdio_ops.mkstemp) = dlsym(RTLD_NEXT, "mkstemp" );
+    *(void **)(&stdio_ops.tmpfile) = dlsym(RTLD_NEXT, "tmpfile" );
+    *(void **)(&stdio_ops.opendir) = dlsym(RTLD_NEXT, "opendir" );
+    *(void **)(&stdio_ops.fdopendir) = dlsym(RTLD_NEXT, "fdopendir" );
+    *(void **)(&stdio_ops.dirfd) = dlsym(RTLD_NEXT, "dirfd" );
+    *(void **)(&stdio_ops.readdir) = dlsym(RTLD_NEXT, "readdir" );
+    *(void **)(&stdio_ops.readdir64) = dlsym(RTLD_NEXT, "readdir64" );
+    *(void **)(&stdio_ops.rewinddir) = dlsym(RTLD_NEXT, "rewinddir" );
+    *(void **)(&stdio_ops.seekdir) = dlsym(RTLD_NEXT, "seekdir" );
+    *(void **)(&stdio_ops.telldir) = dlsym(RTLD_NEXT, "telldir" );
+    *(void **)(&stdio_ops.closedir) = dlsym(RTLD_NEXT, "closedir" );
+    *(void **)(&stdio_ops.scandir) = dlsym(RTLD_NEXT, "scandir" );
+    *(void **)(&stdio_ops.scandir64) = dlsym(RTLD_NEXT, "scandir64" );
+    *(void **)(&stdio_ops.flockfile) = dlsym(RTLD_NEXT, "flockfile" );
+    *(void **)(&stdio_ops.ftrylockfile) = dlsym(RTLD_NEXT, "ftrylockfile" );
+    *(void **)(&stdio_ops.funlockfile) = dlsym(RTLD_NEXT, "funlockfile" );
     
     /* can't do this here - we need to run before the pvfs2 init so that
      * debug prints can be made there if needed, but this init is
@@ -3331,7 +3338,7 @@ static void init_stdio_internal(void)
     init_flag = 1;
     recurse_flag = 0;
     gen_mutex_unlock(&initlock);
-};
+}
 
 /* add a configure option to enable this */
 #if 0

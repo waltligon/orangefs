@@ -319,7 +319,7 @@ static int perm_mgmt_get_dirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirent);
+PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirent)
 
 struct PINT_server_req_params pvfs2_mgmt_get_dirent_params =
 {

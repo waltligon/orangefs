@@ -47,7 +47,7 @@ struct PINT_handle_array
 endecode_fields_1a_struct(PINT_handle_array,
                           skip4,,
                           int32_t, count,
-                          PVFS_handle, handles);
+                          PVFS_handle, handles)
 
 /* extended attribute name spaces supported in PVFS2 */
 struct PINT_eattr_check

@@ -513,7 +513,7 @@ static int perm_chdirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(chdirent);
+PINT_GET_OBJECT_REF_DEFINE(chdirent)
 
 struct PINT_server_req_params pvfs2_chdirent_params =
 {

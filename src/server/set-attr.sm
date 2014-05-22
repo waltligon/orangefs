@@ -536,10 +536,11 @@ static PINT_sm_action setattr_setobj_attribs(
         "handle = %llu | S = %p | mask = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
+        llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size,
-        llu(s_op->req->u.setattr.handle), s_op, a_p->mask);
+        llu(s_op->req->u.setattr.handle), (void *)s_op, a_p->mask);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);
@@ -1065,8 +1066,8 @@ static int perm_setattr(PINT_server_op *s_op)
     return 0;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(setattr);
-PINT_GET_CREDENTIAL_DEFINE(setattr);
+PINT_GET_OBJECT_REF_DEFINE(setattr)
+PINT_GET_CREDENTIAL_DEFINE(setattr)
 
 struct PINT_server_req_params pvfs2_set_attr_params =
 {

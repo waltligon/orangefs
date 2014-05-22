@@ -1603,14 +1603,14 @@ static int dbpf_dspace_cancel(
     state = cur_op->op.state;
     gen_mutex_unlock(&cur_op->mutex);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", cur_op);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", (void *)cur_op);
 
     switch(state)
     {
         case OP_QUEUED:
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
-                             "op %p is queued: handling\n", cur_op);
+                             "op %p is queued: handling\n", (void *)cur_op);
 
                 /* dequeue and complete the op in canceled state */
                 cur_op->op.state = OP_IN_SERVICE;
@@ -1622,7 +1622,7 @@ static int dbpf_dspace_cancel(
                 dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
                 gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", (void *)cur_op);
                 ret = 0;
             }
             break;

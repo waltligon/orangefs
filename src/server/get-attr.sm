@@ -1347,7 +1347,7 @@ static PINT_sm_action getattr_read_acl(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (getattr sm) state: getattr_read_acl\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op));
+                 (void *)s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
 
@@ -2359,8 +2359,8 @@ static int perm_getattr(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(getattr);
-PINT_GET_CREDENTIAL_DEFINE(getattr);
+PINT_GET_OBJECT_REF_DEFINE(getattr)
+PINT_GET_CREDENTIAL_DEFINE(getattr)
 
 struct PINT_server_req_params pvfs2_get_attr_params =
 {

@@ -221,12 +221,11 @@ static void* null_lio_thread(void* foo)
     }
     else if(tmp_item->cb_p->aio_lio_opcode == LIO_WRITE)
     {
-        gossip_debug(GOSSIP_BSTREAM_DEBUG,
-                     "[null-aio]: pwrite: cb_p: %p, "
-                     "fd: %d, bufp: %p, size: %zd off:%llu\n",
-                     tmp_item->cb_p, tmp_item->cb_p->aio_fildes, 
-                     tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes,
-		     llu(tmp_item->cb_p->aio_offset));
+        gossip_debug(GOSSIP_BSTREAM_DEBUG, "[null-aio]: pwrite: cb_p: %p, "
+                "fd: %d, bufp: %p, size: %zd off:%llu\n",
+                (void *)tmp_item->cb_p, tmp_item->cb_p->aio_fildes,
+                (void *)tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes,
+                llu(tmp_item->cb_p->aio_offset));
 
         /* check size of file */
         /* note, if either fstat or ftruncate fail, then we let the ret and

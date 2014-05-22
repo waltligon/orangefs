@@ -336,10 +336,10 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
                                        &op_id);
         if (ret < 0)
         {
-            gossip_err("trove_collection_iterate failed: \
-ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
-                       ret, method_id, llu(pos), &name,
-                       coll_id, count, llu(op_id));
+            gossip_err("trove_collection_iterate failed: ret=%d method=%d "
+                    "pos=%lld name=%p coll=%d count=%d op=%lld\n",
+                    ret, method_id, llu(pos), (void *)&name,
+                    coll_id, count, llu(op_id));
             goto complete;
         }
 
@@ -547,10 +547,10 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
                                            &iterate_op_id);
         if (ret < 0)
         {
-            gossip_err("trove_dspace_iterate_handles failed: \
-ret=%d coll=%d pos=%lld handles=%p count=%d context=%lld op=%lld\n",
-                       ret, coll_id, llu(pos), handles, handle_count,
-                       llu(context_id), llu(iterate_op_id));
+            gossip_err("trove_dspace_iterate_handles failed: ret=%d coll=%d "
+                    "pos=%lld handles=%p count=%d context=%lld op=%lld\n",
+                    ret, coll_id, llu(pos), (void *)handles, handle_count,
+                    llu(context_id), llu(iterate_op_id));
             goto complete;
         }
         TROVE_DSPACE_WAIT(ret, coll_id, iterate_op_id, context_id, \
@@ -568,10 +568,11 @@ ret=%d coll=%d pos=%lld handles=%p count=%d context=%lld op=%lld\n",
                                         PVFS_HINT_NULL); 
         if (ret < 0)
         {
-            gossip_err("trove_dspace_getattr_list failed: \
-ret=%d coll=%d handles=%p attrs=%p states=%p count=%d context=%lld op=%lld\n",
-                       ret, coll_id, handles, attrs, states, handle_count,
-                       llu(context_id), llu(getattr_op_id));
+            gossip_err("trove_dspace_getattr_list failed: ret=%d coll=%d "
+                    "handles=%p attrs=%p states=%p count=%d context=%lld "
+                    "op=%lld\n", ret, coll_id, (void *)handles, (void *)attrs,
+                    (void *)states, handle_count, llu(context_id),
+                    llu(getattr_op_id));
             goto complete;
         }
 
@@ -661,11 +662,10 @@ ret=%d handle=%lld context=%lld op=%lld\n",
                                            context_id);
             if (ret < 0)
             {
-                gossip_err("trove_dspace_testcontext failed: ret=%d \
-coll=%d ids=%p count=%d states=%p context=%lld\n",
-                           ret, coll_id, completed_ids,
-                           completed_count, completed_states,
-                           lld(context_id));
+                gossip_err("trove_dspace_testcontext failed: ret=%d coll=%d "
+                        "ids=%p count=%d states=%p context=%lld\n",
+                        ret, coll_id, (void *)completed_ids, completed_count,
+                        (void *)completed_states, lld(context_id));
                 goto complete;
             }
 
@@ -675,10 +675,9 @@ coll=%d ids=%p count=%d states=%p context=%lld\n",
             {
                 if (completed_states[k] != 0)
                 {
-                    gossip_err("trove_dspace_testcontext failure: \
-coll=%d id=%lld state=%d\n",
-                               coll_id, lld(completed_ids[k]),
-                               completed_states[k]);
+                    gossip_err("trove_dspace_testcontext failure: coll=%d "
+                            "id=%lld state=%d\n", coll_id,
+                            lld(completed_ids[k]), completed_states[k]);
                     goto complete;
                 }
             }

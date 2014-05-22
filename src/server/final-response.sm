@@ -68,10 +68,9 @@ static PINT_sm_action final_response_release(
     int ret = -1;
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),
-                 js_p->error_code);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "(s_op %p) %s (FR sm) state: "
+            "release: (error_code = %d)\n", (void *)s_op,
+            PINT_map_server_op_to_string(s_op->req->op), js_p->error_code);
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
@@ -112,7 +111,7 @@ static PINT_sm_action final_response_send_resp(
     gossip_debug(
         GOSSIP_SERVER_DEBUG, 
 	"(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
-	s_op, PINT_map_server_op_to_string(s_op->req->op),
+	(void *)s_op, PINT_map_server_op_to_string(s_op->req->op),
 	s_op->resp.status);
 
     if (js_p->error_code != 0)
@@ -156,7 +155,7 @@ static PINT_sm_action final_response_cleanup(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(s_op %p) %s (FR sm) state: cleanup\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op));
+                 (void *)s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
@@ -175,12 +174,12 @@ static void PINT_gossip_err_server_resp(
         if (resp->op >= 0 && resp->op < PVFS_SERV_NUM_OPS)
         {
             gossip_err("Server Response %p is of type: %s\n",
-                       resp, PINT_map_server_op_to_string(resp->op));
+                    (void *)resp, PINT_map_server_op_to_string(resp->op));
         }
         else
         {
             gossip_err("Server Response %p is of type: UNKNOWN (op %d)\n",
-                       resp, resp->op);
+                    (void *)resp, resp->op);
         }
 
         switch(resp->op)
@@ -196,8 +195,8 @@ static void PINT_gossip_err_server_resp(
                         gossip_err(
                             "METAFILE [ dist is %p, dist_size is %d,\n\t"
                             "   dfile_array is %p, dfile_count is %d ]\n",
-                            attr->u.meta.dist, attr->u.meta.dist_size,
-                            attr->u.meta.dfile_array, 
+                            (void *)attr->u.meta.dist, attr->u.meta.dist_size,
+                            (void *)attr->u.meta.dfile_array, 
                             attr->u.meta.dfile_count);
 
                         if (attr->u.meta.dfile_array)

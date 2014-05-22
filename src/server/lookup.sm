@@ -1085,8 +1085,8 @@ static int perm_lookup(PINT_server_op *s_op)
 
     return ret;
 }
-PINT_GET_CREDENTIAL_DEFINE(lookup_path);
-PINT_GET_OBJECT_REF_DEFINE(lookup_path);
+PINT_GET_CREDENTIAL_DEFINE(lookup_path)
+PINT_GET_OBJECT_REF_DEFINE(lookup_path)
 
 struct PINT_server_req_params pvfs2_lookup_params = 
 {

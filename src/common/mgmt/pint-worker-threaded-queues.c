@@ -360,8 +360,8 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %d:worker location is %p: manager location is %p.\n"
                                   ,__func__
                                   ,(int)thread->thread_id
-                                  ,worker
-                                  ,manager);
+                                  ,(void *)worker
+                                  ,(void *)manager);
 #endif
 
 

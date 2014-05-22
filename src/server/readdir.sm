@@ -229,7 +229,7 @@ static int perm_readdir(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(readdir);
+PINT_GET_OBJECT_REF_DEFINE(readdir)
 
 struct PINT_server_req_params pvfs2_readdir_params =
 {

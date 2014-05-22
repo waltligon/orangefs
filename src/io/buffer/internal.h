@@ -6,7 +6,6 @@
 #include <pthread.h>
 #endif
 #include "ncac-interface.h"
-#include "ncac-list.h"
 #include "radix.h"
 #include "aiovec.h"
 #include "flags.h"
@@ -27,15 +26,15 @@ struct NCAC_cache_info{
 };
 
 struct cache_stack {
-    struct list_head list;
+    struct qlist_head list;
     NCAC_lock 	 	 lock;
     unsigned long    nr_inactive;
     unsigned long    nr_active;
-    struct list_head active_list;
-    struct list_head inactive_list;
+    struct qlist_head active_list;
+    struct qlist_head inactive_list;
 
     unsigned long 	 nr_free;
-    struct list_head free_extent_list;
+    struct qlist_head free_extent_list;
 	unsigned long    nr_dirty;
 	unsigned long    nr_writeback;
 	unsigned long    ratelimits;
@@ -54,14 +53,14 @@ struct NCAC_dev{
     unsigned long mrwusize;
 
     /* free req list */
-    struct list_head free_req_list;
+    struct qlist_head free_req_list;
     struct NCAC_req  *free_req_src;
     unsigned int     free_req_num;
 
     /* a non-free request could be in one of the three lists */
-    struct list_head prepare_list;
-    struct list_head bufcomp_list;
-    struct list_head comp_list;
+    struct qlist_head prepare_list;
+    struct qlist_head bufcomp_list;
+    struct qlist_head comp_list;
     
     /* lock to manage requests in different lists */
     NCAC_lock        req_list_lock;
@@ -120,7 +119,7 @@ struct NCAC_req{
    PVFS_id_gen_t ioreq;
 
    int read_out;
-   struct list_head list;
+   struct qlist_head list;
 
    int nr_dirty;
    //struct list_head dirty_list;
@@ -152,8 +151,8 @@ struct inode
 
     struct radix_tree_root page_tree;
 
-    struct list_head clean_pages;
-    struct list_head dirty_pages;
+    struct qlist_head clean_pages;
+    struct qlist_head dirty_pages;
     unsigned long nrpages;
     int  nr_dirty;
 
@@ -172,8 +171,8 @@ struct extent {
    int  	id;
    unsigned long index;
 
-   struct list_head  list;
-   struct list_head  lru;
+   struct qlist_head  list;
+   struct qlist_head  lru;
 
    unsigned int writes;
    unsigned int reads;
@@ -241,8 +240,11 @@ int cache_init(NCAC_info_t *info);
 NCAC_req_t *NCAC_rwreq_build(NCAC_desc_t*desc, NCAC_optype optype);
 int NCAC_rwjob_prepare(NCAC_req_t *ncac_req, NCAC_reply_t *reply );
 
-int NCAC_do_jobs(struct list_head *list, struct list_head *bufcomp_list, struct list_head * comp_list, NCAC_lock *lock);
-int NCAC_do_a_job(NCAC_req_t *req, struct list_head *list, struct list_head *bufcomp_list, struct list_head * comp_list, NCAC_lock *lock);
+int NCAC_do_jobs(struct qlist_head *list, struct qlist_head *bufcomp_list,
+        struct qlist_head * comp_list, NCAC_lock *lock);
+int NCAC_do_a_job(NCAC_req_t *req, struct qlist_head *list,
+        struct qlist_head *bufcomp_list, struct qlist_head *comp_list,
+        NCAC_lock *lock);
 
 #define NCAC_COMM_NOT_READY    0
 #define NCAC_READ_PREPARE   1
@@ -284,35 +286,35 @@ static inline struct cache_stack *get_extent_cache_stack(struct extent *page)
 static inline void
 add_page_to_active_list(struct cache_stack  *cache_stack, struct extent *page)
 {
-        list_add(&page->lru, &cache_stack->active_list);
+        qlist_add(&page->lru, &cache_stack->active_list);
         cache_stack->nr_active++;
 }
 
 static inline void
 add_page_to_inactive_list(struct cache_stack *cache_stack, struct extent *page)
 {
-        list_add(&page->lru, &cache_stack->inactive_list);
+        qlist_add(&page->lru, &cache_stack->inactive_list);
         cache_stack->nr_inactive++;
 }
 
 static inline void
 del_page_from_active_list(struct cache_stack *cache_stack, struct extent *page)
 {
-        list_del(&page->lru);
+        qlist_del(&page->lru);
         cache_stack->nr_active--;
 }
 
 static inline void
 del_page_from_inactive_list(struct cache_stack *cache_stack, struct extent *page)
 {
-        list_del(&page->lru);
+        qlist_del(&page->lru);
         cache_stack->nr_inactive--;
 }
 
 static inline void
 del_page_from_lru(struct cache_stack *cache_stack, struct extent *page)
 {
-        list_del(&page->lru);
+        qlist_del(&page->lru);
         if (PageActive(page)) {
                 ClearPageActive(page);
                 cache_stack->nr_active--;
@@ -327,27 +329,23 @@ del_page_from_lru(struct cache_stack *cache_stack, struct extent *page)
 
 #if defined(DEBUG) 
 
-#ifndef WIN32
-#define DPRINT(fmt, args...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__ ); fprintf(stderr, fmt, ## args); fprintf(stderr, "\n"); }
-#else
-#define DPRINT(fmt, ...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__ ); fprintf(stderr, fmt, __VA_ARGS__); fprintf(stderr, "\n"); }
-#endif
+#define DPRINT(...) do { \
+    fprintf(stderr, "[%s:%d]", __FILE__, __LINE__ ); \
+    fprintf(stderr, __VA_ARGS__); \
+    fprintf(stderr, "\n"); \
+} while (0)
 
 #else
 
-#ifndef WIN32
-#define DPRINT(fmt, args...)
-#else
-#define DPRINT(fmt, ...)
-#endif
+#define DPRINT(...)
 
 #endif
 
-#ifndef WIN32
-#define NCAC_error(fmt, args...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); fprintf(stderr, fmt, ## args); fprintf(stderr, "\n");}
-#else
-#define NCAC_error(fmt, ...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); fprintf(stderr, fmt, __VA_ARGS__); fprintf(stderr, "\n");}
-#endif
+#define NCAC_error(...) do { \
+    fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); \
+    fprintf(stderr, __VA_ARGS__); \
+    fprintf(stderr, "\n"); \
+} while (0);
 
 /* gets defined in internal.c.  This needs a declaration so
  * that tests can call it without warnings.

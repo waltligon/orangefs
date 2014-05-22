@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
+#include "quicklist.h"
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
@@ -222,12 +223,12 @@ void PINT_dist_decode(PINT_dist **dist, void *buffer)
 void PINT_dist_dump(PINT_dist *dist)
 {
     gossip_debug(GOSSIP_DIST_DEBUG,"******************************\n");
-    gossip_debug(GOSSIP_DIST_DEBUG,"address\t\t%p\n", dist);
+    gossip_debug(GOSSIP_DIST_DEBUG,"address\t\t%p\n", (void *)dist);
     gossip_debug(GOSSIP_DIST_DEBUG,"dist_name\t%s\n", dist->dist_name);
     gossip_debug(GOSSIP_DIST_DEBUG,"name_size\t%d\n", dist->name_size);
     gossip_debug(GOSSIP_DIST_DEBUG,"param_size\t%d\n", dist->param_size);
-    gossip_debug(GOSSIP_DIST_DEBUG,"params\t\t%p\n", dist->params);
-    gossip_debug(GOSSIP_DIST_DEBUG,"methods\t\t%p\n", dist->methods);
+    gossip_debug(GOSSIP_DIST_DEBUG,"params\t\t%p\n", (void *)dist->params);
+    gossip_debug(GOSSIP_DIST_DEBUG,"methods\t\t%p\n", (void *)dist->methods);
     gossip_debug(GOSSIP_DIST_DEBUG,"******************************\n");
 }
 

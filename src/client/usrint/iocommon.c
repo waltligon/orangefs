@@ -22,9 +22,8 @@
 #include <errno.h>
 #include <pint-cached-config.h>
 
-static int iocommon_parse_serverlist(char *serverlist,
-                                     struct PVFS_sys_server_list *slist,
-                                     PVFS_fs_id fsid);
+static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
+        PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
@@ -376,17 +375,15 @@ errorout:
  * Parses a simple string to find the number and select of servers
  * for the LIST layout method
  */
-static int iocommon_parse_serverlist(char *serverlist,
-                                     struct PVFS_sys_server_list *slist,
-                                     PVFS_fs_id fsid)
+static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
+        PVFS_fs_id fsid)
 {
     PVFS_BMI_addr_t *server_array;
-    int count;
+    int count, i;
     char *tok, *save_ptr;
-    int i;
 
-    /* expects slist->servers to be NULL */
-    if (!slist || slist->servers)
+    /* expects layout->servers to be NULL */
+    if (!layout || layout->servers)
     {
         errno = EINVAL;
         return -1;
@@ -397,25 +394,24 @@ static int iocommon_parse_serverlist(char *serverlist,
         errno = EINVAL;
         return -1;
     }
-    slist->count = atoi(tok);
+    layout->count = atoi(tok);
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
-    if (slist->count < 1 || slist->count > count)
+    if (layout->count < 1 || layout->count > count)
     {
         errno = EINVAL;
         return -1;
     }
-    slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
-                                                slist->count);
-    if (!slist->servers)
+    layout->servers = malloc(sizeof(PVFS_BMI_addr_t) * layout->count);
+    if (!layout->servers)
     {
         errno = ENOMEM;
         return -1;
     }
-    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
+    server_array = malloc(sizeof(PVFS_BMI_addr_t)*count);
     if (!server_array)
     {
-        free(slist->servers);
-        slist->servers = NULL;
+        free(layout->servers);
+        layout->servers = NULL;
         errno = ENOMEM;
         return -1;
     }
@@ -423,18 +419,18 @@ static int iocommon_parse_serverlist(char *serverlist,
                                         PINT_SERVER_TYPE_IO,
                                         server_array,
                                         &count);
-    for (i = 0; i < slist->count; i++)
+    for (i = 0; i < layout->count; i++)
     {
         tok = strtok_r(NULL, ":", &save_ptr);
         if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
         {
-            free(slist->servers);
-            slist->servers = NULL;
+            free(layout->servers);
+            layout->servers = NULL;
             free(server_array);
             errno = EINVAL;
             return -1;
         }
-        slist->servers[i] = server_array[atoi(tok)];
+        layout->servers[i] = server_array[atoi(tok)];
     }
     free(server_array);
     return 0;
@@ -512,8 +508,8 @@ int iocommon_create_file(const char *filename,
         {
             layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
             layout->algorithm = *(int *)value;
-            layout->server_list.count = 0;
-            layout->server_list.servers = NULL;
+            layout->count = 0;
+            layout->servers = NULL;
         }
         /* check for server list */
         value = PINT_hint_get_value_by_type(file_creation_param,
@@ -527,10 +523,9 @@ int iocommon_create_file(const char *filename,
                 rc = EINVAL;
                 goto errorout;
             }
-            layout->server_list.count = 0;
-            layout->server_list.servers = NULL;
-            rc = iocommon_parse_serverlist(value, &layout->server_list,
-                                           parent_ref.fs_id);
+            layout->count = 0;
+            layout->servers = NULL;
+            rc = iocommon_parse_serverlist(value, layout, parent_ref.fs_id);
             if (rc < 0)
             {
                 return rc;

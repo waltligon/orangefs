@@ -388,7 +388,7 @@ extern int dup3(int oldfd, int newfd, int flags);
 # define GOSSIP_USRINT_DEBUG stderr
 # define gossip_debug fprintf
 #else
-# define gossip_debug(__m, __f, ...)
+# define gossip_debug(_m, ...)
 #endif /* USRINT_DEBUG */
 
 #define PVFS_STDIO_DEBUG 0

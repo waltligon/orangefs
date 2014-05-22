@@ -675,9 +675,9 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
         for(j = 0, s = pc->sample; j < pc->history_size && s; j++, s = s->next)
         {
 #ifdef WIN32
-            ret = _snprintf(position, 15, " %13Ld", lld(s->value[i]));
+            ret = _snprintf(position, 15, " %13lld", lld(s->value[i]));
 #else
-            ret = snprintf(position, 15, " %13Ld", lld(s->value[i]));
+            ret = snprintf(position, 15, " %13lld", lld(s->value[i]));
 #endif
             if(ret >= 15)
             {
