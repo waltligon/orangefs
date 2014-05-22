@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 
-#ifdef HAVE_MALLOC_H
+#ifdef HAVE_MEMALIGN
 #include <malloc.h>
 #endif
 
@@ -66,9 +66,10 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
-
 {
-#ifdef __DARWIN__
+#ifdef HAVE_MEMALIGN
+    return memalign(alignment, size);
+#else
     void *ptr;
     int rc;
     rc = posix_memalign(&ptr, alignment, size);
@@ -80,8 +81,6 @@ void *clean_memalign(size_t alignment, size_t size)
     {
         return NULL;
     }
-#else
-    return memalign(alignment, size);
 #endif
 }
 

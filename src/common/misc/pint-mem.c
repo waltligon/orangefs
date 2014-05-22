@@ -9,9 +9,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 
 #include "pvfs2-config.h"
 

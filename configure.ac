@@ -54,8 +54,6 @@ AC_CHECK_HEADER([features.h],
         [AC_DEFINE(HAVE_FEATURES_H, 1, Define if features.h exists)])
 AC_CHECK_HEADER([fstab.h],
         [AC_DEFINE(HAVE_FSTAB_H, 1, Define if fstab.h exists)])
-AC_CHECK_HEADER([malloc.h],
-        [AC_DEFINE(HAVE_MALLOC_H, 1, Define if malloc.h exists)])
 AC_CHECK_HEADER([memory.h],
         [AC_DEFINE(HAVE_MEMORY_H, 1, Define if memory.h exists)])
 AC_CHECK_HEADER([mntent.h],
@@ -91,8 +89,6 @@ AC_CHECK_HEADER([dlfcn.h],
 
 AC_CHECK_HEADER([linux/types.h],
         [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
-AC_CHECK_HEADER([linux/malloc.h],
-        [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
 
 AC_CHECK_HEADER([selinux/selinux.h],
         [AC_DEFINE(HAVE_SELINUX_H, 1, Define if selinux/selinux.h exists)])
@@ -1479,6 +1475,9 @@ gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
 AC_MSG_RESULT(yes)
 AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
 AC_MSG_RESULT(no)  )
+
+dnl check for memalign function
+AC_CHECK_FUNCS([memalign])
 
 CFLAGS="$oldcflags"
 
