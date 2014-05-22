@@ -1,117 +1,118 @@
-/* Macros to swap the order of bytes in integer values.
-   Copyright (C) 1997, 1998, 2000, 2001, 2002 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
-
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.  */
-
-/* Modified by Phil Carns (pcarns@parl.clemson.edu) 
- * June 2003
- * For use with custom network encoding routines in the BMI component of 
- * the Parallel Virtual File System version 2.
+/*
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
  */
 
-#ifndef __BMI_BYTESWAP_H
-#define __BMI_BYTESWAP_H 
+#ifndef BMI_BYTESWAP_H
+#define BMI_BYTESWAP_H
 
-#include "pvfs2-internal.h"
-
-#ifndef __bswap_16
-/* Swap bytes in 16 bit value.  */
-#ifdef __GNUC__
-# define __bswap_16(x) \
-    (__extension__							      \
-     ({ unsigned short int __bsx = (x);					      \
-        ((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8)); }))
-#else
-static __inline unsigned short int
-__bswap_16 (unsigned short int __bsx)
-{
-  return ((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8));
-}
-#endif
+#include <stdint.h>
+#ifdef HAVE_BYTESWAP_H
+#include <byteswap.h>
 #endif
 
-#ifndef __bswap_32
-/* Swap bytes in 32 bit value.  */
-#ifdef __GNUC__
-# define __bswap_32(x) \
-    (__extension__							      \
-     ({ unsigned int __bsx = (x);					      \
-        ((((__bsx) & 0xff000000) >> 24) | (((__bsx) & 0x00ff0000) >>  8) |    \
-	 (((__bsx) & 0x0000ff00) <<  8) | (((__bsx) & 0x000000ff) << 24)); }))
-#else
-static __inline unsigned int
-__bswap_32 (unsigned int __bsx)
-{
-  return ((((__bsx) & 0xff000000) >> 24) | (((__bsx) & 0x00ff0000) >>  8) |
-	  (((__bsx) & 0x0000ff00) <<  8) | (((__bsx) & 0x000000ff) << 24));
-}
-#endif
-#endif
-
-#ifndef __bswap_64
-#if defined __GNUC__ && __GNUC__ >= 2
-/* Swap bytes in 64 bit value.  */
-#ifndef __bswap_constant_64
-# define __bswap_constant_64(x) \
-     ((((x) & 0xff00000000000000ull) >> 56)				      \
-      | (((x) & 0x00ff000000000000ull) >> 40)				      \
-      | (((x) & 0x0000ff0000000000ull) >> 24)				      \
-      | (((x) & 0x000000ff00000000ull) >> 8)				      \
-      | (((x) & 0x00000000ff000000ull) << 8)				      \
-      | (((x) & 0x0000000000ff0000ull) << 24)				      \
-      | (((x) & 0x000000000000ff00ull) << 40)				      \
-      | (((x) & 0x00000000000000ffull) << 56))
-#endif
-
-#ifndef BSWAP_64_IS_A_FUNC
-# define __bswap_64(x) \
-     (__extension__							      \
-      ({ union { __extension__ unsigned long long int __ll;		      \
-		 unsigned int __l[2]; } __w, __r;			      \
-         if (__builtin_constant_p (x))					      \
-	   __r.__ll = __bswap_constant_64 (x);				      \
-	 else								      \
-	   {								      \
-	     __w.__ll = (x);						      \
-	     __r.__l[0] = __bswap_32 (__w.__l[1]);			      \
-	     __r.__l[1] = __bswap_32 (__w.__l[0]);			      \
-	   }								      \
-	 __r.__ll; }))
-#endif
-#else
-#ifdef WORDS_BIGENDIAN
-#error FIX ME: no 64 bit bswap routine for non GNUC preprocessor.
-#endif
-#endif
-#endif 
+/* Byte swapping is only necessary on big endian systems. */
 
 #ifdef WORDS_BIGENDIAN
-#define htobmi16(x) __bswap_16(x)
-#define htobmi32(x) __bswap_32(x)
-#define htobmi64(x) __bswap_64(x)
+
+/* On Linux glibc, byteswap.h will exist and contain fast machine-dependent
+ * byteswapping functions. */
+
+#ifdef HAVE_BYTESWAP_H
+
+#define htobmi16 bswap_16(x)
+#define htobmi32 bswap_32(x)
+#define htobmi64 bswap_64(x)
+#define bmitoh16 bswap_16(x)
+#define bmitoh32 bswap_32(x)
+#define bittoh64 bswap_64(x)
+
+/* Otherwise, we do not know about any fast machine-dependent byteswapping
+ * functions, so we will use these and hope the optimizer is good. */
+
 #else
-#define htobmi16(x) x
-#define htobmi32(x) x
-#define htobmi64(x) x
+
+static inline uint16_t htobmi16(uint16_t x)
+{
+    uint16_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&y;
+    buf[1] = x>>8&0xff;
+    buf[0] = x&0xff;
+    return y;
+}
+
+static inline uint32_t htobmi32(uint32_t x)
+{
+    uint32_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&y;
+    buf[3] = x>>24&0xff;
+    buf[2] = x>>16&0xff;
+    buf[1] = x>>8&0xff;
+    buf[0] = x&0xff;
+    return y;
+}
+
+static inline uint64_t htobmi64(uint64_t x)
+{
+    uint64_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&y;
+    buf[7] = x>>56&0xff;
+    buf[6] = x>>48&0xff;
+    buf[5] = x>>40&0xff;
+    buf[4] = x>>32&0xff;
+    buf[3] = x>>24&0xff;
+    buf[2] = x>>16&0xff;
+    buf[1] = x>>8&0xff;
+    buf[0] = x&0xff;
+    return y;
+}
+
+static inline uint16_t bmitoh16(uint16_t x)
+{
+    uint16_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&x;
+    y = (buf[1]&0xff)<<8 | (buf[0]&0xff);
+    return y;
+}
+
+static inline uint32_t bmitoh32(uint32_t x)
+{
+    uint32_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&x;
+    y = (uint32_t)(buf[3]&0xff)<<24 | (uint32_t)(buf[2]&0xff)<<16 |
+            (uint32_t)(buf[1]&0xff)<<8 | (buf[0]&0xff);
+    return y;
+}
+
+static inline uint64_t bmitoh64(uint64_t x)
+{
+    uint64_t y = 0;
+    unsigned char *buf;
+    buf = (unsigned char *)&x;
+    y = (uint64_t)(buf[7]&0xff)<<56 | (uint64_t)(buf[6]&0xff)<<48 |
+            (uint64_t)(buf[5]&0xff)<<40 | (uint64_t)(buf[4]&0xff)<<32 |
+            (uint64_t)(buf[3]&0xff)<<24 | (uint64_t)(buf[2]&0xff)<<16 |
+            (uint64_t)(buf[1]&0xff)<<8 | (buf[0]&0xff);
+    return y;
+}
+
 #endif
 
-#define bmitoh16(x) htobmi16(x) 
-#define bmitoh32(x) htobmi32(x)
-#define bmitoh64(x) htobmi64(x)
+/* Little endians systems do not need byte swapping. */
 
-#endif /* __BMI_BYTESWAP_H */
+#else
 
+#define htobmi16(x) (x)
+#define htobmi32(x) (x)
+#define htobmi64(x) (x)
+#define bmitoh16(x) (x)
+#define bmitoh32(x) (x)
+#define bmitoh64(x) (x)
+
+#endif
