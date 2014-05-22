@@ -49,7 +49,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     else
     {
 
-#if defined(__DARWIN__)
+#if defined(__APPLE__)
         ret = strerror_r(map_err, buf, (size_t)limit);
 #elif defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
         char *tmpbuf = strerror_r(map_err, buf, limit);

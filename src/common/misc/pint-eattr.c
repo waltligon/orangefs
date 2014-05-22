@@ -157,7 +157,7 @@ static struct PINT_eattr_check PINT_eattr_decode_keyvals[] =
  * If one matches, it uses the other fields in that checking structure
  * to verify the eattr.
  */
-static inline int PINT_eattr_verify(
+static int PINT_eattr_verify(
     struct PINT_eattr_check * eattr_array,
     PVFS_ds_keyval *key, PVFS_ds_keyval *val);
 
@@ -249,7 +249,7 @@ static int PINT_eattr_decode_datafile_handle_array(
     return 0;
 }
 
-static inline int PINT_eattr_verify(
+static int PINT_eattr_verify(
     struct PINT_eattr_check * eattr_array,
     PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {

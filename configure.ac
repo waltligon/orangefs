@@ -1022,20 +1022,26 @@ dnl Method to disable build of user interface libraries
 BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
    [  --disable-usrint        Do not build posix and stdio user libraries],
-   [if test "x$enableval" = "xyes" ; then
+   [if test "x$enableval" = "xyes" -a "`uname -s`" = "Linux"; then
        AC_DEFINE(PVFS_USRINT_BUILD, 1,
                  [Should we build user interface libraries.])
        BUILD_USRINT=1
     else
        AC_DEFINE(PVFS_USRINT_BUILD, 0,
                  [Should we build user interface libraries.])
+       BUILD_USRINT=0
     fi
     build_usrint=$enableval
    ],
-   [AC_DEFINE(PVFS_USRINT_BUILD, 1,
-              [Should we build user interface libraries.])
-    build_usrint=yes
-    BUILD_USRINT=1
+   [if test "`uname -s`" = "Linux"; then
+       AC_DEFINE(PVFS_USRINT_BUILD, 0,
+                 [Should we build user interface libraries.])
+       build_usrint=yes
+       BUILD_USRINT=1
+    else
+       build_usrint=no
+       BUILD_USRINT=0
+    fi
    ])
 AC_SUBST(build_usrint)
 
@@ -1434,22 +1440,6 @@ if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
 	AX_CHECK_NEEDS_LIBRT
 fi
-
-case "$host_os" in
-
-    *darwin*)
-	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
-    	TARGET_OS_DARWIN=1
-        CFLAGS="$CFLAGS -D__DARWIN__"
-	AC_SUBST(TARGET_OS_DARWIN)
-        AC_SUBST(CFLAGS)
-    ;;
-    *linux*)
-	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)
-    	TARGET_OS_LINUX=1
-	AC_SUBST(TARGET_OS_LINUX)
-    ;;
-esac
 
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)

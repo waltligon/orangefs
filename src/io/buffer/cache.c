@@ -38,7 +38,7 @@ struct extent * lookup_cache_item(struct inode *mapping, unsigned long index)
  * Each inode has a cache tree, protected by its "lock". 
  * NOT cache policy related.
  */
-static inline int add_cache_item_no_policy(struct extent *extent, 
+static int add_cache_item_no_policy(struct extent *extent, 
          struct inode *mapping, unsigned long index)
 {
     int error;
@@ -57,7 +57,7 @@ static inline int add_cache_item_no_policy(struct extent *extent,
  * Current implementation is related to LRU. This function is
  * cache policy related.
  */
-static inline void add_cache_item_with_policy(struct extent *extent, int cache_policy)
+static void add_cache_item_with_policy(struct extent *extent, int cache_policy)
 {
     struct cache_stack *cache_stack = NULL;
 

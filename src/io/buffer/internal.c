@@ -21,9 +21,9 @@ static void NCAC_read_request_from_list_lock(struct qlist_head *head,
 
 /* This file contains NCAC internal functions. */
 
-static inline struct inode *get_inode( PVFS_fs_id, PVFS_handle , PVFS_context_id);
-static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req);
-static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req);
+static struct inode *get_inode( PVFS_fs_id, PVFS_handle , PVFS_context_id);
+static int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req);
+static int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req);
 
 /* get_internal_req(): get a internal request structure from the free
  * list. To avoid dynamic allocation, for the timebeing, I hard code
@@ -249,7 +249,7 @@ int NCAC_rwjob_prepare(NCAC_req_t *ncac_req, NCAC_reply_t *reply )
  *  buffers are same.
  */
 
-static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
+static int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
 {
     int extcnt;  /* cache extent count */
     int comcnt;  /* communication buffer count */
@@ -369,7 +369,7 @@ static int comp_pos(const void *x1, const void *x2)
     return 0;
 }
 
-static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
+static int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
 {
     int extcnt;  /* cache extent count */
     int comcnt;  /* communication buffer count */
@@ -753,7 +753,7 @@ int NCAC_done_request( int id )
     return ret;
 }
 
-static inline struct inode *search_inode_list (PVFS_handle handle)
+static struct inode *search_inode_list (PVFS_handle handle)
 {
     int inode_index;
     struct inode * cur;

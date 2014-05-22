@@ -14,18 +14,18 @@
 #include "pvfs2-internal.h"
 
 /* internal functions */
-static inline struct extent *find_extent(NCAC_req_t *ncac_req,
+static struct extent *find_extent(NCAC_req_t *ncac_req,
                        unsigned long index);
-static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, 
+static struct extent *allocate_extent(NCAC_req_t *ncac_req, 
                        int flag);
-static inline int free_extent(NCAC_req_t *ncac_req,
+static int free_extent(NCAC_req_t *ncac_req,
                        struct extent *extent);
-static inline int init_extent_read(NCAC_req_t *ncac_req,
+static int init_extent_read(NCAC_req_t *ncac_req,
                 struct extent *extent, PVFS_offset foffset, PVFS_size size);
-static inline void set_extent_read_pending(struct extent *extent);
-static inline int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent);
-static inline void increase_read_reference(struct extent *extent);
-static inline int add_extent_to_cache(struct extent * extent,
+static void set_extent_read_pending(struct extent *extent);
+static int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent);
+static void increase_read_reference(struct extent *extent);
+static int add_extent_to_cache(struct extent * extent,
          unsigned long index, NCAC_req_t *ncac_req, int policy);
 
 /* do a read job.
@@ -186,7 +186,7 @@ int NCAC_do_a_sync_job(struct NCAC_req *ncac_req)
  * This operation is protected by the inode lock. The caller should 
  * acquire the inode lock.
  */
-static inline struct extent *find_extent(NCAC_req_t *ncac_req, 
+static struct extent *find_extent(NCAC_req_t *ncac_req, 
                                         unsigned long index)
 {
     struct extent *avail;
@@ -209,7 +209,7 @@ static inline struct extent *find_extent(NCAC_req_t *ncac_req,
  * only cache stack lock is needed.
  */
 
-static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
+static struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
 {
     struct extent *new = NULL;
     struct cache_stack *cache;
@@ -265,7 +265,7 @@ static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
 /* add it later 
  * free_extent: return an extent to a list
  */
-static inline int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
+static int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
 {
     return 0;
 }
@@ -274,7 +274,7 @@ static inline int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
  * init_extent_read: initiate trove request to read an extent. The
  * file offset is "foffset", and the size is "size".
  */
-static inline int init_extent_read(NCAC_req_t *ncac_req, 
+static int init_extent_read(NCAC_req_t *ncac_req, 
                    struct extent *extent, PVFS_offset foffset, PVFS_size size)
 {
     int ret;
@@ -312,13 +312,13 @@ static inline int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent)
     return 0;
 }
 
-static inline void increase_read_reference(struct extent *extent)
+static void increase_read_reference(struct extent *extent)
 {
     extent->reads ++;
     return;
 }
 
-static inline int add_extent_to_cache(struct extent * extent,
+static int add_extent_to_cache(struct extent * extent,
             unsigned long index, NCAC_req_t *ncac_req, int policy)
 {
     int ret;

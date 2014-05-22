@@ -306,7 +306,7 @@ static PVFS_error completion_list_retrieve_some_completed(
     return 0;
 }
 
-static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
+static int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
@@ -606,7 +606,7 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_DEFERRED);
 
-        PINT_id_gen_safe_register(&sm_p->sys_op_id, (void *)smcb);
+        id_gen_safe_register(&sm_p->sys_op_id, (void *)smcb);
         if (op_id)
         {
             *op_id = sm_p->sys_op_id;
@@ -635,7 +635,7 @@ PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
 
     PINT_smcb_set_complete(smcb);
 
-    PINT_id_gen_safe_unregister(sm_p->sys_op_id);
+    id_gen_safe_unregister(sm_p->sys_op_id);
 
     /* free the internal hint list */
     PVFS_hint_free(sm_p->hints);
@@ -661,7 +661,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     gossip_debug(GOSSIP_CANCEL_DEBUG,
             "PINT_client_io_cancel id %lld\n",lld(id));
 
-    smcb = PINT_id_gen_safe_lookup(id);
+    smcb = id_gen_safe_lookup(id);
     if (!smcb)
     {
 	/* if we can't find it, it may have already completed */
@@ -822,7 +822,7 @@ PVFS_error PINT_client_state_machine_test(
         return ret;
     }
 
-    smcb = PINT_id_gen_safe_lookup(op_id);
+    smcb = id_gen_safe_lookup(op_id);
     if (!smcb)
     {
         gen_mutex_unlock(&test_mutex);
@@ -1084,7 +1084,7 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
 
     if (in_op_str && out_error && in_class_str)
     {
-        smcb = PINT_id_gen_safe_lookup(op_id);
+        smcb = id_gen_safe_lookup(op_id);
         assert(smcb);
 
         do
@@ -1123,12 +1123,12 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     PINT_smcb *smcb; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
-    smcb = PINT_id_gen_safe_lookup(op_id);
+    smcb = id_gen_safe_lookup(op_id);
     if (smcb == NULL) 
     {
         return;
     }
-    PINT_id_gen_safe_unregister(op_id);
+    id_gen_safe_unregister(op_id);
     PINT_sys_release_smcb(smcb);
 
     return;
