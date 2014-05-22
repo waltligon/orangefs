@@ -43,7 +43,9 @@ static int bmi_pending_count = 0;
 static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
+#ifdef __PVFS2_CLIENT__
 static int dev_unexp_pending_count = 0;
+#endif
 /* locks for internal queues */
 static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
@@ -132,7 +134,9 @@ static void bmi_thread_mgr_callback(void* data,
     PVFS_size actual_size,
     PVFS_error error_code);
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
+#ifdef __PVFS2_CLIENT__
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
+#endif
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d, int cancel_path);
@@ -4979,6 +4983,7 @@ static void bmi_thread_mgr_unexp_handler(
     }
 }
 
+#ifdef __PVFS2_CLIENT__
 /* dev_thread_mgr_unexp_handler()
  *
  * callback function executed by the thread manager for dev when an unexpected
@@ -5024,6 +5029,7 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
         gen_mutex_unlock(&dev_unexp_mutex);
     }
 }
+#endif /* __PVFS2_CLIENT__ */
 
 /* fill_status()
  *
