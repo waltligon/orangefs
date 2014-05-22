@@ -486,7 +486,7 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     pvfs2_inode = PVFS2_I(inode);
-    return (PVFS_khandle_cmp(&(pvfs2_inode->refn.khandle), &(ref->khandle)) &&
+    return (!PVFS_khandle_cmp(&(pvfs2_inode->refn.khandle), &(ref->khandle)) &&
             pvfs2_inode->refn.fs_id == ref->fs_id);
 
 }

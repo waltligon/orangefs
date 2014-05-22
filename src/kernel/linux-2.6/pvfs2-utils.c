@@ -1628,19 +1628,22 @@ int pvfs2_remove_entry(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = dentry->d_inode;
-    char *s;
+    char *s1;
+    char *s2;
 
     if (inode && parent && dentry)
     {
-        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+        s1 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+        s2 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_UTILS_DEBUG,
-                     "pvfs2_remove_entry: called on %s\n  (inode %s): "
+                     "pvfs2_remove_entry: called on %s (inode %s): "
                      "Parent is %s | fs_id %d\n",
                      dentry->d_name.name,
-                     k2s(get_khandle_from_ino(inode),s),
-                     k2s(&(parent->refn.khandle),s),
+                     k2s(get_khandle_from_ino(inode),s1),
+                     k2s(&(parent->refn.khandle),s2),
                      parent->refn.fs_id);
-        kfree(s);
+        kfree(s1);
+        kfree(s2);
 
         new_op = op_alloc(PVFS2_VFS_OP_REMOVE);
         if (!new_op)
@@ -1678,6 +1681,7 @@ int pvfs2_remove_entry(
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
     }
+
     return ret;
 }
 
