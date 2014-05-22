@@ -1441,30 +1441,14 @@ if test "x$BUILD_SERVER" = "x1"; then
 	AX_CHECK_NEEDS_LIBRT
 fi
 
-dnl check for gethostbyname function
-AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
 CFLAGS="$USR_CFLAGS"
-AC_TRY_COMPILE([
-#include <netdb.h>
-], [
-gethostbyname("localhost");
-],
-AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
-AC_MSG_RESULT(no)
-WARN_ABOUT_HOSTNAMES="yes")
 
-AC_MSG_CHECKING(for gethostbyaddr)
-AC_TRY_COMPILE([
-#include <netdb.h>
-], [
-struct sockaddr_in peer;
-gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
-],
-AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
-AC_MSG_RESULT(no)  )
+dnl check for gethostbyname function
+AC_CHECK_FUNCS([gethostbyname])
+
+dnl check for gethostbyaddr function
+AC_CHECK_FUNCS([gethostbyaddr])
 
 dnl check for memalign function
 AC_CHECK_FUNCS([memalign])
