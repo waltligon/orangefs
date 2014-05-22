@@ -2138,7 +2138,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
 
         binfo.buffer = sm_p->u.io.buffer;
         binfo.len = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-        binfo.rw = sm_p->u.io.io_type;
+        binfo.rw = (enum BMI_io_type)sm_p->u.io.io_type;
         BMI_set_info(cur_ctx->msg.svr_addr, BMI_OPTIMISTIC_BUFFER_REG, &binfo);
     }
 
