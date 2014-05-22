@@ -392,7 +392,7 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                 }
                 memset(s, 0, sizeof(sizeof(struct PINT_perf_sample)));
                 s->value = calloc(pc->key_count, sizeof *(s->value));
-                if(!s->value);
+                if(!s->value)
                 {
                     free(s);
                     gen_mutex_unlock(&pc->mutex);

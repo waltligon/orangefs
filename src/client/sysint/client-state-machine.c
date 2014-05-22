@@ -860,13 +860,9 @@ PVFS_error PINT_client_state_machine_test(
 
         if (!PINT_smcb_complete(tmp_smcb))
         {
-            ret = PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
-
-            if (ret != SM_ACTION_DEFERRED &&
-                    ret != SM_ACTION_TERMINATE); /* ret == 0 */
-            {
-                continue;
-            }
+            /* There used to be a test for errors here but the code did
+             * nothing no matter what the result. */
+            PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
         }
     }
 
