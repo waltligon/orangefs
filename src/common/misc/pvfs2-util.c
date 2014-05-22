@@ -46,9 +46,6 @@
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
 #endif
 
 #ifdef HAVE_MNTENT_H
@@ -519,37 +516,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
        credential for another user. */
 
     /* get user group list */
-#ifdef HAVE_GETGROUPLIST
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ret = getgrouplist(pwd.pw_name, grp.gr_gid, groups, &ngroups);
+    groups[0] = grp.gr_gid;
+    ret = getgroups(sizeof groups/sizeof *groups - 1, groups+1);
     if (ret == -1)
     {
         gossip_lerr("error: unable to get group list for user %s\n",
                     pwd.pw_name);
         return -PVFS_EINVAL;
     }
-    if (groups[0] != grp.gr_gid)
-    {
-        assert(groups[ngroups-1] == grp.gr_gid);
-        groups[ngroups-1] = groups[0];
-        groups[0] = grp.gr_gid;
-    }
-
-#else /* !HAVE_GETGROUPLIST */
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd.pw_name, grp.gr_gid);
-    if (ngroups == -1)
-    {
-        gossip_lerr("error: unable to get group list for user %s: %s\n",
-                pwd.pw_name, strerror(errno));
-        free(pwdbuf);
-        free(grpbuf);
-        return -PVFS_EINVAL;
-    }
-
-#endif /* HAVE_GETGROUPLIST */
+    ngroups = ret+1;
 
     /* fill in credential struct */
     cred->userid = (PVFS_uid)pwd.pw_uid;

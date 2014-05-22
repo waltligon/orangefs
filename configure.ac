@@ -261,9 +261,6 @@ AC_SUBST(BUILD_SERVER)
 dnl locate OpenSSL libraries
 AX_OPENSSL
 
-dnl check to see if the "fast" getgrouplist function is available
-AX_GETGROUPLIST
-
 dnl check for key-based security
 AC_ARG_ENABLE(security-key,
 [  --enable-security-key   Enables key-based security],
