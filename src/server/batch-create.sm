@@ -61,8 +61,7 @@ machine pvfs2_batch_create_sm
  *
  * Synopsis: Create a dataspace.
  */
-static int batch_create_create(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int batch_create_create(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -74,20 +73,20 @@ static int batch_create_create(
         return(SM_ACTION_COMPLETE);
     }
 
-    s_op->resp.u.batch_create.handle_count 
-        = s_op->req->u.batch_create.handle_count; 
+    s_op->resp.u.batch_create.handle_count =
+                            s_op->req->u.batch_create.handle_count; 
 
     /* allocate some space to hold the handles we create */
     s_op->resp.u.batch_create.handle_array = 
-        malloc(s_op->req->u.batch_create.handle_count * sizeof(PVFS_handle));
+                            malloc(s_op->req->u.batch_create.handle_count *
+                            sizeof(PVFS_handle));
     if(!s_op->resp.u.batch_create.handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }
-    memset(s_op->resp.u.batch_create.handle_array,
-           0,
-           s_op->req->u.batch_create.handle_count * sizeof(PVFS_handle));
+    ZEROMEM(s_op->resp.u.batch_create.handle_array,
+            s_op->req->u.batch_create.handle_count * sizeof(PVFS_handle));
 
 
     ret = job_trove_dspace_create_list(
@@ -123,8 +122,7 @@ static int batch_create_create(
  * Synopsis: free memory and return
  *           
  */
-static int batch_create_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int batch_create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;

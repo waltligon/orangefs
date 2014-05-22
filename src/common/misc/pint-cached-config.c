@@ -772,7 +772,7 @@ int PINT_cached_config_map_servers(
          * that inout_num_datafiles < num_io_servers but
          * this code should correctly allocate multiple
          * datafiles per server round robin - though that
-         * won't happen with the current caode base 
+         * won't happen with the current code base 
          */
 
         if(num_io_servers < *inout_num_datafiles)
@@ -1662,6 +1662,11 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
     PVFS_BMI_addr_t *server_addrs;
     const char **servers;
 
+    /* This was run on client before sending request
+     * Not clear if total number of IO servers makes sense any more, or
+     * at least finding out that number may not be as simple as looking
+     * in the config - does this kick off a search for more IO servers?
+     */
     /* find the server list from the layout */
     ret = PINT_cached_config_get_num_dfiles(fs_id,
                                             dist,
@@ -1673,6 +1678,11 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
         return ret;
     }
 
+    /* This is the protocol limit for how many can be sent in a request.
+     * The limiting factor here is the number sent back to the client
+     * (this is called from the server) after the create.  This limit
+     * needs to take into account SIDs as well
+     */
     if(num_io_servers > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
         num_io_servers = PVFS_REQ_LIMIT_DFILE_COUNT;
@@ -1687,6 +1697,9 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
         return -PVFS_ENOMEM;
     }
 
+    /* could (should) this limit have been applied client side?
+     * is layout going to be subsumed by a SIDcache query?
+     */
     ret = PINT_cached_config_map_servers(fs_id,
                                          &num_io_servers,
                                          layout,

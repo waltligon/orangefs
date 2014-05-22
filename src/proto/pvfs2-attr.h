@@ -107,7 +107,8 @@ struct PVFS_metafile_attr_s
     PVFS_handle *mirror_dfile_array; /* V3 remove this replaced by sids */
     uint32_t mirror_copies_count;
 
-    int32_t stuffed_size;
+    int32_t stuffed;      /* is object currently stuffed */
+    int32_t stuffed_size; /* threshold size of unstuffing */
 
     PVFS_metafile_hint hint;
 };

@@ -39,10 +39,18 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid);
 
 /**
  * Look up a list of SIDs by type and return the matching BMI address
+ * _n versions require number of bmi_addr in the provided buffer and
+ * return the number actually read in n
  */
 int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr, 
+                                int *n, /* inout */
+                                uint32_t stype);
 
 int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr, 
+                               int *n, /* inout */
+                               uint32_t stype);
 
 #endif
 

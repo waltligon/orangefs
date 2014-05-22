@@ -380,8 +380,9 @@ static int create_comp_fn(void *v_p,
         return resp_p->status;
     }
 
+/* V3 handles no longer returned from metaserver but passed TO it */
+#if 0
     /* otherwise, just stash the newly created meta handle */
-    /* V3 handles no longer returned from metaserver but passed TO it */
     sm_p->u.create.datafile_count = resp_p->u.create.datafile_count;
 
     sm_p->u.create.datafile_handles = malloc(
@@ -414,6 +415,13 @@ static int create_comp_fn(void *v_p,
            (sizeof(*sm_p->u.create.sid_array) * resp_p->u.create.sid_count));
 
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
+#else
+    sm_p->u.create.datafile_count = sm_p->msgarray_op.msgpair.req.u.create.datafile_count;
+    sm_p->u.create.datafile_handles = sm_p->msgarray_op.msgpair.req.u.create.datafile_handles;
+    sm_p->u.create.sid_count = sm_p->msgarray_op.msgpair.req.u.create.sid_count;
+    sm_p->u.create.sid_array = sm_p->msgarray_op.msgpair.req.u.create.sid_array;
+    /* sm_p->u.create.stuffed = sm_p->msgarray_op.msgpair.req.u.create.stuffed; */
+#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "*** Got newly created handle %s\n",
@@ -524,8 +532,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                      PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
     }
 
-    /* note - should we allocated the OIDs and SIDs for the data files
-     * here on the client, or on the metaserver?
+    /* note - we should allocate the OIDs and SIDs for the data files
+     * here and include the SID in the macro below
      * should we send a distinct create to each SID for the metaobject
      * or let the server send them out?
      * if we fan out here we certainly need to allocated all SIDs here
@@ -861,7 +869,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     */
 
     current_dist = sm_p->u.create.dist;
-    /* We have an overriding distribution name for this directory.. honor that */
+    /* We have an overriding distribution name for this directory. honor that */
     if (attr->u.dir.hint.dist_name_len > 0)
     {
         /* switch it only if it is different! */

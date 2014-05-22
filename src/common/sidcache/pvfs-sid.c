@@ -164,7 +164,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     return ret;
 }
 
-/* These functions find servers of a give type
+/* These functions find servers of a given type
  */
 static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t stype,
@@ -185,9 +185,12 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                flag);           /* get flags */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                     "Error getting sid from sid cache : %s\n",
-                     db_strerror(ret));
+        if (ret != DB_NOTFOUND)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                        "Error getting sid from sid cache : %s\n",
+                        db_strerror(ret));
+        }
         return(ret);
     }
 
@@ -206,6 +209,45 @@ int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
 int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
 {
     return PVFS_SID_get_server(bmi_addr, stype, DB_NEXT);
+}
+
+/* reads up to *n bmi addresses of type stype and sets *n to the number
+ * actually read
+ */
+static int PVFS_SID_get_server_n(PVFS_BMI_addr_t *bmi_addr,
+                                int *n,  /* inout */
+                                uint32_t stype,
+                                int flag)
+{
+    int ret = 0;
+    int i = 0;
+
+    if (*n <= 0)
+    {
+        *n = 0;
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_get_server(bmi_addr, stype, flag);
+    for (i = 0; (i <= *n) && !ret; i++)
+    {
+        ret = PVFS_SID_get_server(&bmi_addr[i], stype, DB_NEXT);
+    }
+    *n = i;
+    return ret;
+}
+
+int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr,
+                                int *n,
+                                uint32_t stype)
+{
+    return PVFS_SID_get_server_n(bmi_addr, n, stype, DB_SET);
+}
+
+int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
+                               int *n,
+                               uint32_t stype)
+{
+    return PVFS_SID_get_server_n(bmi_addr, n, stype, DB_NEXT);
 }
 
 /*
