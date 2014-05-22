@@ -24,12 +24,6 @@ struct PINT_queue_trigger
 
 static int PINT_queue_update_stats(struct PINT_queue_s *queue, int microsecs);
 
-inline static int PINT_default_compare(
-    PINT_queue_entry_t *a, PINT_queue_entry_t *b)
-{
-    return 0;
-}
-
 int PINT_queue_create(
     PINT_queue_id *qid, PINT_queue_entry_compare_callback compare)
 {
@@ -189,7 +183,7 @@ int PINT_queue_add_trigger(PINT_queue_id queue_id,
     return 0;
 }
 
-inline int PINT_queue_count(PINT_queue_id qid)
+int PINT_queue_count(PINT_queue_id qid)
 {
     struct PINT_queue_s *queue;
     int count;
