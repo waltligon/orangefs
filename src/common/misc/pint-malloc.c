@@ -362,7 +362,21 @@ void *PINT_malloc(size_t size)
 
 void *PINT_calloc(size_t nmemb, size_t size)
 {
-    return PINT_malloc(nmemb * size);
+    size_t total;
+    void *p;
+    total = nmemb*size;
+    /* Check for overflow. */
+    if (total < nmemb || total < size)
+    {
+        return NULL;
+    }
+    p = PINT_malloc(total);
+    if (p == NULL)
+    {
+        return p;
+    }
+    memset(p, 0, total);
+    return p;
 }
 
 int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
