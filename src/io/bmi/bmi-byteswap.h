@@ -29,84 +29,42 @@
 #define bittoh64 bswap_64(x)
 
 /* Otherwise, we do not know about any fast machine-dependent byteswapping
- * functions, so we will use these and hope the optimizer is good. */
+ * functions, so we will use these and hope the optimizer is good. These
+ * are functions so that the argument only gets evaluated once.
+ */
 
-#else
+#else /* HAVE_BYTESWAP_H */
 
-static inline uint16_t htobmi16(uint16_t x)
+static inline uint16_t PVFS_bswap16(uint16_t x)
 {
-    uint16_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&y;
-    buf[1] = x>>8&0xff;
-    buf[0] = x&0xff;
-    return y;
+    return (((x)&0xff)<<8 | ((x)&0xff00)>>8);
 }
 
-static inline uint32_t htobmi32(uint32_t x)
+static inline uint32_t PVFS_bswap32(uint32_t x)
 {
-    uint32_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&y;
-    buf[3] = x>>24&0xff;
-    buf[2] = x>>16&0xff;
-    buf[1] = x>>8&0xff;
-    buf[0] = x&0xff;
-    return y;
+    x = ((x&0xff00ff00u)>>8 | (x&0xff00ffu)<<8);
+    return (x&0xffff0000u)>>16 | (x&0xffff)<<16;
 }
 
-static inline uint64_t htobmi64(uint64_t x)
+static inline uint64_t PVFS_bswap64(uint64_t x)
 {
-    uint64_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&y;
-    buf[7] = x>>56&0xff;
-    buf[6] = x>>48&0xff;
-    buf[5] = x>>40&0xff;
-    buf[4] = x>>32&0xff;
-    buf[3] = x>>24&0xff;
-    buf[2] = x>>16&0xff;
-    buf[1] = x>>8&0xff;
-    buf[0] = x&0xff;
-    return y;
+    x = ((x&0xff00ff00ff00ff00ull)>>8 | (x&0xff00ff00ff00ffull)<<8);
+    x = ((x&0xffff0000ffff0000ull)>>16 | (x&0xffff0000ffffull)<<16);
+    return ((x&0xffffffff00000000ull)>>32 | (x&0xffffffffu)<<32);
 }
 
-static inline uint16_t bmitoh16(uint16_t x)
-{
-    uint16_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&x;
-    y = (buf[1]&0xff)<<8 | (buf[0]&0xff);
-    return y;
-}
-
-static inline uint32_t bmitoh32(uint32_t x)
-{
-    uint32_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&x;
-    y = (uint32_t)(buf[3]&0xff)<<24 | (uint32_t)(buf[2]&0xff)<<16 |
-            (uint32_t)(buf[1]&0xff)<<8 | (buf[0]&0xff);
-    return y;
-}
-
-static inline uint64_t bmitoh64(uint64_t x)
-{
-    uint64_t y = 0;
-    unsigned char *buf;
-    buf = (unsigned char *)&x;
-    y = (uint64_t)(buf[7]&0xff)<<56 | (uint64_t)(buf[6]&0xff)<<48 |
-            (uint64_t)(buf[5]&0xff)<<40 | (uint64_t)(buf[4]&0xff)<<32 |
-            (uint64_t)(buf[3]&0xff)<<24 | (uint64_t)(buf[2]&0xff)<<16 |
-            (uint64_t)(buf[1]&0xff)<<8 | (buf[0]&0xff);
-    return y;
-}
+#define htobmi16 PVFS_bswap16(x)
+#define htobmi32 PVFS_bswap32(x)
+#define htobmi64 PVFS_bswap64(x)
+#define bmitoh16 PVFS_bswap16(x)
+#define bmitoh32 PVFS_bswap32(x)
+#define bittoh64 PVFS_bswap64(x)
 
 #endif
 
 /* Little endians systems do not need byte swapping. */
 
-#else
+#else /* WORDS_BIGENDIAN */
 
 #define htobmi16(x) (x)
 #define htobmi32(x) (x)
@@ -115,4 +73,6 @@ static inline uint64_t bmitoh64(uint64_t x)
 #define bmitoh32(x) (x)
 #define bmitoh64(x) (x)
 
-#endif
+#endif /* WORDS_BIGENDIAN */
+
+#endif /* BMI_BYTESWAP_H */
