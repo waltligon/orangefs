@@ -104,17 +104,12 @@ void dbpf_open_cache_initialize(void)
 
     gen_mutex_lock(&cache_mutex);
 
-    /* run through preallocated cache elements to initialize
-     * and put them on the free list
-     */
-    if (OPEN_CACHE_SIZE == 0)
-    {
-	gossip_err("Warning: dbpf_open_cache disabled.\n");
-    }
-
     /* initialize prealloc array */
     memset(&prealloc[0],0,sizeof(struct open_cache_entry)*OPEN_CACHE_SIZE);
 
+    /* run through preallocated cache elements to initialize
+     * and put them on the free list
+     */
     for (i = 0; i < OPEN_CACHE_SIZE; i++)
     {
         prealloc[i].fd = -1;

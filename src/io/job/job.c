@@ -881,6 +881,7 @@ int job_dev_unexp(
     enum job_flags flags,
     job_context_id context_id)
 {
+#ifdef __PVFS2_CLIENT__
     /* post a dev recv for an unexpected message.  We will do a quick
      * test to see if an unexpected message is available.  If so, we
      * return the necessary info; if not we queue up to test again later
@@ -888,10 +889,6 @@ int job_dev_unexp(
     int ret = -1;
     struct job_desc *jd = NULL;
     int outcount = 0;
-
-#ifndef __PVFS2_CLIENT__
-    return(-PVFS_ENOSYS);
-#endif
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the user ptr etc.
@@ -946,6 +943,9 @@ int job_dev_unexp(
     PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
 
     return (0);
+#else
+    return(-PVFS_ENOSYS);
+#endif
 }
 
 /* job_dev_write()
@@ -964,17 +964,12 @@ int job_dev_write(void* buffer,
     job_id_t * id,
     job_context_id context_id)
 {
-    int ret = -1;
-
     /* NOTE: This function will _always_ immediately complete for now.  
      * It is really just in the job interface for completeness, in case we 
      * decide later to make the function asynchronous
      */
-
-#ifndef __PVFS2_CLIENT__
-    return(-PVFS_ENOSYS);
-#endif
-
+#ifdef __PVFS2_CLIENT__
+    int ret = -1;
     ret = PINT_dev_write(buffer, size, buffer_type, tag);
     if(ret < 0)
     {
@@ -989,6 +984,9 @@ int job_dev_write(void* buffer,
     out_status_p->status_user_tag = status_user_tag;
     out_status_p->actual_size = size;
     return(1);
+#else
+    return(-PVFS_ENOSYS);
+#endif
 }
 
 
@@ -1010,17 +1008,12 @@ int job_dev_write_list(void** buffer_list,
     job_id_t* id,
     job_context_id context_id)
 {
-    int ret = -1;
-
     /* NOTE: This function will _always_ immediately complete for now.  
      * It is really just in the job interface for completeness, in case we 
      * decide later to make the function asynchronous
      */
-
-#ifndef __PVFS2_CLIENT__
-    return(-PVFS_ENOSYS);
-#endif
-
+#ifdef __PVFS2_CLIENT__
+    int ret = -1;
     ret = PINT_dev_write_list(buffer_list, size_list, list_count,
         total_size, buffer_type, tag);
     if(ret < 0)
@@ -1036,6 +1029,9 @@ int job_dev_write_list(void** buffer_list,
     out_status_p->status_user_tag = status_user_tag;
     out_status_p->actual_size = total_size;
     return(1);
+#else
+    return(-PVFS_ENOSYS);
+#endif
 }
 
 

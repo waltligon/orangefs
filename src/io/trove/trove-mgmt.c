@@ -257,13 +257,7 @@ int trove_open_context(TROVE_coll_id coll_id, TROVE_context_id *context_id)
 {
     TROVE_method_id method_id;
     int ret = 0;
-
     method_id = global_trove_method_callback(coll_id);
-    if(method_id < 0)
-    {
-        return -TROVE_EINVAL;
-    }
-
     if (trove_init_status != 0)
     {
         ret = context_method_table[method_id]->open_context(coll_id,
@@ -276,13 +270,7 @@ int trove_close_context(TROVE_coll_id coll_id, TROVE_context_id context_id)
 {
     TROVE_method_id method_id;
     int ret = 0;
-
     method_id = global_trove_method_callback(coll_id);
-    if(method_id < 0)
-    {
-        return -TROVE_EINVAL;
-    }
-
     if (trove_init_status != 0)
     {
         ret = context_method_table[method_id]->close_context(coll_id,

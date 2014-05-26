@@ -40,9 +40,9 @@ static int tcache_lookup_oldest(
  * \return pointer to tcache on success, NULL on failure
  */
 struct PINT_tcache* PINT_tcache_initialize(
-    int (*compare_key_entry) (void *key, struct qhash_head* link), /**< function 
+    int (*compare_key_entry) (const void *key, struct qhash_head* link), /**< function 
     to compare keys with payloads within entry, return 1 on match, 0 if not match */
-    int (*hash_key) (void *key, int table_size), /**< function to hash keys */
+    int (*hash_key) (const void *key, int table_size), /**< function to hash keys */
     int (*free_payload) (void* payload), /**< function to free payload members (used during reclaim) */
     int table_size) /**< size of hash table to use */
 {

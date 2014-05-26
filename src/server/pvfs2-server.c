@@ -2133,12 +2133,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if( fs_conf == NULL )
-    {
-        gossip_err("Failure copying configuration file path\n");
-        goto parse_cmd_line_args_failure;
-    }
-
     if(argc - total_arguments > 2)
     {
         /* Assume user is passing in a server.conf.  Bit of a hack here to

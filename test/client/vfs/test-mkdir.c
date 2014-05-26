@@ -35,7 +35,6 @@ int main(int argc, char **argv)
     char   filename[PATH_MAX]= { 0 },
            testDir[PATH_MAX]= { 0 }, /* Directory where all test files reside */
            pvfsPath[PVFS_NAME_MAX]= { 0 }, /* fs relative path */
-           cmd[PATH_MAX]       = { 0 },
            pvfs2_tab_file[PATH_MAX]= { 0 }; /* used to store pvfs2 tab file */
     struct file_ref stFileRef;
     struct common_options commonOpts;
@@ -253,7 +252,7 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "\t FAILED. Unable to remove [%s]\n", testDir);
     }
-   
+
     /* ---------- BEGIN TEST CASE  ---------- 
      * Make sure we can create parent directories. Send a directory to create
      * whose parent doesn't exist either. Only do this for PVFS2 
@@ -264,8 +263,10 @@ int main(int argc, char **argv)
         sprintf(filename, "%s/%s", testDir, "child_dir");
         mode = S_IRWXO | S_IRWXG | S_IRWXU;  /* 0777 */
 
-        sprintf(cmd, "pvfs2-mkdir -p -m %o %s", mode, filename);
-        ret = system(cmd);
+        ret = create_path(filename,
+                               mode,
+                               commonOpts.use_pvfs2_lib,
+                               commonOpts.verbose);
     
         if(ret != TEST_COMMON_SUCCESS)
         {
@@ -322,6 +323,7 @@ int main(int argc, char **argv)
         }
     }
 
+#if 0
     /* ---------- BEGIN TEST CASE  ---------- 
      * Pass more than one directory to the pvfs2-mkdir command. Only run if 
      * this is using the PVFS2 API
@@ -329,12 +331,15 @@ int main(int argc, char **argv)
     if(commonOpts.use_pvfs2_lib)
     {
         memset(filename, 0, PATH_MAX);
-        sprintf(filename, "%s/%s", testDir, "child_dir");
+        sprintf(filename, "%s %s/%s", testDir, testDir, "child_dir");
         mode = S_IRWXO | S_IRWXG | S_IRWXU;  /* 0777 */
 
-        memset(cmd, 0, PATH_MAX);
-        sprintf(cmd, "pvfs2-mkdir -p -m %o %s %s", mode, testDir, filename);
-        ret = system(cmd);
+
+        ret = create_path(filename,
+                                       mode,
+                                       commonOpts.use_pvfs2_lib,
+                                       commonOpts.verbose);
+
     
         if(ret != TEST_COMMON_SUCCESS)
         {
@@ -385,8 +390,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "\t FAILED. Unable to remove [%s]\n", filename);
         }
     }
-
-
+#endif
     /* Remove any leftover test data */
     ret = finalize(commonOpts.use_pvfs2_lib);
     if(ret < 0)

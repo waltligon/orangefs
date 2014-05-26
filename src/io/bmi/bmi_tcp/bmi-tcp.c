@@ -3781,7 +3781,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     struct tcp_addr *tcp_addr_data = dest->method_data;
     method_op_p query_op = NULL;
     int ret = -1;
-    bmi_size_t total_size = 0;
     bmi_size_t amt_complete = 0;
     bmi_size_t env_amt_complete = 0;
     struct op_list_search_key key;
@@ -3789,14 +3788,13 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
 
-    if(PINT_EVENT_ENABLED)
+#if PINT_EVENT_ENABLED
+    int i = 0;
+    for(; i < list_count; ++i)
     {
-        int i = 0;
-        for(; i < list_count; ++i)
-        {
-            total_size += size_list[i];
-        }
+        total_size += size_list[i];
     }
+#endif
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,

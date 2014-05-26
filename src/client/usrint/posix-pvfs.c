@@ -1946,13 +1946,7 @@ int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
-
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents: called with %d\n", fd);
-    if (fd < 0)
-    {
-        errno = EBADF;
-        return -1;
-    }
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -1965,13 +1959,7 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
-
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents64: called with %d\n", fd);
-    if (fd < 0)
-    {
-        errno = EBADF;
-        return -1;
-    }
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {

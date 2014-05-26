@@ -113,7 +113,6 @@ static PINT_sm_action perf_mon_do_work(
     if(ret < 0)
     {
         return SM_ACTION_COMPLETE;
-        return(ret);
     }
     
     /* get no more counters than exist, and no more than requested */

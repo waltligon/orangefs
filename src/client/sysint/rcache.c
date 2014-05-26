@@ -65,8 +65,8 @@ struct rcache_key
 static struct PINT_tcache* rcache = NULL;
 static gen_mutex_t rcache_mutex = GEN_MUTEX_INITIALIZER;
   
-static int rcache_compare_key_entry(void* key, struct qhash_head* link);
-static int rcache_hash_key(void* key, int table_size);
+static int rcache_compare_key_entry(const void* key, struct qhash_head* link);
+static int rcache_hash_key(const void* key, int table_size);
 static int rcache_free_payload(void* payload);
 static struct PINT_perf_counter* rcache_pc = NULL;
 
@@ -444,9 +444,9 @@ assert(enabled == 1);
  *
  * returns 1 on match, 0 otherwise
  */
-static int rcache_compare_key_entry(void* key, struct qhash_head* link)
+static int rcache_compare_key_entry(const void* key, struct qhash_head* link)
 {
-    struct rcache_key* real_key = (struct rcache_key*)key;
+    const struct rcache_key* real_key = (const struct rcache_key*)key;
     struct rcache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
@@ -492,9 +492,9 @@ do { \
  *
  * returns hash index 
  */
-static int rcache_hash_key(void* key, int table_size)
+static int rcache_hash_key(const void* key, int table_size)
 {
-    struct rcache_key* key_entry = (struct rcache_key*) key;
+    const struct rcache_key* key_entry = (const struct rcache_key*) key;
 
     uint32_t a = (uint32_t)(key_entry->ref.handle >> 32);
     uint32_t b = (uint32_t)(key_entry->ref.handle & 0x00000000FFFFFFFF);
