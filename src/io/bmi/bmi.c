@@ -2065,26 +2065,26 @@ int BMI_cancel(bmi_op_id_t id,
         return(0);
     }
 
-    if (target_op->op_id != id)
+    if (target_op->op_id == id)
+    {
+        if(active_method_table[target_op->addr->method_type]->cancel)
+        {
+            ret = active_method_table[target_op->addr->method_type]
+                    ->cancel(id, context_id);
+        }
+        else
+        {
+            gossip_err("Error: BMI_cancel() unimplemented "
+                    "for this module.\n");
+            ret = bmi_errno_to_pvfs(-ENOSYS);
+        }
+    }
+    else
     {
         gossip_err("%s: target_op->op_id (%llu) != id (%llu)\n",
                 __func__, llu(target_op->op_id), llu(id));
         ret = bmi_errno_to_pvfs(-EINVAL);
     }
-
-    if(active_method_table[target_op->addr->method_type]->cancel)
-    {
-        ret = active_method_table[
-            target_op->addr->method_type]->cancel(
-                id, context_id);
-    }
-    else
-    {
-        gossip_err("Error: BMI_cancel() unimplemented "
-                   "for this module.\n");
-        ret = bmi_errno_to_pvfs(-ENOSYS);
-    }
-
     return (ret);
 }
 
