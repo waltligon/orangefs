@@ -408,14 +408,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         {
             if (uid > PVFS_UID_MAX)
             {
-                ret = -1;
+                ret = PVFS_EINVAL;
                 presult = NULL;
             }
             else
             {
-                ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+                getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
                 if (presult == NULL)
                 {
+                    ret = PVFS_errno_to_error(errno);
                     gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
                                 uid, ret);
                 }
@@ -423,9 +424,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-            ret = getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
+            getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
             if (presult == NULL)
             {
+                ret = PVFS_errno_to_error(errno);
                 gossip_lerr("User %s lookup error: %d (0 = not found)\n", 
                             user, ret);
             }
@@ -434,9 +436,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         uid = getuid();
-        ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+        getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
         if (presult == NULL)
         {
+            ret = PVFS_errno_to_error(errno);
             gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
                         uid, ret);
         }
@@ -444,7 +447,7 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     if (presult == NULL)
     {
         free(pwdbuf);
-        return -PVFS_EINVAL;
+        return -ret;
     }
 
     /* allocate buffer for grp functions */
@@ -472,14 +475,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         {
             if (gid > PVFS_GID_MAX)
             {
-                ret = -1;
+                ret = PVFS_EINVAL;
                 gresult = NULL;
             }
             else
             {
-                ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+                getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
                 if (gresult == NULL)
                 {
+                    ret = PVFS_errno_to_error(errno);
                     gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
                                 gid, ret);
                 }
@@ -487,9 +491,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-            ret = getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
+            getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
             if (gresult == NULL)
             {
+                ret = PVFS_errno_to_error(errno);
                 gossip_lerr("Group %s lookup error: %d (0 = not found)\n",
                             group, ret);
             }
@@ -498,9 +503,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         gid = getgid();
-        ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+        getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
         if (gresult == NULL)
         {
+            ret = PVFS_errno_to_error(errno);
             gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
                         gid, ret);
         }
@@ -509,7 +515,7 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     {
         free(pwdbuf);
         free(grpbuf);
-        return -PVFS_EINVAL;
+        return -ret;
     }
 
     /* Note: without security enabled any user can generate a 
