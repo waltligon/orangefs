@@ -182,22 +182,19 @@ typedef uint64_t u_int64_t;
 /* memory alloc and free, just for decoding */
 #if 0
 /* this is for debugging, if you want to see what is malloc'd */
-static inline void *decode_malloc (int n) {
-	void *p;
-	if (n>0)
-		p = malloc(n);
-	else
-		p = (void *)0;
-	printf("decode malloc %d bytes: %p\n",n,p);
-	return p;
+static inline void *decode_malloc (size_t n) {
+    void *p;
+    p = malloc(n);
+    printf("decode malloc %d bytes: %p\n",n,p);
+    return p;
 }
 /* this is for debugging, if you want to see what is free'd */
 static inline void decode_free (void *p) {
-	printf("decode free: %p\n",p);
-	free(p);
+    printf("decode free: %p\n",p);
+    free(p);
 }
 #else
-#define decode_malloc(n) ((n) ? malloc(n) : 0)
+#define decode_malloc(n) malloc(n)
 #define decode_free(n) free(n)
 #endif
 
