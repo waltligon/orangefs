@@ -387,12 +387,11 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     int ngroups, ret, i;
 
     /* allocate buffer for pwd functions */
-    bufsize = -1;
-#ifdef _SC_GETPW_R_SIZE_MAX
-    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+#ifdef _SC_GETGR_R_SIZE_MAX
+    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+#else
+    bufsize = 16384;
 #endif
-    if (bufsize == -1)
-        bufsize = 16384;  /* adequate amount */
     
     pwdbuf = (char *) malloc(bufsize);
     if (pwdbuf == NULL)
@@ -451,14 +450,11 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     }
 
     /* allocate buffer for grp functions */
-    bufsize = -1;
 #ifdef _SC_GETGR_R_SIZE_MAX
     bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+#else
+    bufsize = 16384;
 #endif
-    if (bufsize == -1)
-    {
-        bufsize = 16384;
-    }
 
     grpbuf = (char *) malloc(bufsize);
     if (grpbuf == NULL)
