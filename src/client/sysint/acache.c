@@ -833,7 +833,7 @@ static void load_payload(struct PINT_tcache* instance,
 
         /* Point to the new one */
         tmp_entry->payload = payload;
-        ret = PINT_tcache_refresh_entry(instance, tmp_entry);
+        PINT_tcache_refresh_entry(instance, tmp_entry);
         /* this counts as an update of an existing entry */
         PINT_perf_count(pc, PERF_ACACHE_UPDATES, 1, PINT_PERF_ADD);
     }

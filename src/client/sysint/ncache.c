@@ -404,7 +404,7 @@ int PINT_ncache_update(
          */
         ncache_free_payload(tmp_entry->payload);
         tmp_entry->payload = tmp_payload;
-        ret = PINT_tcache_refresh_entry(ncache, tmp_entry);
+        PINT_tcache_refresh_entry(ncache, tmp_entry);
         PINT_perf_count(ncache_pc, PERF_NCACHE_UPDATES, 1, PINT_PERF_ADD);
     }
     else
