@@ -35,8 +35,7 @@ int PINT_uid_mgmt_initialize()
     /* free any already existing hash table and linked list */
     if (uid_lru_list)
     {
-        qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link,
-                PINT_uid_mgmt_s, PINT_uid_mgmt_s)
+        qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link)
         {
             free(rover);
         }
@@ -96,8 +95,7 @@ void PINT_uid_mgmt_finalize()
 
     if (uid_lru_list)
     {
-        qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link,
-                PINT_uid_mgmt_s, PINT_uid_mgmt_s)
+        qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link)
         {
             free(rover);
         }

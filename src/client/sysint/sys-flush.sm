@@ -164,7 +164,7 @@ static int flush_datafile_setup_msgpairarray(
     PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) flush state: "
-                 "datafile_setup_msgpairarray\n", (void *)sm_p);
+                 "datafile_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
 
@@ -246,7 +246,8 @@ static int flush_datafile_flush_failure(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) flush state: datafile_flush_failure\n", (void *)sm_p);
+                 "(%p) flush state: datafile_flush_failure\n",
+                 sm_p);
     return SM_ACTION_COMPLETE;
 }
 
@@ -255,7 +256,7 @@ static int flush_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) flush state: flush_cleanup\n", (void *)sm_p);
+                 "(%p) flush state: flush_cleanup\n", sm_p);
 
     sm_p->error_code = js_p->error_code;
 

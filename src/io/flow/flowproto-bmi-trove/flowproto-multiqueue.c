@@ -36,7 +36,7 @@
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",\
-                 (void *)__flow_d);                                   \
+                 __flow_d);                                           \
     cleanup_buffers(__flow_data);                                     \
     __flow_d = (__flow_data)->parent;                                 \
     free(__flow_data);                                                \
@@ -143,7 +143,7 @@ static void trove_write_callback_fn(void *user_ptr,
  * ways, depending on if the function is triggered from an external thread
  * or in a direct invocation
  */
-static void bmi_send_callback_wrapper(void *user_ptr,
+static inline void bmi_send_callback_wrapper(void *user_ptr,
                                              PVFS_size actual_size,
                                              PVFS_error error_code)
 {
@@ -163,7 +163,7 @@ static void bmi_send_callback_wrapper(void *user_ptr,
     }
 }
 
-static void bmi_recv_callback_wrapper(void *user_ptr,
+static inline void bmi_recv_callback_wrapper(void *user_ptr,
                                              PVFS_size actual_size,
                                              PVFS_error error_code)
 {
@@ -182,7 +182,7 @@ static void bmi_recv_callback_wrapper(void *user_ptr,
     }
 }
 
-static void trove_read_callback_wrapper(void *user_ptr,
+static inline void trove_read_callback_wrapper(void *user_ptr,
                                                PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 
@@ -201,7 +201,7 @@ static void trove_read_callback_wrapper(void *user_ptr,
     }
 }
 
-static void trove_write_callback_wrapper(void *user_ptr,
+static inline void trove_write_callback_wrapper(void *user_ptr,
                                                 PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 
@@ -463,8 +463,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
 
-    gossip_err("%s: flow proto cancel called on %p\n", __func__,
-            (void *)flow_d);
+    gossip_err("%s: flow proto cancel called on %p\n", __func__, flow_d);
     gen_mutex_lock(&flow_data->parent->flow_mutex);
     /*
       if the flow is already marked as complete, then there is nothing
@@ -511,7 +510,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     int i;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto posting %p\n",
-            (void *)flow_d);
+                 flow_d);
 
     assert((flow_d->src.endpoint_id == BMI_ENDPOINT && 
             flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
@@ -700,7 +699,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     }
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto posted %p\n",
-            (void *)flow_d);
+                 flow_d);
     return (0);
 }
 
@@ -727,8 +726,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     int sync_mode = 0;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_recv_callback_fn, "
-        "error code: %d, flow: %p.\n", error_code, (void *)flow_data->parent);
+        "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -932,9 +931,8 @@ static void trove_read_callback_fn(void *user_ptr,
     q_item = result_tmp->q_item;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_read_callback_fn, "
-        "error_code: %d, flow: %p.\n",
-        error_code, (void *)flow_data->parent);
+        "flowproto-multiqueue trove_read_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
@@ -1059,7 +1057,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_send_callback_fn, error_code: %d, "
         "initial_call_flag: %d, flow: %p.\n", error_code, initial_call_flag,
-        (void *)flow_data->parent);
+        flow_data->parent);
 
     if(flow_data->parent->error_code != 0 && initial_call_flag)
     {
@@ -1341,7 +1339,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     } while(result_tmp);
 
     return(0);
-}
+};
 
 /* trove_write_callback_fn()
  *
@@ -1362,8 +1360,8 @@ static void trove_write_callback_fn(void *user_ptr, PVFS_error error_code)
 
     gossip_debug(
         GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_write_callback_fn, "
-        "error_code: %d, flow: %p.\n", error_code, (void *)flow_data->parent);
+        "flowproto-multiqueue trove_write_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
@@ -1552,7 +1550,7 @@ static void trove_write_callback_fn(void *user_ptr, PVFS_error error_code)
     }
 
     return;
-}
+};
 #endif
 
 /* cleanup_buffers()
@@ -1663,8 +1661,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-            "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d, "
-            "flow: %p.\n", error_code, (void *)flow_data->parent);
+        "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -1852,8 +1850,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size region_size;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d, "
-        "flow: %p.\n", error_code, (void *)flow_data->parent);
+        "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -2052,7 +2050,7 @@ static void handle_io_error(PVFS_error error_code,
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
         "flowproto-multiqueue handle_io_error() called for flow %p.\n",
-        (void *)flow_data->parent);
+        flow_data->parent);
 
     /* is this the first error registered for this particular flow? */
     if(flow_data->parent->error_code == 0)
@@ -2061,7 +2059,7 @@ static void handle_io_error(PVFS_error error_code,
 
         PVFS_strerror_r(error_code, buf, 64);
         gossip_err("%s: flow proto error cleanup started on %p: %s\n",
-                   __func__, (void *)flow_data->parent, buf);
+                   __func__, flow_data->parent, buf);
 
         flow_data->parent->error_code = error_code;
         if(q_item)
@@ -2118,7 +2116,7 @@ static void handle_io_error(PVFS_error error_code,
             assert(0);
         }
         gossip_err("%s: flow proto %p canceled %d operations, will clean up.\n",
-                   __func__, (void *)flow_data->parent,
+                   __func__, flow_data->parent,
                    flow_data->cleanup_pending_count);
     }
     else
@@ -2135,7 +2133,7 @@ static void handle_io_error(PVFS_error error_code,
     {
         PVFS_strerror_r(flow_data->parent->error_code, buf, 64);
         gossip_err("%s: flow proto %p error cleanup finished: %s\n",
-            __func__, (void *)flow_data->parent, buf);
+            __func__, flow_data->parent, buf);
 
         /* we are finished, make sure error is marked and state is set */
         assert(flow_data->parent->error_code);

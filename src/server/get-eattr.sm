@@ -266,7 +266,7 @@ static int perm_geteattr(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(geteattr)
+PINT_GET_OBJECT_REF_DEFINE(geteattr);
 
 struct PINT_server_req_params pvfs2_get_eattr_params =
 {

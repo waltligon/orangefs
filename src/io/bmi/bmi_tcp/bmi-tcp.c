@@ -1926,7 +1926,7 @@ void tcp_forget_addr(bmi_method_addr_p map,
         bmi_method_addr_forget_callback(bmi_addr);
     }
     return;
-}
+};
 
 /******************************************************************
  * Internal support functions

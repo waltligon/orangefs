@@ -11,9 +11,10 @@
 #define PVFS_DIST_BASIC_NAME "basic_dist"
 #define PVFS_DIST_BASIC_NAME_SIZE 11
 
-/* Empty struct; field does nothing! */
 struct PVFS_basic_params_s {
+#ifdef WIN32
     int field;
+#endif
 };
 typedef struct PVFS_basic_params_s PVFS_basic_params;
 

@@ -46,8 +46,8 @@ int main(int argc, char **argv)
     PVFS_sys_layout layout;
 
     layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
-    layout.count = 0;
-    layout.servers = NULL;
+    layout.server_list.count = 0;
+    layout.server_list.servers = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -75,12 +75,12 @@ int main(int argc, char **argv)
         char filename[PVFS_SEGMENT_MAX] = {0};
 
         layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
-        layout.count = 0;
-        if(layout.servers)
+        layout.server_list.count = 0;
+        if(layout.server_list.servers)
         {
-            free(layout.servers);
+            free(layout.server_list.servers);
         }
-        layout.servers = NULL;
+        layout.server_list.servers = NULL;
 
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
@@ -153,18 +153,19 @@ int main(int argc, char **argv)
         else if(user_opts->server_list)
         {
             layout.algorithm = PVFS_SYS_LAYOUT_LIST;
-            layout.count = 1;
+            layout.server_list.count = 1;
             tmp_server = user_opts->server_list;
 
             /* iterate once to count servers */
             while((tmp_server = index(tmp_server, ',')))
             {
-                layout.count++;
+                layout.server_list.count++;
                 tmp_server++;
             }
 
-            layout.servers = malloc(layout.count * sizeof(PVFS_BMI_addr_t));
-            if(!(layout.servers))
+            layout.server_list.servers = 
+                malloc(layout.server_list.count*sizeof(PVFS_BMI_addr_t));
+            if(!(layout.server_list.servers))
             {
                 perror("malloc");
                 ret = -1;
@@ -177,7 +178,7 @@ int main(int argc, char **argv)
                 tmp_server != NULL;
                 tmp_server = strtok(NULL, ","))
             {
-                assert(tmp_server_index < layout.count);
+                assert(tmp_server_index < layout.server_list.count);
                 
                 /* TODO: is there a way to do this without internal BMI
                  * functions? The address lookups should be done within the create
@@ -185,7 +186,7 @@ int main(int argc, char **argv)
                  * a list of server aliases from the config file.
                  */
                 rc = BMI_addr_lookup(
-                    &layout.servers[tmp_server_index],
+                    &layout.server_list.servers[tmp_server_index],
                     tmp_server);
                 if(rc < 0)
                 {
@@ -194,7 +195,7 @@ int main(int argc, char **argv)
                 }
                 tmp_server_index++;
             }
-            if(tmp_server_index != layout.count)
+            if(tmp_server_index != layout.server_list.count)
             {
                 fprintf(stderr, "Error: unable to resolve server list.\n");
                 ret = -1;
@@ -224,7 +225,7 @@ int main(int argc, char **argv)
 
     if(user_opts->server_list)
     {
-        free(layout.servers);
+        free(layout.server_list.servers);
         free(user_opts->server_list);
     }
     free(user_opts);

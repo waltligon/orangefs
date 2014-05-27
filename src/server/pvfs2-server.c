@@ -1310,13 +1310,13 @@ static int server_setup_signal_handlers(void)
     struct sigaction new_action;
     struct sigaction ign_action;
     struct sigaction hup_action;
-    hup_action.sa_sigaction = hup_sighandler;
+    hup_action.sa_sigaction = (void *)hup_sighandler;
     sigemptyset (&hup_action.sa_mask);
     hup_action.sa_flags = SA_RESTART | SA_SIGINFO;
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
-    segv_action.sa_sigaction = bt_sighandler;
+    segv_action.sa_sigaction = (void *)bt_sighandler;
     sigemptyset (&segv_action.sa_mask);
     segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
 #endif
@@ -2265,8 +2265,8 @@ int server_state_machine_start(
     int ret = -PVFS_EINVAL;
     PVFS_id_gen_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "server_state_machine_start %p\n",
-            (void *)smcb);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start %p\n",smcb);
 
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -2403,8 +2403,8 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "server_state_machine_start_noreq %p\n",
-            (void *)smcb);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start_noreq %p\n",smcb);
 
     tmp_status.error_code = 0;
 
@@ -2438,7 +2438,7 @@ int server_state_machine_complete_noreq(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
         
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: %p\n", __func__, (void *)smcb);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: %p\n", __func__, smcb);
     id_gen_fast_register(&tmp_id, s_op);
                 
     qlist_del(&s_op->next);
@@ -2460,8 +2460,8 @@ int server_state_machine_complete(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "server_state_machine_complete %p\n",
-            (void *)smcb);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_complete %p\n",smcb);
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -2473,7 +2473,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     }
 
     /* release the decoding of the unexpected request */
-    if (ENCODING_IS_SUPPORTED(s_op->decoded.enc_type))
+    if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
         PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
 
@@ -2508,8 +2508,8 @@ int server_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* free the operation structure itself */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "server_state_machine_terminate %p\n",
-            (void *)smcb);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_terminate %p\n",smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
 }
@@ -2585,7 +2585,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                 "null@%s H=%llu S=%p: %s: %s",
                 BMI_addr_rev_lookup_unexpected(s_op->addr),
                 llu(s_op->target_handle),
-                (void *)s_op,
+                s_op,
                 PINT_map_server_op_to_string(s_op->req->op),
                 format);
         }
@@ -2599,7 +2599,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                 PINT_util_bytes2str(s_op->req->capability.signature, 
                                     sig_buf, 4),
                 llu(s_op->target_handle),
-                (void *)s_op,
+                s_op,
                 PINT_map_server_op_to_string(s_op->req->op),
                 format);                
         }

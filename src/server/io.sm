@@ -437,7 +437,7 @@ static enum PINT_server_req_access_type PINT_server_req_access_io(
     return PINT_SERVER_REQ_MODIFY;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(io)
+PINT_GET_OBJECT_REF_DEFINE(io);
 
 struct PINT_server_req_params pvfs2_io_params =
 {

@@ -274,7 +274,7 @@ static PINT_sm_action mgmt_remove_dirent_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_dirent)
+PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_dirent);
 
 static int perm_mgmt_remove_dirent(PINT_server_op *s_op)
 {

@@ -25,6 +25,7 @@
 #include "xattr-utils.h"
 #include "pint-sysint-utils.h"
 #include "pint-distribution.h"
+#include "pvfs2-dist-basic.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-dist-varstrip.h"
 #include "pint-util.h"

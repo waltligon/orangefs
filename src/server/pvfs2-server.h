@@ -838,10 +838,19 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
  * no return value
  */
 #ifdef GOSSIP_DISABLE_DEBUG
-#define PINT_ACCESS_DEBUG(_s_op, _mask, ...) do {} while (0)
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
 #else
-#define PINT_ACCESS_DEBUG(_s_op, _mask, ...)                     \
-    PINT_server_access_debug(_s_op, _mask, __VA_ARGS__)
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+#endif
+#else
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, __VA_ARGS__)
+#else
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, ##f)
+#endif
 #endif
 
 #ifndef GOSSIP_DISABLE_DEBUG

@@ -220,7 +220,7 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_sm_msgarray_op *msgarray = &(s_op->msgarray_op);
 
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",(void *)s_op);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",s_op);
 
    js_p->error_code = 0;
 
@@ -244,7 +244,7 @@ static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_sm_msgarray_op *msgarray = &(s_op->msgarray_op);
 
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",(void *)s_op);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",s_op);
 
    gossip_debug(GOSSIP_SERVER_DEBUG,"\tjs_p->error_code:%d\n"
                                    ,js_p->error_code);

@@ -5,6 +5,9 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
@@ -76,7 +79,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
     static int pvfs_sys_init_flag = 0; /* set to one when init is done */
     static int pvfs_sys_init_in_progress = 0;
-    static gen_mutex_t init_mutex;
+    static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+
     int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
@@ -101,12 +105,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     pvfs_sys_init_in_progress = 1;
 
     /* ready to initialize */
-
-    if (gen_posix_recursive_mutex_init(&init_mutex) < 0)
-    {
-        gossip_err("PVFS_sys_initialize: could not init recursive mutex\n");
-        abort();
-    }
 
 #ifdef WIN32
     pint_client_pid = (int) GetCurrentProcessId();

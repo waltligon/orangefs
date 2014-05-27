@@ -54,6 +54,8 @@ AC_CHECK_HEADER([features.h],
         [AC_DEFINE(HAVE_FEATURES_H, 1, Define if features.h exists)])
 AC_CHECK_HEADER([fstab.h],
         [AC_DEFINE(HAVE_FSTAB_H, 1, Define if fstab.h exists)])
+AC_CHECK_HEADER([malloc.h],
+        [AC_DEFINE(HAVE_MALLOC_H, 1, Define if malloc.h exists)])
 AC_CHECK_HEADER([memory.h],
         [AC_DEFINE(HAVE_MEMORY_H, 1, Define if memory.h exists)])
 AC_CHECK_HEADER([mntent.h],
@@ -89,6 +91,8 @@ AC_CHECK_HEADER([dlfcn.h],
 
 AC_CHECK_HEADER([linux/types.h],
         [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
+AC_CHECK_HEADER([linux/malloc.h],
+        [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
 
 AC_CHECK_HEADER([selinux/selinux.h],
         [AC_DEFINE(HAVE_SELINUX_H, 1, Define if selinux/selinux.h exists)])
@@ -260,6 +264,9 @@ AC_SUBST(BUILD_SERVER)
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
+
+dnl check to see if the "fast" getgrouplist function is available
+AX_GETGROUPLIST
 
 dnl check for key-based security
 AC_ARG_ENABLE(security-key,
@@ -1019,26 +1026,20 @@ dnl Method to disable build of user interface libraries
 BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
    [  --disable-usrint        Do not build posix and stdio user libraries],
-   [if test "x$enableval" = "xyes" -a "`uname -s`" = "Linux"; then
+   [if test "x$enableval" = "xyes" ; then
        AC_DEFINE(PVFS_USRINT_BUILD, 1,
                  [Should we build user interface libraries.])
        BUILD_USRINT=1
     else
        AC_DEFINE(PVFS_USRINT_BUILD, 0,
                  [Should we build user interface libraries.])
-       BUILD_USRINT=0
     fi
     build_usrint=$enableval
    ],
-   [if test "`uname -s`" = "Linux"; then
-       AC_DEFINE(PVFS_USRINT_BUILD, 0,
-                 [Should we build user interface libraries.])
-       build_usrint=yes
-       BUILD_USRINT=1
-    else
-       build_usrint=no
-       BUILD_USRINT=0
-    fi
+   [AC_DEFINE(PVFS_USRINT_BUILD, 1,
+              [Should we build user interface libraries.])
+    build_usrint=yes
+    BUILD_USRINT=1
    ])
 AC_SUBST(build_usrint)
 
@@ -1438,17 +1439,46 @@ if test "x$BUILD_SERVER" = "x1"; then
 	AX_CHECK_NEEDS_LIBRT
 fi
 
-oldcflags="$CFLAGS"
-CFLAGS="$USR_CFLAGS"
+case "$host_os" in
+
+    *darwin*)
+	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
+    	TARGET_OS_DARWIN=1
+        CFLAGS="$CFLAGS -D__DARWIN__"
+	AC_SUBST(TARGET_OS_DARWIN)
+        AC_SUBST(CFLAGS)
+    ;;
+    *linux*)
+	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)
+    	TARGET_OS_LINUX=1
+	AC_SUBST(TARGET_OS_LINUX)
+    ;;
+esac
 
 dnl check for gethostbyname function
-AC_CHECK_FUNCS([gethostbyname])
+AC_MSG_CHECKING(for gethostbyname)
+oldcflags="$CFLAGS"
+CFLAGS="$USR_CFLAGS"
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+gethostbyname("localhost");
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
+AC_MSG_RESULT(no)
+WARN_ABOUT_HOSTNAMES="yes")
 
-dnl check for gethostbyaddr function
-AC_CHECK_FUNCS([gethostbyaddr])
-
-dnl check for memalign function
-AC_CHECK_FUNCS([memalign])
+AC_MSG_CHECKING(for gethostbyaddr)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+struct sockaddr_in peer;
+gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
+AC_MSG_RESULT(no)  )
 
 CFLAGS="$oldcflags"
 

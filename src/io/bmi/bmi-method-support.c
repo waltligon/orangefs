@@ -172,9 +172,13 @@ char *string_key(const char *key,
     if (holder)
     {
 	end = strpbrk(holder, ", \t\n");
-	if (end == NULL)
+	if (end)
 	{
-	    end = id_string + strsize; /* go to the end of the id string (\0) */
+	    end = end;	/* stop on terminator */
+	}
+	else
+	{
+	    end = id_string + strsize;	/* go to the end of the id string (\0) */
 	}
 	/* move holder so it doesn't include the opening key and deliminator */
 	holder = holder + keysize + 3;

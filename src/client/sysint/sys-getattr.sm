@@ -555,7 +555,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     PINT_sm_msgpair_state *msg_p;
     PVFS_capability capability;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) %s\n", (void *)sm_p, __func__);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) %s\n", sm_p, __func__);
 
     js_p->error_code = 0;
 
@@ -743,7 +743,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 "dfile_count = %d "
                 "dist_name_len = %d "
                 "dist_params_len = %d\n",
-                (void *)attr,
+                attr,
                 attr->u.dir.hint.dfile_count,
                 attr->u.dir.hint.dist_name_len,
                 attr->u.dir.hint.dist_params_len);
@@ -836,7 +836,7 @@ static PINT_sm_action getattr_object_getattr_failure(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_object_getattr_failure\n",
-                 (void *)sm_p);
+                 sm_p);
 
     if ((js_p->error_code != -PVFS_ENOENT) &&
         (js_p->error_code != -PVFS_EINVAL))
@@ -1104,7 +1104,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
                  "(%p) getattr state: "
-                 "getattr_datafile_getattr_retry\n", (void *)sm_p);
+                 "getattr_datafile_getattr_retry\n", sm_p);
 
     /* We only need to retry if we have mirrors; otherwise, msgpairarray 
      * has already handled the retries.
@@ -1546,7 +1546,7 @@ static PINT_sm_action getattr_cleanup(
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) getattr state: getattr_cleanup\n", (void *)sm_p);
+                 "(%p) getattr state: getattr_cleanup\n", sm_p);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG
                 ,"%s: js_p->error_code:%d \tgetattr->attr.mask:0x%08x\n"

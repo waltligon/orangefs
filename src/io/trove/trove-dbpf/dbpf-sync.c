@@ -152,7 +152,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     sync_context = & sync_array[sync_context_type][cid];
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                 "[SYNC_COALESCE]: sync_context: %p\n", (void *)sync_context);
+                 "[SYNC_COALESCE]: sync_context: %p\n", sync_context);
 
     if( sync_context_type == COALESCE_CONTEXT_DSPACE )
     {
@@ -227,7 +227,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
                      "to completion queue\n",
-                     (void *)qop_p, llu(qop_p->op.handle), qop_p->op.type);
+                     qop_p, llu(qop_p->op.handle), qop_p->op.type);
 
         if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
         {
@@ -261,10 +261,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
             }
 
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                    "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
-                    "to completion queue\n",
-                    (void *)ready_op, llu(ready_op->op.handle),
-                    ready_op->op.type);
+                         "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
+                         "to completion queue\n",
+                         ready_op, llu(ready_op->op.handle), ready_op->op.type);
 
             dbpf_op_queue_remove(ready_op);
             DBPF_COMPLETION_ADD(ready_op, OP_COMPLETED);

@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 
-#ifdef HAVE_MEMALIGN
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
 
@@ -66,10 +66,9 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
+
 {
-#ifdef HAVE_MEMALIGN
-    return memalign(alignment, size);
-#else
+#ifdef __DARWIN__
     void *ptr;
     int rc;
     rc = posix_memalign(&ptr, alignment, size);
@@ -81,6 +80,8 @@ void *clean_memalign(size_t alignment, size_t size)
     {
         return NULL;
     }
+#else
+    return memalign(alignment, size);
 #endif
 }
 
@@ -101,7 +102,7 @@ char *clean_strndup(const char *str, size_t n)
 
 void clean_free(void *ptr)
 {
-    free(ptr);
+    return free(ptr);
 }
 
 /* These need to be after the clean functions which should call whatever
@@ -257,18 +258,18 @@ static inline void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
     {
-        glibc_malloc_ops.free(mem);
+        return glibc_malloc_ops.free(mem);
     }
     else
     {
         init_glibc_malloc();
         if (glibc_malloc_ops.free)
         {
-            glibc_malloc_ops.free(mem);
+            return glibc_malloc_ops.free(mem);
         }
         else
         {
-            free(mem);
+            return free(mem);
         }
     }
 }
@@ -583,7 +584,8 @@ void init_glibc_malloc(void)
 {
     static int init_flag = 0;
     static int recurse_flag = 0;
-    static gen_mutex_t init_mutex;
+    static gen_mutex_t init_mutex = 
+                       (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
     void *libc_handle;
 
     /* prevent multiple threads from running this */
@@ -602,28 +604,21 @@ void init_glibc_malloc(void)
     recurse_flag = 1;
     memdebug(stderr, "init_glibc_malloc running\n");
 
-    if (gen_posix_recursive_mutex_init(&init_mutex) < 0)
-    {
-        gossip_err("init_glibc_malloc: could not init recursive mutex\n");
-        abort();
-    }
-
     libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)
     {
         libc_handle = RTLD_DEFAULT;
     }
     /* this structure defined in common/misc/pint-malloc.h */
-    *(void **)(&glibc_malloc_ops.malloc) = dlsym(libc_handle, "malloc");
-    *(void **)(&glibc_malloc_ops.calloc) = dlsym(libc_handle, "calloc");
-    *(void **)(&glibc_malloc_ops.posix_memalign) = dlsym(libc_handle,
-            "posix_memalign");
-    *(void **)(&glibc_malloc_ops.memalign) = dlsym(libc_handle, "memalign");
-    *(void **)(&glibc_malloc_ops.valloc) = dlsym(libc_handle, "valloc");
-    *(void **)(&glibc_malloc_ops.realloc) = dlsym(libc_handle, "realloc");
-    *(void **)(&glibc_malloc_ops.strdup) = dlsym(libc_handle, "strdup");
-    *(void **)(&glibc_malloc_ops.strndup) = dlsym(libc_handle, "strndup");
-    *(void **)(&glibc_malloc_ops.free) = dlsym(libc_handle, "free");
+    glibc_malloc_ops.malloc = dlsym(libc_handle, "malloc");
+    glibc_malloc_ops.calloc = dlsym(libc_handle, "calloc");
+    glibc_malloc_ops.posix_memalign = dlsym(libc_handle, "posix_memalign");
+    glibc_malloc_ops.memalign = dlsym(libc_handle, "memalign");
+    glibc_malloc_ops.valloc = dlsym(libc_handle, "valloc");
+    glibc_malloc_ops.realloc = dlsym(libc_handle, "realloc");
+    glibc_malloc_ops.strdup = dlsym(libc_handle, "strdup");
+    glibc_malloc_ops.strndup = dlsym(libc_handle, "strndup");
+    glibc_malloc_ops.free = dlsym(libc_handle, "free");
     if (libc_handle != RTLD_DEFAULT) /* was NEXT but I think that was wrong */
     {
         dlclose(libc_handle);

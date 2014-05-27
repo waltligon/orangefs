@@ -482,8 +482,8 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb,
     {
        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t  io_servers[%d] : %p "
                                         "\t &io_servers[%d] : %p\n",
-                                        i, (void *)imm_p->io_servers[i],
-                                        i, (void *)&(imm_p->io_servers[i])); 
+                                        i, imm_p->io_servers[i],
+                                        i, &(imm_p->io_servers[i])); 
     }
     imm_p->num_io_servers = imm_p->io_servers_required;
 
@@ -503,9 +503,9 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb,
        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t  io_servers[%d] : %p "
                                          "\t *io_servers[%d] : %s "
                                          "\t &io_servers[%d] : %p\n",
-                                         i, (void *)imm_p->io_servers[i], 
                                          i, imm_p->io_servers[i], 
-                                         i, (void *)&(imm_p->io_servers[i])); 
+                                         i, imm_p->io_servers[i], 
+                                         i, &(imm_p->io_servers[i])); 
 
     /* allocate space for the local source handles */
     imm_p->handle_array_base_local = 
@@ -888,7 +888,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG,"hint.flags: %llu\n",
                  llu(sm_p->target_object_attr->u.meta.hint.flags));
     gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n",
-                 (void *)sm_p->target_object_attr->u.meta.dfile_array);
+                 sm_p->target_object_attr->u.meta.dfile_array);
 
     /* find local IO extent array for this file system for metadata host */
     ret = PINT_cached_config_get_server( imm_p->fs_id,
@@ -909,7 +909,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of copies: %d \tlocation:%p\n",
-                                      imm_p->copies,(void *)&imm_p->copies);
+                                      imm_p->copies,&imm_p->copies);
 
 
     /*i create local datahandles - will be used as destination handles for 
@@ -1250,7 +1250,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
         mirror_op->addr = sm_p->addr; /* get addr for this server */
 
         gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmirror_op->req(%p)\n",
-                                          (void *)mirror_op->req);
+                                          mirror_op->req);
 
         if ( strncmp(imm_p->io_servers[src], config->host_id, 
                      SERVER_NAME_MAX-1) == 0 )
@@ -1442,7 +1442,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb,
         if (reqmir->wcIndex)
             free(reqmir->wcIndex);
         gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmirror_op->req(%p)\n",
-                                          (void *)mirror_op->req);
+                                          mirror_op->req);
         free(mirror_op->req);
 
         if (respmir->bytes_written)
@@ -1533,7 +1533,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
     /* setup key/val pairs */
     sm_p->keyval_count = key_count;
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of copies:%d \tlocation:%p\n",
-                                      imm_p->copies,(void *)&imm_p->copies);
+                                      imm_p->copies,&imm_p->copies);
 
     sm_p->key_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
     sm_p->val_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
@@ -1615,7 +1615,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
     sm_p->val_a[i].buffer_sz = sizeof(int);
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s:%d \tpointer:%p \tbuffer size:%d\n",
                                       (char *)sm_p->key_a[i].buffer,
-                                      *myCount,(void *)myCount,
+                                      *myCount,myCount,
                                       sm_p->val_a[i].buffer_sz);
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey count:%d\n", sm_p->keyval_count);
 
@@ -1744,7 +1744,8 @@ static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb,
     if (!imm_p->handle_array_copies_remote)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG, "handle_array_copies_remote is "
-                "null: %p\n", (void *)imm_p->handle_array_copies_remote);
+                                          "null: %p\n",
+                                          imm_p->handle_array_copies_remote);
         js_p->error_code = REPLACE_DONE;
         return SM_ACTION_COMPLETE;
     }
@@ -1910,7 +1911,7 @@ int mirror_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
     struct PVFS_servresp_mirror *respmir = &(mirror_op->resp.u.mirror); 
     int k;
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op:%p\n",(void *)mirror_op);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op:%p\n",mirror_op);
 
     /* only posted one msgpair per source handle*/
     assert(i==0);
@@ -2112,7 +2113,7 @@ static inline int PINT_get_object_ref_copies( struct PVFS_server_req *req,
     *handle = req->u.seteattr.handle;     
 
     return 0;
-}
+};
 
 static int perm_copies(PINT_server_op *s_op)
 {

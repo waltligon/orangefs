@@ -928,7 +928,7 @@ int lock_init(ucache_lock_t * lock)
         return -1;
     }
     #elif LOCK_TYPE == 3
-    gen_posix_shared_mutex_init((pthread_mutex_t *)lock);
+    *lock = (ucache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; //GEN_SHARED_MUTEX_INITIALIZER_NP;
     rc = 0;
     #endif
     return rc;

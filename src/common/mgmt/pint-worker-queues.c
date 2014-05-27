@@ -218,8 +218,7 @@ static int queues_do_work(struct PINT_manager_s *manager,
     if(op->id != 0)
     {
         /* find the op in one of the queues */
-        qlist_for_each_entry(queue, &w->queues, link,
-                struct PINT_queue_s)
+        qlist_for_each_entry(queue, &w->queues, link)
         {
             ret = PINT_queue_search_and_remove(
                 queue->id,
@@ -353,7 +352,7 @@ exit:
     qlist_add_tail(&queue->link, &w->queues);
     gen_mutex_unlock(&w->mutex);
     return ret;
-}
+};
 
 struct PINT_worker_impl PINT_worker_queues_impl =
 {

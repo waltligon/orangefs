@@ -24,6 +24,12 @@ struct PINT_queue_trigger
 
 static int PINT_queue_update_stats(struct PINT_queue_s *queue, int microsecs);
 
+inline static int PINT_default_compare(
+    PINT_queue_entry_t *a, PINT_queue_entry_t *b)
+{
+    return 0;
+}
+
 int PINT_queue_create(
     PINT_queue_id *qid, PINT_queue_entry_compare_callback compare)
 {
@@ -71,8 +77,7 @@ int PINT_queue_destroy(PINT_queue_id qid)
         return -PVFS_EINVAL;
     }
 
-    qlist_for_each_entry_safe(trigger, tmp, &queue->triggers, link,
-            struct PINT_queue_trigger, struct PINT_queue_trigger)
+    qlist_for_each_entry_safe(trigger, tmp, &queue->triggers, link)
     {
         trigger->destroy(trigger->user_ptr);
         qlist_del(&trigger->link);
@@ -183,7 +188,7 @@ int PINT_queue_add_trigger(PINT_queue_id queue_id,
     return 0;
 }
 
-int PINT_queue_count(PINT_queue_id qid)
+inline int PINT_queue_count(PINT_queue_id qid)
 {
     struct PINT_queue_s *queue;
     int count;
@@ -220,14 +225,14 @@ static int PINT_queue_insert(PINT_queue_id qid,
         /* push it onto the front */
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: pushing entry: %p to front of queue: %p\n",
-                     __func__, (void *)&entry->link, (void *)queue);
+                     __func__, &entry->link, queue);
         qlist_add(&entry->link, &queue->entries);
     }
     else
     {
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: pushing entry: %p to back of queue: %p\n",
-                     __func__, (void *)&entry->link, (void *)queue);
+                     __func__, &entry->link, queue);
         qlist_add_tail(&entry->link, &queue->entries);
     }
 
@@ -242,8 +247,7 @@ static int PINT_queue_insert(PINT_queue_id qid,
      */
     gen_cond_signal(&queue->cond);
 
-    qlist_for_each_entry(trigger, &queue->triggers, link,
-            struct PINT_queue_trigger)
+    qlist_for_each_entry(trigger, &queue->triggers, link)
     {
         if(trigger->action == PINT_QUEUE_ACTION_POSTED)
         {
@@ -280,14 +284,13 @@ int PINT_queue_pull(PINT_queue_id qid,
     assert(*count > 0);
 
     gen_mutex_lock(&queue->mutex);
-    qlist_for_each_entry_safe(entry, tmp, &queue->entries, link,
-           PINT_queue_entry_t, PINT_queue_entry_t)
+    qlist_for_each_entry_safe(entry, tmp, &queue->entries, link)
     {
         entries[retcount] = entry;
 
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: removing entry: %p from queue: %p\n",
-                     __func__, (void *)&entry->link, (void *)queue);
+                     __func__, &entry->link, queue);
         qlist_del(&entry->link);
         memset(&entry->link, 0, sizeof(entry->link));
         queue->count--;
@@ -311,8 +314,7 @@ int PINT_queue_pull(PINT_queue_id qid,
     if(retcount > 0)
     {
 
-        qlist_for_each_entry(trigger, &queue->triggers, link,
-                struct PINT_queue_trigger)
+        qlist_for_each_entry(trigger, &queue->triggers, link)
         {
             if(trigger->action == PINT_QUEUE_ACTION_REMOVED)
             {
@@ -352,14 +354,13 @@ int PINT_queue_remove(PINT_queue_id queue_id,
     if(queue->count > 0)
     {
         /* make sure its actually in the queue somewhere */
-        qlist_for_each_entry_safe(e, tmp, &queue->entries, link,
-                PINT_queue_entry_t, PINT_queue_entry_t)
+        qlist_for_each_entry_safe(e, tmp, &queue->entries, link)
         {
             if(e == entry)
             {
                 gossip_debug(GOSSIP_MGMT_DEBUG,
                              "%s: removing entry: %p from queue: %p\n",
-                             __func__, (void *)&e->link, (void *)queue);
+                             __func__, &e->link, queue);
                 qlist_del(&e->link);
                 memset(&e->link, 0, sizeof(e->link));
                 queue->count--;
@@ -375,8 +376,7 @@ int PINT_queue_remove(PINT_queue_id queue_id,
         }
     }
 
-    qlist_for_each_entry(trigger, &queue->triggers, link,
-            struct PINT_queue_trigger)
+    qlist_for_each_entry(trigger, &queue->triggers, link)
     {
         if(trigger->action == PINT_QUEUE_ACTION_REMOVED)
         {
@@ -405,8 +405,7 @@ int PINT_queue_search_and_remove(PINT_queue_id queue_id,
     queue = id_gen_fast_lookup(queue_id);
 
     gen_mutex_lock(&queue->mutex);
-    qlist_for_each_entry_safe(e, tmp, &queue->entries, link,
-            PINT_queue_entry_t, PINT_queue_entry_t)
+    qlist_for_each_entry_safe(e, tmp, &queue->entries, link)
     {
         if(compare(e, user_ptr))
         {
