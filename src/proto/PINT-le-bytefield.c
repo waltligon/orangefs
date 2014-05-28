@@ -333,7 +333,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_TREE_REVOKE_CAP:                
                 req.u.tree_revoke_cap.num_caps = 0;
                 req.u.tree_revoke_cap.cap_id_array = NULL;
-                req.u.tree_revoke_cap.num_servers = 0;
+                req.u.tree_revoke_cap.num_handles = 0;
                 req.u.tree_revoke_cap.handle_array = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_revoke_cap;
                 break;

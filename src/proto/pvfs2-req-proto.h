@@ -511,7 +511,7 @@ struct PVFS_servreq_tree_revoke_cap
     uint32_t num_caps;
     PVFS_capability_id *cap_id_array;
     PVFS_handle cap_handle;
-    uint32_t num_servers;
+    uint32_t num_handles;
     PVFS_handle *handle_array;
 };
 endecode_fields_1a_1a_struct(
@@ -520,7 +520,7 @@ endecode_fields_1a_1a_struct(
     uint32_t, num_caps,
     PVFS_capability_id, cap_id_array,
     PVFS_handle, cap_handle,
-    uint32_t, num_servers,
+    uint32_t, num_handles,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_revoke_cap \
   (PVFS_REQ_LIMIT_CAPS_COUNT * sizeof(PVFS_capability_id)) + \
@@ -532,7 +532,7 @@ endecode_fields_1a_1a_struct(
                                     __num_caps,                          \
                                     __cap_id_array,                      \
                                     __cap_handle,                        \
-                                    __num_servers,                       \
+                                    __num_handles,                       \
                                     __handle_array,                      \
                                     __hints)                             \
 do {                                                                     \
@@ -544,7 +544,7 @@ do {                                                                     \
     (__req).u.tree_revoke_cap.num_caps = (__num_caps);                   \
     (__req).u.tree_revoke_cap.cap_id_array = (__cap_id_array);           \
     (__req).u.tree_revoke_cap.cap_handle = (__cap_handle);               \
-    (__req).u.tree_revoke_cap.num_servers = (__num_servers);             \
+    (__req).u.tree_revoke_cap.num_handles = (__num_handles);             \
     (__req).u.tree_revoke_cap.handle_array = (__handle_array);           \
 } while (0)
 

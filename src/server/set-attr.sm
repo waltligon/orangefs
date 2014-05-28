@@ -1112,7 +1112,7 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
 
     /* debug message */
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: revoking capabilities for "
-                 "object: ", __func__);
+                 "object:\n", __func__);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tPrimary handle: %llu\n", 
                  llu(cap_handle[0]));
     gossip_debug(GOSSIP_SECURITY_DEBUG, "\t\tData handles:\n");
@@ -1140,6 +1140,9 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
                      llu(s_op->u.setattr.rev_cap_ids[i]));
     }
 
+    /* free revoked cap array */
+    PINT_capcache_free_cap_array(rev_caps, num_caps);
+
     PINT_SERVREQ_TREE_REVOKE_CAP_FILL(
         msg_p->req,
         cap,
@@ -1150,6 +1153,22 @@ static PINT_sm_action setattr_revoke_cap_setup_msgpair(
         a_p->u.meta.dfile_count,
         a_p->u.meta.dfile_array,
         s_op->req->hints);
+
+    /* TODO: remove debugging */
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "tree_revoke request:\n"
+                 "\tfs_id: %d\n"
+                 "\tnum_caps: %u\n"
+                 "\tcap_id_array: %p\n"
+                 "\tcap_handle: %llu\n"
+                 "\tnum_handles: %u\n"
+                 "\thandle_array: %p\n",
+                 msg_p->req.u.tree_revoke_cap.fs_id,
+                 msg_p->req.u.tree_revoke_cap.num_caps,
+                 msg_p->req.u.tree_revoke_cap.cap_id_array,
+                 llu(msg_p->req.u.tree_revoke_cap.cap_handle),
+                 msg_p->req.u.tree_revoke_cap.num_handles,
+                 msg_p->req.u.tree_revoke_cap.handle_array);
+    /***/
 
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
     msg_p->handle = a_p->u.meta.dfile_array[0];

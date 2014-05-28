@@ -60,7 +60,7 @@ int PINT_capcache_lookup_by_handle(PVFS_handle handle,
                                    uint32_t *num_caps);
 
 void PINT_capcache_free_cap_array(PVFS_capability *cap_array[],
-                                  uint64_t num_caps);
+                                  uint32_t num_caps);
 
 int PINT_capcache_insert(PVFS_capability *cap,
                          int cap_flags);

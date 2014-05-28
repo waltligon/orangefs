@@ -1333,14 +1333,16 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
+#endif
 
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     if (server_flag && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
         return 1;
     }
-#endif /* ENABLE_SECURITY */
+#endif
 
 #ifdef ENABLE_SECURITY_CERT
     if (server_flag && !config_s->ca_file)
@@ -1493,9 +1495,11 @@ DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
+
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
-    return NULL;
+
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_SECURITY);
 }
 
 DOTCONF_CB(exit_security_context)
@@ -3298,8 +3302,20 @@ DOTCONF_CB(get_server_key)
 DOTCONF_CB(get_credential_timeout)
 {
     struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    config_s->credential_timeout = cmd->data.value;
+        (struct server_configuration_s *)cmd->context;    
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->credential_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CredentialTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value, 
+                   config_s->credential_timeout);
+    }
+    
     return NULL;
 }
 
@@ -3307,7 +3323,19 @@ DOTCONF_CB(get_capability_timeout)
 {
     struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
-    config_s->capability_timeout = cmd->data.value;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->capability_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CapabilityTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->capability_timeout);
+    }
+
     return NULL;
 }
 

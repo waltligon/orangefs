@@ -513,7 +513,7 @@ static PINT_sm_action getattr_verify_attribs(
             js_p->error_code = STATE_SYMLINK;
             break;
         case PVFS_TYPE_INTERNAL:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: internal\n");
             /* nothing interesting to add; this is meaningless to a client */
             break;
         default:

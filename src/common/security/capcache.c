@@ -498,7 +498,8 @@ int PINT_capcache_lookup_by_handle(PVFS_handle handle,
          l_p = PINT_llist_next(l_p))
     {
         entry = (seccache_entry_t *) l_p->item;
-        if (entry == NULL)
+        /* end marker */
+        if (entry == NULL || entry->data == NULL)
         {
             continue;
         }
@@ -552,6 +553,8 @@ int PINT_capcache_lookup_by_handle(PVFS_handle handle,
 
     *cap_array = int_cap_array;
 
+    /* TODO: free cap list */
+
     return 0;
 }
 
@@ -559,9 +562,9 @@ int PINT_capcache_lookup_by_handle(PVFS_handle handle,
  * Frees caps allocated by PINT_capcache_lookup_by_handle
  */
 void PINT_capcache_free_cap_array(PVFS_capability *cap_array[],
-                                  uint64_t num_caps)
+                                  uint32_t num_caps)
 {
-    int i;
+    uint32_t i;
 
     if (cap_array == NULL)
     {
@@ -579,7 +582,7 @@ void PINT_capcache_free_cap_array(PVFS_capability *cap_array[],
 /* insert entry for capability */
 int PINT_capcache_insert(PVFS_capability *cap, int cap_flags)
 {
-    PVFS_capability *cachecap;
+    PVFS_capability *cachecap = NULL;
     capcache_data_t *data;
     int ret = 0;
 
@@ -591,11 +594,11 @@ int PINT_capcache_insert(PVFS_capability *cap, int cap_flags)
     cachecap = PINT_dup_capability(cap);
     if (data == NULL || cachecap == NULL)
     {
-        if (data)
+        if (data != NULL)
         {
             free(data);
         }
-        if (cachecap)
+        if (cachecap != NULL)
         {
             PINT_cleanup_capability(cachecap);
         }
@@ -666,7 +669,7 @@ static int PINT_capcache_compare_quick(void *data,
 /** PINT_capcache_quick_sign
  * Copy signature from cached capability if fields match
  */
-int PINT_capcache_quick_sign(PVFS_capability * cap)
+int PINT_capcache_quick_sign(PVFS_capability *cap)
 {
     seccache_entry_t *curr_entry = NULL;
     capcache_data_t cmp_data;
@@ -733,10 +736,10 @@ int PINT_capcache_revoke_cap(PVFS_handle handle,
     int ret = 0, cap_flags;
     seccache_entry_t entry;
     capcache_data_t data;
-    PVFS_capability *cap, *copy_cap;
+    PVFS_capability *cap = NULL, *copy_cap = NULL;
 
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: revoking cap %llx\n", 
-                 __func__, llu(cap->cap_id));
+                 __func__, llu(cap_id));
 
     /* lookup cap on id list */
     /* TODO: remove
@@ -747,7 +750,7 @@ int PINT_capcache_revoke_cap(PVFS_handle handle,
     PINT_seccache_unlock(capcache);
     */
 
-    ret = PINT_capcache_lookup_by_id(handle, cap_id, &cap, &cap_flags);
+    ret = PINT_capcache_lookup_by_id(cap_id, handle, &cap, &cap_flags);
 
     if (ret == CAPCACHE_LOOKUP_REVOKED)
     {
@@ -798,12 +801,12 @@ int PINT_capcache_revoke_cap(PVFS_handle handle,
     else if (ret == CAPCACHE_LOOKUP_NOT_FOUND)
     {
         /* store cap_id in revocation list */
-        ret = PINT_revlist_insert(cap->cap_id);
+        ret = PINT_revlist_insert(cap_id);
     }
     else
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: error %d revoking cap %llx\n", 
-                     __func__, ret, llu(cap->cap_id));
+                     __func__, ret, llu(cap_id));
     }
 
     return ret;
