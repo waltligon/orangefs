@@ -442,12 +442,10 @@ struct PINT_server_rmdirent_op
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
-    PVFS_handle *old_dirent_handle;      /* buffer for old info from dirent */
+    PVFS_handle old_dirent_handle;      /* buffer for old info from dirent */
     PVFS_SID *old_sid_array;
     int32_t old_sid_count;
-    PVFS_handle *new_dirent_handle;      /* buffer for new info to dirent */
-    PVFS_SID *new_sid_array;
-    int32_t new_sid_count;
+    
     int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
