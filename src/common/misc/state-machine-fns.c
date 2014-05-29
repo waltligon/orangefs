@@ -434,31 +434,9 @@ int PINT_smcb_op(struct PINT_smcb *smcb)
     return smcb->op;
 }
 
-static int PINT_smcb_sys_op(struct PINT_smcb *smcb)
-{
-    if (smcb->op > 0 && smcb->op < PVFS_OP_SYS_MAXVALID)
-        return 1;
-    return 0;
-}
-
-static int PINT_smcb_mgmt_op(struct PINT_smcb *smcb)
-{
-    if (smcb->op > PVFS_OP_SYS_MAXVAL && smcb->op < PVFS_OP_MGMT_MAXVALID)
-        return 1;
-    return 0;
-}
-
-static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
-{
-    return smcb->op == PVFS_SERVER_GET_CONFIG 
-        || smcb->op == PVFS_CLIENT_JOB_TIMER 
-        || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
-        || smcb->op == PVFS_DEV_UNEXPECTED;
-}
-
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
 {
-    if (!PINT_smcb_sys_op(smcb) && !PINT_smcb_mgmt_op(smcb) && !PINT_smcb_misc_op(smcb))
+    if (smcb->op >= PVFS_OP_MAXVAL)
         return 1;
     return 0;
 }

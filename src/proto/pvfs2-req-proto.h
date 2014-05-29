@@ -99,7 +99,9 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
 #endif
-
+    PVFS_SERV_MGMT_PROC_START = 52,
+    PVFS_SERV_MGMT_PROC_STOP = 53,
+    PVFS_SERV_MGMT_PROC_STATUS = 54,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -199,6 +201,12 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
+/* max size of process command line (in bytes) */
+#define PVFS_REQ_LIMIT_CMDLINE_BYTES 1024
+/* max number of processes to transfer in status */
+#define PVFS_REQ_LIMIT_PROCS_COUNT 256
+
+
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -2525,8 +2533,137 @@ endecode_fields_1_struct(
     PVFS_security_key, public_key);
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
-
 #endif /* ENABLE_SECURITY_CERT */
+
+/* proc_start *********************************************************/
+/* - start a process */
+
+
+struct PVFS_servreq_mgmt_proc_start
+{
+    char *cmdline;
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mgmt_proc_start(pptr,x) do { \
+    encode_string(pptr, &(x)->cmdline); \
+} while (0)
+
+#define decode_PVFS_servreq_mgmt_proc_start(pptr,x) do { \
+    decode_string(pptr, &(x)->cmdline); \
+} while (0)
+#endif
+
+#define extra_size_PVFS_servreq_mgmt_proc_start \
+    (roundup8(PVFS_REQ_LIMIT_CMDLINE_BYTES + 1))
+
+#define PINT_SERVREQ_MGMT_PROC_START_FILL(__req,             \
+                                          __cap,             \
+                                          __cmdline)         \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_PROC_START;                  \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_proc_start.cmdline  = (__cmdline);        \
+} while (0)
+
+struct PVFS_servresp_mgmt_proc_start
+{
+    uint32_t handle;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_proc_start,
+    uint32_t, handle);
+
+/* proc_stop **********************************************************/
+/* - stop a process */
+
+struct PVFS_servreq_mgmt_proc_stop
+{
+    uint32_t handle;
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mgmt_proc_stop(pptr,x) do { \
+    encode_uint32_t(pptr, &(x)->handle); \
+} while (0)
+
+#define decode_PVFS_servreq_mgmt_proc_stop(pptr,x) do { \
+    decode_uint32_t(pptr, &(x)->handle); \
+} while (0)
+#endif
+
+#define PINT_SERVREQ_MGMT_PROC_STOP_FILL(__req,              \
+                                         __cap,              \
+                                         __handle)           \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_PROC_STOP;                   \
+    (__req).capability = (__cap);                            \
+    (__req).u.mgmt_proc_stop.handle  = (__handle);           \
+} while (0)
+
+struct PVFS_servresp_mgmt_proc_stop
+{
+    int32_t status;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_proc_stop,
+    int32_t, status);
+
+/* proc_status *********************************************************/
+/* - list current process statuses */
+
+struct PVFS_servreq_mgmt_proc_status
+{
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mgmt_proc_status(pptr,x) do { \
+} while (0)
+
+#define decode_PVFS_servreq_mgmt_proc_status(pptr,x) do { \
+} while (0)
+#endif
+
+#define PINT_SERVREQ_MGMT_PROC_STATUS_FILL(__req,            \
+                                           __cap)            \
+do {                                                         \
+    memset(&(__req), 0, sizeof(__req));                      \
+    (__req).op = PVFS_SERV_MGMT_PROC_STATUS;                 \
+    (__req).capability = (__cap);                            \
+} while (0)
+
+struct PVFS_servresp_mgmt_proc_status
+{
+    uint32_t num;
+    char **cmdlines;
+    uint32_t *handles;
+};
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servresp_mgmt_proc_status(pptr,x) do { \
+    uint32_t i; \
+    encode_uint32_t(pptr, &(x)->num); \
+    for (i = 0; i < (x)->num; i++) { \
+        encode_string(pptr, &(x)->cmdlines[i]); \
+        encode_uint32_t(pptr, &(x)->handles[i]); \
+    } \
+} while (0)
+
+#define decode_PVFS_servresp_mgmt_proc_status(pptr,x) do { \
+    uint32_t i; \
+    decode_uint32_t(pptr, &(x)->num); \
+    (x)->cmdlines = decode_malloc((x)->num*sizeof(char *)); \
+    (x)->handles = decode_malloc((x)->num*sizeof(uint32_t)); \
+    for (i = 0; i < (x)->num; i++) { \
+        decode_string(pptr, &(x)->cmdlines[i]); \
+        decode_uint32_t(pptr, &(x)->handles[i]); \
+    } \
+} while (0)
+#endif
+
+#define extra_size_PVFS_servresp_mgmt_proc_status \
+    (PVFS_REQ_LIMIT_PROCS_COUNT*(roundup8(PVFS_REQ_LIMIT_CMDLINE_BYTES + 1)))
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -2584,6 +2721,9 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
 #endif
+        struct PVFS_servreq_mgmt_proc_start mgmt_proc_start;
+        struct PVFS_servreq_mgmt_proc_stop mgmt_proc_stop;
+        struct PVFS_servreq_mgmt_proc_status mgmt_proc_status;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2649,6 +2789,9 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
 #endif
+        struct PVFS_servresp_mgmt_proc_start mgmt_proc_start;
+        struct PVFS_servresp_mgmt_proc_stop mgmt_proc_stop;
+        struct PVFS_servresp_mgmt_proc_status mgmt_proc_status;
     } u;
 };
 endecode_fields_2_struct(

@@ -351,6 +351,17 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq;
                 break;
 #endif
+            case PVFS_SERV_MGMT_PROC_START:
+                req.u.mgmt_proc_start.cmdline = NULL;
+                reqsize = extra_size_PVFS_servreq_mgmt_proc_start;
+                break;
+            case PVFS_SERV_MGMT_PROC_STATUS:
+                resp.u.mgmt_proc_status.num = 0;
+                resp.u.mgmt_proc_status.cmdlines = NULL;
+                resp.u.mgmt_proc_status.handles = NULL;
+                respsize = extra_size_PVFS_servresp_mgmt_proc_status;
+            case PVFS_SERV_MGMT_PROC_STOP:
+                break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -535,6 +546,9 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
 #endif
+        CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
+        CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
+        CASE(PVFS_SERV_MGMT_PROC_STATUS, mgmt_proc_status);
 
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -642,6 +656,9 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
 #endif
+        CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
+        CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
+        CASE(PVFS_SERV_MGMT_PROC_STATUS, mgmt_proc_status);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -769,6 +786,9 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
 #endif
+        CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
+        CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
+        CASE(PVFS_SERV_MGMT_PROC_STATUS, mgmt_proc_status);
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -865,6 +885,9 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
 #endif
+        CASE(PVFS_SERV_MGMT_PROC_START, mgmt_proc_start);
+        CASE(PVFS_SERV_MGMT_PROC_STOP, mgmt_proc_stop);
+        CASE(PVFS_SERV_MGMT_PROC_STATUS, mgmt_proc_status);
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -1115,6 +1138,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
             case PVFS_SERV_MGMT_GET_USER_CERT:
 #endif
+            case PVFS_SERV_MGMT_PROC_START:
+            case PVFS_SERV_MGMT_PROC_STOP:
+            case PVFS_SERV_MGMT_PROC_STATUS:
               /*nothing to free*/
                   break;
             case PVFS_SERV_INVALID:
@@ -1302,6 +1328,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       break;
                    }
 #endif
+                case PVFS_SERV_MGMT_PROC_STATUS:
+                    decode_free(resp->u.mgmt_proc_status.cmdlines);
+                    decode_free(resp->u.mgmt_proc_status.handles);
+                    break;
+
+                case PVFS_SERV_MGMT_PROC_START:
+                case PVFS_SERV_MGMT_PROC_STOP:
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:

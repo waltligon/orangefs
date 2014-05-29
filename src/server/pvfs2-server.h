@@ -930,6 +930,10 @@ int server_state_machine_complete_noreq(PINT_smcb *smcb);
 
 struct PINT_state_machine_s *server_op_state_get_machine(int);
 
+/* background processing */
+extern int bgproc_pipes[2];
+int bgproc_main(void);
+
 #endif /* __PVFS_SERVER_H */
 
 /*

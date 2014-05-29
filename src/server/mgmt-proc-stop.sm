@@ -1,0 +1,89 @@
+/*
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdio.h>
+
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_mgmt_proc_stop_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+    state do_work
+    {
+        run mgmt_proc_stop_do_work;
+        default => final_response;
+    }
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+    state cleanup
+    {
+        run mgmt_proc_stop_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action mgmt_proc_stop_do_work(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char buf[32];
+    size_t len;
+    int r;
+
+    s_op->resp.u.mgmt_proc_stop.status = -1;
+
+    len = snprintf(buf, sizeof buf, "K%lu\n",
+        (unsigned long)s_op->req->u.mgmt_proc_stop.handle);
+    r = write(bgproc_pipes[0], buf, len);
+    if (r == -1 || r == 0)
+    {
+        goto fail;
+    }
+    r = read(bgproc_pipes[1], buf, (sizeof buf)-1);
+    if (r == -1 || r == 0)
+    {
+        goto fail;
+    }
+    if (buf[0] == 'E')
+    {
+        buf[r] = 0;
+        /* xxx: print debug error */
+        goto fail;
+    }
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+fail:
+    if (errno == 0)
+        errno = EIO;
+    js_p->error_code = -errno;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_proc_stop_cleanup(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+/*  struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);*/
+    return server_state_machine_complete(smcb);
+}
+
+struct PINT_server_req_params pvfs2_mgmt_proc_stop_params =
+{
+    .string_name = "mgmt_proc_stop",
+    .state_machine = &pvfs2_mgmt_proc_stop_sm
+};

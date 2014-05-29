@@ -631,6 +631,35 @@ struct PINT_client_mgmt_get_user_cert_sm
 };
 #endif
 
+struct PINT_client_mgmt_proc_start_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t addr_count;
+    PVFS_id_gen_t *addr_array;
+    char *cmdline;
+    int *statuses;
+    uint32_t *handles;
+};
+
+struct PINT_client_mgmt_proc_stop_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t addr_count;
+    PVFS_id_gen_t *addr_array;
+    uint32_t *handles;
+    int *statuses;
+};
+
+struct PINT_client_mgmt_proc_status_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t addr_count;
+    PVFS_id_gen_t *addr_array;
+    uint32_t *num;
+    uint32_t **handles;
+    char ***cmdlines;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -718,6 +747,9 @@ typedef struct PINT_client_sm
 #ifdef ENABLE_SECURITY_CERT
         struct PINT_client_mgmt_get_user_cert_sm mgmt_get_user_cert;
 #endif
+        struct PINT_client_mgmt_proc_start_sm mgmt_proc_start;
+        struct PINT_client_mgmt_proc_stop_sm mgmt_proc_stop;
+        struct PINT_client_mgmt_proc_status_sm mgmt_proc_status;
     } u;
 } PINT_client_sm;
 
@@ -782,57 +814,52 @@ const char *PINT_client_get_name_str(int op_type);
  */
 enum
 {
-    PVFS_SYS_REMOVE                = 1,
-    PVFS_SYS_CREATE                = 2,
-    PVFS_SYS_MKDIR                 = 3,
-    PVFS_SYS_SYMLINK               = 4,
-    PVFS_SYS_GETATTR               = 5,
-    PVFS_SYS_IO                    = 6,
-    PVFS_SYS_FLUSH                 = 7,
-    PVFS_SYS_TRUNCATE              = 8,
-    PVFS_SYS_READDIR               = 9,
-    PVFS_SYS_SETATTR               = 10,
-    PVFS_SYS_LOOKUP                = 11,
-    PVFS_SYS_RENAME                = 12,
-    PVFS_SYS_GETEATTR              = 13,
-    PVFS_SYS_SETEATTR              = 14,
-    PVFS_SYS_DELEATTR              = 15,
-    PVFS_SYS_LISTEATTR             = 16,
-    PVFS_SYS_SMALL_IO              = 17,
-    PVFS_SYS_STATFS                = 18,
-    PVFS_SYS_FS_ADD                = 19,
-    PVFS_SYS_READDIRPLUS           = 20,
-    PVFS_SYS_ATOMICEATTR           = 21,
-    PVFS_MGMT_SETPARAM_LIST        = 70,
-    PVFS_MGMT_NOOP                 = 71,
-    PVFS_MGMT_STATFS_LIST          = 72,
-    PVFS_MGMT_PERF_MON_LIST        = 73,
-    PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
-    PVFS_MGMT_GET_DFILE_ARRAY      = 75,
-    PVFS_MGMT_EVENT_MON_LIST       = 76,
-    PVFS_MGMT_REMOVE_OBJECT        = 77,
-    PVFS_MGMT_REMOVE_DIRENT        = 78,
-    PVFS_MGMT_CREATE_DIRENT        = 79,
-    PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
-    PVFS_MGMT_GET_UID_LIST         = 81, 
-    PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
+    PVFS_SYS_REMOVE,
+    PVFS_SYS_CREATE,
+    PVFS_SYS_MKDIR,
+    PVFS_SYS_SYMLINK,
+    PVFS_SYS_GETATTR,
+    PVFS_SYS_IO,
+    PVFS_SYS_FLUSH,
+    PVFS_SYS_TRUNCATE,
+    PVFS_SYS_READDIR,
+    PVFS_SYS_SETATTR,
+    PVFS_SYS_LOOKUP,
+    PVFS_SYS_RENAME,
+    PVFS_SYS_GETEATTR,
+    PVFS_SYS_SETEATTR,
+    PVFS_SYS_DELEATTR,
+    PVFS_SYS_LISTEATTR,
+    PVFS_SYS_SMALL_IO,
+    PVFS_SYS_STATFS,
+    PVFS_SYS_FS_ADD,
+    PVFS_SYS_READDIRPLUS,
+    PVFS_SYS_ATOMICEATTR,
+    PVFS_MGMT_SETPARAM_LIST,
+    PVFS_MGMT_NOOP,
+    PVFS_MGMT_STATFS_LIST,
+    PVFS_MGMT_PERF_MON_LIST,
+    PVFS_MGMT_ITERATE_HANDLES_LIST,
+    PVFS_MGMT_GET_DFILE_ARRAY,
+    PVFS_MGMT_EVENT_MON_LIST,
+    PVFS_MGMT_REMOVE_OBJECT,
+    PVFS_MGMT_REMOVE_DIRENT,
+    PVFS_MGMT_CREATE_DIRENT,
+    PVFS_MGMT_GET_DIRDATA_HANDLE,
+    PVFS_MGMT_GET_UID_LIST,
+    PVFS_MGMT_GET_DIRDATA_ARRAY,
 #ifdef ENABLE_SECURITY_CERT
-    PVFS_MGMT_GET_USER_CERT        = 83,
+    PVFS_MGMT_GET_USER_CERT
 #endif
-    PVFS_SERVER_GET_CONFIG         = 200,
-    PVFS_CLIENT_JOB_TIMER          = 300,
-    PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
-    PVFS_DEV_UNEXPECTED            = 400
+    PVFS_MGMT_PROC_START,
+    PVFS_MGMT_PROC_STOP,
+    PVFS_MGMT_PROC_STATUS,
+    PVFS_SERVER_GET_CONFIG,
+    PVFS_CLIENT_JOB_TIMER,
+    PVFS_CLIENT_PERF_COUNT_TIMER,
+    PVFS_DEV_UNEXPECTED,
+    PVFS_OP_MAXVAL
 };
-
-#define PVFS_OP_SYS_MAXVALID  22
-#define PVFS_OP_SYS_MAXVAL 69
-#ifdef ENABLE_SECURITY_CERT
-#define PVFS_OP_MGMT_MAXVALID 84
-#else
-#define PVFS_OP_MGMT_MAXVALID 83
-#endif
-#define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
 
@@ -940,6 +967,9 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_array_sm;
 #ifdef ENABLE_SECURITY_CERT
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_user_cert_sm;
 #endif
+extern struct PINT_state_machine_s pvfs2_client_mgmt_proc_start_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_proc_stop_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_proc_status_sm;
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;

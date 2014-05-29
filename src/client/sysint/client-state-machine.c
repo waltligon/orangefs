@@ -342,7 +342,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
-struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
+struct PINT_client_op_entry_s PINT_client_sm_table[] =
 {
     {&pvfs2_client_remove_sm},
     {&pvfs2_client_create_sm},
@@ -364,11 +364,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
-    {&pvfs2_client_atomic_eattr_sm}
-};
-
-struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
-{
+    {&pvfs2_client_atomic_eattr_sm},
     {&pvfs2_client_mgmt_setparam_list_sm},
     {&pvfs2_client_mgmt_noop_sm},
     {&pvfs2_client_mgmt_statfs_list_sm},
@@ -381,12 +377,18 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm}
+    {&pvfs2_client_mgmt_get_dirdata_array_sm},
 #ifdef ENABLE_SECURITY_CERT
-    ,{&pvfs2_client_mgmt_get_user_cert_sm}
+    {&pvfs2_client_mgmt_get_user_cert_sm},
 #endif
+    {&pvfs2_client_mgmt_proc_start_sm},
+    {&pvfs2_client_mgmt_proc_stop_sm},
+    {&pvfs2_client_mgmt_proc_status_sm},
+    {&pvfs2_server_get_config_sm},
+    {&pvfs2_client_job_timer_sm},
+    {&pvfs2_client_perf_count_timer_sm},
+    {&pvfs2_sysdev_unexp_sm}
 };
-
 
 /* This function allows the generic state-machine-fns.c locate function
  * to access the appropriate sm struct based on the client operation index
@@ -403,38 +405,9 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_op_state_get_machine %d\n",op);
-
-    switch (op)
-    {
-    /* special cases first */
-    case PVFS_SERVER_GET_CONFIG :
-        return &pvfs2_server_get_config_sm;
-    case PVFS_CLIENT_JOB_TIMER :
-        return &pvfs2_client_job_timer_sm;
-    case PVFS_CLIENT_PERF_COUNT_TIMER :
-        return &pvfs2_client_perf_count_timer_sm;
-    case PVFS_DEV_UNEXPECTED :
-        return &pvfs2_sysdev_unexp_sm;
-    default:
-        /* now check range for sys functions */
-        if (op <= PVFS_OP_SYS_MAXVAL)
-        {
-            return PINT_client_sm_sys_table[op-1].sm;
-        }
-        else
-        {
-            /* now check range for mgmt functions */
-            if (op <= PVFS_OP_MGMT_MAXVAL)
-            {
-                return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
-            }
-            else
-            {
-                /* otherwise its out of range */
-                return NULL;
-            }
-        }
-    }
+    if (op < PVFS_OP_MAXVAL)
+        return PINT_client_sm_table[op].sm;
+    return NULL;
 }
 
 /* callback for a terminating state machine
@@ -1225,6 +1198,9 @@ const char *PINT_client_get_name_str(int op_type)
 #ifdef ENABLE_SECURITY_CERT
         { PVFS_MGMT_GET_USER_CERT, "PVFS_MGMT_GET_USER_CERT" },
 #endif
+        { PVFS_MGMT_PROC_START, "PVFS_MGMT_PROC_START" },
+        { PVFS_MGMT_PROC_STOP, "PVFS_MGMT_PROC_STOP" },
+        { PVFS_MGMT_PROC_STATUS, "PVFS_MGMT_PROC_STATUS" },
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_ATOMICEATTR, "PVFS_SYS_ATOMICEATTR" },

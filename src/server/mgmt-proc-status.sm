@@ -1,0 +1,128 @@
+/*
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdio.h>
+
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_mgmt_proc_status_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+    state do_work
+    {
+        run mgmt_proc_status_do_work;
+        default => final_response;
+    }
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+    state cleanup
+    {
+        run mgmt_proc_status_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action mgmt_proc_status_do_work(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* So that at least one line and other information will be read. */
+    char buf[2*PVFS_REQ_LIMIT_CMDLINE_BYTES];
+    size_t idx;
+    int r;
+    uint32_t nprocs = 0;
+    char **cmdlines = NULL;
+    uint32_t *handles = NULL;
+
+    r = write(bgproc_pipes[0], "S\n", 2);
+    if (r == -1 || r == 0)
+    {
+        goto fail;
+    }
+
+    idx = 0;
+    while ((r = read(bgproc_pipes[1], buf+idx, (sizeof buf)-idx-1)) != -1
+        && r != 0)
+    {
+        unsigned long handle;
+        char *cmdline, *s, *end;
+        buf[idx+r] = 0;
+        s = buf;
+        while ((end = strchr(s, '\n')) != NULL) {
+            if (strcmp(s, "S\n") == 0)
+                goto done;
+            handle = strtol(s+1, &cmdline, 10);
+            cmdline++;
+            *end = 0;
+            {
+                void *new;
+                new = realloc(cmdlines, (nprocs+1)*sizeof *cmdlines);
+                if (new == NULL)
+                    goto fail;
+                cmdlines = new;
+                new = realloc(handles, (nprocs+1)*sizeof *handles);
+                if (new == NULL)
+                    goto fail;
+                handles = new;
+                cmdlines[nprocs] = strdup(cmdline);
+                if (cmdlines[nprocs] == NULL)
+                    goto fail;
+                handles[nprocs] = handle;
+                nprocs++;
+            }
+            s = end+1;
+        }
+        memmove(buf, s, idx+r-(s-buf));
+	idx = idx+r-(s-buf);
+    }
+
+done:
+    s_op->resp.u.mgmt_proc_status.num = nprocs;
+    s_op->resp.u.mgmt_proc_status.cmdlines = cmdlines;
+    s_op->resp.u.mgmt_proc_status.handles = handles;
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+fail:
+    s_op->resp.u.mgmt_proc_status.num = nprocs;
+    s_op->resp.u.mgmt_proc_status.cmdlines = cmdlines;
+    s_op->resp.u.mgmt_proc_status.handles = handles;
+    if (errno == 0)
+        errno = EIO;
+    js_p->error_code = -errno;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_proc_status_cleanup(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    uint32_t i;
+    for (i = 0; i < s_op->resp.u.mgmt_proc_status.num; i++)
+    {
+        free(s_op->resp.u.mgmt_proc_status.cmdlines[i]);
+    }
+    free(s_op->resp.u.mgmt_proc_status.cmdlines);
+    free(s_op->resp.u.mgmt_proc_status.handles);
+    return server_state_machine_complete(smcb);
+}
+
+struct PINT_server_req_params pvfs2_mgmt_proc_status_params =
+{
+    .string_name = "mgmt_proc_status",
+    .state_machine = &pvfs2_mgmt_proc_status_sm
+};

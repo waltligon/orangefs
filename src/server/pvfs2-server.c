@@ -186,6 +186,9 @@ static int precreate_pool_count(
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
+int bgproc_startup(void);
+int bgproc_pipes[2] = {-1, -1};
+
 
 struct server_configuration_s *PINT_get_server_config(void)
 {
@@ -578,6 +581,15 @@ static int server_initialize(
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
     }
+
+    /* initialize the background process monitor */
+    ret = bgproc_startup();
+    if (ret < 0)
+    {
+        gossip_err("Error: Cannot create background process monitor; aborting.\n");
+        return ret;
+    }
+
 
     /* initialize the security module */
     ret = PINT_security_initialize();
@@ -3109,6 +3121,53 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     }
 
     return(0);
+}
+
+int bgproc_startup(void)
+{
+    int ret;
+    int pfds_in[2] = {-1, -1};
+    int pfds_out[2] = {-1, -1};
+    ret = pipe(pfds_in);
+    if (ret == -1)
+        goto failure;
+    ret = pipe(pfds_out);
+    if (ret == -1)
+        goto failure;
+    ret = fork();
+    if (ret == 0)
+    {
+        close(0);
+        close(1);
+        close(2);
+        close(pfds_in[1]);
+        close(pfds_out[0]);
+        ret = dup2(pfds_in[0], 0);
+        ret = dup2(pfds_out[1], 1);
+        if (ret == -1)
+            _exit(1);
+        ret = bgproc_main();
+        _exit(ret);
+    }
+    else if (ret == -1)
+    {
+        goto failure;
+    }
+    close(pfds_in[0]);
+    close(pfds_out[1]);
+    bgproc_pipes[0] = pfds_in[1];
+    bgproc_pipes[1] = pfds_out[0];
+    return 1;
+failure:
+    if (pfds_in[0] != -1)
+        close(pfds_in[0]);
+    if (pfds_in[1] != -1)
+        close(pfds_in[1]);
+    if (pfds_out[0] != -1)
+        close(pfds_out[0]);
+    if (pfds_out[1] != -1)
+        close(pfds_out[1]);
+    return -1;
 }
 
 /*

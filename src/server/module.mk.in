@@ -52,7 +52,10 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-uid.c \
                 $(DIR)/mgmt-get-dirent.c \
                 $(DIR)/mgmt-create-root-dir.c \
-                $(DIR)/mgmt-split-dirent.c
+                $(DIR)/mgmt-split-dirent.c \
+                $(DIR)/mgmt-proc-start.c \
+                $(DIR)/mgmt-proc-stop.c \
+                $(DIR)/mgmt-proc-status.c
 
 ifdef ENABLE_SECURITY_CERT
 	SERVER_SMCGEN += \
@@ -71,7 +74,8 @@ endif
 
 	# server code that will be linked manually, not included in library
 	SERVERBINSRC += \
-		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c
+		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c \
+                $(DIR)/pvfs2-monitor.c
 
 	# to stat the fs, need to know about handle statistics
 	MODCFLAGS_$(DIR)/statfs.c = \

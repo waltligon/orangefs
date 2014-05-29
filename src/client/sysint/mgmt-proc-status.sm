@@ -1,0 +1,190 @@
+/*
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdio.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+static int mgmt_proc_status_comp_fn(void* v_p, struct PVFS_server_resp *resp_p,
+                                   int i);
+
+%%
+
+machine pvfs2_client_mgmt_proc_status_sm
+{
+    state req_setup_msgpair
+    {
+        run mgmt_proc_status_setup_msgpair;
+        success => req_xfer_msgpair;
+        default => cleanup;
+    }
+    state req_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+    state cleanup
+    {
+        run mgmt_proc_status_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+PVFS_error PVFS_imgmt_proc_status(
+    PVFS_fs_id fs_id,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    uint32_t *num,
+    uint32_t **handles,
+    char ***cmdlines,
+    PVFS_mgmt_op_id *op_id)
+{
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+    int ret = 0;
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_PROC_STATUS,
+        sizeof(struct PINT_client_sm),
+        client_op_state_get_machine,
+        client_state_machine_terminate,
+        pint_client_sm_context);
+
+    if  (smcb == NULL)
+       return -PVFS_ENOMEM;
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, fs_id);
+    memset(&sm_p->u.mgmt_proc_status, 0, sizeof(sm_p->u.mgmt_proc_status));
+    sm_p->u.mgmt_proc_status.fs_id = fs_id;
+    sm_p->u.mgmt_proc_status.addr_count = addr_count;
+    sm_p->u.mgmt_proc_status.addr_array = addr_array;
+    sm_p->u.mgmt_proc_status.num = num;
+    sm_p->u.mgmt_proc_status.cmdlines = cmdlines;
+    sm_p->u.mgmt_proc_status.handles = handles;
+
+    *sm_p->u.mgmt_proc_status.num = 0;
+    *sm_p->u.mgmt_proc_status.cmdlines = NULL;
+    *sm_p->u.mgmt_proc_status.handles = NULL;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, addr_count);
+    if (ret != 0)
+    {
+        PINT_smcb_free(smcb);
+        return ret;
+    }
+
+    return PINT_client_state_machine_post(smcb, op_id, NULL);
+}
+
+PVFS_error PVFS_mgmt_proc_status(
+    PVFS_fs_id fs_id,
+    uint32_t addr_count,
+    PVFS_BMI_addr_t *addr_array,
+    uint32_t *num,
+    uint32_t **handles,
+    char ***cmdlines)
+{
+    PVFS_error ret = 0;
+    PVFS_mgmt_op_id op_id;
+    int error;
+
+    ret = PVFS_imgmt_proc_status(fs_id, addr_count, addr_array, num,
+        handles, cmdlines, &op_id);
+    if (ret == 0) {
+        ret = PVFS_mgmt_wait(op_id, "proc_status", &error);
+        if (ret) {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            PINT_mgmt_release(op_id);
+            return error;
+        }
+    } else {
+        PVFS_perror_gossip("PVFS_imgmt_proc_status call", ret);
+        PINT_mgmt_release(op_id);
+        return ret;
+    }
+
+    return 0;
+}
+
+
+static PINT_sm_action mgmt_proc_status_setup_msgpair(struct PINT_smcb *smcb,
+    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_capability capability;
+    PINT_sm_msgpair_state *msg_p;
+    int i;
+
+    js_p->error_code = 0;
+
+    PINT_null_capability(&capability);
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_MGMT_PROC_STATUS_FILL(msg_p->req,
+            capability);
+        msg_p->fs_id = sm_p->u.mgmt_proc_status.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = mgmt_proc_status_comp_fn;
+        msg_p->svr_addr = sm_p->u.mgmt_proc_status.addr_array[i];
+    }
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_proc_status_cleanup(struct PINT_smcb *smcb,
+    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->error_code = js_p->error_code;
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_COMPLETE;
+}
+
+static int mgmt_proc_status_comp_fn(void* v_p, struct PVFS_server_resp *resp_p,
+                                   int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
+    {
+        void *buf;
+        uint32_t new, j;
+        new = *sm_p->u.mgmt_proc_status.num + resp_p->u.mgmt_proc_status.num;
+        buf = realloc(*sm_p->u.mgmt_proc_status.cmdlines,
+                new * sizeof(char *));
+        if (buf == NULL)
+            return 0;
+        *sm_p->u.mgmt_proc_status.cmdlines = buf;
+        buf = realloc(*sm_p->u.mgmt_proc_status.handles,
+                new * sizeof(char *));
+        if (buf == NULL)
+            return 0;
+        *sm_p->u.mgmt_proc_status.handles = buf;
+
+        for (j = 0; j < resp_p->u.mgmt_proc_status.num; j++)
+        {
+            (*sm_p->u.mgmt_proc_status.cmdlines)
+                    [*sm_p->u.mgmt_proc_status.num+j] = strdup(
+                    resp_p->u.mgmt_proc_status.cmdlines[j]);
+            (*sm_p->u.mgmt_proc_status.handles)
+                    [*sm_p->u.mgmt_proc_status.num+j] =
+                    resp_p->u.mgmt_proc_status.handles[j];
+        }
+        *sm_p->u.mgmt_proc_status.num += resp_p->u.mgmt_proc_status.num;
+    }
+    else
+    {
+        return -PVFS_EIO;
+    }
+    return 0;
+}
