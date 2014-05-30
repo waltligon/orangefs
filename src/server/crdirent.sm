@@ -1849,7 +1849,7 @@ static int perm_crdirent(PINT_server_op *s_op)
 
 PINT_GET_OBJECT_REF_DEFINE(crdirent);
 
-struct PINT_server_req_params pvfs2_crdirent_params
+struct PINT_server_req_params pvfs2_crdirent_params =
 {
     .string_name = "crdirent",
     .perm = perm_crdirent,
