@@ -632,7 +632,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     /* Copy handle and SIDs in to the new buffer */
     s_op->u.crdirent.keyval_temp_store = 
                     (PVFS_ID *) malloc(
-                                  OSASZ(1, s_op->req->u.crdirent.sid_count);
+                                  OSASZ(1, s_op->req->u.crdirent.sid_count));
     s_op->u.crdirent.keyval_temp_store[0].oid = s_op->u.crdirent.new_handle;
     memcpy(&(s_op->u.crdirent.keyval_temp_store[1]),
            s_op->req->u.crdirent.new_sid_array,
