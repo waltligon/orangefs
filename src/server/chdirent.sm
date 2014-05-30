@@ -348,15 +348,8 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
                   (PVFS_handle *) malloc(OSASZ(1, s_op->metasidcnt));
 
 
-    /*(PVFS_handle *)malloc(
-                       sizeof(PVFS_handle) +
-                       (s_op->metasidcnt * sizeof(PVFS_SID)));*/
     s_op->u.chdirent.old_sid_array =
                   (PVFS_SID *)(s_op->u.chdirent.old_dirent_handle + 1);
-
-    /*(PVFS_handle *)malloc(
-                       sizeof(PVFS_handle *) +
-                       (s_op->metasidcnt * sizeof(PVFS_SID *)));*/
 
     s_op->key.buffer = s_op->req->u.chdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
