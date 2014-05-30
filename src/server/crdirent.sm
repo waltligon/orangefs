@@ -1765,9 +1765,11 @@ static PINT_sm_action crdirent_cleanup(struct PINT_smcb *smcb, job_status_s *js_
     {
        free(s_op->val.buffer);
     }
-    if (s_op->u.crdirent.keyval_temp_store){
+    if (s_op->u.crdirent.keyval_temp_store)
+    {
         free(s_op->u.crdirent.keyval_temp_store);
     }
+    
     memset(&(s_op->key),0,sizeof(s_op->key));
     memset(&(s_op->val),0,sizeof(s_op->val));
 
