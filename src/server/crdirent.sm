@@ -388,8 +388,12 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     attr_p->u.dir.dist_dir_bitmap =
         malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
                 sizeof(PVFS_dist_dir_bitmap_basetype));
+
     attr_p->u.dir.dirdata_handles =
-        malloc(OSASZ(attr_p->u.dir.dist_dir_attr.dirdata_count, attr_p->u.dir.dist_dir_attr.sid_count));
+        malloc(
+            OSASZ(attr_p->u.dir.dist_dir_attr.dirdata_count, 
+                  attr_p->u.dir.dist_dir_attr.sid_count)
+            );
 
     if(!attr_p->u.dir.dist_dir_bitmap ||
             !attr_p->u.dir.dirdata_handles)
