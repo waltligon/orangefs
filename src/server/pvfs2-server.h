@@ -443,7 +443,7 @@ struct PINT_server_rmdirent_op
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
-    PVFS_handle old_dirent_handle;      /* buffer for old info from dirent */
+    PVFS_handle *old_dirent_handle;      /* buffer for old info from dirent */
     PVFS_SID *old_sid_array;
     int32_t old_sid_count;
     
