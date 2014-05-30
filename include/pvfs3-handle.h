@@ -19,9 +19,9 @@
 #define SW(x,y) (((uint32_t)(x))>>(y))
 
 /* size of OID array of size n */
-#define OASZ(n) ((n) * sizeof(PVFS_OID)
+#define OASZ(n) ((n) * sizeof(PVFS_OID))
 /* size of SID array of size m */
-#define SASZ(m) ((m) * sizeof(PVFS_SID)
+#define SASZ(m) ((m) * sizeof(PVFS_SID))
 /* size of OID array of size n with m SIDs per OID */
 #define OSASZ(n,m) ((n) * (OASZ(1) + SASZ(m)))
 
