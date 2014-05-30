@@ -428,7 +428,7 @@ static PINT_sm_action chdirent_change_directory_entry(struct PINT_smcb *smcb,
                  "  changing dir entry for %s from handle value "
                  "%s to %s\n", s_op->req->u.chdirent.entry,
                  PVFS_OID_str(s_op->u.chdirent.old_dirent_handle),
-                 PVFS_OID_str(s_op->req->u.chdirent.new_dirent_handle));
+                 PVFS_OID_str(&s_op->req->u.chdirent.new_dirent_handle));
 
     ret = job_trove_keyval_write(s_op->req->u.chdirent.fs_id,
                                  s_op->req->u.chdirent.dirdata_handle,
