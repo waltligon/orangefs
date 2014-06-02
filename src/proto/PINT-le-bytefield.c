@@ -949,6 +949,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_CREATE:
                 decode_free(req->u.create.credential.group_array);
                 decode_free(req->u.create.credential.signature);
+                decode_free(req->u.create.credential.certificate.buf);
                 if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
                     decode_free(req->u.create.attr.u.meta.dist);
                 if (req->u.create.layout.servers)
@@ -979,6 +980,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.mkdir.handle_extent_array.extent_array);
                 decode_free(req->u.mkdir.credential.group_array);
                 decode_free(req->u.mkdir.credential.signature);
+                decode_free(req->u.mkdir.credential.certificate.buf);
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
                     decode_free(req->u.mkdir.attr.u.meta.dist);
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
@@ -996,6 +998,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_SETATTR:
                 decode_free(req->u.setattr.credential.group_array);
                 decode_free(req->u.setattr.credential.signature);
+                decode_free(req->u.setattr.credential.certificate.buf);
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
                     decode_free(req->u.setattr.attr.u.meta.dist);
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -1022,24 +1025,28 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.tree_remove.handle_array);
                 decode_free(req->u.tree_remove.credential.group_array);
                 decode_free(req->u.tree_remove.credential.signature);
+                decode_free(req->u.tree_remove.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_TREE_GET_FILE_SIZE:
                 decode_free(req->u.tree_get_file_size.handle_array);
                 decode_free(req->u.tree_get_file_size.credential.group_array);
                 decode_free(req->u.tree_get_file_size.credential.signature);
+                decode_free(req->u.tree_get_file_size.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_TREE_GETATTR:
                 decode_free(req->u.tree_getattr.handle_array);
                 decode_free(req->u.tree_getattr.credential.group_array);
                 decode_free(req->u.tree_getattr.credential.signature);
+                decode_free(req->u.tree_getattr.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_TREE_SETATTR:
                 decode_free(req->u.tree_setattr.handle_array);
                 decode_free(req->u.tree_setattr.credential.group_array);
                 decode_free(req->u.tree_setattr.credential.signature);
+                decode_free(req->u.tree_setattr.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_LISTATTR:
@@ -1050,6 +1057,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_GETATTR:
                 decode_free(req->u.getattr.credential.group_array);
                 decode_free(req->u.getattr.credential.signature);
+                decode_free(req->u.getattr.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_SETEATTR:
@@ -1071,21 +1079,25 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_UNSTUFF:
                 decode_free(req->u.unstuff.credential.group_array);
                 decode_free(req->u.unstuff.credential.signature);
+                decode_free(req->u.unstuff.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_LOOKUP_PATH:
                 decode_free(req->u.lookup_path.credential.group_array);
                 decode_free(req->u.lookup_path.credential.signature);
+                decode_free(req->u.lookup_path.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_CRDIRENT:
                 decode_free(req->u.crdirent.credential.group_array);
                 decode_free(req->u.crdirent.credential.signature);
+                decode_free(req->u.crdirent.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_REMOVE:
                 decode_free(req->u.remove.credential.group_array);
                 decode_free(req->u.remove.credential.signature);
+                decode_free(req->u.remove.credential.certificate.buf);
                 break;
 
             case PVFS_SERV_GETCONFIG:
