@@ -615,7 +615,7 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
-#ifdef HAVE_CURRENT_FSUID
+#if defined(HAVE_CURRENT_FSUID) || defined(HAVE_FROM_KUID)
         inode->i_uid = current_fsuid();
         inode->i_gid = current_fsgid();
 #else
