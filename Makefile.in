@@ -587,6 +587,8 @@ LIBSRC :=
 ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
+# BGPROCSRC is source code for background process programs
+BGPROCSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 ifdef BUILD_BMI_ONLY
@@ -762,6 +764,11 @@ UCACHEDTOOLS := $(patsubst %.c,%, $(filter %.c, $(UCACHEDSRC)))
 # UCACHEDDEPENDS is a list of dependency files for ucached programs
 UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
 
+# BGPROCOBJS is a list of bgproc program objects
+BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
+# BGPROCBINS is a list of bgproc program executables
+BGPROCBINS := $(patsubst %.c,%, $(filter %.c,$(BGPROCSRC)))
+
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
     ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
@@ -870,7 +877,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools bgprocbins $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -881,6 +888,9 @@ usertools: $(USERTOOLS)
 
 # target for building ucached tools
 ucachedtools: $(UCACHEDTOOLS)
+
+# target for building bgproc executables
+bgprocbins: $(BGPROCBINS)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)

@@ -1,0 +1,4 @@
+DIR := src/apps/bgproc
+
+BGPROCSRC := \
+	$(DIR)/bgproc-count.c

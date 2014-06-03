@@ -1869,6 +1869,7 @@ Makefile
 module.mk
 src/apps/admin/module.mk
 src/apps/admin/pvfs2-config
+src/apps/bgproc/module.mk
 src/apps/devel/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
