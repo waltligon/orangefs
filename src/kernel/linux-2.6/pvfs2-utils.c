@@ -1315,11 +1315,6 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
                      "pvfs2_create_file: Instantiating\n *negative* "
                     "dentry %p for %s\n", dentry, dentry->d_name.name);
 
-#ifdef HAVE_D_SET_D_OP
-        d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-        dentry->d_op = &pvfs2_dentry_operations;
-#endif
         d_instantiate(dentry, inode);
         s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_UTILS_DEBUG,
@@ -1422,11 +1417,6 @@ static inline struct inode *pvfs2_create_dir(struct inode *dir,
                     "dentry %p for %s\n", dentry,
                     dentry->d_name.name);
 
-#ifdef HAVE_D_SET_D_OP
-        d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-        dentry->d_op = &pvfs2_dentry_operations;
-#endif
         d_instantiate(dentry, inode);
         s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_UTILS_DEBUG,
@@ -1538,11 +1528,6 @@ static inline struct inode *pvfs2_create_symlink(
                     "*negative* dentry %p for %s\n", dentry,
                     dentry->d_name.name);
 
-#ifdef HAVE_D_SET_D_OP
-        d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-        dentry->d_op = &pvfs2_dentry_operations;
-#endif
         d_instantiate(dentry, inode);
         s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
         gossip_debug(GOSSIP_UTILS_DEBUG,

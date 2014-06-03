@@ -217,17 +217,6 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                          "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
                          dentry, dentry->d_name.name);
 
-            /*
-             * make sure to set the pvfs2 specific dentry operations for
-             * the negative dentry that we're adding now so that a
-             * potential future lookup of this cached negative dentry can
-             * be properly revalidated.
-             */
-#ifdef HAVE_D_SET_D_OP
-            d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-            dentry->d_op = &pvfs2_dentry_operations;
-#endif
             d_add(dentry, inode);
 
             res = NULL;
@@ -247,25 +236,10 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                      __FILE__, __func__, __LINE__, inode->i_ino,
                      (int)atomic_read(&inode->i_count));
 
-        /* update dentry/inode pair into dcache */
-#ifdef HAVE_D_SET_D_OP
-        d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
-        dentry->d_op = &pvfs2_dentry_operations;
-#endif
-
         res = pvfs2_d_splice_alias(dentry, inode);
 
         gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
                      (int)atomic_read(&inode->i_count));
-        if (res)
-        {
-#ifdef HAVE_D_SET_D_OP
-            d_set_d_op(res, &pvfs2_dentry_operations);
-#else
-            res->d_op = &pvfs2_dentry_operations;
-#endif
-        }
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
         res = NULL;

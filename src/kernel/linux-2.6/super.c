@@ -1086,6 +1086,9 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
+#ifdef HAVE_D_SET_D_OP
+    sb->s_d_op = &pvfs2_dentry_operations;
+#endif
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
@@ -1123,9 +1126,7 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
         ret = -ENOMEM;
         goto error_exit;
     }
-#ifdef HAVE_D_SET_D_OP
-    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
-#else
+#ifndef HAVE_D_SET_D_OP
     root_dentry->d_op = &pvfs2_dentry_operations;
 #endif
     sb->s_root = root_dentry;
@@ -1216,11 +1217,10 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
    }
 #endif
 
-#ifdef HAVE_D_SET_D_OP
-   d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
+#ifndef HAVE_D_SET_D_OP
    dentry->d_op = &pvfs2_dentry_operations;
 #endif
+
    return dentry;
 }
 #endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
@@ -1402,6 +1402,9 @@ int pvfs2_fill_sb(struct super_block *sb,
 #endif
     sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
+#ifdef HAVE_D_SET_D_OP
+    sb->s_d_op = &pvfs2_dentry_operations;
+#endif
     sb->s_type = &pvfs2_fs_type;
 
     sb->s_blocksize = pvfs_bufmap_size_query();
@@ -1442,11 +1445,6 @@ int pvfs2_fill_sb(struct super_block *sb,
         iput(root);
         return -ENOMEM;
     }
-#ifdef HAVE_D_SET_D_OP
-    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
-#else
-    root_dentry->d_op = &pvfs2_dentry_operations;
-#endif
 
     sb->s_export_op = &pvfs2_export_ops;
     sb->s_root = root_dentry;
