@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <sys/statvfs.h>
 #include <sys/utsname.h>
 
@@ -31,6 +37,7 @@ int main(void)
     struct mntent *me;
     char path[512];
     FILE *f, *outf;
+    double loadavg[3];
 
     if (bgproc_setup() != 0)
     {
@@ -41,6 +48,12 @@ int main(void)
     if (uname(&buf) == -1)
     {
         perror("could not get uname");
+        return EXIT_FAILURE;
+    }
+
+    if (getloadavg(loadavg, 3) == -1)
+    {
+        fprintf(stderr, "could not get load averages\n");
         return EXIT_FAILURE;
     }
 
@@ -65,6 +78,13 @@ int main(void)
         return EXIT_FAILURE;
     }
 
+    if (fprintf(outf, "%4.2f %4.2f %4.2f\n",
+            loadavg[0], loadavg[1], loadavg[2]) == -1)
+    {
+        perror("could not write output file");
+        return EXIT_FAILURE;
+    }
+
     /* getmntent, statvfs */
     f = fopen("/etc/mtab", "r");
     if (f == NULL)
@@ -75,6 +95,7 @@ int main(void)
     while ((me = getmntent(f)) != NULL)
     {
         struct statvfs sfs;
+        double used = 0.0;
         if (statvfs(me->mnt_dir, &sfs) != 0)
         {
             if (fprintf(outf, "%s failure\n", me->mnt_dir) == -1)
@@ -83,8 +104,11 @@ int main(void)
                 return EXIT_FAILURE;
             }
         }
-        if (fprintf(outf, "%s %f\n", me->mnt_dir,
-                (double)sfs.f_bfree/sfs.f_blocks) == -1)
+        if (sfs.f_blocks)
+        {
+            used = 1.0-(double)sfs.f_bfree/sfs.f_blocks;
+        }
+        if (fprintf(outf, "%s %f\n", me->mnt_dir, used) == -1)
         {
             perror("could not write output file");
             return EXIT_FAILURE;

@@ -1,4 +1,4 @@
 DIR := src/apps/bgproc
 
 BGPROCSRC := \
-	$(DIR)/bgproc-count.c
+	$(DIR)/bgproc-stat.c

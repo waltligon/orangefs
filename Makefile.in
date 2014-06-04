@@ -140,7 +140,7 @@ build_symbolic = @build_symbolic@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools bgprocbins
 
 ################################################################
 # Find project subdirectories
@@ -1209,6 +1209,8 @@ $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
 
+$(BGPROCBINS): %: %.o $(LIBRARIES)
+
 # special rules to build state machine compiler using build host compiler
 $(STATECOMPOBJS): %.o: %.c
 	$(Q) "  BUILD_CC	$@"
@@ -1271,6 +1273,7 @@ clean::
                 $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
+                $(BGPROCOBJS) $(BGPROCBINS) \
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
                 $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
