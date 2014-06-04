@@ -123,10 +123,10 @@ public class OrangeFileSystem extends FileSystem {
             fParent = f.getParent();
             OFSLOG.debug("fParent = " + fParent);
             if (fParent != null && !exists(fParent)) {
-		OFSLOG.debug("missing fParent = " + fParent);
-                /* Try to create the directories. */
-                if (!mkdirs(fParent, permission)) {
-			OFSLOG.debug("mkdir on fParent failed = " + fParent);
+                OFSLOG.debug("missing fParent = " + fParent);
+                /* Create missing parent dirs with default dir permissions */
+                if (!mkdirs(fParent)) {
+                    OFSLOG.debug("mkdir on fParent failed = " + fParent);
                     /* mkdirs could fail if another task creates the parent 
                      * directory after we checked to see if the parent exists.
                      * So, check if the parent exists again to make sure
@@ -477,7 +477,6 @@ public class OrangeFileSystem extends FileSystem {
         return new Path(workingDirectory, path);
     }
 
-    /* Make the given file and all non-existent parents into directories. */
     @Override
     public boolean mkdirs(Path f, FsPermission permission) throws IOException {
         int ret = 0;
@@ -487,6 +486,8 @@ public class OrangeFileSystem extends FileSystem {
         OFSLOG.debug("mkdirs attempting to create directory: "
                 + makeAbsolute(f).toString());
         OFSLOG.debug("permission = " + permission);
+        OFSLOG.debug("process user.name=" + System.getProperty("user.name"));
+        OFSLOG.debug("mode = " + mode);
         /* Check to see if the directory already exists. */
         if (exists(f)) {
             if (isDir(f)) {
@@ -521,7 +522,7 @@ public class OrangeFileSystem extends FileSystem {
                 }
                 else {
                     // Create the missing parent and setPermission.
-                    ret = orange.posix.mkdir(getOFSPathName(parents[i]), mode);
+                    ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
                     }
@@ -535,7 +536,7 @@ public class OrangeFileSystem extends FileSystem {
             }
         }
         // Now create the directory f
-        ret = orange.posix.mkdir(getOFSPathName(f), mode);
+        ret = orange.posix.mkdir(getOFSPathName(f), 0700);
         if (ret == 0) {
             setPermission(f, permission);
             return true;
@@ -571,9 +572,18 @@ public class OrangeFileSystem extends FileSystem {
         if (permission == null) {
             return;
         }
+        OFSLOG.debug("permission (symbolic) = " + permission.toString());
         fOFS = new Path(getOFSPathName(p));
         mode = permission.toShort();
-        OFSLOG.debug("permission (symbolic) = " + permission.toString());
+        if((mode & 01000) == 01000)
+        {
+        	OFSLOG.warn("permission contains sticky bit, removing it...");
+        	mode = mode ^ 01000;
+        	OFSLOG.warn("new mode = " + mode);
+        	FsPermission newModeAsPermission = new FsPermission((short) mode);
+        	OFSLOG.warn("new mode (symbolic) = " +
+                    newModeAsPermission.toString());
+        }
         if (orange.posix.chmod(fOFS.toString(), mode) < 0) {
             throw new IOException("Failed to set permissions on path = "
                     + makeAbsolute(p) + ", mode = " + mode);
