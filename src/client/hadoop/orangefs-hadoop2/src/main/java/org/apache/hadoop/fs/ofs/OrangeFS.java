@@ -205,7 +205,13 @@ public class OrangeFS extends AbstractFileSystem {
             fParent = f.getParent();
             OFSLOG.debug("fParent = " + fParent);
             if (fParent != null && !exists(fParent)) {
-                mkdir(fParent, absolutePermission, true);
+            	if(createParent) {
+            		mkdir(fParent, FsPermission.getDirDefault(), true);
+            	}
+            	else {
+            		throw new ParentNotDirectoryException("Parent directory is "
+            				+ "missing and createParent is false.");
+            	}
             }
         }
         fsdos = new FSDataOutputStream(new OrangeFileSystemOutputStream(fOFS
@@ -328,7 +334,6 @@ public class OrangeFS extends AbstractFileSystem {
         /**/
         OFSLOG.debug("f = " + f.toString());
         OFSLOG.debug("makeQualified(f) = " + makeQualified(f));
-        OFSLOG.debug("potential fix for failed statement: " + makeQualified(makeAbsolute(f)));
         fileStatus = new FileStatus(stats.st_size, isdir, block_replication,
                 stats.st_blksize, stats.st_mtime * 1000, stats.st_atime * 1000,
                 permission, username, groupname, 
@@ -452,6 +457,7 @@ public class OrangeFS extends AbstractFileSystem {
         OFSLOG.debug("mkdirs attempting to create directory: "
                 + makeAbsolute(dir).toString());
         OFSLOG.debug("permission = " + permission);
+        OFSLOG.debug("process user.name=" + System.getProperty("user.name"));
         /* Check to see if the directory already exists. */
         if (exists(dir)) {
             if (isDir(dir)) {
@@ -486,7 +492,7 @@ public class OrangeFS extends AbstractFileSystem {
                 }
                 else {
                     /* Create the missing parent and setPermission. */
-                    ret = orange.posix.mkdir(getOFSPathName(parents[i]), mode);
+                	ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
                     }
@@ -506,7 +512,7 @@ public class OrangeFS extends AbstractFileSystem {
             }
         }
         /* Now create the directory f */
-        ret = orange.posix.mkdir(getOFSPathName(dir), mode);
+        ret = orange.posix.mkdir(getOFSPathName(dir), 0700);
         if (ret == 0) {
             setPermission(dir, permission);
         }
@@ -605,9 +611,18 @@ public class OrangeFS extends AbstractFileSystem {
 		throw new org.apache.hadoop.security.AccessControlException(
 				"FsPermission permission is null");
         }
+        OFSLOG.debug("permission (symbolic) = " + permission.toString());
         fOFS = new Path(getOFSPathName(f));
         mode = permission.toShort();
-        OFSLOG.debug("permission (symbolic) = " + permission.toString());
+        if((mode & 01000) == 01000)
+        {
+        	OFSLOG.warn("permission contains sticky bit, removing it...");
+        	mode = mode ^ 01000;
+        	OFSLOG.warn("new mode = " + mode);
+        	FsPermission newModeAsPermission = new FsPermission((short) mode);
+        	OFSLOG.warn("new mode (symbolic) = " +
+                    newModeAsPermission.toString());
+        }
         if (orange.posix.chmod(fOFS.toString(), mode) < 0) {
 		/* TODO Determine the OrangeFS error code so that the appropriate
 		 * exception may be thrown. */
