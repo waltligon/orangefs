@@ -1,9 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 cd $(dirname $0)
 
-HADOOP_PREFIX=/opt/hadoop-2.2.0
-HADOOP_CONFIG_DIR=/home/denton/projects/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf
+# This script requires two variables to be defined in ./setenv
+# - HADOOP_PREFIX
+# - HADOOP_CONFIG_DIR
+. setenv
 
 # START
 $HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONFIG_DIR} start resourcemanager

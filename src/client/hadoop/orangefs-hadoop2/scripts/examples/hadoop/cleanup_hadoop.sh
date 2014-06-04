@@ -1,9 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 cd $(dirname $0)
 
-HADOOP_LOG_DIR="/home/denton/hadoop2logs"
-HADOOP_LOCAL_DIR="/home/denton/hadoop2local"
+# This script requires two variables to be defined in ./setenv
+# - HADOOP_LOG_DIR
+# - HADOOP_LOCAL_DIR
+. setenv
 
 # CLEANUP
 rm -rf "${HADOOP_LOG_DIR}" "${HADOOP_LOCAL_DIR}"
