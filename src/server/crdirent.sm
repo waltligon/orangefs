@@ -1245,14 +1245,34 @@ static PINT_sm_action crdirent_retrieve_dir_entries(struct PINT_smcb *smcb,
 
     dirent_array = (PVFS_dirent *)memory_buffer;
 
+    if(s_op->u.crdirent.keyval_temp_store){
+        free(s_op->u.crdirent.keyval_temp_store);
+    }
+
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.crdirent.fs_id, 
+                                         &(s_op->metasidcnt));
+
+    s_op->u.crdirent.keyval_temp_store = 
+                    malloc(OSASZ(s_op->u.crdirent.keyval_handle_info.count,
+                                 s_op->metasidcnt));
+
+    PVFS_ID *val_buffer_location = s_op->u.crdirent.keyval_temp_store;
+
+
+    /* TJS: Load buffer handles and SIDs into a temporary location, unpack
+     * location in next state so SID array and dirent_array are 
+     * populated */
     for (j = 0; j < s_op->u.crdirent.keyval_handle_info.count; j++)
     {
         s_op->u.crdirent.entries_key_a[j].buffer =
                                           dirent_array[j].d_name;
         s_op->u.crdirent.entries_key_a[j].buffer_sz = PVFS_NAME_MAX;
         s_op->u.crdirent.entries_val_a[j].buffer =
-                                          &(dirent_array[j].handle);
-        s_op->u.crdirent.entries_val_a[j].buffer_sz = sizeof(PVFS_handle);
+                                          val_buffer_location;
+        val_buffer_location += 1 + s_op->metasidcnt;
+        s_op->u.crdirent.entries_val_a[j].buffer_sz = 
+                                          sizeof(OSASZ(1, s_op->metasidcnt));
     }
 
     gossip_debug(
@@ -1302,7 +1322,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
                                                   job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i = 0, j = 0;
+    int i = 0, j = 0, k = 0;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index = 0;
     int ret = -PVFS_EINVAL;
@@ -1383,6 +1403,13 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
                     s_op->u.crdirent.entries_key_a[j].buffer;
             s_op->u.crdirent.entry_handles[s_op->u.crdirent.nentries] =
                     (PVFS_handle) (*(PVFS_handle *) s_op->u.crdirent.entries_val_a[j].buffer);
+            /* TJS: roll out all of the SIDs read during keyval_iterate into the appropriate place in 
+               SID buffer */
+            for(k = 0; k < s_op->metasidcnt; k++){
+                s_op->u.crdirent.entry_sids[j * s_op->metasidcnt + k] = 
+                            *s_op->u.crdirent.entries_val_a[j].buffer[1 + k];
+
+            }
             cur_bytes += strlen(s_op->u.crdirent.entries_key_a[j].buffer) + 1 +
                          sizeof(PVFS_handle);
             if (cur_bytes >= PVFS_REQ_LIMIT_SPLIT_SIZE_MAX)

@@ -422,6 +422,7 @@ struct PINT_server_crdirent_op
     int read_all_directory_entries;
     int nentries;
     PVFS_handle *entry_handles;
+    PVFS_SID *entry_sid;
     char **entry_names;
     int num_msgs_required;
     split_msg_boundary *msg_boundaries;
