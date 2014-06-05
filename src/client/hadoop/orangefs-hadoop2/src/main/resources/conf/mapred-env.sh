@@ -14,7 +14,7 @@
 # limitations under the License.
 
 export JAVA_HOME=${JAVA_HOME}
-export HADOOP_MAPRED_LOG_DIR="/home/${USER}/hadoop2logs"
+export HADOOP_MAPRED_LOG_DIR="/tmp/hadoop-${USER}/hadoop2logs"
 
 export HADOOP_JOB_HISTORYSERVER_HEAPSIZE=1000
 export HADOOP_MAPRED_ROOT_LOGGER=INFO,RFA

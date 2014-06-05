@@ -70,7 +70,7 @@ fi
 # so that filenames w/ spaces are handled correctly in loops below
 IFS=
 
-export YARN_LOG_DIR=/home/${USER}/hadoop2logs
+export YARN_LOG_DIR=/tmp/hadoop-${USER}/hadoop2logs
 if [ "$YARN_LOGFILE" = "" ]; then
   YARN_LOGFILE='yarn.log'
 fi
