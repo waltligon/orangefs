@@ -1150,7 +1150,12 @@ struct PVFS_servresp_mkdir
 {
     PVFS_handle handle;
     PVFS_capability capability; /* capability for new directory */
+    uint32_t sid_count;
+    PVFS_SID *sid_array;
 };
+
+/* V3: TJS: Need to update struct with array */
+
 endecode_fields_2_struct(
     PVFS_servresp_mkdir,
     PVFS_handle, handle,

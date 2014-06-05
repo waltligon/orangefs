@@ -649,11 +649,8 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 //Make sure this attr fields get allocated contiguously
     s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.dirdata_count * 
-                               (sizeof(*attr->u.dir.dirdata_handles) +
-// V3 IS THIS RIGHT? - is sid_count total or per handle?
-                                      (attr->u.dir.dist_dir_attr.sid_count *
-                                       sizeof(PVFS_SID)));
+    s_op->val_a[2].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+                                     attr->u.dir.dist_dir_attr.sid_count);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "  writing dist-dir-struct keyvals for meta handle: %s "
