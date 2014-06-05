@@ -1406,8 +1406,8 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
             /* TJS: roll out all of the SIDs read during keyval_iterate into the appropriate place in 
                SID buffer */
             for(k = 0; k < s_op->metasidcnt; k++){
-                s_op->u.crdirent.entry_sids[j * s_op->metasidcnt + k] = 
-                            *s_op->u.crdirent.entries_val_a[j].buffer[1 + k];
+                s_op->u.crdirent.entry_sid[j * s_op->metasidcnt + k] = 
+                            (PVFS_SID) *s_op->u.crdirent.entries_val_a[j].buffer[1 + k];
 
             }
             cur_bytes += strlen(s_op->u.crdirent.entries_key_a[j].buffer) + 1 +
