@@ -233,7 +233,7 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
     {
         /* Get the handle from the appropriate entry in the keyval
          * temporary place holder */
-        s_op->resp.u.readdir.dirent_array[j] = 
+        s_op->resp.u.readdir.dirent_array[j].handle = 
                 s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1)].oid;
 
         /* Copy SIDs from appropriate index in keval temporary store into
