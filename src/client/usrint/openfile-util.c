@@ -781,6 +781,12 @@ static void cleanup_usrint_internal(void)
  */
 static void signal_handler(int sig)
 {
+    static int times_run = 0;
+    if (times_run++ > 0)
+    {
+        gossip_err("Repeated running of signal handler\n");
+        exit(-1);
+    }
     cleanup_usrint_internal();
     (*default_handler[sig])(sig);
 }
@@ -795,6 +801,15 @@ static void signal_handler(int sig)
  */
 static void init_signal_handlers(void)
 {
+    /* this should only be called within the usrint init sequence
+     * so it should never be run by more than one thread or more than
+     * once by a thread - this counter is just to be sure
+     */
+    static int times_run = 0;
+    if (times_run++ > 0)
+    {
+        return;
+    }
     default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
     default_handler[SIGINT] = signal(SIGINT, signal_handler);
     default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);
@@ -1215,7 +1230,7 @@ static int init_usrint_internal(void)
 #endif
 
     /* create handlers to run cleanup before aborting */
-    //init_signal_handlers();
+    init_signal_handlers();
 
     init_debug("finished with initialization\n");
 
@@ -1588,6 +1603,9 @@ static void init_descriptor_area_internal(void)
         glibc_ops.perror("failed to malloc descriptor table");
         exit(-1);
     }
+
+    /* unlink the /dev/shm entry - noone should need to open it again */
+    glibc_ops.unlink(shmobjpath);
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
@@ -2181,6 +2199,7 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
     pd->s->fent = NULL; /* not caching if left NULL */
     pd->s->flags = 0;
     pd->s->mode = 0;
+    pd->s->mode_deferred = 0;
 
 #if PVFS_UCACHE_ENABLE
     if (ucache_enabled && use_cache)
@@ -2466,6 +2485,16 @@ int pvfs_free_descriptor(int fd)
     if (dup_cnt <= 0 && !pd->shared_status)
     {
         /* not shared and last dup */
+        if (pd->s->mode & pd->s->mode_deferred)
+        {
+            PVFS_sys_attr attr;
+            /* there were deferred mode bits */
+            iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_DEFAULT_MASK);
+            attr.perms &= ~(pd->s->mode_deferred);
+            attr.mask = PVFS_ATTR_SYS_PERM;
+            iocommon_setattr(pd->s->pvfs_ref, &attr);
+        }
+        /* free up dpath space */
         if (pd->s->dpath)
         {
             pvfs_dpath_remove(pd->s->dpath);

@@ -994,17 +994,21 @@ construct_poll_plan(struct method_usage_t * method_usage,
         if ((method_usage[i].iters_active <= usage_iters_active) &&
             (!(method_usage[i].flags & BMI_METHOD_FLAG_NO_POLLING))){
             /* recently busy, poll */
-            if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling active meth %d: %d / %d\n", __func__, i,
                          method_usage[i].iters_active, usage_iters_active);
+#endif
             method_usage[i].plan = 1;
             ++numplan;
             *idle_time_ms = 0;  /* busy polling */
         } else if (method_usage[i].iters_polled >= usage_iters_starvation) {
             /* starving, time to poke this one */
-            if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling starving meth %d: %d / %d\n", __func__, i,
                          method_usage[i].iters_polled, usage_iters_starvation);
+#endif
             method_usage[i].plan = 1;
             ++numplan;
         } 
@@ -1023,9 +1027,11 @@ construct_poll_plan(struct method_usage_t * method_usage,
                 *idle_time_ms = 1;
         }
         /* note that BMI_testunexpected is always called with idle_time 0 */
-        if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                      "%s: polling all %d methods, idle %d ms\n", __func__,
                      numplan, *idle_time_ms);
+#endif
     }
 }
 

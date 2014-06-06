@@ -16,7 +16,7 @@
 #define JNI_INITIAL_ARRAY_LIST_SIZE 1024
 #define NULL_JOBJECT ((jobject) NULL)
 
-//#define JNI_DEBUG
+#define JNI_DEBUG
 
 /* Helpful Debugging Macros for JNI Layer */
 #ifdef JNI_DEBUG

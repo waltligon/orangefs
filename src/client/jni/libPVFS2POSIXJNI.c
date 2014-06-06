@@ -202,7 +202,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_chmod(JNIEnv *env, jobject obj,
     int cpath_len = (*env)->GetStringLength(env, path);
     char cpath[cpath_len + 1];
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-
+    JNI_PRINT("mode = %u\n", (unsigned int) mode);
     ret = chmod(cpath, (mode_t) mode);
     if (ret < 0)
     {

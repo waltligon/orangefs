@@ -292,9 +292,6 @@ static inline int PINT_eattr_verify(
         }
         i++;
     }
-
-    /* this shouldn't be possible */
-    return(0);
 }
 
 /** Checks an attribute key against a system list

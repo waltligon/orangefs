@@ -16,8 +16,8 @@
 gen_mutex_t dbpf_attr_cache_mutex = GEN_MUTEX_INITIALIZER;
 
 /* these are based on code from src/server/request-scheduler.c */
-static int hash_key(void *key, int table_size);
-static int hash_key_compare(void *key, struct qlist_head *link);
+static int hash_key(const void *key, int table_size);
+static int hash_key_compare(const void *key, struct qlist_head *link);
 
 static int s_cache_size = DBPF_ATTR_CACHE_DEFAULT_SIZE;
 static int s_max_num_cache_elems = 
@@ -525,10 +525,10 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
  *
  * returns integer offset into table
  */
-static int hash_key(void *key, int table_size)
+static int hash_key(const void *key, int table_size)
 {
     unsigned long tmp = 0;
-    TROVE_object_ref *ref = (TROVE_object_ref *)key;
+    const TROVE_object_ref *ref = (const TROVE_object_ref *)key;
 
     tmp = (ref->fs_id << 12);
     tmp += ref->handle;
@@ -544,10 +544,10 @@ static int hash_key(void *key, int table_size)
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_key_compare(void *key, struct qlist_head *link)
+static int hash_key_compare(const void *key, struct qlist_head *link)
 {
     dbpf_attr_cache_elem_t *cache_elem = NULL;
-    TROVE_object_ref *ref = (TROVE_object_ref *)key;
+    const TROVE_object_ref *ref = (const TROVE_object_ref *)key;
 
     cache_elem = qlist_entry(link, dbpf_attr_cache_elem_t, hash_link);
     assert(cache_elem);

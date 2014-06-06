@@ -1126,13 +1126,16 @@ endecode_fields_1_struct(
 
 /* chdirent ****************************************************/
 /* - modifies an existing directory entry on a particular file system */
+/* This is only used when sys-rename.sm notices that the destination
+   already exists and the directory entry should be updated in place
+   rather than a new one created. */
 
 struct PVFS_servreq_chdirent
 {
-    char *entry;                   /* name of entry to remove */
-    PVFS_handle new_dirent_handle; /* handle of directory */
-    PVFS_handle handle;     /* handle of directory */
-    PVFS_handle dirent_handle; /* handle of directory entries */
+    char *entry;                   /* name of entry to change */
+    PVFS_handle new_dirent_handle; /* handle to be newly-associated with entry */
+    PVFS_handle handle;            /* handle of parent directory */
+    PVFS_handle dirent_handle;     /* handle of bucket */
     PVFS_fs_id fs_id;              /* file system */
 };
 endecode_fields_5_struct(

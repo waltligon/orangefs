@@ -49,8 +49,8 @@ struct qhash_table
 {
     struct qhash_head *array;
     int table_size;
-    int (*compare) (void *key, struct qhash_head * link);
-    int (*hash) (void *key, int table_size);
+    int (*compare) (const void *key, struct qhash_head * link);
+    int (*hash) (const void *key, int table_size);
 
 #ifdef __KERNEL__
     spinlock_t lock;
@@ -66,9 +66,9 @@ struct qhash_table
  * returns pointer to table on success, NULL on failure
  */
 static inline struct qhash_table *qhash_init(
-    int (*compare) (void *key,
+    int (*compare) (const void *key,
 		    struct qhash_head * link),
-    int (*hash) (void *key,
+    int (*hash) (const void *key,
 		 int table_size),
     int table_size)
 {
@@ -130,7 +130,7 @@ static inline void qhash_finalize(
  */
 static inline void qhash_add(
     struct qhash_table *table,
-    void *key,
+    const void *key,
     struct qhash_head *link)
 {
     int index = 0;
@@ -156,7 +156,7 @@ static inline void qhash_add(
  */
 static inline struct qhash_head *qhash_search(
     struct qhash_table *table,
-    void *key)
+    const void *key)
 {
     int index = 0;
     struct qhash_head *tmp_link = NULL;
@@ -217,7 +217,7 @@ static inline struct qhash_head *qhash_search_at_index(
  */
 static inline struct qhash_head *qhash_search_and_remove(
     struct qhash_table *table,
-    void *key)
+    const void *key)
 {
     int index = 0;
     struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
@@ -292,9 +292,9 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
     } while(0)
 
 /* http://www.cris.com/~Ttwang/tech/inthash.htm */
-static inline int quickhash_32bit_hash(void *k, int table_size)
+static inline int quickhash_32bit_hash(const void *k, int table_size)
 {
-    int32_t key = *(int32_t *)k;
+    int32_t key = *(const int32_t *)k;
     key = ~key + (key << 15); /* key = (key << 15) - key - 1; */
     key = key ^ (key >> 12);
     key = key + (key << 2);
@@ -305,9 +305,9 @@ static inline int quickhash_32bit_hash(void *k, int table_size)
     return (int) (key & (table_size - 1));
 }
 
-static inline int quickhash_64bit_hash(void *k, int table_size)
+static inline int quickhash_64bit_hash(const void *k, int table_size)
 {
-    uint64_t key  = *(uint64_t *)k;
+    uint64_t key  = *(const uint64_t *)k;
 
     key = (~key) + (key << 18); /* key = (key << 18) - key - 1; */
     key = key ^ (key >> 31);
@@ -324,9 +324,9 @@ static inline int quickhash_64bit_hash(void *k, int table_size)
  * {Compilers: Principles, Techniques and Tools}, published by Addison-Wesley. 
  * This algorithm comes from P.J. Weinberger's C compiler. 
  */
-static inline int quickhash_string_hash(void *k, int table_size)
+static inline int quickhash_string_hash(const void *k, int table_size)
 {
-    const char *str = (char *)k;
+    const char *str = (const char *)k;
     uint32_t g, h = 0;
 
     while(*str)
