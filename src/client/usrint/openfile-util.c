@@ -781,6 +781,12 @@ static void cleanup_usrint_internal(void)
  */
 static void signal_handler(int sig)
 {
+    static int times_run = 0;
+    if (times_run++ > 0)
+    {
+        gossip_err("Repeated running of signal handler\n");
+        exit(-1)
+    }
     cleanup_usrint_internal();
     (*default_handler[sig])(sig);
 }
@@ -795,6 +801,15 @@ static void signal_handler(int sig)
  */
 static void init_signal_handlers(void)
 {
+    /* this should only be called within the usint init sequence
+     * so it should never be run by more than one thread or more than
+     * once by a thread - this counter is just to be sure
+     */
+    static int times_run = 0;
+    if (times_run++ > 0)
+    {
+        return;
+    }
     default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
     default_handler[SIGINT] = signal(SIGINT, signal_handler);
     default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);
