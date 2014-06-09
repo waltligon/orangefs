@@ -1735,7 +1735,7 @@ static int perm_crdirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(crdirent);
+PINT_GET_OBJECT_REF_DEFINE(crdirent)
 
 struct PINT_server_req_params pvfs2_crdirent_params =
 {

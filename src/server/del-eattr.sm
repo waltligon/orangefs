@@ -219,7 +219,7 @@ static int perm_deleattr(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(deleattr);
+PINT_GET_OBJECT_REF_DEFINE(deleattr)
 
 struct PINT_server_req_params pvfs2_del_eattr_params =
 {

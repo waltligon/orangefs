@@ -46,9 +46,6 @@
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
 #endif
 
 #ifdef HAVE_MNTENT_H
@@ -390,12 +387,11 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     int ngroups, ret, i;
 
     /* allocate buffer for pwd functions */
-    bufsize = -1;
-#ifdef _SC_GETPW_R_SIZE_MAX
-    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+#ifdef _SC_GETGR_R_SIZE_MAX
+    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+#else
+    bufsize = 16384;
 #endif
-    if (bufsize == -1)
-        bufsize = 16384;  /* adequate amount */
     
     pwdbuf = (char *) malloc(bufsize);
     if (pwdbuf == NULL)
@@ -411,14 +407,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         {
             if (uid > PVFS_UID_MAX)
             {
-                ret = -1;
+                ret = PVFS_EINVAL;
                 presult = NULL;
             }
             else
             {
-                ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+                getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
                 if (presult == NULL)
                 {
+                    ret = PVFS_errno_to_error(errno);
                     gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
                                 uid, ret);
                 }
@@ -426,9 +423,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-            ret = getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
+            getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
             if (presult == NULL)
             {
+                ret = PVFS_errno_to_error(errno);
                 gossip_lerr("User %s lookup error: %d (0 = not found)\n", 
                             user, ret);
             }
@@ -437,9 +435,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         uid = getuid();
-        ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+        getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
         if (presult == NULL)
         {
+            ret = PVFS_errno_to_error(errno);
             gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
                         uid, ret);
         }
@@ -447,18 +446,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     if (presult == NULL)
     {
         free(pwdbuf);
-        return -PVFS_EINVAL;
+        return -ret;
     }
 
     /* allocate buffer for grp functions */
-    bufsize = -1;
 #ifdef _SC_GETGR_R_SIZE_MAX
     bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+#else
+    bufsize = 16384;
 #endif
-    if (bufsize == -1)
-    {
-        bufsize = 16384;
-    }
 
     grpbuf = (char *) malloc(bufsize);
     if (grpbuf == NULL)
@@ -475,14 +471,15 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         {
             if (gid > PVFS_GID_MAX)
             {
-                ret = -1;
+                ret = PVFS_EINVAL;
                 gresult = NULL;
             }
             else
             {
-                ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+                getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
                 if (gresult == NULL)
                 {
+                    ret = PVFS_errno_to_error(errno);
                     gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
                                 gid, ret);
                 }
@@ -490,9 +487,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-            ret = getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
+            getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
             if (gresult == NULL)
             {
+                ret = PVFS_errno_to_error(errno);
                 gossip_lerr("Group %s lookup error: %d (0 = not found)\n",
                             group, ret);
             }
@@ -501,9 +499,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         gid = getgid();
-        ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+        getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
         if (gresult == NULL)
         {
+            ret = PVFS_errno_to_error(errno);
             gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
                         gid, ret);
         }
@@ -512,44 +511,22 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     {
         free(pwdbuf);
         free(grpbuf);
-        return -PVFS_EINVAL;
+        return -ret;
     }
 
     /* Note: without security enabled any user can generate a 
        credential for another user. */
 
     /* get user group list */
-#ifdef HAVE_GETGROUPLIST
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ret = getgrouplist(pwd.pw_name, grp.gr_gid, groups, &ngroups);
+    groups[0] = grp.gr_gid;
+    ret = getgroups(sizeof groups/sizeof *groups - 1, groups+1);
     if (ret == -1)
     {
         gossip_lerr("error: unable to get group list for user %s\n",
                     pwd.pw_name);
         return -PVFS_EINVAL;
     }
-    if (groups[0] != grp.gr_gid)
-    {
-        assert(groups[ngroups-1] == grp.gr_gid);
-        groups[ngroups-1] = groups[0];
-        groups[0] = grp.gr_gid;
-    }
-
-#else /* !HAVE_GETGROUPLIST */
-
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd.pw_name, grp.gr_gid);
-    if (ngroups == -1)
-    {
-        gossip_lerr("error: unable to get group list for user %s: %s\n",
-                pwd.pw_name, strerror(errno));
-        free(pwdbuf);
-        free(grpbuf);
-        return -PVFS_EINVAL;
-    }
-
-#endif /* HAVE_GETGROUPLIST */
+    ngroups = ret+1;
 
     /* fill in credential struct */
     cred->userid = (PVFS_uid)pwd.pw_uid;
@@ -2089,7 +2066,6 @@ static int parse_encoding_string(
     for (++cp; isspace(*cp); cp++);        /* optional spaces */
     for (cq = cp; *cq && *cq != ','; cq++);/* find option end */
 
-    *et = -1;
     for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
     {
         int n = strlen(enc_str[i].name);
@@ -2098,16 +2074,12 @@ static int parse_encoding_string(
         if (!strncmp(enc_str[i].name, cp, n))
         {
             *et = enc_str[i].val;
-            break;
+            return 0;
         }
     }
-    if (*et == -1)
-    {
-        gossip_err("Error: %s: unknown encoding type in tab file.\n",
-                   __func__);
-        return -PVFS_EINVAL;
-    }
-    return 0;
+    gossip_err("Error: %s: unknown encoding type in tab file.\n",
+            __func__);
+    return -PVFS_EINVAL;
 }
 
 /* PINT_release_pvfstab()

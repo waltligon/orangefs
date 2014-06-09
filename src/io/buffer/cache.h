@@ -12,7 +12,7 @@
 #define TWOQ_POLICY       3
 
 struct extent *lookup_cache_item(struct inode *mapping, unsigned long offset);
-struct extent *get_free_extent_list_item(struct list_head *list);
+struct extent *get_free_extent_list_item(struct qlist_head *list);
 int add_cache_item(struct extent *page, struct inode *mapping, 
                     unsigned long index, int policy);
 void remove_cache_item(struct extent *page, int policy);

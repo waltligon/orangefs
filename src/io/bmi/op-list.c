@@ -237,16 +237,16 @@ static void gossip_print_op(method_op_p print_op)
 {
 
     gossip_err("Operation:\n------------\n");
-    gossip_err("  op_id: %ld\n", (long) print_op->op_id);
-    gossip_err("  send_recv: %d\n", (int) print_op->send_recv);
-    gossip_err("  msg_tag: %d\n", (int) print_op->msg_tag);
-    gossip_err("  error_code: %d\n", (int) print_op->error_code);
-    gossip_err("  amt_complete: %ld\n", (long) print_op->amt_complete);
+    gossip_err("  op_id: %ld\n", (long)print_op->op_id);
+    gossip_err("  send_recv: %d\n", (int)print_op->send_recv);
+    gossip_err("  msg_tag: %d\n", (int)print_op->msg_tag);
+    gossip_err("  error_code: %d\n", (int)print_op->error_code);
+    gossip_err("  amt_complete: %ld\n", (long)print_op->amt_complete);
     gossip_err("  buffer: %p\n", print_op->buffer);
-    gossip_err("  actual size: %ld\n", (long) print_op->actual_size);
-    gossip_err("  expected size: %ld\n", (long) print_op->expected_size);
-    gossip_err("  addr: %p\n", print_op->addr);
-    gossip_err("  mode: %d\n", (int) print_op->mode);
+    gossip_err("  actual size: %ld\n", (long)print_op->actual_size);
+    gossip_err("  expected size: %ld\n", (long)print_op->expected_size);
+    gossip_err("  addr: %p\n", (void *)print_op->addr);
+    gossip_err("  mode: %d\n", (int)print_op->mode);
 
     return;
 }

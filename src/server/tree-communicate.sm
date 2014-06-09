@@ -661,14 +661,11 @@ static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb, job_status_s *js
     s_op->resp.u.tree_remove.handle_count =
             s_op->req->u.tree_remove.handle_count;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: frame:%p \ttree.caller_handle_index:%u\n"
-                                     "\t\ttree.handle_count:%d "
-                                     "\ttree.op:%d\n"
-                                    ,__func__
-                                    ,s_op
-                                    ,s_op->resp.u.tree_remove.caller_handle_index
-                                    ,s_op->resp.u.tree_remove.handle_count
-                                    ,s_op->resp.op);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: frame:%p "
+            "\ttree.caller_handle_index:%u\n\t\ttree.handle_count:%d "
+            "\ttree.op:%d\n", __func__, (void *)s_op,
+            s_op->resp.u.tree_remove.caller_handle_index,
+            s_op->resp.u.tree_remove.handle_count, s_op->resp.op);
 
     /* allocate response arrays */
     s_op->resp.u.tree_remove.status = (int32_t *)
@@ -897,14 +894,11 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb, job_statu
     s_op->resp.u.tree_get_file_size.handle_count =
             s_op->req->u.tree_get_file_size.num_data_files;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: frame:%p \ttree.caller_handle_index:%u\n"
-                                     "\t\ttree.handle_count:%d "
-                                     "\ttree.op:%d\n"
-                                    ,__func__
-                                    ,s_op
-                                    ,s_op->resp.u.tree_get_file_size.caller_handle_index
-                                    ,s_op->resp.u.tree_get_file_size.handle_count
-                                    ,s_op->resp.op);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: frame:%p "
+            "\ttree.caller_handle_index:%u\n\t\ttree.handle_count:%d "
+            "\ttree.op:%d\n", __func__, (void *)s_op,
+            s_op->resp.u.tree_get_file_size.caller_handle_index,
+            s_op->resp.u.tree_get_file_size.handle_count, s_op->resp.op);
 
     /* allocate response arrays */
     s_op->resp.u.tree_get_file_size.error = (PVFS_error *)
@@ -1154,14 +1148,11 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb, job_status_s *j
     s_op->resp.u.tree_getattr.handle_count =
             s_op->req->u.tree_getattr.handle_count;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: frame:%p \ttree.caller_handle_index:%u\n"
-                                     "\t\ttree.handle_count:%d "
-                                     "\ttree.op:%d\n"
-                                    ,__func__
-                                    ,s_op
-                                    ,s_op->resp.u.tree_getattr.caller_handle_index
-                                    ,s_op->resp.u.tree_getattr.handle_count
-                                    ,s_op->resp.op);
+    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: frame:%p "
+            "\ttree.caller_handle_index:%u\n\t\ttree.handle_count:%d "
+            "\ttree.op:%d\n", __func__, (void *)s_op,
+            s_op->resp.u.tree_getattr.caller_handle_index,
+            s_op->resp.u.tree_getattr.handle_count, s_op->resp.op);
 
     /* allocate response arrays */
     s_op->resp.u.tree_getattr.error = (PVFS_error *)
@@ -1391,7 +1382,7 @@ static inline int PINT_get_object_ref_tree_setattr(
     *fs_id = req->u.tree_setattr.fs_id;
     *handle = req->u.tree_setattr.handle_array[0];
     return 0;
-};
+}
 
 static int perm_tree_setattr(struct PINT_server_op *s_op)
 {
@@ -1403,7 +1394,7 @@ static int perm_tree_setattr(struct PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_CREDENTIAL_DEFINE(tree_setattr);
+PINT_GET_CREDENTIAL_DEFINE(tree_setattr)
 
 struct PINT_server_req_params pvfs2_tree_setattr_params =
 {
@@ -1421,7 +1412,7 @@ static inline int PINT_get_object_ref_tree_remove(
     *fs_id = req->u.tree_remove.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
 static int perm_tree_remove(struct PINT_server_op *s_op)
 {
@@ -1440,7 +1431,7 @@ static int perm_tree_remove(struct PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_CREDENTIAL_DEFINE(tree_remove);
+PINT_GET_CREDENTIAL_DEFINE(tree_remove)
 
 struct PINT_server_req_params pvfs2_tree_remove_params =
 {
@@ -1458,7 +1449,7 @@ static inline int PINT_get_object_ref_tree_get_file_size(
     *fs_id = req->u.tree_get_file_size.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
 static int perm_tree_get_file_size(PINT_server_op *s_op)
 {
@@ -1485,7 +1476,7 @@ static inline int PINT_get_object_ref_tree_getattr(
     *fs_id = req->u.tree_getattr.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
 static int perm_tree_getattr(PINT_server_op *s_op)
 {
@@ -1505,4 +1496,3 @@ struct PINT_server_req_params pvfs2_tree_getattr_params =
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_tree_getattr_sm
 };
-

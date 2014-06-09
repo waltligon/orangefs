@@ -87,9 +87,8 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
-void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
-int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
-void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+#define encode_PVFS_BMI_addr_t encode_int64_t
+#define decode_PVFS_BMI_addr_t decode_int64_t
 
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
@@ -121,13 +120,8 @@ enum PVFS_encoding_type
 };
 
 /* these values must correspond to the defined encoding types above */
-#define ENCODING_INVALID_MIN                    0
-#define ENCODING_INVALID_MAX                    4
 #define ENCODING_SUPPORTED_MIN ENCODING_LE_BFIELD
 #define ENCODING_SUPPORTED_MAX ENCODING_LE_BFIELD
-#define ENCODING_IS_VALID(enc_type)      \
-((enc_type > ENCODING_INVALID_MIN) &&    \
- (enc_type < ENCODING_INVALID_MAX))
 #define ENCODING_IS_SUPPORTED(enc_type)  \
 ((enc_type >= ENCODING_SUPPORTED_MIN) && \
  (enc_type <= ENCODING_SUPPORTED_MAX))
@@ -182,7 +176,7 @@ typedef struct
 endecode_fields_2(
     PVFS_handle_extent,
     PVFS_handle, first,
-    PVFS_handle, last);
+    PVFS_handle, last)
 
 /* an array of contiguous ranges of handles */
 typedef struct
@@ -194,7 +188,7 @@ endecode_fields_1a(
     PVFS_handle_extent_array,
     skip4,,
     uint32_t, extent_count,
-    PVFS_handle_extent, extent_array);
+    PVFS_handle_extent, extent_array)
 
 /* Layout algorithm for converting from server lists in the config
  * to a list of servers to use to store datafiles for a file.
@@ -218,22 +212,12 @@ enum PVFS_sys_layout_algorithm
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
-/* The list of datafile servers that can be passed into PVFS_sys_create
- * to specify the exact layout of a file.  The count parameter will override
- * the num_dfiles field in the attribute.
- */
-struct PVFS_sys_server_list
-{
-    int32_t count;
-    PVFS_BMI_addr_t *servers;
-};
-
 /* The server laout struct passed to PVFS_sys_create.  The algorithm
  * specifies how the servers are chosen to layout the file.  If the
  * algorithm is set to PVFS_SYS_LAYOUT_LIST, the server_list parameter
  * is used to determine the layout.
  */
-typedef struct PVFS_sys_layout_s
+typedef struct PVFS_sys_layout
 {
     /* The algorithm to use to layout the file */
     enum PVFS_sys_layout_algorithm algorithm;
@@ -241,12 +225,14 @@ typedef struct PVFS_sys_layout_s
     /* The server list specified if the
      * PVFS_SYS_LAYOUT_LIST algorithm is chosen.
      */
-    struct PVFS_sys_server_list server_list;
+    int32_t count;
+    PVFS_BMI_addr_t *servers;
 } PVFS_sys_layout;
 #define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
-
-void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
-void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+endecode_fields_1a_struct(PVFS_sys_layout,
+    enum, algorithm,
+    int32_t, count,
+    PVFS_BMI_addr_t, servers)
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL    ((PVFS_context_id)-1)
@@ -479,7 +465,7 @@ endecode_fields_12(
     uint64_t, load_15,
     uint64_t, uptime_seconds,
     uint64_t, handles_available_count,
-    uint64_t, handles_total_count);
+    uint64_t, handles_total_count)
 
 /** object reference (uniquely refers to a single file, directory, or
     symlink).
@@ -533,7 +519,7 @@ typedef struct
 endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
-    PVFS_handle, handle);
+    PVFS_handle, handle)
 
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
@@ -556,7 +542,7 @@ endecode_fields_6(
     int32_t, bitmap_size,
     int32_t, split_size,
     int32_t, server_no,
-    int32_t, branch_level);
+    int32_t, branch_level)
 
 typedef uint32_t PVFS_dist_dir_bitmap_basetype;
 typedef uint32_t *PVFS_dist_dir_bitmap;
@@ -604,7 +590,7 @@ encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
 
 enum PVFS_server_mode
 {
@@ -630,7 +616,7 @@ typedef struct {
 
 typedef struct {
     uint32_t p_version;
-    pvfs2_acl_entry p_entries[0];
+    pvfs2_acl_entry *p_entries;
 } pvfs2_acl_header;
 #endif
 
@@ -1085,7 +1071,7 @@ endecode_fields_1a_struct (
     PVFS_certificate,
     skip4,,
     uint32_t, buf_size,
-    PVFS_cert_data, buf);
+    PVFS_cert_data, buf)
 #define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
 
 /* Buffer and structure for certificate private key */
@@ -1101,7 +1087,7 @@ endecode_fields_1a_struct (
     PVFS_security_key,
     skip4,,
     uint32_t, buf_size,
-    PVFS_key_data, buf);
+    PVFS_key_data, buf)
 #define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
 
 typedef unsigned char *PVFS_signature;
@@ -1129,7 +1115,7 @@ endecode_fields_3a2a_struct (
     PVFS_time, timeout,
     uint32_t, op_mask,
     uint32_t, num_handles,
-    PVFS_handle, handle_array);
+    PVFS_handle, handle_array)
 #define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
                                     sizeof(PVFS_handle)          + \
                                     PVFS_REQ_LIMIT_ISSUER        + \
@@ -1160,7 +1146,7 @@ endecode_fields_3a2a1_struct (
     PVFS_time, timeout,
     uint32_t, sig_size,
     PVFS_signature, signature,
-    PVFS_certificate, certificate);
+    PVFS_certificate, certificate)
 #define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
                                     sizeof(PVFS_gid)         + \
                                     PVFS_REQ_LIMIT_ISSUER    + \

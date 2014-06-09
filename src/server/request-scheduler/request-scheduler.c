@@ -544,13 +544,13 @@ int PINT_req_sched_post(enum PVFS_server_op op,
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-                 llu(handle), tmp_element);
+                 llu(handle), (void *)tmp_element);
 
     if (ret == 1)
     {
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
                      "handle: %llu, queue_element: %p\n",
-		     llu(handle), tmp_element);
+		     llu(handle), (void *)tmp_element);
     }
     sched_count++;
     return (ret);
@@ -873,7 +873,7 @@ int PINT_req_sched_release(
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED RELEASING, handle: %llu, queue_element: %p\n",
-		 llu(tmp_element->handle), tmp_element);
+		 llu(tmp_element->handle), (void *)tmp_element);
 
     /* destroy the released request element */
     free(tmp_element);
@@ -927,7 +927,7 @@ int PINT_req_sched_test(
 	*out_status = 0;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
                      "handle: %llu, queue_element: %p\n",
-                     llu(tmp_element->handle), tmp_element);
+                     llu(tmp_element->handle), (void *)tmp_element);
 
         PINT_req_sched_do_change_mode(tmp_element);
         return (1);
@@ -950,7 +950,7 @@ int PINT_req_sched_test(
 	    *out_status = 0;
 	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			 "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
-			 tmp_element);
+			 (void *)tmp_element);
 	    free(tmp_element);
 	    return (1);
 	}
@@ -1022,7 +1022,7 @@ int PINT_req_sched_testsome(
 	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			 "REQ SCHED SCHEDULING, handle: %llu, "
                          "queue_element: %p\n",
-			 llu(tmp_element->handle), tmp_element);
+			 llu(tmp_element->handle), (void *)tmp_element);
             PINT_req_sched_do_change_mode(tmp_element);
 	}
 	else if(tmp_element->state == REQ_TIMING)
@@ -1045,7 +1045,7 @@ int PINT_req_sched_testsome(
 		(*inout_count_p)++;
 		gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			     "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
-			     tmp_element);
+			     (void *)tmp_element);
 		free(tmp_element);
 	    }
 	}
@@ -1129,7 +1129,7 @@ int PINT_req_sched_testworld(
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, "
                      "handle: %llu, queue_element: %p\n",
-		     llu(tmp_element->handle), tmp_element);
+		     llu(tmp_element->handle), (void *)tmp_element);
         PINT_req_sched_do_change_mode(tmp_element);
     }
     if (*inout_count_p > 0)

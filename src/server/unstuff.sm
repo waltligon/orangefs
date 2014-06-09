@@ -10,6 +10,8 @@
 #include <string.h>
 #include <assert.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -472,9 +474,9 @@ static PINT_sm_action cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if(s_op->u.unstuff.layout.server_list.servers)
+    if(s_op->u.unstuff.layout.servers)
     {
-        free(s_op->u.unstuff.layout.server_list.servers);
+        free(s_op->u.unstuff.layout.servers);
     }
     if(s_op->u.unstuff.encoded_layout)
     {
@@ -599,8 +601,8 @@ static int perm_unstuff(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(unstuff);
-PINT_GET_CREDENTIAL_DEFINE(unstuff);
+PINT_GET_OBJECT_REF_DEFINE(unstuff)
+PINT_GET_CREDENTIAL_DEFINE(unstuff)
 
 struct PINT_server_req_params pvfs2_unstuff_params =
 {

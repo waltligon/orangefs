@@ -4,10 +4,10 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#include "ncac-list.h"
-
+#include "quicklist.h"
 #include "pvfs2-internal.h"
 #include "internal.h"
 #include "radix.h"
@@ -25,7 +25,7 @@ unsigned long radix_get_value(const void *item);
 /* TODO: */
 static int extlog2(int extsize)
 {
-	return 15;
+    return 15;
 }
 
 
@@ -70,9 +70,9 @@ int cache_init(NCAC_info_t *info)
     init_cache_stack_list();
 
 
-    INIT_LIST_HEAD( &NCAC_dev.prepare_list);
-    INIT_LIST_HEAD( &NCAC_dev.bufcomp_list);
-    INIT_LIST_HEAD( &NCAC_dev.comp_list);
+    INIT_QLIST_HEAD(&NCAC_dev.prepare_list);
+    INIT_QLIST_HEAD(&NCAC_dev.bufcomp_list);
+    INIT_QLIST_HEAD(&NCAC_dev.comp_list);
 
 
     memset( inode_arr, 0, sizeof(struct inode*)*MAX_INODE_NUM );
@@ -81,7 +81,7 @@ int cache_init(NCAC_info_t *info)
     NCAC_dev.max_b     = RADIX_MAX_BITS;
 
     fprintf(stderr, "CACHE SUMMARY:\n");
-    fprintf(stderr, "---- req num:%d\t	ext num: %ld\t\n", reqnum, NCAC_dev.extcnt);
+    fprintf(stderr, "---- req num:%d\t    ext num: %ld\t\n", reqnum, NCAC_dev.extcnt);
 
     return 0;
 }
@@ -99,17 +99,17 @@ static inline void init_free_extent_list(int num)
     int i;
     struct extent *start;
     struct cache_stack *cache;
-    struct list_head *head;
+    struct qlist_head *head;
 
     cache = &NCAC_dev.cache_stack;
     start = NCAC_dev.free_extent_src;
 
 
     head = &cache->free_extent_list;
-    INIT_LIST_HEAD( head );
+    INIT_QLIST_HEAD(head);
 
     for (i = 0; i < num; i++ ){
-        list_add_tail( &start[i].list, head );
+        qlist_add_tail( &start[i].list, head );
         //DPRINT("%d: %p\n", i, start+i);
         start[i].addr = NCAC_dev.cachemem+i*NCAC_dev.extsize;
         start[i].ioreq = INVAL_IOREQ;
@@ -122,22 +122,22 @@ static inline void init_free_req_list(int num)
 {
     int i;
     struct NCAC_req *start;
-    struct list_head *head;
+    struct qlist_head *head;
 
     head = &NCAC_dev.free_req_list;
     start = NCAC_dev.free_req_src;
 
-    INIT_LIST_HEAD(head);
+    INIT_QLIST_HEAD(head);
     for (i = 0; i < num; i++ ){
-        list_add_tail(&start[i].list, head);
+        qlist_add_tail(&start[i].list, head);
         //DPRINT("%d: %p\n", i, start+i);
 
         start[i].id = i;
         start[i].reserved_cbufcnt = 0;
     }
     NCAC_dev.free_req_num = num;
-	spin_lock_init(&NCAC_dev.req_list_lock);
-	
+    spin_lock_init(&NCAC_dev.req_list_lock);
+    
 }
 
 static inline void init_cache_stack_list()
@@ -147,7 +147,7 @@ static inline void init_cache_stack_list()
     cache = &NCAC_dev.cache_stack;
 
     cache->nr_active = cache->nr_inactive = 0;
-    INIT_LIST_HEAD( &cache->active_list);
-    INIT_LIST_HEAD( &cache->inactive_list);
-	spin_lock_init(&cache->lock);
+    INIT_QLIST_HEAD(&cache->active_list);
+    INIT_QLIST_HEAD(&cache->inactive_list);
+    spin_lock_init(&cache->lock);
 }

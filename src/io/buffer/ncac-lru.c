@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "quicklist.h"
 #include "internal.h"
 #include "state.h"
 #include "flags.h"
@@ -9,14 +10,13 @@
 #include "ncac-lru.h"
 #include "pvfs2-internal.h"
 
-
 /* add an extent into a lru cache list. The caller should hold the lock 
  * of "cache". 
  */
 void LRU_add_cache_item(struct cache_stack *cache,struct extent *extent)
 {
     /* Insert an entry after the specified head "active_list". */
-    list_add(&extent->lru, &cache->active_list);
+    qlist_add(&extent->lru, &cache->active_list);
     SetPageLRU(extent);
     extent->mapping->nrpages++;
     cache->nr_active++;
@@ -27,7 +27,7 @@ void LRU_add_cache_item(struct cache_stack *cache,struct extent *extent)
  */
 void LRU_remove_cache_item(struct cache_stack *cache, struct extent *extent)
 {
-    list_del(&extent->lru);
+    qlist_del(&extent->lru);
     extent->mapping->nrpages--;
     cache->nr_active--;
 }
@@ -39,18 +39,18 @@ void LRU_remove_cache_item(struct cache_stack *cache, struct extent *extent)
 int LRU_shrink_cache(struct cache_stack *cache, unsigned int expected,
                 unsigned int *shrinked)
 {
-    struct list_head *lru_head, *lru_tail;
+    struct qlist_head *lru_head, *lru_tail;
     struct extent *victim;
     int ret = 0;
 
-    fprintf(stderr, "%s: expected:%d\n", __FUNCTION__, expected);
+    fprintf(stderr, "%s: expected:%d\n", __func__, expected);
      
     *shrinked = 0;
     lru_head = &cache->active_list;
     lru_tail = lru_head->prev;
 
     while (*shrinked < expected && lru_tail != (& cache->active_list) ){
-        victim = list_entry(lru_tail, struct extent, lru);
+        victim = qlist_entry(lru_tail, struct extent, lru);
 
         if ( !PageLRU(victim) ){
             NCAC_error("extent flag is wrong. LRU flag is expected\n");
@@ -75,7 +75,7 @@ int LRU_shrink_cache(struct cache_stack *cache, unsigned int expected,
 
         if ( is_extent_discardable(victim) ){
             LRU_remove_cache_item(cache, victim);
-            list_add_tail(&victim->list, &cache->free_extent_list);
+            qlist_add_tail(&victim->list, &cache->free_extent_list);
             (*shrinked)++;
         }
     }

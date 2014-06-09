@@ -436,7 +436,7 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", (void *)sm_p);
 
     assert((js_p->error_code == 0) ||
            (js_p->error_code == IO_RETRY));
@@ -579,7 +579,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
     int sio_count;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_datafile_setup_msgpairs\n", sm_p);
+                 "io_datafile_setup_msgpairs\n", (void *)sm_p);
 
     if (PINT_smcb_cancelled(smcb))
     {
@@ -791,13 +791,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
             goto recv_already_posted;
         }
 
-        if (!ENCODING_IS_VALID(sm_p->u.io.encoding))
-        {
-            PRINT_ENCODING_ERROR("supported", sm_p->u.io.encoding);
-            must_loop_encodings = 1;
-            sm_p->u.io.encoding = (ENCODING_INVALID_MIN + 1);
-        }
-        else if (!ENCODING_IS_SUPPORTED(sm_p->u.io.encoding))
+        if (!ENCODING_IS_SUPPORTED(sm_p->u.io.encoding))
         {
             PRINT_ENCODING_ERROR("supported", sm_p->u.io.encoding);
             must_loop_encodings = 1;
@@ -805,8 +799,6 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
         }
 
       try_next_encoding:
-        assert(ENCODING_IS_VALID(sm_p->u.io.encoding));
-
         ret = PINT_encode(&msg->req,
                           PINT_ENCODE_REQ,
                           &msg->encoded_req,
@@ -817,11 +809,10 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
             if (must_loop_encodings)
             {
                 gossip_debug(GOSSIP_CLIENT_DEBUG, "Looping through "
-                             "encodings [%d/%d]\n", sm_p->u.io.encoding,
-                             ENCODING_INVALID_MAX);
+                             "encodings [%d]\n", sm_p->u.io.encoding);
 
                 sm_p->u.io.encoding++;
-                if (ENCODING_IS_VALID(sm_p->u.io.encoding))
+                if (ENCODING_IS_SUPPORTED(sm_p->u.io.encoding))
                 {
                     goto try_next_encoding;
                 }
@@ -1282,7 +1273,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
-                 "(tag %lu)\n", sm_p, status_user_tag);
+                 "(tag %lu)\n", (void *)sm_p, status_user_tag);
 
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
@@ -1435,7 +1426,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
         }
 
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
-                     "context %p%s\n", cur_ctx,
+                     "context %p%s\n", (void *)cur_ctx,
                      ((cur_ctx->write_ack_in_progress ?
                       " and reset write_recv timeout" : "")));
 
@@ -1497,7 +1488,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
         cur_ctx->write_ack.recv_status = *js_p;
 
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed ack for "
-                     "context %p\n", cur_ctx);
+                     "context %p\n", (void *)cur_ctx);
 
         cur_ctx->write_ack_in_progress = 0;
         sm_p->u.io.write_ack_completion_count--;
@@ -1597,7 +1588,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
     PVFS_object_attr *attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_analyze_results\n", sm_p);
+                 "io_analyze_results\n", (void *)sm_p);
 
     attr = &sm_p->getattr.attr;
 
@@ -2012,7 +2003,8 @@ static PINT_sm_action io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n",
+            (void *)sm_p);
 
     io_contexts_destroy(sm_p);
 
@@ -2078,7 +2070,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
         gossip_debug(GOSSIP_IO_DEBUG, "  error %d with status %d related "
                      "to response from context %p; not submitting flow.\n",
                      cur_ctx->msg.recv_status.error_code,
-                     cur_ctx->msg.op_status, cur_ctx);
+                     cur_ctx->msg.op_status, (void *)cur_ctx);
 
         if (cur_ctx->msg.recv_status.error_code)
         {
@@ -2146,7 +2138,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
 
         binfo.buffer = sm_p->u.io.buffer;
         binfo.len = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-        binfo.rw = sm_p->u.io.io_type;
+        binfo.rw = (enum BMI_io_type)sm_p->u.io.io_type;
         BMI_set_info(cur_ctx->msg.svr_addr, BMI_OPTIMISTIC_BUFFER_REG, &binfo);
     }
 
@@ -2241,7 +2233,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
         }
 
         gossip_debug(GOSSIP_IO_DEBUG, "  immediate flow failure for "
-                     "context %p, error code: %d\n", cur_ctx,
+                     "context %p, error code: %d\n", (void *)cur_ctx,
                      cur_ctx->flow_desc.error_code);
         gossip_debug(GOSSIP_IO_DEBUG, "  posting job_null() to propigate.\n");
 
@@ -2260,7 +2252,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
     else
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  posted flow for "
-                     "context %p\n", cur_ctx);
+                     "context %p\n", (void *)cur_ctx);
     }
 
     cur_ctx->flow_has_been_posted = 1;
@@ -2278,7 +2270,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
     unsigned long status_user_tag;
 
     gossip_debug(GOSSIP_IO_DEBUG, "  preposting write "
-                 "ack for context %p.\n", cur_ctx);
+                 "ack for context %p.\n", (void *)cur_ctx);
 
     cur_ctx->write_ack.max_resp_sz = PINT_encode_calc_max_size(
                                                 PINT_ENCODE_RESP,
@@ -2498,17 +2490,17 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
     if (cur_ctx->msg.send_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair send for context %p\n",
-                     cur_ctx->msg.send_status.error_code,
-                     cur_ctx);
+                "  error (%d) in msgpair send for context %p\n",
+                cur_ctx->msg.send_status.error_code,
+                (void *)cur_ctx);
         ret = cur_ctx->msg.send_status.error_code;
     }
     else if (cur_ctx->msg.recv_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair recv for context %p\n",
-                     cur_ctx->msg.recv_status.error_code,
-                     cur_ctx);
+                "  error (%d) in msgpair recv for context %p\n",
+                cur_ctx->msg.recv_status.error_code,
+                (void *)cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
     }
     else if (io_type == PVFS_IO_WRITE)
@@ -2519,8 +2511,9 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
         if (cur_ctx->write_ack.recv_status.error_code)
         {
             gossip_debug(GOSSIP_IO_DEBUG,
-                         "  error (%d) in final ack for context %p\n",
-                         cur_ctx->write_ack.recv_status.error_code, cur_ctx);
+                    "  error (%d) in final ack for context %p\n",
+                    cur_ctx->write_ack.recv_status.error_code,
+                    (void *)cur_ctx);
 
             assert(cur_ctx->write_ack_has_been_posted);
             ret = cur_ctx->write_ack.recv_status.error_code;
@@ -2534,17 +2527,17 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
               have to decode it first
             */
             ret = PINT_serv_decode_resp(cur_ctx->msg.fs_id,
-                                    cur_ctx->write_ack.encoded_resp_p,
-                                    &decoded_resp,
-                                    &cur_ctx->msg.svr_addr,
-                                    cur_ctx->write_ack.recv_status.actual_size,
-                                    &resp);
+                    cur_ctx->write_ack.encoded_resp_p,
+                    &decoded_resp,
+                    &cur_ctx->msg.svr_addr,
+                    cur_ctx->write_ack.recv_status.actual_size,
+                    &resp);
             if (ret == 0)
             {
                 gossip_debug(GOSSIP_IO_DEBUG,
-                             "  %lld bytes written to context %p\n",
-                             lld(resp->u.write_completion.total_completed),
-                             cur_ctx);
+                        "  %lld bytes written to context %p\n",
+                        lld(resp->u.write_completion.total_completed),
+                        (void *)cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;
                 
@@ -2560,15 +2553,15 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
 
             PINT_flow_reset(&cur_ctx->flow_desc);
             BMI_memfree(cur_ctx->msg.svr_addr,
-                        cur_ctx->write_ack.encoded_resp_p,
-                        cur_ctx->write_ack.max_resp_sz,
-                        BMI_RECV);
+                    cur_ctx->write_ack.encoded_resp_p,
+                    cur_ctx->write_ack.max_resp_sz,
+                    BMI_RECV);
         }
         else if (cur_ctx->flow_status.error_code)
         {
             gossip_debug(GOSSIP_IO_DEBUG,
-                         "  error (%d) in flow for context %p\n",
-                         cur_ctx->flow_status.error_code, cur_ctx);
+                    "  error (%d) in flow for context %p\n",
+                    cur_ctx->flow_status.error_code, (void *)cur_ctx);
             PINT_flow_reset(&cur_ctx->flow_desc);
             ret = cur_ctx->flow_status.error_code;
         }
@@ -2576,15 +2569,16 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
     else if (cur_ctx->flow_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in flow for context %p\n",
-                     cur_ctx->flow_status.error_code, cur_ctx);
+                "  error (%d) in flow for context %p\n",
+                cur_ctx->flow_status.error_code, (void *)cur_ctx);
         PINT_flow_reset(&cur_ctx->flow_desc);
         ret = cur_ctx->flow_status.error_code;
     }
     else if (io_type == PVFS_IO_READ)
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-                     lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
+                lld(cur_ctx->flow_desc.total_transferred),
+                (void *)cur_ctx);
 
         /* size for reads are reported in the flow */
         *total_size += cur_ctx->flow_desc.total_transferred;
@@ -3200,8 +3194,7 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         msg->comp_fn = NULL;
 
         ret = PINT_cached_config_map_to_server(&msg->svr_addr,
-                                               msg->handle,
-                                               msg->fs_id);
+                msg->handle, msg->fs_id);
         if(ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -3210,7 +3203,7 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         }
         
         gossip_debug(GOSSIP_IO_DEBUG, "initializing context[%d] %p\n",
-                     i, cur_ctx);
+                i, (void *)cur_ctx);
 
         cur_ctx->index = i;
         cur_ctx->server_nr = sm_p->u.io.datafile_index_array[i];

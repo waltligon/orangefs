@@ -390,7 +390,7 @@ assert(enabled == 1);
          */
         rcache_free_payload(tmp_entry->payload);
         tmp_entry->payload = tmp_payload;
-        ret = PINT_tcache_refresh_entry(rcache, tmp_entry);
+        PINT_tcache_refresh_entry(rcache, tmp_entry);
         PINT_perf_count(rcache_pc, PERF_RCACHE_UPDATES, 1, PINT_PERF_ADD);
     }
     else

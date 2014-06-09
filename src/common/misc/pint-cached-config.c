@@ -609,21 +609,21 @@ int PINT_cached_config_map_servers(
     {
     case PVFS_SYS_LAYOUT_LIST:
 
-        if(*inout_num_datafiles < layout->server_list.count)
+        if(*inout_num_datafiles < layout->count)
         {
             gossip_err("The specified datafile layout is larger"
                        " than the number of requested datafiles\n");
             return -PVFS_EINVAL;
         }
 
-        *inout_num_datafiles = layout->server_list.count;
-        for(i = 0; i < layout->server_list.count; ++i)
+        *inout_num_datafiles = layout->count;
+        for(i = 0; i < layout->count; ++i)
         {
             if(handle_extent_array)
             {
                 ret = PINT_cached_config_get_extents(
                                          fsid,
-                                         &layout->server_list.servers[i],
+                                         &layout->servers[i],
                                          &handle_extent_array[i]);
                 if(ret < 0)
                 {
@@ -633,7 +633,7 @@ int PINT_cached_config_map_servers(
                 }
             }
 
-            addr_array[i] = layout->server_list.servers[i];
+            addr_array[i] = layout->servers[i];
         }
         break;
 
@@ -763,10 +763,14 @@ int PINT_cached_config_map_servers(
         /* init all the addrs to 0, so we know whether we've set an
          * address at a particular index or not
          */
-        random_array = (int *)malloc(*inout_num_datafiles * sizeof(int));
-        server_array = (int *)malloc(num_io_servers * sizeof(int));
-        memset(random_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
-        memset(server_array, 0, (num_io_servers)*sizeof(*addr_array));
+        random_array = calloc(*inout_num_datafiles, sizeof(int));
+        server_array = calloc(num_io_servers, sizeof(int));
+        if (random_array == NULL || server_array == NULL)
+        {
+            free(random_array);
+            free(server_array);
+            return -PVFS_ENOMEM;
+        }
 
         /* generate list of unique random numbers from 0 to */
         /* inout_num_datafiles - 1 */
@@ -808,6 +812,11 @@ int PINT_cached_config_map_servers(
             /* lookup addresses */
             ret = BMI_addr_lookup(&addr_array[df],
                                   sv->alias_mapping->bmi_address);
+            if (ret != 0)
+            {
+                free(random_array);
+                return ret;
+            }
             /* no one uses this but we get it anyway */
             if(handle_extent_array)
             {

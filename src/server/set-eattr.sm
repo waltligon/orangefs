@@ -114,7 +114,7 @@ static int seteattr_verify_eattribs(
     int i; 
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in set-eattr.sm "
-                                     "is %p.\n",s_op);       
+            "is %p.\n", (void *)s_op);
 
     PVFS_object_attr *a_p = NULL;
     a_p = &s_op->attr;
@@ -464,8 +464,8 @@ static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
        js_p->error_code = ret;
     }
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tseteattr:s_op:%p "
-                                     "\tnew_op:%p\n",s_op,new_op);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tseteattr:s_op:%p \tnew_op:%p\n",
+            (void *)s_op, (void *)new_op);
     return SM_ACTION_COMPLETE;
 }/*end action setup_create_immutable_copies*/
 
@@ -501,10 +501,9 @@ static PINT_sm_action inspect_imm_copies(struct PINT_smcb *smcb
       js_p->error_code = error_code;
     }
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tfrom pop, imm_op:%p\n"
-                                    ,imm_op);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tfrom pop, imm_op:%p\n", (void *)imm_op);
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tcurrent, s_op:%p\n",s_op);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tcurrent, s_op:%p\n", (void *)s_op);
 
     if (js_p->error_code)
     {
@@ -695,7 +694,7 @@ static int perm_seteattr(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(seteattr);
+PINT_GET_OBJECT_REF_DEFINE(seteattr)
 
 struct PINT_server_req_params pvfs2_set_eattr_params =
 {

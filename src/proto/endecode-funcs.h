@@ -182,22 +182,19 @@ typedef uint64_t u_int64_t;
 /* memory alloc and free, just for decoding */
 #if 0
 /* this is for debugging, if you want to see what is malloc'd */
-static inline void *decode_malloc (int n) {
-	void *p;
-	if (n>0)
-		p = malloc(n);
-	else
-		p = (void *)0;
-	printf("decode malloc %d bytes: %p\n",n,p);
-	return p;
+static inline void *decode_malloc (size_t n) {
+    void *p;
+    p = malloc(n);
+    printf("decode malloc %d bytes: %p\n",n,p);
+    return p;
 }
 /* this is for debugging, if you want to see what is free'd */
 static inline void decode_free (void *p) {
-	printf("decode free: %p\n",p);
-	free(p);
+    printf("decode free: %p\n",p);
+    free(p);
 }
 #else
-#define decode_malloc(n) ((n) ? malloc(n) : 0)
+#define decode_malloc(n) malloc(n)
 #define decode_free(n) free(n)
 #endif
 
@@ -853,24 +850,24 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
-#ifdef WIN32
+#ifdef __GNUC__
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
+__attribute__((unused)) \
 static void encode_func_##__name__(char **pptr, void *x) \
 { \
     encode_##__name__(pptr, (__type__ *)x); \
-}; \
+} \
+__attribute__((unused)) \
 static void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
 }
 #else
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
-__attribute__((unused)) \
 static void encode_func_##__name__(char **pptr, void *x) \
 { \
     encode_##__name__(pptr, (__type__ *)x); \
-}; \
-__attribute__((unused)) \
+} \
 static void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
@@ -887,7 +884,7 @@ static inline void encode_##name(char **pptr, const struct name *x)           \
         case en2: encode_##ut2(pptr, &x->uname.un2); break;                   \
         default: assert(0);                                                   \
     }                                                                         \
-};                                                                            \
+}                                                                             \
 static inline void decode_##name(char **pptr, struct name *x)                 \
 {                                                                             \
     decode_enum(pptr, &x->ename);                                             \
@@ -897,7 +894,7 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         case en2: decode_##ut2(pptr, &x->uname.un2); break;                   \
         default: assert(0);                                                   \
     }                                                                         \
-};
+} 
 /* 3 fields, then an array, then 2 fields, then an array */
 #define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \

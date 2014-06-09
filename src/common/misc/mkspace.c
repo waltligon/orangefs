@@ -38,12 +38,12 @@ static TROVE_handle s_used_handles[4] =
     TROVE_HANDLE_NULL, TROVE_HANDLE_NULL
 };
 
-#define mkspace_print(v, format, f...)              \
+#define mkspace_print(v, ...)                       \
 do {                                                \
  if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)             \
-   gossip_debug(GOSSIP_SERVER_DEBUG, format, ##f);  \
+   gossip_debug(GOSSIP_SERVER_DEBUG, __VA_ARGS__);  \
  else if (v == PVFS2_MKSPACE_STDERR_VERBOSE)        \
-   fprintf(stderr,format, ##f);                     \
+   fprintf(stderr, __VA_ARGS__);                    \
 } while(0)
 
 #if 0

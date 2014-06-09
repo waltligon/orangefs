@@ -43,7 +43,9 @@ static int bmi_pending_count = 0;
 static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
+#ifdef __PVFS2_CLIENT__
 static int dev_unexp_pending_count = 0;
+#endif
 /* locks for internal queues */
 static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
@@ -132,7 +134,9 @@ static void bmi_thread_mgr_callback(void* data,
     PVFS_size actual_size,
     PVFS_error error_code);
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
+#ifdef __PVFS2_CLIENT__
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
+#endif
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d, int cancel_path);
@@ -4729,7 +4733,8 @@ static void precreate_pool_fill_thread_mgr_callback(
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
             qlist_del(&jd_checker->job_desc_q_link);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Pushing get_handles() sleeper for jd: %p.\n", jd_checker);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Pushing get_handles() sleeper "
+                    "for jd: %p.\n", (void *)jd_checker);
             precreate_pool_get_handles_try_post(jd_checker);
         }
     }
@@ -4978,6 +4983,7 @@ static void bmi_thread_mgr_unexp_handler(
     }
 }
 
+#ifdef __PVFS2_CLIENT__
 /* dev_thread_mgr_unexp_handler()
  *
  * callback function executed by the thread manager for dev when an unexpected
@@ -5023,6 +5029,7 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
         gen_mutex_unlock(&dev_unexp_mutex);
     }
 }
+#endif /* __PVFS2_CLIENT__ */
 
 /* fill_status()
  *
@@ -5685,7 +5692,7 @@ int job_precreate_pool_register_server(
         for( i=0; i < PVFS_DS_TYPE_COUNT; i++ )
         {
             gossip_debug(GOSSIP_JOB_DEBUG, "%s: fs_pool %p, storing batch "
-                         "count at index %d: %u\n", __func__, fs, i, 
+                         "count at index %d: %u\n", __func__, (void *)fs, i, 
                          fs->type_batch_count[i]);
         }
 

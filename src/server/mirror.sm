@@ -854,10 +854,10 @@ static PINT_sm_action check_results( struct PINT_smcb *smcb,
                                             "\t\t\tresp : %p\n",
                                             reqmir_p->fs_id,
                                             (void *)jobs[i].encoded_resp_p,
-                                            &decoded_resp,
+                                            (void *)&decoded_resp,
                                             (long int)jobs[i].svr_addr,
                                             (int)jobs[i].recv_status.actual_size,
-                                           resp);
+                                           (void *)resp);
           ret = PINT_serv_decode_resp( reqmir_p->fs_id,
                                        jobs[i].encoded_resp_p,
                                        &decoded_resp,
@@ -1027,7 +1027,7 @@ static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req,
     *fs_id  = req->u.mirror.fs_id;
     *handle = req->u.mirror.src_handle;
     return 0;
-};
+}
 
 static int perm_mirror(PINT_server_op *s_op)
 {

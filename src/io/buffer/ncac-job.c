@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
+#include "quicklist.h"
 #include "internal.h"
 #include "state.h"
 #include "aiovec.h"
@@ -14,18 +14,18 @@
 #include "pvfs2-internal.h"
 
 /* internal functions */
-static inline struct extent *find_extent(NCAC_req_t *ncac_req,
+static struct extent *find_extent(NCAC_req_t *ncac_req,
                        unsigned long index);
-static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, 
+static struct extent *allocate_extent(NCAC_req_t *ncac_req, 
                        int flag);
-static inline int free_extent(NCAC_req_t *ncac_req,
+static int free_extent(NCAC_req_t *ncac_req,
                        struct extent *extent);
-static inline int init_extent_read(NCAC_req_t *ncac_req,
+static int init_extent_read(NCAC_req_t *ncac_req,
                 struct extent *extent, PVFS_offset foffset, PVFS_size size);
-static inline void set_extent_read_pending(struct extent *extent);
-static inline int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent);
-static inline void increase_read_reference(struct extent *extent);
-static inline int add_extent_to_cache(struct extent * extent,
+static void set_extent_read_pending(struct extent *extent);
+static int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent);
+static void increase_read_reference(struct extent *extent);
+static int add_extent_to_cache(struct extent * extent,
          unsigned long index, NCAC_req_t *ncac_req, int policy);
 
 /* do a read job.
@@ -37,12 +37,12 @@ static inline int add_extent_to_cache(struct extent * extent,
  * Lock stuff: A design choice has been made to do locks as follows:
  *     1) each inode has a lock;
  *     2) each cache stack has a lock (many inodes may share a same 
- *	cache stack).
+ *    cache stack).
  * To avoid lock calls on each extent, we had a sort of "big" lock 
  * across jobs on an inode. During a job processing, if the cache stack 
  * is touched, the job should acquire the cache stack lock. So the lock 
  * order is:
- *	inode lock
+ *    inode lock
  *             ----> cache stack lock
  *             ----> release cache stack lock
  *  release inode lock
@@ -81,22 +81,22 @@ int NCAC_do_a_read_job(struct NCAC_req *ncac_req)
     for (i=0; i<comcnt; i++){
         if ( NULL == cbufhash[i] ){
             index = foff[i] >> NCAC_dev.extlog2;
-		    new_extent = find_extent(ncac_req, index);
+            new_extent = find_extent(ncac_req, index);
             if ( NULL == new_extent ){ /* not cached */
-			    new_extent= allocate_extent(ncac_req,BLOCKING_EXTENT_ALLOC);
-			    if ( new_extent ){
-				    new_extent->index = index;
-				    new_extent->mapping = ncac_req->mapping;
+                new_extent= allocate_extent(ncac_req,BLOCKING_EXTENT_ALLOC);
+                if ( new_extent ){
+                    new_extent->index = index;
+                    new_extent->mapping = ncac_req->mapping;
                     new_extent->ioreq = INVAL_IOREQ;
 
-				    ret = init_extent_read(ncac_req, new_extent,
+                    ret = init_extent_read(ncac_req, new_extent,
                                          foff[i], NCAC_dev.extsize);
                     if ( ret < 0 ) {
-				        NCAC_error("init_extent_read error ext:%p\n",
-                                 new_extent);
+                        NCAC_error("init_extent_read error ext:%p\n",
+                                (void *)new_extent);
 
                         free_extent(ncac_req, new_extent);
-	                    inode_unlock (&ncac_req->mapping->lock);
+                        inode_unlock (&ncac_req->mapping->lock);
                         return ret;
                     }
                     add_extent_to_cache(new_extent, index, ncac_req,
@@ -118,21 +118,22 @@ int NCAC_do_a_read_job(struct NCAC_req *ncac_req)
         if ( cbufhash[i] ){
             ret = 1;
             if ( PageReadPending(cbufhash[i]) ){
-                fprintf(stderr, "extent:%p ioreq:%lld\n", cbufhash[i], lld(cbufhash[i]->ioreq));
+                fprintf(stderr, "extent:%p ioreq:%lld\n",
+                        (void *)cbufhash[i], lld(cbufhash[i]->ioreq));
                 ret = check_extent_read(ncac_req, cbufhash[i]);
                 if (ret < 0){
-				    ncac_req->error = ret;	
-				    NCAC_error("check_read_pending extent=%p\n", cbufhash[i]);
-
+                    ncac_req->error = ret;    
+                    NCAC_error("check_read_pending extent=%p\n",
+                            (void *)cbufhash[i]);
                     inode_unlock (&ncac_req->mapping->lock);
-				    return ret;
-			    }
+                    return ret;
+                }
             }
-			cbufflag[i] = ret;
-		}
+            cbufflag[i] = ret;
+        }
     }
 
-	inode_unlock (&ncac_req->mapping->lock);
+    inode_unlock (&ncac_req->mapping->lock);
 
     readcnt = 0;
     for (i=0; i<comcnt; i++){
@@ -144,7 +145,7 @@ int NCAC_do_a_read_job(struct NCAC_req *ncac_req)
     else ncac_req->status = NCAC_PARTIAL_PROCESS;
 
     fprintf(stderr, "NCAC_do_a_read_job: exit\n");
-	return 0;
+    return 0;
 }
 
 /* do a write job.
@@ -185,7 +186,7 @@ int NCAC_do_a_sync_job(struct NCAC_req *ncac_req)
  * This operation is protected by the inode lock. The caller should 
  * acquire the inode lock.
  */
-static inline struct extent *find_extent(NCAC_req_t *ncac_req, 
+static struct extent *find_extent(NCAC_req_t *ncac_req, 
                                         unsigned long index)
 {
     struct extent *avail;
@@ -208,54 +209,54 @@ static inline struct extent *find_extent(NCAC_req_t *ncac_req,
  * only cache stack lock is needed.
  */
 
-static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
+static struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
 {
     struct extent *new = NULL;
-	struct cache_stack *cache;
+    struct cache_stack *cache;
     unsigned int shrinked;
 
     char *buf;
     int ret;
 
-	cache = ncac_req->mapping->cache_stack;
+    cache = ncac_req->mapping->cache_stack;
 
-    if ( !list_empty( &cache->free_extent_list ) ) {
-		cache_lock( &cache->lock);
+    if ( !qlist_empty( &cache->free_extent_list ) ) {
+        cache_lock( &cache->lock);
         new = get_free_extent_list_item( &(cache->free_extent_list) );
-	    cache_unlock(&cache->lock);
+        cache_unlock(&cache->lock);
 
         if ( new ) {
-    		buf = new->addr;
-   			memset(new, 0, sizeof(struct extent));
-    		new->addr = buf;
-    		SetPageBlank(new);
-    		DPRINT("new extent:%p, flags:%lx\n", new, new->flags);
-			return new;
-		}
+            buf = new->addr;
+               memset(new, 0, sizeof(struct extent));
+            new->addr = buf;
+            SetPageBlank(new);
+            DPRINT("new extent:%p, flags:%lx\n", new, new->flags);
+            return new;
+        }
     }
 
     /* No free extent so far */
     if ( BLOCKING_EXTENT_ALLOC == flag ){
 
-		cache_lock( &cache->lock);
+        cache_lock( &cache->lock);
         ret = shrink_cache(cache, DELT_DISCARD_NUM, LRU_POLICY, &shrinked); 
         if ( ret < 0 ) {
             ncac_req->error = ret;
-		    cache_unlock(&cache->lock);
+            cache_unlock(&cache->lock);
             return NULL;
         }
         new = get_free_extent_list_item( &(ncac_req->mapping->cache_stack->free_extent_list) );
-	    cache_unlock(&cache->lock);
+        cache_unlock(&cache->lock);
 
-	    if ( !new ) return NULL;
+        if ( !new ) return NULL;
         else {
-    		buf = new->addr;
-   			memset(new, 0, sizeof(struct extent));
-    		new->addr = buf;
-    		SetPageBlank(new);
-    		DPRINT("new extent:%p, flags:%lx\n", new, new->flags);
-			return new;
-	    }
+            buf = new->addr;
+               memset(new, 0, sizeof(struct extent));
+            new->addr = buf;
+            SetPageBlank(new);
+            DPRINT("new extent:%p, flags:%lx\n", new, new->flags);
+            return new;
+        }
     }
 
     return NULL;
@@ -264,7 +265,7 @@ static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
 /* add it later 
  * free_extent: return an extent to a list
  */
-static inline int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
+static int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
 {
     return 0;
 }
@@ -273,7 +274,7 @@ static inline int free_extent(NCAC_req_t *ncac_req,struct extent *extent)
  * init_extent_read: initiate trove request to read an extent. The
  * file offset is "foffset", and the size is "size".
  */
-static inline int init_extent_read(NCAC_req_t *ncac_req, 
+static int init_extent_read(NCAC_req_t *ncac_req, 
                    struct extent *extent, PVFS_offset foffset, PVFS_size size)
 {
     int ret;
@@ -287,14 +288,15 @@ static inline int init_extent_read(NCAC_req_t *ncac_req,
         return ret;
     }
     extent->ioreq = ioreq;
-    fprintf(stderr, "init_extent_read: foff:%lld, size:%lld, extent:%p, opid:%lld\n", lld(foffset), lld(size), extent, lld(ioreq));
+    fprintf(stderr, "init_extent_read: foff:%lld, size:%lld, extent:%p, "
+            "opid:%lld\n", lld(foffset), lld(size), (void *)extent, lld(ioreq));
     return 0;
 }
 
 static inline void set_extent_read_pending(struct extent *extent)
 {
     ClearPageBlank(extent);
-	SetPageReadPending(extent);
+    SetPageReadPending(extent);
 }
 
 static inline int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent)
@@ -310,13 +312,13 @@ static inline int check_extent_read(NCAC_req_t *ncac_req, struct extent *extent)
     return 0;
 }
 
-static inline void increase_read_reference(struct extent *extent)
+static void increase_read_reference(struct extent *extent)
 {
     extent->reads ++;
     return;
 }
 
-static inline int add_extent_to_cache(struct extent * extent,
+static int add_extent_to_cache(struct extent * extent,
             unsigned long index, NCAC_req_t *ncac_req, int policy)
 {
     int ret;

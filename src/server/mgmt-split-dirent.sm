@@ -308,7 +308,7 @@ static inline int PINT_get_object_ref_mgmt_split_dirent(
     *fs_id = req->u.mgmt_split_dirent.fs_id;
     *handle = req->u.mgmt_split_dirent.dest_dirent_handle;
     return 0;
-};
+}
 
 static int perm_mgmt_split_dirent(PINT_server_op *s_op)
 {

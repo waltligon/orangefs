@@ -93,7 +93,7 @@ void dbpf_op_queue_add(dbpf_op_queue_p op_queue,
 {
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG, 
                  "op_queue add: %p\n",
-                 dbpf_op);
+                 (void *)dbpf_op);
 
     qlist_add_tail(&dbpf_op->link, op_queue);
 }
@@ -380,7 +380,7 @@ int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
         if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
         {
             PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id,
-                           *qop_p->op.u.d_create.out_handle_p);
+                    *qop_p->op.u.d_create.out_handle_p);
         }
         else
         {

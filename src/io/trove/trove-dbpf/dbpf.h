@@ -147,8 +147,8 @@ do {                                                                     \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
-inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
-inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
+int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
+int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
@@ -435,23 +435,14 @@ struct dbpf_bstream_rw_list_op
     void *queued_op_ptr;
 };
 
-inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-                                TROVE_handle handle,
-                                char **mem_offset_array,
-                                TROVE_size *mem_size_array,
-                                int mem_count,
-                                TROVE_offset *stream_offset_array,
-                                TROVE_size *stream_size_array,
-                                int stream_count,
-                                TROVE_size *out_size_p,
-                                TROVE_ds_flags flags,
-                                TROVE_vtag_s *vtag,
-                                void *user_ptr,
-                                TROVE_context_id context_id,
-                                TROVE_op_id *out_op_id_p,
-                                int opcode,
-                                struct dbpf_aio_ops * aio_ops,
-                                PVFS_hint  hints);
+int dbpf_bstream_rw_list(TROVE_coll_id coll_id, TROVE_handle handle,
+        char **mem_offset_array, TROVE_size *mem_size_array,
+        int mem_count, TROVE_offset *stream_offset_array,
+        TROVE_size *stream_size_array, int stream_count,
+        TROVE_size *out_size_p, TROVE_ds_flags flags,
+        TROVE_vtag_s *vtag, void *user_ptr, TROVE_context_id context_id,
+        TROVE_op_id *out_op_id_p, int opcode,
+        struct dbpf_aio_ops *aio_ops, PVFS_hint hints);
 
 enum dbpf_key_type
 {
@@ -664,22 +655,22 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define DBPF_EVENT_START(__coll_p, __q_op_p, __event_type, __event_id, args...) \
-    if(__coll_p->immediate_completion)                                          \
-    {                                                                           \
-        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
-                         ## args);                                              \
-    }                                                                           \
-    else                                                                        \
-    {                                                                           \
-        __q_op_p->event_type = __event_type;                                    \
-        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
-                         ## args);                                              \
-        *(__event_id) = __q_op_p->event_id;                                     \
+#define DBPF_EVENT_START(_coll_p, _q_op_p, _event_type, _event_id, ...) \
+    if(_coll_p->immediate_completion)                         \
+    {                                                         \
+        PINT_EVENT_START(_event_type, dbpf_pid, NULL,         \
+                _event_id, __VA_ARGS__);                      \
+    }                                                         \
+    else                                                      \
+    {                                                         \
+        _q_op_p->event_type = _event_type;                    \
+        PINT_EVENT_START(_event_type, dbpf_pid, NULL,         \
+                _event_id, __VA_ARGS__);                      \
+        *(_event_id) = _q_op_p->event_id;                     \
     }
 
-#define DBPF_EVENT_END(__event_type, __event_id) \
-    PINT_EVENT_END(__event_type, dbpf_pid, NULL, __event_id)
+#define DBPF_EVENT_END(_event_type, _event_id) \
+    PINT_EVENT_END(_event_type, dbpf_pid, NULL, _event_id)
 
 extern struct dbpf_storage *my_storage_p;
 

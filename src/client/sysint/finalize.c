@@ -5,9 +5,7 @@
  */
 
 /* System Interface Finalize Implementation */
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
+#include <stdlib.h>
 
 #include "pvfs2-internal.h"
 #include "pint-sysint-utils.h"

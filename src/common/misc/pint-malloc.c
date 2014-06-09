@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 
-#ifdef HAVE_MALLOC_H
+#ifdef HAVE_MEMALIGN
 #include <malloc.h>
 #endif
 
@@ -66,9 +66,10 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
-
 {
-#ifdef __DARWIN__
+#ifdef HAVE_MEMALIGN
+    return memalign(alignment, size);
+#else
     void *ptr;
     int rc;
     rc = posix_memalign(&ptr, alignment, size);
@@ -80,8 +81,6 @@ void *clean_memalign(size_t alignment, size_t size)
     {
         return NULL;
     }
-#else
-    return memalign(alignment, size);
 #endif
 }
 
@@ -102,7 +101,7 @@ char *clean_strndup(const char *str, size_t n)
 
 void clean_free(void *ptr)
 {
-    return free(ptr);
+    free(ptr);
 }
 
 /* These need to be after the clean functions which should call whatever
@@ -258,18 +257,18 @@ static inline void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
     {
-        return glibc_malloc_ops.free(mem);
+        glibc_malloc_ops.free(mem);
     }
     else
     {
         init_glibc_malloc();
         if (glibc_malloc_ops.free)
         {
-            return glibc_malloc_ops.free(mem);
+            glibc_malloc_ops.free(mem);
         }
         else
         {
-            return free(mem);
+            free(mem);
         }
     }
 }
@@ -363,7 +362,21 @@ void *PINT_malloc(size_t size)
 
 void *PINT_calloc(size_t nmemb, size_t size)
 {
-    return PINT_malloc(nmemb * size);
+    size_t total;
+    void *p;
+    total = nmemb*size;
+    /* Check for overflow. */
+    if (total < nmemb || total < size)
+    {
+        return NULL;
+    }
+    p = PINT_malloc(total);
+    if (p == NULL)
+    {
+        return p;
+    }
+    memset(p, 0, total);
+    return p;
 }
 
 int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
@@ -615,15 +628,16 @@ void init_glibc_malloc(void)
         libc_handle = RTLD_DEFAULT;
     }
     /* this structure defined in common/misc/pint-malloc.h */
-    glibc_malloc_ops.malloc = dlsym(libc_handle, "malloc");
-    glibc_malloc_ops.calloc = dlsym(libc_handle, "calloc");
-    glibc_malloc_ops.posix_memalign = dlsym(libc_handle, "posix_memalign");
-    glibc_malloc_ops.memalign = dlsym(libc_handle, "memalign");
-    glibc_malloc_ops.valloc = dlsym(libc_handle, "valloc");
-    glibc_malloc_ops.realloc = dlsym(libc_handle, "realloc");
-    glibc_malloc_ops.strdup = dlsym(libc_handle, "strdup");
-    glibc_malloc_ops.strndup = dlsym(libc_handle, "strndup");
-    glibc_malloc_ops.free = dlsym(libc_handle, "free");
+    *(void **)(&glibc_malloc_ops.malloc) = dlsym(libc_handle, "malloc");
+    *(void **)(&glibc_malloc_ops.calloc) = dlsym(libc_handle, "calloc");
+    *(void **)(&glibc_malloc_ops.posix_memalign) = dlsym(libc_handle,
+            "posix_memalign");
+    *(void **)(&glibc_malloc_ops.memalign) = dlsym(libc_handle, "memalign");
+    *(void **)(&glibc_malloc_ops.valloc) = dlsym(libc_handle, "valloc");
+    *(void **)(&glibc_malloc_ops.realloc) = dlsym(libc_handle, "realloc");
+    *(void **)(&glibc_malloc_ops.strdup) = dlsym(libc_handle, "strdup");
+    *(void **)(&glibc_malloc_ops.strndup) = dlsym(libc_handle, "strndup");
+    *(void **)(&glibc_malloc_ops.free) = dlsym(libc_handle, "free");
     if (libc_handle != RTLD_DEFAULT) /* was NEXT but I think that was wrong */
     {
         dlclose(libc_handle);

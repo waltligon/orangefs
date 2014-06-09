@@ -308,11 +308,6 @@ void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
             input_buffer, input_type);
     }
-    else if (input_buffer->enc_type == -1)
-    {
-        /* invalid return from PINT_decode, quietly return */
-        ;
-    }
     else
     {
         gossip_err("PINT_decode_release: Encoder type %d is not "

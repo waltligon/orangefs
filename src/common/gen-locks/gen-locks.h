@@ -71,8 +71,8 @@ int gen_posix_cond_broadcast(pthread_cond_t *cond);
 typedef pthread_mutex_t gen_mutex_t;
 typedef pthread_t       gen_thread_t;
 typedef pthread_cond_t  gen_cond_t;
-#define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
-#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
+#define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER
 
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)

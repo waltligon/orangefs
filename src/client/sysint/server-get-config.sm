@@ -309,7 +309,7 @@ static PINT_sm_action server_get_config_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    if (ENCODING_IS_VALID(sm_p->u.get_config.mntent->encoding))
+    if (ENCODING_IS_SUPPORTED(sm_p->u.get_config.mntent->encoding))
     {
         msg_p->enc_type = sm_p->u.get_config.mntent->encoding;
     }

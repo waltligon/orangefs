@@ -24,12 +24,6 @@ struct PINT_queue_trigger
 
 static int PINT_queue_update_stats(struct PINT_queue_s *queue, int microsecs);
 
-inline static int PINT_default_compare(
-    PINT_queue_entry_t *a, PINT_queue_entry_t *b)
-{
-    return 0;
-}
-
 int PINT_queue_create(
     PINT_queue_id *qid, PINT_queue_entry_compare_callback compare)
 {
@@ -189,7 +183,7 @@ int PINT_queue_add_trigger(PINT_queue_id queue_id,
     return 0;
 }
 
-inline int PINT_queue_count(PINT_queue_id qid)
+int PINT_queue_count(PINT_queue_id qid)
 {
     struct PINT_queue_s *queue;
     int count;
@@ -226,14 +220,14 @@ static int PINT_queue_insert(PINT_queue_id qid,
         /* push it onto the front */
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: pushing entry: %p to front of queue: %p\n",
-                     __func__, &entry->link, queue);
+                     __func__, (void *)&entry->link, (void *)queue);
         qlist_add(&entry->link, &queue->entries);
     }
     else
     {
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: pushing entry: %p to back of queue: %p\n",
-                     __func__, &entry->link, queue);
+                     __func__, (void *)&entry->link, (void *)queue);
         qlist_add_tail(&entry->link, &queue->entries);
     }
 
@@ -293,7 +287,7 @@ int PINT_queue_pull(PINT_queue_id qid,
 
         gossip_debug(GOSSIP_MGMT_DEBUG,
                      "%s: removing entry: %p from queue: %p\n",
-                     __func__, &entry->link, queue);
+                     __func__, (void *)&entry->link, (void *)queue);
         qlist_del(&entry->link);
         memset(&entry->link, 0, sizeof(entry->link));
         queue->count--;
@@ -365,7 +359,7 @@ int PINT_queue_remove(PINT_queue_id queue_id,
             {
                 gossip_debug(GOSSIP_MGMT_DEBUG,
                              "%s: removing entry: %p from queue: %p\n",
-                             __func__, &e->link, queue);
+                             __func__, (void *)&e->link, (void *)queue);
                 qlist_del(&e->link);
                 memset(&e->link, 0, sizeof(e->link));
                 queue->count--;

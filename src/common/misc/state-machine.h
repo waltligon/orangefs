@@ -129,11 +129,8 @@ struct PINT_state_s
     const char *state_name;
     struct PINT_state_machine_s *parent_machine;
     enum PINT_state_code flag;
-    union
-    {
-        int (*func)(struct PINT_smcb *, job_status_s *);
-        struct PINT_state_machine_s *nested;
-    } action;
+    int (*func)(struct PINT_smcb *, job_status_s *);
+    struct PINT_state_machine_s *nested;
     struct PINT_pjmp_tbl_s *pjtbl;
     struct PINT_tran_tbl_s *trtbl;
 };

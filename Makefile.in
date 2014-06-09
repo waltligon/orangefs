@@ -102,8 +102,6 @@ ENABLE_CREDCACHE = @ENABLE_CREDCACHE@
 ENABLE_CERTCACHE = @ENABLE_CERTCACHE@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 LIB_NEEDS_LIBRT = @LIB_NEEDS_LIBRT@
-TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
-TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
 INTELC = @INTELC@
 # configure default is silent, unless --enable-verbose-build in
@@ -201,10 +199,12 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
+BUILD_CFLAGS = -std=c99 -pedantic \
+        -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
-CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
+CFLAGS = -std=c99 -pedantic \
+        -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -639,16 +639,11 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-ifdef TARGET_OS_DARWIN
-LIBRARIES_STATIC := lib/libpvfs2.a
-LIBRARIES_LIBTOOL := lib/liborangefs.la
-else
 LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
 
 LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
-endif
 
 ifdef BUILD_BMI_ONLY
 LIBRARIES_STATIC += lib/libbmi.a
@@ -1458,11 +1453,6 @@ ifneq (,$(KERNAPPSTHR))
 	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
 endif
-endif
-
-ifdef TARGET_OS_DARWIN
-#       TOC needs to be regenerated in libs after they get moved
-	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
 endif
 
 	install -d $(bindir)

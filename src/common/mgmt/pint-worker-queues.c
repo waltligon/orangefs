@@ -353,7 +353,7 @@ exit:
     qlist_add_tail(&queue->link, &w->queues);
     gen_mutex_unlock(&w->mutex);
     return ret;
-};
+}
 
 struct PINT_worker_impl PINT_worker_queues_impl =
 {

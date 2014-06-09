@@ -11,9 +11,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 #include <assert.h>
 #include <errno.h>
 #include <string.h>

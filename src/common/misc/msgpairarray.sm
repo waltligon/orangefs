@@ -26,28 +26,17 @@
 #include "server-config-mgr.h"
 #include "state-machine.h"
 
-#ifdef WIN32
-#define gossip_err_unless_quiet(format, ...) \
+#define gossip_err_unless_quiet(...) \
 do {\
     if(mop->params.quiet_flag)\
     {\
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, format, __VA_ARGS__); \
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, __VA_ARGS__); \
     }\
     else \
     {\
-        gossip_err(format, __VA_ARGS__); \
+        gossip_err(__VA_ARGS__); \
     }\
 } while(0)
-
-#else
-#define gossip_err_unless_quiet(format, f...) \
-do {\
-    if(mop->params.quiet_flag)\
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, format, ##f); \
-    else \
-        gossip_err(format, ##f); \
-} while(0)
-#endif
 
 enum
 {
@@ -115,7 +104,7 @@ static PINT_sm_action msgpairarray_init(
                                     ,smcb->base_frame,smcb->frame_count);
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
-                 "(%d msgpair(s))\n", smcb, mop->count);
+                 "(%d msgpair(s))\n", (void *)smcb, mop->count);
 
     assert(mop->count > 0);
 
@@ -172,7 +161,7 @@ static PINT_sm_action msgpairarray_post(
 
     gossip_debug(
         GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
-        "%d total message(s) with %d incomplete\n", __func__, smcb,
+        "%d total message(s) with %d incomplete\n", __func__, (void *)smcb,
         mop->count * 2, mop->params.comp_ct);
 
     js_p->error_code = 0;
@@ -211,13 +200,7 @@ static PINT_sm_action msgpairarray_post(
                 msg_p->enc_type = cur_fs->encoding;
             }
 
-            if (!ENCODING_IS_VALID(msg_p->enc_type))
-            {
-                PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
-                must_loop_encodings = 1;
-                msg_p->enc_type = (ENCODING_INVALID_MIN + 1);
-            }
-            else if (!ENCODING_IS_SUPPORTED(msg_p->enc_type))
+            if (!ENCODING_IS_SUPPORTED(msg_p->enc_type))
             {
                 PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
                 must_loop_encodings = 1;
@@ -225,8 +208,6 @@ static PINT_sm_action msgpairarray_post(
             }
 
           try_next_encoding:
-            assert(ENCODING_IS_VALID(msg_p->enc_type));
-
             ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
                               &msg_p->encoded_req, msg_p->svr_addr,
                               msg_p->enc_type);
@@ -235,11 +216,10 @@ static PINT_sm_action msgpairarray_post(
                 if (must_loop_encodings)
                 {
                     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
-                                 "encodings [%d/%d]\n", msg_p->enc_type,
-                                 ENCODING_INVALID_MAX);
+                                 "encodings [%d]\n", msg_p->enc_type);
 
                     msg_p->enc_type++;
-                    if (ENCODING_IS_VALID(msg_p->enc_type))
+                    if (ENCODING_IS_SUPPORTED(msg_p->enc_type))
                     {
                         goto try_next_encoding;
                     }
@@ -272,7 +252,7 @@ static PINT_sm_action msgpairarray_post(
         msg_p->session_tag = session_tag;
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
-                     "posting recv\n", __func__, smcb, i);
+                     "posting recv\n", __func__, (void *)smcb, i);
 
         /* post receive of response; job_id stored in recv_id */
         ret = job_bmi_recv(msg_p->svr_addr,
@@ -343,7 +323,7 @@ static PINT_sm_action msgpairarray_post(
         assert(ret == 0);
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
-                     "posting send\n", __func__, smcb, i);
+                     "posting send\n", __func__, (void *)smcb, i);
 
         /* post send of request; job_id stored in send_id */
         ret = job_bmi_send_list(msg_p->encoded_req.dest,
@@ -418,7 +398,7 @@ static PINT_sm_action msgpairarray_post_retry(
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p, wait %d ms\n",
-      __func__, smcb, mop->params.retry_delay);
+      __func__, (void *)smcb, mop->params.retry_delay);
 
     js_p->error_code = 0;  /* do not leak MSGPAIRS_RETRY through to wait */
     return job_req_sched_post_timer(
@@ -433,7 +413,7 @@ static PINT_sm_action msgpairarray_complete(
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_MSGPAIR_DEBUG,
       "%s: sm %p status_user_tag %d msgarray_count %d\n",
-      __func__, smcb, (int) js_p->status_user_tag, mop->count);
+      __func__, (void *)smcb, (int) js_p->status_user_tag, mop->count);
 
 
     /* match operation with something in the msgpair array */
@@ -514,7 +494,7 @@ static PINT_sm_action msgpairarray_completion_fn(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
-                 "completion_fn\n", smcb);
+                 "completion_fn\n", (void *)smcb);
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_completion_fn..\n");
 
     for (i = 0; i < mop->count; i++)
@@ -640,7 +620,7 @@ static PINT_sm_action msgpairarray_completion_fn(
         msg_p->complete = 1;
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
-                     "marked complete\n", __func__, smcb, i);
+                     "marked complete\n", __func__, (void *)smcb, i);
     }/*end for*/
 
     if (need_retry) {

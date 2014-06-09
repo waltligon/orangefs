@@ -366,12 +366,7 @@ int PINT_tcache_insert_entry_ex(
     }
     else
     {
-        ret = PINT_tcache_refresh_entry(tcache, tmp_entry);
-        if(ret < 0)
-        {
-            free(tmp_entry);
-            return(ret);
-        }
+        PINT_tcache_refresh_entry(tcache, tmp_entry);
     }
 
     /* add to hash table */
@@ -544,22 +539,21 @@ int PINT_tcache_delete(
  * milliseconds in the future
  * \return 0 on success, -PVFS_error on failure
  */
-int PINT_tcache_refresh_entry(
+void PINT_tcache_refresh_entry(
     struct PINT_tcache* tcache,      /**< pointer to tcache instance */
     struct PINT_tcache_entry* entry) /**< entry to refresh */
 {
-
-    if(!tcache->expiration_enabled) return 0;
-
-    gettimeofday(&entry->expiration_date, NULL);
-    entry->expiration_date.tv_sec += (tcache->timeout_msecs / 1000);
-    entry->expiration_date.tv_usec += ((tcache->timeout_msecs % 1000)*1000);
-    if(entry->expiration_date.tv_usec > 1000000)
+    if (tcache->expiration_enabled)
     {
-        entry->expiration_date.tv_usec -= 1000000;
-        entry->expiration_date.tv_sec += 1;
+        gettimeofday(&entry->expiration_date, NULL);
+        entry->expiration_date.tv_sec += (tcache->timeout_msecs / 1000);
+        entry->expiration_date.tv_usec += ((tcache->timeout_msecs % 1000)*1000);
+        if (entry->expiration_date.tv_usec > 1000000)
+        {
+            entry->expiration_date.tv_usec -= 1000000;
+            entry->expiration_date.tv_sec += 1;
+        }
     }
-    return(0);
 }
 
 

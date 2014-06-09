@@ -80,7 +80,7 @@ id          [_a-zA-Z][_0-9a-zA-Z]*
 "\%\%"		{BEGIN(CODE);}
 
 <CODE>"\%\%"	{fprintf(out_file,"#ifndef WIN32\n");
-                 fprintf(out_file,"# %d \"%s\"\n", line-1, in_file_name);
+                 fprintf(out_file,"#line %d \"%s\"\n", line-1, in_file_name);
                  fprintf(out_file,"#endif\n");
                  BEGIN(0);}
 

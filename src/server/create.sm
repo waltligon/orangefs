@@ -7,12 +7,15 @@
 #include <string.h>
 #include <assert.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-config.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-types.h"
 #include "pint-util.h"
 #include "pint-cached-config.h"
 #include "pint-security.h"
@@ -209,10 +212,10 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
     {
-        for(i=0; i<layout->server_list.count; i++)
+        for(i=0; i<layout->count; i++)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
-                i, lld(layout->server_list.servers[i])); 
+                i, lld(layout->servers[i])); 
         }
     }
 
@@ -895,9 +898,9 @@ static inline int PINT_get_object_ref_create(
     *fs_id = req->u.create.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
-PINT_GET_CREDENTIAL_DEFINE(create);
+PINT_GET_CREDENTIAL_DEFINE(create)
 
 static int perm_create(PINT_server_op *s_op)
 {

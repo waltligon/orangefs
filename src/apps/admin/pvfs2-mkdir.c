@@ -37,7 +37,7 @@ struct options
 {
     char ** dir_array;  /* array of directories to create */
     int     numdirs; /* number of directories to create */
-    int     mode;    /* mode of directories */
+    unsigned int mode;    /* mode of directories */
     int     init_num_dirdata; /* init num of dirdata handles */
     int     max_num_dirdata; /* max num of dirdata handles */
     int     split_size;

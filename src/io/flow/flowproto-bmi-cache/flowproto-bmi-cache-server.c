@@ -893,7 +893,7 @@ static void cache_write_callback_fn(void *user_ptr,
 #endif
 
 	return;
-};
+}
 
 
 
@@ -967,7 +967,7 @@ static void cache_read_callback_fn(void *user_ptr,
 #endif
 
 	return;
-};
+}
 
 /* bmi_send_callback_fn()
  *

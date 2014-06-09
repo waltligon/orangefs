@@ -976,7 +976,7 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
 }
 
 
-PINT_GET_OBJECT_REF_DEFINE(mgmt_create_root_dir);
+PINT_GET_OBJECT_REF_DEFINE(mgmt_create_root_dir)
 
 static int perm_mgmt_create_root_dir(PINT_server_op *s_op)
 {
