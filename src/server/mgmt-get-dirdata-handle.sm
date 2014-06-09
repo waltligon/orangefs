@@ -70,7 +70,7 @@ static int mgmt_get_dirdata_handle_from_parent(
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
     s_op->u.mgmt_get_dirdata_handle.keyval_temp_array = malloc(
-                            OSASZ(1, s_op->metasidcnt);
+                            OSASZ(1, s_op->metasidcnt));
     s_op->val.buffer = s_op->u.mgmt_get_dirdata_handle.keyval_temp_array;
     s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
@@ -101,7 +101,7 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     if (js_p->error_code == 0)
     {
         if(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array){
-            s_ops_op->resp.u.mgmt_get_dirdata_handle.handle =
+            s_op->resp.u.mgmt_get_dirdata_handle.handle =
                 (PVFS_handle) s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[0].oid;
             s_op->resp.u.mgmt_get_dirdata_handle.sid_array = 
                         malloc(SASZ(s_op->metasidcnt));
