@@ -232,7 +232,7 @@ public class OrangeFileSystem extends FileSystem {
             OFSLOG.debug("stat(" + makeAbsolute(f) + ") returned null");
             throw new FileNotFoundException();
         }
-        isdir = (orange.posix.isDir(stats.st_mode) == 0);
+        isdir = orange.posix.isDir(stats.st_mode) == 1;
         OFSLOG.debug("file/directory=" + (isdir ? "directory" : "file"));
         /* Get UGO permissions out of st_mode... */
         intPermission = stats.st_mode & 0777;

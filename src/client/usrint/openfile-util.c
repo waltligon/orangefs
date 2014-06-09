@@ -791,9 +791,9 @@ static void signal_handler(int sig)
     (*default_handler[sig])(sig);
 }
 
-/** sets up signal handlers to run cleanup on abort
- *  abort (via various sources) does not run destructors
- *  and thus we need to try to catch those and run it ourselves
+/** sets up signal handlers to run cleanup on abort.
+ *  Abort (via various sources) does not run destructors
+ *  and thus we need to try to catch those and run it ourselves.
  *  The application might replace these handlers - they SHOULD call our
  *  handler after theirs (unless they recover from the abort) but they
  *  might not.  Not much we can do if they don't.  This should run
@@ -1230,7 +1230,7 @@ static int init_usrint_internal(void)
 #endif
 
     /* create handlers to run cleanup before aborting */
-    init_signal_handlers();
+    //init_signal_handlers();
 
     init_debug("finished with initialization\n");
 
