@@ -35,9 +35,6 @@
 #define snprintf    _snprintf
 #endif
 
-/* TODO: this can be larger after system interface readdir logic
- * is in place to break up large readdirs into multiple operations
- */
 /* MAX_NUM_DIRENTS cannot be any larger than PVFS_REQ_LIMIT_LISTATTR */
 #define MAX_NUM_DIRENTS  60
 
@@ -522,7 +519,6 @@ int do_list(
 {
     int i = 0, printed_dot_info = 0;
     int ret = -1;
-    int pvfs_dirent_incount;
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
@@ -567,7 +563,6 @@ int do_list(
 
     ref.handle = lk_response.ref.handle;
     ref.fs_id = fs_id;
-    pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
@@ -614,13 +609,13 @@ int do_list(
 
     if (do_timing)
         begin = Wtime();
-    token = 0;
+    token = PVFS_ITERATE_START;
     do
     {
         memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
         ret = PVFS_sys_readdirplus(
-                ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials,
+                ref, token,
+                MAX_NUM_DIRENTS, &credentials,
                 (opts->list_long) ? 
                 PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
                 &rdplus_response,
@@ -717,7 +712,7 @@ int do_list(
             rdplus_response.attr_array = NULL;
         }
 
-    } while(rdplus_response.pvfs_dirent_outcount == pvfs_dirent_incount);
+    } while (token != PVFS_ITERATE_END);
     if (do_timing) {
         end = Wtime();
         printf("PVFS_sys_readdirplus took %g msecs\n", 
