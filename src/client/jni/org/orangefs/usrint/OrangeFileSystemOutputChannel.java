@@ -50,8 +50,11 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
             if (ret < 0) {
                 throw new IOException("write error");
             }
-            channelBuffer.clear();
+	/* possible bug: if the limit is accidently set to 0, then we are going to get an infinie flush()
+	*/
+        //    channelBuffer.clear();
         }
+        channelBuffer.clear();
     }
 
     @Override

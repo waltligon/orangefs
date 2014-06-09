@@ -17,6 +17,7 @@
 <!-- Put site-specific property overrides in this file. -->
 
 <configuration>
+
   <property>
     <name>mapreduce.framework.name</name>
     <value>yarn</value>
@@ -24,7 +25,7 @@
 
   <property>
     <name>yarn.app.mapreduce.am.staging-dir</name>
-    <value>ofs://localhost-orangefs:3334/job-staging-yarn/</value>
+    <value>ofs://localhost-orangefs:3334/job-staging-yarn</value>
   </property>
 
   <property>
@@ -47,4 +48,70 @@
     <value>ofs://localhost-orangefs:3334/user</value>
   </property>
 
+  <property>
+    <name>mapreduce.map.cpu.vcores</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>341</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx272m</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.cpu.vcores</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.memory.mb</name>
+    <value>682</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx545m</value>
+  </property>
+
+  <property>
+    <name>yarn.app.mapreduce.am.resource.mb</name>
+    <value>341</value>
+  </property>
+
+  <property>
+    <name>yarn.app.mapreduce.am.command-opts</name>
+    <value>-Xmx272m</value>
+  </property>
+
+  <property>
+    <name>mapreduce.task.io.sort.mb</name>
+    <value>136</value>
+  </property>
+
 </configuration>
+
+
+
+<!-- other optional configurations
+
+  <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5006</value>
+  </property>
+
+  <property>
+    <name>mapreduce.task.io.sort.factor</name>
+    <value>100</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.shuffle.parallelcopies</name>
+    <value>2</value>
+  </property>
+
+-->

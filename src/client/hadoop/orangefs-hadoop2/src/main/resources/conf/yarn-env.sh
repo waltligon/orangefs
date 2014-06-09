@@ -15,8 +15,8 @@
 
 # User for YARN daemons
 export HADOOP_YARN_USER=${USER}
-export YARN_CONF_DIR=/home/$USER/projects/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf
-export JAVA_HOME=${JAVA_HOME}
+#export YARN_CONF_DIR=/home/$USER/projects/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf
+#export JAVA_HOME=${JAVA_HOME}
 
 if [ "$JAVA_HOME" = "" ]; then
   echo "Error: JAVA_HOME is not set."

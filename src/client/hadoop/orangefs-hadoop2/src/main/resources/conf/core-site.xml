@@ -33,9 +33,7 @@
   <property>
     <name>fs.AbstractFileSystem.ofs.impl</name>
     <value>org.apache.hadoop.fs.ofs.OrangeFs</value>
-    <description>
-      The file system for OrangeFS (ofs:) uris.
-    </description>
+    <description> The file system for OrangeFS (ofs:) uris.</description>
   </property>
 
   <property>
