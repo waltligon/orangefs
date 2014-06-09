@@ -70,13 +70,9 @@ static int mgmt_get_dirdata_handle_from_parent(
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
     s_op->u.mgmt_get_dirdata_handle.keyval_temp_array = malloc(
-                            sizeof(PVFS_handle) *
-                            sizeof(PVFS_SID) *
-                            s_op->metasidcnt);
+                            OSASZ(1, s_op->metasidcnt);
     s_op->val.buffer = s_op->u.mgmt_get_dirdata_handle.keyval_temp_array;
-    s_op->val.buffer_sz = sizeof(PVFS_handle) *
-                          sizeof(PVFS_SID) *
-                          s_op->metasidcnt;
+    s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
@@ -104,15 +100,17 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
-        s_op->resp.u.mgmt_get_dirdata_handle.handle =
-            (PVFS_handle) s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[0].oid;
-        s_op->resp.u.mgmt_get_dirdata_handle.sid_array = malloc(sizeof(PVFS_SID) *
-                                        s_op->metasidcnt);
-        memcpy(s_op->resp.u.mgmt_get_dirdata_handle.sid_array,
-                    (PVFS_SID *) &(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[1]),
-                    sizeof(PVFS_SID) * s_op->metasidcnt);
-        free(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array);
-        s_op->resp.u.mgmt_get_dirdata_handle.sid_count = s_op->metasidcnt;
+        if(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array){
+            s_ops_op->resp.u.mgmt_get_dirdata_handle.handle =
+                (PVFS_handle) s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[0].oid;
+            s_op->resp.u.mgmt_get_dirdata_handle.sid_array = 
+                        malloc(SASZ(s_op->metasidcnt));
+            memcpy(s_op->resp.u.mgmt_get_dirdata_handle.sid_array,
+                        (PVFS_SID *) &(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[1]),
+                        SASZ(s_op->metasidcnt));
+            free(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array);
+            s_op->resp.u.mgmt_get_dirdata_handle.sid_count = s_op->metasidcnt;
+        }
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "  Found dirdata handle %s of parent %s\n",
             PVFS_OID_str(&s_op->resp.u.mgmt_get_dirdata_handle.handle),
