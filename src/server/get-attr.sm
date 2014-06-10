@@ -1435,14 +1435,6 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = PINT_set_capability_id(&resp_attr->capability);
-    if (ret < 0)
-    {
-        gossip_err("%s: could not set capability id\n", __func__);
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
     resp_attr->capability.num_handles = 1;
 
     if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
@@ -1519,9 +1511,19 @@ static PINT_sm_action getattr_create_capability(
 #if defined(ENABLE_CAPCACHE) && defined(ENABLE_SECURITY_MODE)
     /* if capability fields match cached capability, use
        signature from that capability */
-    ret = PINT_capcache_quick_sign(&resp_attr->capability);
+    ret = PINT_capcache_reuse_capability(&resp_attr->capability);
     if (ret != 0)
     {
+        /* set the capability id */
+        ret = PINT_set_capability_id(&resp_attr->capability);
+        if (ret < 0)
+        {
+            gossip_err("%s: could not set capability id\n", __func__);
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        /* sign the capability */
         gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
                      "getattr: signing capability...\n");
         ret = PINT_sign_capability(&resp_attr->capability);
@@ -1530,7 +1532,8 @@ static PINT_sm_action getattr_create_capability(
     {
         /* no need to insert capability into cache */
         gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
-                     "getattr: used quick sign\n");
+                     "getattr: reused cap %llx\n", 
+                     llu(resp_attr->capability.cap_id));
         insert_flag = 0;
     }
 #else

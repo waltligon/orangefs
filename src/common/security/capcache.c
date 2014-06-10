@@ -257,6 +257,21 @@ int PINT_capcache_lookup_by_cap(PVFS_capability *cap,
     capcache_data_t cmp_data, *data;
     int ret, int_flags;
 
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* this is a server-to-server cap that is not cached */
+    if (cap->handle_array == NULL)
+    {
+        if (cap_flags != NULL)
+        {
+            cap_flags = 0;
+        }
+        return CAPCACHE_LOOKUP_NOT_FOUND;
+    }
+
 #ifdef ENABLE_REVOCATION
     /* check revocation list for revoked cap */
     rev_entry = PINT_revlist_lookup(cap->cap_id);
@@ -469,7 +484,7 @@ int PINT_capcache_lookup_by_handle(PVFS_handle handle,
     PVFS_capability *cap, *dup_cap, **int_cap_array;
     int cap_i, ret;
 
-    if (cap_array == NULL || num_caps == NULL)
+    if (handle == 0 || cap_array == NULL || num_caps == NULL)
     {
         return -PVFS_EINVAL;
     }
@@ -586,6 +601,17 @@ int PINT_capcache_insert(PVFS_capability *cap, int cap_flags)
     capcache_data_t *data;
     int ret = 0;
 
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* do not insert cap with no handles (server-to-server cap) */
+    if (cap->num_handles == 0 || cap->handle_array == NULL)
+    {
+        return 0;
+    }
+
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "Capability cache: inserting cap "
                  "%llx\n", llu(cap->cap_id));
 
@@ -669,6 +695,8 @@ static int PINT_capcache_compare_quick(void *data,
 /** PINT_capcache_quick_sign
  * Copy signature from cached capability if fields match
  */
+#if 0
+/* TODO: remove *************/
 int PINT_capcache_quick_sign(PVFS_capability *cap)
 {
     seccache_entry_t *curr_entry = NULL;
@@ -725,6 +753,77 @@ int PINT_capcache_quick_sign(PVFS_capability *cap)
 
     return 0;
 }
+#endif /* 0 */
+
+int PINT_capcache_reuse_capability(PVFS_capability *cap)
+{
+    seccache_entry_t *curr_entry = NULL;
+    capcache_data_t cmp_data;
+    uint16_t index = 0;
+    PVFS_capability *curr_cap;
+
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* do not reuse server-to-server cap */
+    if (cap->num_handles == 0 || cap->handle_array == NULL)
+    {
+        return 1;
+    }
+
+    /* fill in data for comparison */
+    cmp_data.cap = cap;
+    cmp_data.flags = 0;
+    cmp_data.handle = cap->handle_array[0];
+
+    PINT_seccache_lock(capcache);
+
+    /* get the index of the hash table chain */
+    index = capcache->methods.get_index(&cmp_data, capcache->hash_limit);
+
+    /* iterate over the hash table chain at the calculated index until a match
+     * is found.
+     */
+    curr_entry = (seccache_entry_t *) PINT_llist_search(
+        capcache->hash_table[index],
+        &cmp_data,
+        &PINT_capcache_compare_quick);
+
+    /* release the lock */
+    PINT_seccache_unlock(capcache);
+
+    if (curr_entry != NULL)
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry found\n",
+                     __func__);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: no entry\n",
+                     __func__);
+        return 1;
+    }
+
+    /* copy capability id, timeout & signature */
+    curr_cap = CAPCACHE_ENTRY_CAP(curr_entry);
+    /* check timeout */
+    if (PINT_util_get_current_time() >= curr_cap->timeout)
+    {
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry timed out\n",
+                     __func__);
+        return 1;
+    }
+    cap->cap_id = curr_cap->cap_id;
+    cap->timeout = curr_cap->timeout;
+    cap->sig_size = curr_cap->sig_size;
+    memcpy(cap->signature, curr_cap->signature, 
+           curr_cap->sig_size);
+
+    return 0;
+}
+
 #endif /* ENABLE_SECURITY_MODE */
 
 #ifdef ENABLE_REVOCATION
@@ -740,6 +839,11 @@ int PINT_capcache_revoke_cap(PVFS_handle handle,
 
     gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: revoking cap %llx\n", 
                  __func__, llu(cap_id));
+
+    if (handle == 0 || cap_id == 0)
+    {
+        return -PVFS_EINVAL;
+    }
 
     /* lookup cap on id list */
     /* TODO: remove
@@ -821,7 +925,6 @@ int PINT_capcache_revoke_cap(PVFS_handle handle,
  */
 int PINT_capcache_init(void)
 {
-
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing capability cache...\n");
 
     capcache = PINT_seccache_new("Capability", &capcache_methods, 0);

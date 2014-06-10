@@ -66,7 +66,8 @@ int PINT_capcache_insert(PVFS_capability *cap,
                          int cap_flags);
 
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
-int PINT_capcache_quick_sign(PVFS_capability *cap);
+/* TODO: remove int PINT_capcache_quick_sign(PVFS_capability *cap); */
+int PINT_capcache_reuse_capability(PVFS_capability *cap);
 #endif
 
 #ifdef ENABLE_REVOCATION

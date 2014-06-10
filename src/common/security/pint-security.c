@@ -517,6 +517,8 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
         return -PVFS_ENOMEM;
     }
 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Generating server-to-server "
+                 "capability...\n");
     capability->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (capability->issuer == NULL)
     {
@@ -543,6 +545,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     ret = PINT_sign_capability(capability);
     if (ret < 0)
     {
+        PINT_cleanup_capability(capability);
         return -PVFS_EINVAL;
     }
     return 0;

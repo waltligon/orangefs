@@ -231,6 +231,13 @@ static PINT_sm_action setup_fn(
 
     cap->fsid = s_op->u.precreate_pool_refiller.fsid;
     cap->op_mask = PINT_CAP_BATCH_CREATE;
+    ret = PINT_set_capability_id(cap); 
+    if (ret < 0)
+    {
+        PINT_cleanup_capability(cap);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
     cap->num_handles = 0;
     cap->handle_array = NULL;
 
@@ -238,6 +245,7 @@ static PINT_sm_action setup_fn(
         (char *) malloc(strlen(user_opts->server_alias) + 3);
     if (cap->issuer == NULL)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -247,7 +255,8 @@ static PINT_sm_action setup_fn(
     ret = PINT_sign_capability(cap);
     if (ret < 0)
     {
-        js_p->error_code = -PVFS_EINVAL;
+        PINT_cleanup_capability(cap);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
         
@@ -255,6 +264,7 @@ static PINT_sm_action setup_fn(
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }
