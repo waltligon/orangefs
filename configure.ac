@@ -1912,6 +1912,7 @@ src/io/dev/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
+src/client/bgproc/module.mk
 src/client/jni/module.mk
 src/client/sysint/module.mk
 src/client/usrint/module.mk

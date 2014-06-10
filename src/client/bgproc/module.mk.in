@@ -1,0 +1,3 @@
+DIR := src/client/bgproc
+
+LIBBGPROCSRC := $(DIR)/bgproc.c

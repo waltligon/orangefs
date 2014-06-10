@@ -627,6 +627,7 @@ JNISTREAMSCHANNELSJAVA :=
 # HADOOPJAVA represents OrangeFS/Hadoop related Java files
 # TODO: commit src to Apache Hadoop
 HADOOPJAVA :=
+LIBBGPROCSRC :=
 
 ################################################################
 # Top level (default) targets
@@ -642,12 +643,12 @@ endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
 ifdef TARGET_OS_DARWIN
-LIBRARIES_STATIC := lib/libpvfs2.a
+LIBRARIES_STATIC := lib/libpvfs2.a lib/libbgproc.a
 LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
-LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
+LIBRARIES_STATIC := lib/libpvfs2.a lib/libbgproc.a lib/liborangefs.a
 
-LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
+LIBRARIES_SHARED := lib/libpvfs2.so lib/libbgproc.a lib/liborangefs.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
 endif
@@ -857,6 +858,9 @@ JNISTREAMSCHANNELSCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTREAM
 # HADOOPCLS is a list of compiled classes representing PVFS2/Hadoop related classes.
 HADOOPCLS := $(patsubst %.java,%.class, $(filter %.java, $(HADOOPJAVA)))
 
+# LIBBGPROCOBJS is the object files for libbgproc.a or libbgproc.so
+LIBBGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBBGPROCSRC)))
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
@@ -1059,6 +1063,20 @@ $(FUSE): $(FUSEOBJS) $(LIBRARIES)
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(VISMISCOBJS) $(LIBS) $(call modldflags,$<)
+
+# rule for building background process objects
+lib/libbgproc.a: $(LIBBGPROCOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(LIBBGPROCOBJS)
+
+lib/libbgproc.so: $(LIBBGPROCOBJS)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBBGPROCOBJS) $(LIBS) $(call modldflags,$<)
+
+$(BGPROCOBJS): %.o: %.c
+	$(Q) "  CC		$@"
+	$(E) $(CC) $(CFLAGS) -Isrc/client/bgproc $(call modcflags,$<) $< -c -o $@
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
