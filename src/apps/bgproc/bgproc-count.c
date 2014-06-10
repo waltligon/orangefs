@@ -12,36 +12,7 @@
 #include <stdlib.h>
 
 #include <pvfs2.h>
-
-char *bgproc_fs;
-char *bgproc_outdir;
-
-int bgproc_setup(void)
-{
-    int ret;
-
-    bgproc_fs = getenv("bgproc_fs");
-    if (!bgproc_fs)
-    {
-        fprintf(stderr, "missing environment variable bgproc_fs\n");
-        exit(EXIT_FAILURE);
-    }
-    bgproc_outdir = getenv("bgproc_outdir");
-    if (!bgproc_outdir)
-    {
-        fprintf(stderr, "missing environment variable bgproc_outdir\n");
-        exit(EXIT_FAILURE);
-    }
-
-    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_sys_initialize", ret);
-        exit(EXIT_FAILURE);
-    }
-
-    return 0;
-}
+#include <pvfs2-bgproc.h>
 
 int readtree(PVFS_fs_id fsid, PVFS_credential *cred, char *path)
 {
@@ -73,7 +44,7 @@ int readtree(PVFS_fs_id fsid, PVFS_credential *cred, char *path)
         {
             puts(readdir.dirent_array[i].d_name);
         }
-        free(readdir.dirent_array);
+/*      free(readdir.dirent_array);*/
         token = readdir.token;
     }
 
@@ -87,13 +58,13 @@ int main(void)
     PVFS_fs_id fsid;
     int ret;
 
-    if (bgproc_setup() != 0)
+    if (bgproc_setup(1) != 0)
     {
         fprintf(stderr, "could not setup bgproc\n");
         return EXIT_FAILURE;
     }
 
-    ret = PVFS_util_resolve("/mnt/orangefs", &fsid,
+    ret = PVFS_util_resolve(bgproc_fs, &fsid,
         path, PVFS_PATH_MAX);
     if (ret < 0)
     {

@@ -11,25 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-char *bgproc_fs;
-char *bgproc_outdir;
-
-int bgproc_setup(void)
-{
-    bgproc_fs = getenv("bgproc_fs");
-    if (!bgproc_fs)
-    {
-        fprintf(stderr, "missing environment variable bgproc_fs\n");
-        exit(EXIT_FAILURE);
-    }
-    bgproc_outdir = getenv("bgproc_outdir");
-    if (!bgproc_outdir)
-    {
-        fprintf(stderr, "missing environment variable bgproc_outdir\n");
-        exit(EXIT_FAILURE);
-    }
-    return 0;
-}
+#include <pvfs2-bgproc.h>
 
 int main(void)
 {
@@ -39,7 +21,7 @@ int main(void)
     FILE *f, *outf;
     double loadavg[3];
 
-    if (bgproc_setup() != 0)
+    if (bgproc_setup(0) != 0)
     {
         fprintf(stderr, "could not setup bgproc\n");
         return EXIT_FAILURE;
@@ -86,7 +68,10 @@ int main(void)
     }
 
     /* getmntent, statvfs */
-    f = fopen("/etc/mtab", "r");
+    /*f = fopen("/etc/mtab", "r");*/
+    f = NULL;
+    /* XXX: This needs to be re-written. The usrint is not supported
+     * here. */
     if (f == NULL)
     {
         perror("could not list filesystems");
