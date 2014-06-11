@@ -103,8 +103,7 @@
     <description>CLASSPATH for YARN applications. A comma-separated list of CLASSPATH entries</description>
     <name>yarn.application.classpath</name>
     <value>
-      /opt/orangefs-denton.hadoop2.trunk/lib/orangefs-hadoop2-2.9.jar,
-      /opt/orangefs-denton.hadoop2.trunk/lib/ofs_jni.jar,
+      $JNI_LIBRARY_PATH/*,
       $HADOOP_CONF_DIR,
       $HADOOP_COMMON_HOME/share/hadoop/common/*,
       $HADOOP_COMMON_HOME/share/hadoop/common/lib/*,
@@ -151,6 +150,22 @@
   <property>
     <name>yarn.nodemanager.localizer.address</name>
     <value>localhost:8060</value>
+  </property>
+
+  <property>
+    <description>CLASSPATH for YARN applications. A comma-separated list of CLASSPATH entries</description>
+    <name>yarn.application.classpath</name>
+    <value>
+      /opt/orangefs-denton.hadoop2.trunk/lib/orangefs-hadoop2-2.9.jar,
+      /opt/orangefs-denton.hadoop2.trunk/lib/ofs_jni.jar,
+      $HADOOP_CONF_DIR,
+      $HADOOP_COMMON_HOME/share/hadoop/common/*,
+      $HADOOP_COMMON_HOME/share/hadoop/common/lib/*,
+      $HADOOP_HDFS_HOME/share/hadoop/hdfs/*,
+      $HADOOP_HDFS_HOME/share/hadoop/hdfs/lib/*,
+      $HADOOP_YARN_HOME/share/hadoop/yarn/*,
+      $HADOOP_YARN_HOME/share/hadoop/yarn/lib/*
+    </value>
   </property>
 
 -->

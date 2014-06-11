@@ -93,6 +93,14 @@
     <value>136</value>
   </property>
 
+  <property>
+    <name>mapreduce.input.fileinputformat.split.minsize</name>
+    <value>67108864</value>
+    <description>
+    The minimum size chunk that map input should be split into. Note that some file formats may have minimum split sizes that take priority over this setting
+    </description>
+  </property>
+
 </configuration>
 
 

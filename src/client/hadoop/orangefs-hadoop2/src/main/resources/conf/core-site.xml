@@ -53,6 +53,12 @@
   </property>
 
   <property>
+    <name>file.blocksize</name>
+    <value>67108864</value>
+    <descrition>Block size</descrition>
+  </property>
+
+  <property>
     <name>fs.default.name</name>
     <value>ofs://localhost-orangefs:3334</value>
   </property>
