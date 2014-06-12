@@ -539,6 +539,7 @@ JNI_DIR := $(srcdir)/src/client/jni
 ORGDIR := $(JNI_DIR)/org/orangefs/usrint
 ORGDOT := org.orangefs.usrint
 COMMONS_LOGGING_JAR := `ls $(JNI_DIR)/lib/commons-logging-api-*.jar`
+JUNIT_JAR := `ls $(JNI_DIR)/lib/junit-?.*.jar`
 OFS_JNI_JAR := $(JNI_DIR)/lib/ofs_jni.jar
 JNIPOSIXHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
 JNISTDIOHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
@@ -1079,7 +1080,7 @@ $(OFS_JNI_JAR): $(JNIPOSIXCLS) $(JNISTDIOCLS) $(JNISTREAMSCHANNELSCLS)
 
 $(JNIPOSIXCLS): $(JNIPOSIXJAVA)
 	$(Q) "  JAVAC		$(JNIPOSIXCLS)"
-	$(E)$(JAVAC) -cp $(JNI_DIR) $(JNIPOSIXJAVA)
+	$(E)$(JAVAC) -cp "$(JUNIT_JAR):$(JNI_DIR)" $(JNIPOSIXJAVA)
 
 # Force the JNI posix .class files to be a dependency of the header file. 
 $(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
@@ -1093,7 +1094,7 @@ $(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR
 
 $(JNISTDIOCLS): $(JNISTDIOJAVA)
 	$(Q) "  JAVAC		$(JNISTDIOCLS)"
-	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTDIOJAVA)
+	$(E)$(JAVAC) -cp "$(JUNIT_JAR):$(JNI_DIR)" $(JNISTDIOJAVA)
 
 # Force the JNI stdio .class files to be a dependency of the header file.
 $(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)

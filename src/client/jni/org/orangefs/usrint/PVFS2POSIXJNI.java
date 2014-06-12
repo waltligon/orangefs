@@ -206,4 +206,7 @@ public class PVFS2POSIXJNI {
     public native int utimes(String path, long actime_usec, long modtime_usec);
 
     public native long write(int fd, ByteBuffer buf, long count);
+    
+    //public native int getcwd(String path, long mode);
+
 }

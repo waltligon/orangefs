@@ -882,6 +882,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj,
         jlong stream, jlong offset, jlong whence)
 {
     JNI_PFI();
+    JNI_PRINT("stream = %llu\noffset = %llu\nwhence = %llu\n",
+              (long long unsigned int) stream,
+              (long long unsigned int) offset,
+              (long long unsigned int) whence);
     jint ret = (jint) fseek((FILE *) stream, (long) offset, (int) whence);
     if (ret != 0)
     {
