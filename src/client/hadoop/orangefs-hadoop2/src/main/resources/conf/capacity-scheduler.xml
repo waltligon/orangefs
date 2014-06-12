@@ -23,7 +23,7 @@
 
   <property>
     <name>yarn.scheduler.capacity.maximum-am-resource-percent</name>
-    <value>0.1</value>
+    <value>0.3</value>
     <description>
       Maximum percent of resources in the cluster which can be used to run 
       application masters i.e. controls number of concurrent running
@@ -101,6 +101,8 @@
     <name>yarn.scheduler.capacity.node-locality-delay</name>
     <value>-1</value>
     <description>
+      Attention: this value must always be set to -1, if Hadoop and OrangeFS are deployed on seperated compute nodes 
+
       Number of missed scheduling opportunities after which the CapacityScheduler 
       attempts to schedule rack-local containers. 
       Typically this should be set to number of racks in the cluster, this 
