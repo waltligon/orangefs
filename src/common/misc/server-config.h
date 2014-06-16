@@ -84,10 +84,11 @@ typedef struct filesystem_configuration_s
     PINT_llist *root_servers; /* ptrs are type host_alias_t */
 
     /* FS level defaults - some can be overridden */
-    int default_num_dfiles;             /* num defiles for each file */
-    int metadata_replication_factor;    /* num sids for each meta object */
-    enum PVFS_flowproto_type flowproto; /* default flowprotocol */
-    enum PVFS_encoding_type encoding;   /* encoding used for messages */
+    int default_num_dfiles;               /* num defiles for each file */
+    int default_dfile_replication_factor; /* num defiles for each dfile */
+    int metadata_replication_factor;      /* num sids for each meta object */
+    enum PVFS_flowproto_type flowproto;   /* default flowprotocol */
+    enum PVFS_encoding_type encoding;     /* encoding used for messages */
 
     /*
      * misc storage hints.  may need to be a union later depending on

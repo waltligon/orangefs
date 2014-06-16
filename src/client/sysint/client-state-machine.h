@@ -123,7 +123,7 @@ typedef struct PINT_sm_getattr_state
     int keep_size_array;
     int *active_dirdata_index;
 
-    PVFS_size * size_array;
+    PVFS_size *size_array;
     PVFS_size size;
 
     int flags;
@@ -133,8 +133,7 @@ typedef struct PINT_sm_getattr_state
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
     do { \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref.fs_id = (_objref).fs_id; \
-        (_state).object_ref.handle = (_objref).handle; \
+        (_state).object_ref = _objref; \
         (_state).req_attrmask = _mask; \
         (_state).ref_type = _reftype; \
         (_state).flags = _flags; \
@@ -191,23 +190,28 @@ struct PINT_client_create_sm
     PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
-    int num_data_files;
     int user_requested_num_data_files;
     int stored_error_code;
 
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    int datafile_count;        /* metaobject stored in sm_p->object_ref */
+    PVFS_handle *metadata_handle;
+    int metadata_sid_count;
+    PVFS_SID *metadata_sid_array;
+
+    int datafile_count;
     PVFS_handle *datafile_handles;
-    int sid_count;
-    PVFS_SID *sid_array;
+    int datafile_sid_count;
+    PVFS_SID *datafile_sid_array;
 
     int stuffed;
     PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
+    int dirent_sid_count;
+    PVFS_SID *dirent_sid_array;
 
     PVFS_handle handles[2];
 };
@@ -745,59 +749,50 @@ typedef struct PINT_client_sm
 } PINT_client_sm;
 
 /* sysint post/test functions */
-PVFS_error PINT_client_state_machine_post(
-    PINT_smcb *smcb,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
+PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
+                                          PVFS_sys_op_id *op_id,
+                                          void *user_ptr);
 
-PVFS_error PINT_client_state_machine_release(
-    PINT_smcb * smcb);
+PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb);
 
-PVFS_error PINT_sys_dev_unexp(
-    struct PINT_dev_unexp_info *info,
-    job_status_s *jstat,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
+PVFS_error PINT_sys_dev_unexp(struct PINT_dev_unexp_info *info,
+                              job_status_s *jstat,
+                              PVFS_sys_op_id *op_id,
+                              void *user_ptr);
 
-PVFS_error PINT_client_state_machine_test(
-    PVFS_sys_op_id op_id,
-    int *error_code);
+PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
+                                          int *error_code);
 
-PVFS_error PINT_client_state_machine_testany(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms);
+PVFS_error PINT_client_state_machine_testany(PVFS_sys_op_id *op_id_array,
+                                             int *op_count, /* in/out */
+                                             void **user_ptr_array,
+                                             int *error_code_array,
+                                             int timeout_ms);
 
-PVFS_error PINT_client_state_machine_testsome(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms);
+PVFS_error PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
+                                              int *op_count, /* in/out */
+                                              void **user_ptr_array,
+                                              int *error_code_array,
+                                              int timeout_ms);
 
 /* exposed wrappers around the id-generator code */
-static inline int PINT_id_gen_safe_register(
-    PVFS_sys_op_id *new_id,
-    void *item)
+static inline int PINT_id_gen_safe_register(PVFS_sys_op_id *new_id,
+                                            void *item)
 {
     return id_gen_safe_register(new_id, item);
 }
 
-static inline void *PINT_id_gen_safe_lookup(
-    PVFS_sys_op_id id)
+static inline void *PINT_id_gen_safe_lookup(PVFS_sys_op_id id)
 {
     return id_gen_safe_lookup(id);
 }
 
-static inline int PINT_id_gen_safe_unregister(
-    PVFS_sys_op_id id)
+static inline int PINT_id_gen_safe_unregister(PVFS_sys_op_id id)
 {
     return id_gen_safe_unregister(id);
 }
 
-/* debugging method for getting a string macthing the op_type */
+/* debugging method for getting a string matching the op_type */
 const char *PINT_client_get_name_str(int op_type);
 
 /* used with post call to tell the system what state machine to use

@@ -89,8 +89,7 @@ machine pvfs2_io_sm
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int io_send_ack(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_send_ack (io.sm)....\n");
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -145,8 +144,7 @@ static int io_send_ack(
  *           carry out the data transfer
  *           
  */
-static PINT_sm_action io_start_flow(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action io_start_flow(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
@@ -194,8 +192,8 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
-    fs_conf = PINT_config_find_fs_id(user_opts, 
-        s_op->req->u.io.fs_id);
+    fs_conf = PINT_config_find_fs_id(user_opts, s_op->req->u.io.fs_id);
+
     if(fs_conf)
     {
         /* pick up any buffer settings overrides from fs conf */
@@ -266,8 +264,7 @@ static PINT_sm_action io_start_flow(
  *
  * Synopsis: releases the operation from the scheduler
  */
-static PINT_sm_action io_release(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action io_release(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
@@ -297,8 +294,7 @@ static PINT_sm_action io_release(
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static PINT_sm_action io_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action io_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};

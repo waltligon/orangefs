@@ -181,13 +181,16 @@ typedef enum
 
 struct PINT_server_create_op
 {
+/* V3 */
+#if 0
     const char **io_servers;
     const char **remote_io_servers;
     int num_io_servers;
-    PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
-    int handle_array_local_count;
     int handle_array_remote_count;
+#endif
+    PVFS_handle* handle_array_local; 
+    int handle_array_local_count;
     PVFS_error saved_error_code;
     int handle_index;
 };
@@ -368,6 +371,8 @@ struct PINT_server_lookup_op
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
 
+    PVFS_ID *keyval_temp_store;
+
     int dirdata_server_index;
     int dirdata_sid_index;
 };
@@ -378,7 +383,6 @@ struct PINT_server_readdir_op
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
     PVFS_ID *keyval_db_entries;
-    uint32_t metadata_sid_count;
     PVFS_size dirdata_size;
 };
 
@@ -406,6 +410,7 @@ struct PINT_server_crdirent_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
+    PVFS_ID *keyval_temp_store;
 
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
@@ -420,6 +425,7 @@ struct PINT_server_crdirent_op
     int read_all_directory_entries;
     int nentries;
     PVFS_handle *entry_handles;
+    PVFS_SID *entry_sid;
     char **entry_names;
     int num_msgs_required;
     split_msg_boundary *msg_boundaries;
@@ -432,6 +438,7 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
+    PVFS_SID *sid_array;
     PVFS_size dirent_count;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -440,12 +447,10 @@ struct PINT_server_rmdirent_op
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
-    PVFS_handle old_dirent_handle;
+    PVFS_handle *old_dirent_handle;      /* buffer for old info from dirent */
     PVFS_SID *old_sid_array;
     int32_t old_sid_count;
-    PVFS_handle new_dirent_handle;
-    PVFS_SID *new_sid_array;
-    int32_t new_sid_count;
+    
     int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -487,7 +492,12 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
-/* WBL V# removing precreate */
+struct PINT_server_mgmt_split_dirent_op
+{
+    PVFS_ID *keyval_temp_store;
+};
+
+/* WBL V3 removing precreate */
 #if 0
 struct PINT_server_precreate_pool_refiller_op
 {
@@ -516,7 +526,8 @@ struct PINT_server_batch_remove_op
 
 struct PINT_server_mgmt_get_dirdata_op
 {
-    PVFS_handle dirdata_handle;
+    PVFS_ID *keyval_temp_array;
+
     PVFS_SID *sid_array;
     int sid_count;
 };
@@ -626,6 +637,7 @@ struct PINT_server_tree_communicate_op
 struct PINT_server_mgmt_get_dirent_op
 {
     PVFS_handle handle;
+    PVFS_ID *keyval_temp_store;
 };
 
 struct PINT_server_mgmt_create_root_dir_op
@@ -684,13 +696,14 @@ typedef struct PINT_server_op
     PVFS_object_attr attr;
 
     PVFS_BMI_addr_t addr;   /* address of client that contacted us */
-    bmi_msg_tag_t tag; /* operation tag */
+    bmi_msg_tag_t tag;      /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
     struct PVFS_server_req *req; 
     struct PVFS_server_resp resp; 
+
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
@@ -707,6 +720,9 @@ typedef struct PINT_server_op
     enum PINT_server_sched_policy sched_policy;
 
     int num_pjmp_frames;
+
+    /* Used just about everywhere so this is a std place to keep it */
+    uint32_t metasidcnt; /* number of sids per handle for metadata */
 
     union
     {
@@ -729,6 +745,7 @@ typedef struct PINT_server_op
         struct PINT_server_truncate_op truncate;
         struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
+        struct PINT_server_mgmt_split_dirent_op mgmt_split_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
 /*
         struct PINT_server_precreate_pool_refiller_op

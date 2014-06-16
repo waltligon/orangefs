@@ -18,6 +18,13 @@
 #define DW(x,y) (((uint64_t)(x))>>(y))
 #define SW(x,y) (((uint32_t)(x))>>(y))
 
+/* size of OID array of size n */
+#define OASZ(n) ((n) * sizeof(PVFS_OID))
+/* size of SID array of size m */
+#define SASZ(m) ((m) * sizeof(PVFS_SID))
+/* size of OID array of size n with m SIDs per OID */
+#define OSASZ(n,m) ((n) * (OASZ(1) + SASZ(m)))
+
 /* uuid_t is an unsigned char[16] array and thus passes by reference */
 
 /** Unique identifier for a server on a PVFS3 file system  128-bit */
@@ -97,6 +104,13 @@ static __inline__ int PVFS_OID_cmp(const PVFS_OID *oid1, const PVFS_OID *oid2)
 {
     return uuid_compare(oid1->u, oid2->u);
 }
+
+#define PVFS_OID_EQ(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) == 0)
+#define PVFS_OID_NE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) != 0)
+#define PVFS_OID_GT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) > 0)
+#define PVFS_OID_GE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) >= 0)
+#define PVFS_OID_LT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) < 0)
+#define PVFS_OID_LE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <=0)
 
 static __inline__ void PVFS_OID_cpy(PVFS_OID *dst, const PVFS_OID *src)
 {
@@ -188,6 +202,13 @@ static __inline__ int PVFS_SID_cmp(const PVFS_SID *sid1, const PVFS_SID *sid2)
 {
     return uuid_compare(sid1->u, sid2->u);
 }
+
+#define PVFS_SID_EQ(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) == 0)
+#define PVFS_SID_NE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) != 0)
+#define PVFS_SID_GT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) > 0)
+#define PVFS_SID_GE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) >= 0)
+#define PVFS_SID_LT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) < 0)
+#define PVFS_SID_LE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) <=0)
 
 static __inline__ void PVFS_SID_cpy(PVFS_SID *dst, const PVFS_SID *src)
 {

@@ -56,7 +56,7 @@ struct PVFS_ds_datafile_attr_s
     PVFS_size b_size; /* bstream size */
 };
 
-/* this is the same as the clien/memory side attr structure */
+/* this is the same as the client/memory side attr structure */
 struct PVFS_ds_directory_attr_s
 {
     /* global info */
@@ -74,7 +74,18 @@ struct PVFS_ds_directory_attr_s
 
 struct PVFS_ds_dirdata_attr_s
 {
-    uint64_t count; /* number of entries in the dirdata? */
+    uint64_t count;        /* number of dirents in this dirdata */
+    /* global info */
+    int32_t tree_height;   /* ceil(log2(dirdata_count)) */
+    int32_t dirdata_count; /* total number of servers */
+    int32_t sid_count;     /* number of SIDs total */
+    int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
+                           /* stored under the key DIST_DIR_BITMAP */
+    int32_t split_size;    /* maximum number of entries before a split */
+    /* local info */
+    int32_t server_no;     /* 0 to dirdata_count-1, indicates */
+                           /* which server is running this code */
+    int32_t branch_level;  /* level of branching on this server */
 };
 
 /* dataspace attributes that are not explicitly stored within the

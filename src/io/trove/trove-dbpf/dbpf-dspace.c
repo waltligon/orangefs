@@ -1419,6 +1419,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                      PINT_HINT_GET_OP_ID(hints));
 
    /* initialize op-specific members */
+    ds_attr_p->fs_id = coll_id;
+    ds_attr_p->handle = handle;
     op_p->u.d_setattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 

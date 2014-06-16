@@ -29,7 +29,7 @@ int PVFS_sys_getparent(
         return ret;
     }
 
-    if (PINT_get_base_dir(entry_name,parent_buf,PVFS_NAME_MAX))
+    if (PINT_get_base_dir(entry_name, parent_buf, PVFS_NAME_MAX))
     {
         if (entry_name[0] != '/')
         {
@@ -38,9 +38,13 @@ int PVFS_sys_getparent(
         return ret;
     }
 
-    memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
-    ret = PVFS_sys_lookup(fs_id, parent_buf, credential,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW, hints);
+    memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));
+    ret = PVFS_sys_lookup(fs_id,
+                          parent_buf,
+                          credential,
+                          &resp_look,
+                          PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                          hints);
     if (ret)
     {
         gossip_err("Lookup failed on %s\n",parent_buf);

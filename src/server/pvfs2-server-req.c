@@ -162,8 +162,9 @@ PINT_server_req_get_sched_policy(struct PVFS_server_req *req)
     return PINT_server_req_table[req->op].params->sched_policy;
 }
 
-int PINT_server_req_get_object_ref(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
+                                   PVFS_fs_id *fs_id,
+                                   PVFS_handle *handle)
 {
     CHECK_OP(req->op);
 
@@ -176,12 +177,14 @@ int PINT_server_req_get_object_ref(
     else
     {
         return PINT_server_req_table[req->op].params->get_object_ref(
-            req, fs_id, handle);
+                                                      req,
+                                                      fs_id,
+                                                      handle);
     }
 }
 
-int PINT_server_req_get_credential(
-    struct PVFS_server_req *req, PVFS_credential **cred)
+int PINT_server_req_get_credential(struct PVFS_server_req *req,
+                                   PVFS_credential **cred)
 {
     int ret;
     CHECK_OP(req->op);
@@ -193,8 +196,7 @@ int PINT_server_req_get_credential(
     }
     else
     {
-        ret = PINT_server_req_table[req->op].params->get_credential(
-            req, cred);
+        ret = PINT_server_req_table[req->op].params->get_credential(req, cred);
     }
 
     return ret;

@@ -184,6 +184,7 @@ struct bmi_optimistic_buffer_info {
 #define BMI_EADDRNTFD	    ((5|BMI_NON_ERROR_BIT) | BMI_ERROR)
 #define BMI_ENORECVR	    ((6|BMI_NON_ERROR_BIT) | BMI_ERROR)
 #define BMI_ETRYAGAIN	    ((7|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_NOTINITIALIZED  ((8|BMI_NON_ERROR_BIT) | BMI_ERROR)
 
 /** default bmi error translation function */
 int bmi_errno_to_pvfs(int error);

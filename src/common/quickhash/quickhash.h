@@ -76,8 +76,7 @@ static inline struct qhash_table *qhash_init(
     struct qhash_table *new_table = NULL;
 
     /* create struct to contain table information */
-    new_table = (struct qhash_table *)
-                    qhash_malloc(sizeof(struct qhash_table));
+    new_table = (struct qhash_table *)qhash_malloc(sizeof(struct qhash_table));
     if (!new_table)
     {
 	return (NULL);
@@ -90,7 +89,7 @@ static inline struct qhash_table *qhash_init(
 
     /* create array for actual table */
     new_table->array = (struct qhash_head *)
-	            qhash_malloc(sizeof(struct qhash_head) * table_size);
+	               qhash_malloc(sizeof(struct qhash_head) * table_size);
     if (!new_table->array)
     {
 	qhash_free(new_table);
@@ -159,7 +158,7 @@ static inline struct qhash_head *qhash_first(struct qhash_table *table)
     qhash_lock(&table->lock);
     for (index = 0; index < table->table_size; index++)
     {
-        if (qlist_empty(&(table->array[index])))
+        if (!qlist_empty(&(table->array[index])))
         {
             return &(table->array[index]);
         }

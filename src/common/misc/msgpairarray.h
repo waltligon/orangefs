@@ -23,27 +23,28 @@
 
 /* these are used as the status_user_tag for bmi jobs */
 typedef enum msgphase_t {
-    PVFS_MPA_SEND,
-    PVFS_MPA_RECV,
-    PVFS_MPA_FLOW,
-    PVFS_MPA_ACK
+    PVFS_MPA_SEND = 400,
+    PVFS_MPA_RECV = 401,
+    PVFS_MPA_FLOW = 402,
+    PVFS_MPA_ACK  = 403
 } msgphase_t;
 
 typedef enum msgaction_t {
-    PVFS_MPA_OK,
-    PVFS_MPA_RETRY,
-    PVFS_MPA_FAIL
+    PVFS_MPA_OK    = 100,
+    PVFS_MPA_RETRY = 101,
+    PVFS_MPA_FAIL  = 102
 } msgaction_t;
 
 extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 
 /*
-  the following values are to be used by the struct
-  PINT_sm_msgpair_state_s message's retry_flag variable
-*/
+ * the following values are to be used by the struct
+ * PINT_sm_msgpair_state_s message's retry_flag variable
+ */
 #define PVFS_MSGPAIR_RETRY          0xFE
 #define PVFS_MSGPAIR_NO_RETRY       0xFF
 
+/* used in callbacks to get the parent frame */
 #define PINT_MSGPAIR_PARENT_SM -1
 
 /*
@@ -76,11 +77,14 @@ typedef struct PINT_sm_msgpair_state_s
     /* server address - corresponds to sid_array[sid_index] */
     /* initialize to address of sid_array[0] */
     PVFS_BMI_addr_t svr_addr;
+
     /* number of sids in the array */
     /* if this is 1 should never try to access sid_array */
     int sid_count;
+
     /* which SID we are using - always initialize to 0 */
     int sid_index;
+
     /* pointer to alternate sids for the target object */
     /* if this is NULL there are no alternates, sid_count should be 1 */
     PVFS_SID *sid_array;
@@ -181,6 +185,25 @@ typedef struct PINT_sm_msgarray_op
         (op)->msgarray = &(op)->msgpair;                          \
     } while(0)
 
+/* This does not appear to be used any more - it is pre-mpa_op
+ * It should be deleted after a suitable confirmation period
+ * WBL
+ */
+#if 0
+#define PINT_init_msgpair(__sm_p, __msg_p)                           \
+do {                                                                 \
+    __msg_p = &__sm_p->msgpair;                                      \
+    memset(__msg_p, 0, sizeof(PINT_sm_msgpair_state));               \
+    if (__sm_p->msgarray && (__sm_p->msgarray != &(__sm_p->msgpair)))\
+    {                                                                \
+        free(__sm_p->msgarray);                                      \
+        __sm_p->msgarray = NULL;                                     \
+    }                                                                \
+    __sm_p->msgarray = __msg_p;                                      \
+    __sm_p->msgarray_count = 1;                                      \
+} while(0)
+#endif
+
 #define foreach_msgpair(__msgarray_op, __msg_p, __i)          \
     for(__i = 0, __msg_p = &((__msgarray_op)->msgarray[__i]); \
         __i < (__msgarray_op)->count;                         \
@@ -188,9 +211,7 @@ typedef struct PINT_sm_msgarray_op
 
 /* helper functions */
 
-int PINT_msgpairarray_init(
-    PINT_sm_msgarray_op *op,
-    int count);
+int PINT_msgpairarray_init(PINT_sm_msgarray_op *op, int count);
 
 void PINT_msgpairarray_destroy(PINT_sm_msgarray_op *op);
 
@@ -222,19 +243,6 @@ do {                                                                \
                "by using \"encoding=default\"\n", type_str);        \
     gossip_err("***********************************************"    \
                "********************\n");                           \
-} while(0)
-
-#define PINT_init_msgpair(__sm_p, __msg_p)                         \
-do {                                                           \
-    __msg_p = &__sm_p->msgpair;                                    \
-    memset(__msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
-    if (__sm_p->msgarray && (__sm_p->msgarray != &(__sm_p->msgpair)))\
-    {                                                          \
-        free(__sm_p->msgarray);                                  \
-        __sm_p->msgarray = NULL;                                 \
-    }                                                          \
-    __sm_p->msgarray = __msg_p;                                    \
-    __sm_p->msgarray_count = 1;                                  \
 } while(0)
 
 

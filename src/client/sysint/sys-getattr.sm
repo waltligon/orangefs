@@ -60,8 +60,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 static int getattr_datafile_getattr_comp_fn(void *v_p,
                                             struct PVFS_server_resp *resp_p,
                                             int index);
-static int getattr_dirdata_getattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int getattr_dirdata_getattr_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int index);
 
 %%
 
@@ -306,17 +307,18 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
 /* <======================= COMPLETION FUNCTIONS ====================> */
 
 /*
-  copies data from getattr response into the user supplied sys_attr
-  structure.  returns 0 for directories and symlinks, and
-  GETATTR_NEED_DATAFILE_SIZES for a metafile (when appropriate)
-*/
+ * copies data from getattr response into the user supplied sys_attr
+ * structure.  returns 0 for directories and symlinks, and
+ * GETATTR_NEED_DATAFILE_SIZES for a metafile (when appropriate)
+ */
 static int getattr_object_getattr_comp_fn(void *v_p,
                                           struct PVFS_server_resp *resp_p,
                                           int index)
 {
     PVFS_object_attr *attr = NULL;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -539,7 +541,8 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
                                             int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
 /* V3 this functionality moved to MPA */
 #if 0
@@ -684,6 +687,8 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     assert(PVFS_OID_cmp(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(object_ref.sid_count > 0);
+    assert(object_ref.sid_array != NULL);
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
                  "%s: handle %s fsid %d\n",
@@ -911,6 +916,8 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
 
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
     assert(PVFS_OID_cmp(&object_ref.handle, &PVFS_HANDLE_NULL));
+    assert(object_ref.sid_count > 0);
+    assert(object_ref.sid_array != NULL);
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
@@ -1490,7 +1497,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
     /* find out active dirdata handles */
     tmp_index = 0;
-    for(i=0; i<attr->u.dir.dist_dir_attr.dirdata_count; i++)
+    for(i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         if(PINT_is_dist_dir_bucket_active(&attr->u.dir.dist_dir_attr,
                     attr->u.dir.dist_dir_bitmap, i))
@@ -1564,12 +1571,17 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
 }
 
-
-static int getattr_dirdata_getattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
+/* This is called from mesgpairarray which has a PJMP and this code
+ * tries to unroll the statck, thus it must use the parent point on the
+ * smcb to correctly get back in context.
+ */
+static int getattr_dirdata_getattr_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int index)
 {   
     PINT_smcb *smcb = v_p; 
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr *attr_p = NULL;
     PVFS_object_attr *resp_attr_p = NULL;
     int cur_index;
@@ -1596,7 +1608,8 @@ static int getattr_dirdata_getattr_comp_fn(
     assert( (cur_index >= 0) &&
             (cur_index < attr_p->u.dir.dist_dir_attr.dirdata_count));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata getattr[%d] (#[%d]) returns attrs: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "dirdata getattr[%d] (#[%d]) returns attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
             index, cur_index,
             llu(resp_attr_p->u.dir.dirent_count),
@@ -1607,6 +1620,7 @@ static int getattr_dirdata_getattr_comp_fn(
     /* update timestamp and dirent_count */
     sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dir.dirent_count;
     attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
+
     if(attr_p->atime < resp_attr_p->atime)
     {   
         attr_p->atime = resp_attr_p->atime;
@@ -1631,7 +1645,8 @@ static int getattr_dirdata_getattr_comp_fn(
 }
 
 static PINT_sm_action getattr_dirdata_getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                      struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {   
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     

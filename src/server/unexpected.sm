@@ -69,8 +69,7 @@ static PINT_sm_action unexpected_post(
  * This instance will continue execution in another state machine
  * Set up another unexpected receive
  */
-static PINT_sm_action unexpected_map(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action unexpected_map(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret = 0;
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

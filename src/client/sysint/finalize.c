@@ -24,6 +24,7 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "sid.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -58,6 +59,8 @@ int PVFS_sys_finalize()
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();
+
+    SID_finalize();
 
     /* flush all known server configurations */
     PINT_server_config_mgr_finalize();

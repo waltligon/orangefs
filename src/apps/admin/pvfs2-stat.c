@@ -183,6 +183,11 @@ int main(int argc, char **argv)
    return(ret_agg);
 }
 
+/** do_stat
+ *
+ * This is where the actual work gets done.  First look up the path,
+ * then do a getattr on it.
+ */
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
@@ -195,9 +200,9 @@ static int do_stat(const char             * pszFile,
    PVFS_sysresp_getattr getattr_response;
 
    /* Initialize memory */
-   memset(&lk_response,     0, sizeof(lk_response));
-   memset(&ref,             0, sizeof(ref));
-   memset(&getattr_response,0, sizeof(getattr_response));
+   memset(&lk_response,      0, sizeof(lk_response));
+   memset(&ref,              0, sizeof(ref));
+   memset(&getattr_response, 0, sizeof(getattr_response));
    
 
    /* Do we want to follow if the file is a symbolic link */
@@ -205,17 +210,19 @@ static int do_stat(const char             * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credential *) credentials, 
+                            credentials, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+                            PVFS2_LOOKUP_LINK_FOLLOW,
+                            NULL);
    }
    else
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credential *) credentials, 
+                            credentials, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                            NULL);
    }
    
    if(ret < 0)
@@ -228,13 +235,13 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
-   ref.handle = lk_response.ref.handle;
-   ref.fs_id  = fs_id;
+   ref = lk_response.ref;
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          (PVFS_credential *) credentials, 
-                          &getattr_response, NULL);
+                          credentials, 
+                          &getattr_response,
+                          NULL);
 
    if(ret < 0)
    {                          

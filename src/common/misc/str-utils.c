@@ -238,7 +238,8 @@ int PINT_string_next_segment(char *pathname,
     return 0;
 }
 
-
+/* V3 remove - no more handlee ranges */
+#if 0
 /*
  * PINT_parse_handle_ranges:  the first time this is called, set 'status' to
  * zero.  get back the first range in the string in the out_extent
@@ -327,6 +328,7 @@ int PINT_parse_handle_ranges(
     }
     return 1;
 }
+#endif
 
 /*
  * PINT_get_path_element:  gets the specified segment in the

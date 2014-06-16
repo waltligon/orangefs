@@ -312,7 +312,7 @@ typedef struct extra_s
 {
     void     *mem;
 #if PVFS_MALLOC_MAGIC
-    uint32_t magic;
+    uint64_t magic;
 #endif
 #if PVFS_MALLOC_FREE_ZERO
     size_t   size;

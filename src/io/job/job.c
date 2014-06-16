@@ -4470,13 +4470,14 @@ int job_testcontext(job_id_t *out_id_array_p,
                                        returned_user_ptr_array,
                                        out_status_array_p,
                                        context_id);
+
         gen_mutex_unlock(&completion_mutex);
         /* return here on error or completion */
         if (ret < 0)
         {
             return (ret);
         }
-        if (ret  > 0)
+        if (ret > 0)
         {
             return (1);
         }
@@ -4641,7 +4642,7 @@ static void bmi_thread_mgr_callback(void* data,
     assert(tmp_desc);
 
     gen_mutex_lock(&initialized_mutex);
-    if(initialized == 0)
+    if (initialized == 0)
     {
         /* The job interface has been shutdown.  Silently ignore callback. */
         gen_mutex_unlock(&initialized_mutex);
@@ -4782,7 +4783,7 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
  */
 static void fill_status(struct job_desc *jd,
                         void **returned_user_ptr_p,
-                        job_status_s * status)
+                        job_status_s *status)
 {
     assert(jd);
     assert(status);

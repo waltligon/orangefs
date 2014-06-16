@@ -22,7 +22,8 @@
 
 enum {
     PVFS_OBJ_META,
-    PVFS_OBJ_DATA
+    PVFS_OBJ_DATA,
+    PVFS_OBJ_FILE
 };
 
 static int PVFS_OBJ_gen(PVFS_object_ref *obj,
@@ -108,7 +109,7 @@ static int PVFS_OBJ_gen(PVFS_object_ref *obj_array,
             goto errorout;
         }
         /* clear SID array */
-        memset(obj_array[i].sid_array, 0, sizeof(PVFS_SID) * num_copies);
+        ZEROMEM(obj_array[i].sid_array, sizeof(PVFS_SID) * num_copies);
         /* loop through servers assigning one to each SID */
         for (s = 0; s < num_copies; s++)
         {
@@ -139,72 +140,178 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    ret = SID_cache_lookup_server(SID_db, sid, &temp_cacheval);
+    ret = SID_cache_get(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;
     }
     if (temp_cacheval->bmi_addr == 0);
     {
-#if 0
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&temp_cacheval->bmi_addr, temp_cacheval->url);
         if (ret != 0)
         {
             return ret;
         }
-        ret = SID_cache_update_server(&SID_db, sid, temp_cacheval);
+        /* NULL enables overwrite of the record just looked up */
+        ret = SID_cache_put(SID_db, sid, temp_cacheval, NULL);
         if (ret != 0)
         {
             return ret;
         }
-#endif
     }
     *bmi_addr = temp_cacheval->bmi_addr;
     free(temp_cacheval);
     return ret;
 }
 
+/* These functions find servers of a given type
+ */
 static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
+                               PVFS_SID *sid,
                                uint32_t stype,
                                uint32_t flag)
 {
     int ret = 0;
-    DBT key, data;
+    DBT key, pkey, data;
     SID_cacheval_t *temp_cacheval;
 
     SID_zero_dbt(&key, &data, NULL);
+    memset(&pkey, 0, sizeof(DBT));
 
     key.data = &stype;
     key.size = sizeof(uint32_t);
    
-    ret = SID_type_cursor->get(SID_type_cursor, /* type index */
-                               &key,            /* Sid_sid_t sid */
-                               &data,           /* SID_cacheval_t struct ptr */
-                               flag);           /* get flags */
+    ret = SID_type_cursor->pget(SID_type_cursor, /* type index */
+                                &key,            /* key of secondary index  */
+                                &pkey,           /* key of primary table */
+                                &data,           /* SID_cacheval_t struct ptr */
+                                flag);           /* get flags */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                     "Error getting sid from sid cache : %s\n",
-                     db_strerror(ret));
+        if (ret != DB_NOTFOUND)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                        "Error getting sid from sid cache : %s\n",
+                        db_strerror(ret));
+        }
         return(ret);
     }
 
     /* Unmarshalling the data */
     SID_cacheval_unpack(&temp_cacheval, &data);
-    *bmi_addr = temp_cacheval->bmi_addr;
+    if (bmi_addr)
+    {
+        *bmi_addr = temp_cacheval->bmi_addr;
+    }
+    if (sid && (pkey.size >= sizeof(PVFS_SID)))
+    {
+        *sid = *(PVFS_SID *)(pkey.data);
+    }
     free(temp_cacheval);
     return(ret);
 }
 
-int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
+int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr,
+                              PVFS_SID *sid,
+                              uint32_t stype)
 {
-    return PVFS_SID_get_server(bmi_addr, stype, DB_SET);
+    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_SET);
 }
 
-int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype)
+int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
+                             PVFS_SID *sid,
+                             uint32_t stype)
 {
-    return PVFS_SID_get_server(bmi_addr, stype, DB_NEXT);
+    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_NEXT);
+}
+
+/* reads up to *n bmi addresses of type stype and sets *n to the number
+ * actually read
+ */
+static int PVFS_SID_get_server_n(PVFS_BMI_addr_t *bmi_addr,
+                                 PVFS_SID *sid,
+                                 int *n,  /* inout */
+                                 uint32_t stype,
+                                 int flag)
+{
+    int ret = 0;
+    int i = 0;
+
+    if (*n <= 0)
+    {
+        *n = 0;
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_get_server(bmi_addr, sid, stype, flag);
+    for (i = 0; (i <= *n) && !ret; i++)
+    {
+        ret = PVFS_SID_get_server(&bmi_addr[i], &sid[i], stype, DB_NEXT);
+    }
+    *n = i;
+    return ret;
+}
+
+int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr,
+                                PVFS_SID *sid,
+                                int *n,
+                                uint32_t stype)
+{
+    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_SET);
+}
+
+int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
+                               PVFS_SID *sid,
+                               int *n,
+                               uint32_t stype)
+{
+    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_NEXT);
+}
+
+/******************************************
+ * These are higher-level policy generators
+ * ****************************************/
+
+/**
+ * These routine runs various policy quieries to allocated the OIDs and
+ * SIDs needed for a file.  
+ */
+
+/**
+ * Simple default policy just picks them in order found in the DB
+ */
+int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
+                      PVFS_handle *handle,
+                      uint32_t sid_count,
+                      PVFS_SID **sid_array,
+                      uint32_t datafile_count,
+                      PVFS_handle **datafile_handles,
+                      uint32_t datafile_sid_count,
+                      PVFS_SID **datafile_sid_array)
+{
+    int ret = 0;
+    int n;
+    int i;
+
+    /* generate metadata handle */
+    PVFS_OID_gen(handle);
+    /* generate datafile handles */
+    *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
+    for (i = 0; i < datafile_count; i++)
+    {
+        PVFS_OID_gen(*datafile_handles);
+    }
+    /* generate SIDs for metadata object */
+    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
+    n = sid_count;
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, PVFS_OBJ_META);
+    /* generate SIDs for datafile objects */
+    *datafile_sid_array = (PVFS_SID *)malloc(datafile_count *
+                                             datafile_sid_count *
+                                             sizeof(PVFS_SID));
+    n = datafile_sid_count;
+    PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, PVFS_OBJ_DATA);
+    return ret;
 }
 
 /*

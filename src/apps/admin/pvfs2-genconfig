@@ -35,6 +35,7 @@ my $opt_metadata = '';
 my $opt_trovesync = '1';
 my $opt_trovemethod = '';
 my $opt_quiet = '';
+my $opt_verbose = '';
 my $opt_logging = '';
 my $opt_tracing = '';
 my $opt_logstamp = '';
@@ -415,17 +416,17 @@ sub emit_defaults
 
     if(defined($default_storage))
     {
-        print $target "\n\tDataStorageSpace " . $default_storage . "\n";
+        print $target "\tDataStorageSpace " . $default_storage . "\n";
     }
 
     if(defined($default_meta_storage))
     {
-        print $target "\tMetadataStorageSpace " . $default_meta_storage . "\n\n";
+        print $target "\tMetadataStorageSpace " . $default_meta_storage . "\n";
     }
 
     if(defined($default_config_storage))
     {
-        print $target "\tConfigStorageSpace " . $default_config_storage . "\n\n";
+        print $target "\tConfigStorageSpace " . $default_config_storage . "\n";
     }
 
     if(defined($default_logfile))
@@ -1311,9 +1312,12 @@ sub get_ionames
     my $configstorage = shift;
     my $logfile = shift;
     my $ioline = '';
-    if ($opt_ioservers) {
+    if ($opt_ioservers)
+    {
         $ioline = $opt_ioservers;
-    } else {
+    }
+    else
+    {
         print $OUT "Next you must list the hostnames of " .
                    "the I/O servers.\nAcceptable syntax is " .
                    "\"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
@@ -1331,7 +1335,10 @@ sub get_ionames
         }
         else
         {
-
+            if ($opt_verbose)
+            {
+                printf $OUT "Adding host " . $io_host . "\n";
+            }
             $all_endpoints{$io_host} = {
                 ALIAS => $io_host, 
                 TYPE => $IO_ENDPOINT,
@@ -1368,6 +1375,10 @@ sub get_metanames
         {
             foreach my $alias (keys %all_endpoints)
             {
+                if ($opt_verbose)
+                {
+                    print $OUT "Adding META to host " . $alias . "\n";
+                }
                 $all_endpoints{$alias}->{TYPE} |= $META_ENDPOINT;
             }
         }
@@ -1387,10 +1398,18 @@ sub get_metanames
     {
         if(exists $all_endpoints{$meta_host})
         {
+            if ($opt_verbose)
+            {
+                print $OUT "Adding META to host " . $meta_host . "\n";
+            }
             $all_endpoints{$meta_host}->{TYPE} |= $META_ENDPOINT;
         }
         else
         {
+            if ($opt_verbose)
+            {
+                printf $OUT "Adding host " . $meta_host . "\n";
+            }
             $all_endpoints{$meta_host} = {
                 ALIAS => $meta_host, 
                 TYPE => $META_ENDPOINT,
@@ -1429,6 +1448,10 @@ sub get_rootnames
             {
                 if($all_endpoints{$alias}->{TYPE} & $META_ENDPOINT)
                 {
+                    if ($opt_verbose)
+                    {
+                        print $OUT "Adding ROOT to host " . $alias . "\n";
+                    }
                     $all_endpoints{$alias}->{TYPE} |= $ROOT_ENDPOINT;
                 }
             }
@@ -1450,6 +1473,10 @@ sub get_rootnames
         if(exists $all_endpoints{$root_host} &&
            $all_endpoints{$root_host}->{TYPE} & $META_ENDPOINT)
         {
+            if ($opt_verbose)
+            {
+                print $OUT "Adding ROOT to host " . $root_host . "\n";
+            }
             $all_endpoints{$root_host}->{TYPE} |= $ROOT_ENDPOINT;
         }
         else
@@ -1549,6 +1576,10 @@ sub get_specs
             }
 
             my $alias = $hostname . $alias_suffix;
+            if ($opt_verbose)
+            {
+                printf $OUT "Adding host " . $alias . "\n";
+            }
             $all_endpoints{$alias} = {
                 ALIAS => $alias, 
                 TYPE => $type,
@@ -1648,6 +1679,10 @@ sub get_specs
                         }
                         else
                         {
+                            if ($opt_verbose)
+                            {
+                                printf $OUT "Adding host " . $alias . "\n";
+                            }
                             $all_endpoints{$alias} = {
                                 ALIAS => $alias, 
                                 TYPE => $type,
@@ -1671,6 +1706,10 @@ sub get_specs
                             }
                             else
                             {
+                                if ($opt_verbose)
+                                {
+                                    printf $OUT "Adding host " . $alias . "\n";
+                                }
                                 $all_endpoints{$alias} = {
                                     ALIAS => $alias,
                                     TYPE => $type,
@@ -1711,6 +1750,11 @@ sub get_specs
                                 }
                                 else
                                 {
+                                    if ($opt_verbose)
+                                    {
+                                        printf $OUT "Adding host " .
+                                                        $alias . "\n";
+                                    }
                                     $all_endpoints{$alias} = {
                                         ALIAS => $alias,
                                         TYPE => $type,
@@ -2048,6 +2092,7 @@ GetOptions('protocol=s' => \$opt_protocol,
     'metadata=s'    => \$opt_metadata,
     'help'          => \$show_help,
     'quiet!'        => \$opt_quiet,
+    'verbose'       => \$opt_verbose,
     'trovesync!'    => \$opt_trovesync,
     'trove-method=s' => \$opt_trovemethod,
     'iospec=s'      => \$opt_iospec,

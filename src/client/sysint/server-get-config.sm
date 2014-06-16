@@ -434,15 +434,15 @@ static PINT_sm_action server_get_config_parse(struct PINT_smcb *smcb,
         if (!cur_fs)
         {
             gossip_err("Warning:\n Cannot retrieve information about "
-                    "filesystem %s at tab entry: %s\n",
-                    sm_p->u.get_config.mntent->pvfs_fs_name,
-                    sm_p->u.get_config.mntent->the_pvfs_config_server);
+                       "filesystem %s at tab entry: %s\n",
+                       sm_p->u.get_config.mntent->pvfs_fs_name,
+                       sm_p->u.get_config.mntent->the_pvfs_config_server);
 
             /*
-              if the device has no space left on it, we can't save
-              the config file for parsing and get a failure; make
-              a note of that possibility here
-            */ 
+             * if the device has no space left on it, we can't save
+             * the config file for parsing and get a failure; make
+             * a note of that possibility here
+             */ 
             gossip_err("\nHINTS: If you're sure that your pvfstab file "
                        "contains valid information,\n please make sure "
                        "that you are not out of disk space and that you "

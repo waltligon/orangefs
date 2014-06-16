@@ -258,9 +258,9 @@ void print_collection( DBT key, DBT val )
     k = key.data;
     v = *(int32_t *)val.data;
     if (hex) 
-        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%d) -> (%x) (%d)\n", k, key.size, v, val.size);
     else
-        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%d) -> (%d) (%d)\n", k, key.size, v, val.size);
     return;
 }
 
@@ -271,21 +271,21 @@ void print_storage( DBT key, DBT val )
     k = key.data;
     v = *(int32_t *)val.data;
     if (hex) 
-        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%d) -> (%x) (%d)\n", k, key.size, v, val.size);
     else
-        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%d) -> (%d) (%d)\n", k, key.size, v, val.size);
     return;
 }
 
 void print_dspace( DBT key, DBT val )
 {
-    uint64_t k;
+    PVFS_handle *k;
     struct PVFS_ds_attributes_s *v;
 
     time_t r_ctime, r_mtime, r_atime;
     char ctimeStr[1024], mtimeStr[1024], atimeStr[1024];
 
-    k = *(uint64_t *)key.data;
+    k = (PVFS_handle *)key.data;
     v = val.data;
 
     if (v->ctime != 0)
@@ -328,21 +328,19 @@ void print_dspace( DBT key, DBT val )
         strcpy(atimeStr, "");
     }
 
-
-    if (hex)
-        printf("(%llx)(%d) -> ", llu(k), key.size);
-    else
-        printf("(%llu)(%d) -> ", llu(k), key.size);
+    printf("(%s)(%d) -> ", PVFS_OID_str(k), key.size);
 
     print_ds_type( v->type );
 
-    if (hex) {
+    if (hex)
+    {
         printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(%d)\n",
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)\n",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
-           ctimeStr, mtimeStr, atimeStr, val.size);
+           ctimeStr, mtimeStr, atimeStr);
     }
-    else {
+    else
+    {
          printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
@@ -353,16 +351,45 @@ void print_dspace( DBT key, DBT val )
     switch (v->type)
     {
         case PVFS_TYPE_METAFILE:
-            printf("(dfile_count: %u)(dist_size: %u)(%d)\n",
-                    v->u.metafile.dfile_count, v->u.metafile.dist_size, val.size);
+            printf("(dfile_count: %u)(sid_count: %u)(dist_size: %u) (%d)\n",
+                    v->u.metafile.dfile_count,
+                    v->u.metafile.sid_count,
+                    v->u.metafile.dist_size,
+                    val.size);
+            break;
+
+        case PVFS_TYPE_DIRECTORY:
+            printf("(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
+                   "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
+                   "(branch_level: %d) (%d)\n",
+                    v->u.directory.tree_height,
+                    v->u.directory.dirdata_count,
+                    v->u.directory.sid_count,
+                    v->u.directory.bitmap_size,
+                    v->u.directory.split_size,
+                    v->u.directory.server_no,
+                    v->u.directory.branch_level,
+                    val.size);
             break;
 
         case PVFS_TYPE_DATAFILE:
-            printf("(bsize: %llu)(%d)\n", llu(v->u.datafile.b_size), val.size);
+            printf("(bsize: %llu) (%d)\n", llu(v->u.datafile.b_size), val.size);
             break;
 
         case PVFS_TYPE_DIRDATA:
-            printf("(count: %llu)(%d)\n", llu(v->u.dirdata.count), val.size);
+            printf("(count: %llu)"
+                   "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
+                   "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
+                   "(branch_level: %d) (%d)\n",
+                    llu(v->u.dirdata.count),
+                    v->u.dirdata.tree_height,
+                    v->u.dirdata.dirdata_count,
+                    v->u.dirdata.sid_count,
+                    v->u.dirdata.bitmap_size,
+                    v->u.dirdata.split_size,
+                    v->u.dirdata.server_no,
+                    v->u.dirdata.branch_level,
+                    val.size);
             break;
 
         default:
@@ -376,8 +403,7 @@ void print_dspace( DBT key, DBT val )
 void print_keyval( DBT key, DBT val )
 {
     struct dbpf_keyval_db_entry *k;
-    uint64_t vh, kh;
-    uint32_t vi;
+    uint64_t kh;
 
 
     k = key.data;
@@ -387,113 +413,145 @@ void print_keyval( DBT key, DBT val )
     switch (k->type)
     {
         case DBPF_DIRECTORY_ENTRY_TYPE:
-            vh = *(uint64_t *)val.data;
-            printf("(%s)(%d) -> (%llu)(%d)\n", k->key,  key.size, llu(vh), val.size);
+        {
+            PVFS_handle *handle = val.data;
+            printf("(%s)(%d) -> (%s) (%d)\n",
+                   k->key,
+                   key.size,
+                   PVFS_OID_str(handle),
+                   val.size);
+        }
             break;
 
         case DBPF_ATTRIBUTE_TYPE:
-            if( strncmp(k->key, "dh", 3) == 0) /* datafile handle */
+            /* datafile handle */
+            if( strncmp(k->key, "dh", 3) == 0)
             {
-               printf("(dh)(%d) -> ",key.size);
-               int s = 0;
-               while (s < val.size)
-               {
-                   vh = *(uint64_t *)(val.data + s);
-                   printf("(%llu) ", llu(vh));
-                   s += sizeof(TROVE_handle);
-               }
-               printf("(%d)\n",val.size);
-            }
-            else if( strncmp(k->key, "md", 3) == 0 ) /* metafile dist */
-            {
-               /* just print the name of the distribution, the rest is extra.
-                * the PINT_dist struct is packed/encoded before writing to db. that
-                * means the first uint32_t bytes are the length of the string, skip
-                * it. */
-               char *dname = val.data + sizeof(uint32_t);
-               printf("(md)(%d) -> (%s)(%d)\n", key.size, dname, val.size );
-            }
-            else if( strncmp(k->key, "st", 3) == 0 ) /* symlink target */
-            {
-                printf("(st)(%d) -> (%s)(%d)\n", key.size, (char *) val.data, val.size);
-            }
-            else if( strncmp(k->key, "ml", 3) == 0 ) /* metafile layout */
-            {
-               int32_t layout;
-
-               printf("(ml)(%d) -> ", key.size);
-
-               /* just print the name of the layout, the rest is extra. */
-               layout = *(int32_t *)val.data;
-               switch (layout)
-               {
-                   case PVFS_SYS_LAYOUT_NONE:
-                       printf("(PVFS_SYS_LAYOUT_NONE)\n");
-                       break;
-                   case PVFS_SYS_LAYOUT_ROUND_ROBIN:
-                       printf("(PVFS_SYS_LAYOUT_ROUND_ROBIN)\n");
-                       break;
-                   case PVFS_SYS_LAYOUT_RANDOM:
-                       printf("(PVFS_SYS_LAYOUT_RANDOM)\n");
-                       break;
-                   case PVFS_SYS_LAYOUT_LIST:
-                       printf("(PVFS_SYS_LAYOUT_LIST)\n");
-                       break;
-                   default:
-                       vi = *(uint32_t *)val.data;
-                       printf("(unrecognized: %d)\n", vi);
-                       break;
+                PVFS_handle *handle = val.data;
+                printf("(dh)(%d) -> ", key.size);
+                int s = 0;
+                while (s < val.size)
+                {
+                    printf("(%s) ", PVFS_OID_str(handle));
+                    s += sizeof(TROVE_handle);
                 }
+                printf("(%d)\n",val.size);
             }
-            else if( strncmp(k->key, "nd", 3) == 0 ) /* num dfiles req */
+            /* metafile dist */
+            else if( strncmp(k->key, "md", 3) == 0 )
             {
-                vi = *(uint32_t *)val.data;
-                printf("(nd)(%d) -> (%d)\n", key.size, vi);
+                /* just print the name of the distribution, the rest is extra.
+                 * the PINT_dist struct is packed/encoded before writing to db.
+                 * that means the first uint32_t bytes are the length of the
+                 * string, skip it.
+                 */
+                char *dname = (char *)val.data + sizeof(uint32_t);
+                printf("(md)(%d) -> (%s) (%d)\n", key.size, dname, val.size );
             }
-            else if( strncmp(k->key, "/dda", 5) == 0 ) /* dist directory attr */
+            /* symlink target */
+            else if( strncmp(k->key, "st", 3) == 0 )
             {
-                PVFS_dist_dir_attr *dist_dir_attr = (PVFS_dist_dir_attr *) val.data;
+                printf("(st)(%d) -> (%s) (%d)\n",
+                       key.size,
+                       (char *) val.data,
+                       val.size);
+            }
+            /* metafile layout */
+            else if( strncmp(k->key, "ml", 3) == 0 )
+            {
+                int32_t layout;
+
+                printf("(ml)(%d) -> ", key.size);
+
+                /* just print the name of the layout, the rest is extra. */
+                layout = *(int32_t *)val.data;
+                switch (layout)
+                {
+                    case PVFS_SYS_LAYOUT_NONE:
+                        printf("(PVFS_SYS_LAYOUT_NONE) (%d)\n",
+                               (int)sizeof(int32_t));
+                        break;
+                    case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+                        printf("(PVFS_SYS_LAYOUT_ROUND_ROBIN) (%d)\n",
+                               (int)sizeof(int32_t));
+                        break;
+                    case PVFS_SYS_LAYOUT_RANDOM:
+                         printf("(PVFS_SYS_LAYOUT_RANDOM) (%d)\n",
+                               (int)sizeof(int32_t));
+                        break;
+                    case PVFS_SYS_LAYOUT_LIST:
+                        printf("(PVFS_SYS_LAYOUT_LIST) (%d)\n",
+                               (int)sizeof(int32_t));
+                        break;
+                    default:
+                        printf("(unrecognized: %d) (%d)\n",
+                               *(uint32_t *)val.data,
+                               (int)sizeof(int32_t));
+                        break;
+                 }
+            }
+            /* num dfiles req */
+            else if( strncmp(k->key, "nd", 3) == 0 )
+            {
+                printf("(nd)(%d) -> (%d) (%d)\n",
+                       key.size,
+                       *(uint32_t *)val.data,
+                       val.size);
+            }
+            /* dist directory attr */
+            else if( strncmp(k->key, "/dda", 5) == 0 )
+            {
+                PVFS_dist_dir_attr *dist_dir_attr =
+                                   (PVFS_dist_dir_attr *) val.data;
 
                 if (val.size == sizeof(PVFS_dist_dir_attr))
                 {
-                    printf("(/dda)(%d) -> (%d)(%d)(%d)(%d)(%d)(%d)\n",
+                    printf("(/dda)(%d) -> (%d)(%d)(%d)(%d)(%d)(%d)(%d) (%d)\n",
                         key.size,
                         dist_dir_attr->tree_height,
-                        dist_dir_attr->num_servers,
+                        dist_dir_attr->dirdata_count,
+                        dist_dir_attr->sid_count,
                         dist_dir_attr->bitmap_size,
                         dist_dir_attr->split_size,
                         dist_dir_attr->server_no,
-                        dist_dir_attr->branch_level);
+                        dist_dir_attr->branch_level,
+                        val.size);
                 }
                 else
                 {
-                    printf("(/dda)(%d) -> Invalid size for distributed directory attributes.\n", key.size);
+                    printf("(/dda)(%d) -> "
+                           "Invalid size for distributed directory attributes."
+                           "(%d)\n",
+                           key.size,
+                           val.size);
                 }
             }
-            else if( strncmp(k->key, "/ddh", 5) == 0 ) /* dist directory handles */
+            /* dist directory handles */
+            else if( strncmp(k->key, "/ddh", 5) == 0 )
             {
                 PVFS_handle *handle = val.data;
 
                 printf("(/ddh)(%d) -> ", key.size);
-                while ((void *) handle - val.data < val.size)
+                while ((char *)handle - (char *)val.data < val.size)
                 {
                     printf("(%s)", PVFS_OID_str(handle));
                     handle++;
                 }
-                printf("\n");
+                printf(" (%d)\n", val.size);
             }
-            else if( strncmp(k->key, "/ddb", 5) == 0 ) /* dist directory bitmap */
+            /* dist directory bitmap */
+            else if( strncmp(k->key, "/ddb", 5) == 0 )
             {
                 int i;
                 unsigned char *c = NULL;
 
                 printf("(/ddb)(%d) -> ", key.size);
-                for(i = val.size - 1; i >= 0 ; i--)
+                for(i = val.size - 4; i >= 0 ; i--)
                 {
-                    c = (unsigned char *)(val.data + i);
+                    c = ((unsigned char *)val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
                 }
-                printf("\n");
+                printf(" (%d)\n", val.size);
             }
             else if (key.size == 17)
             {
@@ -509,8 +567,10 @@ void print_keyval( DBT key, DBT val )
             break;
 
         case DBPF_COUNT_TYPE:
-            vh = *(uint64_t *)val.data;
-            printf("()(%d) -> (%llu)(%d)\n", key.size, llu(vh), val.size);
+            printf("()(%d) -> (%llu) (%d)\n",
+                   key.size,
+                   llu(*(uint64_t *)val.data),
+                   val.size);
             break;
 
         default:
@@ -530,14 +590,19 @@ void print_collection_attr( DBT key, DBT val )
     {
         vu = *(uint64_t *)val.data;
         if (hex)
-            printf("(%llx)(%d)\n", llu(vu), val.size);
+            printf("(%llx) (%d)\n", llu(vu), val.size);
         else
-            printf("(%llu)(%d)\n", llu(vu), val.size);
+            printf("(%llu) (%d)\n", llu(vu), val.size);
+    }
+    else if (val.size == 16)
+    {
+        printf("(%s) (%d)\n", PVFS_OID_str((PVFS_OID *)val.data), val.size);
     }
     else
     {
+        /* assume it is a string */
         vs = val.data;
-        printf("(%s)(%d)\n", vs, val.size);
+        printf("(%s) (%d)\n", vs, val.size);
     }
     return;
 }
