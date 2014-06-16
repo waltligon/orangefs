@@ -138,7 +138,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     #
     
     def readCloudPasswordFile(self,filename):
-        self.nova_password = string.rstrip(open(filename).readlines()[0])
+        self.nova_password = string.rstrip(open(os.path.expandvars(filename)).readlines()[0])
         
         
                
