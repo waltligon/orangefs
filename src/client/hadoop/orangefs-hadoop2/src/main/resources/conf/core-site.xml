@@ -19,6 +19,16 @@
 <configuration>
 
   <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop-${user.name}</value>
+    <description>
+    Notes: user should point the default /tmp directory to a larger local storage. Otherwise, spilled intermediate data could fill all temp space.    
+    
+    A base for other temporary directories.
+    </description>
+  </property>
+
+  <property>
     <name>fs.defaultFS</name>
     <value>ofs://localhost-orangefs:3334</value>
     <description>
