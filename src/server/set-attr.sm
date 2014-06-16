@@ -270,6 +270,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
                 GOSSIP_SETATTR_DEBUG," *** using dfile_count of %d\n",
                 req_a_p->u.meta.dfile_count);
             a_p->u.meta.dfile_count = req_a_p->u.meta.dfile_count;
+            a_p->u.meta.sid_count = req_a_p->u.meta.sid_count;
             js_p->error_code = STATE_METAFILE;
         }
         else
@@ -346,19 +347,35 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
                 a_p->u.dir.dirdata_handles = NULL;
             }
 
+            /* Alocate enough space to copy SIDs into buffer too */
             a_p->u.dir.dirdata_handles =
                         malloc(a_p->u.dir.dist_dir_attr.dirdata_count *
-                                    sizeof(PVFS_handle));
+                               (sizeof(PVFS_handle) +
+                                (a_p->u.dir.dist_dir_attr.sid_count *
+                                 sizeof(PVFS_SID))));
 
-            if (! a_p->u.dir.dirdata_handles)
+            if (!a_p->u.dir.dirdata_handles)
             {
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
             }
 
+            /* Copy the SID buffer along with the dirdata handles */
+            if(req_a_p->u.dir.dirdata_handles != 
+                  (PVFS_handle *)(req_a_p->u.dir.dirdata_sids - 
+                                  req_a_p->u.dir.dist_dir_attr.dirdata_count))
+            {
+                gossip_debug(GOSSIP_SETATTR_DEBUG,
+                    "  Received attr.dist_dir_attr doesn't have a contiguous \
+                        handles/sid_array. \n.");
+            }
+
             memcpy(a_p->u.dir.dirdata_handles,
                    req_a_p->u.dir.dirdata_handles,
-                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle));
+                   a_p->u.dir.dist_dir_attr.dirdata_count *
+                   (sizeof(PVFS_handle) +
+                    (a_p->u.dir.dist_dir_attr.sid_count *
+                     sizeof(PVFS_SID))));
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRECTORY;
@@ -434,9 +451,20 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
                 a_p->u.dir.dirdata_handles = NULL;
             }
 
+            if (req_a_p->u.dir.dirdata_handles !=
+                    (PVFS_handle *)(req_a_p->u.dir.dirdata_sids - 
+                                    req_a_p->u.dir.dist_dir_attr.dirdata_count))
+            {
+                gossip_debug(GOSSIP_SETATTR_DEBUG,
+                      "  Received attr.dist_dir_attr doesn't have a contiguous"
+                      "handles/sid_array. \n.");
+            }
+
             a_p->u.dir.dirdata_handles =
                             malloc(a_p->u.dir.dist_dir_attr.dirdata_count *
-                                         sizeof(PVFS_handle));
+                                   (sizeof(PVFS_handle) +
+                                    (a_p->u.dir.dist_dir_attr.sid_count *
+                                     sizeof(PVFS_SID))));
 
             if (! a_p->u.dir.dirdata_handles)
             {
@@ -446,7 +474,11 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
 
             memcpy(a_p->u.dir.dirdata_handles,
                    req_a_p->u.dir.dirdata_handles,
-                   a_p->u.dir.dist_dir_attr.dirdata_count * sizeof(PVFS_handle));
+                   a_p->u.dir.dist_dir_attr.dirdata_count *
+                   sizeof(PVFS_handle));
+
+            a_p->u.dir.dirdata_sids = (PVFS_SID *)(a_p->u.dir.dirdata_handles + 
+                                      a_p->u.dir.dist_dir_attr.dirdata_count);
 
             a_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRDATA;
@@ -630,8 +662,13 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
                  "  metafile has %d datafiles associated with it\n",
                  s_op->req->u.setattr.attr.u.meta.dfile_count);
 
+    /* TJS: Assumes that whoever sets the dfile_array makes
+             it a contiguous buffer with sid_array */
     s_op->val.buffer = s_op->req->u.setattr.attr.u.meta.dfile_array;
-    s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
+    s_op->val.buffer_sz = dfile_count * 
+                          sizeof(PVFS_handle) + 
+                          s_op->req->u.setattr.attr.u.meta.sid_count * 
+                          sizeof(PVFS_SID);
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  writing %s [%s,%d,len %d]\n",
                  (char *)s_op->key.buffer,
@@ -793,9 +830,14 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
+    /* TJS: make sure that dirdata_handles gets allocated with contiguous
+             SID buffer
+             */
     s_op->val_a[2].buffer = s_op->attr.u.dir.dirdata_handles;
     s_op->val_a[2].buffer_sz = sizeof(PVFS_handle) *
-                               s_op->attr.u.dir.dist_dir_attr.dirdata_count;
+                               s_op->attr.u.dir.dist_dir_attr.dirdata_count +
+                               sizeof(PVFS_SID) *
+                               s_op->attr.u.dir.dist_dir_attr.sid_count;
 
     for (i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
@@ -938,6 +980,7 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
     assert(s_op->req->u.setattr.attr.u.sym.target_path);
 
     /* set up key and value structure for keyval write */
+    /* TJS: find out if SYMLINK needs to worry about SID storage */
     s_op->key.buffer = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
 

@@ -1131,7 +1131,7 @@ error_exit:
         if (me->pvfs_config_servers)
         {
             int j;
-            for (j=0; j<me->num_pvfs_config_servers; j++)
+            for (j = 0; j < me->num_pvfs_config_servers; j++)
             {
                 if (me->pvfs_config_servers[j])
                 {
@@ -1281,14 +1281,14 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 
         /* copy the mntent to our table in the dynamic tab area */
         new_index = s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_count;
+                        PVFS2_DYNAMIC_TAB_INDEX].mntent_count;
 
         if (new_index == 0)
         {
             /* allocate and initialize the dynamic tab object */
             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array =
-                (struct PVFS_sys_mntent *)malloc(
-                    sizeof(struct PVFS_sys_mntent));
+                            (struct PVFS_sys_mntent *)malloc(
+                                    sizeof(struct PVFS_sys_mntent));
             if (!s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
             {
                 gen_mutex_unlock(&s_stat_tab_mutex);
@@ -1303,7 +1303,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
         {
             /* we need to re-alloc this guy to add a new array entry */
             tmp_mnt_array = (struct PVFS_sys_mntent *)malloc(
-                ((new_index + 1) * sizeof(struct PVFS_sys_mntent)));
+                     ((new_index + 1) * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
                 gen_mutex_unlock(&s_stat_tab_mutex);
@@ -1317,7 +1317,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             for(i = 0; i < new_index; i++)
             {
                 current_mnt = &s_stat_tab_array[
-                    PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
+                              PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
                 PVFS_util_copy_mntent(&tmp_mnt_array[i], current_mnt);
                 PVFS_util_free_mntent(current_mnt);
             }
@@ -1325,7 +1325,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             /* finally, swap the mntent arrays */
             free(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array);
             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array =
-                tmp_mnt_array;
+                            tmp_mnt_array;
         }
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "* Adding new dynamic mount "
@@ -1333,7 +1333,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                      PVFS2_DYNAMIC_TAB_INDEX, new_index);
 
         current_mnt = &s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_array[new_index];
+                        PVFS2_DYNAMIC_TAB_INDEX].mntent_array[new_index];
 
         ret = PVFS_util_copy_mntent(current_mnt, mntent);
 

@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "server-config.h"
+#include "pint-cached-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
@@ -103,8 +104,8 @@ machine pvfs2_chdirent_sm
 
 %%
 
-static PINT_sm_action chdirent_get_dirdata_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_get_dirdata_attr(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {       
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -113,10 +114,10 @@ static PINT_sm_action chdirent_get_dirdata_attr(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for dirdata handle %s\n",
-                 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle));
+                 PVFS_OID_str(&s_op->req->u.chdirent.dirdata_handle));
 
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
-                                   s_op->req->u.chdirent.dirent_handle,
+                                   s_op->req->u.chdirent.dirdata_handle,
                                    smcb,
                                    &(s_op->u.chdirent.dirdata_ds_attr),
                                    0,
@@ -128,8 +129,8 @@ static PINT_sm_action chdirent_get_dirdata_attr(
     return ret;
 }
 
-static PINT_sm_action chdirent_get_dist_dir_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {       
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -141,6 +142,7 @@ static PINT_sm_action chdirent_get_dist_dir_attr(
     */
     PVFS_ds_attr_to_object_attr(&s_op->u.chdirent.dirdata_ds_attr,
                                 &s_op->u.chdirent.dirdata_attr);
+
     s_op->u.chdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
 
     /* set up key and value structures for reading the dist_dir_attr */
@@ -160,12 +162,12 @@ static PINT_sm_action chdirent_get_dist_dir_attr(
                  "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.chdirent.fs_id,
-                 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.chdirent.dirdata_handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
                  
     ret = job_trove_keyval_read(s_op->req->u.chdirent.fs_id,
-                                s_op->req->u.chdirent.dirent_handle,
+                                s_op->req->u.chdirent.dirdata_handle,
                                 &s_op->key,
                                 &s_op->val,
                                 0,
@@ -180,8 +182,8 @@ static PINT_sm_action chdirent_get_dist_dir_attr(
     return ret;
 }   
 
-static PINT_sm_action chdirent_get_bitmap(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_get_bitmap(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
@@ -192,6 +194,7 @@ static PINT_sm_action chdirent_get_bitmap(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
+        /* error in previous keyval read */
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "chdirent: no DIST_DIR_ATTR key present "
                      "in dirdata handle!!\n");
@@ -206,7 +209,7 @@ static PINT_sm_action chdirent_get_bitmap(
             "chdirent: get dist-dir-attr for dirdata handle %s "
             "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
+            PVFS_OID_str(&s_op->req->u.chdirent.dirdata_handle),
             attr_p->u.dir.dist_dir_attr.tree_height,
             attr_p->u.dir.dist_dir_attr.dirdata_count,
             attr_p->u.dir.dist_dir_attr.bitmap_size,
@@ -216,9 +219,10 @@ static PINT_sm_action chdirent_get_bitmap(
 
     /* allocate space for dirdata bitmap */
     attr_p->u.dir.dirdata_handles = NULL;
-    attr_p->u.dir.dist_dir_bitmap =
-        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype));
+    attr_p->u.dir.dist_dir_bitmap = malloc(
+                      attr_p->u.dir.dist_dir_attr.bitmap_size *
+                      sizeof(PVFS_dist_dir_bitmap_basetype));
+
     if(!attr_p->u.dir.dist_dir_bitmap)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -246,12 +250,12 @@ static PINT_sm_action chdirent_get_bitmap(
                  "  trying to read dirdata bitmap (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.chdirent.fs_id,
-                 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.chdirent.dirdata_handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.chdirent.fs_id,
-                                s_op->req->u.chdirent.dirent_handle,
+                                s_op->req->u.chdirent.dirdata_handle,
                                 &s_op->key,
                                 &s_op->val,
                                 0,
@@ -275,46 +279,47 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
     int i;
     unsigned char *c;
     PVFS_object_attr *attr_p;
+
+    /* V3 Should we check for an error on last keyval read */
     
     attr_p = &s_op->attr;
     
-    /* gossip bitmap, since jump from get_bitmap*/
+    /* gossip bitmap, since jump from get_bitmap */
     gossip_debug(GOSSIP_SERVER_DEBUG, "chdirent: dist_dir_bitmap as:\n");
     for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
         c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                " i=%d : %02x %02x %02x %02x\n",
-                i, c[3], c[2], c[1], c[0]);
+                     " i=%d : %02x %02x %02x %02x\n",
+                     i, c[3], c[2], c[1], c[0]);
     }           
     gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
     
 
-    /* make sure the entry belongs to the dirdata handle*/
+    /* make sure the entry belongs to the dirdata handle */
     PVFS_dist_dir_hash_type dirdata_hash; 
     int dirdata_server_index;
     
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(s_op->req->u.chdirent.entry);
     gossip_debug(GOSSIP_SERVER_DEBUG,
-          "chdirent: encrypt dirent %s into hash value %llu.\n",
-            s_op->req->u.chdirent.entry,
-            llu(dirdata_hash));
+                 "chdirent: encrypt dirent %s into hash value %llu.\n",
+                 s_op->req->u.chdirent.entry,
+                 llu(dirdata_hash));
             
-    dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &attr_p->u.dir.dist_dir_attr,
-            attr_p->u.dir.dist_dir_bitmap);
+    dirdata_server_index = PINT_find_dist_dir_bucket(
+                                             dirdata_hash,
+                                             &attr_p->u.dir.dist_dir_attr,
+                                             attr_p->u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
-          "chdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
-            dirdata_server_index);
+                 "chdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
             
-    if(dirdata_server_index !=
-            attr_p->u.dir.dist_dir_attr.server_no)
+    if(dirdata_server_index != attr_p->u.dir.dist_dir_attr.server_no)
     {       
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                "chdirent: error: WRONG dirdata object "
-                "for the dirent! Returning error.\n");         
+                     "chdirent: error: WRONG dirdata object "
+                     "for the dirent! Returning error.\n");         
 
         /* return an error to tell the client to try again */
         js_p->error_code = -PVFS_EAGAIN;
@@ -323,21 +328,36 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
     else
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                "chdirent: Correct dirdata object!\n");
+                     "chdirent: Correct dirdata object!\n");
     }           
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  reading from dirent handle = %s, name = %s\n",
-                 PVFS_OID_str(&s_op->req->u.chdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.chdirent.dirdata_handle),
                  s_op->req->u.chdirent.entry);
+
+    /* get metadata sid count from config */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                              s_op->req->u.chdirent.fs_id,
+                                              &s_op->metasidcnt);
+
+    /* allocate bufferss for dirents, 
+     * Creates contiguous buffer for SIDs and Handle, sets pointers
+     * accordingly */
+    s_op->u.chdirent.old_dirent_handle = 
+                  (PVFS_handle *) malloc(OSASZ(1, s_op->metasidcnt));
+
+
+    s_op->u.chdirent.old_sid_array =
+                  (PVFS_SID *)(s_op->u.chdirent.old_dirent_handle + 1);
 
     s_op->key.buffer = s_op->req->u.chdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
     s_op->val.buffer = &s_op->u.chdirent.old_dirent_handle;
-    s_op->u.chdirent.old_sid_array = s_op->u.chdirent.old_dirent_handle + sizeof(PVFS_handle);
-    s_op->val.buffer_sz = sizeof(PVFS_handle)) + s_op->req->u.chdirent.old_sid_count * sizeof(PVFS_SID);
+    s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
+
     ret = job_trove_keyval_read(s_op->req->u.chdirent.fs_id,
-                                s_op->req->u.chdirent.dirent_handle,
+                                s_op->req->u.chdirent.dirdata_handle,
                                 &s_op->key,
                                 &s_op->val,
                                 TROVE_KEYVAL_DIRECTORY_ENTRY,
@@ -353,7 +373,8 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
 }
 
 static PINT_sm_action chdirent_read_directory_entry_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     switch (js_p->error_code)
     {
@@ -368,8 +389,8 @@ static PINT_sm_action chdirent_read_directory_entry_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action chdirent_change_directory_entry(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_change_directory_entry(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -377,42 +398,49 @@ static PINT_sm_action chdirent_change_directory_entry(
 
     js_p->error_code = 0;
 
-    s_op->u.chdirent.new_dirent_handle =
-        s_op->req->u.chdirent.new_dirent_handle;
-    s_op->u.chdirent.new_sid_array = 
-        s_op->req->u.chdirent.new_sid_array;
-
+/* V3 not needed - SIDs can change, and eveen if nothing changes why
+ * error
+ */
+#if 0
     if (!PVFS_OID_cmp(&s_op->u.chdirent.old_dirent_handle,
                       &s_op->u.chdirent.new_dirent_handle))
     {
         /* FIXME: return an error since a dirent is
            being changed to itself (?) */
     }
+#endif
 
     s_op->key.buffer = s_op->req->u.chdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
 
-    s_op->val.buffer = &s_op->u.chdirent.new_dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle) + sizeof(PVFS_SID) * s_op->req->u.chdirent.new_sid_count;
+    s_op->val.buffer = &s_op->req->u.chdirent.new_dirent_handle;
+    /* V3 WBL new_sid_count should always be the standard size ??? */
+    s_op->val.buffer_sz = OSASZ(1, s_op->req->u.chdirent.new_sid_count);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  changing dir entry for %s from handle value "
                  "%s to %s\n", s_op->req->u.chdirent.entry,
-                 PVFS_OID_str(&s_op->u.chdirent.old_dirent_handle),
-                 PVFS_OID_str(&s_op->u.chdirent.new_dirent_handle));
+                 PVFS_OID_str(s_op->u.chdirent.old_dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.chdirent.new_dirent_handle));
 
-    ret = job_trove_keyval_write(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
-        &s_op->key, &s_op->val, 
-        TROVE_SYNC | TROVE_KEYVAL_DIRECTORY_ENTRY |
-        0,
-        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_write(s_op->req->u.chdirent.fs_id,
+                                 s_op->req->u.chdirent.dirdata_handle,
+                                 &s_op->key,
+                                 &s_op->val,
+                                 TROVE_SYNC | TROVE_KEYVAL_DIRECTORY_ENTRY | 0,
+                                 NULL,
+                                 smcb,
+                                 0,
+                                 js_p,
+                                 &j_id,
+                                 server_job_context,
+                                 s_op->req->hints);
 
     return ret;
 }
 
-static PINT_sm_action chdirent_update_directory_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_update_directory_attr(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -423,24 +451,30 @@ static PINT_sm_action chdirent_update_directory_attr(
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.chdirent.dirdata_attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME |
+                          PVFS_ATTR_COMMON_MTIME |
+                          PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
     ds_attr = &(s_op->u.chdirent.dirdata_ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
-    ret = job_trove_dspace_setattr(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
-        ds_attr,
-        TROVE_SYNC |
-        0,
-        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_setattr(s_op->req->u.chdirent.fs_id,
+                                   s_op->req->u.chdirent.dirdata_handle,
+                                   ds_attr, TROVE_SYNC | 0,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
 
 static PINT_sm_action chdirent_change_directory_entry_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                      struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     assert(js_p->error_code != -TROVE_ENOENT);
             
@@ -464,14 +498,17 @@ static PINT_sm_action chdirent_setup_resp(struct PINT_smcb *smcb,
     {
         /* return original dirent handle in the response */
         s_op->resp.u.chdirent.old_dirent_handle =
-                        s_op->u.chdirent.old_dirent_handle;
-        s_op->resp.u.chdirent.old_sid_count = s_op->req->u.chdirent.old_sid_count;
-        s_op->resp.u.chdirent.old_sid_array = s_op->u.chdirent.old_sid_array;
+                              *s_op->u.chdirent.old_dirent_handle;
+
+        s_op->resp.u.chdirent.sid_count =
+                              s_op->req->u.chdirent.sid_count;
+
+        s_op->resp.u.chdirent.sid_array = s_op->u.chdirent.old_sid_array;
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "  succeeded; returning handle %s in response, with sid_count %d\n",
                      PVFS_OID_str(&s_op->resp.u.chdirent.old_dirent_handle),
-                     s_op->resp.u.chdirent.old_sid_count);
+                     s_op->resp.u.chdirent.sid_count);
     }
     else
     {
@@ -480,11 +517,15 @@ static PINT_sm_action chdirent_setup_resp(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action chdirent_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action chdirent_cleanup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    if(s_op->u.chdirent.old_dirent_handle){
+      free(s_op->u.chdirent.old_sid_array);
+    }
+    
     PINT_free_object_attr(&s_op->attr);
     return (server_state_machine_complete(smcb));
 }
@@ -506,7 +547,16 @@ static int perm_chdirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(chdirent);
+/* PINT_GET_OBJECT_REF_DEFINE(chdirent); */
+
+static int PINT_get_object_ref_chdirent(struct PVFS_server_req *req,
+                                        PVFS_fs_id *fs_id,
+                                        PVFS_handle *handle)
+{
+    *fs_id = req->u.chdirent.fs_id;
+    *handle = req->u.chdirent.dirdata_handle;
+    return 0;
+}
 
 struct PINT_server_req_params pvfs2_chdirent_params =
 {

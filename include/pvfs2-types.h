@@ -188,6 +188,8 @@ typedef uint64_t PVFS_flags;
 #define encode_PVFS_flags encode_uint64_t
 #define decode_PVFS_flags decode_uint64_t
 
+/* V3 handle ranges defunct */
+#if 0
 /* contiguous range of handles */
 typedef struct
 {
@@ -210,6 +212,7 @@ endecode_fields_1a(
     skip4,,
     uint32_t, extent_count,
     PVFS_handle_extent, extent_array);
+#endif
 
 /* Layout algorithm for converting from server lists in the config
  * to a list of servers to use to store datafiles for a file.
@@ -501,8 +504,8 @@ endecode_fields_12(
     uint64_t, handles_total_count);
 
 /** object reference (uniquely refers to a single file, directory, or
-    symlink).
-*/
+ *  symlink) metadata object.
+ */
 typedef struct PVFS_object_ref_s
 {
     PVFS_handle handle;
@@ -510,6 +513,66 @@ typedef struct PVFS_object_ref_s
     int32_t     sid_count;
     PVFS_SID    *sid_array;
 } PVFS_object_ref;
+
+/* a sid_count of -1 indicates the default which should be obtained
+ * from the configuration - for the moment stuck at 3
+ */
+#define PVFS_object_ref_init(oref, sid_count) \
+do { \
+    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    { \
+        gossip_err("tried to init a non empty PVFS_object_ref"); \
+        break; \
+    } \
+    memset(oref, 0; sizeof(PVFS_object_ref)); \
+    if (sid_count == -1) \
+    { \
+        oref->sid_count = 3; \
+    } \
+    else \
+    { \
+        oref->sid_count = sid_count; \
+    } \
+    oref->sid_array = (PVFS_SID *)malloc(SASZ(oref->sid_count)); \
+    if (!oref->sid_array) \
+    { \
+        gossip_err("malloc returned error");\
+        break; \
+    } \
+    ZEROMEM(oref->sid_array, SASZ(oref->sid_count)); \
+} while (0)
+
+/* dst must be empty (released) */
+#define PVFS_object_ref_copy(dst, src) \
+do { \
+    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    { \
+        gossip_err("tried to copy to a non empty PVFS_object_ref"); \
+        break; \
+    } \
+    *dst = *src; \
+    if (src->sid_count > 0 && src->sid_array) \
+    { \
+        dst->sid_array = (PVFS_SID *)malloc(SASZ(src->sid_count)); \
+        if (!dst->sid_array) \
+        { \
+            gossip_err("malloc returned error");\
+            break; \
+        } \
+        ZEROMEM(dst->sid_array, SASZ(src->sid_count)); \
+        memcpy(dst->sid_array, src->sid_array, SASZ(src->sid_count)); \
+    } \
+} while (0)
+
+/* does not free the object_ref, but the resources it holds */
+#define PVFS_object_ref_release(oref) \
+do { \
+    if (oref->sid_count > 0 && oref->sid_array) \
+    { \
+        free(oref->sid_array); \
+    } \
+    memset(oref, 0; sizeof(PVFS_object_ref)); \
+} while (0)
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN  256
@@ -563,18 +626,18 @@ endecode_fields_2(
  */
 typedef struct PVFS_dist_dir_attr_s
 {
-        /* global info */
-        int32_t tree_height;    /* ceil(log2(dirdata_count)) */
-        int32_t dirdata_count;  /* total number of servers */
-        int32_t sid_count;      /* number of copies of each bucket */
-        int32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
-                                /* stored under the key DIST_DIR_BITMAP */
-        int32_t split_size;     /* maximum number of entries before a split */
+    /* global info */
+    int32_t tree_height;    /* ceil(log2(dirdata_count)) */
+    int32_t dirdata_count;  /* total number of servers */
+    int32_t sid_count;      /* number of copies of each bucket */
+    int32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
+                            /* stored under the key DIST_DIR_BITMAP */
+    int32_t split_size;     /* maximum number of entries before a split */
 
-        /* local info */
-        int32_t server_no;      /* 0 to dirdata_count-1, indicates */
+    /* local info */
+    int32_t server_no;      /* 0 to dirdata_count-1, indicates */
                                 /* which server is running this code */
-        int32_t branch_level;   /* level of branching on this server */
+    int32_t branch_level;   /* level of branching on this server */
 } PVFS_dist_dir_attr;
 endecode_fields_7(
     PVFS_dist_dir_attr,

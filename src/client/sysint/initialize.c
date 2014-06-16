@@ -33,6 +33,7 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "sid.h"
 
 PINT_smcb *g_smcb = NULL; 
 
@@ -57,7 +58,8 @@ typedef enum
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
     CLIENT_DIST_INIT         = (1 << 10),
     CLIENT_SECURITY_INIT     = (1 << 11),
-    CLIENT_RCACHE_INIT       = (1 << 12)
+    CLIENT_RCACHE_INIT       = (1 << 12),
+    CLIENT_SIDCACHE_INIT     = (1 << 13)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -275,7 +277,15 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }        
     client_status_flag |= CLIENT_CONFIG_MGR_INIT;
 
-/* WBL V3 ADD SID INIT CALL */
+    /* initialize the SID cache */
+    /* maintains list of known servers */
+    ret = SID_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing SID cache\n");
+        goto error_exit;        
+    }        
+    client_status_flag |= CLIENT_SIDCACHE_INIT;
 
     /* initialize the cached config table */
     /* hashes fsid to file system config */
@@ -314,6 +324,11 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 error_exit:
 
     id_gen_safe_finalize();
+
+    if (client_status_flag & CLIENT_SIDCACHE_INIT)
+    {
+        SID_finalize();
+    }
 
     if (client_status_flag & CLIENT_CONFIG_MGR_INIT)
     {

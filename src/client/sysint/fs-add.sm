@@ -208,9 +208,10 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
+    /* V3 debug values, fix */
     sm_p->msgarray_op.params.job_context = pint_client_sm_context;
-    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.job_timeout = 300;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 200000; /* 2 second retry delay */
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
     PINT_msgpair_init(&sm_p->msgarray_op);

@@ -300,7 +300,7 @@ int SID_add_server_list(SID_server_list_t *sid_list, const PVFS_SID *sid)
     SID_cacheval_t *temp_cacheval;
     int url_len;
 
-    ret = SID_cache_lookup_server(SID_db, sid, &temp_cacheval);
+    ret = SID_cache_get(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;

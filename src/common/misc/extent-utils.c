@@ -17,6 +17,9 @@
 #include "str-utils.h"
 #include "extent-utils.h"
 
+/* V3 REMOVE ME - remove entire file and headers */
+#if 0
+
 /* PINT_create_extent_list()
  *
  * Return an extent llist based on extent string input
@@ -181,6 +184,7 @@ void PINT_release_extent_list(PINT_llist *extent_list)
         PINT_llist_free(extent_list,free);
     }
 }
+#endif
 
 /*
  * Local variables:

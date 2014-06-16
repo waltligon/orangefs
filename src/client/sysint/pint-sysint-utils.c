@@ -70,7 +70,7 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
   configurations during run-time
 */
 struct server_configuration_s *PINT_get_server_config_struct(
-    PVFS_fs_id fs_id)
+                                                PVFS_fs_id fs_id)
 {
     return PINT_server_config_mgr_get_config(fs_id);
 }
@@ -87,11 +87,10 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-int PINT_lookup_parent(
-    char *filename,
-    PVFS_fs_id fs_id,
-    PVFS_credential *credential,
-    PVFS_handle * handle)
+int PINT_lookup_parent(char *filename,
+                       PVFS_fs_id fs_id,
+                       PVFS_credential *credential,
+                       PVFS_handle *handle)
 {
     int ret = -PVFS_EINVAL;
     char buf[PVFS_SEGMENT_MAX] = {0};
@@ -110,8 +109,11 @@ int PINT_lookup_parent(
         return ret;
     }
 
-    ret = PVFS_sys_lookup(fs_id, buf, credential,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+    ret = PVFS_sys_lookup(fs_id, buf,
+                          credential,
+                          &resp_look,
+                          PVFS2_LOOKUP_LINK_FOLLOW,
+                          NULL);
     if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n", buf);

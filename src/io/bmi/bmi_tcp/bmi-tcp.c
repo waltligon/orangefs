@@ -1100,11 +1100,11 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-int BMI_tcp_post_recv(bmi_op_id_t * id,
+int BMI_tcp_post_recv(bmi_op_id_t *id,
 		      bmi_method_addr_p src,
 		      void *buffer,
 		      bmi_size_t expected_size,
-		      bmi_size_t * actual_size,
+		      bmi_size_t *actual_size,
 		      enum bmi_buffer_type buffer_type,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
@@ -1130,10 +1130,18 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     }
     gen_mutex_lock(&interface_mutex);
 
-    ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
-                                1, expected_size, actual_size,
-                                buffer_type, tag,
-                                user_ptr, context_id, hints);
+    ret = tcp_post_recv_generic(id,
+                                src,
+                                &buffer,
+                                &expected_size,
+                                1,
+                                expected_size,
+                                actual_size,
+                                buffer_type,
+                                tag,
+                                user_ptr,
+                                context_id,
+                                hints);
 
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -1317,13 +1325,13 @@ int BMI_tcp_testunexpected(int incount,
  * returns 0 on success, -errno on failure
  */
 int BMI_tcp_testcontext(int incount,
-		     bmi_op_id_t* out_id_array,
-		     int *outcount,
-		     bmi_error_code_t * error_code_array,
-		     bmi_size_t * actual_size_array,
-		     void **user_ptr_array,
-		     int max_idle_time,
-		     bmi_context_id context_id)
+                        bmi_op_id_t *out_id_array,
+                        int *outcount,
+                        bmi_error_code_t *error_code_array,
+                        bmi_size_t *actual_size_array,
+                        void **user_ptr_array,
+                        int max_idle_time,
+                        bmi_context_id context_id)
 {
     int ret = -1;
     method_op_p query_op = NULL;
@@ -1356,8 +1364,7 @@ int BMI_tcp_testcontext(int incount,
 
     /* pop as many items off of the completion queue as we can */
     while((*outcount < incount) && 
-          (query_op =
-           op_list_shownext(completion_array[context_id])))
+          (query_op = op_list_shownext(completion_array[context_id])))
     {
         assert(query_op);
         assert(query_op->context_id == context_id);
@@ -1367,15 +1374,18 @@ int BMI_tcp_testcontext(int incount,
         error_code_array[*outcount] = query_op->error_code;
         actual_size_array[*outcount] = query_op->actual_size;
         out_id_array[*outcount] = query_op->op_id;
+
         if (user_ptr_array != NULL)
         {
             user_ptr_array[*outcount] = query_op->user_ptr;
         }
 
         PINT_EVENT_END((query_op->send_recv == BMI_SEND ?
-                        bmi_tcp_send_event_id : bmi_tcp_recv_event_id),
-                       bmi_tcp_pid, NULL, query_op->event_id,
-                       query_op->actual_size);
+                            bmi_tcp_send_event_id : bmi_tcp_recv_event_id),
+                        bmi_tcp_pid,
+                        NULL,
+                        query_op->event_id,
+                        query_op->actual_size);
 
         dealloc_tcp_method_op(query_op);
         query_op = NULL;
@@ -1450,7 +1460,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
  * returns 0 on success, 1 on immediate successful completion,
  * -errno on failure
  */
-int BMI_tcp_post_recv_list(bmi_op_id_t * id,
+int BMI_tcp_post_recv_list(bmi_op_id_t *id,
 			   bmi_method_addr_p src,
 			   void *const *buffer_list,
 			   const bmi_size_t *size_list,
@@ -1472,10 +1482,18 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 
     gen_mutex_lock(&interface_mutex);
 
-    ret = tcp_post_recv_generic(id, src, buffer_list, size_list,
-                                list_count, total_expected_size,
-                                total_actual_size, buffer_type, tag, user_ptr,
-                                context_id, hints);
+    ret = tcp_post_recv_generic(id,
+                                src,
+                                buffer_list,
+                                size_list,
+                                list_count,
+                                total_expected_size,
+                                total_actual_size,
+                                buffer_type,
+                                tag,
+                                user_ptr,
+                                context_id,
+                                hints);
 
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -2396,13 +2414,13 @@ static int enqueue_operation(op_list_p target_list,
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-static int tcp_post_recv_generic(bmi_op_id_t * id,
+static int tcp_post_recv_generic(bmi_op_id_t *id,
                                  bmi_method_addr_p src,
                                  void *const *buffer_list,
                                  const bmi_size_t *size_list,
                                  int list_count,
                                  bmi_size_t expected_size,
-                                 bmi_size_t * actual_size,
+                                 bmi_size_t *actual_size,
                                  enum bmi_buffer_type buffer_type,
                                  bmi_msg_tag_t tag,
                                  void *user_ptr,
@@ -2420,14 +2438,16 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     int i;
     PINT_event_id eid = 0;
 
-    PINT_EVENT_START(
-        bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
-        PINT_HINT_GET_CLIENT_ID(hints),
-        PINT_HINT_GET_REQUEST_ID(hints),
-        PINT_HINT_GET_RANK(hints),
-        PINT_HINT_GET_HANDLE(hints),
-        PINT_HINT_GET_OP_ID(hints),
-        expected_size);
+    PINT_EVENT_START(bmi_tcp_recv_event_id,
+                     bmi_tcp_pid,
+                     NULL,
+                     &eid,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     PINT_HINT_GET_HANDLE(hints),
+                     PINT_HINT_GET_OP_ID(hints),
+                     expected_size);
 
     tcp_addr_data = src->method_data;
 
@@ -2436,10 +2456,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
      */
     if(tcp_addr_data->addr_error && tcp_addr_data->dont_reconnect)
     {
-        gossip_debug(
-            GOSSIP_BMI_DEBUG_TCP,
-            "Warning: BMI communication attempted "
-            "on an address in failure mode.\n");
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                     "Warning: BMI communication attempted "
+                     "on an address in failure mode.\n");
         return(tcp_addr_data->addr_error);
     }
 
@@ -2452,8 +2471,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     key.msg_tag = tag;
     key.msg_tag_yes = 1;
 
-    query_op =
-        op_list_search(op_list_array[IND_RECV_EAGER_DONE_BUFFERING], &key);
+    query_op = op_list_search(op_list_array[IND_RECV_EAGER_DONE_BUFFERING],
+                              &key);
     if (query_op)
     {
         /* make sure it isn't too big */
@@ -2473,8 +2492,11 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
             {
                 copy_size = query_op->actual_size - total_copied;
             }
-            memcpy(buffer_list[i], (void *) ((char *) query_op->buffer +
-                                             total_copied), copy_size);
+
+            memcpy(buffer_list[i],
+                   (void *) ((char *) query_op->buffer + total_copied),
+                   copy_size);
+
             total_copied += copy_size;
             if (total_copied == query_op->actual_size)
             {
@@ -2487,7 +2509,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         *id = 0;
         op_list_remove(query_op);
         dealloc_tcp_method_op(query_op);
-        PINT_EVENT_END(bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, eid, 0,
+
+        PINT_EVENT_END(bmi_tcp_recv_event_id,
+                       bmi_tcp_pid,
+                       NULL,
+                       eid,
+                       0,
                        *actual_size);
 
         return (1);
@@ -2522,8 +2549,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
             }
             if (copy_size > 0)
             {
-                memcpy(buffer_list[i], (void *) ((char *) query_op->buffer +
-                                                 total_copied), copy_size);
+                memcpy(buffer_list[i],
+                       (void *) ((char *) query_op->buffer + total_copied),
+                       copy_size);
             }
             total_copied += copy_size;
             if (total_copied == query_op->amt_complete)
@@ -2555,6 +2583,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         query_op->list_count = list_count;
         query_op->user_ptr = user_ptr;
         query_op->context_id = context_id;
+
         /* if there is only one item in the list, then keep the list stored
          * in the op structure.  This allows us to use the same code for send
          * and recv as we use for send_list and recv_list, without having to 
@@ -2605,9 +2634,13 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
             *id = 0;
             (*actual_size) = query_op->actual_size;
             dealloc_tcp_method_op(query_op);
-            PINT_EVENT_END(
-                bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, eid,
-                0, *actual_size);
+
+            PINT_EVENT_END(bmi_tcp_recv_event_id,
+                           bmi_tcp_pid,
+                           NULL,
+                           eid,
+                           0,
+                           *actual_size);
 
             return (1);
         }
@@ -2637,12 +2670,25 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     }
     bogus_header.tag = tag;
     ret = enqueue_operation(op_list_array[IND_RECV],
-                            BMI_RECV, src, buffer_list, size_list,
-                            list_count, 0, 0, id, BMI_TCP_INPROGRESS,
-                            bogus_header, user_ptr, 0,
-                            expected_size, context_id, eid);
+                            BMI_RECV,
+                            src,
+                            buffer_list,
+                            size_list,
+                            list_count,
+                            0,
+                            0,
+                            id,
+                            BMI_TCP_INPROGRESS,
+                            bogus_header,
+                            user_ptr,
+                            0,
+                            expected_size,
+                            context_id,
+                            eid);
+
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
+
     /* TODO: figure out why this causes deadlocks; observable in 2
      * scenarios:
      * - pvfs2-client-core with threaded library and nptl
@@ -2700,8 +2746,9 @@ static int tcp_cleanse_addr(bmi_method_addr_p map, int error_code)
 		else
 		{
 		    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
-			BMI_TCP_COMPLETE;
-		    op_list_add(completion_array[query_op->context_id], query_op);
+			            BMI_TCP_COMPLETE;
+		    op_list_add(completion_array[query_op->context_id],
+                                query_op);
 		}
 	    }
 	}
@@ -2789,9 +2836,11 @@ static int tcp_do_work(int max_idle_time)
 
     /* our turn to look at the socket collection */
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
-				       TCP_WORK_METRIC, &socket_count,
-				       addr_array, status_array,
-				       max_idle_time);
+				           TCP_WORK_METRIC,
+                                           &socket_count,
+				           addr_array,
+                                           status_array,
+				           max_idle_time);
 
     gen_mutex_lock(&interface_mutex);
     sc_test_busy = 0;
@@ -2806,7 +2855,9 @@ static int tcp_do_work(int max_idle_time)
     }
 
     if(socket_count == 0)
+    {
 	busy_flag = 0;
+    }
 
     /* do different kinds of work depending on results */
     for (i = 0; i < socket_count; i++)
@@ -2909,7 +2960,9 @@ static int tcp_do_work_send(bmi_method_addr_p map, int* stall_flag)
 
 	ret = work_on_send_op(active_method_op, &blocked_flag, &tmp_stall_flag);
 	if(!tmp_stall_flag)
+        {
 	    *stall_flag = 0;
+        }
     }
 
     return (ret);
@@ -3069,7 +3122,8 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
      * header - we really want it atomically
      */
     ret = BMI_sockio_nbpeek(tcp_addr_data->socket,
-                            new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+                            new_header.enc_hdr,
+                            TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-errno));
@@ -3078,9 +3132,8 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
 
     if (ret == 0)
     {
-        gossip_debug(
-            GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable "
-            "to recv any data reported by poll(). [2]\n");
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable "
+                     "to recv any data reported by poll(). [2]\n");
 
         if (tcp_addr_data->zero_read_limit++ ==
             BMI_TCP_ZERO_READ_LIMIT)
@@ -3104,7 +3157,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
             tcp_addr_data->short_header_timer = current_time;
         }
         else if((current_time - tcp_addr_data->short_header_timer) > 
-            BMI_TCP_HEADER_WAIT_SECONDS)
+                BMI_TCP_HEADER_WAIT_SECONDS)
         {
 	    gossip_err("Error: incomplete BMI TCP header after %d seconds, closing connection.\n",
                 BMI_TCP_HEADER_WAIT_SECONDS);
@@ -3119,8 +3172,11 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     tcp_addr_data->short_header_timer = 0;
     *stall_flag = 0;
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
+
     ret = BMI_sockio_nbrecv(tcp_addr_data->socket,
-                           new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+                            new_header.enc_hdr,
+                            TCP_ENC_HDR_SIZE);
+
     if (ret < TCP_ENC_HDR_SIZE)
     {
 	tmp_errno = errno;
@@ -3291,7 +3347,8 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
  * returns 0 on success, -errno on failure.
  */
 static int work_on_send_op(method_op_p my_method_op,
-			   int *blocked_flag, int* stall_flag)
+                           int *blocked_flag,
+                           int* stall_flag)
 {
     int ret = -1;
     struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
@@ -3320,15 +3377,15 @@ static int work_on_send_op(method_op_p my_method_op,
     }
 
     ret = payload_progress(tcp_addr_data->socket,
-	my_method_op->buffer_list,
-	my_method_op->size_list,
-	my_method_op->list_count,
-	my_method_op->actual_size,
-	&(my_method_op->list_index),
-	&(my_method_op->cur_index_complete),
-	BMI_SEND,
-	tcp_op_data->env.enc_hdr,
-	&my_method_op->env_amt_complete);
+	                   my_method_op->buffer_list,
+	                   my_method_op->size_list,
+	                   my_method_op->list_count,
+	                   my_method_op->actual_size,
+	                   &(my_method_op->list_index),
+	                   &(my_method_op->cur_index_complete),
+	                   BMI_SEND,
+	                   tcp_op_data->env.enc_hdr,
+	                   &my_method_op->env_amt_complete);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: payload_progress", ret);
@@ -3338,13 +3395,16 @@ static int work_on_send_op(method_op_p my_method_op,
     }
 
     if(ret == 0)
+    {
 	*stall_flag = 1;
+    }
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     my_method_op->amt_complete += ret;
     assert(my_method_op->amt_complete <= my_method_op->actual_size);
 
-    if (my_method_op->amt_complete == my_method_op->actual_size && my_method_op->env_amt_complete == TCP_ENC_HDR_SIZE)
+    if ((my_method_op->amt_complete == my_method_op->actual_size) &&
+        (my_method_op->env_amt_complete == TCP_ENC_HDR_SIZE))
     {
 	/* we are done */
 	my_method_op->error_code = 0;
@@ -3352,7 +3412,7 @@ static int work_on_send_op(method_op_p my_method_op,
 					   my_method_op->addr);
 	op_list_remove(my_method_op);
 	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
-	    BMI_TCP_COMPLETE;
+	                BMI_TCP_COMPLETE;
 	op_list_add(completion_array[my_method_op->context_id], my_method_op);
 	*blocked_flag = 0;
     }
@@ -3375,7 +3435,7 @@ static int work_on_send_op(method_op_p my_method_op,
  *
  * returns 0 on success, -errno on failure.
  */
-static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
+static int work_on_recv_op(method_op_p my_method_op, int *stall_flag)
 {
 
     int ret = -1;
@@ -3388,15 +3448,15 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
     {
 	/* now let's try to recv some actual data */
 	ret = payload_progress(tcp_addr_data->socket,
-	    my_method_op->buffer_list,
-	    my_method_op->size_list,
-	    my_method_op->list_count,
-	    my_method_op->actual_size,
-	    &(my_method_op->list_index),
-	    &(my_method_op->cur_index_complete),
-	    BMI_RECV,
-	    NULL,
-	    0);
+	                       my_method_op->buffer_list,
+	                       my_method_op->size_list,
+	                       my_method_op->list_count,
+	                       my_method_op->actual_size,
+	                       &(my_method_op->list_index),
+	                       &(my_method_op->cur_index_complete),
+	                       BMI_RECV,
+	                       NULL,
+	                       0);
 	if (ret < 0)
 	{
             PVFS_perror_gossip("Error: payload_progress", ret);
@@ -3411,7 +3471,9 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
     }
 
     if(ret > 0)
+    {
 	*stall_flag = 0;
+    }
 
     my_method_op->amt_complete += ret;
     assert(my_method_op->amt_complete <= my_method_op->actual_size);
@@ -3437,8 +3499,9 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 	    else
 	    {
 		((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
-		    BMI_TCP_COMPLETE;
-		op_list_add(completion_array[my_method_op->context_id], my_method_op);
+                                 BMI_TCP_COMPLETE;
+		op_list_add(completion_array[my_method_op->context_id],
+                            my_method_op);
 	    }
 	}
     }
@@ -3465,12 +3528,16 @@ static int tcp_do_work_error(bmi_method_addr_p map)
     /* perform a read on the socket so that we can get a real errno */
     ret = read(tcp_addr_data->socket, &buf, sizeof(int));
     if (ret == 0)
+    {
         tmp_errno = EPIPE;  /* report other side closed socket with this */
+    }
     else
+    {
         tmp_errno = errno;
+    }
 
     gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Error: bmi_tcp: %s\n",
-      strerror(tmp_errno));
+                 strerror(tmp_errno));
 
     if (tcp_addr_data->server_port)
     {
@@ -3482,7 +3549,9 @@ static int tcp_do_work_error(bmi_method_addr_p map)
     }
 
     if(tmp_errno == 0)
+    {
 	tmp_errno = EPROTO;
+    }
 
     tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
 
@@ -3521,7 +3590,8 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
     /* setup for a fast restart to avoid bind addr in use errors */
     if (BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1) < 0)
     {
-        gossip_lerr("Could not set SO_REUSEADDR on local socket (port %hd)\n", my_local_port);
+        gossip_lerr("Could not set SO_REUSEADDR on local socket (port %hd)\n",
+                    my_local_port);
     }
     if (BMI_sockio_bind_sock(tcp_addr_data->socket, my_requested_port) < 0)
     {
@@ -3537,7 +3607,8 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
     {
         my_local_port = ntohs(my_local_sockaddr.sin_port);
     }
-    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Bound locally to port: %hd\n", my_local_port);
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                 "Bound locally to port: %hd\n", my_local_port);
     return 0;
 }
 
@@ -3566,8 +3637,8 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
     /* Don't refuse connects if there were any
      * parse errors or if it is not enabled in the config file
      */
-    if (gtcp_allowed_connection->port_enforce == 0
-            && gtcp_allowed_connection->network_enforce == 0)
+    if ((gtcp_allowed_connection->port_enforce == 0) &&
+        (gtcp_allowed_connection->network_enforce == 0))
     {
         return 0;
     }
@@ -3582,12 +3653,15 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
         for (i = 0; i < gtcp_allowed_connection->network_count; i++)
         {
             /* check with all the masks */
-            if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask[i].s_addr) 
-                    != (gtcp_allowed_connection->network[i].s_addr & gtcp_allowed_connection->netmask[i].s_addr ))
+            if ((peer_sockaddr->sin_addr.s_addr &
+                 gtcp_allowed_connection->netmask[i].s_addr) 
+                    != (gtcp_allowed_connection->network[i].s_addr &
+                        gtcp_allowed_connection->netmask[i].s_addr ))
             {
                 continue;
             }
-            else {
+            else
+            {
                 goto port_check;
             }
         }
@@ -3598,8 +3672,8 @@ port_check:
     /* make sure that the client port numbers are within specified limits */
     if (gtcp_allowed_connection->port_enforce == 1)
     {
-        if (peer_port < gtcp_allowed_connection->ports[0]
-                || peer_port > gtcp_allowed_connection->ports[1])
+        if ((peer_port < gtcp_allowed_connection->ports[0]) ||
+            (peer_port > gtcp_allowed_connection->ports[1]))
         {
             what_failed = (what_failed < 0) ? 1 : 2;
         }
@@ -3625,7 +3699,7 @@ port_check:
  *
  * returns 0 on success, -errno on failure.
  */
-static int tcp_accept_init(int *socket, char** peer)
+static int tcp_accept_init(int *socket, char **peer)
 {
 
     int ret = -1;
@@ -3634,7 +3708,7 @@ static int tcp_accept_init(int *socket, char** peer)
     int oldfl = 0;
     struct sockaddr_in peer_sockaddr;
     int peer_sockaddr_size = sizeof(struct sockaddr_in);
-    char* tmp_peer;
+    char *tmp_peer;
 
     /* do we have a socket on this end yet? */
     if (tcp_addr_data->socket < 0)
@@ -3646,8 +3720,9 @@ static int tcp_accept_init(int *socket, char** peer)
 	}
     }
 
-    *socket = accept(tcp_addr_data->socket, (struct sockaddr*)&peer_sockaddr,
-              (socklen_t *)&peer_sockaddr_size);
+    *socket = accept(tcp_addr_data->socket,
+                     (struct sockaddr*)&peer_sockaddr,
+                     (socklen_t *)&peer_sockaddr_size);
 
     if (*socket < 0)
     {
@@ -3709,7 +3784,7 @@ static int tcp_accept_init(int *socket, char** peer)
 
     /* allocate ip address string */
     tmp_peer = inet_ntoa(peer_sockaddr.sin_addr);
-    *peer = (char*)malloc(strlen(tmp_peer)+1);
+    *peer = (char *)malloc(strlen(tmp_peer)+1);
     if(!(*peer))
     {
         close(*socket);
@@ -3759,7 +3834,7 @@ static void dealloc_tcp_method_op(method_op_p old_op)
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-static int tcp_post_send_generic(bmi_op_id_t * id,
+static int tcp_post_send_generic(bmi_op_id_t *id,
                                  bmi_method_addr_p dest,
                                  const void *const *buffer_list,
                                  const bmi_size_t *size_list,
@@ -3790,14 +3865,16 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         }
     }
 
-    PINT_EVENT_START(
-        bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
-        PINT_HINT_GET_CLIENT_ID(hints),
-        PINT_HINT_GET_REQUEST_ID(hints),
-        PINT_HINT_GET_RANK(hints),
-        PINT_HINT_GET_HANDLE(hints),
-        PINT_HINT_GET_OP_ID(hints),
-        total_size);
+    PINT_EVENT_START(bmi_tcp_send_event_id,
+                     bmi_tcp_pid,
+                     NULL,
+                     &eid,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     PINT_HINT_GET_HANDLE(hints),
+                     PINT_HINT_GET_OP_ID(hints),
+                     total_size);
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -3828,11 +3905,20 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     if (query_op)
     {
         /* queue up operation */
-        ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-                                dest, (void **) buffer_list,
-                                size_list, list_count, 0, 0,
-                                id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-                                my_header.size, 0,
+        ret = enqueue_operation(op_list_array[IND_SEND],
+                                BMI_SEND,
+                                dest,
+                                (void **) buffer_list,
+                                size_list,
+                                list_count,
+                                0,
+                                0,
+                                id,
+                                BMI_TCP_INPROGRESS,
+                                my_header,
+                                user_ptr,
+                                my_header.size,
+                                0,
                                 context_id,
                                 eid);
 
@@ -3886,11 +3972,20 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     if (tcp_addr_data->not_connected)
     {
 	/* if the connection is not completed, queue up for later work */
-	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-				dest, (void **) buffer_list, size_list,
-				list_count, 0, 0,
-				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-				my_header.size, 0,
+	ret = enqueue_operation(op_list_array[IND_SEND],
+                                BMI_SEND,
+				dest,
+                                (void **) buffer_list,
+                                size_list,
+				list_count,
+                                0,
+                                0,
+				id,
+                                BMI_TCP_INPROGRESS,
+                                my_header,
+                                user_ptr,
+				my_header.size,
+                                0,
 				context_id,
                                 eid);
 	if(ret < 0)
@@ -3903,9 +3998,15 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     /* try to send some data */
     env_amt_complete = 0;
     ret = payload_progress(tcp_addr_data->socket,
-	(void **) buffer_list,
-	size_list, list_count, my_header.size, &list_index,
-	&cur_index_complete, BMI_SEND, my_header.enc_hdr, &env_amt_complete);
+	                   (void **) buffer_list,
+	                   size_list,
+                           list_count,
+                           my_header.size,
+                           &list_index,
+	                   &cur_index_complete,
+                           BMI_SEND,
+                           my_header.enc_hdr,
+                           &env_amt_complete);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: payload_progress", ret);
@@ -3921,18 +4022,32 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     if (amt_complete == my_header.size && env_amt_complete == TCP_ENC_HDR_SIZE)
     {
         /* we are already done */
-        PINT_EVENT_END(bmi_tcp_send_event_id, bmi_tcp_pid,
-                       NULL, eid, 0, amt_complete);
+        PINT_EVENT_END(bmi_tcp_send_event_id,
+                       bmi_tcp_pid,
+                       NULL,
+                       eid,
+                       0,
+                       amt_complete);
         return (1);
     }
 
     /* queue up the remainder */
-    ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
-                            dest, (void **) buffer_list,
-                            size_list, list_count,
-                            amt_complete, env_amt_complete, id,
-                            BMI_TCP_INPROGRESS, my_header, user_ptr,
-                            my_header.size, 0, context_id, eid);
+    ret = enqueue_operation(op_list_array[IND_SEND],
+                            BMI_SEND,
+                            dest,
+                            (void **) buffer_list,
+                            size_list,
+                            list_count,
+                            amt_complete,
+                            env_amt_complete,
+                            id,
+                            BMI_TCP_INPROGRESS,
+                            my_header,
+                            user_ptr,
+                            my_header.size,
+                            0,
+                            context_id,
+                            eid);
 
     if(ret < 0)
     {
@@ -3948,10 +4063,16 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
  *
  * returns amount completed on success, -errno on failure
  */
-static int payload_progress(int s, void *const *buffer_list, const bmi_size_t* 
-    size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
-    char* enc_hdr, bmi_size_t* env_amt_complete)
+static int payload_progress(int s,
+                            void *const *buffer_list,
+                            const bmi_size_t *size_list,
+                            int list_count,
+                            bmi_size_t total_size,
+                            int *list_index,
+                            bmi_size_t *current_index_complete,
+                            enum bmi_op_type send_recv,
+                            char *enc_hdr,
+                            bmi_size_t *env_amt_complete)
 {
     int i;
     int count = 0;
@@ -3968,7 +4089,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     if(send_recv == BMI_RECV)
     {
 	/* find out if we should stop short in list processing */
-	for(i=0; i<list_count; i++)
+	for(i = 0; i < list_count; i++)
 	{
 	    sum += size_list[i];
 	    if(sum >= total_size)
@@ -3989,22 +4110,24 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     }
 
     /* do we need to send any of the header? */
-    if(send_recv == BMI_SEND && *env_amt_complete < TCP_ENC_HDR_SIZE)
+    if((send_recv == BMI_SEND) && (*env_amt_complete < TCP_ENC_HDR_SIZE))
     {
 	stat_io_vector[vector_index].iov_base = &enc_hdr[*env_amt_complete];
-	stat_io_vector[vector_index].iov_len = TCP_ENC_HDR_SIZE - *env_amt_complete;
+	stat_io_vector[vector_index].iov_len = TCP_ENC_HDR_SIZE -
+                                               *env_amt_complete;
 	count++;
 	vector_index++;
 	header_flag = 1;
     }
 
     /* setup vector */
-    stat_io_vector[vector_index].iov_base = 
-	(char*)buffer_list[*list_index] + *current_index_complete;
+    stat_io_vector[vector_index].iov_base = (char*)buffer_list[*list_index] +
+                                            *current_index_complete;
     count++;
     if(final_index == 0)
     {
-	stat_io_vector[vector_index].iov_len = final_size - *current_index_complete;
+	stat_io_vector[vector_index].iov_len = final_size -
+                                               *current_index_complete;
     }
     else
     {
@@ -4040,9 +4163,13 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
 
     /* if error or nothing done, return now */
     if(ret == 0)
-	return(0);
+    {
+        return(0);
+    }
     if(ret <= 0)
-	return(bmi_tcp_errno_to_pvfs(-errno));
+    {
+        return(bmi_tcp_errno_to_pvfs(-errno));
+    }
 
     completed = ret;
     if(header_flag && (completed >= 0))
@@ -4050,7 +4177,9 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
 	/* take care of completed header status */
 	tmp_env_done = TCP_ENC_HDR_SIZE - *env_amt_complete;
 	if(tmp_env_done > completed)
+        {
 	    tmp_env_done = completed;
+        }
 	completed -= tmp_env_done;
 	ret -= tmp_env_done;
 	(*env_amt_complete) += tmp_env_done;
@@ -4077,18 +4206,27 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     return(ret);
 }
 
-static void bmi_set_sock_buffers(int socket){
-	//Set socket buffer sizes:
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Default socket buffers send:%d receive:%d\n",
-		GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Setting socket buffer size for send:%d receive:%d \n",
-		tcp_buffer_size_send, tcp_buffer_size_receive);
+static void bmi_set_sock_buffers(int socket)
+{
+    //Set socket buffer sizes:
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                 "Default socket buffers send:%d receive:%d\n",
+    	         GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                 "Setting socket buffer size for send:%d receive:%d \n",
+                 tcp_buffer_size_send, tcp_buffer_size_receive);
     if( tcp_buffer_size_receive != 0)
-         SET_RECVBUFSIZE(socket,tcp_buffer_size_receive);
+    {
+        SET_RECVBUFSIZE(socket,tcp_buffer_size_receive);
+    }
     if( tcp_buffer_size_send != 0)
-         SET_SENDBUFSIZE(socket,tcp_buffer_size_send);
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Reread socket buffers send:%d receive:%d\n",
-		GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
+    {
+        SET_SENDBUFSIZE(socket,tcp_buffer_size_send);
+
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                     "Reread socket buffers send:%d receive:%d\n",
+                     GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
+    }
 }
 
 /*

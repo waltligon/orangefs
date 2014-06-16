@@ -13,7 +13,10 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-cached-config.h"
 #include "pint-security.h"
+#include "pint-util.h"
+
 
 %%
 
@@ -60,12 +63,16 @@ static int mgmt_get_dirdata_handle_from_parent(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
-
+    /* TJS: fill in with proper function call */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.readdir.fs_id, 
+                                         &(s_op->metasidcnt));
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-
-    s_op->val.buffer = &s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->u.mgmt_get_dirdata_handle.keyval_temp_array = malloc(
+                            OSASZ(1, s_op->metasidcnt));
+    s_op->val.buffer = s_op->u.mgmt_get_dirdata_handle.keyval_temp_array;
+    s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
@@ -93,17 +100,27 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
-        s_op->resp.u.mgmt_get_dirdata_handle.handle =
-            s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
-
+        if(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array){
+            s_op->resp.u.mgmt_get_dirdata_handle.handle =
+                (PVFS_handle) s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[0].oid;
+            s_op->resp.u.mgmt_get_dirdata_handle.sid_array = 
+                        malloc(SASZ(s_op->metasidcnt));
+            memcpy(s_op->resp.u.mgmt_get_dirdata_handle.sid_array,
+                        (PVFS_SID *) &(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array[1]),
+                        SASZ(s_op->metasidcnt));
+            free(s_op->u.mgmt_get_dirdata_handle.keyval_temp_array);
+            s_op->resp.u.mgmt_get_dirdata_handle.sid_count = s_op->metasidcnt;
+        }
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "  Found dirdata handle %s of parent %s\n",
-            PVFS_OID_str(&s_op->u.mgmt_get_dirdata_handle.dirdata_handle),
+            PVFS_OID_str(&s_op->resp.u.mgmt_get_dirdata_handle.handle),
             PVFS_OID_str(&s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
     else
     {
         s_op->resp.u.mgmt_get_dirdata_handle.handle = PVFS_HANDLE_NULL;
+        s_op->resp.u.mgmt_get_dirdata_handle.sid_array = NULL;
+        s_op->resp.u.mgmt_get_dirdata_handle.sid_count = 0;
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to retrieve dirdata "
                     "handle from parent %s\n",

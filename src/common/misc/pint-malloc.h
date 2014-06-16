@@ -62,7 +62,7 @@ extern void  PINT_free(void *mem);
 # define PVFS_MALLOC_FREE_ZERO 1
 #endif
 
-#define PVFS_MALLOC_MAGIC_NUM 0xFAE00000
+#define PVFS_MALLOC_MAGIC_NUM 0xF0E1D2C3B4A59687
 
 #if PVFS_MALLOC_REDEF
 

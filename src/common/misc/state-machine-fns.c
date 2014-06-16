@@ -130,9 +130,10 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     const char * machine_name;
     int children_started = 0;
 
-    if (!(smcb) || !(smcb->current_state) ||
+    if (!(smcb) ||
+        !(smcb->current_state) ||
         !(smcb->current_state->flag == SM_RUN ||
-        smcb->current_state->flag == SM_PJMP) ||
+          smcb->current_state->flag == SM_PJMP) ||
         !(smcb->current_state->action.func))
     {
         gossip_err("SM invoke called on invalid smcb or state\n");
@@ -308,7 +309,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
                 }
                 if (!smcb->op_terminate)
                 {
-	            gossip_lerr("Error: state machine reached terminate"
+	              gossip_lerr("Error: state machine reached terminate"
                             " without returning SM_ACTION_TERMINATE\n");
                     smcb->op_terminate = 1;
                 }
@@ -699,6 +700,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 
         if (frame_entry->frame && frame_entry->task_id == 0)
         {
+            /* V3 - are we assured this frame has had any referenced
+             * memory freed.  Shouldn't we call a specific free routine
+             * on it to make sure and free anything remaining, rather
+             * than the generic free?
+             */
             /* only free if task_id is 0 */
             free(frame_entry->frame);
         } 

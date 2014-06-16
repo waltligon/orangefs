@@ -42,15 +42,22 @@ enum PVFS_server_op parent_check_ops[] = {PVFS_SERV_REMOVE,
                                           PVFS_SERV_TREE_REMOVE};
 #define PARENT_CHECK_OP_COUNT    2
 
-static int check_mode(enum access_type access, PVFS_uid userid,
-    PVFS_gid group, const PVFS_object_attr *attr);
-static int check_acls(void *acl_buf, size_t acl_size, 
-    const PVFS_object_attr *attr, PVFS_uid uid, PVFS_gid *group_array, 
-    uint32_t num_groups, int want);
+static int check_mode(enum access_type access,
+                      PVFS_uid userid,
+                      PVFS_gid group,
+                      const PVFS_object_attr *attr);
+static int check_acls(void *acl_buf,
+                      size_t acl_size,
+                      const PVFS_object_attr *attr,
+                      PVFS_uid uid,
+                      PVFS_gid *group_array,
+                      uint32_t num_groups,
+                      int want);
 static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
-    PVFS_BMI_addr_t client_addr);
+                                PVFS_BMI_addr_t client_addr);
 static int permit_operation(PVFS_fs_id fsid,
-    enum PINT_server_req_access_type access_type, PVFS_BMI_addr_t client_addr);
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr);
 
 
 /* PINT_get_capabilities
@@ -92,22 +99,37 @@ int PINT_get_capabilities(void *acl_buf,
            give anyone free access.
         */
 
-        ret = check_acls(acl_buf, acl_size, attr, userid, 
-                         group_array, num_groups, PVFS2_ACL_READ);
+        ret = check_acls(acl_buf,
+                         acl_size,
+                         attr,
+                         userid,
+                         group_array,
+                         num_groups,
+                         PVFS2_ACL_READ);
         if (!ret)
         {
             *op_mask |= PINT_CAP_READ;
         }
 
-        ret = check_acls(acl_buf, acl_size, attr, userid,
-                         group_array, num_groups, PVFS2_ACL_WRITE);
+        ret = check_acls(acl_buf,
+                         acl_size,
+                         attr,
+                         userid,
+                         group_array,
+                         num_groups,
+                         PVFS2_ACL_WRITE);
         if (!ret)
         {
             *op_mask |= PINT_CAP_WRITE;
         }
 
-        ret = check_acls(acl_buf, acl_size, attr, userid,
-                         group_array, num_groups, PVFS2_ACL_EXECUTE);
+        ret = check_acls(acl_buf,
+                         acl_size,
+                         attr,
+                         userid,
+                         group_array,
+                         num_groups,
+                         PVFS2_ACL_EXECUTE);
         if (!ret)
         {
             *op_mask |= PINT_CAP_EXEC;
@@ -225,9 +247,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         else {
             /* check parent object permissions */
             PVFS_handle *parent_handle = (PVFS_handle *)
-                PINT_hint_get_value_by_type(s_op->req->hints, 
-                                            PINT_HINT_HANDLE, 
-                                            NULL);
+                                PINT_hint_get_value_by_type(s_op->req->hints, 
+                                                            PINT_HINT_HANDLE, 
+                                                            NULL);
             if (parent_handle == NULL)
             {
                 gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Could not retrieve "
@@ -278,9 +300,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
 }
 
 static int check_mode(enum access_type access, 
-               PVFS_uid userid, 
-               PVFS_gid group,
-               const PVFS_object_attr *attr)
+                      PVFS_uid userid, 
+                      PVFS_gid group,
+                      const PVFS_object_attr *attr)
 {
     int user_other_access = 0;
     int group_access = 0;
@@ -373,7 +395,7 @@ static int check_acls(void *acl_buf,
     if (acl_size == 0)
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
-            "no acl's present..check metadata instead!\n");
+                     "no acl's present..check metadata instead!\n");
         return -PVFS_EIO;
     }
 
@@ -384,10 +406,10 @@ static int check_acls(void *acl_buf,
     acl_size -= sizeof(pvfs2_acl_header);
 #endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
-        " %d (%d acl entries)\n",
-        (int) acl_size, (int) (acl_size / sizeof(pvfs2_acl_entry)));
+                 " %d (%d acl entries)\n",
+                 (int) acl_size, (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
-        uid, group_array[0], want);
+                 uid, group_array[0], want);
 
     assert(acl_buf);
     /* if the acl format doesn't look valid, then return an error rather than
@@ -421,18 +443,22 @@ static int check_acls(void *acl_buf,
         pe.p_id   = bmitoh32(pa->p_id);
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
-            "(p_tag %d, p_perm %d, p_id %d)\n",
-            i, pa->p_tag, pa->p_perm, pa->p_id);
+                     "(p_tag %d, p_perm %d, p_id %d)\n",
+                     i, pa->p_tag, pa->p_perm, pa->p_id);
         switch(pa->p_tag) 
         {
             case PVFS2_ACL_USER_OBJ:
                 /* (May have been checked already) */
                 if (attr->owner == uid)
+                {
                     goto check_perm;
+                }
                 break;
             case PVFS2_ACL_USER:
                 if (pa->p_id == uid)
+                {
                     goto mask;
+                }
                 break;
             case PVFS2_ACL_GROUP_OBJ:
                 for (j = 0; j < num_groups; j++)
@@ -441,7 +467,9 @@ static int check_acls(void *acl_buf,
                     {
                         found = 1;
                         if ((pa->p_perm & want) == want)
+                        {
                             goto mask;
+                        }
                         break;
                     }
                 }
@@ -453,7 +481,9 @@ static int check_acls(void *acl_buf,
                     {
                         found = 1;
                         if ((pa->p_perm & want) == want)
+                        {
                             goto mask;
+                        }
                         break;
                     }
                 }
@@ -463,19 +493,20 @@ static int check_acls(void *acl_buf,
             case PVFS2_ACL_OTHER:
                 if (found)
                 {
-                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
-                        "returning EIO\n");
+                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                                 "(1) PINT_check_acls: returning EIO\n");
                     return -PVFS_EIO;
                 }
                 else
                     goto check_perm;
             default:
-                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(2) PINT_check_acls: "
-                        "returning EIO\n");
+                gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                             "(2) PINT_check_acls: returning EIO\n");
                 return -PVFS_EIO;
         }
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(3) PINT_check_acls: returning EIO\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                 "(3) PINT_check_acls: returning EIO\n");
     return -PVFS_EIO;
 mask:
     /* search the remaining entries */
@@ -488,31 +519,35 @@ mask:
         pvfs2_acl_entry me, *mask_obj = &(ph->p_entries[i]);        
 #endif
         /* 
-          NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
-          convert it to host endian format
+         * NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
+         * convert it to host endian format
          */
         me.p_tag  = bmitoh32(mask_obj->p_tag);
         me.p_perm = bmitoh32(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
-            "(p_tag %d, p_perm %d, p_id %d)\n",
-            i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
+                     "(p_tag %d, p_perm %d, p_id %d)\n",
+                     i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
         if (mask_obj->p_tag == PVFS2_ACL_MASK) 
         {
             if ((pa->p_perm & mask_obj->p_perm & want) == want)
+            {
                 return 0;
+            }
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(4) PINT_check_acls:"
-                "returning access denied (mask)\n");
+                         "returning access denied (mask)\n");
             return -PVFS_EACCES;
         }
     }
 
 check_perm:
     if ((pa->p_perm & want) == want)
+    {
         return 0;
+    }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(5) PINT_check_acls: returning"
-            "access denied\n");
+                 "access denied\n");
     return -PVFS_EACCES;
 }
 
@@ -571,8 +606,9 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig,
                      lld(client_addr), fsconfig->ro_hosts[i]);
         /* Does the client address match the wildcard specification and/or 
            the netmask specification? */
-        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
-                fsconfig->ro_netmasks[i]) == 1)
+        if (BMI_query_addr_range(client_addr,
+                                 fsconfig->ro_hosts[i],
+                                 fsconfig->ro_netmasks[i]) == 1)
         {
             return 1;
         }

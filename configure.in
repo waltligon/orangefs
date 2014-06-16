@@ -1078,9 +1078,9 @@ AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
-    [  --enable-shared         Build shared client library],
+    [  --disable-shared        Do not build shared client library],
     [build_shared=$enableval],
-    [build_shared=no])
+    [build_shared=yes])
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static
@@ -1091,7 +1091,7 @@ fi
 
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
-    [  --disable-threaded      Do not build threaded client library],
+    [  --enable-threaded       Build threaded client library],
     [if "x$THREADED_KMOD_HELPER = xyes" ; then
          build_threaded=yes
          AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
@@ -1099,7 +1099,7 @@ AC_ARG_ENABLE(threaded,
          build_threaded=$enableval
      fi
     ],
-    [build_threaded=yes])
+    [build_threaded=no])
 AC_SUBST(build_threaded)
 
 dnl Method to disable build of user interface libraries
