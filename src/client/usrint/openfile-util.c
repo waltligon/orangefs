@@ -1994,11 +1994,6 @@ static void put_status(pvfs_descriptor_status *pds)
         gossip_lerr(" bad fds in put_status\n");
         return;
     }
-    if (pds->pvfs_ref)
-    {
-        /* this was allocated in pvfs_alloc_descriptor */
-        free(pds->pvfs_ref);
-    }
     memset(pds, 0, sizeof(pvfs_descriptor_status));
     pvfs_desc_free(dstat, &stat_index);
 }
