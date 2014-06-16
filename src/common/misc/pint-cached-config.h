@@ -48,6 +48,8 @@ int PINT_cached_config_get_server(
 int PINT_cached_config_server_local(
                 const PVFS_SID *sid);
 
+/* This appears to be obsolete */
+#if 0
 int PINT_cached_config_get_next_meta(
                 PVFS_fs_id fsid,
                 PVFS_BMI_addr_t *meta_addr,
@@ -59,8 +61,6 @@ int PINT_cached_config_get_io(
                 PVFS_BMI_addr_t *io_addr,
                 PVFS_handle_extent_array *ext_array);
 
-/* This appears to be obsolete */
-#if 0
 int PINT_cached_config_get_next_io(
                 PVFS_fs_id fsid,
                 int num_servers,
@@ -89,7 +89,6 @@ int PINT_cached_config_map_to_server(
                 PVFS_BMI_addr_t *server_addr,
                 PVFS_handle handle,
                 PVFS_fs_id fs_id);
-#endif
 
 int PINT_cached_config_map_servers(
                 PVFS_fs_id fsid,
@@ -97,6 +96,7 @@ int PINT_cached_config_map_servers(
                 PVFS_sys_layout *layout,
                 PVFS_BMI_addr_t *addr_array,
                 PVFS_handle_extent_array *handle_extent_array);
+#endif
 
 int PINT_cached_config_get_num_dfiles(
                 PVFS_fs_id fsid,

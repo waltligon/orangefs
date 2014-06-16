@@ -992,11 +992,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 {
                     decode_free(req->u.create.layout.server_list.servers); 
                 }
-                */
                 if (req->u.create.datafile_handles)
                 {
                     decode_free(req->u.create.datafile_handles);
                 }
+                */
+                /* all of the OIDs and SIDs arrays are malloced with 1
+                 * call - sid_array points to the buffer
+                 */
                 if (req->u.create.sid_array)
                 {
                     decode_free(req->u.create.sid_array);
@@ -1059,19 +1062,16 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 {
                     decode_free(req->u.setattr.attr.u.meta.dfile_array);
                 }
-                if (req->u.setattr.attr.mask &
-                    PVFS_ATTR_DISTDIR_ATTR)
+                if (req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
                 {
                     if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
                     {
-                        decode_free
-                            (req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                        decode_free(req->u.setattr.attr.u.dir.dist_dir_bitmap);
                         req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
                     }
                     if(req->u.setattr.attr.u.dir.dirdata_handles)
                     {
-                        decode_free
-                            (req->u.setattr.attr.u.dir.dirdata_handles);
+                        decode_free(req->u.setattr.attr.u.dir.dirdata_handles);
                         req->u.setattr.attr.u.dir.dirdata_handles = NULL;
                     }
                 }
@@ -1210,8 +1210,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 
                 case PVFS_SERV_CREATE:
                     decode_free(resp->u.create.capability.signature);
-                    decode_free(resp->u.create.capability.handle_array);
                     /* V3 remove this:
+                    decode_free(resp->u.create.capability.handle_array);
                     decode_free(resp->u.create.datafile_handles); */
                     break;
 

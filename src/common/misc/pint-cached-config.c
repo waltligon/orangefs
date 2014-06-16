@@ -464,7 +464,7 @@ int PINT_cached_config_server_local(const PVFS_SID *sid)
 #endif
 
 /* V3 becomes SID cache function */
-
+#if 0
 /* PINT_cached_config_get_next_meta()
  *
  * returns the bmi address of a random server that should be used to
@@ -569,6 +569,7 @@ int PINT_cached_config_get_next_meta(PVFS_fs_id fs_id,
     }
     return ret;
 }
+#endif
 
 /* V3 no more extents - but this may be call path for getting servers
  * */
@@ -629,7 +630,7 @@ static int PINT_cached_config_get_extents(
 #endif
 
 /* V3 becomes SID cache function */
-
+#if 0
 int PINT_cached_config_map_servers(
                                  PVFS_fs_id fs_id,
                                  int *inout_num_datafiles,
@@ -914,6 +915,7 @@ int PINT_cached_config_map_servers(
     return 0;
 
 }
+#endif
 
 /* THIS APPEARS TO BE SUPERCEDED BY THE PREVIOUS FUNCTION*/
 #if 0
@@ -1658,9 +1660,9 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
                                        const char ***server_names,
                                        int *server_count)
 {
-    int num_io_servers, ret, i;
+    int num_io_servers, ret/*, i*/;
     PVFS_BMI_addr_t *server_addrs;
-    const char **servers;
+    /*const char **servers;*/
 
     /* This was run on client before sending request
      * Not clear if total number of IO servers makes sense any more, or
@@ -1700,6 +1702,13 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
     /* could (should) this limit have been applied client side?
      * is layout going to be subsumed by a SIDcache query?
      */
+    /* V3 WBL This is no longer a viable function call
+     * we have much more complex calls to allocated OIDs and SIDs
+     * and there is no longer a statis list of servers
+     * for now I'm just taking this call out but the whole
+     * function (get_server_list) is going to need a rewrite
+     */
+#if 0
     ret = PINT_cached_config_map_servers(fs_id,
                                          &num_io_servers,
                                          layout,
@@ -1725,8 +1734,9 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
     }
     free(server_addrs);
 
-    *server_count = num_io_servers;
     *server_names = servers;
+#endif
+    *server_count = num_io_servers;
 
     return 0;
 }

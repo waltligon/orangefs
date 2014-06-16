@@ -123,7 +123,7 @@ typedef struct PINT_sm_getattr_state
     int keep_size_array;
     int *active_dirdata_index;
 
-    PVFS_size * size_array;
+    PVFS_size *size_array;
     PVFS_size size;
 
     int flags;
@@ -190,23 +190,28 @@ struct PINT_client_create_sm
     PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
-    int num_data_files;
     int user_requested_num_data_files;
     int stored_error_code;
 
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    int datafile_count;        /* metaobject stored in sm_p->object_ref */
+    PVFS_handle *metadata_handle;
+    int metadata_sid_count;
+    PVFS_SID *metadata_sid_array;
+
+    int datafile_count;
     PVFS_handle *datafile_handles;
-    int sid_count;
-    PVFS_SID *sid_array;
+    int datafile_sid_count;
+    PVFS_SID *datafile_sid_array;
 
     int stuffed;
     PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
+    int dirent_sid_count;
+    PVFS_SID *dirent_sid_array;
 
     PVFS_handle handles[2];
 };

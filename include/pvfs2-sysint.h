@@ -47,10 +47,10 @@ struct PVFS_sys_attr_s
     PVFS_time ctime;
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
-    PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial); /* Changed to int32_t so that size of structure does not change */
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max); /* Changed to int32_t so that size of structure does not change */
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size); /* Changed to int32_t so that size of structure does not change */
+    PVFS2_ALIGN_VAR(int32_t, dfile_count);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size);
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
     PVFS2_ALIGN_VAR(char*, dist_name);   /**< NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(char*, dist_params); /**< NOTE: caller must free if valid */
@@ -66,13 +66,12 @@ typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 struct PVFS_sys_mntent
 {
     char **pvfs_config_servers;	/**< addresses of servers with config info */
-    int32_t num_pvfs_config_servers; /**< changed to int32_t so that size of structure does not change */
+    int32_t num_pvfs_config_servers;
     char *the_pvfs_config_server; /**< first of the entries above that works */
     char *pvfs_fs_name;		  /**< name of PVFS2 file system */
     enum PVFS_flowproto_type flowproto;	/**< flow protocol */
     enum PVFS_encoding_type encoding;   /**< wire data encoding */
     PVFS_fs_id fs_id; /**< fs id, filled in by system interface when it looks up the fs */
-    /* int32_t for portable, fixed size structure */
     int32_t default_num_dfiles; /**< Default number of dfiles mount option value */
     int32_t integrity_check; /**< Check to determine whether the mount process must perform the integrity checks on the config files */
     /* the following fields are included for convenience;
@@ -162,23 +161,23 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
-    PVFS_dirent *dirent_array;
-    uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
-    PVFS_SID *sid_array;
+    PVFS_dirent *dirent_array; /* V3 should SIDs be in dirent */
+    uint32_t pvfs_dirent_outcount;
+    PVFS_SID *sid_array;       /* and not in a distinct array */
     uint32_t sid_count;
     uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 
-/** Holds results of a readdirplus operation (position token, directory version
- *  information, array of directory entries, array of stat error codes and array of
- *  attribute information).
+/** Holds results of a readdirplus operation (position token,
+ * directory version information, array of directory entries,
+ * array of stat error codes and array of attribute information).
  */
 struct PVFS_sysresp_readdirplus_s
 {
     PVFS_ds_position token;
     PVFS_dirent   *dirent_array;
-    uint32_t      pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
+    uint32_t      pvfs_dirent_outcount;
     uint64_t      directory_version;
     PVFS_error    *stat_err_array; 
     PVFS_sys_attr *attr_array;
@@ -192,7 +191,7 @@ typedef struct PVFS_sysresp_readdirplus_s PVFS_sysresp_readdirplus;
 struct PVFS_sysresp_statfs_s
 {
     PVFS_statfs statfs_buf;
-    int32_t server_count; /* int32_t for portable, fixed size structure */
+    int32_t server_count;
 };
 typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
 

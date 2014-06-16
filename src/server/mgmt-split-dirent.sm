@@ -95,6 +95,11 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
     job_id_t j_id;
     int j;
     TROVE_ds_flags keyval_flags;
+    PVFS_ID *val_buffer_entry_point = 
+                            s_op->u.mgmt_split_dirent.keyval_temp_store;
+    /* This is a tmp hack, FIXME */
+    PVFS_SID *sid_array_entry_point = NULL;
+            /*s_op->req->u.mgmt_split_dirent.sid_array;*/
 
     assert(PVFS_OID_cmp(&s_op->req->u.mgmt_split_dirent.dest_dirent_handle,
                         &PVFS_HANDLE_NULL));
@@ -107,9 +112,6 @@ static PINT_sm_action mgmt_split_dirent_write_directory_entries(
                                   s_op->metasidcnt)
                                  )
                                 );
-    PVFS_ID *val_buffer_entry_point = 
-                            s_op->u.mgmt_split_dirent.keyval_temp_store;
-    PVFS_SID *sid_array_entry_point = s_op->req->u.mgmt_split_dirent.sid_array;
     js_p->error_code = 0;
 
     if (s_op->req->u.mgmt_split_dirent.nentries < 1)

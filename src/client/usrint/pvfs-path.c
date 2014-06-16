@@ -246,6 +246,8 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                     */
                     Ppath->fs_id = obj_ref.fs_id;
                     Ppath->handle = obj_ref.handle;
+                    Ppath->sid_count = obj_ref.sid_count;
+                    Ppath->sid_array = obj_ref.sid_array;
                     Ppath->filename = npath;
                     SET_LOOKEDUP(Ppath);
                 }
@@ -395,6 +397,8 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
         {
             Ppath->fs_id = obj_ref.fs_id;
             Ppath->handle = obj_ref.handle;
+            Ppath->sid_count = obj_ref.sid_count;
+            Ppath->sid_array = obj_ref.sid_array;
             Ppath->filename = npath;
             SET_LOOKEDUP(Ppath);
         }

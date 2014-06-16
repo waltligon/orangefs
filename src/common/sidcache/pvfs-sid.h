@@ -42,16 +42,30 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid);
  * _n versions require number of bmi_addr in the provided buffer and
  * return the number actually read in n
  */
-int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, 
+                              PVFS_SID *sid,
+                              uint32_t stype);
 int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr, 
+                                PVFS_SID *sid,
                                 int *n, /* inout */
                                 uint32_t stype);
 
-int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr, uint32_t stype);
+int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
+                             PVFS_SID *sid,
+                             uint32_t stype);
 int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr, 
+                               PVFS_SID *sid,
                                int *n, /* inout */
                                uint32_t stype);
 
+int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
+                      PVFS_handle *handle,
+                      uint32_t sid_count,
+                      PVFS_SID **sid_array,
+                      uint32_t datafile_count,
+                      PVFS_handle **datafile_handles,
+                      uint32_t datafile_sid_count,
+                      PVFS_SID **datafile_sid_array);
 #endif
 
 /*

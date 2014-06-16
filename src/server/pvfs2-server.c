@@ -559,7 +559,7 @@ static int server_get_remote_config(
         goto error_exit;
     }
     /* Find a config server in the SID cache */
-    ret = PVFS_SID_get_server_first(&bmi_addr, SID_SERVER_CONFIG);
+    ret = PVFS_SID_get_server_first(&bmi_addr, NULL, SID_SERVER_CONFIG);
 
     PINT_server_get_config(server_config, mntent, credential, NULL);
 

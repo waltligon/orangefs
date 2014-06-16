@@ -181,13 +181,16 @@ typedef enum
 
 struct PINT_server_create_op
 {
+/* V3 */
+#if 0
     const char **io_servers;
     const char **remote_io_servers;
     int num_io_servers;
-    PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
-    int handle_array_local_count;
     int handle_array_remote_count;
+#endif
+    PVFS_handle* handle_array_local; 
+    int handle_array_local_count;
     PVFS_error saved_error_code;
     int handle_index;
 };
@@ -494,7 +497,7 @@ struct PINT_server_mgmt_split_dirent_op
     PVFS_ID *keyval_temp_store;
 };
 
-/* WBL V# removing precreate */
+/* WBL V3 removing precreate */
 #if 0
 struct PINT_server_precreate_pool_refiller_op
 {

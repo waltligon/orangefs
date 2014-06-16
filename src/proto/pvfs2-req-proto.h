@@ -225,13 +225,17 @@ struct PVFS_servreq_create
     PVFS_credential credential;
     PVFS_object_attr attr;
     PVFS_handle handle;            /* metafile */
-    PVFS_handle parent;            /* back pointer */
-    PVFS_SID parent_sid;           /* back pointer */
+    int32_t sid_count;             /* number of sids per metadata */
+    PVFS_SID *sid_array;           /* sids for metafile - reflexive */
+    PVFS_handle *parent;           /* pointer to back pointer handle */
+    PVFS_SID *parent_sid_array;    /* sids for back pointer */
     int32_t datafile_count;        /* number of datafiles sent */
     PVFS_handle *datafile_handles; /* array of datafile handles */
-    int32_t sid_count;             /* number of sids per datafile */
-    PVFS_SID *sid_array;           /* array of sids */
+    int32_t datafile_sid_count;    /* number of sids per datafile */
+    PVFS_SID *datafile_sid_array;  /* sids for datafiles */
 };
+
+#if 0
 endecode_fields_7a1a_struct(
     PVFS_servreq_create,
     PVFS_fs_id, fs_id,
@@ -244,8 +248,82 @@ endecode_fields_7a1a_struct(
     int32_t, datafile_count,
     PVFS_handle, datafile_handles,
     skip4,,
-    int32_t, sid_count,
+    int32_t, sid_count, /* this is non-standard this is # per handle */
     PVFS_SID, sid_array);
+#endif
+
+/* custom encode/decode macros */
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_create(pptr,x) do {                           \
+   int i;                                                                 \
+   encode_PVFS_fs_id((pptr), &(x)->fs_id);                                \
+   encode_PVFS_credential((pptr), &(x)->credential);                      \
+   encode_PVFS_object_attr((pptr), &(x)->attr);                           \
+   encode_uint32_t((pptr), &(x)->sid_count);                              \
+   encode_uint32_t((pptr), &(x)->datafile_count);                         \
+   encode_uint32_t((pptr), &(x)->datafile_sid_count);                     \
+   (pptr) += 4;                                                           \
+   encode_PVFS_handle((pptr), &(x)->handle);                              \
+   for (i = 0; i < (x)->sid_count; i++)                                   \
+   {                                                                      \
+       encode_PVFS_SID((pptr), &(x)->sid_array[i]);                       \
+   }                                                                      \
+   encode_PVFS_handle((pptr), (x)->parent);                               \
+   for (i = 0; i < (x)->sid_count; i++)                                   \
+   {                                                                      \
+       encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);                \
+   }                                                                      \
+   for (i = 0; i < (x)->datafile_count; i++)                              \
+   {                                                                      \
+       encode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             \
+   }                                                                      \
+   for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  \
+   {                                                                      \
+       encode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              \
+   }                                                                      \
+} while (0)
+
+#define decode_PVFS_servreq_create(pptr,x) do {                           \
+   int i;                                                                 \
+   decode_PVFS_fs_id((pptr), &(x)->fs_id);                                \
+   decode_PVFS_credential((pptr), &(x)->credential);                      \
+   decode_PVFS_object_attr((pptr), &(x)->attr);                           \
+   decode_uint32_t((pptr), &(x)->sid_count);                              \
+   decode_uint32_t((pptr), &(x)->datafile_count);                         \
+   decode_uint32_t((pptr), &(x)->datafile_sid_count);                     \
+   (pptr) += 4;                                                           \
+   (x)->sid_array = decode_malloc(                                        \
+                 SASZ((x)->sid_count) +                                   \
+                 OSASZ(1,(x)->sid_count) +                                \
+                 OSASZ((x)->datafile_count,(x)->datafile_sid_count));     \
+   (x)->parent = (PVFS_handle *)((x)->sid_array + SASZ((x)->sid_count));  \
+   (x)->parent_sid_array = (PVFS_SID *)((x)->parent + 1);                 \
+   (x)->datafile_handles = (PVFS_handle *)((x)->parent_sid_array +        \
+                                           SASZ((x)->sid_count));         \
+   (x)->datafile_sid_array = (PVFS_SID *)((x)->datafile_handles +         \
+                                          OASZ((x)->datafile_count));     \
+   decode_PVFS_handle((pptr), &(x)->handle);                              \
+   for (i = 0; i < (x)->sid_count; i++)                                   \
+   {                                                                      \
+       decode_PVFS_SID((pptr), &(x)->sid_array[i]);                       \
+   }                                                                      \
+   decode_PVFS_handle((pptr), (x)->parent);                               \
+   for (i = 0; i < (x)->sid_count; i++)                                   \
+   {                                                                      \
+       decode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);                \
+   }                                                                      \
+   for (i = 0; i < (x)->datafile_count; i++)                              \
+   {                                                                      \
+       decode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             \
+   }                                                                      \
+   for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  \
+   {                                                                      \
+       decode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              \
+   }                                                                      \
+} while (0)
+#endif
+
 #define extra_size_PVFS_servreq_create \
      (extra_size_PVFS_object_attr + \
       extra_size_PVFS_sys_layout + \
@@ -256,28 +334,35 @@ endecode_fields_7a1a_struct(
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __cap,                                    \
                                  __cred,                                   \
+                                 __attr,                                   \
                                  __fsid,                                   \
                                  __handle,                                 \
+                                 __sid_count,                              \
+                                 __sid_array,                              \
                                  __parent,                                 \
-                                 __parent_sid,                             \
-                                 __attr,                                   \
+                                 __parent_sids,                            \
                                  __datafile_count,                         \
-                                 __layout,                                 \
+                                 __datafile_handles,                       \
+                                 __datafile_sid_count,                     \
+                                 __datafile_sid_array,                     \
                                  __hints)                                  \
 do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).capability = (__cap);                                          \
     (__req).hints = (__hints);                                             \
-    (__req).u.create.fs_id = (__fsid);                                     \
+    (__req).capability = (__cap);                                          \
     (__req).u.create.credential = (__cred);                                \
+    (__req).u.create.fs_id = (__fsid);                                     \
     (__req).u.create.handle = (__handle);                                  \
+    (__req).u.create.sid_count = (__sid_count);                            \
+    (__req).u.create.sid_array = (__sid_array);                            \
     (__req).u.create.parent = (__parent);                                  \
-    (__req).u.create.parent_sid = (__parent_sid);                          \
+    (__req).u.create.parent_sid_array = (__parent_sids);                   \
     (__req).u.create.datafile_count = (__datafile_count);                  \
-    /*(__req).u.create.sid_count = (__sid_count);*/                            \
-    /*(__req).u.create.sid_array = (__sid_array);*/                            \
+    (__req).u.create.datafile_handles = (__datafile_handles);              \
+    (__req).u.create.datafile_sid_count = (__datafile_sid_count);          \
+    (__req).u.create.datafile_sid_array = (__datafile_sid_array);          \
     (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
     mask = (__attr).mask;                                                  \
     (__attr).mask = PVFS_ATTR_COMMON_ALL;                                  \
@@ -335,8 +420,8 @@ endecode_fields_4a_struct(
 do {                                                        \
     memset(&(__req), 0, sizeof(__req));                     \
     (__req).op = PVFS_SERV_BATCH_CREATE;                    \
-    (__req).capability = (__cap);                           \
     (__req).hints = (__hints);                              \
+    (__req).capability = (__cap);                           \
     (__req).u.batch_create.fs_id = (__fsid);                \
     (__req).u.batch_create.parent_oid = (__parent_oid);     \
     (__req).u.batch_create.parent_sid = (__parent_sid);     \
@@ -1109,8 +1194,9 @@ endecode_fields_10_struct(
     int32_t, distr_dir_servers_max,
     int32_t, distr_dir_split_size,
     PVFS_sys_layout, layout);
+/* FIX ME V3 */
 #define extra_size_PVFS_servreq_mkdir \
-            (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
+            (PVFS_REQ_LIMIT_HANDLES_COUNT + \
              extra_size_PVFS_credential + \
              extra_size_PVFS_object_attr)
 
@@ -2617,8 +2703,6 @@ struct PVFS_servreq_mgmt_split_dirent
     int32_t     nentries;
     PVFS_handle *entry_handles;
     char **entry_names;
-    PVFS_SID *sid_array;
-    int sid_count;
 };
 endecode_fields_5aa_struct(
     PVFS_servreq_mgmt_split_dirent,

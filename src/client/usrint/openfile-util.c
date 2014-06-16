@@ -1994,6 +1994,11 @@ static void put_status(pvfs_descriptor_status *pds)
         gossip_lerr(" bad fds in put_status\n");
         return;
     }
+    if (pds->pvfs_ref)
+    {
+        /* this was allocated in pvfs_alloc_descriptor */
+        free(pds->pvfs_ref);
+    }
     memset(pds, 0, sizeof(pvfs_descriptor_status));
     pvfs_desc_free(dstat, &stat_index);
 }
@@ -2168,10 +2173,10 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
 	    pd->s->pvfs_ref.handle = file_ref->handle;
 	    pd->s->pvfs_ref.sid_count = file_ref->sid_count;
         pd->s->pvfs_ref.sid_array = (PVFS_SID *)malloc(
-                        file_ref->sid_count * sizeof(PVFS_SID));
+                                                SASZ(file_ref->sid_count));
 	    memcpy(pd->s->pvfs_ref.sid_array,
                file_ref->sid_array,
-               file_ref->sid_count * sizeof(PVFS_SID));
+               SASZ(file_ref->sid_count));
     }
     else
     {
@@ -2199,6 +2204,9 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
             /* We have the file identifiers
              * so insert file info into ucache
              * this fills in mtbl
+             */
+            /* V3 need to include SIDs here - probably just pass a
+             * file_ref
              */
             ucache_open_file(&(file_ref->fs_id),
                              &(file_ref->handle), 

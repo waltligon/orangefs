@@ -700,6 +700,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 
         if (frame_entry->frame && frame_entry->task_id == 0)
         {
+            /* V3 - are we assured this frame has had any referenced
+             * memory freed.  Shouldn't we call a specific free routine
+             * on it to make sure and free anything remaining, rather
+             * than the generic free?
+             */
             /* only free if task_id is 0 */
             free(frame_entry->frame);
         } 

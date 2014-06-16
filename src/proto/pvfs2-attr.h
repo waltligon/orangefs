@@ -97,7 +97,7 @@ struct PVFS_metafile_attr_s
     uint32_t dfile_count;
 
     /* list of sids */
-    /* V3 there are dfile_count * (mirror_copies_count + 1) sids */
+    /* V3 there are dfile_count * (sid_count + 1) sids */
     PVFS_SID *sid_array;
     uint32_t sid_count;
 
@@ -230,6 +230,7 @@ struct PVFS_directory_hint_s
     char     *dist_params;
     /* how many dfiles ought to be used */
     uint32_t dfile_count;
+    uint32_t dfile_sid_count;
 };
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
