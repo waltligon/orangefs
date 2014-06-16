@@ -93,6 +93,16 @@
     <value>136</value>
   </property>
 
+  <property>
+    <name>mapreduce.input.fileinputformat.split.minsize</name>
+    <value>67108864</value>
+    <description>
+    Note: To prevent using OFS stripe size (e.g. 2MB) as Hadoop chunck size (e.g. 64MB), this option is still required in some cases. Otherwise, an IO exception could be thrown
+   " java.io.IOException: Split metadata size exceeded 10000000. Aborting job ..." 
+
+    The minimum size chunk that map input should be split into. Note that some file formats may have minimum split sizes that take priority over this setting
+    </description>
+
 </configuration>
 
 
@@ -114,12 +124,6 @@
     <value>2</value>
   </property>
 
-  <property>
-    <name>mapreduce.input.fileinputformat.split.minsize</name>
-    <value>67108864</value>
-    <description>
-    The minimum size chunk that map input should be split into. Note that some file formats may have minimum split sizes that take priority over this setting
-    </description>
   </property>
 
 
