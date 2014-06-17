@@ -1136,7 +1136,7 @@ class OFSTestNode(object):
             
             
         elif "suse" in self.distro.lower():
-            batch_commands = [
+            install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
