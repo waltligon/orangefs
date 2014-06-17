@@ -156,25 +156,13 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
     /* optimize smaller error messages; also reduce the change of not
      * being able to print out of memory due to heap exhaustion */
     struct timeval tv;
+    va_list aq;
     char stackbuf[1024], prefixbuf[256];
     char *buf = NULL;
     size_t len, prefixlen = 0;
     int r;
     if (!gossip_enabled)
         return 0;
-    /* generate log message */
-    len = vsnprintf(stackbuf, sizeof stackbuf, fmt, ap);
-    if (len > sizeof stackbuf)
-    {
-        buf = malloc(len+1);
-        if (buf == NULL)
-            return -1;
-        vsnprintf(buf, len+1, fmt, ap);
-    }
-    else
-    {
-        buf = stackbuf;
-    }
     /* generate prefix */
     prefixlen = snprintf(prefixbuf+prefixlen, sizeof prefixbuf-prefixlen,
             "[%c", prefix);
@@ -216,10 +204,22 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
 #endif
             break;
     }
+    /* generate log message */
+    va_copy(aq, ap);
+    len = vsnprintf(stackbuf, sizeof stackbuf, fmt, ap)+prefixlen+1;
+    if (len > sizeof stackbuf)
+    {
+        buf = malloc(len);
+        if (buf == NULL)
+            return -1;
+    }
+    else
+    {
+        buf = stackbuf;
+    }
+    strncpy(buf, prefixbuf, prefixlen+1);
+    vsnprintf(buf+prefixlen, len-prefixlen, fmt, aq);
     /* write out prefix and message */
-    r = gossip_mech.log(prefixbuf, prefixlen, gossip_mech.data);
-    if (r < 0)
-        return r;
     r = gossip_mech.log(buf, len, gossip_mech.data);
     if (buf != stackbuf)
         free(buf);
