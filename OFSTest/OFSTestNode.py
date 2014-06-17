@@ -1806,8 +1806,10 @@ class OFSTestNode(object):
         logging.debug( ofs_patch_files)
         for patch in ofs_patch_files:
             
-            logging.info( "Patching: patch -c -p1 < %s" % patch)
-            rc = self.runSingleCommand("patch -c -p1 < %s" % patch)
+            patch_name = os.path.basename(patch)
+            
+            logging.info( "Patching: patch -p0 < %s" % patch_name)
+            rc = self.runSingleCommand("patch -p0 < %s" % patch_name)
             if rc != 0:
                 logging.exception( "Patch Failed!")
        
@@ -1879,7 +1881,7 @@ class OFSTestNode(object):
         elif security_mode.lower() == "cert":
             configure_opts = configure_opts+" --enable-security-cert"
         
-        rc = self.runSingleCommand("./configure %s" % configure_opts, output)
+        rc = self.runSingleCommand("CFLAGS='-g -O0' ./configure %s" % configure_opts, output)
         
         # did configure run correctly?
         if rc == 0:

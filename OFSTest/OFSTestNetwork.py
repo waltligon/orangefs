@@ -525,8 +525,8 @@ class OFSTestNetwork(object):
 
         for patch in ofs_patch_files:
             
-            
-            rc = self.local_master.copyToRemoteNode(patch,build_node,patch,False)
+            patch_name = os.path.basename(patch)
+            rc = self.local_master.copyToRemoteNode(patch,build_node,"%s/%s" % (build_node.ofs_source_location,patch_name),False)
             if rc != 0:
                 logging.exception("Could not upload patch at %s to buildnode %s" % (patch,build_node.hostname))
                 return rc
