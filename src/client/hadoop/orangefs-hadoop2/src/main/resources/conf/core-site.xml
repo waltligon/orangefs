@@ -79,4 +79,9 @@
     <description>An extension of FileSystem for OrangeFS URIs.</description>
   </property>
 
+  <property>
+    <name>io.compression.codecs</name>
+    <value>org.apache.hadoop.io.compress.SnappyCodec</value>
+  </property>
+
 </configuration>
