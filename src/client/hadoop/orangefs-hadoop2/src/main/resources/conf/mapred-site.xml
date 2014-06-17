@@ -116,9 +116,9 @@
 
   <property>
     <name>mapreduce.map.output.compress.codec</name>
-    <value>org.apache.hadoop.io.compress.SnappyCodec</value>
+    <value>org.apache.hadoop.io.compress.GzipCodec</value>
     <description>
-    Notes: SnappyCodec requires native lib.
+    Notes: if use SnappyCodec, then installation of libsnappy is required.
 
     If the map outputs are compressed, how should they be compressed?
     </description>
