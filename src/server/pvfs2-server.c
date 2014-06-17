@@ -211,7 +211,7 @@ int main(int argc, char **argv)
     /* Enable the gossip interface to send out stderr and set an
      * initial debug mask so that we can output errors at startup.
      */
-    gossip_enable_stderr();
+    gossip_enable(&gossip_mech_stderr);
     gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
 
     server_status_flag |= SERVER_GOSSIP_INIT;
@@ -233,9 +233,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
-                    "PVFS2 Server on node %s version %s starting...\n",
-                    s_server_options.server_alias, PVFS2_VERSION);
+    gossip_print('S', "PVFS2 Server on node %s version %s starting...\n",
+            s_server_options.server_alias, PVFS2_VERSION);
 
     /* code to handle older two config file format */
     ret = PINT_parse_config(&server_config, fs_conf,
@@ -372,8 +371,7 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
-                    "PVFS2 Server ready.\n");
+    gossip_print('S', "PVFS2 Server ready.\n");
 
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
@@ -388,7 +386,7 @@ int main(int argc, char **argv)
                 reload_config();
 
                 /* re-open log file to allow normal rotation */
-                gossip_reopen_file(server_config.logfile, "a");
+                gossip_reset();
                 gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
                 gossip_debug(GOSSIP_SERVER_DEBUG,
                              "Re-opened log %s, continuing\n", 
@@ -513,23 +511,9 @@ static int server_initialize(
     job_status_s *job_status_structs)
 {
     int ret = 0, i = 0; 
-    FILE *dummy;
     uint64_t debug_mask = 0;
     
     assert(server_config.logfile != NULL);
-
-    if(!strcmp(server_config.logtype, "file"))
-    {
-        dummy = fopen(server_config.logfile, "a");
-        if (dummy == NULL)
-        {
-            int tmp_errno = errno;
-            gossip_err("error opening log file %s\n",
-                    server_config.logfile);
-            return -tmp_errno;
-        }
-        fclose(dummy);
-    }
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
@@ -543,15 +527,15 @@ static int server_initialize(
 
         if(!strcmp(server_config.logtype, "syslog"))
         {
-            ret = gossip_enable_syslog(LOG_INFO);
+            ret = gossip_enable(&gossip_mech_syslog);
         }
         else if(!strcmp(server_config.logtype, "file"))
         {
-            ret = gossip_enable_file(server_config.logfile, "a");
+            ret = gossip_enable(&gossip_mech_file, server_config.logfile);
         }
         else
         {
-            ret = gossip_enable_stderr();
+            ret = gossip_enable(&gossip_mech_stderr);
         }
 
         if (ret < 0)
@@ -2569,19 +2553,18 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...)
 {
-    static char pint_access_buffer[GOSSIP_BUF_SIZE];
+    static char pint_access_buffer[256];
     char sig_buf[10], mask_buf[10];
     va_list ap;
 
     if ((gossip_debug_on) &&
-        (gossip_debug_mask & debug_mask) &&
-        (gossip_facility))
+        (gossip_debug_mask & debug_mask))
     {
         va_start(ap, format);
 
         if (strlen(s_op->req->capability.issuer) == 0)
         {
-            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+            snprintf(pint_access_buffer, sizeof pint_access_buffer,
                 "null@%s H=%llu S=%p: %s: %s",
                 BMI_addr_rev_lookup_unexpected(s_op->addr),
                 llu(s_op->target_handle),
@@ -2591,7 +2574,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         }
         else
         {
-            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+            snprintf(pint_access_buffer, sizeof pint_access_buffer,
                 "%s@%s %s sig=%s H=%llu S=%p: %s: %s",
                 s_op->req->capability.issuer,
                 BMI_addr_rev_lookup_unexpected(s_op->addr),
@@ -2604,7 +2587,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                 format);                
         }
 
-        __gossip_debug_va(debug_mask, 'A', pint_access_buffer, ap);
+        gossip_vprint('A', pint_access_buffer, ap);
 
         va_end(ap);
     }

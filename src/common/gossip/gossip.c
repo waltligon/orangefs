@@ -1,422 +1,127 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
  *
  * See COPYING in top-level directory.
  */
 
-/** \file
- *  \ingroup gossip
- *
- *  Implementation of gossip interface.
- */
+#include <sys/time.h>
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <time.h>
 
-#ifdef WIN32
+/* for thread ids */
+#if WIN32
 #include "wincommon.h"
 #else
-#include <syslog.h>
-#include <sys/time.h>
+#include "gen-locks.h"
 #endif
 
-#include "pvfs2-internal.h"
-#ifdef HAVE_EXECINFO_H
+#if HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
 
+#include <syslog.h>
+
 #include "gossip.h"
-#include "gen-locks.h"
 
-/** controls whether debugging is on or off */
-int gossip_debug_on = 0;
+/*
+ * setup
+ */
 
-/** controls the mask level for debugging messages */
-uint64_t gossip_debug_mask = 0;
+/* xxx: threads */
 
-enum
+static int gossip_enabled = 0;
+static struct gossip_mech gossip_mech;
+
+void gossip_disable(void)
 {
-    GOSSIP_STDERR = 1,
-    GOSSIP_FILE = 2,
-    GOSSIP_SYSLOG = 4
-};
-
-/** determines which logging facility to use.  Default to stderr to begin
- *  with.
- */
-int gossip_facility = GOSSIP_STDERR;
-
-/* file handle used for file logging */
-static FILE *internal_log_file = NULL;
-
-/* syslog priority setting */
-#ifndef WIN32
-static int internal_syslog_priority = LOG_INFO;
-#endif
-
-/* what type of timestamp to put on logs */
-static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
-
-/*****************************************************************
- * prototypes
- */
-static int gossip_disable_stderr(void);
-static int gossip_disable_file(void);
-
-static int gossip_debug_fp_va(FILE *fp, char prefix, const char *format, va_list ap, enum
-gossip_logstamp ts);
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap);
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap);
-static int gossip_disable_syslog(
-    void);
-
-
-/*****************************************************************
- * visible functions
- */
-
-/** Turns on syslog logging facility.  The priority argument is a
- *  combination of the facility and level to use, as seen in the
- *  syslog(3) man page.
- *
- *  \return 0 on success, -errno on failure.
- */
-#ifdef WIN32
-/** Only a stub on Windows
- *  TODO: possibly add logging to Windows Event Log
- */
-int gossip_enable_syslog(
-    int priority)
-{
-    return 0;
-}
-#else
-int gossip_enable_syslog(
-    int priority)
-{
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
-
-    /* turn off any running facility */
-    gossip_disable();
-
-    internal_syslog_priority = priority;
-    gossip_facility = GOSSIP_SYSLOG;
-
-    openlog("PVFS2", 0, LOG_DAEMON);
-
-    /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
-
-    return 0;
-}
-#endif
-
-/** Turns on logging to stderr.
- *
- *  \return 0 on success, -errno on failure.
- */
-int gossip_enable_stderr(
-    void)
-{
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
-
-    /* turn off any running facility */
-    gossip_disable();
-
-    gossip_facility = GOSSIP_STDERR;
-
-    /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
-
-    return 0;
+    if (!gossip_enabled)
+        return;
+    gossip_enabled = 0;
+    if (gossip_mech.shutdown)
+        gossip_mech.shutdown(gossip_mech.data);
 }
 
-/** Turns on logging to a file.  The filename argument indicates which
- *  file to use for logging messages, and the mode indicates whether the
- *  file should be truncated or appended (see fopen() man page).
- *
- *  \return 0 on success, -errno on failure.
- */
-int gossip_enable_file(
-    const char *filename,
-    const char *mode)
+int gossip_enable(struct gossip_mech *mech, ...)
 {
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
-
-    /* turn off any running facility */
-    gossip_disable();
-
-    internal_log_file = fopen(filename, mode);
-    if (!internal_log_file)
+    int r = 0;
+    va_list ap;
+    va_start(ap, mech);
+    if (gossip_enabled && gossip_mech.shutdown)
+        gossip_mech.shutdown(gossip_mech.data);
+    memcpy(&gossip_mech, mech, sizeof gossip_mech);
+    if (gossip_mech.startup)
     {
-        return -errno;
+        r = gossip_mech.startup(gossip_mech.data, ap);
+        if (r < 0)
+            return r;
     }
-
-    gossip_facility = GOSSIP_FILE;
-
-    /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
-
-    return 0;
+    gossip_enabled = 1;
+    va_end(ap);
+    return r;
 }
 
-int gossip_reopen_file(
-    const char *filename,
-    const char *mode)
+int gossip_reset(void)
 {
-    if( gossip_facility != GOSSIP_FILE )
-    {
-        return -EINVAL;
-    }
-
-    /* close the file */
-    gossip_disable_file();
-
-    /* open the file */
-    gossip_enable_file( filename, mode );
-    return 0;
+    int r = 0;
+    if (!gossip_enabled)
+        return -1;
+    if (gossip_mech.reset)
+        r = gossip_mech.reset(gossip_mech.data);
+    return r;
 }
 
-/** Turns off any active logging facility and disables debugging.
- *
- *  \return 0 on success, -errno on failure.
+/*
+ * parameters
  */
-int gossip_disable(
-    void)
-{
-    int ret = -EINVAL;
 
-    switch (gossip_facility)
-    {
-    case GOSSIP_STDERR:
-        ret = gossip_disable_stderr();
-        break;
-    case GOSSIP_FILE:
-        ret = gossip_disable_file();
-        break;
-    case GOSSIP_SYSLOG:
-        ret = gossip_disable_syslog();
-        break;
-    default:
-        break;
-    }
+static enum gossip_logstamp gossip_ts = GOSSIP_LOGSTAMP_DEFAULT;
+uint64_t gossip_debug_mask;
+int gossip_debug_on;
 
-    gossip_debug_on = 0;
-    gossip_debug_mask = 0;
-
-    return ret;
-}
-
-/** Fills in args indicating whether debugging is on or off, and what the 
- *  mask level is.
- *
- *  \return 0 on success, -errno on failure.
- */
-int gossip_get_debug_mask(
-    int *debug_on,
-    uint64_t *mask)
+void gossip_get_debug_mask(int *debug_on, uint64_t *mask)
 {
     *debug_on = gossip_debug_on;
     *mask = gossip_debug_mask;
-    return 0;
 }
 
-/** Determines whether debugging messages are turned on or off.  Also
- *  specifies the mask that determines which debugging messages are
- *  printed.
- *
- *  \return 0 on success, -errno on failure.
- */
-int gossip_set_debug_mask(
-    int debug_on,
-    uint64_t mask)
+void gossip_set_debug_mask(int debug_on, uint64_t mask)
 {
-    if ((debug_on != 0) && (debug_on != 1))
-    {
-        return -EINVAL;
-    }
-
     gossip_debug_on = debug_on;
     gossip_debug_mask = mask;
-    return 0;
 }
 
-/* gossip_set_logstamp()
- *
- * sets timestamp style for gossip messages
- *
- * returns 0 on success, -errno on failure
- */
-int gossip_set_logstamp(
-    enum gossip_logstamp ts)
+int gossip_debug_enabled(uint64_t mask)
 {
-    internal_logstamp = ts;
-    return(0);
+   return gossip_debug_on && mask & gossip_debug_mask;
 }
 
-#ifndef __GNUC__
-/* __gossip_debug_stub()
- * 
- * stub for gossip_debug that doesn't do anything; used when debugging
- * is "compiled out" on non-gcc builds
- *
- * returns 0
- */
-int __gossip_debug_stub(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    ...)
+void gossip_get_logstamp(enum gossip_logstamp *ts)
 {
-    return 0;
+    *ts = gossip_ts;
 }
+
+void gossip_set_logstamp(enum gossip_logstamp ts)
+{
+    gossip_ts = ts;
+}
+
+/*
+ * log functions
+ */
+
+#if HAVE_EXECINFO_H && defined(GOSSIP_ENABLE_BACKTRACE)
+#ifndef GOSSIP_BACKTRACE_DEPTH
+#define GOSSIP_BACKTRACE_DEPTH 24
 #endif
-
-
-/* __gossip_debug()
- * 
- * Logs a standard debugging message.  It will not be printed unless the
- * mask value matches (logical "and" operation) with the mask specified in
- * gossip_set_debug_mask() and debugging is turned on.
- *
- * returns 0 on success, -errno on failure
- */
-int __gossip_debug(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    ...)
-{
-    int ret = -EINVAL;
-    va_list ap;
-
-    /* rip out the variable arguments */
-    va_start(ap, format);
-    ret = __gossip_debug_va(mask, prefix, format, ap);
-    va_end(ap);
-
-    return ret;
-}
-
-int __gossip_debug_va(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    va_list ap)
-{
-    int ret = -EINVAL;
-
-    /* NOTE: this check happens in the macro (before making a function call)
-     * if we use gcc 
-     */
-#ifndef __GNUC__
-    /* exit quietly if we aren't meant to print */
-    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) ||
-        (!gossip_facility))
-    {
-        return 0;
-    }
+#ifndef GOSSIP_MAX_BT
+#define GOSSIP_MAX_BT 8
 #endif
-
-    if(prefix == '?')
-    {
-        /* automatic prefix assignment */
-        prefix = 'D';
-    }
-
-    switch (gossip_facility)
-    {
-    case GOSSIP_STDERR:
-        ret = gossip_debug_fp_va(stderr, prefix, format, ap, internal_logstamp);
-        break;
-    case GOSSIP_FILE:
-        ret = gossip_debug_fp_va(
-            internal_log_file, prefix, format, ap, internal_logstamp);
-        break;
-    case GOSSIP_SYSLOG:
-        ret = gossip_debug_syslog(prefix, format, ap);
-        break;
-    default:
-        break;
-    }
-
-    return ret;
-}
-
-/** Logs a critical error message.  This will print regardless of the
- *  mask value and whether debugging is turned on or off, as long as some
- *  logging facility has been enabled.
- *
- *  \return 0 on success, -errno on failure.
- */
-int gossip_err(
-    const char *format,
-    ...)
-{
-    va_list ap;
-    int ret = -EINVAL;
-
-    if (!gossip_facility)
-    {
-        return 0;
-    }
-
-    /* rip out the variable arguments */
-    va_start(ap, format);
-
-    switch (gossip_facility)
-    {
-    case GOSSIP_STDERR:
-        ret = gossip_debug_fp_va(stderr, 'E', format, ap, internal_logstamp);
-        break;
-    case GOSSIP_FILE:
-        ret = gossip_debug_fp_va(internal_log_file, 'E', format, ap, internal_logstamp);
-        break;
-    case GOSSIP_SYSLOG:
-        ret = gossip_err_syslog(format, ap);
-        break;
-    default:
-        break;
-    }
-
-    va_end(ap);
-
-    return ret;
-}
-
-#ifdef GOSSIP_ENABLE_BACKTRACE
-#  ifndef GOSSIP_BACKTRACE_DEPTH
-#    define GOSSIP_BACKTRACE_DEPTH 24
-#  endif
-#  ifndef GOSSIP_MAX_BT
-#    define GOSSIP_MAX_BT 8
-#  endif
-
-/** Prints out a dump of the current stack (excluding this function)
- *  using gossip_err.
- */
 void gossip_backtrace(void)
 {
     void *trace[GOSSIP_BACKTRACE_DEPTH];
@@ -438,257 +143,240 @@ void gossip_backtrace(void)
         /* something is really wrong, time to bail out */
         exit(-1);
     }
+
 }
 #else
 void gossip_backtrace(void)
 {
 }
-#endif /* GOSSIP_ENABLE_BACKTRACE */
-
-/****************************************************************
- * Internal functions
- */
-
-/* gossip_debug_syslog()
- * 
- * This is the standard debugging message function for the syslog logging
- * facility
- *
- * returns 0 on success, -errno on failure
- */
-#ifdef WIN32
-/** Only a stub on Windows
- *  TODO: possibly add logging to Windows Event Log
- */
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap)
-{
-    return 0;
-}
-#else
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap)
-{
-    char buffer[GOSSIP_BUF_SIZE];
-    char *bptr = buffer;
-    int bsize = sizeof(buffer);
-    int ret = -EINVAL;
-
-    sprintf(bptr, "[%c] ", prefix);
-    bptr += 4;
-    bsize -= 4;
-
-    ret = vsnprintf(bptr, bsize, format, ap);
-    if (ret < 0)
-    {
-        return -errno;
-    }
-
-    syslog(internal_syslog_priority, "%s", buffer);
-
-    return 0;
-}
 #endif
 
-int gossip_debug_fp(FILE *fp, char prefix, 
-                    enum gossip_logstamp ts, const char *format, ...)
+int gossip_vprint(char prefix, const char *fmt, va_list ap)
 {
-    int ret;
-    va_list ap;
-
-    /* rip out the variable arguments */
-    va_start(ap, format);
-    ret = gossip_debug_fp_va(fp, prefix, format, ap, ts);
-    va_end(ap);
-    return ret;
-}
-
-/* gossip_debug_fp_va()
- * 
- * This is the standard debugging message function for the file logging
- * facility or to stderr.
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_debug_fp_va(FILE *fp, char prefix,
-    const char *format, va_list ap, enum gossip_logstamp ts)
-{
-    char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
-    int bsize = sizeof(buffer), temp_size;
-    int ret = -EINVAL;
+    /* optimize smaller error messages; also reduce the change of not
+     * being able to print out of memory due to heap exhaustion */
     struct timeval tv;
-    time_t tp;
-
-    sprintf(bptr, "[%c ", prefix);
-    bptr += 3;
-    bsize -= 3;
-
-    switch(ts)
+    char stackbuf[1024], prefixbuf[256];
+    char *buf = NULL;
+    size_t len, prefixlen = 0;
+    int r;
+    if (!gossip_enabled)
+        return 0;
+    /* generate log message */
+    len = vsnprintf(stackbuf, sizeof stackbuf, fmt, ap);
+    if (len > sizeof stackbuf)
     {
+        buf = malloc(len+1);
+        if (buf == NULL)
+            return -1;
+        vsnprintf(buf, len+1, fmt, ap);
+    }
+    else
+    {
+        buf = stackbuf;
+    }
+    /* generate prefix */
+    prefixlen = snprintf(prefixbuf+prefixlen, sizeof prefixbuf-prefixlen,
+            "[%c", prefix);
+    switch (gossip_ts)
+    {
+        case GOSSIP_LOGSTAMP_NONE:
+            prefixlen += snprintf(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, "] ");
+            break;
         case GOSSIP_LOGSTAMP_USEC:
             gettimeofday(&tv, 0);
-            tp = tv.tv_sec;
-            strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld] ", (long)tv.tv_usec);
-            bptr += 17;
-            bsize -= 17;
+            prefixlen += strftime(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, " %H:%M:%S",
+                    localtime(&tv.tv_sec));
+            prefixlen += snprintf(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, ".%06ld] ", tv.tv_usec);
             break;
         case GOSSIP_LOGSTAMP_DATETIME:
             gettimeofday(&tv, 0);
-            tp = tv.tv_sec;
-            strftime(bptr, 22, "%m/%d/%Y %H:%M:%S] ", localtime(&tp));
-            bptr += 21;
-            bsize -= 21;
+            prefixlen += strftime(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, " %m/%d/%Y %H:%M:%S] ",
+                    localtime(&tv.tv_sec));
             break;
         case GOSSIP_LOGSTAMP_THREAD:
             gettimeofday(&tv, 0);
-            tp = tv.tv_sec;
-            strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            bptr += 8;
-            bsize -= 8;
+            prefixlen += strftime(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, " %H:%M:%S",
+                    localtime(&tv.tv_sec));
+            prefixlen += snprintf(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen, ".%06ld] ", tv.tv_usec);
 #ifdef WIN32
-            temp_size = sprintf(bptr, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
-                           GetThreadId(GetCurrentThread()));
+            prefixlen += snprintf(prefixbuf+prefixlen,
+                sizeof prefixbuf-prefixlen,
+                "(%4ld) ", GetThreadId(GetCurrentThread())));
 #else
-            temp_size = sprintf(bptr, ".%06ld (%ld)] ", (long)tv.tv_usec, 
-                           (long int)gen_thread_self());
+            prefixlen += snprintf(prefixbuf+prefixlen,
+                    sizeof prefixbuf-prefixlen,
+                    "(%ld) ", (long int)gen_thread_self());
 #endif
-            bptr += temp_size;
-            bsize -= temp_size;
-            break;
-
-        case GOSSIP_LOGSTAMP_NONE:
-            bptr--;
-            sprintf(bptr, "] ");
-            bptr += 2;
-            bsize++;
-            break;
-        default:
             break;
     }
-    
-#ifndef WIN32
-    ret = vsnprintf(bptr, bsize, format, ap);
-    if (ret < 0)
-    {
-        return -errno;
-    }
-#else
-    ret = vsnprintf_s(bptr, bsize, _TRUNCATE, format, ap);
-    if (ret == -1 && errno != 0)
-    {
-        return -errno;
-    }
-#endif
-
-    ret = fprintf(fp, "%s", buffer);
-    if (ret < 0)
-    {
-        return -errno;
-    }
-    fflush(fp);
-
-    return 0;
+    /* write out prefix and message */
+    r = gossip_mech.log(prefixbuf, prefixlen, gossip_mech.data);
+    if (r < 0)
+        return r;
+    r = gossip_mech.log(buf, len, gossip_mech.data);
+    if (buf != stackbuf)
+        free(buf);
+    return r;
 }
 
-/* gossip_err_syslog()
- * 
- * error message function for the syslog logging facility
- *
- * returns 0 on success, -errno on failure
- */
-#ifdef WIN32
-/** just a stub on Windows
- *  TODO: possibly add errors to Windows Event Log
- */
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap)
+int gossip_err(const char *fmt, ...)
 {
-    return 0;
-}
-#else
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap)
-{
-    /* for syslog we have the opportunity to change the priority level
-     * for errors
-     */
-    int tmp_priority = internal_syslog_priority;
-    internal_syslog_priority = LOG_ERR;
-
-    gossip_debug_syslog('E', format, ap);
-
-    internal_syslog_priority = tmp_priority;
-
-    return 0;
-}
-#endif
-
-/* gossip_disable_stderr()
- * 
- * The shutdown function for the stderr logging facility.
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_disable_stderr(
-    void)
-{
-    /* this function doesn't need to do anything... */
-    return 0;
+    va_list ap;
+    int r;
+    va_start(ap, fmt);
+    r = gossip_vprint('E', fmt, ap);
+    va_end(ap);
+    return r;
 }
 
-/* gossip_disable_file()
- * 
- * The shutdown function for the file logging facility.
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_disable_file(
-    void)
+int gossip_perf_log(const char *fmt, ...)
 {
-    if (internal_log_file)
+    va_list ap;
+    int r;
+    va_start(ap, fmt);
+    r = gossip_vprint('P', fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+int gossip_debug(uint64_t mask, const char *fmt, ...)
+{
+    va_list ap;
+    int r;
+    if (gossip_debug_on && mask & gossip_debug_mask)
     {
-        fclose(internal_log_file);
-        internal_log_file = NULL;
+        va_start(ap, fmt);
+        r = gossip_vprint('D', fmt, ap);
+        va_end(ap);
+        return r;
     }
     return 0;
 }
 
-/* gossip_disable_syslog()
- * 
- * The shutdown function for the syslog logging facility.
- *
- * returns 0 on success, -errno on failure
- */
-#ifdef WIN32
-/** just a stub on Windows
- * TODO: Possibly add logging to Windows Event Log
- */
-static int gossip_disable_syslog(
-    void)
+int gossip_print(char prefix, const char *fmt, ...)
 {
-    return 0;
+    va_list ap;
+    int r;
+    va_start(ap, fmt);
+    r = gossip_vprint(prefix, fmt, ap);
+    va_end(ap);
+    return r;
 }
-#else
-static int gossip_disable_syslog(
-    void)
-{
-    closelog();
-    return 0;
-}
-#endif
 
 /*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * log mechanisms
  */
+
+/* stderr */
+
+static int gossip_mech_stderr_log(char *str, size_t len, void *data)
+{
+    (void)len;
+    (void)data;
+    if (fputs(str, stderr) == EOF)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+struct gossip_mech gossip_mech_stderr = {NULL, gossip_mech_stderr_log};
+
+/* syslog */
+
+struct gossip_mech_syslog_data {
+    char *ident;
+    int option;
+    int facility;
+};
+static struct gossip_mech_syslog_data gossip_mech_syslog_data =
+        {"pvfs2", 0, LOG_INFO};
+
+static int gossip_mech_syslog_startup(void *data, va_list ap)
+{
+    struct gossip_mech_syslog_data *mydata = data;
+    (void)ap;
+    openlog(mydata->ident, mydata->option, mydata->facility);
+    return 0;
+}
+
+static int gossip_mech_syslog_log(char *str, size_t len, void *data)
+{
+    (void)len;
+    syslog(LOG_INFO, str);
+    return 0;
+}
+
+static void gossip_mech_syslog_shutdown(void *data)
+{
+    (void)data;
+    closelog();
+}
+
+struct gossip_mech gossip_mech_syslog =
+        {gossip_mech_syslog_startup, gossip_mech_syslog_log,
+        gossip_mech_syslog_shutdown, NULL, &gossip_mech_syslog_data};
+
+/* file */
+
+struct gossip_mech_file_data {
+    char *path;
+    FILE *f;
+};
+static struct gossip_mech_file_data gossip_mech_file_data;
+
+static int gossip_mech_file_startup(void *data, va_list ap)
+{
+    struct gossip_mech_file_data *mydata = data;
+    char *path;
+    path = va_arg(ap, char *);
+    mydata->path = strdup(path);
+    mydata->f = fopen(path, "a");
+    if (mydata->f == NULL)
+        return -1;
+    return 0;
+}
+
+static int gossip_mech_file_log(char *str, size_t len, void *data)
+{
+    struct gossip_mech_file_data *mydata = data;
+    (void)len;
+    if (fputs(str, mydata->f) == EOF)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+static void gossip_mech_file_shutdown(void *data)
+{
+    struct gossip_mech_file_data *mydata = data;
+    free(mydata->path);
+    if (fclose(mydata->f) == EOF) {
+        perror("could not close log");
+    }
+}
+
+static int gossip_mech_file_reset(void *data)
+{
+    struct gossip_mech_file_data *mydata = data;
+    if (fclose(mydata->f) == EOF) {
+        perror("could not close log");
+    }
+    mydata->f = fopen(mydata->path, "a");
+    if (mydata->f == NULL)
+        return -1;
+    return 0;
+}
+
+struct gossip_mech gossip_mech_file =
+        {gossip_mech_file_startup, gossip_mech_file_log,
+        gossip_mech_file_shutdown, gossip_mech_file_reset,
+        &gossip_mech_file_data};

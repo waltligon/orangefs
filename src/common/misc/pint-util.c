@@ -10,6 +10,7 @@
  */
 
 /* This file includes definitions of common internal utility functions */
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 

@@ -1,60 +1,21 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * Copyright (C) 2014 Omnibond Systems, L.L.C.
  *
  * See COPYING in top-level directory.
  */
 
-/** \defgroup gossip gossip logging interface
- *
- * This is a basic application logging facility.  It uses printf style
- * formatting and provides several mechanisms for output.
- *
- * @{
- */
+#ifndef GOSSIP_H
+#define GOSSIP_H
 
-/** \file
- *
- *  Declarations for the gossip logging interface.
- */
-
-#ifndef __GOSSIP_H
-#define __GOSSIP_H
-
-#ifdef WIN32
-#include "wincommon.h"
-#endif
-
-#ifndef __KERNEL__
-#include <stdint.h>
-#include <stdarg.h>
-#ifndef WIN32
-#include "syslog.h"
-#endif
-#endif
-#include "pvfs2-config.h"
-
-/********************************************************************
- * Visible interface
- */
-
-extern uint64_t gossip_debug_mask;
-extern int gossip_debug_on;
-extern int gossip_facility;
-
-#define GOSSIP_BUF_SIZE 5120
-
-/* what type of timestamp to place in msgs */
-enum gossip_logstamp
-{
-    GOSSIP_LOGSTAMP_NONE = 0,
-    GOSSIP_LOGSTAMP_USEC = 1,
-    GOSSIP_LOGSTAMP_DATETIME = 2,
-    GOSSIP_LOGSTAMP_THREAD = 3
-};
-#define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
-
-/* Keep a simplified version for the kmod */
 #ifdef __KERNEL__
+
+/* The kernel does not really use Gossip. This lets it pretend. It would
+ * probably be a good idea to use printk directly in the kernel to
+ * reduce the maintenence burden on the Linux developers. */
+
+/* This is duplicated from below and declared in pvfs2-mod.c. */
+extern uint64_t gossip_debug_mask;
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
@@ -84,138 +45,76 @@ do {                                               \
 
 #else /* __KERNEL__ */
 
-/* stdio is needed by gossip_debug_fp declaration for FILE* */
-#include <stdio.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 
-int gossip_enable_syslog(int priority);
-int gossip_enable_stderr(void);
-int gossip_enable_file(const char *filename, const char *mode);
-int gossip_reopen_file(const char *filename, const char *mode);
-int gossip_disable(void);
-int gossip_set_debug_mask(int debug_on, uint64_t mask);
-int gossip_get_debug_mask(int *debug_on, uint64_t *mask);
-int gossip_set_logstamp(enum gossip_logstamp ts);
+enum gossip_logstamp {
+    GOSSIP_LOGSTAMP_NONE,
+    GOSSIP_LOGSTAMP_USEC,
+    GOSSIP_LOGSTAMP_DATETIME,
+    GOSSIP_LOGSTAMP_THREAD
+};
+#define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
+
+struct gossip_mech {
+    int (*startup)(void *, va_list);
+    int (*log)(char *, size_t, void *);
+    void (*shutdown)(void *);
+    int (*reset)(void *);
+    void *data;
+};
+
+/*
+ * setup
+ */
+
+void gossip_disable(void);
+int gossip_enable(struct gossip_mech *, ...);
+int gossip_reset(void);
+
+/*
+ * parameters
+ */
+
+extern uint64_t gossip_debug_mask;
+extern int gossip_debug_on;
+
+void gossip_get_debug_mask(int *, uint64_t *);
+void gossip_set_debug_mask(int, uint64_t);
+int gossip_debug_enabled(uint64_t mask);
+void gossip_get_logstamp(enum gossip_logstamp *);
+void gossip_set_logstamp(enum gossip_logstamp);
+
+/*
+ * log functions
+ */
 
 void gossip_backtrace(void);
+int gossip_vprint(char, const char *, va_list);
+int gossip_print(char, const char *, ...);
+int gossip_debug(uint64_t, const char *, ...);
+int gossip_err(const char *, ...);
+int gossip_perf_log(const char *, ...);
 
-#ifdef __GNUC__
+#define gossip_ldebug(mask, ...) do { \
+        gossip_debug(mask, "%s:%d: ", __FILE__, __LINE__); \
+        gossip_debug(mask, __VA_ARGS__); \
+    } while (0);
 
-/* do printf style type checking if built with gcc */
-int __gossip_debug(uint64_t mask,
-                   char prefix,
-                   const char *format,
-                   ...) __attribute__ ((format(printf, 3, 4)));
-int gossip_err(const char *format,
-               ...) __attribute__ ((format(printf, 1, 2)));
-int __gossip_debug_va(uint64_t mask,
-                      char prefix,
-                      const char *format,
-                      va_list ap);
-int gossip_debug_fp(FILE *fp,
-                    char prefix,
-                    enum gossip_logstamp ts,
-                    const char *format,
-                    ...) __attribute__ ((format(printf, 4, 5)));
+#define gossip_lerr(...) do { \
+        gossip_err("%s:%d: ", __FILE__, __LINE__); \
+        gossip_err(__VA_ARGS__); \
+    } while (0);
 
-#ifdef GOSSIP_DISABLE_DEBUG
-#define gossip_debug(mask, format, f...) do {} while(0)
-#define gossip_perf_log(format, f...) do {} while(0)
-#define gossip_debug_enabled(__m) 0
-#else
+/*
+ * log mechanisms
+ */
 
-#define gossip_debug_enabled(__m) \
-    (gossip_debug_on && (gossip_debug_mask & __m))
-
-/* try to avoid function call overhead by checking masks in macro */
-#define gossip_debug(mask, format, f...)                  \
-do {                                                      \
-    if ((gossip_debug_on) && (gossip_debug_mask & mask) &&\
-        (gossip_facility))                                \
-    {                                                     \
-        __gossip_debug(mask, '?', format, ##f);           \
-    }                                                     \
-} while(0)
-#define gossip_perf_log(format, f...)                     \
-do {                                                      \
-    if ((gossip_debug_on) &&                              \
-        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
-        (gossip_facility))                                \
-    {                                                     \
-        __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
-            format, ##f);                                 \
-    }                                                     \
-} while(0)
-
-#endif /* GOSSIP_DISABLE_DEBUG */
-
-/* do file and line number printouts w/ the GNU preprocessor */
-#define gossip_ldebug(mask, format, f...)                  \
-do {                                                       \
-    gossip_debug(mask, "%s: " format, __func__ , ##f); \
-} while(0)
-
-#define gossip_lerr(format, f...)                  \
-do {                                               \
-    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
-    gossip_backtrace();                            \
-} while(0)
-#else /* ! __GNUC__ */
-
-#define gossip_perf_log(format, ...)                     \
-do {                                                      \
-    if ((gossip_debug_on) &&                              \
-        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
-        (gossip_facility))                                \
-    {                                                     \
-        __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
-            format, __VA_ARGS__);                         \
-    }                                                     \
-} while(0)
-
-int __gossip_debug(uint64_t mask, char prefix, const char *format, ...);
-int __gossip_debug_va(uint64_t mask,
-                      char prefix,
-                      const char *format,
-                      va_list ap);
-int __gossip_debug_stub(uint64_t mask, char prefix, const char *format, ...);
-int gossip_err(const char *format, ...);
-
-#ifdef GOSSIP_DISABLE_DEBUG
-#ifdef WIN32
-#define gossip_debug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
-#define gossip_ldebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
-#else
-#define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
-#define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
-#endif
-#define gossip_debug_enabled(__m) 0
-#else
-#ifdef WIN32
-#define gossip_debug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
-#define gossip_ldebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
-#else
-#define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
-#define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
-#endif
-#define gossip_debug_enabled(__m) \
-            ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
-#endif /* GOSSIP_DISABLE_DEBUG */
-
-#define gossip_lerr gossip_err
-
-#endif /* __GNUC__ */
+extern struct gossip_mech gossip_mech_stderr;
+extern struct gossip_mech gossip_mech_syslog;
+extern struct gossip_mech gossip_mech_file;
 
 #endif /* __KERNEL__ */
 
-#endif /* __GOSSIP_H */
-
-/* @} */
-
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 expandtab
- */
+#endif /* GOSSIP_H */
