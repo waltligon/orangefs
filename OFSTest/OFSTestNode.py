@@ -1075,7 +1075,7 @@ class OFSTestNode(object):
 
 
     def installRequiredSoftware(self):
-        
+        output = []
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             
@@ -1124,7 +1124,7 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
             ]
             
-            output = []
+            
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
@@ -1177,7 +1177,7 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            output = []
+            
             # download Java 6
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
