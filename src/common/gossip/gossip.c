@@ -140,7 +140,7 @@ void gossip_backtrace(void)
     messages = backtrace_symbols(trace, trace_size);
     for(i = 1; i < trace_size; i++)
     {
-        gossip_err("\t[bt] %s\n", messages[i]);
+        gossip_print('E', "\t[bt] %s\n", messages[i]);
     }
     /* backtrace_symbols is a libc call that mallocs */
     /* we need to free it with clean_free, not our free */
@@ -160,11 +160,11 @@ void gossip_backtrace(void)
 
 int gossip_vprint(char prefix, const char *fmt, va_list ap)
 {
-    /* optimize smaller error messages; also reduce the change of not
+    /* optimize for smaller error messages; also reduce the chance of not
      * being able to print out of memory due to heap exhaustion */
     struct timeval tv;
     va_list aq;
-    char stackbuf[1024], prefixbuf[256];
+    char stackbuf[512], prefixbuf[32];
     char *buf = NULL;
     size_t len, prefixlen = 0;
     int r;
@@ -240,6 +240,7 @@ int gossip_err(const char *fmt, ...)
     va_start(ap, fmt);
     r = gossip_vprint('E', fmt, ap);
     va_end(ap);
+    gossip_backtrace();
     return r;
 }
 
