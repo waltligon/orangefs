@@ -62,7 +62,7 @@ struct gossip_mech {
     int (*log)(char *, size_t, void *);
     void (*shutdown)(void *);
     int (*reset)(void *);
-    void *data;
+    size_t datasz;
 };
 
 /*

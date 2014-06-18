@@ -223,7 +223,7 @@ static int monitor_pvfs2_client(options_t *opts)
                 }
                 else if(!strcmp(opts->logtype, "syslog"))
                 {
-                    gossip_enable(&gossip_mech_syslog);
+                    gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
                 }
                 else
                 {
@@ -296,7 +296,7 @@ static int monitor_pvfs2_client(options_t *opts)
                 }
                 else if(!strcmp(opts->logtype, "syslog"))
                 {
-                    gossip_enable(&gossip_mech_syslog);
+                    gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
                 }
                 else
                 {

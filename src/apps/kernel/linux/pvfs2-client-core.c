@@ -3726,7 +3726,7 @@ int main(int argc, char **argv)
     }
     else if(!strcmp(s_opts.logtype, "syslog"))
     {
-        ret = gossip_enable(&gossip_mech_syslog);
+        ret = gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
         if(ret < 0)
         {
             fprintf(stderr, "Error opening syslog\n");

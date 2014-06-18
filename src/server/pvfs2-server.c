@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <getopt.h>
+#include <syslog.h>
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
@@ -526,7 +527,7 @@ static int server_initialize(
 
         if(!strcmp(server_config.logtype, "syslog"))
         {
-            ret = gossip_enable(&gossip_mech_syslog);
+            ret = gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
         }
         else if(!strcmp(server_config.logtype, "file"))
         {

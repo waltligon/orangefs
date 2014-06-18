@@ -37,6 +37,7 @@
 
 static int gossip_enabled = 0;
 static struct gossip_mech gossip_mech;
+static void *gossip_data;
 
 void gossip_disable(void)
 {
@@ -44,7 +45,8 @@ void gossip_disable(void)
         return;
     gossip_enabled = 0;
     if (gossip_mech.shutdown)
-        gossip_mech.shutdown(gossip_mech.data);
+        gossip_mech.shutdown(gossip_data);
+    free(gossip_data);
 }
 
 int gossip_enable(struct gossip_mech *mech, ...)
@@ -53,11 +55,16 @@ int gossip_enable(struct gossip_mech *mech, ...)
     va_list ap;
     va_start(ap, mech);
     if (gossip_enabled && gossip_mech.shutdown)
-        gossip_mech.shutdown(gossip_mech.data);
+        gossip_mech.shutdown(gossip_data);
+    /* Then gossip_data is malloced and is either a valid pointer or NULL. */
+    free(gossip_data);
     memcpy(&gossip_mech, mech, sizeof gossip_mech);
     if (gossip_mech.startup)
     {
-        r = gossip_mech.startup(gossip_mech.data, ap);
+        gossip_data = malloc(gossip_mech.datasz);
+        if (gossip_data == NULL)
+            return -1;
+        r = gossip_mech.startup(gossip_data, ap);
         if (r < 0)
             return r;
     }
@@ -72,7 +79,7 @@ int gossip_reset(void)
     if (!gossip_enabled)
         return -1;
     if (gossip_mech.reset)
-        r = gossip_mech.reset(gossip_mech.data);
+        r = gossip_mech.reset(gossip_data);
     return r;
 }
 
@@ -220,7 +227,7 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
     strncpy(buf, prefixbuf, prefixlen+1);
     vsnprintf(buf+prefixlen, len-prefixlen, fmt, aq);
     /* write out prefix and message */
-    r = gossip_mech.log(buf, len, gossip_mech.data);
+    r = gossip_mech.log(buf, len, gossip_data);
     if (buf != stackbuf)
         free(buf);
     return r;
@@ -296,13 +303,13 @@ struct gossip_mech_syslog_data {
     int option;
     int facility;
 };
-static struct gossip_mech_syslog_data gossip_mech_syslog_data =
-        {"pvfs2", 0, LOG_INFO};
 
 static int gossip_mech_syslog_startup(void *data, va_list ap)
 {
     struct gossip_mech_syslog_data *mydata = data;
-    (void)ap;
+    mydata->ident = strdup(va_arg(ap, char *));
+    mydata->option = va_arg(ap, int);
+    mydata->facility = va_arg(ap, int);
     openlog(mydata->ident, mydata->option, mydata->facility);
     return 0;
 }
@@ -316,13 +323,15 @@ static int gossip_mech_syslog_log(char *str, size_t len, void *data)
 
 static void gossip_mech_syslog_shutdown(void *data)
 {
-    (void)data;
+    struct gossip_mech_syslog_data *mydata = data;
+    free(mydata->ident);
     closelog();
 }
 
 struct gossip_mech gossip_mech_syslog =
         {gossip_mech_syslog_startup, gossip_mech_syslog_log,
-        gossip_mech_syslog_shutdown, NULL, &gossip_mech_syslog_data};
+        gossip_mech_syslog_shutdown, NULL,
+        sizeof(struct gossip_mech_syslog_data)};
 
 /* file */
 
@@ -330,7 +339,6 @@ struct gossip_mech_file_data {
     char *path;
     FILE *f;
 };
-static struct gossip_mech_file_data gossip_mech_file_data;
 
 static int gossip_mech_file_startup(void *data, va_list ap)
 {
@@ -379,4 +387,4 @@ static int gossip_mech_file_reset(void *data)
 struct gossip_mech gossip_mech_file =
         {gossip_mech_file_startup, gossip_mech_file_log,
         gossip_mech_file_shutdown, gossip_mech_file_reset,
-        &gossip_mech_file_data};
+        sizeof(struct gossip_mech_file_data)};
