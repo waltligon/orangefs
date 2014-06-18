@@ -439,6 +439,12 @@ public class OrangeFileSystem extends FileSystem {
     public FileStatus[] listStatus(Path f) throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + makeAbsolute(f).toString());
+        FileStatus fStatus[] = { getFileStatus(f) };
+        if(!fStatus[0].isDirectory()) {
+        	/* Not a directory */
+        	return fStatus;
+        }
+        
         ArrayList<String> arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
         if(arrayList == null) {
             return null;
