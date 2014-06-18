@@ -1136,6 +1136,12 @@ class OFSTestNode(object):
             
             
         elif "suse" in self.distro.lower():
+            
+                        # download Java 6
+            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            if rc != 0:
+                logging.exception(output)
+                return rc
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",

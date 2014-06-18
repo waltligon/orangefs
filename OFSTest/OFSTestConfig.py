@@ -24,6 +24,7 @@ class OFSTestConfig(object):
         
         ## @var log_file
         # name of output logfile
+        # Web Interface: auto
         self.log_file = "OFSTest.log"
         
         #------------------------------
@@ -34,72 +35,73 @@ class OFSTestConfig(object):
        
         ## @var using_cloud
         # Are we using OpenStack/Cloud?
-        self.using_cloud = False
+        
+        self.using_cloud = False  # Web Interface: auto
         
         ## @var cloud_config
         # Location of the ec2rc.sh/openstack.sh file
-        self.cloud_config = ""
+        self.cloud_config = ""  # Web Interface: auto
         
         ## @var ssh_key_filepath
         # Path of ssh key used to access all nodes
-        self.ssh_key_filepath = ""
+        self.ssh_key_filepath = "" # Web Interface: auto
         
         ## @var ssh_key_filepaths 
         # List of differing keypaths, if applicable
-        self.ssh_key_filepaths = []
+        self.ssh_key_filepaths = []  # Web Interface: not used
         
         ## @var cloud_key_name
         # Internal cloud key name. Must be consistant accross nodes.
-        self.cloud_key_name = ""
+        self.cloud_key_name = "" # Web Interface: auto
         
         ## @var number_new_cloud_nodes
         # Number of new cloud nodes to be created. 
         # If == 0, then using existing nodes.
-        self.number_new_cloud_nodes = 0
+        self.number_new_cloud_nodes = 0 # Web Interface: user
         
         ## @var cloud_image
         # Image name to be launched for cloud instance.
         # Must be consistant across nodes.
-        self.cloud_image = ""
+        self.cloud_image = "" # Web Interface: user
         
         ## @var cloud_machine
         # cloud machine type (e.g. m1.medium)
         # Must be consistant across nodes.
-        self.cloud_machine = ""
+        self.cloud_machine = "" # Web Interface: user
         
         ## @var cloud_delete_after_test
         # Should the nodes be deleted after testing?
-        self.cloud_delete_after_test = False
+        self.cloud_delete_after_test = False # Web Interface: user
         
         ## @var cloud_domain
         # Cloud domain
-        self.cloud_domain=None
+        self.cloud_domain=None # Web Interface: auto
         
         ## @var cloud_associate_ip
         # Associate external ip address with Cloud nodes?
-        self.cloud_associate_ip=False
+        self.cloud_associate_ip=False # Web Interface: auto
         
         ## @var node_ip_addresses
         # List of node ip addresses. If a private network is used, this is the
         # Internal network.
-        self.node_ip_addresses = []
-        
+        self.node_ip_addresses = [] # Web Interface: not used
+         
         ## @var node_ext_ip_addresses
         # List of addresses accessible from the local machine.
         # if node_ip_addresses is accessible, this need not be set.
-        self.node_ext_ip_addresses = []
+        self.node_ext_ip_addresses = [] # Web Interface: not used
         
         ## @var node_username
         # Single username to access all nodes
-        self.node_username = "cloud-user"
+        self.node_username = "cloud-user" # Web Interface: not used
         
         ## @var node_usernames
         # usernames for login of individual nodes, if necessary
-        self.node_usernames = []
+        self.node_usernames = [] # Web Interface: not used
         
         ## @var ofs_fs_name
         # Name of OrangeFS filesystem service in URL. No longer needed
-        self.ofs_fs_name=None
+        self.ofs_fs_name=None # Web Interface: not used
         
         #------------------------------
         #
@@ -109,15 +111,15 @@ class OFSTestConfig(object):
         
         ## @var ofs_resource_location
         # location of OrangeFS source
-        self.ofs_resource_location = ""
+        self.ofs_resource_location = "" # Web Interface: user
         
         ## @var ofs_resource_type
         # What package is the OrangeFS source? SVN, TAR, Local Dir, Node? 
-        self.ofs_resource_type = ""
+        self.ofs_resource_type = "" # Web Interface: auto
         
         ## @var pvfs2genconfig_opts
         # Additional options for pvfs2genconfig to generate Orangefs.conf file
-        self.pvfs2genconfig_opts = ""
+        self.pvfs2genconfig_opts = "" # Web Interface: user
         
         #------------------------------
         #
@@ -127,64 +129,64 @@ class OFSTestConfig(object):
         
         ## @var install_fuse
         # Build Fuse module
-        self.install_fuse=False
+        self.install_fuse=False  # Web Interface: user
             
         ## @var install_prefix
         # Where to install OrangeFS.
-        self.install_prefix = "/opt/orangefs"
+        self.install_prefix = "/opt/orangefs" # Web Interface: auto
         
         ## @var db4_prefix
         # Location of DB4
-        self.db4_prefix = "/opt/db4"
+        self.db4_prefix = "/opt/db4" # Web Interface: auto
 
         ## @var install_OFS_client
         # Install the OrangeFS client and add --with-kernel option
-        self.install_OFS_client = True
+        self.install_OFS_client = True # Web Interface: auto
 
         ## @var install_shared
         # --enable-shared flag
-        self.install_shared = False
+        self.install_shared = False # Web Interface: auto
         
         ## @var enable_strict
         # --enable-strict flag
-        self.enable_strict = True
+        self.enable_strict = True # Web Interface: user
         
         ## @var ofs_security_mode
         # Security Mode. Default is None. Options are "Key" and "Cert"
-        self.ofs_security_mode = None
+        self.ofs_security_mode = None # Web Interface: user
         
         ## @var ofs_build_kmod
         # Build the kernel module?
-        self.ofs_build_kmod = True
+        self.ofs_build_kmod = True # Web Interface: auto
         
         ## @var ofs_compile_debug
         # Compile with -g debugging option?
-        self.ofs_compile_debug = True
+        self.ofs_compile_debug = True # Web Interface: user
 
         ## @var ofs_patch_files
         # List of patches to patch OrangeFS source
-        self.ofs_patch_files=[]
+        self.ofs_patch_files=[] # Web Interface: user
         
         ## @var svn_username
         # Username of svn user. Allows checkout instead of export
-        self.svn_username = None
+        self.svn_username = None # Web Interface: not used
         
         ## @var svn_password
         # Password of svn user. Allows checkout instead of export
-        self.svn_password = None
+        self.svn_password = None # Web Interface: not used
 
         
         ## @var svn_options
         # Additional options for SVN
-        self.svn_options = None
+        self.svn_options = None # Web Interface: not used
 
         ## @var install_hadoop
         # Enable OrangeFS hadoop support
-        self.install_hadoop = False
+        self.install_hadoop = False # Web Interface: auto
 
         ## @var configure_opts
         # Additional options for configure
-        self.configure_opts = ""
+        self.configure_opts = "" # Web Interface: user
 
         #------------------------------
         #
@@ -194,31 +196,31 @@ class OFSTestConfig(object):
         
         ## @var mount_OFS_after_setup
         # Mount the filesystem after setup
-        self.mount_OFS_after_setup = True
+        self.mount_OFS_after_setup = True # Web Interface: auto
         
         ## @var ofs_tcp_port
         # TCP port on which to run OrangeFS
-        self.ofs_tcp_port = "3396"
+        self.ofs_tcp_port = "3396" # Web Interface: auto
         
         ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
-        self.ofs_mount_as_fuse = False
+        self.ofs_mount_as_fuse = False # Web Interface: user
         
         ## @var install_tests
         # Install OrangeFS tests
-        self.install_tests = True
+        self.install_tests = True # Web Interface: auto
         
         ## @var install_OFS_server
         # Install and start the OrangeFS server software
-        self.install_OFS_server = True
+        self.install_OFS_server = True # Web Interface: auto
         
         ## @var install_MPI
         # Install MPI software, including Torque
-        self.install_MPI = False
+        self.install_MPI = False # Web Interface: user
         
         ## @var install_opts
         # Additional installation options
-        self.install_opts = ""
+        self.install_opts = "" # Web Interface: user
         
         
         #------------------------------
@@ -229,37 +231,37 @@ class OFSTestConfig(object):
         
         ## @var ofs_extra_tests_location
         # location of suite of testing benchmarks
-        self.ofs_extra_tests_location = None
+        self.ofs_extra_tests_location = None # Web Interface: not used
         
         ## @var ofs_pvfs2tab_file
         # location of PVFS2TAB_FILE. Mountpoint will be read from file
-        self.ofs_pvfs2tab_file = None
+        self.ofs_pvfs2tab_file = None # Web Interface: not used
         
         ## @var ofs_source_location
         # location of orangefs on the main node
-        self.ofs_source_location = None
+        self.ofs_source_location = None # Web Interface: not used
         
         ## @var ofs_config_file
         #Location of OrangeFS.conf file
-        self.ofs_config_file = None
+        self.ofs_config_file = None  # Web Interface: not used
         
         ## @var delete_existing_data
         # Delete data on OrangeFS partition
-        self.delete_existing_data = False
+        self.delete_existing_data = False # Web Interface: not used
         
         ## @var ofs_mount_point
         # OrangeFS mount point
-        self.ofs_mount_point = None
+        self.ofs_mount_point = None # Web Interface: not used
         
         ## @var ofs_hostname_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
         # a bug on some cloud setups.
-        self.ofs_hostname_override = []
+        self.ofs_hostname_override = [] # Web Interface: not used
         
         ## @var start_client_on_all_nodes
         # Start the OrangeFS client on all nodes after installation?
-        self.start_client_on_all_nodes = False
+        self.start_client_on_all_nodes = False # Web Interface: not used
         
         
         #------------------------------
@@ -270,27 +272,27 @@ class OFSTestConfig(object):
         
         ## @var run_sysint_tests
         # Run the system integration tests?
-        self.run_sysint_tests = False
+        self.run_sysint_tests = False # Web Interface: user
         
         ## @var run_usrint_tests
         # Run the user integration library tests?
-        self.run_usrint_tests = False
+        self.run_usrint_tests = False # Web Interface: user
         
         ## @var run_vfs_tests
         # Run the kernel module vfs tests?
-        self.run_vfs_tests = False
+        self.run_vfs_tests = False # Web Interface: user
         
         ## @var run_fuse_tests
         # Run the fuse vfs tests?
-        self.run_fuse_tests = False
+        self.run_fuse_tests = False # Web Interface: user
         
         ## @var run_mpi_tests
         # Run OrangeFS ROM-IO tests.
-        self.run_mpi_tests = False
+        self.run_mpi_tests = False # Web Interface: user
         
         ## @var run_hadoop_tests
         # Run OrangeFS Hadoop tests
-        self.run_hadoop_tests = False
+        self.run_hadoop_tests = False # Web Interface: user
         
         ## @var cloud_subnet
         # cloud subnet ID for primary network interface
@@ -298,14 +300,14 @@ class OFSTestConfig(object):
         #TODO: Remove hardcoded definition. 
         self.cloud_subnet="03de6c88-231c-4c2c-9bfd-3c2d17604a82"
         
-        self.cloud_type = 'EC2'
-        self.nova_password_file=None
+        self.cloud_type = 'EC2' # Web Interface: auto
+        self.nova_password_file=None # Web Interface: auto
         
         ## @var instance_suffix
         #
         # Suffix to add to instance name.
         # usually the same as the output directory.
-        self.instance_suffix = ""
+        self.instance_suffix = "" # Web Interface: auto
         
     
     ##

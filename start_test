@@ -91,3 +91,6 @@ if rc != 0:
 # Ok, now we have a good OrangeFS installation. Let's test it!    
 if rc == 0:
     test_driver.runTest()
+
+# Leave a running installation
+test_driver.restartOFS()

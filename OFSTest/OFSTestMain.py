@@ -740,6 +740,14 @@ class OFSTestMain(object):
                 pass
 
 
+    def restartOFS(self):
+        print "Restarting all OrangeFS clients and servers"
+        self.ofs_network.unmountOFSFilesystemAllNodes()
+        self.ofs_network.stopOFSClientAllNodes()
+        self.ofs_network.stopOFSServers()
+        self.ofs_network.startOFSServers()
+        self.ofs_network.startOFSClient(security=self.config.security_mode) 
+        self.ofs_network.mountOFSFilesystem()
     
     
 
