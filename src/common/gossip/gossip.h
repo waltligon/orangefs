@@ -49,7 +49,8 @@ do {                                               \
 #include <stddef.h>
 #include <stdint.h>
 
-enum gossip_logstamp {
+enum gossip_logstamp
+{
     GOSSIP_LOGSTAMP_NONE,
     GOSSIP_LOGSTAMP_USEC,
     GOSSIP_LOGSTAMP_DATETIME,
@@ -57,7 +58,8 @@ enum gossip_logstamp {
 };
 #define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
 
-struct gossip_mech {
+struct gossip_mech
+{
     int (*startup)(void *, va_list);
     int (*log)(char *, size_t, void *);
     void (*shutdown)(void *);

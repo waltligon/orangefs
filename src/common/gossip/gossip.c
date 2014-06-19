@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <quicklist.h>
 
 /* for thread ids */
 #if WIN32
@@ -35,18 +36,31 @@
 
 /* xxx: threads */
 
+struct gossip_config
+{
+    struct gossip_mech mech;
+    void *data;
+    int nextlevel;
+    struct qlist_head list;
+};
+
 static int gossip_enabled = 0;
-static struct gossip_mech gossip_mech;
-static void *gossip_data;
+static struct gossip_config *gossip_config;
 
 void gossip_disable(void)
 {
+    struct gossip_config *p;
     if (!gossip_enabled)
         return;
     gossip_enabled = 0;
-    if (gossip_mech.shutdown)
-        gossip_mech.shutdown(gossip_data);
-    free(gossip_data);
+    if (!gossip_config)
+        return;
+    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
+    do {
+        p->mech.shutdown(p->data);
+        free(p->data);
+        p = qlist_entry(&p->list.next, struct gossip_config, list);
+    } while (&p->list != &gossip_config->list);
 }
 
 int gossip_enable(struct gossip_mech *mech, ...)
@@ -54,33 +68,48 @@ int gossip_enable(struct gossip_mech *mech, ...)
     int r = 0;
     va_list ap;
     va_start(ap, mech);
-    if (gossip_enabled && gossip_mech.shutdown)
-        gossip_mech.shutdown(gossip_data);
-    /* Then gossip_data is malloced and is either a valid pointer or NULL. */
-    free(gossip_data);
-    memcpy(&gossip_mech, mech, sizeof gossip_mech);
-    if (gossip_mech.startup)
+    if (gossip_enabled)
+        gossip_disable();
+
+    gossip_config = malloc(sizeof *gossip_config);
+    INIT_QLIST_HEAD(&gossip_config->list);
+
+    memcpy(&gossip_config->mech, mech, sizeof gossip_config->mech);
+    gossip_config->nextlevel = 0;
+    gossip_config->data = malloc(gossip_config->mech.datasz);
+    if (gossip_config->data == NULL) {
+        free(gossip_config);
+        gossip_config = NULL;
+        return -1;
+    }
+    if (gossip_config->mech.startup)
     {
-        gossip_data = malloc(gossip_mech.datasz);
-        if (gossip_data == NULL)
-            return -1;
-        r = gossip_mech.startup(gossip_data, ap);
-        if (r < 0)
+        r = gossip_config->mech.startup(gossip_config->data, ap);
+        if (r < 0) {
+            free(gossip_config->data);
+            free(gossip_config);
+            gossip_config = NULL;
             return r;
+        }
     }
     gossip_enabled = 1;
     va_end(ap);
-    return r;
+    return 0;
 }
 
 int gossip_reset(void)
 {
+    struct gossip_config *p;
     int r = 0;
     if (!gossip_enabled)
         return -1;
-    if (gossip_mech.reset)
-        r = gossip_mech.reset(gossip_data);
-    return r;
+    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
+    do {
+        if (r >= 0)
+            r = p->mech.reset(p->data);
+        p = qlist_entry(&p->list.next, struct gossip_config, list);
+    } while (&p->list != &gossip_config->list);
+    return 0;
 }
 
 /*
@@ -166,6 +195,7 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
     va_list aq;
     char stackbuf[512], prefixbuf[32];
     char *buf = NULL;
+    struct gossip_config *p;
     size_t len, prefixlen = 0;
     int r;
     if (!gossip_enabled)
@@ -227,7 +257,14 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
     strncpy(buf, prefixbuf, prefixlen+1);
     vsnprintf(buf+prefixlen, len-prefixlen, fmt, aq);
     /* write out prefix and message */
-    r = gossip_mech.log(buf, len, gossip_data);
+    /* r will be negative if any log fails. */
+    r = 0;
+    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
+    do {
+        if (r >= 0)
+            r = p->mech.log(buf, len, p->data);
+        p = qlist_entry(&p->list.next, struct gossip_config, list);
+    } while (&p->list != &gossip_config->list);
     if (buf != stackbuf)
         free(buf);
     return r;
