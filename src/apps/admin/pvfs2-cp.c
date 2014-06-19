@@ -26,6 +26,7 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-hint.h"
+#include "pvfs2-usrint.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -55,6 +56,8 @@ typedef struct pvfs2_file_object_s {
     char user_path[PVFS_NAME_MAX+1];
     PVFS_sys_attr attr;
     PVFS_permissions perms;
+    int fd;
+    int mode;
 } pvfs2_file_object;
 
 typedef struct unix_file_object_s {
@@ -335,6 +338,7 @@ static size_t generic_read(file_object *src, char *buffer,
 	return (read(src->u.ufs.fd, buffer, count));
     else
     {
+	return (pvfs_read(src->u.pvfs2.fd, buffer, count));
 	file_req = PVFS_BYTE;
 	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
 	if (ret < 0)
@@ -367,7 +371,8 @@ static size_t generic_write(file_object *dest, char *buffer,
     if (dest->fs_type == UNIX_FILE)
 	return(write(dest->u.ufs.fd, buffer, count));
     else
-    {
+    {	
+	return(write(dest->u.pvfs2.fd, buffer, count));
 	file_req = PVFS_BYTE;
 	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
 	if (ret < 0)
@@ -478,6 +483,43 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     }
     else
     {
+	memset(&stat_buf, 0, sizeof(struct stat));
+	pvfs_stat(obj->u.pvfs2.pvfs2_path, &stat_buf);
+	if(open_type == OPEN_SRC)
+	{
+		if(S_ISDIR(stat_buf.st_mode))
+		{
+			fprintf(stderr, "Source cannot be a directory\n");
+			return(-1);
+		}
+		obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path, O_RDONLY);
+		obj->u.pvfs2.mode = (int)stat_buf.st_mode;
+	}
+	else
+	{
+		if (S_ISDIR(stat_buf.st_mode))
+		{
+			if (srcname)
+                	{
+		    		strncat(obj->u.pvfs2.pvfs2_path, basename(srcname), NAME_MAX);
+                	}
+			else
+			{
+		    		fprintf(stderr, "cannot find name for "
+                            		"destination. giving up\n");
+		    		return(-1);
+			}
+	    	}
+	    	obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path,
+				   O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC,0666);
+	}
+	if (obj->u.pvfs2.fd < 0)
+	{
+	    perror("open");
+	    fprintf(stderr, "could not open %s\n", obj->u.pvfs2.pvfs2_path);
+	    return (-1);
+	}
+
 	entry_name = str_buf;
 	/* it's a PVFS2 file */
 	if (strcmp(obj->u.pvfs2.pvfs2_path, "/") == 0)
