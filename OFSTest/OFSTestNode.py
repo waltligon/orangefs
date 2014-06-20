@@ -1147,14 +1147,12 @@ class OFSTestNode(object):
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive patch libuuid1 uuid-devel gdb",
+                "zypper --non-interactive install patch libuuid1 uuid-devel gdb",
                 
     
-                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`",
-                "cp /boot/config-\\`uname -r\\` .config",
-                "make oldconfig &> /dev/null",
-                "make modules_prepare &>/dev/null",
-                "make prepare &>/dev/null",
+                
+                "cp /boot/config-\\`uname -r\\` /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`/.config",
+                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`; make oldconfig && make modules_prepare && make prepare",
                 "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
                 "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
