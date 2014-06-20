@@ -45,7 +45,7 @@ struct gossip_config
 };
 
 static int gossip_enabled = 0;
-static struct gossip_config *gossip_config;
+static struct qlist_head gossip_config = QLIST_HEAD_INIT(gossip_config);
 
 void gossip_disable(void)
 {
@@ -53,45 +53,39 @@ void gossip_disable(void)
     if (!gossip_enabled)
         return;
     gossip_enabled = 0;
-    if (!gossip_config)
-        return;
-    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
-    do {
+    qlist_for_each_entry(p, &gossip_config, list) {
         p->mech.shutdown(p->data);
         free(p->data);
-        p = qlist_entry(&p->list.next, struct gossip_config, list);
-    } while (&p->list != &gossip_config->list);
+    }
 }
 
 int gossip_enable(struct gossip_mech *mech, ...)
 {
+    struct gossip_config *p;
     int r = 0;
     va_list ap;
     va_start(ap, mech);
     if (gossip_enabled)
         gossip_disable();
 
-    gossip_config = malloc(sizeof *gossip_config);
-    INIT_QLIST_HEAD(&gossip_config->list);
-
-    memcpy(&gossip_config->mech, mech, sizeof gossip_config->mech);
-    gossip_config->nextlevel = 0;
-    gossip_config->data = malloc(gossip_config->mech.datasz);
-    if (gossip_config->data == NULL) {
-        free(gossip_config);
-        gossip_config = NULL;
+    p = malloc(sizeof *p);
+    memcpy(&p->mech, mech, sizeof p->mech);
+    p->nextlevel = 0;
+    p->data = malloc(p->mech.datasz);
+    if (p->data == NULL) {
+        free(p);
         return -1;
     }
-    if (gossip_config->mech.startup)
+    if (p->mech.startup)
     {
-        r = gossip_config->mech.startup(gossip_config->data, ap);
+        r = p->mech.startup(p->data, ap);
         if (r < 0) {
-            free(gossip_config->data);
-            free(gossip_config);
-            gossip_config = NULL;
+            free(p->data);
+            free(p);
             return r;
         }
     }
+    qlist_add(&p->list, &gossip_config);
     gossip_enabled = 1;
     va_end(ap);
     return 0;
@@ -103,12 +97,10 @@ int gossip_reset(void)
     int r = 0;
     if (!gossip_enabled)
         return -1;
-    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
-    do {
+    qlist_for_each_entry(p, &gossip_config, list) {
         if (r >= 0)
             r = p->mech.reset(p->data);
-        p = qlist_entry(&p->list.next, struct gossip_config, list);
-    } while (&p->list != &gossip_config->list);
+    }
     return 0;
 }
 
@@ -259,12 +251,10 @@ int gossip_vprint(char prefix, const char *fmt, va_list ap)
     /* write out prefix and message */
     /* r will be negative if any log fails. */
     r = 0;
-    p = qlist_entry(&gossip_config->list, struct gossip_config, list);
-    do {
+    qlist_for_each_entry(p, &gossip_config, list) {
         if (r >= 0)
             r = p->mech.log(buf, len, p->data);
-        p = qlist_entry(&p->list.next, struct gossip_config, list);
-    } while (&p->list != &gossip_config->list);
+    }
     if (buf != stackbuf)
         free(buf);
     return r;
@@ -291,6 +281,7 @@ int gossip_perf_log(const char *fmt, ...)
     return r;
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 int gossip_debug(uint64_t mask, const char *fmt, ...)
 {
     va_list ap;
@@ -304,6 +295,7 @@ int gossip_debug(uint64_t mask, const char *fmt, ...)
     }
     return 0;
 }
+#endif
 
 int gossip_print(char prefix, const char *fmt, ...)
 {

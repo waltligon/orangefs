@@ -95,14 +95,22 @@ void gossip_set_logstamp(enum gossip_logstamp);
 void gossip_backtrace(void);
 int gossip_vprint(char, const char *, va_list);
 int gossip_print(char, const char *, ...);
+#ifdef GOSSIP_DISABLE_DEBUG
+#define gossip_debug(...) do {} while (0)
+#else
 int gossip_debug(uint64_t, const char *, ...);
+#endif
 int gossip_err(const char *, ...);
 int gossip_perf_log(const char *, ...);
 
+#ifdef GOSSIP_DISABLE_DEBUG
+#define gossip_ldebug(...) do {} while (0)
+#else
 #define gossip_ldebug(mask, ...) do { \
         gossip_debug(mask, "%s:%d: ", __FILE__, __LINE__); \
         gossip_debug(mask, __VA_ARGS__); \
     } while (0);
+#endif
 
 #define gossip_lerr(...) do { \
         gossip_err("%s:%d: ", __FILE__, __LINE__); \
