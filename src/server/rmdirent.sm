@@ -110,10 +110,10 @@ static PINT_sm_action rmdirent_get_dirdata_attr(
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for dirdata handle %llu\n", llu(s_op->req->u.rmdirent.dirent_handle));         
+                 "for dirdata handle %llu\n", llu(s_op->req->u.rmdirent.handle));         
 
     ret = job_trove_dspace_getattr(
-        s_op->target_fs_id, s_op->req->u.rmdirent.dirent_handle, smcb,
+        s_op->target_fs_id, s_op->req->u.rmdirent.handle, smcb,
         &(s_op->u.rmdirent.dirdata_ds_attr),
         0, js_p, &tmp_id, server_job_context, s_op->req->hints);
         
@@ -151,12 +151,12 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.rmdirent.fs_id, llu(s_op->req->u.rmdirent.dirent_handle),
+                 s_op->req->u.rmdirent.fs_id, llu(s_op->req->u.rmdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
-        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.dirent_handle,
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
         &s_op->key, &s_op->val,
         0,
         NULL, smcb, 0, js_p,
@@ -190,7 +190,7 @@ static PINT_sm_action rmdirent_get_bitmap(
             "rmdirent: get dist-dir-attr for dirdata handle %llu "
             "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            llu(s_op->req->u.rmdirent.dirent_handle),
+            llu(s_op->req->u.rmdirent.handle),
             attr_p->dist_dir_attr.tree_height,
             attr_p->dist_dir_attr.num_servers,
             attr_p->dist_dir_attr.bitmap_size,
@@ -230,12 +230,12 @@ static PINT_sm_action rmdirent_get_bitmap(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dirdata bitmap (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.rmdirent.fs_id, llu(s_op->req->u.rmdirent.dirent_handle),
+                 s_op->req->u.rmdirent.fs_id, llu(s_op->req->u.rmdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
-        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.dirent_handle,
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
         &s_op->key, &s_op->val,
         0,
         NULL, smcb, 0, js_p,
@@ -326,7 +326,7 @@ static int rmdirent_remove_directory_entry(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
                  "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
-                 llu(s_op->req->u.rmdirent.dirent_handle));
+                 llu(s_op->req->u.rmdirent.handle));
 
     /* set the sync flag */
     flags = TROVE_SYNC;
@@ -337,7 +337,7 @@ static int rmdirent_remove_directory_entry(
     flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
 
     ret = job_trove_keyval_remove(
-        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.dirent_handle,
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
         &s_op->key, 
         &s_op->val,
         flags,
@@ -387,9 +387,9 @@ static PINT_sm_action rmdirent_update_directory_attr(
     ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
-    /* setting dirent_handle dspace */
+    /* setting dspace */
     ret = job_trove_dspace_setattr(
-        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.dirent_handle,
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
         ds_attr,
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);

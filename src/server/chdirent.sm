@@ -124,10 +124,10 @@ static PINT_sm_action chdirent_get_dirdata_attr(
     memset(&(s_op->u.chdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for dirdata handle %llu\n", llu(s_op->req->u.chdirent.dirent_handle));
+                 "for dirdata handle %llu\n", llu(s_op->req->u.chdirent.handle));
 
     ret = job_trove_dspace_getattr(
-        s_op->target_fs_id, s_op->req->u.chdirent.dirent_handle, smcb,
+        s_op->target_fs_id, s_op->req->u.chdirent.handle, smcb,
         &(s_op->u.chdirent.dirdata_ds_attr),
         0, js_p, &tmp_id, server_job_context, s_op->req->hints);
 
@@ -165,12 +165,12 @@ static PINT_sm_action chdirent_get_dist_dir_attr(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.chdirent.fs_id, llu(s_op->req->u.chdirent.dirent_handle
+                 s_op->req->u.chdirent.fs_id, llu(s_op->req->u.chdirent.handle
 ),                                (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
                  
     ret = job_trove_keyval_read(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
         &s_op->key, &s_op->val,
         0,
         NULL, smcb, 0, js_p,
@@ -203,7 +203,7 @@ static PINT_sm_action chdirent_get_bitmap(
             "chdirent: get dist-dir-attr for dirdata handle %llu "
             "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            llu(s_op->req->u.chdirent.dirent_handle),
+            llu(s_op->req->u.chdirent.handle),
             attr_p->dist_dir_attr.tree_height,
             attr_p->dist_dir_attr.num_servers,
             attr_p->dist_dir_attr.bitmap_size,
@@ -243,12 +243,12 @@ static PINT_sm_action chdirent_get_bitmap(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dirdata bitmap (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.chdirent.fs_id, llu(s_op->req->u.chdirent.dirent_handle),
+                 s_op->req->u.chdirent.fs_id, llu(s_op->req->u.chdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
         &s_op->key, &s_op->val,
         0,
         NULL, smcb, 0, js_p,
@@ -320,7 +320,7 @@ static PINT_sm_action chdirent_read_directory_entry(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading from dirent handle = %llu, name = %s\n",
-		 llu(s_op->req->u.chdirent.dirent_handle),
+		 llu(s_op->req->u.chdirent.handle),
 		 s_op->req->u.chdirent.entry);
 
     s_op->key.buffer = s_op->req->u.chdirent.entry;
@@ -330,7 +330,7 @@ static PINT_sm_action chdirent_read_directory_entry(
 
     ret = job_trove_keyval_read(
         s_op->req->u.chdirent.fs_id,
-        s_op->req->u.chdirent.dirent_handle,
+        s_op->req->u.chdirent.handle,
         &s_op->key,
         &s_op->val,
         TROVE_KEYVAL_DIRECTORY_ENTRY,
@@ -392,7 +392,7 @@ static PINT_sm_action chdirent_change_directory_entry(
                  llu(s_op->u.chdirent.new_dirent_handle));
 
     ret = job_trove_keyval_write(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
         &s_op->key, &s_op->val, 
         TROVE_SYNC | TROVE_KEYVAL_DIRECTORY_ENTRY |
         0,
@@ -440,7 +440,7 @@ static PINT_sm_action chdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
         ds_attr,
         TROVE_SYNC |
         0,

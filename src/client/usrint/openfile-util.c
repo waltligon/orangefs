@@ -784,11 +784,21 @@ static void signal_handler(int sig)
     static int times_run = 0;
     if (times_run++ > 0)
     {
-        gossip_err("Repeated running of signal handler\n");
+        gossip_err("Repeated running of signal handler for %d\n", sig);
         exit(-1);
     }
+    else
+    {
+        gossip_err("Signal %d caught\n", sig);
+    }
     cleanup_usrint_internal();
-    (*default_handler[sig])(sig);
+    if (default_handler[sig] && default_handler[sig] != SIG_ERR)
+    {
+        gossip_err("Running default signal handler\n");
+        (*default_handler[sig])(sig);
+    }
+    gossip_err("Hander exiting\n");
+    exit(-1);
 }
 
 /** sets up signal handlers to run cleanup on abort
@@ -808,8 +818,11 @@ static void init_signal_handlers(void)
     static int times_run = 0;
     if (times_run++ > 0)
     {
+        gossip_err("Repeated running of init signal handlers\n");
         return;
     }
+    memset(default_handler, 0, sizeof(default_handler));
+    /* catch all signals that result in termination */
     default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
     default_handler[SIGINT] = signal(SIGINT, signal_handler);
     default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);

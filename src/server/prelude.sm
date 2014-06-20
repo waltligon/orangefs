@@ -559,6 +559,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* anything else we treat as a real error */
+    if (js_p->error_code)
+    {
+        js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
+
     js_p->error_code = ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
