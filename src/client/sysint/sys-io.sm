@@ -84,7 +84,8 @@ static int io_find_target_datafiles(
     int *handle_index_array,
     int *handle_index_out_count,
     int *sio_handle_index_array,
-    int *sio_handle_index_count);
+    int *sio_handle_index_count,
+    int object_num);
 
 static int io_find_total_size(
     PINT_client_sm * sm_p,
@@ -288,6 +289,22 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
                         PVFS_sys_op_id *op_id,
                         PVFS_hint hints,
                         void *user_ptr)
+                        {return PVFS_isys_io_object(ref, file_req, file_req_offset, buffer,
+                                                    mem_req, credential, resp_p, io_type,
+                                                    op_id, hints, user_ptr, -1);}
+
+PVFS_error PVFS_isys_io_object(PVFS_object_ref ref,
+                        PVFS_Request file_req,
+                        PVFS_offset file_req_offset,
+                        void *buffer,
+                        PVFS_Request mem_req,
+                        const PVFS_credential *credential,
+                        PVFS_sysresp_io *resp_p,
+                        enum PVFS_io_type io_type,
+                        PVFS_sys_op_id *op_id,
+                        PVFS_hint hints,
+                        void *user_ptr,
+                        int object_num)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -363,6 +380,7 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
     sm_p->u.io.total_size = 0;
     sm_p->u.io.small_io = 0;
     sm_p->object_ref = ref;
+    sm_p->u.io.object_num = object_num; //object number to access individual objects
 
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
@@ -379,6 +397,7 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
  *
  *  \param type specifies if the operation is a read or write.
  */
+
 PVFS_error PVFS_sys_io(PVFS_object_ref ref,
                        PVFS_Request file_req,
                        PVFS_offset file_req_offset,
@@ -388,13 +407,27 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
                        PVFS_sysresp_io *resp_p,
                        enum PVFS_io_type io_type,
                        PVFS_hint hints)
+                       {return PVFS_sys_io_object(ref, file_req, file_req_offset, buffer,
+                                                  mem_req, credential, resp_p, io_type,
+                                                  hints, -1);}
+
+PVFS_error PVFS_sys_io_object(PVFS_object_ref ref,
+                              PVFS_Request file_req,
+                              PVFS_offset file_req_offset,
+                              void *buffer,
+                              PVFS_Request mem_req,
+                              const PVFS_credential *credential,
+                              PVFS_sysresp_io *resp_p,
+                              enum PVFS_io_type io_type,
+                              PVFS_hint hints,
+                              int object_number)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
 
-    ret = PVFS_isys_io(ref,
+    ret = PVFS_isys_io_object(ref,
                        file_req,
                        file_req_offset,
                        buffer,
@@ -404,7 +437,8 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
                        io_type,
                        &op_id,
                        hints,
-                       NULL);
+                       NULL,
+                       object_number);
     if (ret == 1)
     {
         return 0;
@@ -577,6 +611,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
     int target_datafile_count = 0;
     int * sio_array;
     int sio_count;
+    
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
@@ -586,7 +621,6 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ECANCEL;
         goto exit;
     }
-
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
@@ -615,6 +649,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_EBADF;
             goto exit;
     }
+
     /* cannot write to an immutable file */
     if (sm_p->u.io.io_type == PVFS_IO_WRITE
         && (attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL))
@@ -622,6 +657,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EPERM;
         goto exit;
     }
+
     ret = PINT_dist_lookup(attr->u.meta.dist);
     if (ret)
     {
@@ -630,12 +666,14 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         goto exit;
     }
 
+
     ret = io_datafile_index_array_init(sm_p, attr->u.meta.dfile_count);
     if(ret < 0)
     {
         js_p->error_code = ret;
         goto error_exit;
     }
+
 
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->u.io.dfile_size_array, 
                                      attr->u.meta.dfile_count);
@@ -650,6 +688,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         goto datafile_index_array_destroy;
     }
+
    
     ret = io_find_target_datafiles(sm_p->u.io.mem_req,
                                    sm_p->u.io.file_req,
@@ -662,7 +701,8 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                                    sm_p->u.io.datafile_index_array,
                                    &target_datafile_count,
                                    sio_array, 
-                                   &sio_count);
+                                   &sio_count,
+                                   sm_p->u.io.object_num);  //for individual object access
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -2651,7 +2691,8 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
                                     int *handle_index_array,
                                     int *handle_index_out_count,
                                     int *sio_handle_index_array,
-                                    int *sio_handle_index_count)
+                                    int *sio_handle_index_count,
+                                    int object_num)
 {
     int ret = -PVFS_EINVAL, i = 0;
     struct PINT_Request_state *req_state = NULL;
@@ -2664,6 +2705,10 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
     struct server_configuration_s * server_config;
     struct filesystem_configuration_s * fs_config;
     int small_io_size;
+    int start_handle = 0, end_handle = input_handle_count; 
+    if(object_num >= 0){
+        input_handle_count = 1;
+    }
 
     gossip_debug(GOSSIP_IO_DEBUG, "- io_find_target_datafiles called\n");
 
@@ -2696,8 +2741,14 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
      * or if any data should be written
      * (in the case of writes).
      */
-    for(i = 0; i < input_handle_count; i++)
-    {
+    if(object_num >= 0)
+    {   
+        start_handle = object_num;
+        end_handle = (object_num + 1);
+    }
+    
+    for( i = start_handle; i < end_handle; i++)
+    {   
         int max_unexp_payload;
 
         ret = io_get_max_unexp_size(file_req,
@@ -2832,6 +2883,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
                          __func__, i, *handle_index_out_count);
         }
     }
+
     PINT_free_request_state(req_state);
     PINT_free_request_state(mem_req_state);
 

@@ -463,6 +463,19 @@ PVFS_error PVFS_isys_io(
     PVFS_hint hints,
     void *user_ptr);
 
+PVFS_error PVFS_isys_io_object(PVFS_object_ref ref,
+                        PVFS_Request file_req,
+                        PVFS_offset file_req_offset,
+                        void *buffer,
+                        PVFS_Request mem_req,
+                        const PVFS_credential *credential,
+                        PVFS_sysresp_io *resp_p,
+                        enum PVFS_io_type io_type,
+                        PVFS_sys_op_id *op_id,
+                        PVFS_hint hints,
+                        void *user_ptr,
+                        int object_num);
+
 /** Macro for convenience read is a call to io */
 #define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
 PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8,x9)
@@ -489,6 +502,18 @@ PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
 /** Macro for convenience write is a call to io */
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,z)
+
+PVFS_error PVFS_sys_io_object(PVFS_object_ref ref,
+                              PVFS_Request file_req,
+                              PVFS_offset file_req_offset,
+                              void *buffer,
+                              PVFS_Request mem_req,
+                              const PVFS_credential *credential,
+                              PVFS_sysresp_io *resp_p,
+                              enum PVFS_io_type io_type,
+                              PVFS_hint hints,
+                              int object_number);
+
 
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,

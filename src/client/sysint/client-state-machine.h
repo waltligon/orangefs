@@ -345,6 +345,8 @@ struct PINT_client_io_sm
 
     PVFS_size * dfile_size_array;
     int small_io;
+
+    int object_num;     //for access to an individual object
 };
 
 struct PINT_client_flush_sm

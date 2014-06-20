@@ -697,16 +697,19 @@ int PINT_cached_config_map_servers(
          * datafiles per server round robin - though that
          * won't happen with the current caode base 
          */
+/*bypassed for object interface <Kirby june 20 2014>
 
+#if 0
         if(num_io_servers < *inout_num_datafiles)
         {
             *inout_num_datafiles = num_io_servers;
         }
+#endif
 
         if(start_index == -1)
         {
             start_index = rand() % num_io_servers;
-        }
+        }*/
 
         /* start at beginning of server list */
         server_list = server_list_head;
@@ -756,10 +759,14 @@ int PINT_cached_config_map_servers(
         /* limit this layout to a number of datafiles no greater than
          * the number of servers
          */
+
+/*Commented out for object interfacing <Kirby june 10 2014>
+#if 0
         if(num_io_servers < *inout_num_datafiles)
         {
             *inout_num_datafiles = num_io_servers;
         }
+#endif*/
         /* init all the addrs to 0, so we know whether we've set an
          * address at a particular index or not
          */
@@ -1246,6 +1253,7 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
             num_dfiles_requested = cur_config_cache->fs->default_num_dfiles;
         }
     }
+    
 
     /* Determine the number of I/O servers available */
     rc = PINT_cached_config_get_num_io(fsid, &num_io_servers);
@@ -1259,24 +1267,20 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
     *num_dfiles = dist->methods->get_num_dfiles(dist->params,
                                                 num_io_servers,
                                                 num_dfiles_requested);
+    /*<Kirby June 11, 2014> changed statement to fit with object interfacing*/    
+
     if(*num_dfiles < 1)
     {
+        //not sure what to put in for the error statement
         gossip_err("Error: distribution failure for %d servers "
                    "and %d requested datafiles.\n", num_io_servers,
                    num_dfiles_requested);
-        return(-PVFS_EINVAL);
+        *num_dfiles = num_io_servers; // if invaid number of servers is specified the max number of servers is used.
     }
  
-    if (*num_dfiles > num_io_servers)
+    else if (*num_dfiles > num_io_servers)
     {
-        gossip_err("%s: Distribution requires more datafiles(%d) "
-                   "than I/O servers(%d) currently defined in the "
-                   "system. Capping "
-                   "number of datafiles to the number of I/O servers.\n"
-                   ,__func__
-                   ,*num_dfiles
-                   ,num_io_servers);
-        *num_dfiles = num_io_servers;
+        *num_dfiles = num_dfiles_requested; //if its greater than the number of servers, still give the amount of dfiles requested for object dist
     }
 
     return 0;

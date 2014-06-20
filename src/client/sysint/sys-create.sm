@@ -1012,6 +1012,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
                 }
                 else
                 {
+                    printf("sys-create.sm line 1015: dist_name: %s\n", dist->dist_name);
                     rc = dist->methods->set_param(dist->dist_name,
                                                   dist->params,
                                                   param->name,

@@ -263,6 +263,28 @@ Number of datafiles/servers = 1
 Server 0 - tcp://localhost:3334, handle: 5223372036854744172 (487d2531626f846c.bstream)
 \end{verbatim}
 
+\subsection{Object}
+
+The object distribution is mainly included for object interfacing
+developers.  It performs no striping at all, and instead places all
+data on one server.  The basic distribution overrides the number of
+datafiles (as shown in the previous section) and only uses one datafile
+in all cases.  There are no tunable parameters.
+
+\begin{verbatim}
+# to enable object distribution for a directory:
+$ setfattr -n user.pvfs2.dist_name -v object_dist /mnt/pvfs2/dir
+
+# to create a new file and confirm the distribution:
+$ touch /mnt/pvfs2/dir/file
+$ pvfs2-viewdist -f /mnt/pvfs2/dir/file
+dist_name = object_dist
+dist_params:
+none
+Number of datafiles/servers = 1
+Server 0 - tcp://localhost:3334, handle: 5223372036854744172 (487d2531626f846c.bstream)
+\end{verbatim}
+
 
 \subsection{Two Dimensional Stripe}
 

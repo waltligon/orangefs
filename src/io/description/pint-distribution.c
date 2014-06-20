@@ -24,6 +24,7 @@ static int PINT_Dist_count = 0;
 
 /* compiled-in distributions */
 extern PINT_dist basic_dist;
+extern PINT_dist object_dist; //object dist for testing
 extern PINT_dist simple_stripe_dist;
 
 /* initial dist table - default dists */
