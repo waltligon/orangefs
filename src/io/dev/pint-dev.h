@@ -54,6 +54,10 @@ int PINT_dev_initialize(
     const char* dev_name,
     int flags);
 
+#ifdef WITH_LINUX_KMOD
+int LOG2(int number);
+#endif
+
 int PINT_dev_get_mapped_regions(
     int ndesc,
     struct PVFS_dev_map_desc *desc,

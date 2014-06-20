@@ -200,7 +200,7 @@ void PINT_dev_finalize(void)
 
 #ifdef WITH_LINUX_KMOD
 /* log to base 2 when we know that number is a power of 2 */
-static int LOG2(int number)
+int LOG2(int number)
 {
     int count = 0;
     if (number == 0 || (number & (number - 1))) 
