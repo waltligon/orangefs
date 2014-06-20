@@ -870,7 +870,7 @@ class OFSTestNetwork(object):
             node_list = self.network_nodes
         # TODO: make this multithreaded
         for node in node_list:
-            self.unmountOFSFilesystem(node)
+            node.unmountOFSFilesystem()
 
    
     ##    

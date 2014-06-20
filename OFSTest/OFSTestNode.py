@@ -1846,8 +1846,8 @@ class OFSTestNode(object):
          
         if build_kmod == True:
             
-            if "suse" in self.distro.lower():
-                # SuSE puts kernel source in a different location.
+            if "opensuse" in self.distro.lower():
+                # openSuSE puts kernel source in a different location.
                 configure_opts = "%s --with-kernel=%s/source" % (configure_opts,self.kernel_source_location)
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
