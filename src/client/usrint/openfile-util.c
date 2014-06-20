@@ -767,9 +767,18 @@ static void cleanup_usrint_internal(void)
         close_descriptor_area_list(qlist_entry(qh, pvfs_desc_list_t, link));
     }
     /* unlink our area - remains until all others have unmapped */
-    glibc_ops.munmap(shmctrl, shmsize);
-    glibc_ops.close(shmobj);
-    glibc_ops.unlink(shmobjpath);
+    if (shmctrl)
+    {
+        glibc_ops.munmap(shmctrl, shmsize);
+    }
+    if (shmobj >= 0)
+    {
+        glibc_ops.close(shmobj);
+    }
+    if (strnlen(shmobjpath, sizeof(shmobjpath)))
+    {
+        glibc_ops.unlink(shmobjpath);
+    }
     /* clear globals */
     shmobj = -1;
     shmctrl = NULL;
@@ -781,24 +790,24 @@ static void cleanup_usrint_internal(void)
  */
 static void signal_handler(int sig)
 {
+#ifndef PVFS_UINT_SIG_DISABLE
     static int times_run = 0;
     if (times_run++ > 0)
     {
-        gossip_err("Repeated running of signal handler for %d\n", sig);
-        exit(-1);
+        init_printerr1("Repeated running of signal handler for %d\n", sig);
     }
     else
     {
-        gossip_err("Signal %d caught\n", sig);
+        init_printerr1("Signal %d caught\n", sig);
+        cleanup_usrint_internal();
+        if (default_handler[sig] && default_handler[sig] != SIG_ERR)
+        {
+            init_printerr("Running default signal handler\n");
+            (*default_handler[sig])(sig);
+        }
+        init_printerr("Signal handler done\n");
     }
-    cleanup_usrint_internal();
-    if (default_handler[sig] && default_handler[sig] != SIG_ERR)
-    {
-        gossip_err("Running default signal handler\n");
-        (*default_handler[sig])(sig);
-    }
-    gossip_err("Hander exiting\n");
-    exit(-1);
+#endif
 }
 
 /** sets up signal handlers to run cleanup on abort
@@ -815,10 +824,11 @@ static void init_signal_handlers(void)
      * so it should never be run by more than one thread or more than
      * once by a thread - this counter is just to be sure
      */
+#ifndef PVFS_UINT_SIG_DISABLE
     static int times_run = 0;
     if (times_run++ > 0)
     {
-        gossip_err("Repeated running of init signal handlers\n");
+        init_printerr("Repeated running of init signal handlers\n");
         return;
     }
     memset(default_handler, 0, sizeof(default_handler));
@@ -848,6 +858,7 @@ static void init_signal_handlers(void)
     default_handler[SIGIO] = signal(SIGIO, signal_handler);
     default_handler[SIGPWR] = signal(SIGPWR, signal_handler);
     /* default_handler[SIGLOST] = signal(SIGLOST, signal_handler); */
+#endif
 }
 
 #if PVFS_UCACHE_ENABLE
@@ -1619,6 +1630,7 @@ static void init_descriptor_area_internal(void)
 
     /* unlink the /dev/shm entry - noone should need to open it again */
     glibc_ops.unlink(shmobjpath);
+    memset(shmobjpath, 0, sizeof(shmobjpath));
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
