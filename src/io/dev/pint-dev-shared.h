@@ -52,6 +52,8 @@
 /* Sane maximum values for these parameters (128 MB) */
 #define PVFS2_BUFMAP_MAX_TOTAL_SIZE      (128ULL * (1024 * 1024))
 
+int LOG2(int number);
+
 #define PVFS2_READDIR_DEFAULT_DESC_COUNT  5
 #define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
 #define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17

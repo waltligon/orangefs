@@ -7,9 +7,13 @@
 #ifndef BMI_BYTESWAP_H
 #define BMI_BYTESWAP_H
 
+#ifndef __KERNEL__
 #include <stdint.h>
 #ifdef HAVE_BYTESWAP_H
 #include <byteswap.h>
+#endif
+#else
+#include <linux/types.h>
 #endif
 
 /* Byte swapping is only necessary on big endian systems. */

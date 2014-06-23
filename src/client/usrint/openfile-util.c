@@ -205,11 +205,6 @@ static void cleanup_usrint_internal(void)
 /* static int pvfs_sys_init_elf(void) GCC_UNUSED; */
 static int pvfs_lib_init_flag = 0;      /* initialization done */
 
-/* table of signals handlers replace with ours */
-static void signal_handler(int sig);
-static void init_signal_handlers(void);
-static void (*default_handler[32])(int);
-
 posix_ops glibc_ops;
 
 /* wrapper so we can call getpwd for initialization
@@ -767,87 +762,23 @@ static void cleanup_usrint_internal(void)
         close_descriptor_area_list(qlist_entry(qh, pvfs_desc_list_t, link));
     }
     /* unlink our area - remains until all others have unmapped */
-    glibc_ops.munmap(shmctrl, shmsize);
-    glibc_ops.close(shmobj);
-    glibc_ops.unlink(shmobjpath);
+    if (shmctrl)
+    {
+        glibc_ops.munmap(shmctrl, shmsize);
+    }
+    if (shmobj >= 0)
+    {
+        glibc_ops.close(shmobj);
+    }
+    if (strnlen(shmobjpath, sizeof(shmobjpath)))
+    {
+        glibc_ops.unlink(shmobjpath);
+    }
     /* clear globals */
     shmobj = -1;
     shmctrl = NULL;
     descriptor_table = NULL;
     memset(shmobjpath, 0, sizeof(shmobjpath));
-}
-
-/** generic usrint signal handler
- */
-static void signal_handler(int sig)
-{
-    static int times_run = 0;
-    if (times_run++ > 0)
-    {
-        gossip_err("Repeated running of signal handler for %d\n", sig);
-        exit(-1);
-    }
-    else
-    {
-        gossip_err("Signal %d caught\n", sig);
-    }
-    cleanup_usrint_internal();
-    if (default_handler[sig] && default_handler[sig] != SIG_ERR)
-    {
-        gossip_err("Running default signal handler\n");
-        (*default_handler[sig])(sig);
-    }
-    gossip_err("Hander exiting\n");
-    exit(-1);
-}
-
-/** sets up signal handlers to run cleanup on abort
- *  abort (via various sources) does not run destructors
- *  and thus we need to try to catch those and run it ourselves
- *  The application might replace these handlers - they SHOULD call our
- *  handler after theirs (unless they recover from the abort) but they
- *  might not.  Not much we can do if they don't.  This should run
- *  before any other handlers are set up.
- */
-static void init_signal_handlers(void)
-{
-    /* this should only be called within the usrint init sequence
-     * so it should never be run by more than one thread or more than
-     * once by a thread - this counter is just to be sure
-     */
-    static int times_run = 0;
-    if (times_run++ > 0)
-    {
-        gossip_err("Repeated running of init signal handlers\n");
-        return;
-    }
-    memset(default_handler, 0, sizeof(default_handler));
-    /* catch all signals that result in termination */
-    default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
-    default_handler[SIGINT] = signal(SIGINT, signal_handler);
-    default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);
-    default_handler[SIGILL] = signal(SIGILL, signal_handler);
-    default_handler[SIGABRT] = signal(SIGABRT, signal_handler);
-    default_handler[SIGFPE] = signal(SIGFPE, signal_handler);
-    default_handler[SIGSEGV] = signal(SIGSEGV, signal_handler);
-    default_handler[SIGPIPE] = signal(SIGPIPE, signal_handler);
-    default_handler[SIGALRM] = signal(SIGALRM, signal_handler);
-    default_handler[SIGTERM] = signal(SIGTERM, signal_handler);
-    default_handler[SIGUSR1] = signal(SIGUSR1, signal_handler);
-    default_handler[SIGUSR2] = signal(SIGUSR2, signal_handler);
-    default_handler[SIGBUS] = signal(SIGBUS, signal_handler);
-    default_handler[SIGPOLL] = signal(SIGPOLL, signal_handler);
-    default_handler[SIGPROF] = signal(SIGPROF, signal_handler);
-    default_handler[SIGSYS] = signal(SIGSYS, signal_handler);
-    default_handler[SIGTRAP] = signal(SIGTRAP, signal_handler);
-    default_handler[SIGVTALRM] = signal(SIGVTALRM, signal_handler);
-    default_handler[SIGXCPU] = signal(SIGXCPU, signal_handler);
-    default_handler[SIGXFSZ] = signal(SIGXFSZ, signal_handler);;
-    default_handler[SIGIOT] = signal(SIGIOT, signal_handler);
-    /* default_handler[SIGEMT] = signal(SIGEMT, signal_handler); */
-    default_handler[SIGIO] = signal(SIGIO, signal_handler);
-    default_handler[SIGPWR] = signal(SIGPWR, signal_handler);
-    /* default_handler[SIGLOST] = signal(SIGLOST, signal_handler); */
 }
 
 #if PVFS_UCACHE_ENABLE
@@ -1248,9 +1179,6 @@ static int init_usrint_internal(void)
    }
 #endif
 
-    /* create handlers to run cleanup before aborting */
-    init_signal_handlers();
-
     init_debug("finished with initialization\n");
 
     pvfs_lib_init_flag = 1;
@@ -1625,6 +1553,7 @@ static void init_descriptor_area_internal(void)
 
     /* unlink the /dev/shm entry - noone should need to open it again */
     glibc_ops.unlink(shmobjpath);
+    memset(shmobjpath, 0, sizeof(shmobjpath));
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
