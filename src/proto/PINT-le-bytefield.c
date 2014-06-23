@@ -340,7 +340,6 @@ static void lebf_initialize(void)
                 /* nothing special */
                 break;
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                req.u.mgmt_split_dirent.dist = &tmp_dist;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
             case PVFS_SERV_MGMT_GET_USER_CERT:

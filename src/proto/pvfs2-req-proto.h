@@ -2696,50 +2696,113 @@ do {                                                       \
 /* V3 need SIDs for entry handles */
 struct PVFS_servreq_mgmt_split_dirent
 {
-    PVFS_fs_id fs_id;
-    PVFS_handle dest_dirent_handle; /* should be dirdata handle need SIDs */
-    PINT_dist   *dist;
-    int32_t     undo;
-    int32_t     nentries;
+    PVFS_fs_id   fs_id;
+    int32_t      undo;
+    int32_t      nentries;
+    int32_t      sid_count;          /* sids per meta handle */
+    PVFS_handle  dest_dirent_handle; /* should be dirdata handle need SIDs */
+    PVFS_SID    *dest_dirent_sids;   /* should be dirdata handle need SIDs */
     PVFS_handle *entry_handles;
-    char **entry_names;
+    char       **entry_names;
 };
+#if 0
 endecode_fields_5aa_struct(
     PVFS_servreq_mgmt_split_dirent,
     PVFS_fs_id, fs_id,
     PVFS_handle, dest_dirent_handle,
     PINT_dist, dist,
-    skip4,,
     int32_t, undo,
     int32_t, nentries,
+    int32_t, sid_count,
     PVFS_handle, entry_handles,
     string, entry_names);
+#endif
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mgmt_split_dirent(pptr,x)                         \
+    do {                                                                      \
+        int i, j = 0;                                                         \
+        encode_PVFS_fs_id((pptr), &(x)->fs_id);                               \
+        encode_uint32_t((pptr), &(x)->undo);                                  \
+        encode_uint32_t((pptr), &(x)->nentries);                              \
+        encode_uint32_t((pptr), &(x)->sid_count);                             \
+        encode_PVFS_handle((pptr), &(x)->dest_dirent_handle);                 \
+        for (i = 0; i < (x)->sid_count; i++)                                  \
+        {                                                                     \
+            encode_PVFS_SID((pptr), &(x)->dest_dirent_sids[i]);               \
+        }                                                                     \
+        for (i = 0; i < (x)->nentries; i++)                                   \
+        {                                                                     \
+            encode_string((pptr), &(x)->entry_names[i]);                      \
+        }                                                                     \
+        for (i = 0; i < (x)->sid_count; i++)                                  \
+        {                                                                     \
+            encode_PVFS_handle((pptr), &(x)->entry_handles[j++]);             \
+            for (i = 0; i < (x)->sid_count; i++)                              \
+            {                                                                 \
+                encode_PVFS_SID((pptr), (PVFS_SID *)&(x)->entry_handles[j++]);\
+            }                                                                 \
+        }                                                                     \
+    } while (0);
+
+#define decode_PVFS_servreq_mgmt_split_dirent(pptr,x)                         \
+    do {                                                                      \
+        int i, j = 0;                                                         \
+        decode_PVFS_fs_id((pptr), &(x)->fs_id);                               \
+        decode_uint32_t((pptr), &(x)->undo);                                  \
+        decode_uint32_t((pptr), &(x)->nentries);                              \
+        decode_uint32_t((pptr), &(x)->sid_count);                             \
+        decode_PVFS_handle((pptr), &(x)->dest_dirent_handle);                 \
+        (x)->dest_dirent_sids = decode_malloc(SASZ((x)->sid_count));          \
+        (x)->entry_handles = decode_malloc(OSASZ((x)->nentries,               \
+                                                 (x)->sid_count));            \
+        for (i = 0; i < (x)->sid_count; i++)                                  \
+        {                                                                     \
+            decode_PVFS_SID((pptr), &(x)->dest_dirent_sids[i]);               \
+        }                                                                     \
+        for (i = 0; i < (x)->nentries; i++)                                   \
+        {                                                                     \
+            decode_string((pptr), &(x)->entry_names[i]);                      \
+        }                                                                     \
+        for (i = 0; i < (x)->nentries; i++)                                   \
+        {                                                                     \
+            decode_PVFS_handle((pptr), &(x)->entry_handles[j++]);             \
+            for (i = 0; i < (x)->sid_count; i++)                              \
+            {                                                                 \
+                decode_PVFS_SID((pptr), (PVFS_SID *)&(x)->entry_handles[j++]);\
+            }                                                                 \
+        }                                                                     \
+    } while (0);
+
+#endif
 #define extra_size_PVFS_servreq_mgmt_split_dirent \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
      (PVFS_REQ_LIMIT_HANDLES_COUNT * roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1)))
 
-#define PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(__req,       \
-                                       __cap,            \
-                                       __fsid,           \
-                                       __dest_dirent_handle,  \
-                                       __dist,           \
-                                       __undo,           \
-                                       __nentries,       \
-                                       __entry_handles,  \
-                                       __entry_names,    \
-                                       __hints)          \
-do {                                                                 \
-    memset(&(__req), 0, sizeof(__req));                              \
-    (__req).op = PVFS_SERV_MGMT_SPLIT_DIRENT;                        \
-    (__req).capability = (__cap);                                    \
-    (__req).hints       = (__hints);                                 \
-    (__req).u.mgmt_split_dirent.fs_id = (__fsid);                    \
-    (__req).u.mgmt_split_dirent.dest_dirent_handle = (__dest_dirent_handle);   \
-    (__req).u.mgmt_split_dirent.dist          = (__dist);            \
-    (__req).u.mgmt_split_dirent.undo          = (__undo);            \
-    (__req).u.mgmt_split_dirent.nentries      = (__nentries);        \
-    (__req).u.mgmt_split_dirent.entry_handles = (__entry_handles);   \
-    (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);     \
+#define PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(__req,                            \
+                                       __cap,                                 \
+                                       __fsid,                                \
+                                       __sid_count,                           \
+                                       __dest_dirent_handle,                  \
+                                       __dest_dirent_sids,                    \
+                                       __undo,                                \
+                                       __nentries,                            \
+                                       __entry_handles,                       \
+                                       __entry_names,                         \
+                                       __hints)                               \
+do {                                                                          \
+    memset(&(__req), 0, sizeof(__req));                                       \
+    (__req).op = PVFS_SERV_MGMT_SPLIT_DIRENT;                                 \
+    (__req).capability = (__cap);                                             \
+    (__req).hints       = (__hints);                                          \
+    (__req).u.mgmt_split_dirent.fs_id = (__fsid);                             \
+    (__req).u.mgmt_split_dirent.sid_count = (__sid_count);                    \
+    (__req).u.mgmt_split_dirent.dest_dirent_handle = (__dest_dirent_handle);  \
+    (__req).u.mgmt_split_dirent.dest_dirent_sids = (__dest_dirent_sids);      \
+    (__req).u.mgmt_split_dirent.undo          = (__undo);                     \
+    (__req).u.mgmt_split_dirent.nentries      = (__nentries);                 \
+    (__req).u.mgmt_split_dirent.entry_handles = (__entry_handles);            \
+    (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);              \
 } while (0)
 
 /* get_user_cert ******************************************************/

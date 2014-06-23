@@ -62,6 +62,8 @@
 (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
 
 /* internal attribute mask for distributed directory information */
+/* this may be in the meta or dirdata area depending on objtype */
+/* This includes the bitmap and dirdata handles/sids info */
 #define PVFS_ATTR_DISTDIR_ATTR         (1 << 21)
 
 /* internal attribute mask for capability objects */
