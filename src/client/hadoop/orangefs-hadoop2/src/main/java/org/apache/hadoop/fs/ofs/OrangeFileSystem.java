@@ -5,28 +5,20 @@
  */
 package org.apache.hadoop.fs.ofs;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
+import org.orangefs.usrint.*;
+import org.orangefs.usrint.Stat;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.util.Progressable;
-import org.orangefs.usrint.Orange;
-import org.orangefs.usrint.OrangeFileSystemOutputStream;
-import org.orangefs.usrint.PVFS2POSIXJNIFlags;
-import org.orangefs.usrint.PVFS2STDIOJNIFlags;
-import org.orangefs.usrint.Stat;
 
 /* An extension of the Hadoop FileSystem class utilizing OrangeFS as the
  * file system.
@@ -41,6 +33,11 @@ public class OrangeFileSystem extends FileSystem {
     private FileSystem localFS;
     private static final Log OFSLOG = LogFactory.getLog(OrangeFileSystem.class);
     private boolean initialized;
+
+    /**
+     * Optimized io.file.buffer.size between OrangeFS and Hadoop stack (4 MB)
+     */
+    public static final int IO_FILE_BUFFER_SIZE = 4 * 1024 * 1024;
 
     /*
      * After OrangeFileSystem is constructed, called initialize to set fields.
