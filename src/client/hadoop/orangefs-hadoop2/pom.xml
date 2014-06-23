@@ -10,27 +10,31 @@
 
   # TODO install resulting jar to /opt/orangefs/lib
   -->
-  <groupId>org.apache.hadoop.fs.orangefs</groupId>
+
+  <groupId>org.apache.hadoop.fs.ofs</groupId>
   <artifactId>orangefs-hadoop2</artifactId>
   <packaging>jar</packaging>
-  <version>2.9</version>
+  <version>2.9.1</version>
   <name>orangefs-hadoop2</name>
-  <url>http://maven.apache.org</url>
+
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <hadoop.version>2.3.0</hadoop.version>
+    <orangefs-jni.version>2.9</orangefs-jni.version>
+    <log4j.version>1.2.17</log4j.version>
   </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <version>2.3.0</version>
+      <version>${hadoop.version}</version>
     </dependency>
     <dependency>
       <groupId>org.orangefs.usrint</groupId>
       <artifactId>orangefs-jni</artifactId>
-      <version>2.9</version>
-      <scope>system</scope>
-      <systemPath>${jni.library.path}/ofs_jni.jar</systemPath>
+      <version>${orangefs-jni.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -39,4 +43,5 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
 </project>
