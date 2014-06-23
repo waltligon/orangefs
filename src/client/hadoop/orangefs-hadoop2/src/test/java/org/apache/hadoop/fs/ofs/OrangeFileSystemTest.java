@@ -1,14 +1,18 @@
 package org.apache.hadoop.fs.ofs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.junit.*;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.net.URI;
 
-import static org.junit.Assert.*;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class OrangeFileSystemTest {
 	
@@ -103,7 +107,7 @@ public class OrangeFileSystemTest {
 	}
 
 	@Test
-	public void testExistsPath() throws IOException {
+	public void testExistsPath() {
 		assertTrue(ofs.exists(new Path("/test")));
 		assertTrue(ofs.exists(new Path("/test/testfile1")));
 		assertFalse(ofs.exists(new Path("/missing/path")));
