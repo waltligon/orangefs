@@ -93,20 +93,23 @@ static void make_attribs(PVFS_sys_attr *attr,
 static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
 {
     int ret = 0, i = 0;
-    static int modes[9] =
+    /* added sticky bit */
+    static int modes[10] =
     {
         S_IXOTH, S_IWOTH, S_IROTH,
         S_IXGRP, S_IWGRP, S_IRGRP,
-        S_IXUSR, S_IWUSR, S_IRUSR
+        S_IXUSR, S_IWUSR, S_IRUSR,
+	S_ISVTX
     };
-    static int pvfs2_modes[9] =
+    static int pvfs2_modes[10] =
     {
         PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
         PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
         PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+	PVFS_U_VTX
     };
 
-    for(i = 0; i < 9; i++)
+    for(i = 0; i < 10; i++)
     {
         if (perms & pvfs2_modes[i])
         {

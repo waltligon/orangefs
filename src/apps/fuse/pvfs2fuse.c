@@ -247,6 +247,9 @@ static int pvfs_fuse_getattr_pfhp(pvfs_fuse_handle_t *pfhp, struct stat *stbuf)
 
    if (attrs->perms & PVFS_G_SGID)
       perm_mode |= S_ISGID;
+/* added sticky bit */
+        if (attrs->perms & PVFS_U_VTX)
+            perm_mode |= S_ISVTX;
 
    /* Should we honor the suid bit of the file? */
    /* FIXME should we check the file system suid flag */

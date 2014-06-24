@@ -286,14 +286,16 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 #define PVFS_U_WRITE   (1 << 7)
 #define PVFS_U_READ    (1 << 8)
 /* no PVFS_U_VTX (sticky bit) */
+#define PVFS_U_VTX     (1 << 9) /* added sticky bit */
 #define PVFS_G_SGID    (1 << 10)
 #define PVFS_U_SUID    (1 << 11)
 
 /* valid permission mask */
+/* added sticky bit */
 #define PVFS_PERM_VALID \
 (PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
  PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
- PVFS_U_READ | PVFS_G_SGID | PVFS_U_SUID)
+ PVFS_U_READ | PVFS_G_SGID | PVFS_U_SUID | PVFS_U_VTX)
 
 #define PVFS_USER_ALL  (PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ)
 #define PVFS_GROUP_ALL (PVFS_G_EXECUTE|PVFS_G_WRITE|PVFS_G_READ)

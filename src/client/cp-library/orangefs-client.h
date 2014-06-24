@@ -113,14 +113,16 @@ typedef unsigned char *OrangeFS_signature;
 #define OrangeFS_U_WRITE   (1 << 7)
 #define OrangeFS_U_READ    (1 << 8)
 /* no OrangeFS_U_VTX (sticky bit) */
+#define OrangeFS_U_VTX     (1 << 9) /* added sticky bit */
 #define OrangeFS_G_SGID    (1 << 10)
 #define OrangeFS_U_SUID    (1 << 11)
 
 /* valid permission mask */
+/* added sticky bit */
 #define OrangeFS_PERM_VALID \
 (OrangeFS_O_EXECUTE | OrangeFS_O_WRITE | OrangeFS_O_READ | OrangeFS_G_EXECUTE | \
  OrangeFS_G_WRITE | OrangeFS_G_READ | OrangeFS_U_EXECUTE | OrangeFS_U_WRITE | \
- OrangeFS_U_READ | OrangeFS_G_SGID | OrangeFS_U_SUID)
+ OrangeFS_U_READ | OrangeFS_G_SGID | OrangeFS_U_SUID | OrangeFS_U_VTX) 
 
 #define OrangeFS_USER_ALL  (OrangeFS_U_EXECUTE|OrangeFS_U_WRITE|OrangeFS_U_READ)
 #define OrangeFS_GROUP_ALL (OrangeFS_G_EXECUTE|OrangeFS_G_WRITE|OrangeFS_G_READ)

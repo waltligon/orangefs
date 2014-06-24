@@ -593,6 +593,11 @@ int iocommon_create_file(const char *filename,
     {
         attr.perms |= PVFS_U_READ;
     }
+    /* added sticky bit */
+    if (user_mode & S_ISVTX)
+    {
+        attr.perms |= PVFS_U_VTX;
+    }
 
     /* Set credential */
     rc = iocommon_cred(&credential);

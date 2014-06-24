@@ -236,6 +236,10 @@ int copy_attributes_to_inode(
             perm_mode |= S_IWUSR;
         if (attrs->perms & PVFS_U_READ)
             perm_mode |= S_IRUSR;
+/* added sticky bit */
+        if (attrs->perms & PVFS_U_VTX)
+            perm_mode |= S_ISVTX;
+
 
         if (attrs->perms & PVFS_G_SGID)
             perm_mode |= S_ISGID;
@@ -385,6 +389,8 @@ static inline int copy_attributes_from_inode(
     if (iattr->ia_valid & ATTR_MODE)
     {
         tmp_mode = iattr->ia_mode;
+	
+	/* sticky bit removal
         if (tmp_mode & (S_ISVTX))
         {
             if (is_root_handle(inode))
@@ -392,7 +398,7 @@ static inline int copy_attributes_from_inode(
                 /* allow sticky bit to be set on root (since it shows up that
                  * way by default anyhow), but don't show it to
                  * the server
-                 */
+                 *
                 tmp_mode -= S_ISVTX;
             }
             else
@@ -402,6 +408,7 @@ static inline int copy_attributes_from_inode(
                 return(-EINVAL);
             }
         }
+        */
 
         if (tmp_mode & (S_ISUID))
         {
@@ -2162,21 +2169,22 @@ int pvfs2_normalize_to_errno(PVFS_error error_code)
 int32_t PVFS_util_translate_mode(int mode, int suid)
 {
     int ret = 0, i = 0;
-#define NUM_MODES 11
+    /* added sticky bit */
+#define NUM_MODES 12
     static int modes[NUM_MODES] =
     {
         S_IXOTH, S_IWOTH, S_IROTH,
         S_IXGRP, S_IWGRP, S_IRGRP,
         S_IXUSR, S_IWUSR, S_IRUSR,
-        S_ISGID, S_ISUID
-    };
+        S_ISGID, S_ISUID, S_ISVTX
+    };/* added sticky bit */
     static int pvfs2_modes[NUM_MODES] =
     {
         PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
         PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
         PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
-        PVFS_G_SGID,    PVFS_U_SUID
-    };
+        PVFS_G_SGID,    PVFS_U_SUID,  PVFS_U_VTX
+    };/* added sticky bit */
 
     for(i = 0; i < NUM_MODES; i++)
     {

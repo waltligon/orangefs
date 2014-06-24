@@ -238,6 +238,7 @@ void print_entry_attr(
     char scratch_size[16] = {0}, scratch_inode[21] = {0};
     char f_type = '-';
     char group_x_char = '-';
+    char other_x_char = '-';/* added sticky bit */
     int num_bytes = 0;
 
     if (!opts->list_all && (entry_name[0] == '.'))
@@ -384,6 +385,15 @@ void print_entry_attr(
     {
         group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
     }
+/* added sticky bit */
+    if(attr->perms & PVFS_U_VTX)
+    {    
+        other_x_char = ((attr->perms & PVFS_O_EXECUTE) ? 't' : 'T');
+    }    
+    else 
+    {    
+        other_x_char = ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-');
+    }  
 
     snprintf(entry_buffer,ENTRY_MAX,"%s %c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%s %s",
@@ -397,7 +407,7 @@ void print_entry_attr(
              group_x_char,
              ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
+             other_x_char,
              formatted_owner,
              formatted_group,
              formatted_size,

@@ -2334,8 +2334,8 @@ static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)
 int32_t PVFS_util_translate_mode(int mode, int suid)
 {
     int ret = 0, i = 0;
-#define NUM_MODES 11
-
+    /* added sticky bit */
+#define NUM_MODES 12
 #define S_IXOTH 0001
 #define S_IWOTH 0002
 #define S_IROTH 0004
@@ -2345,6 +2345,8 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
 #define S_IXUSR 0100
 #define S_IWUSR 0200
 #define S_IRUSR 0400
+    /* added sticky bit */
+#define S_ISVTX 001000
 #define S_ISGID 002000
 #define S_ISUID 004000
 
@@ -2353,15 +2355,15 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
         S_IXOTH, S_IWOTH, S_IROTH,
         S_IXGRP, S_IWGRP, S_IRGRP,
         S_IXUSR, S_IWUSR, S_IRUSR,
-        S_ISGID, S_ISUID
-    };
+        S_ISGID, S_ISUID, S_ISVTX
+    };/* added sticky bit */
     static int pvfs2_modes[NUM_MODES] =
     {
         PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
         PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
         PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
-        PVFS_G_SGID,    PVFS_U_SUID
-    };
+        PVFS_G_SGID,    PVFS_U_SUID,  PVFS_U_VTX
+    };/* added sticky bit */
 
     for(i = 0; i < NUM_MODES; i++)
     {
