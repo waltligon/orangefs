@@ -127,6 +127,9 @@ AC_CHECK_HEADER([arpa/inet.h],
 AC_CHECK_HEADER([attr/xattr.h],
         [AC_DEFINE(HAVE_ATTR_XATTR_H, 1, Define if attr/xattr.h exists)])
 
+AC_CHECK_HEADER([execinfo.h],
+        [AC_DEFINE(HAVE_EXECINFO_H, 1, Define if execinfo.h exists)])
+
 AC_CHECK_SIZEOF([long int])
 
 dnl Check for utilities that we need during the build process

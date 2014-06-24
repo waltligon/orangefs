@@ -112,7 +112,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     pint_client_pid = getpid();
 #endif
 
-    gossip_enable_stderr();
+    gossip_enable(&gossip_mech_stderr);
 
     debug_mask_str = getenv("PVFS2_DEBUGMASK");
     debug_mask = (debug_mask_str ?
@@ -120,11 +120,11 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
                   default_debug_mask);
     gossip_set_debug_mask(1,debug_mask);
 
-    debug_file = getenv("PVFS2_DEBUGFILE");
+/*  debug_file = getenv("PVFS2_DEBUGFILE");
     if (debug_file)
     {
         gossip_enable_file(debug_file, "w");
-    }
+    }*/
 
     ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
 

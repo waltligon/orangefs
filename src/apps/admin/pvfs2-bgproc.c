@@ -151,13 +151,13 @@ int main(int argc, char *argv[])
 {
     int c, mode = 0, hvalid = 0;
     char *cmdline = NULL, *serverlist = NULL;
-    long handle;
+    long handle = 0;
     int ret;
     const PVFS_util_tab *tab;
     PVFS_fs_id fs_id;
     char path[PVFS_PATH_MAX];
     int addr_count;
-    PVFS_BMI_addr_t *addr_array;
+    PVFS_BMI_addr_t *addr_array = NULL;
     if (argc < 2)
     {
         (void)usage();

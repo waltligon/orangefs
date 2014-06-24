@@ -1630,7 +1630,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 
             mask=PVFS_debug_eventlog_to_mask(vfs_request->in_upcall.req.param.s_value);
 
-            ret=gossip_set_debug_mask(1,mask);
+            gossip_set_debug_mask(1,mask);
             gossip_debug(GOSSIP_PROC_DEBUG,"Value of new debug mask is %0x.\n"
                                           ,(unsigned int)gossip_debug_mask);
 
@@ -3717,7 +3717,7 @@ int main(int argc, char **argv)
 
     if(!strcmp(s_opts.logtype, "file"))
     {
-        ret = gossip_enable_file(s_opts.logfile, "a");
+        ret = gossip_enable(&gossip_mech_file, s_opts.logfile);
         if(ret < 0)
         {
             fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
@@ -3726,7 +3726,7 @@ int main(int argc, char **argv)
     }
     else if(!strcmp(s_opts.logtype, "syslog"))
     {
-        ret = gossip_enable_syslog(LOG_INFO);
+        ret = gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
         if(ret < 0)
         {
             fprintf(stderr, "Error opening syslog\n");
@@ -3735,6 +3735,7 @@ int main(int argc, char **argv)
     }
     else
     {
+        ret = gossip_enable(&gossip_mech_stderr);
         fprintf(stderr, "Error: unsupported log type.\n");
         return(-PVFS_EINVAL);
     }

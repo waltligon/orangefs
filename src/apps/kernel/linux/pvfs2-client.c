@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <syslog.h>
 
 #include "pvfs2-types.h"
 #include "acache.h"
@@ -219,15 +220,15 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 if(!strcmp(opts->logtype, "file"))
                 {
-                    gossip_enable_file(opts->logfile, "a");
+                    gossip_enable(&gossip_mech_file, opts->logfile);
                 }
                 else if(!strcmp(opts->logtype, "syslog"))
                 {
-                    gossip_enable_syslog(LOG_INFO);
+                    gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
                 }
                 else
                 {
-                    gossip_enable_stderr();
+                    gossip_enable(&gossip_mech_stderr);
                 }
                 gossip_err("pvfs2-client-core with pid %d exited with "
                        "value %d\n", core_pid, (int)WEXITSTATUS(ret));
@@ -292,15 +293,15 @@ static int monitor_pvfs2_client(options_t *opts)
 
                 if(!strcmp(opts->logtype, "file"))
                 {
-                    gossip_enable_file(opts->logfile, "a");
+                    gossip_enable(&gossip_mech_file, opts->logfile);
                 }
                 else if(!strcmp(opts->logtype, "syslog"))
                 {
-                    gossip_enable_syslog(LOG_INFO);
+                    gossip_enable(&gossip_mech_syslog, "pvfs2", 0, LOG_INFO);
                 }
                 else
                 {
-                    gossip_enable_stderr();
+                    gossip_enable(&gossip_mech_stderr);
                 }
 
                 gossip_err("Child process with pid %d was killed by "
