@@ -713,6 +713,13 @@ class OFSTestMain(object):
 #            print "Terminating Nodes"
 #            self.ofs_network.terminateAllCloudNodes()
 
+    def terminateAllCloudNodes(self):
+            print ""
+            print "==================================================================="
+            print "Terminating Nodes"
+            self.ofs_network.terminateAllCloudNodes()
+
+        
     ##
     #
     # @fn runFunctionGroup(self,function_group_name):
@@ -749,5 +756,10 @@ class OFSTestMain(object):
         self.ofs_network.startOFSClient(security=self.config.security_mode) 
         self.ofs_network.mountOFSFilesystem()
     
-    
+    def doPostTest(self,rc):
+        if rc == 0:
+            if self.config.cloud_delete_after_test == True:
+                self.terminateAllCloudNodes()
+            else:
+                self.restartOFS()
 
