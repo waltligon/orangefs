@@ -1852,16 +1852,18 @@ class OFSTestNode(object):
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
-        # No reason to do this. We want debug info
-#         if enable_strict == True:
-#             # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
-#             # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
-#             
-#             # won't work for rhel 5 based distros, gcc is too old.
-#             if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
-#                 pass
-#             else:
-#                 configure_opts = configure_opts+" --enable-strict"
+        if enable_strict == True:
+            # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
+            # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
+             
+            # won't work for rhel 5 based distros, gcc is too old.
+            if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
+                pass
+            else:
+                configure_opts = configure_opts+" --enable-strict"
+        else:
+            # otherwise, disable optimizations
+            configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
             configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
@@ -1885,7 +1887,8 @@ class OFSTestNode(object):
         elif security_mode.lower() == "cert":
             configure_opts = configure_opts+" --enable-security-cert"
         
-        rc = self.runSingleCommand("CFLAGS='-g -O0' ./configure %s" % configure_opts, output)
+        
+        rc = self.runSingleCommand("./configure %s" % configure_opts, output)
         
         # did configure run correctly?
         if rc == 0:
