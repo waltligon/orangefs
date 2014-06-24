@@ -11,11 +11,11 @@ JNIPOSIXJAVA := \
 	$(ORGDIR)/PVFS2POSIXJNI.java \
 	$(ORGDIR)/PVFS2POSIXJNIFlags.java \
     $(ORGDIR)/PVFS2POSIXJNITest.java \
-	$(ORGDIR)/Stat.java
+	$(ORGDIR)/Stat.java \
+	$(ORGDIR)/Statfs.java
 
 # TODO
-#	$(ORGDIR)/Statfs.java \
-#	$(ORGDIR)/Statvfs.java \
+#	$(ORGDIR)/Statvfs.java
 
 JNISTDIOJAVA := \
 	$(ORGDIR)/PVFS2STDIOJNI.java \

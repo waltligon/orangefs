@@ -18,17 +18,16 @@ public class Statfs {
     long f_bavail;
     long f_files;
     long f_ffree;
-    long f_flags;
+    int f_fsid;
     long f_namelen;
+    /* SHOULD always be zero since OrangeFS doesn't handle this field yet. */
     long f_frsize;
-    long[] f_spare = new long[5];
 
     /*
      * This probably won't get called much since we're depending upon a native
      * method to initialize this object.
      */
-    Statfs() {
-
+    public Statfs() {
     }
 
     /* Generic Object Dump to String */

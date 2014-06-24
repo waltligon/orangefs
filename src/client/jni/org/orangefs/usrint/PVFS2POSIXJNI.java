@@ -88,7 +88,7 @@ public class PVFS2POSIXJNI {
 
     public native Stat fstatat(int fd, String path, long flags);
 
-    /* TODO: public native Statfs fstatfs(int fd); */
+    public native Statfs fstatfs(int fd);
 
     /* TODO: fstatvfs */
     public native int fsync(int fd);
@@ -156,7 +156,7 @@ public class PVFS2POSIXJNI {
 
     public native Stat stat(String path);
 
-    /* TODO: public native Statfs statfs(String path); */
+    public native Statfs statfs(String path);
 
     /* TODO: statvfs */
     public native int symlink(String oldpath, String newpath);

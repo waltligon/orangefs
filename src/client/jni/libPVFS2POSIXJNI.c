@@ -83,17 +83,17 @@ static int fill_stat(JNIEnv *env, struct stat *ptr, jobject *inst)
 }
 
 /* Convert allocated structure to an instance of our Statfs Class */
-#if 0
+
 static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
 {
-    int num_fields = 12;
+    int num_fields = 10;
     char *field_names[] =
     {
-        "f_type", "f_bsize", "f_blocks", "f_bfree", "f_bavail", "f_files",
-        "f_ffree", "f_flags", "f_namelen", "f_frsize", "f_spare", "f_fsid" };
+        "f_type", "f_bsize", "f_blocks", "f_bfree", "f_bavail",
+        "f_files", "f_ffree", "f_fsid", "f_namelen", "f_frsize"};
     char *field_types[] =
     {
-        "J", "J", "J", "J", "J", "J", "J", "J", "J", "J", "[J", "[I" };
+        "J", "J", "J", "J", "J", "J", "J", "I", "J", "J"};
     jfieldID fids[num_fields];
     char *cls_name = "org/orangefs/usrint/Statfs";
     jclass cls = (*env)->FindClass(env, cls_name);
@@ -113,24 +113,10 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
             return -1;
         }
     }
-
+    /* Initialize jobject */
     jmethodID mid = (*env)->GetMethodID(env, cls, "<init>", "()V");
     *inst = (*env)->NewObject(env, cls, mid);
-    jlongArray ar;
-    jlongArray ar1;
-    int jval;
-    jlong cbuf[5];
-    jlong cbuf1[2];
-    for (jval = 0; jval < 5; jval++)
-    {
-        cbuf[jval] = ptr->f_spare[jval];
 
-    }
-    for (jval = 0; jval < 2; jval++)
-    {
-        cbuf1[jval] = ptr->f_fsid.__val[jval];
-
-    }
     /* Load object with data from structure using
      * constructor or set methods.
      */
@@ -141,19 +127,11 @@ static int fill_statfs(JNIEnv *env, struct statfs *ptr, jobject *inst)
     (*env)->SetLongField(env, *inst, fids[4], ptr->f_bavail);
     (*env)->SetLongField(env, *inst, fids[5], ptr->f_files);
     (*env)->SetLongField(env, *inst, fids[6], ptr->f_ffree);
-    (*env)->SetLongField(env, *inst, fids[7], ptr->f_flags);
+    (*env)->SetIntField(env, *inst, fids[7], ptr->f_fsid.__val[0]);
     (*env)->SetLongField(env, *inst, fids[8], ptr->f_namelen);
-    (*env)->SetLongField(env, *inst, fids[9], ptr->f_frsize);
-
-    ar = (*env)->GetObjectField(env, *inst, fids[10]);
-    (*env)->SetLongArrayRegion(env, ar, 0, 5, cbuf);
-
-    ar1 = (*env)->GetObjectField(env, *inst, fids[11]);
-    (*env)->SetLongArrayRegion(env, ar1, 0, 2, cbuf1);
-
+    (*env)->SetLongField(env, *inst, fids[9], 0); /* TODO: ptr->f_frsize */
     return 0;
 }
-#endif
 
 /* access */
 JNIEXPORT jint JNICALL
@@ -676,29 +654,28 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatat(JNIEnv *env, jobject obj, int fd,
 }
 
 /* fstatfs */
-#if 0
+
 JNIEXPORT jobject JNICALL
-Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, int fd)
+Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatfs(JNIEnv *env, jobject obj, jint fd)
 {
     JNI_PFI();
+    JNI_PRINT("fd = %d\n", (int) fd);
+    jobject statfs_obj;
     int ret = -1;
-    struct statfs st;
-    ret = fstatfs(fd, &st);
+    struct statfs buf;
+    ret = fstatfs(fd, &buf);
     if (ret < 0)
     {
         JNI_PERROR();
         return (jobject) 0;
     }
-    jobject statfs_obj;
-    if (fill_statfs(env, ptr, &statfs_obj) == 0)
+    if (fill_statfs(env, &buf, &statfs_obj) == 0)
     {
         return statfs_obj;
     }
     return (jobject) 0;
 }
-#endif
 
-/* TODO */
 #if 0
 /* fstatvfs */
 JNIEXPORT jobject JNICALL
@@ -706,8 +683,8 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fstatvfs(JNIEnv *env, jobject obj, jint f
 {
     JNI_PFI();
     JNI_PRINT("fd = %d\n", (int) fd);
-    struct statvfs vfs_stat;
-    int ret = fstatvfs(fd, &vfs_stat);
+    struct statvfs buf;
+    int ret = fstatvfs(fd, &buf);
     if (ret == -1)
     {
         JNI_PERROR();
@@ -1348,55 +1325,52 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat(JNIEnv *env, jobject obj,
 }
 
 /* statfs */
-#if 0
+
 JNIEXPORT jobject JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_statfs(JNIEnv *env, jobject obj,
         jstring path)
 {
     JNI_PFI();
     int ret = -1;
-    struct statfs st;
+    jobject statfs_obj;
+    struct statfs buf;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = statfs(cpath, &st);
-
+    JNI_PRINT("path = %s\n", cpath);
+    ret = statfs(cpath, &buf);
     if (ret < 0)
     {
         JNI_PERROR();
         return (jobject) 0;
     }
-
-    jobject statfs_obj;
-    if (fill_statfs(env, &st, &statfs_obj) == 0)
+    if (fill_statfs(env, &buf, &statfs_obj) == 0)
     {
         return statfs_obj;
     }
     return (jobject) 0;
 }
-#endif
 
-/* TODO */
 #if 0
 /* statvfs */
-JNIEXPORT jint JNICALL
+JNIEXPORT jobject JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_statvfs(JNIEnv *env, jobject obj,
         jlong jarg, jstring path)
 {
     JNI_PFI();
     int ret = 0;
-    struct statvfs *arg;
-    arg = (struct statvfs *) jarg;
+    struct statvfs buf;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = statvfs(cpath, arg);
+    ret = statvfs(cpath, &buf);
     if (ret < 0)
     {
         JNI_PERROR();
         ret = -1;
     }
-    return ret;
+    /* TODO return jobject */
+    return (jobject) 0;
 }
 #endif
 
