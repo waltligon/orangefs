@@ -27,7 +27,20 @@ public class Statfs {
      * This probably won't get called much since we're depending upon a native
      * method to initialize this object.
      */
-    public Statfs() {
+    Statfs() {
+
+    }
+
+    public long getCapacity() {
+      return f_bsize;
+    }
+
+    public long getUsed() {
+      return f_bfree;
+    }
+
+    public long getRemaining() {
+      return f_bavail;
     }
 
     /* Generic Object Dump to String */
