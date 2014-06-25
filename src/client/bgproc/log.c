@@ -11,7 +11,6 @@
 #include <pvfs2-bgproc.h>
 
 int bgproc_log(const char *fmt, ...)
-	
 {
 	return 0;
 }
