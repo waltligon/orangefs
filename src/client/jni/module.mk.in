@@ -1,11 +1,12 @@
 ifdef BUILD_JNI
 
-DIR := src/client/jni
-ORGDIR := $(DIR)/org/orangefs/usrint
+JNI_C_DIR := src/client/jni
+JNI_JAVA_DIR := src/client/jni/src/main/java
+ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint
 
 USRC := \
-    $(DIR)/libPVFS2POSIXJNI.c \
-    $(DIR)/libPVFS2STDIOJNI.c
+    $(JNI_C_DIR)/libPVFS2POSIXJNI.c \
+    $(JNI_C_DIR)/libPVFS2STDIOJNI.c
 
 JNIPOSIXJAVA := \
 	$(ORGDIR)/PVFS2POSIXJNI.java \

@@ -1271,94 +1271,6 @@ AC_ARG_ENABLE(
 )
 AC_SUBST(BUILD_JNI)
 
-HADOOP1_PREFIX=
-AC_ARG_WITH(
-    hadoop1,
-    [  --with-hadoop1=<path>    Enables support for OrangeFS extensions of Hadoop v1 classes.],
-    [
-        HADOOP1_PREFIX=$withval;
-        corepath=`ls $withval/hadoop-core-1.?.?.jar`
-        AC_CHECK_FILE($corepath,
-            [],
-            [
-                AC_MSG_ERROR(could not locate $withval/hadoop-core-1.?.?.jar at the path given with --with-hadoop1.)
-            ]
-        )
-    ],
-    [   with_hadoop1=no]
-)
-AC_SUBST(HADOOP1_PREFIX)
-
-HADOOP2_PREFIX=
-AC_ARG_WITH(
-    hadoop2,
-    [  --with-hadoop2=<path>    Enables support for OrangeFS extensions of Hadoop v2 classes.],
-    [
-        HADOOP2_PREFIX=$withval;
-        corepath=`ls $withval/share/hadoop/common/hadoop-common-2.?.?.jar`
-        AC_CHECK_FILE($corepath,
-            [],
-            [
-                AC_MSG_ERROR(could not locate $withval/share/hadoop/common/hadoop-common-?.?.?.jar at the path given with --with-hadoop2.)
-            ]
-        )
-    ],
-    [   with_hadoop2=no]
-)
-AC_SUBST(HADOOP2_PREFIX)
-
-dnl Method to enable OrangeFS extensions to Hadoop classes.
-BUILD_HADOOP1=
-AC_ARG_ENABLE(
-    hadoop1,
-    [  --enable-hadoop1         Enables OrangeFS extenions of Hadoop v1 classes. Requires --enable-jni --with-jdk and --with-hadoop1.],
-    [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP1_PREFIX" = "x"; then
-                AC_MSG_ERROR(--enable-hadoop1 must be used in conjunction with --with-hadoop1=path.)
-            fi
-            if test "$BUILD_JNI" != "1"; then
-                AC_MSG_ERROR(--enable-hadoop1 must be used in conjunction with --enable-jni.)
-            fi
-            AC_DEFINE(PVFS_HADOOP1_ENABLE, 1,
-                [Should we enable OrangeFS extensions of Hadoop v1 classes.])
-            BUILD_HADOOP1=1
-        else
-            AC_DEFINE(PVFS_HADOOP1_ENABLE, 0,
-                [Should we enable OrangeFS extensions of Hadoop v1 classes.])
-        fi
-    ],
-    [   AC_DEFINE(PVFS_HADOOP1_ENABLE, 0,
-            [Should we enable OrangeFS extensions of Hadoop v1 classes.])
-    ]
-)
-AC_SUBST(BUILD_HADOOP1)
-
-dnl Method to enable OrangeFS extensions to Hadoop classes.
-BUILD_HADOOP2=
-AC_ARG_ENABLE(
-    hadoop2,
-    [  --enable-hadoop2         Enables OrangeFS extenions of Hadoop v2 classes. Requires --enable-jni --with-jdk and --with-hadoop2.],
-    [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP2_PREFIX" = "x"; then
-                AC_MSG_ERROR(--enable-hadoop2 must be used in conjunction with --with-hadoop2=path.)
-            fi
-            if test "$BUILD_JNI" != "1"; then
-                AC_MSG_ERROR(--enable-hadoop2 must be used in conjunction with --enable-jni.)
-            fi
-            AC_DEFINE(PVFS_HADOOP2_ENABLE, 1,
-                [Should we enable OrangeFS extensions of Hadoop v2 classes.])
-            BUILD_HADOOP2=1
-        else
-            AC_DEFINE(PVFS_HADOOP2_ENABLE, 0,
-                [Should we enable OrangeFS extensions of Hadoop v2 classes.])
-        fi
-    ],
-    [   AC_DEFINE(PVFS_HADOOP2_ENABLE, 0,
-            [Should we enable OrangeFS extensions of Hadoop v2 classes.])
-    ]
-)
-AC_SUBST(BUILD_HADOOP2)
-
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
 AC_MSG_CHECKING(for user acl includes sys/acl.h acl/libacl.h)
@@ -2123,12 +2035,6 @@ if test "x$BUILD_JNI" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
 else
    AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
-fi
-
-if test "x$BUILD_HADOOP" = "x1" ; then
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 : yes])
-else
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 :  no])
 fi
 
 else
