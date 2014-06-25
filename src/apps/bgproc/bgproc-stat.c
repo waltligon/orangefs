@@ -46,6 +46,7 @@ int main(void)
         return EXIT_FAILURE;
     }
 
+    /* xxx: usrint is not available here */
     outf = fopen(path, "w");
     if (outf == NULL)
     {
@@ -68,10 +69,7 @@ int main(void)
     }
 
     /* getmntent, statvfs */
-    /*f = fopen("/etc/mtab", "r");*/
-    f = NULL;
-    /* XXX: This needs to be re-written. The usrint is not supported
-     * here. */
+    f = fopen("/etc/mtab", "r");
     if (f == NULL)
     {
         perror("could not list filesystems");

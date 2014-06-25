@@ -11,6 +11,7 @@
 #include <pvfs2-bgproc.h>
 
 char *bgproc_fs;
+char *bgproc_log;
 char *bgproc_outdir;
 
 int bgproc_setup(int initialize)
@@ -20,6 +21,12 @@ int bgproc_setup(int initialize)
     if (!bgproc_fs)
     {
         fprintf(stderr, "missing environment variable bgproc_fs\n");
+        exit(EXIT_FAILURE);
+    }
+    bgproc_log = getenv("bgproc_log");
+    if (!bgproc_log)
+    {
+        fprintf(stderr, "missing environment variable bgproc_log\n");
         exit(EXIT_FAILURE);
     }
     bgproc_outdir = getenv("bgproc_outdir");
@@ -36,6 +43,12 @@ int bgproc_setup(int initialize)
             PVFS_perror("PVFS_util_init_defaults", ret);
             exit(EXIT_FAILURE);
         }
+    }
+    ret = bgproc_log_setup();
+    if (ret < 0)
+    {
+        PVFS_perror("bgproc_log_setup", ret);
+        exit(EXIT_FAILURE);
     }
     return 0;
 }
