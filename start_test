@@ -97,4 +97,4 @@ if rc == 0:
 
 test_driver.doPostTest(rc)
 
-return rc
+exit(rc)
