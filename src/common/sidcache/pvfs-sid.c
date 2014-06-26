@@ -281,7 +281,7 @@ int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
  * Simple default policy just picks them in order found in the DB
  */
 int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
-                      PVFS_handle *handle,
+                      PVFS_handle **handle,
                       uint32_t sid_count,
                       PVFS_SID **sid_array,
                       uint32_t datafile_count,
@@ -294,17 +294,21 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     int i;
 
     /* generate metadata handle */
-    PVFS_OID_gen(handle);
+    *handle = malloc(sizeof(PVFS_handle));
+    PVFS_OID_gen(*handle);
+
+    /* generate SIDs for metadata object */
+    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
+    n = sid_count;
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, PVFS_OBJ_META);
+
     /* generate datafile handles */
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
         PVFS_OID_gen(*datafile_handles);
     }
-    /* generate SIDs for metadata object */
-    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
-    n = sid_count;
-    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, PVFS_OBJ_META);
+
     /* generate SIDs for datafile objects */
     *datafile_sid_array = (PVFS_SID *)malloc(datafile_count *
                                              datafile_sid_count *

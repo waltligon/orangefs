@@ -801,12 +801,12 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
      * Data objects are not created until used.
      */
     ret = PVFS_OBJ_gen_file(sm_p->parent_ref.fs_id,
-                            sm_p->u.create.metadata_handle,
-                            sm_p->u.create.metadata_sid_count,
+                            &sm_p->u.create.metadata_handle,
+                            sm_p->u.create.metadata_sid_count, /* in */
                             &sm_p->u.create.metadata_sid_array,
-                            sm_p->u.create.datafile_count,
+                            sm_p->u.create.datafile_count,     /* in */
                             &sm_p->u.create.datafile_handles,
-                            sm_p->u.create.datafile_sid_count,
+                            sm_p->u.create.datafile_sid_count, /* in */
                             &sm_p->u.create.datafile_sid_array);
     if(ret != 0)
     {
@@ -834,7 +834,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                                  *sm_p->cred_p,
                                  sm_p->u.create.attr,
                                  sm_p->parent_ref.fs_id,
-                                 *sm_p->u.create.metadata_handle, 
+                                 sm_p->u.create.metadata_handle, 
                                  sm_p->u.create.metadata_sid_count,
                                  sm_p->u.create.metadata_sid_array, 
                                  &sm_p->parent_ref.handle, /* back ptr */
@@ -855,7 +855,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = create_comp_fn;
         /* we are creating so we need to send a complete attr */
-        msg_p->req.u.create.attr.u.meta.dfile_count = 0;
+        msg_p->req.u.create.attr.u.meta.dfile_count =
+                                     sm_p->u.create.datafile_count;
         msg_p->req.u.create.attr.u.meta.dist = sm_p->u.create.dist;
         msg_p->req.u.create.attr.u.meta.dist_size =
                         PINT_DIST_PACK_SIZE(sm_p->u.create.dist);

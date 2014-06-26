@@ -59,7 +59,7 @@ int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t stype);
 
 int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
-                      PVFS_handle *handle,
+                      PVFS_handle **handle,
                       uint32_t sid_count,
                       PVFS_SID **sid_array,
                       uint32_t datafile_count,

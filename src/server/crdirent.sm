@@ -1361,10 +1361,10 @@ static PINT_sm_action crdirent_retrieve_dir_entries(struct PINT_smcb *smcb,
         s_op->u.crdirent.entries_key_a[j].buffer =
                                           dirent_array[j].d_name;
 
-        s_op->u.crdirent.entries_val_a[j].buffer =
-                                          val_buffer_location;
         s_op->u.crdirent.entries_val_a[j].buffer_sz = 
                                           sizeof(OSASZ(1, s_op->metasidcnt));
+        s_op->u.crdirent.entries_val_a[j].buffer =
+                                          val_buffer_location;
 
         val_buffer_location += 1 + s_op->metasidcnt;
     }

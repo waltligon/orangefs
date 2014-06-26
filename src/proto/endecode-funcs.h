@@ -34,30 +34,39 @@ typedef uint64_t u_int64_t;
 
 /* basic types */
 #define encode_uint64_t(pptr,x) do { \
-    *(u_int64_t*) *(pptr) = htobmi64(*(x)); \
+    *(u_int64_t *) *(pptr) = htobmi64(*(x)); \
     *(pptr) += 8; \
 } while (0)
 #define decode_uint64_t(pptr,x) do { \
-    *(x) = bmitoh64(*(u_int64_t*) *(pptr)); \
+    *(x) = bmitoh64(*(u_int64_t *) *(pptr)); \
     *(pptr) += 8; \
 } while (0)
 
 #define encode_int64_t(pptr,x) do { \
-    *(int64_t*) *(pptr) = htobmi64(*(x)); \
+    *(int64_t *) *(pptr) = htobmi64(*(x)); \
     *(pptr) += 8; \
 } while (0)
 #define decode_int64_t(pptr,x) do { \
-    *(x) = bmitoh64(*(int64_t*) *(pptr)); \
+    *(x) = bmitoh64(*(int64_t *) *(pptr)); \
     *(pptr) += 8; \
 } while (0)
 
 #define encode_uint32_t(pptr,x) do { \
-    *(u_int32_t*) *(pptr) = htobmi32(*(x)); \
+    *(u_int32_t *) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
 } while (0)
 #define decode_uint32_t(pptr,x) do { \
-    *(x) = bmitoh32(*(u_int32_t*) *(pptr)); \
+    *(x) = bmitoh32(*(u_int32_t *) *(pptr)); \
     *(pptr) += 4; \
+} while (0)
+
+#define encode_uint8_t(pptr,x) do { \
+    *(u_int8_t *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_uint8_t(pptr,x) do { \
+    *(x) = *(u_int8_t *) *(pptr); \
+    *(pptr) += 1; \
 } while (0)
 
 #define encode_PVFS_signature(pptr,x) encode_char(pptr,x)
@@ -79,18 +88,18 @@ typedef uint64_t u_int64_t;
 } while (0)
 
 #define encode_int32_t(pptr,x) do { \
-    *(int32_t*) *(pptr) = htobmi32(*(x)); \
+    *(int32_t *) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
 } while (0)
 #define decode_int32_t(pptr,x) do { \
-    *(x) = bmitoh32(*(int32_t*) *(pptr)); \
+    *(x) = bmitoh32(*(int32_t *) *(pptr)); \
     *(pptr) += 4; \
 } while (0)
 
 /* skip 4 bytes, maybe zeroing them to avoid valgrind getting annoyed */
 #ifdef HAVE_VALGRIND_H
 #define encode_skip4(pptr,x) do { \
-    *(int32_t*) *(pptr) = 0; \
+    *(int32_t *) *(pptr) = 0; \
     *(pptr) += 4; \
 } while (0)
 #else
