@@ -12,7 +12,8 @@ SRC := \
 	$(DIR)/aiocommon.c \
 	$(DIR)/aio-pvfs.c \
 	$(DIR)/pvfs-path.c \
-	$(DIR)/pvfs-qualify-path.c
+	$(DIR)/pvfs-qualify-path.c \
+	$(DIR)/envvar_hint.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed

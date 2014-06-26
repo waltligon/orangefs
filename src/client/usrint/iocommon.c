@@ -9,6 +9,14 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
+
+/**/
+#define USER_ENVIRONMENT_VARIABLES 1
+#ifdef USER_ENVIRONMENT_VARIABLES
+#include "envvar_hint.h"
+#endif
+/**/
+
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -439,7 +447,7 @@ static int iocommon_parse_serverlist(char *serverlist,
     free(server_array);
     return 0;
 }
-    
+
 
 /**
  * Create a file via the PVFS system interface
@@ -463,6 +471,19 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
+#ifdef USER_ENVIRONMENT_VARIABLES
+    PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
+    struct orangefs_user_envvars_s envvars;
+    envvar_struct_initialize(&envvars);
+    int index = 0;
+    for(; index < ENVVAR_ENUM_COUNT; index++)
+    {
+        printf("%s=%s\n",
+               envvars.envvar_array[index].envvar_name,
+               envvars.envvar_array[index].envvar_value);
+    }
+#endif /* USER_ENVIRONMENT_VARIABLES */
+
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "iocommon_create_file: called with %s\n", filename);
 
@@ -478,6 +499,18 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
+#ifdef USER_ENVIRONMENT_VARIABLES
+    if(envvars.envvar_present && !file_creation_param)
+    {
+        printf("envvar_present && no hint detected!\n");
+        //file_creation_param = &no_hint_hint;
+
+        /* TODO: Load envvar hints into PVFS_HINT struct */
+
+    }
+#endif /* USER_ENVIRONMENT_VARIABLES */
+    /* ====================================================================== */
+
     if (file_creation_param) /* these are hints */
     {
         int length;
@@ -489,7 +522,17 @@ int iocommon_create_file(const char *filename,
         if (value)
         {
             dist = PVFS_sys_dist_lookup((char *)value);
-            if (!dist) /* distribution not found */
+            if (dist)
+            {
+                /* TODO add distribution parameters */
+#if 0
+                value = PINT_hint_get_value_by_type(file_creation_param,
+                                                    PINT_HINT_DISTRIBUTION_PV,
+                                                    &length);
+                printf("value = %s\n", value);
+#endif
+            }
+            else /* distribution not found */
             {
                 rc = EINVAL;
                 goto errorout;

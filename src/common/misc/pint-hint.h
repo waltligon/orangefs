@@ -30,7 +30,8 @@ enum PINT_hint_type
     PINT_HINT_LAYOUT,
     PINT_HINT_DFILE_COUNT,
     PINT_HINT_SERVERLIST,
-    PINT_HINT_CACHE
+    PINT_HINT_CACHE,
+    PINT_HINT_DISTRIBUTION_PV
 };
 
 typedef struct PVFS_hint_s
