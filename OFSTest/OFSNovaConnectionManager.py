@@ -103,7 +103,8 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     def readCloudConfigFile(self,filename):
         
         #open Cloud file
-        print "Reading config file %s" % filename
+        msg = "Reading config file %s" % filename
+
         conf_rc = open(filename,'r')
         
         for line in conf_rc:
@@ -152,10 +153,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
 
     def connect(self,debug=0):
         
-#         print "AUTH_URL=%s" % self.nova_auth_url
-#         print self.nova_username
-#         print self.nova_password
-#         print self.nova_tenant_name
+        logging.debug("AUTH_URL=%s NOVA_USERNAME=%s NOVA_PASSWORD=%s NOVA_TENANT_NAME=%s " % (self.nova_auth_url, self.nova_username, self.nova_password, self.nova_tenant_name))
         self.keystoneapi = keystoneclient.v2_0.Client(username=self.nova_username, password=self.nova_password, tenant_name=self.nova_tenant_name, auth_url=self.nova_auth_url)
         self.novaapi = novaclient.Client(self.nova_username, self.nova_password, self.nova_tenant_name, self.nova_auth_url, no_cache=True)
         self.glance_endpoint = self.keystoneapi.service_catalog.get_endpoints("image")["image"][0]["publicURL"]
@@ -202,7 +200,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     # @return    A list of new instances.
     #        
         
-    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None):
+    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
         self.checkCloudConnection()  
         
         # This creates a new instance for the system of a given machine type
@@ -215,20 +213,26 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         image = next((i for i in self.cloud_image_list if i.name == image_name), None)
         
         if image == None:
-            print "Image %s Not Found!" % image_name
+            logging.exception( "Image %s Not Found!" % image_name)
             return None
         
         flavor = next((f for f in self.novaapi.flavors.list() if f.name == flavor_name),None)
         if flavor == None:
-            print "Flavor %s not found!" % flavor_name
+            logging.exception("Flavor %s not found!" % flavor_name)
+            return None
         
-        print "Creating %d new %s %s instances." % (number_nodes,image_name,flavor_name)
+        msg = "Creating %d new %s %s instances." % (number_nodes,image_name,flavor_name)
+        print msg
+        logging.info(msg)
+        
         #print image.__dict__
         new_instances = []
 
         for index in range(0,number_nodes):
-            instance = self.novaapi.servers.create("ofsnode-%d"%(index+1), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
-            print "Created new Cloud instance %s " % instance.name
+            instance = self.novaapi.servers.create("ofsnode-%d%s"%(index+1,instance_suffix), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
+            msg = "Created new Cloud instance %s " % instance.name
+            logging.info(msg)
+            print msg
             new_instances.append(instance)
         
         return new_instances
@@ -245,8 +249,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     #
 
     def associateIPAddresses(self,instances=[],domain=None):
-        # TODO: Add associate ip address
-        print "External adderss association not yet implemented for nova"
+        
         external_addresses = []
         floating_ip = None
         
@@ -260,7 +263,9 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
                 floating_ip_list.append(new_floating_ip)
             
         for idx,instance in enumerate(instances):
-            print "Associating external ip %s with instance %s" % (floating_ip_list[idx].ip,instance.name) 
+            msg = "Associating external ip %s with instance %s" % (floating_ip_list[idx].ip,instance.name)
+            print msg
+            logging.info(msg) 
             self.novaapi.servers.add_floating_ip(instance,floating_ip_list[idx])
             external_addresses.append(floating_ip_list[idx].ip)
         #external_addresses = [s.addresses[self.nova_network_name][0]['addr'] for s in instances]
@@ -423,12 +428,12 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
 
 
     
-    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None):
+    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None, instance_suffix=""):
         
         # This function creates number nodes on the cloud system. 
         # It returns a list of nodes
         
-        new_instances = self.createNewCloudInstances(number_nodes,image_name,flavor_name,cloud_subnet)
+        new_instances = self.createNewCloudInstances(number_nodes,image_name,flavor_name,cloud_subnet,instance_suffix)
         # new instances should have a 60 second delay to make sure everything is running.
 
         ip_addresses = []
@@ -459,7 +464,9 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
             for idx,instance in enumerate(new_instances):
                 
                 #pprint(instance.__dict__)
-                print "Instance %s using current IP %s" % (instance.id,instance.addresses[self.nova_network_name][0]['addr'])
+                msg = "Instance %s using current IP %s" % (instance.id,instance.addresses[self.nova_network_name][0]['addr'])
+                print msg
+                logging.info(msg)
                 #(i.__dict__)
                 ip_addresses.append(instance.addresses[self.nova_network_name][0]['addr'])
         
@@ -484,7 +491,8 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
             new_ofs_test_nodes.append(new_node)
 
         # return the list of newly created nodes.
-        #print ip_addresses
+        logging.debug("New Node IP Addresses: ")
+        logging.debug(ip_addresses)
         return new_ofs_test_nodes
 
 

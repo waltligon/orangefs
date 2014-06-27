@@ -35,6 +35,7 @@ import time
 import sys
 import traceback
 from pprint import pprint
+import logging
 
 class OFSTestMain(object):
     
@@ -59,7 +60,11 @@ class OFSTestMain(object):
         
         # @var self.network 
         # OFSTestNework Virtual cluster.
+
         self.ofs_network = OFSTestNetwork.OFSTestNetwork()
+        
+        
+
         
         
 
@@ -155,6 +160,8 @@ class OFSTestMain(object):
         print "===========================================================" 
         print "Enabling Passwordless SSH access"
         self.ofs_network.enablePasswordlessSSH()
+        #print "Enabling Passwordless SSH access for root"
+        #self.ofs_network.enablePasswordlessSSH(user="root")
         
         # TODO: Make this smart enough to return success or failure.
         return 0
@@ -198,8 +205,9 @@ class OFSTestMain(object):
             resource_location=self.config.ofs_resource_location,
             resource_type=self.config.ofs_resource_type,
             ofs_config_file=self.config.ofs_config_file,
+            ofs_tcp_port=self.config.ofs_tcp_port,
             ofs_fs_name=self.config.ofs_fs_name,
-            ofs_host_name_override=self.config.ofs_host_name_override,
+            ofs_hostname_override=self.config.ofs_hostname_override,
             ofs_mount_point=self.config.ofs_mount_point
             )
         
@@ -243,7 +251,7 @@ class OFSTestMain(object):
             if self.config.number_new_cloud_nodes > 0:
                 print "===========================================================" 
                 print "Creating %d new EC2/OpenStack cloud nodes" % self.config.number_new_cloud_nodes
-                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet)
+                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet,self.config.instance_suffix)
             
         # Setup the virtual cluster.
         self.initNetwork()
@@ -597,7 +605,7 @@ class OFSTestMain(object):
 
             # TODO: Check to see if usrint and fuse are compatible.
             if False == True:
-                self.writeOutputHeader("Usrint Tests not compatible with fuse=====================================\n")
+                self.writeOutputHeader(filename,"Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
                 head_node.unmountOFSFilesystem()

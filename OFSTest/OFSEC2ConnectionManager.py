@@ -2,20 +2,22 @@
 
 
 #import os
-import time
-import re
 from boto import ec2
-from pprint import pprint
 from datetime import datetime, timedelta
+from pprint import pprint
+import re
+import time
+import logging
+
 import OFSCloudConnectionManager
 import OFSTestRemoteNode
+
 
 ## 
 # @class OFSEC2ConnectionManager
 #
 # @brief This class manages the EC2 connection. It has no awareness of OFSTestNodes or the OFSTestNetwork.
 #
-
 class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManager):
   
     ##
@@ -113,12 +115,9 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
             if "export EC2_ACCESS_KEY" in line:
                 # check for EC2_ACCESS_KEY
                 (export,variable,self.ec2_access_key) = re.split(' |=',line.rstrip())    
-                #print line_v
-                #print "%s,%s,%s" %    (export,variable,self.ec2_access_key)
             elif "export EC2_SECRET_KEY" in line:
                 # check for EC2_SECRET_KEY
                 (export,variable,self.ec2_secret_key) = re.split(" |=",line.rstrip())    
-                #print "%s,%s,%s" %    (export,variable,self.ec2_secret_key)
                 
             elif "export EC2_URL" in line:
                 # check for EC2_URL
@@ -154,19 +153,21 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
 
     def connect(self,debug=0):
         
-        print "Connecting to EC2/OpenStack region=%s endpoint=%s" % (self.ec2_region_name,self.ec2_endpoint)
+        msg = "Connecting to EC2/OpenStack region=%s endpoint=%s" % (self.ec2_region_name,self.ec2_endpoint)
+        print msg
+        logging.info(msg)
         self.ec2_region = ec2.regioninfo.RegionInfo(name=self.ec2_region_name,endpoint=self.ec2_endpoint)
 
         
-        if debug > 0:
-            print "EC2 region is %r" % self.ec2_region
-            print "ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path)
+
+        logging.debug("EC2 region is %r" % self.ec2_region)
+        logging.debug("ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path))
         
         self.ec2_connection = ec2.connection.EC2Connection(aws_access_key_id=self.ec2_access_key,aws_secret_access_key=self.ec2_secret_key,is_secure=self.ec2_is_secure,port=self.ec2_port
         ,debug=debug,region=self.ec2_region,path=self.ec2_path)
         
-        if debug > 0:
-            print "EC2 connection is %r" % self.ec2_connection
+
+        logging.debug("EC2 connection is %r" % self.ec2_connection)
 
 
     ##
@@ -204,14 +205,14 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
             self.getAllCloudInstances()
             node_instance = next(( i for i in self.cloud_instance_list if i.ip_address == ip_address),None)
         if node_instance == None:
-            print "Instance at %s not found." % ip_address
+            logging.exception( "Instance at %s not found." % ip_address)
             return 1
             
         try: 
-            print "Releasing external IP address %s" % node_instance.ext_ip_address
+            logging.exception( "Releasing external IP address %s" % node_instance.ext_ip_address)
             self.ec2_connection.release_address(node_instance.ext_ip_address)
         except:
-            print "Warning: Could not release external IP Address "+ node_instance.ext_ip_address
+            logging.exception( "Warning: Could not release external IP Address "+ node_instance.ext_ip_address)
             
         print "Terminating node at %s" % ip_address
         
@@ -235,7 +236,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     # @return	A list of new instances.
     #		
         
-    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None):
+    def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
         self.checkEC2Connection()  
         
         # This creates a new instance for the system of a given machine type
@@ -248,16 +249,16 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         image = next((i for i in self.cloud_image_list if i.name == image_name), None)
         
         if image == None:
-            print "Image %s Not Found!" % image_name
+            logging.exception( "Image %s Not Found!" % image_name)
             return None
         
-        print "Creating %d new %s %s instances." % (number_nodes,flavor_name,image_name)
-        #print image.__dict__
         
 
         reservation = self.ec2_connection.run_instances(image_id=image.id,min_count=number_nodes, max_count=number_nodes, key_name=self.cloud_instance_key, user_data=None, instance_type=flavor_name)
 
-        print "Creating %d new %s %s instances." % (number_nodes,flavor_name,image_name)
+        msg = "Creating %d new %s %s instances." % (number_nodes,flavor_name,image_name)
+        print msg
+        logging.info(msg)
 
         print "Waiting 120 seconds for all instances to start."
         time.sleep(120)
@@ -272,7 +273,9 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         new_instances = [i for i in reservation.instances]
         
         for i in new_instances:
-            print "Created new EC2 instance %s " % i.id
+            msg = "Created new EC2 instance %s " % i.id
+            print msg
+            logging.info(msg)
             #pprint(i.__dict__)
         
         return new_instances
@@ -290,14 +293,16 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         external_addresses = []
         try:
             all_addresses = self.ec2_connection.get_all_addresses()
-            print all_addresses
+            logging.debug("All addresses: "+ all_addresses)
         except:
             pass
         for i in instances:
             #print i.__dict__
 
             address = self.ec2_connection.allocate_address(domain)
-            print "Associating ext IP %s to %s with int IP %s" % (address.public_ip,i.id,i.ip_address)
+            msg = "Associating ext IP %s to %s with int IP %s" % (address.public_ip,i.id,i.ip_address)
+            print msg
+            logging.info(msg)
             self.ec2_connection.associate_address(instance_id=i.id,public_ip=address.public_ip)
             external_addresses.append(address.public_ip)
         
@@ -427,7 +432,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
 
 
     
-    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None):
+    def createNewCloudNodes(self,number_nodes,image_name,flavor_name,local_master,associateip=False,domain=None,cloud_subnet=None,instance_suffix=""):
         
         # This function creates number nodes on the cloud system. 
         # It returns a list of nodes
@@ -440,13 +445,13 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
         for idx,instance in enumerate(new_instances):
             instance.update()
-            #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
+            logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
             
             while instance.state_code == 0:
                 
                 time.sleep(10)
                 instance.update()
-                #print "Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code)
+                logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
             
             
         
@@ -459,7 +464,9 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
             
             for i in new_instances:
                 i.update()
-                print "Instance %s using current IP %s" % (i.id,i.ip_address)
+                msg = "Instance %s using current IP %s" % (i.id,i.ip_address)
+                print msg
+                logging.info(msg)
                 #(i.__dict__)
                 ip_addresses.append(i.ip_address)
 
@@ -486,36 +493,3 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
         return new_ofs_test_nodes
 
-
-
-#     
-# def OFSEC2ConnectionManager_test_driver():
-#     
-#     # old_mgr = OFSCloudConnectionManager(ec2_config_file="/home/jburton/Projects/Testing/PyTest/ec2-cred/ec2rc.sh",region_name="nova")
-#     my_mgr = OFSCloudConnectionManager(ec2_config_file="/home/jburton/cuer1/ec2rc.sh",region_name="RegionOne")
-#     print "Connect to EC2"
-#     #old_mgr.connect(debug=1)
-#     my_mgr.connect(debug=1)
-#     
-#     print "Testing connection"
-#     #old_mgr.printAllInstanceStatus()
-#     #my_mgr.printAllInstanceStatus()
-#     #my_mgr.getAllCloudImages()
-#     #my_mgr.deleteOldInstances(days_old=3)
-#     #old_mgr.setEC2Key("BuildBot","/home/jburton/buildbot.pem")
-#     my_mgr.setEC2Key("BuildBot2","/home/jburton/cuer1/buildbot2.pem")
-# 
-#     
-#     
-#     
-#         
-#     print "Creating Instances"
-#     
-#     node_list = my_mgr.createNewEC2Instances(number_nodes=1,image_system="cloud-rhel6",type="m1.small")
-#         
-#     #print my_mgr
-#     for node in node_list:
-#         my_mgr.terminateEC2Instance(node.ip_address)
-# 
-# 
-# #OFSEC2ConnectionManager_test_driver()

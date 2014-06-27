@@ -31,9 +31,8 @@ import shlex
 import cmd
 import time
 import sys
-import xml.etree.ElementTree as ET
 import traceback
-
+import logging
 
 ## @var batch_count
 # global variable for batch counting
@@ -249,6 +248,8 @@ class OFSTestNode(object):
         # Information about node in the network.
         self.node_number = OFSTestNode.node_number
         OFSTestNode.node_number += 1
+        self.timestamp = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        
 
     ##
     # 
@@ -262,14 +263,10 @@ class OFSTestNode(object):
     def currentNodeInformation(self):
         
         self.distro = ""
-        #print "Getting current node information"
-
+        
 
         # can we ssh in? We'll need the group if we can't, so let's try this first.
-        output = []
-        self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,output)
-        print output
-        
+        self.runSingleCommand("ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user)
         
         
         self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user)
@@ -279,24 +276,23 @@ class OFSTestNode(object):
         if self.current_group.rstrip() == "":
             self.current_group = self.runSingleCommandBacktick(command="ls -l /Users/ | grep %s | awk '{print \\$4}'" % self.current_user)
 
-        print "Current group is "+self.current_group
+        logging.info("Current group is "+self.current_group)
 
-        # Direct access as root not good. Need to get the actual user in
+        # Try to get in as root. If we can get in, we need to get the actual user in
         # Gross hackery for SuseStudio images. OpenStack injects key into root, not user.
                     
         if self.current_group.rstrip() == "":
             self.current_group = self.runSingleCommandBacktick(command="ls -l /home/ | grep %s | awk '{print \\$4}'" % self.current_user,remote_user="root")
 
-            print "Current group for %s (from root) is %s" % (self.current_user,self.current_group)
+            logging.info("Current group for %s (from root) is %s" % (self.current_user,self.current_group))
             if self.current_group.rstrip() == "":
-                print "Could not access node at "+self.ext_ip_address+" via ssh"
+                logging.exception("Could not access node at "+self.ext_ip_address+" via ssh")
                 exit(-1)
-            
             
             # copy the ssh key to the user's directory
             rc = self.runSingleCommand(command="cp -r /root/.ssh /home/%s/" % self.current_user,remote_user="root")
             if rc != 0:
-                print "Could not copy ssh key from /root/.ssh to /home/%s/ " % self.current_user
+                logging.exception("Could not copy ssh key from /root/.ssh to /home/%s/ " % self.current_user)
                 exit(rc)
             
             #get the user and group name of the home directory
@@ -304,10 +300,15 @@ class OFSTestNode(object):
             # change the owner of the .ssh directory from root to the login user
             rc = self.runSingleCommand(command="chown -R %s:%s /home/%s/.ssh/" % (self.current_user,self.current_group,self.current_user),remote_user="root") 
             if rc != 0:
-                print "Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group)
+                logging.exception("Could not change ownership of /home/%s/.ssh to %s:%s" % (self.current_user,self.current_user,self.current_group))
                 exit(rc)
-            
 
+        # We got in. Now copy the key from user directoy to /root. If user has passwordless sudo access, might as well.          
+        else:
+            # only implement this when we want to implement it.
+            self.allowRootSshAccess();
+                
+        
 
         # get kernel version and processor type
         self.kernel_version = self.runSingleCommandBacktick("uname -r")
@@ -318,53 +319,75 @@ class OFSTestNode(object):
             
         # information for ubuntu and suse is in /etc/os-release
 
-        if self.runSingleCommandBacktick('find /etc -name "os-release" 2> /dev/null').rstrip() == "/etc/os-release":
+        if self.runSingleCommand('test -f /etc/os-release') == 0:
             #print "SuSE or Ubuntu based machine found"
             pretty_name = self.runSingleCommandBacktick("cat /etc/os-release | grep PRETTY_NAME")
             [var,self.distro] = pretty_name.split("=")
         # for redhat based distributions, information is in /etc/system-release
-        elif self.runSingleCommandBacktick('find /etc -name "redhat-release" 2> /dev/null').rstrip() == "/etc/redhat-release":
+        elif self.runSingleCommand('test -f /etc/redhat-release') == 0:
             #print "RedHat based machine found"
             self.distro = self.runSingleCommandBacktick("cat /etc/redhat-release")
-        elif self.runSingleCommandBacktick('find /etc -name "lsb-release" 2> /dev/null').rstrip() == "/etc/lsb-release":
+        elif self.runSingleCommand('test -f /etc/lsb-release') == 0:
             #print "Ubuntu based machine found"
             #print self.runSingleCommandBacktick("cat /etc/lsb-release ")
             pretty_name = self.runSingleCommandBacktick("cat /etc/lsb-release | grep DISTRIB_DESCRIPTION")
             #print "Pretty name " + pretty_name
             [var,self.distro] = pretty_name.split("=")    
         # Mac OS X 
-        elif self.runSingleCommandBacktick('find /etc -name "SuSE-release" 2> /dev/null').rstrip() == "/etc/SuSE-release":
+        elif self.runSingleCommand('test -f /etc/SuSE-release') == 0: 
             self.distro = self.runSingleCommandBacktick("head -n 1 /etc/SuSE-release").rstrip()
 
             
         elif self.runSingleCommandBacktick("uname").rstrip() == "Darwin":
             #print "Mac OS X based machine found"
             self.distro = "Mac OS X-%s" % self.runSingleCommandBacktick("sw_vers -productVersion")
-
+        
+        # Disable GSSAPI authentication, because it slows EVERYTHING down.
+        # http://stackoverflow.com/questions/21498322/unexpected-behavior-of-ssh-in-centos-6-x
+        #self.runSingleCommandAsBatch("sudo sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd", output)
+        #self.runSingleCommandAsBatch("nohup sudo service sshd restart &", output)
+        #time.sleep(15)
         # get the hostname
         self.hostname = self.runSingleCommandBacktick("hostname")
 
         # SuSE distros require a hostname kludge to get it to work. Otherwise all instances will be set to the same hostname
         # That's a better solution than what Openstack gives us. So why not? 
         if self.is_cloud == True:
-            suse_host = "ofsnode-%d" % self.node_number
-            print "Renaming %s based node to %s" % (self.distro,suse_host)
-            self.runSingleCommandAsBatch("sudo hostname %s" % suse_host)
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
+            
+            suse_host = "ofsnode-%d" % (self.node_number)
+            msg = "Renaming %s based node to %s" % (self.distro,suse_host)
+            print msg
+            logging.info(msg)
+            self.runSingleCommandAsRoot("hostname %s" % suse_host)
+            self.runSingleCommandAsRoot("bash -c 'echo %s > /etc/HOSTNAME'" % suse_host)
             self.hostname = suse_host
             
         # Torque doesn't like long hostnames. Truncate the hostname to 15 characters if necessary.
-        elif len(self.hostname) > 15 and self.is_cloud == True:
-            short_hostname = self.hostname[:15]
-            self.runSingleCommandAsBatch("sudo bash -c 'echo %s > /etc/hostname'" % short_hostname)
-            self.runSingleCommandAsBatch("sudo hostname %s" % short_hostname)
-            print "Truncating hostname %s to %s" % (self.hostname,short_hostname)
-            self.hostname = self.hostname[:15]
-        elif self.is_cloud == False:
-            print "Not an Cloud Node!"
+#         elif len(self.hostname) > 15 and self.is_cloud == True:
+#             short_hostname = self.hostname[:15]
+#             self.runSingleCommandAsRoot("bash -c 'echo %s > /etc/hostname'" % short_hostname)
+#             self.runSingleCommandAsRoot("hostname %s" % short_hostname)
+#             print "Truncating hostname %s to %s" % (self.hostname,short_hostname)
+#             self.hostname = self.hostname[:15]
+        else:
+             logging.info("Node %s is not a Cloud Node!" % self.hostname)
         
         # print out node information
-        print "Node: %s %s %s %s" % (self.hostname,self.distro,self.kernel_version,self.processor_type)
+        msg = "Node: %s %s %s %s" % (self.hostname,self.distro,self.kernel_version,self.processor_type)
+        print msg
+        logging.info(msg)
+        
+    ##
+    #
+    # @fn allowRootSshAccess(self)
+    #
+    # This function copies the user's .ssh key to root's .ssh directory. Assumes passwordless sudo already enabled.
+    # Superclass assumes you really don't want to do this unless part of a subclass that implements this function. 
+    #
+    # @param self The object pointer        
+        
+    def allowRootSshAccess(self):
+        logging.info("Cannot allow root ssh access on this machine.")
         
         
        
@@ -472,7 +495,7 @@ class OFSTestNode(object):
     # @param output Output list
     # @param remote_user User to run as. Default is current user.
     
-    def runSingleCommand(self,command,output=[],remote_user=None):
+    def runSingleCommand(self,command,output=[],remote_user=None,debug=False):
         
         
         
@@ -483,16 +506,40 @@ class OFSTestNode(object):
         # get the correct format of the command line for the node we are running on.    
         command_line = self.prepareCommandLine(command=command,remote_user=remote_user)
         
+        if (debug):
+            print command_line
+        
+        logging.debug('---------------------------------------------------')
+        logging.debug("Command: "+command_line)
+
+        del output[:]
+        output.append(command_line)
+
+        
         # run via Popen
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
-        del output[:]
-        output.append(command_line)
         for i in p.communicate():
             output.append(i)
 
+        logging.debug("RC: %r" % p.returncode)
+        logging.debug("STDOUT: %s" % output[1] )
+        logging.debug("STDERR: %s" % output[2] )
+        
         return p.returncode
+    
+    ##
+    # @fn runSingleCommandAsRoot(self,command,output=[]):
+    # This runs a single command as root and returns the return code of that command
+    #
+    # command, stdout, and stderr are in the output list
+    # @param self The object pointer
+    # @param command The command to run
+    # @param output Output list
+    
+    def runSingleCommandAsRoot(self,command,output=[],debug=False):
+        self.runSingleCommand(command,output,"root",debug)
      
     ##
     # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
@@ -502,13 +549,13 @@ class OFSTestNode(object):
     # @param output Output list
     # @param remote_user User to run as. Default is current user.
           
-    def runSingleCommandBacktick(self,command,output=[],remote_user=None):
+    def runSingleCommandBacktick(self,command,output=[],remote_user=None,debug=False):
         
         if remote_user==None:
             remote_user = self.current_user
       
         
-        self.runSingleCommand(command=command,output=output,remote_user=remote_user)
+        self.runSingleCommand(command=command,output=output,remote_user=remote_user,debug=debug)
         if len(output) >= 2:
             return output[1].rstrip('\n')
         else:
@@ -533,7 +580,10 @@ class OFSTestNode(object):
     def runOFSTest(self,package,test_function,output=[],logfile="",errfile=""):
 
        
-        print "Running test %s-%s" % (package,test_function.__name__)
+        msg = "Running test %s-%s" % (package,test_function.__name__)
+        print msg
+        logging.info(msg)
+        
         
         if logfile == "":
             logfile = "%s-%s.log" % (package,test_function.__name__)
@@ -579,8 +629,8 @@ class OFSTestNode(object):
     
     def prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
         # Implimented in the client. Should not be here.
-        print "This should be implimented in the subclass, not in OFSTestNode."
-        print "Trying naive attempt to create command list."
+        logging.warn("This should be implimented in the subclass, not in OFSTestNode.")
+        logging.warn("Trying naive attempt to create command list.")
         return command
     
     ##
@@ -591,7 +641,7 @@ class OFSTestNode(object):
     # @param output Output list
 
        
-    def runAllBatchCommands(self,output=[]):
+    def runAllBatchCommands(self,output=[],debug=False):
         # implemented in child class
         pass
     
@@ -603,9 +653,9 @@ class OFSTestNode(object):
     # @param output Output list
     
     
-    def runSingleCommandAsBatch(self,command,output=[]):
+    def runSingleCommandAsBatch(self,command,output=[],debug=False):
         self.addBatchCommand(command)
-        self.runAllBatchCommands(output)
+        self.runAllBatchCommands(output,debug)
     
     ##
     # @fn runBatchFile(self,filename,output=[]):
@@ -729,8 +779,8 @@ class OFSTestNode(object):
         output = []
         rc = self.runSingleCommand(rsync_command, output)
         if rc != 0:
-            print rsync_command+" failed!"
-            print output
+            logging.exception(rsync_command+" failed!")
+            logging.exception(output)
         return rc
       
  
@@ -752,26 +802,43 @@ class OFSTestNode(object):
     
     
     def updateNode(self):
-        #print "Distro is " + self.distro
+        logging.debug("Update Node. Distro is " + self.distro)
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y update")
-            self.addBatchCommand("sudo DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade < /dev/zero")
-            self.addBatchCommand("sudo /sbin/reboot ")
+            self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y update")
+            self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade")
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "suse" in self.distro.lower():
-            self.addBatchCommand("sudo zypper --non-interactive update")
-            self.addBatchCommand("sudo /sbin/reboot &")
+            self.runSingleCommandAsRoot("zypper --non-interactive update")
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            self.addBatchCommand("sudo yum update --disableexcludes=main -y")
+            self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
+
             # Uninstall the old kernel
-            self.addBatchCommand("sudo rpm -e kernel-`uname -r`")
-            #Update grub from current kernel to installed kernel
-            self.addBatchCommand('sudo perl -e "s/`uname -r`/`rpm -q --queryformat \'%{VERSION}-%{RELEASE}.%{ARCH}\n\' kernel`/g" -p -i /boot/grub/grub.conf')
-            self.addBatchCommand("sudo /sbin/reboot ")
+            # Must escape double quotes and backquotes for command to run correctly on remote machine.
+            # Otherwise shell will interpret them for local machine and commands won't work.
+            rc = self.runSingleCommandAsRoot("\\`uname -r\\`")
+            
+            rc = self.runSingleCommandAsRoot("rpm -e kernel-\\`uname -r\\`")
+            
+            rc = self.runSingleCommandAsRoot("echo \\\"\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`\\\"")
+            
+                        
+            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p /boot/grub/grub.conf")
+            
+            
+            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p -i /boot/grub/grub.conf")
+            
+
+            rc = self.runSingleCommandAsRoot("nohup /sbin/reboot &")
+
+        #self.runAllBatchCommands()
+        msg = "Node "+self.hostname+" at "+self.ip_address+" updated."
+        print msg
+        logging.info(msg)
         
-        self.runAllBatchCommands()
-        print "Node "+self.hostname+" at "+self.ip_address+" updated."
-        
-        print "Node "+self.hostname+" at "+self.ip_address+" Rebooting."
+        msg = "Node "+self.hostname+" at "+self.ip_address+" Rebooting."
+        print msg
+        logging.info(msg)
     
     ##
     # @fn installTorqueServer(self):
@@ -785,84 +852,83 @@ class OFSTestNode(object):
         #Each distro handles torque slightly differently.
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            batch_commands = '''
+            batch_commands = [
 
                 #install torque
-                echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom < /dev/null 
-                sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name"
                 
-
-            ''' % (self.hostname,self.hostname)
-            self.addBatchCommand(batch_commands)
-
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-server torque-scheduler torque-client torque-mom",  
+                'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                'bash -c "echo %s > /var/spool/torque/server_name"' % self.hostname
+                
+            ]
+        
         elif "suse" in self.distro.lower():
             
             # Torque should already have been installed via SuSE studio, but it needs to be setup.
 
-            batch_commands = '''
-                sudo bash -c "echo %s > /etc/torque/server_name"
-                sudo bash -c "echo %s > /var/spool/torque/server_name"
-            ''' % (self.hostname,self.hostname)
-           
-            
+            batch_commands = [
 
-            self.addBatchCommand(batch_commands)
+                #install torque
+                'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                'bash -c "echo %s > /var/spool/torque/server_name"' % self.hostname
+                
+            ]
+        
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             
             if "6." in self.distro:
-                batch_commands = '''
+                self.runSingleCommand("wget --quiet http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm" % self.processor_type)
+                
+                batch_commands = [
                    
 
-                    echo "Adding epel repository"
-                    wget http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm
-                    sudo rpm -Uvh epel-release-6*.noarch.rpm
-                    echo "Installing TORQUE from rpm: "
-                    sudo yum -y update
-                    sudo yum -y install torque-server torque-client torque-mom torque-scheduler munge
-                    sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
-                    sudo bash -c "echo %s > /etc/torque/server_name"
-                    sudo bash -c "echo %s > /var/lib/torque/server_name"
+                
+                    "rpm -Uvh epel-release-6*.noarch.rpm",
+                    "yum -y update",
+                    "yum -y install torque-server torque-client torque-mom torque-scheduler munge",
+                    "bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'",
+                    'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                    'bash -c "echo %s > /var/lib/torque/server_name"' % self.hostname
 
-                ''' % (self.processor_type,self.hostname,self.hostname)
+                ]
             elif "5." in self.distro:
-                batch_commands = '''
-                   
+                self.runSingleCommand("wget --quiet http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm" % self.processor_type)
+                
+                batch_commands = [
+                
+                    "rpm -Uvh epel-release-5*.noarch.rpm",
+                    "yum -y update",
+                    "yum -y install torque-server torque-client torque-mom torque-scheduler munge",
+                    "bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'",
+                    'bash -c "echo %s > /etc/torque/server_name"' % self.hostname,
+                    'bash -c "echo %s > /var/lib/torque/server_name"' % self.hostname
 
-                    echo "Adding epel repository"
-                    wget http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm
-                    sudo rpm -Uvh epel-release-5*.noarch.rpm
-                    echo "Installing TORQUE from rpm: "
-                    sudo yum -y update
-                    sudo yum -y install torque-server torque-client torque-mom torque-scheduler munge
-                    sudo bash -c '[ -f /etc/munge/munge.key ] || /usr/sbin/create-munge-key'
-                    sudo bash -c "echo %s > /etc/torque/server_name"
-                    sudo bash -c "echo %s > /var/lib/torque/server_name"
-
-                ''' % (self.processor_type,self.hostname,self.hostname)
+                ]
+                
             else:
                 print "TODO: Torque for "+self.distro
                 batch_commands = ""
-            #print batch_commands
-            self.addBatchCommand(batch_commands)
-            
-            # The following commands setup the Torque queue for OrangeFS on all systems.
-            qmgr_commands = '''            
-                sudo qmgr -c "set server scheduling=true"
-                sudo qmgr -c "create queue orangefs_q queue_type=execution"
-                sudo qmgr -c "set queue orangefs_q started=true"
-                sudo qmgr -c "set queue orangefs_q enabled=true"
-                sudo qmgr -c "set queue orangefs_q resources_default.nodes=1"
-                sudo qmgr -c "set queue orangefs_q resources_default.walltime=3600"
-                sudo qmgr -c "set server default_queue=orangefs_q"
-                sudo qmgr -c "set server operators += %s@%s"
-                sudo qmgr -c "set server managers += %s@%s"
-                ''' % (self.current_user,self.hostname,self.current_user,self.hostname)
-
-            self.addBatchCommand(batch_commands)
         
-        self.runAllBatchCommands()
+        #print batch_commands
+        for command in batch_commands:
+            self.runSingleCommandAsRoot(command)
+        
+        # The following commands setup the Torque queue for OrangeFS on all systems.
+        qmgr_commands = [
+            'qmgr -c "set server scheduling=true"',
+            'qmgr -c "create queue orangefs_q queue_type=execution"',
+            'qmgr -c "set queue orangefs_q started=true"',
+            'qmgr -c "set queue orangefs_q enabled=true"',
+            'qmgr -c "set queue orangefs_q resources_default.nodes=1"',
+            'qmgr -c "set queue orangefs_q resources_default.walltime=3600"',
+            'qmgr -c "set server default_queue=orangefs_q"',
+            'qmgr -c "set server operators += %s@%s"'  % (self.current_user,self.hostname),
+            'qmgr -c "set server managers += %s@%s"' % (self.current_user,self.hostname)
+            ] 
+        for command in qmgr_commands:
+           self.runSingleCommandAsRoot(command)
+
+
         
     ##
     # @fn installTorqueClient(self,pbsserver):
@@ -877,14 +943,16 @@ class OFSTestNode(object):
      
     def installTorqueClient(self,pbsserver):
         pbsserver_name = pbsserver.hostname
-        print "Installing Torque Client for "+self.distro.lower()
+        msg = "Installing Torque Client for "+self.distro.lower()
+        print msg
+        logging.info(msg)
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             batch_commands = '''
 
                 #install torque
                 echo "Installing TORQUE from apt-get"
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom  < /dev/null 
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libtorque2 libtorque2-dev  < /dev/null 
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q torque-client torque-mom   
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libtorque2 libtorque2-dev 
                 sudo bash -c 'echo \$pbsserver %s > /var/spool/torque/mom_priv/config' 
                 sudo bash -c 'echo \$logevent 255 >> /var/spool/torque/mom_priv/config'
                 sudo bash -c 'echo %s > /etc/torque/server_name' 
@@ -909,7 +977,7 @@ class OFSTestNode(object):
                 batch_commands = '''
                
                 echo "Adding epel repository"
-                wget http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm
+                wget --quiet http://dl.fedoraproject.org/pub/epel/6/%s/epel-release-6-8.noarch.rpm
                 sudo rpm -Uvh epel-release-6*.noarch.rpm
                 echo "Installing TORQUE from rpm: "
                 sudo yum -y update
@@ -923,7 +991,7 @@ class OFSTestNode(object):
                 batch_commands = '''
                
                 echo "Adding epel repository"
-                wget http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm
+                wget --quiet http://dl.fedoraproject.org/pub/epel/5/%s/epel-release-5-4.noarch.rpm
                 sudo rpm -Uvh epel-release-5*.noarch.rpm
                 echo "Installing TORQUE from rpm: "
                 sudo yum -y update
@@ -988,10 +1056,10 @@ class OFSTestNode(object):
     
     def restartTorqueMom(self):
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            self.runSingleCommandAsBatch("sudo /etc/init.d/torque-mom restart")
+            self.runSingleCommandAsRoot("/etc/init.d/torque-mom restart")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower() or "suse" in self.distro.lower():
               
-            self.runSingleCommandAsBatch("sudo /etc/init.d/pbs_mom restart")
+            self.runSingleCommandAsRoot("/etc/init.d/pbs_mom restart")
 
 
     
@@ -1010,130 +1078,145 @@ class OFSTestNode(object):
         
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
-            batch_commands = '''
-                sudo bash -c 'echo 0 > /selinux/enforce'
-                sudo DEBIAN_FRONTEND=noninteractive apt-get update > /dev/null
+            
+            install_commands = [
+                " bash -c 'echo 0 > /selinux/enforce'",
+                "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-`uname -r` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime < /dev/null
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev < /dev/null
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server < /dev/null
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image < /dev/null
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
                 # will fail on Ubuntu 10.04. Run separately to not break anything
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse < /dev/null
-                #sudo DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils </dev/null
-                sudo apt-get clean
-
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse",
+                #"DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils", 
+                "apt-get clean",
+    
                 #prepare source
-                SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
-                cd /usr/src/${SOURCENAME}
-                sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
-                cd ${SOURCENAME}/
-                sudo cp /boot/config-`uname -r` .config
-                sudo make oldconfig &> /dev/null
-                sudo make prepare &>/dev/null
-                if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
-                then
-                sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
-                fi
-                sudo /sbin/modprobe -v fuse
-                sudo chmod a+x /bin/fusermount
-                sudo chmod a+r /etc/fuse.conf
-                sudo rm -rf /opt
-                sudo ln -s /mnt /opt
-                sudo chmod -R a+w /mnt
-                sudo service cups stop
-                sudo service sendmail stop
-                sudo service rpcbind restart
-                sudo service nfs-kernel-server restart
+                #SOURCENAME=`find /usr/src -name "linux-source*" -type d -prune -printf %f`
+                #cd /usr/src/${SOURCENAME}
+                #sudo tar -xjf ${SOURCENAME}.tar.bz2  &> /dev/null
+                #cd ${SOURCENAME}/
+                #sudo cp /boot/config-`uname -r` .config
+                #sudo make oldconfig &> /dev/null
+                #sudo make prepare &>/dev/null
+                #if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
+                #then
+                #sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
+                #fi
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind restart",
+                "service nfs-kernel-server restart",
 
                 # install Sun Java6 for hadoop via webupd8
-                sudo add-apt-repository ppa:webupd8team/java < /dev/null
-                sudo apt-get update 
-                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'
-                sudo bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer < /dev/null
-                
+                "add-apt-repository ppa:webupd8team/java < /dev/null",
+                "apt-get update ",
+                "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'",
+                "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
+            ]
+            
+            output = []
+            
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+            
 
-            '''
-            self.addBatchCommand(batch_commands)
             
             # ubuntu installs java to a different location than RHEL and SuSE 
             self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
             
             
         elif "suse" in self.distro.lower():
-            batch_commands = '''
-            sudo bash -c 'echo 0 > /selinux/enforce'
-            sudo /sbin/SuSEfirewall2 off
-            # prereqs should be installed as part of the image. Thanx SuseStudio!
-            #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs sudo nano openssl
-            sudo zypper --non-interactive patch libuuid1 uuid-devel
+            batch_commands = [
+                "bash -c 'echo 0 > /selinux/enforce'",
+                "/sbin/SuSEfirewall2 off",
+                # prereqs should be installed as part of the image. Thanx SuseStudio!
+                #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
+                "zypper --non-interactive patch libuuid1 uuid-devel gdb",
+                
+    
+                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`",
+                "cp /boot/config-\\`uname -r\\` .config",
+                "make oldconfig &> /dev/null",
+                "make modules_prepare &>/dev/null",
+                "make prepare &>/dev/null",
+                "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
+                "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
+                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                
 
-            cd /usr/src/linux-`uname -r | sed s/-[\d].*//`
-            sudo cp /boot/config-`uname -r` .config
-            sudo make oldconfig &> /dev/null
-            sudo make modules_prepare &>/dev/null
-            sudo make prepare &>/dev/null
-            sudo ln -s /lib/modules/`uname -r`/build/Module.symvers /lib/modules/`uname -r`/source
-            if [ ! -f /lib/modules/`uname -r`/build/include/linux/version.h ]
-            then
-            sudo ln -s include/generated/uapi/version.h /lib/modules/`uname -r`/build/include/linux/version.h
-            fi
-            sudo modprobe -v fuse
-            sudo chmod a+x /bin/fusermount
-            sudo chmod a+r /etc/fuse.conf
-            #sudo mkdir -p /opt
-            sudo rm -rf /opt
-            sudo ln -s /mnt /opt
-            sudo chmod -R a+w /opt
-            cd /tmp
-            #### Install Java 6 #####
-            wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
-            yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
-            
-            # start rpcbind to work around a bug in OpenSuse
-            sudo /sbin/rpcbind
-            
-
-            '''
-            self.addBatchCommand(batch_commands)
+                #link to use additional space in /mnt drive
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "chmod -R a+w /opt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind start",
+                "service nfs restart",
+                "/sbin/rpcbind"
+            ]
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+    
             
             # RPM installs to default location
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+            output = []
+            # download Java 6
+            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            if rc != 0:
+                logging.exception(output)
+                return rc
             
-            batch_commands = '''
-                sudo bash -c 'echo 0 > /selinux/enforce'
-                echo "Installing prereqs via yum..."
-                sudo yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-`uname -r` kernel-headers-`uname -r` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel
-                sudo yum -y install nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl 
-                sudo /sbin/modprobe -v fuse
-                sudo chmod a+x /bin/fusermount
-                sudo chmod a+r /etc/fuse.conf
-                #sudo mkdir -p /opt
+            install_commands = [
+                "bash -c 'echo 0 > /selinux/enforce'",
+                
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
+                # install java
+                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
+                "/sbin/modprobe -v fuse",
+                "chmod a+x /bin/fusermount",
+                "chmod a+r /etc/fuse.conf",
+                
+
                 #link to use additional space in /mnt drive
-                sudo rm -rf /opt
-                sudo ln -s /mnt /opt
-                sudo chmod -R a+w /mnt
-                sudo chmod -R a+w /opt
-                sudo service cups stop
-                sudo service sendmail stop
-                sudo service rpcbind start
-                sudo service nfs restart
+                "rm -rf /opt",
+                "ln -s /mnt /opt",
+                "chmod -R a+w /mnt",
+                "chmod -R a+w /opt",
+                "service cups stop",
+                "service sendmail stop",
+                "service rpcbind start",
+                "service nfs restart",
                 
-                # install java 6
-                cd /tmp
-                wget -q http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin
-                yes y | sudo bash ./jdk-6u45-linux-x64-rpm.bin
+                
+                ]
             
+
+        
+            for command in install_commands:
+                rc = self.runSingleCommandAsRoot(command, output)
+                    #return rc
+
+                # install java 6
                 
 
-
-            '''
-            self.addBatchCommand(batch_commands)
             
             # RPM installs to default location
             self.jdk6_location = "/usr/java/default"
@@ -1166,7 +1249,7 @@ class OFSTestNode(object):
         output = []
         self.changeDirectory("/opt")
         # Download from a helluva open source mirror.
-        self.runSingleCommand("wget  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+        self.runSingleCommand("wget --quiet  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
         self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
 
         # Add DB4 to the library path.
@@ -1191,7 +1274,6 @@ class OFSTestNode(object):
         mpich_version = "mpich-3.0.4"
             
         url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
-        url = "wget"
         # just to make debugging less painful
         #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
         #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
@@ -1203,7 +1285,7 @@ class OFSTestNode(object):
         rc = self.runSingleCommand("wget --quiet %s" % url)
         #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
         if rc != 0:
-            print "Could not download mpich from %s." % url
+            logging.exception("Could not download mpich from %s." % url)
             self.changeDirectory(tempdir)
             return rc
 
@@ -1228,36 +1310,38 @@ class OFSTestNode(object):
         #print configure
         
 
-        print "Configuring MPICH"
+        msg = "Configuring MPICH"
+        logging.info(msg)
         rc = self.runSingleCommand(configure,output)
         
         if rc != 0:
-            print "Configure of MPICH failed. rc=%d" % rc
-            print output
+            logging.exception("Configure of MPICH failed. rc=%d" % rc)
+            logging.exception( output)
             self.changeDirectory(tempdir)
             return rc
         
-        print "Building MPICH"
+        msg = "Building MPICH"
+        logging.info(msg)
         rc = self.runSingleCommand("make > mpich2make.log")
         if rc != 0:
-            print "Make of MPICH failed."
-            print output
+            logging.exception("Make of MPICH failed.")
+            logging.exception( output)
             self.changeDirectory(tempdir)
             return rc
 
-        print "Installing MPICH"
+        logging.info("Installing MPICH")
         rc = self.runSingleCommand("make install > mpich2install.log")
         if rc != 0:
-            print "Install of MPICH failed."
-            print output
+            logging.exception( "Install of MPICH failed.")
+            logging.exception(output)
             self.changeDirectory(tempdir)
             return rc
         
-        print "Checking MPICH install"
+        logging.info( "Checking MPICH install")
         rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
         if rc != 0:
-            print "Install of MPICH failed."
-            print output
+            logging.info("Install of MPICH failed.")
+            logging.info( output)
             self.changeDirectory(tempdir)
             return rc
         
@@ -1286,10 +1370,14 @@ class OFSTestNode(object):
         if build_location == None:
             build_location = install_location
         
+        
         self.openmpi_version = "openmpi-1.6.5"
         url_base = "http://devorange.clemson.edu/pvfs/"
         url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
-        
+
+        #self.openmpi_version = "openmpi-1.8"
+        #url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+        #url = url_base+self.openmpi_version+".tar.gz"
 
         patch_name = "openmpi.patch"
         patch_url = url_base+patch_name
@@ -1298,15 +1386,14 @@ class OFSTestNode(object):
         tempdir = self.current_directory
         self.changeDirectory(build_location)
         
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
         if rc != 0:
-            print "Could not download %s from %s." % (self.openmpi_version,url)
+            logging.exception( "Could not download %s from %s." % (self.openmpi_version,url))
             self.changeDirectory(tempdir)
             return rc
 
         output = []
+        self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
         self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
         
         self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
@@ -1331,41 +1418,30 @@ class OFSTestNode(object):
         '''
 
         
-        configure = './configure --prefix %s/openmpi --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' >openmpiconfig.log' % (install_location,self.ofs_installation_location)
+        configure = './configure --prefix %s/openmpi --enable-shared --with-pic --with-io-romio-flags=\'--with-pvfs2=%s --with-file-system=pvfs2+nfs\' 2>&1 | tee openmpiconfig.log' % (install_location,self.ofs_installation_location)
         
 
-        print "Configuring %s" % self.openmpi_version
+        logging.info( "Configuring %s" % self.openmpi_version)
         rc = self.runSingleCommand(configure,output)
         
         if rc != 0:
-            print "Configure of %s failed. rc=%d" % (self.openmpi_version,rc)
-            print output
+            logging.exception( "Configure of %s failed. rc=%d" % (self.openmpi_version,rc))
             self.changeDirectory(tempdir)
             return rc
         
-        print "Making %s" % self.openmpi_version
-        rc = self.runSingleCommand("make > openmpimake.log")
+        logging.info( "Making %s" % self.openmpi_version)
+        rc = self.runSingleCommand("make 2>&1 | tee openmpimake.log")
         if rc != 0:
-            print "Make of %s failed."
-            print output
+            logging.exception( "Make of %s failed.")
             self.changeDirectory(tempdir)
             return rc
 
-        print "Installing %s" % self.openmpi_version
-        rc = self.runSingleCommand("make install > openmpiinstall.log")
+        logging.info("Installing %s" % self.openmpi_version)
+        rc = self.runSingleCommand("make install 2>&1 | tee openmpiinstall.log")
         if rc != 0:
-            print "Install of %s failed." % self.openmpi_version
-            print output
+            logging.exception("Install of %s failed." % self.openmpi_version)
             self.changeDirectory(tempdir)
             return rc
-        
-        #print "Checking MPICH install" % openmpi_version
-        #rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
-        #if rc != 0:
-        #    print "Install of MPICH failed."
-        #    print output
-        #    self.changeDirectory(tempdir)
-        #    return rc
         
         self.openmpi_installation_location = install_location+"/openmpi"
         
@@ -1406,16 +1482,17 @@ class OFSTestNode(object):
             svn_options = "%s --username %s --password %s" % (svn_options, svnusername,svnpassword)
             svn_action = "co"
         
-        print "svn %s %s %s" % (svn_action,svnurl,svn_options)
+        msg = "svn %s %s %s" % (svn_action,svnurl,svn_options)
+        print msg
+        logging.info(msg)
         self.changeDirectory(dest_dir)
-        rc = self.runSingleCommand("svn %s %s %s" % (svn_action,svnurl,svn_options),output)
+        rc = self.runSingleCommand("svn %s %s %s" % (svn_action,svnurl,svn_options))
         if rc != 0:
-            print "Could not export from svn"
-            print output
+            logging.exception( "Could not export from svn")
             return rc
         else:
             self.ofs_source_location = "%s/%s" % (dest_dir.rstrip('/'),self.ofs_branch)
-            print "svn exported to %s" % self.ofs_source_location
+            logging.info("svn exported to %s" % self.ofs_source_location)
                
         return rc
 
@@ -1436,7 +1513,9 @@ class OFSTestNode(object):
     def installBenchmarks(self,tarurl="http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz",dest_dir="",configure_options="",make_options="",install_options=""):
         if dest_dir == "":
             dest_dir = "/home/%s/" % self.current_user
-        print "Installing benchmarks from "+tarurl
+        msg = "Installing benchmarks from "+tarurl
+        print msg
+        logging.info(msg)
         tarfile = os.path.basename(tarurl)
         output = []
         
@@ -1444,10 +1523,10 @@ class OFSTestNode(object):
         self.runSingleCommand("mkdir -p "+dest_dir)
         self.changeDirectory(dest_dir)
         self.runSingleCommand("rm " + tarfile)
-        rc = self.runSingleCommand("wget " + tarurl, output)
+        rc = self.runSingleCommand("wget --quiet " + tarurl, output)
         if rc != 0:
-            print "Could not download benchmarks"
-            print output
+            logging.exception("Could not download benchmarks")
+            
             return rc
         tarflags = ""
         taridx = 0
@@ -1465,20 +1544,19 @@ class OFSTestNode(object):
             tarflags = "xf"
             taridx = tarfile.index(".tar")
         else:
-            print "%s Not a tarfile" % tarurl
+            logging.exception( "%s Not a tarfile" % tarurl)
             return 1
     
         tardir = tarfile[:taridx]
         rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
         #print self.runSingleCommandBacktick("ls %s" % dest_dir)
         if rc != 0:
-            print "Could not untar benchmarks"
-            print output
+            logging.exception( "Could not untar benchmarks")
             return rc
         
         self.ofs_extra_tests_location = dest_dir+"/benchmarks" 
-        #print "Extra tests location: "+self.ofs_extra_tests_location
-        #print self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location)
+        logging.info("Extra tests location: "+self.ofs_extra_tests_location)
+        logging.debug(self.runSingleCommandBacktick("ls %s" % self.ofs_extra_tests_location))
         return 0
     
     
@@ -1499,7 +1577,7 @@ class OFSTestNode(object):
         tarfile = os.path.basename(tarurl)
         self.changeDirectory(dest_dir)
         self.runSingleCommand("rm " + tarfile)
-        self.runSingleCommand("wget " + tarurl)
+        self.runSingleCommand("wget --quiet " + tarurl)
         tarflags = ""
         taridx = 0
     
@@ -1548,10 +1626,10 @@ class OFSTestNode(object):
         self.changeDirectory(dest_dir)
         self.runSingleCommand("rm " + tarfile)
         output = []
-        rc = self.runSingleCommand("wget " + tarurl,output)
+        rc = self.runSingleCommand("wget --quiet " + tarurl)
         if rc != 0:
-            print "Could not download OrangeFS"
-            print output
+            logging.exception("Could not download OrangeFS")
+
             return rc
         tarflags = ""
         taridx = 0
@@ -1569,13 +1647,13 @@ class OFSTestNode(object):
             tarflags = "xf"
             taridx = tarfile.index(".tar")
         else:
-            print "%s Not a tarfile" % tarurl
+            logging.exception( "%s Not a tarfile" % tarurl)
             return 1
         
-        rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile),output)
+        rc = self.runSingleCommand("tar %s %s" % (tarflags, tarfile))
         if rc != 0:
-            print "Could not untar OrangeFS"
-            print output
+            logging.exception( "Could not untar OrangeFS")
+
             return rc
         
         #remove the extension from the tarfile for the directory. That is the assumption
@@ -1639,7 +1717,7 @@ class OFSTestNode(object):
         # Make directory dest_dir
         rc = self.runSingleCommand("mkdir -p %s" % dest_dir)
         if rc != 0:
-            print "Could not mkdir -p %s" %dest_dir
+            logging.exception( "Could not mkdir -p %s" %dest_dir)
             return rc
           
         
@@ -1667,7 +1745,7 @@ class OFSTestNode(object):
             # Local directory on the current node. 
             rc = self.copyOFSSourceFromDirectory(resource,dest_dir)
         else:
-            print "Resource type %s not supported!\n" % resource_type
+            logging.exception( "Resource type %s not supported!\n" % resource_type)
             return -1
         
         
@@ -1725,27 +1803,27 @@ class OFSTestNode(object):
         output = []
 
         # Installs patches to OrangeFS. Assumes patches are p1.
-        print ofs_patch_files
+        logging.debug( ofs_patch_files)
         for patch in ofs_patch_files:
             
-            print "Patching: patch -c -p1 < %s" % patch
+            logging.info( "Patching: patch -c -p1 < %s" % patch)
             rc = self.runSingleCommand("patch -c -p1 < %s" % patch)
             if rc != 0:
-                print "Patch Failed!"
+                logging.exception( "Patch Failed!")
        
         # Run prepare. 
-        rc = self.runSingleCommand("./prepare",output)
+        rc = self.runSingleCommand("./prepare")
         if rc != 0:
-            print self.ofs_source_location+"/prepare failed!" 
-            print output
+            logging.exception( self.ofs_source_location+"/prepare failed!") 
+            
             return rc
         
         #sanity check for OFS installation prefix
         rc = self.runSingleCommand("mkdir -p "+ofs_prefix)
         if rc != 0:
-            print "Could not create directory "+ofs_prefix
+            logging.exception( "Could not create directory "+ofs_prefix)
             ofs_prefix = "/home/%s/orangefs" % self.current_user
-            print "Using default %s" % ofs_prefix
+            logging.exception( "Using default %s" % ofs_prefix)
         else:
             self.runSingleCommand("rmdir "+ofs_prefix)
             
@@ -1768,15 +1846,16 @@ class OFSTestNode(object):
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
-        if enable_strict == True:
-            # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
-            # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
-            
-            # won't work for rhel 5 based distros, gcc is too old.
-            if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
-                pass
-            else:
-                configure_opts = configure_opts+" --enable-strict"
+        # No reason to do this. We want debug info
+#         if enable_strict == True:
+#             # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
+#             # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
+#             
+#             # won't work for rhel 5 based distros, gcc is too old.
+#             if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
+#                 pass
+#             else:
+#                 configure_opts = configure_opts+" --enable-strict"
 
         if enable_hadoop == True:
             configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
@@ -1807,8 +1886,8 @@ class OFSTestNode(object):
             # set the OrangeFS installation location to the prefix.
             self.ofs_installation_location = ofs_prefix
         else:
-            print "Configuration of OrangeFS at %s Failed!" % self.ofs_source_location
-            print output
+            logging.exception( "Configuration of OrangeFS at %s Failed!" % self.ofs_source_location)
+            
             
 
         return rc
@@ -1875,15 +1954,15 @@ class OFSTestNode(object):
         # Make
         rc = self.runSingleCommand("make "+make_options, output)
         if rc != 0:
-            print "Build (make) of of OrangeFS at %s Failed!" % self.ofs_source_location
-            print output
+            logging.exception( "Build (make) of of OrangeFS at %s Failed!" % self.ofs_source_location)
+            
             return rc
         # Make the kernel module
         if self.build_kmod == True:
             rc = self.runSingleCommand("make kmod",output)
             if rc != 0:
-                print "Build (make) of of OrangeFS-kmod at %s Failed!" % self.ofs_source_location
-                print output
+                logging.exception( "Build (make) of of OrangeFS-kmod at %s Failed!" % self.ofs_source_location)
+                
             
         return rc
     
@@ -1914,20 +1993,19 @@ class OFSTestNode(object):
         self.changeDirectory(self.ofs_source_location)
         output = []
         if install_as_root == True:
-            rc = self.runSingleCommandAsBatch("sudo make install",output)
+            rc = self.runSingleCommandAsRoot("make install",output)
         else:
             rc = self.runSingleCommand("make install",output)
         
         if rc != 0:
-            
-            print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
-            print output
+            logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
             return rc
+        
         if self.build_kmod == True:
             self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
             if rc != 0:
-                print "Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location)
-                print output
+                logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
+                
         
         return rc
 
@@ -1946,25 +2024,22 @@ class OFSTestNode(object):
         if configure_options == "":
             configure_options = "--with-db=%s --prefix=%s" % (self.db4_dir,self.ofs_installation_location)
         
- 
         
         self.changeDirectory("%s/test" % self.ofs_source_location)
-        rc = self.runSingleCommand("./configure %s"% configure_options)
+        #Turn off optimizations and turn on debug symbols.
+        rc = self.runSingleCommand("CFLAGS='-g -O0' ./configure %s"% configure_options)
         if rc != 0:
-            print "Could not configure OrangeFS tests"
-            print output
+            logging.exception("Could not configure OrangeFS tests")
             return rc
         
         rc = self.runSingleCommand("make all")
         if rc != 0:
-            print "Could not build (make) OrangeFS tests"
-            print output
+            logging.exception( "Could not build (make) OrangeFS tests")
             return rc
    
         rc = self.runSingleCommand("make install")
         if rc != 0:
-            print "Could not install OrangeFS tests"
-            print output
+            logging.exception( "Could not install OrangeFS tests")
         return rc
     
     ##
@@ -1988,28 +2063,32 @@ class OFSTestNode(object):
         
         self.runSingleCommand("mkdir -p %s" % directory_name)
         if "suse" in self.distro.lower():
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
-            sudo /sbin/rpcbind 
-            sleep 3
-            sudo /etc/init.d/nfs restart
-            sudo /etc/init.d/nfsserver restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
+            commands = [
+            "bash -c 'echo \\\"%s %s/%r(%s)\\\" >> /etc/exports'" % (directory_name,self.ip_address,netmask,options),
+            
+            " /sbin/rpcbind", 
+            
+            " sleep 3",
+            " /etc/init.d/nfs restart"
+            " /etc/init.d/nfsserver restart"
+            " exportfs -a"
+             ] 
         else:
-            commands = '''
-            sudo bash -c 'echo "%s %s/%r(%s)" >> /etc/exports'
+            commands = [
+            "bash -c 'echo \\\"%s %s/%r(%s)\\\" >> /etc/exports'" % (directory_name,self.ip_address,netmask,options),
             #sudo service cups stop
             #sudo service sendmail stop
-            sudo service rpcbind restart
-            sudo service nfs restart
-            sudo service nfs-kernel-server restart
-            sudo exportfs -a
-            ''' % (directory_name,self.ip_address,netmask,options)
+            "service rpcbind restart",
+            "service nfs restart",
+            "service nfs-kernel-server restart",
+            "exportfs -a"
+            ]
+            
         
+        for command in commands:
+            self.runSingleCommandAsRoot(command)
         
-        
-        self.runSingleCommandAsBatch(commands)
+
         time.sleep(30)
         
         return "%s:%s" % (self.ip_address,directory_name)
@@ -2027,17 +2106,18 @@ class OFSTestNode(object):
     def mountNFSDirectory(self,nfs_share,mount_point,options=""):
         self.changeDirectory("/home/%s" % self.current_user)
         self.runSingleCommand("mkdir -p %s" % mount_point)
-        commands = 'sudo mount -t nfs -o %s %s %s' % (options,nfs_share,mount_point)
-        print commands
-        self.runSingleCommandAsBatch(commands)
+        commands = 'mount -t nfs -o %s %s %s' % (options,nfs_share,mount_point)
+        print "Mounting NFS: " + commands
+        logging.info("Mounting NFS: " + commands)
+        self.runSingleCommandAsRoot(commands)
         output = []
         rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
         count = 0
         while rc != 0 and count < 10 :
             time.sleep(15)
-            self.runSingleCommandAsBatch(commands)
+            self.runSingleCommandAsRoot(commands)
             rc = self.runSingleCommand("mount | grep %s" % nfs_share,output)
-            print output
+            
             count = count + 1
         return 0
     
@@ -2048,7 +2128,7 @@ class OFSTestNode(object):
     # @param self The object pointer
 
     def clearSHM(self):
-        self.runSingleCommandAsBatch("sudo rm /dev/shm/pvfs*")
+        self.runSingleCommandAsRoot("rm /dev/shm/pvfs\*")
    
    
 
@@ -2114,7 +2194,7 @@ class OFSTestNode(object):
         
         # Add each ofs host to the string of hosts.
         for ofs_host in ofs_hosts_v:
-            ofs_host_str = ofs_host_str + ofs_host.hostname + ":3396,"
+            ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -2134,10 +2214,14 @@ class OFSTestNode(object):
         if security == None:
             pass
         elif security.lower() == "key":
-            print "Configuring key based security"
+            msg = "Configuring key based security"
+            print msg
+            logging.info(msg)
             security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
         elif security.lower() == "cert":
-            print "Certificate based security not yet supported by OFSTest."
+            msg = "Certificate based security not yet supported by OFSTest."
+            print msg
+            logging.info(msg)
             pass
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
@@ -2146,13 +2230,14 @@ class OFSTestNode(object):
         else:
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf %s --quiet" % (self.ofs_installation_location,self.ofs_installation_location,configuration_options)
         
-        print "Generating orangefs.conf "+ genconfig_str
+        msg = "Generating orangefs.conf "+ genconfig_str
+        print msg
+        logging.info(msg)
         # run genconfig
         output = []
         rc = self.runSingleCommand(genconfig_str,output)
         if rc != 0:
-            print "Could not generate orangefs.conf file."
-            print output
+            logging.exception( "Could not generate orangefs.conf file.")
             return rc
         
         # do we need to copy the file to a new location?
@@ -2161,7 +2246,7 @@ class OFSTestNode(object):
         else:
             rc = self.copyLocal(self.ofs_installation_location+"/etc/orangefs.conf",ofs_conf_file,False)
             if rc != 0:
-                print "Could not copy orangefs.conf file to %s. Using %s/etc/orangefs.conf" % (ofs_conf_file,self.ofs_installation_location)
+                logging.warn("Could not copy orangefs.conf file to %s. Using %s/etc/orangefs.conf" % (ofs_conf_file,self.ofs_installation_location))
                 self.ofs_conf_file = self.ofs_installation_location+"/etc/orangefs.conf"
             else:
                 self.ofs_conf_file = ofs_conf_file
@@ -2207,7 +2292,7 @@ class OFSTestNode(object):
             self.alias_list = self.getAliasesFromConfigFile(self.ofs_conf_file)
         
         if len(self.alias_list) == 0:
-            print "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location
+            logging.exception( "Could not find any aliases in %s/etc/orangefs.conf" % self.ofs_installation_location)
             return -1
 
         # for all the aliases in the file
@@ -2222,20 +2307,19 @@ class OFSTestNode(object):
                     rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -r %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias),output)
                     rc = self.runSingleCommand("%s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid -f %s/etc/orangefs.conf -a %s" % ( self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias),output)
                     if rc != 0:
-                        print "Could not create OrangeFS storage space"
-                        print output
+                        logging.exception( "Could not create OrangeFS storage space")
                         return rc
               
                 
                 # Are we running this as root? 
                 prefix = "" 
                 if run_as_root == True:
-                    prefix = "sudo LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
+                    prefix = "LD_LIBRARY_PATH=%s:%s/lib" % (self.db4_lib_dir,self.ofs_installation_location)
                     
                     
                 server_start = "%s %s/sbin/pvfs2-server -p %s/pvfs2-server-%s.pid %s/etc/orangefs.conf -a %s" % (prefix,self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.ofs_installation_location,alias)
                 print server_start
-                rc = self.runSingleCommandAsBatch(server_start,output)
+                rc = self.runSingleCommand(server_start,output)
                 
                 # give the servers 15 seconds to get running
                 print "Starting OrangeFS servers..."
@@ -2245,9 +2329,10 @@ class OFSTestNode(object):
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:3396/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
-        self.runSingleCommandAsBatch("sudo ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
+        self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommandAsRoot("ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
+        self.setEnvironmentVariable("LD_LIBRARY_PATH",self.ofs_installation_location+"/lib:$LD_LIBRARY_PATH")
        
         # set the debug mask
         self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
@@ -2296,9 +2381,9 @@ class OFSTestNode(object):
         rc = self.runSingleCommand('/sbin/lsmod | grep pvfs2')
         if rc == 0:
             return 0
-        self.addBatchCommand("sudo /sbin/insmod %s/lib/modules/%s/kernel/fs/pvfs2/pvfs2.ko &> pvfs2-kernel-module.log" % (self.ofs_installation_location,self.kernel_version))
-        self.addBatchCommand("sudo /sbin/lsmod >> pvfs2-kernel-module.log")
-        self.runAllBatchCommands()
+        self.runSingleCommandAsRoot("/sbin/insmod %s/lib/modules/%s/kernel/fs/pvfs2/pvfs2.ko 2>&1 | tee pvfs2-kernel-module.log" % (self.ofs_installation_location,self.kernel_version))
+        self.runSingleCommandAsRoot("/sbin/lsmod >> pvfs2-kernel-module.log")
+        
         return 0
         
      
@@ -2347,10 +2432,10 @@ class OFSTestNode(object):
         print ""
         
         # start the client 
-        self.addBatchCommand("sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
+        self.runSingleCommandAsRoot("LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
         # change the protection on the logfile to 644
-        self.addBatchCommand("sudo chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
-        self.runAllBatchCommands()
+        self.runSingleCommandAsRoot("chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
+        
 
         return 0
         
@@ -2382,7 +2467,7 @@ class OFSTestNode(object):
         # is the filesystem already mounted?
         rc = self.checkMount(output)
         if rc == 0:
-            print "OrangeFS already mounted at %s" % output[1]
+            logging.warn( "OrangeFS already mounted at %s" % output[1])
             return
         
         # where is this to be mounted?
@@ -2403,8 +2488,8 @@ class OFSTestNode(object):
         #mount with kmod
         else:
             print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.addBatchCommand("sudo mount -t pvfs2 tcp://%s:%s/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
-            self.runAllBatchCommands()
+            self.runSingleCommandAsRoot("mount -t pvfs2 tcp://%s:%s/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
+
         
         print "Waiting 30 seconds for mount"            
         time.sleep(30)
@@ -2419,7 +2504,7 @@ class OFSTestNode(object):
     
     def unmountOFSFilesystem(self):
         print "Unmounting OrangeFS mounted at " + self.ofs_mount_point
-        self.runSingleCommandAsBatch("sudo umount -f -l %s" % self.ofs_mount_point)
+        self.runSingleCommandAsRoot("umount -f -l %s" % self.ofs_mount_point)
         time.sleep(15)
 
     ##
@@ -2435,11 +2520,11 @@ class OFSTestNode(object):
         # Unmount the filesystem.
         self.unmountOFSFilesystem()
         print "Stopping pvfs2-client process"
-        self.addBatchCommand("sudo killall pvfs2-client")
-        self.addBatchCommand("sleep 10")
-        self.addBatchCommand("sudo killall -s 9 pvfs2-client")
-        self.addBatchCommand("sleep 2")
-        self.runAllBatchCommands()
+        self.runSingleCommandAsRoot("killall pvfs2-client")
+        time.sleep(10)
+        self.runSingleCommandAsRoot("killall -s 9 pvfs2-client")
+        time.sleep(2)
+
         
     
  
@@ -2483,7 +2568,7 @@ class OFSTestNode(object):
 
         rc = self.runSingleCommand("mount | grep pvfs2 | awk '{ print \\$2}'",output)
         if rc != 0:
-            print "OrangeFS mount point not detected. Trying /tmp/mount/orangefs."
+            logging.warn("OrangeFS mount point not detected. Trying /tmp/mount/orangefs.")
             self.ofs_mount_point = "/tmp/mount/orangefs"
         else: 
             self.ofs_mount_point = output[1].rstrip()
@@ -2507,177 +2592,3 @@ class OFSTestNode(object):
         # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
         
-        
-
-
-        
-    
-# #===================================================================================================
-# # Unit test script begins here
-# #===================================================================================================
-# def test_driver():
-#     local_machine = OFSTestLocalNode()
-#     local_machine.addRemoteKey('10.20.102.54',"/home/jburton/buildbot.pem")
-#     local_machine.addRemoteKey('10.20.102.60',"/home/jburton/buildbot.pem")
-#     
-#     '''
-#     local_machine.changeDirectory("/tmp")
-#     local_machine.setEnvironmentVariable("FOO","BAR")
-#     local_machine.runSingleCommand("echo $FOO")
-#     local_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
-#     local_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
-#     local_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
-#     local_machine.runAllBatchCommands()
-#     
-# 
-#     
-#     #local_machine.copyOFSSource("LOCALDIR","/home/jburton/testingjdb/","/tmp/jburton/testingjdb/")
-#     #local_machine.configureOFSSource()
-#     #local_machine.makeOFSSource()
-#     #local_machine.installOFSSource()
-#     '''
-#     
-#     remote_machine = OFSTestRemoteNode('cloud-user','10.20.102.54',"/home/jburton/buildbot.pem",local_machine)
-#     remote_machine1 = OFSTestRemoteNode('cloud-user','10.20.102.60', "/home/jburton/buildbot.pem",local_machine)
-# 
-# '''
-#     remote_machine.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
-#     remote_machine1.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib")
-# 
-#    # remote_machine.uploadNodeKeyFromLocal(local_machine)
-#    # remote_machine1.uploadNodeKeyFromLocal(local_machine)
-#     remote_machine.uploadRemoteKeyFromLocal(local_machine,remote_machine1.ip_address)
-#     remote_machine1.uploadRemoteKeyFromLocal(local_machine,remote_machine.ip_address)
-#     
-#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/trunk","/tmp/cloud-user/")
-#     print "Configuring remote source"
-#     remote_machine.configureOFSSource()
-#     remote_machine.makeOFSSource()
-#     remote_machine.installOFSSource()
-#     
-#     #remote_machine1.runSingleCommandAsBatch("sudo rm /tmp/mount/orangefs/touched")
-#     #remote_machine1.copyOFSSource("TAR","http://www.orangefs.org/downloads/LATEST/source/orangefs-2.8.7.tar.gz","/tmp/cloud-user/")
-# 
-# 
-#     print ""
-#     print "-------------------------------------------------------------------------"
-#     print "Configuring remote source without shared libraries on " + remote_machine.hostname
-#     print ""
-#     remote_machine.runSingleCommand("rm -rf /tmp/cloud-user")
-#     remote_machine.runSingleCommand("rm -rf /tmp/orangefs")
-#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/cloud-user/benchmarks")
-#     remote_machine.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/cloud-user/")
-#     remote_machine.configureOFSSource()
-#     remote_machine.makeOFSSource()
-#     remote_machine.installOFSSource()
-# 
-#     remote_machine.configureOFSServer([remote_machine])
-#     remote_machine.stopOFSServer()
-#     remote_machine.startOFSServer()
-#     #remote_machine.stopOFSServer()
-#     print ""
-#     print "Checking to see if pvfs2 server is running..."
-#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs before mount..."
-#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-#     remote_machine.installKernelModule()
-#     remote_machine.startOFSClient()
-#     remote_machine.mountOFSFilesystem()
-#     print ""
-#     print "Checking to see if pvfs2 client is running..."
-#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-#     print "Checking pvfs2 mount..."
-#     remote_machine.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs after mount..."
-#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-#     print ""
-#     print "Checking to see if mounted FS works..."
-#     remote_machine.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs after touch..."
-#     remote_machine.runSingleCommand("ls -l /tmp/mount/orangefs")
-#     print ""
-# 
-#     remote_machine.stopOFSClient()
-#     remote_machine.stopOFSServer()
-#     print "Checking to see if all pvfs2 services have stopped."
-#     remote_machine.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-# 
-#     print ""
-#     print "-------------------------------------------------------------------------"
-#     print "Configuring remote source with shared libraries on " + remote_machine1.hostname
-#     print ""
-#     remote_machine1.runSingleCommand("rm -rf /tmp/orangefs")
-#     remote_machine1.runSingleCommand("rm -rf /tmp/cloud-user")
-#     remote_machine1.installBenchmarks("http://devorange.clemson.edu/pvfs/benchmarks-20121017.tar.gz","/tmp/cloud-user/")
-#     remote_machine1.copyOFSSource("SVN","http://orangefs.org/svn/orangefs/branches/stable","/tmp/cloud-user/")
-# 
-# 
-#     remote_machine1.configureOFSSource("--enable-strict --enable-shared --enable-ucache --disable-karma --with-db=/opt/db4 --prefix=/tmp/orangefs --with-kernel=%s/build" % remote_machine1.getKernelVersion())
-#     #remote_machine1.configureOFSSource()
-#     remote_machine1.makeOFSSource()
-#     remote_machine1.installOFSSource()
-# 
-#     remote_machine1.configureOFSServer([remote_machine1])
-#     remote_machine1.stopOFSServer()
-#     remote_machine1.startOFSServer()
-#     #remote_machine1.stopOFSServer()
-#     print ""
-#     print "Checking to see if pvfs2 server is running..."
-#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs before mount..."
-#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-#     remote_machine1.installKernelModule()
-#     remote_machine1.startOFSClient()
-#     remote_machine1.mountOFSFilesystem()
-#     print ""
-#     print "Checking to see if pvfs2 client is running..."
-#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-#     print "Checking pvfs2 mount..."
-#     remote_machine1.runSingleCommand("mount | (grep pvfs2 || echo \"Not Mounted\")")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs after mount..."
-#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-#     print ""
-#     print "Checking to see if mounted FS works"
-#     remote_machine1.runSingleCommandAsBatch("sudo touch /tmp/mount/orangefs/touched")
-#     print ""
-#     print "Checking to see what is in /tmp/mount/orangefs after touch..."
-#     remote_machine1.runSingleCommand("ls -l /tmp/mount/orangefs")
-# 
-#     remote_machine1.stopOFSClient()
-#     remote_machine1.stopOFSServer()
-#     print "Checking to see if all pvfs2 services have stopped..."
-#     remote_machine1.runSingleCommand("ps aux | grep pvfs2")
-#     print ""
-# 
-# 
-#     #export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:/opt/db4/lib
-#     #export PRELOAD="LD_PRELOAD=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libofs.so:${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/libpvfs2.so
-# 
-#     #local_machine.copyToRemoteNode("/home/jburton/buildbot.pem",remote_machine,"~/buildbot.pem",False)
-#     #remote_machine.copyToRemoteNode("~/buildbot.pem",remote_machine1,"~/buildbot.pem",False)
-# 
-#     
-#     remote_machine.setEnvironmentVariable("FOO","BAR")
-#     remote_machine.runSingleCommand("echo $FOO")
-#     remote_machine.runSingleCommand("hostname -s")
-#     remote_machine.addBatchCommand("echo \"This is a test of the batch command system\"")
-#     remote_machine.addBatchCommand("echo \"Current directory is `pwd`\"")
-#     remote_machine.addBatchCommand("echo \"Variable foo is $FOO\"")
-#     remote_machine.addBatchCommand("touch /tmp/touched")
-#     remote_machine.addBatchCommand("sudo apt-get update && sudo apt-get -y dist-upgrade")
-#     remote_machine.addBatchCommand("sudo yum -y upgrade")
-#     remote_machine.runAllBatchCommands()
-#     
-#    ''' 
-#     
-# #Call script with -t to test
-# #if len(sys.argv) > 1 and sys.argv[1] == "-t":
-# #    test_driver()

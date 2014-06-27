@@ -12,7 +12,8 @@
 # that user. 
 #
 
-from pprint import pprint
+import pprint
+import logging
 
 
 class OFSTestConfig(object):
@@ -195,6 +196,10 @@ class OFSTestConfig(object):
         # Mount the filesystem after setup
         self.mount_OFS_after_setup = True
         
+        ## @var ofs_tcp_port
+        # TCP port on which to run OrangeFS
+        self.ofs_tcp_port = "3396"
+        
         ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
         self.ofs_mount_as_fuse = False
@@ -246,11 +251,11 @@ class OFSTestConfig(object):
         # OrangeFS mount point
         self.ofs_mount_point = None
         
-        ## @var ofs_host_name_override
+        ## @var ofs_hostname_override
         # Override the hostname given by hostname command. Will force the
         # hostname to be the value provided. Needed to workaround
         # a bug on some cloud setups.
-        self.ofs_host_name_override = []
+        self.ofs_hostname_override = []
         
         ## @var start_client_on_all_nodes
         # Start the OrangeFS client on all nodes after installation?
@@ -295,6 +300,12 @@ class OFSTestConfig(object):
         
         self.cloud_type = 'EC2'
         self.nova_password_file=None
+        
+        ## @var instance_suffix
+        #
+        # Suffix to add to instance name.
+        # usually the same as the output directory.
+        self.instance_suffix = ""
         
     
     ##
@@ -366,7 +377,7 @@ class OFSTestConfig(object):
 
     
     def printDict(self):
-        pprint(self.__dict__)
+        logging.debug(pprint.pformat(self.__dict__))
 
 
     ##
@@ -447,13 +458,15 @@ class OFSTestConfig(object):
             for user in userlist:
                 self.node_usernames.append(user)
         
-        temp = d.get('ofs_host_name_override')
+        temp = d.get('ofs_hostname_override')
+        if temp == None:
+            temp = d.get('ofs_host_name_override')
+        
         if temp != None:
-            
             userlist = temp.split(" ")
             #print userlist
             for user in userlist:
-                self.ofs_host_name_override.append(user)
+                self.ofs_hostname_override.append(user)
         
         # one username for all nodes
         temp = d.get('node_username')
@@ -652,4 +665,23 @@ class OFSTestConfig(object):
         if temp != None:
             self.nova_password_file = temp
         
+        temp = d.get('ldap_server_uri')
+        if temp != None:
+            self.ldap_server_uri = temp
         
+        temp = d.get('ldap_admin')
+        if temp != None:
+            self.ldap_admin = temp
+        
+        temp = d.get('ldap_admin_password')
+        if temp != None:
+            self.ldap_admin_password = temp
+
+        temp = d.get('ldap_container')
+        if temp != None:
+            self.ldap_container = temp
+            
+        temp = d.get('ofs_tcp_port')
+        if temp != None:
+            self.ofs_tcp_port = temp
+                

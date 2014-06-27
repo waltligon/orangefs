@@ -24,6 +24,7 @@ prefix = "sysint"
 mount_fs =  False
 run_client = True
 mount_as_fuse = False
+debug = True
 
 ##
 #

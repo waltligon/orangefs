@@ -23,14 +23,16 @@ import shlex
 import cmd
 import time
 import sys
-import xml.etree.ElementTree as ET
+import logging
 
 class OFSTestLocalNode(OFSTestNode.OFSTestNode):
 
     
 
     def __init__(self):
-        print "-----------------------------------------------------------"    
+
+        print "-----------------------------------------------------------"
+            
         super(OFSTestLocalNode,self).__init__()
         
         ## @var is_remote
@@ -84,7 +86,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
     # @param self The object pointer
     # @param output Output of command
      
-    def runAllBatchCommands(self,output=[]):
+    def runAllBatchCommands(self,output=[],debug=False):
      
         
         # Open file with mode 700
@@ -117,10 +119,16 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         script_file.close()
         
         os.chmod(batchfile,0755)
-        
+
+        logging.debug("----- Start generated batchfile: %s -----------------------" % batchfile)
+        script_file = open(batchfile,'r')
+        for line in script_file:
+            logging.debug(line)
+        script_file.close()
+        logging.debug("---- End generated batchfile: %s -------------------------" % batchfile)           
+        logging.debug("Command: "+batchfile)    
+                    
         # run the command and capture stdout and stderr
-        
-        
         p = subprocess.Popen(batchfile,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
         
         # clear the output list, then append stdout,stderr to list to get pass-by-reference to work
@@ -128,6 +136,10 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         output.append(command)
         for i in p.communicate():
             output.append(i)
+        
+        logging.debug("RC: %r" % p.returncode)
+        logging.debug("STDOUT: %s" % output[1] )
+        logging.debug("STDERR: %s" % output[2] )
         
         # now clear out the batch commands list
         self.batch_commands = []    
@@ -174,8 +186,8 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         if remote_user == None:
             remote_user = self.current_user
         elif remote_user == "root":
-            # Really dumb idea to run commands as root on localhost. Easy way to mess up machine. 
-            print "You want to run this as root on localhost? I'm sorry, Dave, I'm afraid I can't do that."
+            logging.warn("I'm sorry, Dave, I'm afraid I can't do that.")
+            logging.warn("Really dumb idea to run commands as root with passwordless access on localhost. Easy way to mess up machine.") 
             remote_user = self.current_user
         
         #start with the ssh command and open quote
@@ -226,8 +238,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         output = []
         rc = self.runSingleCommand(rsync_command,output)
         if rc != 0:
-            print "Could not copy to remote node"
-            print output
+            logging.exception("Could not copy to remote node")
         return rc
     
     ##
@@ -259,8 +270,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         output = []
         rc = self.runSingleCommand(rsync_command,output)
         if rc != 0:
-            print "Could not copy to remote node"
-            print output
+            logging.exception( "Could not copy to remote node")
         return rc
     
     ##
@@ -274,13 +284,9 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
     # @return list of alias names
     def getAliasesFromConfigFile(self,config_file_name):
         
-        #print "Examining "+config_file_name
-        #alias = self.runSingleCommandBacktick("ls -l "+config_file_name)
-#        print alias
-        #alias = self.runSingleCommandBacktick('cat '+config_file_name)
-#        print alias
+
         alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        #print "Alias is "+ alias
+        logging.debug("Alias is "+ alias)
         
         config_file = open(config_file_name,'r')
         
