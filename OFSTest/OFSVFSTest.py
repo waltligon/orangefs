@@ -465,7 +465,7 @@ def ltp(testing_node,output=[]):
     
     if testing_node.runSingleCommand("[ -f %s/runltp ]" % LTP_PREFIX):
         testing_node.runSingleCommand("rm -rf ltp-" + LTP_ARCHIVE_VERSION + "*",output)
-        rc = testing_node.runSingleCommand("wget --output-document=%s %s/%s" % (LTP_ARCHIVE,LTP_URL,LTP_ARCHIVE),output)
+        rc = testing_node.runSingleCommand("wget --no-check-certificate --output-document=%s %s/%s" % (LTP_ARCHIVE,LTP_URL,LTP_ARCHIVE),output)
         if rc != 0:
             
             return rc
