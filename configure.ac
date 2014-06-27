@@ -1210,6 +1210,23 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
     LIBS="$LIBS -ldl"
 ])
 
+dnl Method to enable user environment variable support
+BUILD_USER_ENV_VARS=
+AC_ARG_ENABLE(user-env-vars,
+[  --enable-user-env-vars         Enables usrint environment variable support.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 1,
+      [Should we enable user environment variables.])
+   BUILD_USER_ENV_VARS=1
+else
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+      [Should we enable user environment variables.])
+fi
+AC_SUBST(BUILD_USER_ENV_VARS)],
+[AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+    [Should we enable user environment variables.])
+AC_SUBST(BUILD_USER_ENV_VARS)])
+
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
@@ -2017,6 +2034,12 @@ if test "x$BUILD_SYMBOLIC" = "x1" ; then
    AC_MSG_RESULT([PVFS2 symbolic libraries will be built            : yes])
 else
    AC_MSG_RESULT([PVFS2 symbolic libraries will be built            :  no])
+fi
+
+if test "x$BUILD_USER_ENV_VARS" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          : yes])
+else
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          :  no])
 fi
 
 if test "x$BUILD_UCACHE" = "x1" ; then

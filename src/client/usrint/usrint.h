@@ -288,6 +288,7 @@ extern int fremovexattr(int fd, const char *name);
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
 #include "gen-locks.h"
+#include "env-vars.h"
 
 /* Just in case this is not defined - sizeof blocks reported in stat */
 #ifndef S_BLKSIZE

@@ -10,13 +10,6 @@
  *  PVFS2 user interface routines - low level calls to system interface
  */
 
-/**/
-#define USER_ENVIRONMENT_VARIABLES 1
-#ifdef USER_ENVIRONMENT_VARIABLES
-#include "envvar_hint.h"
-#endif
-/**/
-
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -471,18 +464,9 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
-#ifdef USER_ENVIRONMENT_VARIABLES
+#ifdef PVFS_USER_ENV_VARS_ENABLED
     PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
-    struct orangefs_user_envvars_s envvars;
-    envvar_struct_initialize(&envvars);
-    int index = 0;
-    for(; index < ENVVAR_ENUM_COUNT; index++)
-    {
-        printf("%s=%s\n",
-               envvars.envvar_array[index].envvar_name,
-               envvars.envvar_array[index].envvar_value);
-    }
-#endif /* USER_ENVIRONMENT_VARIABLES */
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
 
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "iocommon_create_file: called with %s\n", filename);
@@ -499,16 +483,14 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#ifdef USER_ENVIRONMENT_VARIABLES
-    if(envvars.envvar_present && !file_creation_param)
+#ifdef PVFS_USER_ENV_VARS_ENABLED
+    env_vars_struct_dump(&env_vars);
+    if(env_vars.env_var_present && !file_creation_param)
     {
-        printf("envvar_present && no hint detected!\n");
-        //file_creation_param = &no_hint_hint;
-
-        /* TODO: Load envvar hints into PVFS_HINT struct */
-
+        printf("env_var_present && no hint detected!\n");
+        /* TODO */
     }
-#endif /* USER_ENVIRONMENT_VARIABLES */
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
     /* ====================================================================== */
 
     if (file_creation_param) /* these are hints */
