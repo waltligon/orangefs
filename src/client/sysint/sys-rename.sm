@@ -957,7 +957,6 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
         msg_p->req,
         sm_p->u.rename.caps[sm_p->u.rename.rmdirent_index],
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
-        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
         sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index],
         sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
         sm_p->hints);
@@ -1091,7 +1090,6 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         msg_p->req,
         sm_p->u.rename.caps[1],
         sm_p->u.rename.parent_refns[1].fs_id,
-        sm_p->u.rename.parent_refns[1].handle,
         sm_p->u.rename.dirent_handle[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.entries[1],

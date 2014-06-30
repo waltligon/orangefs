@@ -66,11 +66,11 @@ static int dbpf_bstream_get_extents(
     dbpf_stream_extents_t *extents);
 
 static int hash_handle_compare(
-    void *key,
+    const void *key,
     struct qlist_head *link);
 
 static int hash_handle(
-    void *handle,
+    const void *handle,
     int table_size);
 
 static int grow_bstream_handle_table_init( int size );
@@ -1644,7 +1644,7 @@ static int grow_bstream_handle_release_lock( TROVE_object_ref ref )
  * returns integer offset into table
  */
 static int hash_handle(
-    void *handle,
+    const void *handle,
     int table_size)
 {
     /* TODO: update this later with a better hash function,
@@ -1652,7 +1652,7 @@ static int hash_handle(
      *
      */
     unsigned long tmp = 0;
-    PVFS_handle *real_handle = handle;
+    const PVFS_handle *real_handle = (const PVFS_handle *)handle;
 
     tmp += (*(real_handle));
     tmp = tmp % table_size;
@@ -1669,11 +1669,11 @@ static int hash_handle(
  * returns 1 if match found, 0 otherwise
  */
 static int hash_handle_compare(
-    void *key,
+    const void *key,
     struct qlist_head *link)
 {
     struct grow_bstream_handle *my_handle;
-    PVFS_handle *real_handle = key;
+    const PVFS_handle *real_handle = (const PVFS_handle *)key;
 
     my_handle = qlist_entry(link, struct grow_bstream_handle, hash_link);
     if (my_handle->handle == *real_handle)

@@ -1053,7 +1053,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): %: %.o $(LIBRARIES)
+$(DEVELTOOLS): %: %.o
 	$(Q) "  LD 		$@"
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 

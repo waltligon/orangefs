@@ -332,6 +332,9 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
             !s_op->u.mkdir.handle_array_local ||
             !s_op->u.mkdir.handle_array_remote )
     {
+        free(attr->dirdata_handles);
+        free(s_op->u.mkdir.handle_array_local);
+        free(s_op->u.mkdir.handle_array_remote);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -394,6 +397,8 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(
         &tmp_id,
         server_job_context, 
         s_op->req->hints);
+
+    free(extent_array.extent_array);
 
     return(ret);
 }
@@ -628,6 +633,18 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    free(s_op->attr.dirdata_handles);
+    free(s_op->attr.dist_dir_bitmap);
+    free(s_op->u.mkdir.handle_array_local);
+    free(s_op->u.mkdir.handle_array_remote);
+    free(s_op->key_a);
+    free(s_op->val_a);
+    free(s_op->error_a);
+    if (s_op->msgarray_op.count > 0)
+    {
+        PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);
+    }
     return(server_state_machine_complete(smcb));
 }
 
@@ -640,6 +657,14 @@ static PINT_sm_action mkdir_prep_sm(
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+
+    s_op->attr.dirdata_handles = NULL;
+    s_op->attr.dist_dir_bitmap = NULL;
+    s_op->u.mkdir.handle_array_local = NULL;
+    s_op->u.mkdir.handle_array_remote = NULL;
+    s_op->key_a = NULL;
+    s_op->val_a = NULL;
+    s_op->error_a = NULL;
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle_extent_array =

@@ -144,6 +144,10 @@ int create_directory(const char * directory,
                      const int    mode,
                      const int    use_pvfs2_lib,
                      const int    verbose);
+int create_path(const char * fullPath,
+                     const int    mode,
+                     const int    use_pvfs2_lib,
+                     const int    verbose);
 
 int remove_directory(const char * directory, 
                      const int    use_pvfs2_lib,
@@ -203,6 +207,10 @@ int create_symlink(const char * linkName,
                    const int    verbose);
 
 int parse_common_args(int argc, char** argv, struct common_options* opts);
+
+int run_external_command(const char * cmd, char * const args[]);
+
+int pvfs2_remove(const char * fileName, const int verbose);
 
 #endif /* __TEST_COMMON_H */
 

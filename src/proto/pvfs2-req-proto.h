@@ -430,15 +430,13 @@ do {                                                  \
 
 struct PVFS_servreq_mgmt_remove_dirent
 {
-    PVFS_handle handle;
-    PVFS_handle dirent_handle; /* Handle of directory entries */
+    PVFS_handle handle;        /* Handle of directory entries */
     PVFS_fs_id fs_id;
     char *entry;
 };
-endecode_fields_5_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_remove_dirent,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     skip4,,
     string, entry);
@@ -449,7 +447,6 @@ endecode_fields_5_struct(
                                              __cap,   \
                                              __fsid,  \
                                              __handle,\
-                                             __dirent_handle,\
                                              __entry, \
                                              __hints) \
 do {                                                  \
@@ -459,7 +456,6 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.mgmt_remove_dirent.fs_id = (__fsid);    \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
-    (__req).u.mgmt_remove_dirent.dirent_handle = (__dirent_handle); \
     (__req).u.mgmt_remove_dirent.entry = (__entry);   \
 } while (0)
 
@@ -1169,15 +1165,13 @@ do {                                                \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle handle; /* handle of directory */
-    PVFS_handle dirent_handle; /* handle of directory entries */
+    PVFS_handle handle;        /* handle of directory entries */
     PVFS_fs_id fs_id;          /* file system */
 };
-endecode_fields_4_struct(
+endecode_fields_3_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id);
 #define extra_size_PVFS_servreq_rmdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -1186,7 +1180,6 @@ endecode_fields_4_struct(
                                    __cap,         \
                                    __fsid,        \
                                    __handle,      \
-                                   __dirent_handle,\
                                    __entry,       \
                                    __hints)       \
 do {                                              \
@@ -1196,7 +1189,6 @@ do {                                              \
     (__req).hints = (__hints);                    \
     (__req).u.rmdirent.fs_id = (__fsid);          \
     (__req).u.rmdirent.handle = (__handle);       \
-    (__req).u.rmdirent.dirent_handle = (__dirent_handle);\
     (__req).u.rmdirent.entry = (__entry);         \
 } while (0);
 
@@ -1210,21 +1202,22 @@ endecode_fields_1_struct(
 
 /* chdirent ****************************************************/
 /* - modifies an existing directory entry on a particular file system */
+/* This is only used when sys-rename.sm notices that the destination
+   already exists and the directory entry should be updated in place
+   rather than a new one created. */
 
 struct PVFS_servreq_chdirent
 {
-    char *entry;                   /* name of entry to remove */
-    PVFS_handle new_dirent_handle; /* handle of directory */
-    PVFS_handle handle;     /* handle of directory */
-    PVFS_handle dirent_handle; /* handle of directory entries */
+    char *entry;                   /* name of entry to change */
+    PVFS_handle new_dirent_handle; /* handle to be newly-associated with entry */
+    PVFS_handle handle;            /* handle of bucket */
     PVFS_fs_id fs_id;              /* file system */
 };
-endecode_fields_5_struct(
+endecode_fields_4_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id);
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -1233,7 +1226,6 @@ endecode_fields_5_struct(
                                    __cap,          \
                                    __fsid,         \
                                    __handle,       \
-                                   __dirent_handle,\
                                    __new_dirent,   \
                                    __entry,        \
                                    __hints)        \
@@ -1245,8 +1237,6 @@ do {                                               \
     (__req).u.chdirent.fs_id = (__fsid);           \
     (__req).u.chdirent.handle =                    \
         (__handle);                                \
-    (__req).u.chdirent.dirent_handle =             \
-        (__dirent_handle);                         \
     (__req).u.chdirent.new_dirent_handle =         \
         (__new_dirent);                            \
     (__req).u.chdirent.entry = (__entry);          \
@@ -1265,8 +1255,7 @@ endecode_fields_1_struct(
 
 struct PVFS_servreq_readdir
 {
-    PVFS_handle handle;     /* handle of dir object */
-    PVFS_handle dirent_handle;     /* handle of directory entries */
+    PVFS_handle handle;     /* handle of directory entries */
     PVFS_fs_id fs_id;       /* file system */
     PVFS_ds_position token; /* dir offset */
     uint32_t dirent_count;  /* desired # of entries */
@@ -1274,16 +1263,15 @@ struct PVFS_servreq_readdir
 endecode_fields_5_struct(
     PVFS_servreq_readdir,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     uint32_t, dirent_count,
+    skip4,,
     PVFS_ds_position, token);
 
 #define PINT_SERVREQ_READDIR_FILL(__req,              \
                                   __cap,              \
                                   __fsid,             \
                                   __handle,           \
-                                  __dirent_handle,    \
                                   __token,            \
                                   __dirent_count,     \
                                   __hints)            \
@@ -1294,7 +1282,6 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.readdir.fs_id = (__fsid);               \
     (__req).u.readdir.handle = (__handle);            \
-    (__req).u.readdir.dirent_handle = (__dirent_handle);\
     (__req).u.readdir.token = (__token);              \
     (__req).u.readdir.dirent_count = (__dirent_count);\
 } while (0);

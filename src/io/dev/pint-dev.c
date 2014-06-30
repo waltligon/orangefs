@@ -219,11 +219,6 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
     for (i = 0; i < ndesc; i++)
     {
         total_size = params[i].dev_buffer_size * params[i].dev_buffer_count;
-        if (total_size < 0) 
-        {
-            gossip_err("Error:please provide sane values for device parameters.\n");
-            break;
-        }
         if (total_size % page_size != 0) 
         {
             gossip_err("Error: total device buffer size must be a multiple of system page size.\n");

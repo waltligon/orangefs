@@ -210,10 +210,11 @@ typedef struct pvfs_descriptor_status_s
     int flags;                /**< the open flags used for this file */
     int clrflags;             /**< modes that must be cleared on close */
     int mode;                 /**< stat mode of the file - may be volatile */
+    int mode_deferred;        /**< mode bits requested but not set yet */
     off64_t file_pointer;     /**< offset from the beginning of the file */
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
     char *dpath;              /**< path of an open directory for fchdir */
-    struct file_ent_s *fent; /**< reference to cached objects */            
+    struct file_ent_s *fent;  /**< reference to cached objects */            
                               /**< set to NULL if not caching this file */
 } pvfs_descriptor_status;
 

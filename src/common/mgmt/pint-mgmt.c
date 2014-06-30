@@ -102,10 +102,11 @@ static int PINT_manager_find_worker(PINT_manager_t manager,
                                     struct PINT_worker_s **result_worker,
                                     PINT_queue_id *queue_id);
 
-static int PINT_queue_to_worker_compare(void *key, struct qhash_head *link);
-static int PINT_queue_to_worker_hash(void *key, int tablesize);
-static int PINT_op_entry_compare(void *key, struct qhash_head *link);
-static int PINT_op_entry_hash(void *key, int tablesize);
+static int PINT_queue_to_worker_compare(const void *key,
+        struct qhash_head *link);
+static int PINT_queue_to_worker_hash(const void *key, int tablesize);
+static int PINT_op_entry_compare(const void *key, struct qhash_head *link);
+static int PINT_op_entry_hash(const void *key, int tablesize);
 
 struct PINT_manager_event_handler_entry_s
 {
@@ -1255,12 +1256,13 @@ int PINT_manager_wait_op(PINT_manager_t manager,
     return ret;
 }
 
-static int PINT_queue_to_worker_compare(void *key, struct qhash_head *link)
+static int PINT_queue_to_worker_compare(const void *key,
+        struct qhash_head *link)
 {
-    PINT_queue_id *queue_id;
+    const PINT_queue_id *queue_id;
     struct PINT_worker_map_entry_s *entry;
 
-    queue_id = (PINT_queue_id *) key;
+    queue_id = (const PINT_queue_id *)key;
     entry = qhash_entry(link, struct PINT_worker_map_entry_s, link);
 
     if(*queue_id == entry->queue_id)
@@ -1270,12 +1272,12 @@ static int PINT_queue_to_worker_compare(void *key, struct qhash_head *link)
     return 0;
 }
 
-static int PINT_queue_to_worker_hash(void *key, int tablesize)
+static int PINT_queue_to_worker_hash(const void *key, int tablesize)
 {
     unsigned long ret = 0;
-    PINT_queue_id *queue_id;
+    const PINT_queue_id *queue_id;
 
-    queue_id = (PINT_queue_id *)key;
+    queue_id = (const PINT_queue_id *)key;
 
     ret += *queue_id;
     ret = ret & (tablesize - 1);
@@ -1283,12 +1285,12 @@ static int PINT_queue_to_worker_hash(void *key, int tablesize)
     return (int) ret;
 }
 
-static int PINT_op_entry_compare(void *key, struct qhash_head *link)
+static int PINT_op_entry_compare(const void *key, struct qhash_head *link)
 {
-    PINT_op_id *id;
+    const PINT_op_id *id;
     struct PINT_op_entry *entry;
 
-    id = (PINT_op_id *)key;
+    id = (const PINT_op_id *)key;
     entry = qhash_entry(link, struct PINT_op_entry, link);
 
     if(entry->op.id == *id)
@@ -1298,10 +1300,10 @@ static int PINT_op_entry_compare(void *key, struct qhash_head *link)
     return 0;
 }
 
-static int PINT_op_entry_hash(void *key, int tablesize)
+static int PINT_op_entry_hash(const void *key, int tablesize)
 {
     unsigned long ret = 0;
-    PINT_op_id * id = (PINT_op_id *)key;
+    const PINT_op_id * id = (const PINT_op_id *)key;
 
     ret += *id;
     ret = ret & (tablesize - 1);

@@ -3,7 +3,7 @@
  *
  * Changes by Acxiom Corporation to add relative path support to
  * PVFS_util_resolve(),
- * Copyright © Acxiom Corporation, 2005
+ * Copyright ï¿½ Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */
@@ -241,7 +241,6 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char *args[7];
         char **ptr = args;
         char timearg[16];
-        char *envp[] = { NULL };
 
         close(STDERR_FILENO);
         dup(errordes[1]);
@@ -281,7 +280,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         }
 #endif
         *ptr++ = NULL;
-        execve(BINDIR"/pvfs2-gencred", args, envp);
+        execv(BINDIR"/pvfs2-gencred", args);
 
         _exit(100);
     }
