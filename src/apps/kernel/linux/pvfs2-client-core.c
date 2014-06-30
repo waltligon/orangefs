@@ -2421,8 +2421,9 @@ PVFS_error write_device_response(
     int outcount = 0;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
-                 "%s: writing device response.  tag: %llu\n",
-                 __func__, llu(tag));
+                 "%s: writing device response. tag: %llu, "
+                 "error code: %d\n",
+                 __func__, llu(tag), jstat->error_code);
 
     if (buffer_list && size_list && list_size &&
         total_size && (list_size < MAX_LIST_SIZE))
@@ -2604,6 +2605,10 @@ static inline void package_downcall_members(
     int ret = -PVFS_EINVAL;
     assert(vfs_request);
     assert(error_code);
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s enter: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->in_upcall.type),
+                 *error_code);
 
     switch(vfs_request->in_upcall.type)
     {
@@ -3113,6 +3118,10 @@ static inline void package_downcall_members(
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s exit: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->out_downcall.type),
+                 vfs_request->out_downcall.status);
+
 }
 
 static inline PVFS_error repost_unexp_vfs_request(
@@ -3148,7 +3157,6 @@ static inline PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-    uint32_t retries = 0;
 
     assert(vfs_request);
 
@@ -3380,16 +3388,6 @@ static inline PVFS_error handle_unexp_vfs_request(
             }
         }
         break;
-        case -PVFS_EAGAIN:
-            /* retry once up to the retry limit (default 1);
-               this may mean permission has been revoked and a 
-               new cap is needed */
-            if (retries++ < PVFS2_CLIENT_CORE_RETRIES)
-            {
-                ret = repost_unexp_vfs_request(
-                    vfs_request, "client retry");
-            }
-            break;
         case REMOUNT_PENDING:
             ret = repost_unexp_vfs_request(
                 vfs_request, "mount pending");

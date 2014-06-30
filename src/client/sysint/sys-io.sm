@@ -783,6 +783,9 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         PINT_sm_msgpair_state *msg = &cur_ctx->msg;
 
+        /* reset op_status */
+        msg->op_status = 0;
+
         /* do not do this one again in retry case */
         if (cur_ctx->msg_recv_has_been_posted &&
             cur_ctx->msg_recv_in_progress)
@@ -1649,7 +1652,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                     else
                     {
                         gossip_debug(GOSSIP_IO_DEBUG, 
-                            "io_check_context_status found error: %d", ret);
+                            "io_check_context_status found error: %d\n", ret);
                     }
                     break;
                 }
@@ -2053,7 +2056,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_process_context_recv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "%s called\n", __func__);
 
     assert(cur_ctx && decoded_resp && resp);
 
@@ -2083,13 +2086,13 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
         if (cur_ctx->msg.recv_status.error_code)
         {
             PVFS_perror_gossip(
-                    "io_process_context_recv (recv_status.error_code)",
+                    "io_decode_ack_response (recv_status.error_code)",
                     cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
         {
-            PVFS_perror_gossip("io_process_context_recv (op_status)",
+            PVFS_perror_gossip("io_decode_ack_response (op_status)",
                                cur_ctx->msg.op_status);
             gossip_err("server: %s\n"
                       , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
@@ -2101,7 +2104,6 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          decoded_resp,
                                          &cur_ctx->msg.svr_addr,
                                          cur_ctx->msg.max_resp_sz);
-        memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
         cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
@@ -2456,7 +2458,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     {
         {
             char buf[1024];
-            PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+            PVFS_strerror_r(ret, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
@@ -2510,6 +2512,14 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                      cur_ctx->msg.recv_status.error_code,
                      cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
+    }
+    else if (cur_ctx->msg.op_status)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in op_status for context %p\n",
+                     cur_ctx->msg.op_status,
+                     cur_ctx);
+        ret = cur_ctx->msg.op_status;
     }
     else if (io_type == PVFS_IO_WRITE)
     {
