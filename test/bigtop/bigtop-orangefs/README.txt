@@ -42,7 +42,7 @@ http://www.orangefs.org/svn/orangefs/branches/denton.hadoop2.trunk/src/client/jn
 http://www.orangefs.org/svn/orangefs/branches/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/
 
 6. Setup Hadoop configuration files: 
-http://www.orangefs.org/svn/orangefs/branches/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/ 
+http://www.orangefs.org/svn/orangefs/branches/orangefs.bigtop.trunk/test/bigtop/bigtop-orangefs/conf/
 
 7. Start OrangeFS server:
 http://www.orangefs.org/svn/orangefs/branches/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/scripts/examples/orangefs/ 
