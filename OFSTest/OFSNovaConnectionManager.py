@@ -450,8 +450,8 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
                 print "Instance %s has status %s" % (instance.id,instance.status)
             
         
-        print "Waiting 120 seconds for networking"            
-        time.sleep(120)
+        print "Waiting 180 seconds for networking"            
+        time.sleep(180)
         # refresh all the instances in the list.
         new_instances = self.refreshCloudInstanceList(new_instances)
 

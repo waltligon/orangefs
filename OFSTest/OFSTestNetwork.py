@@ -389,8 +389,8 @@ class OFSTestNetwork(object):
         # Run updateNode on the nodes simultaneously. 
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.updateNode)
         # Wait for reboot
-        print "Waiting 90 seconds for nodes to reboot"
-        time.sleep(90)
+        print "Waiting 180 seconds for nodes to reboot"
+        time.sleep(180)
         # workaround for strange cuer1 issue where hostname changes on reboot.
         for node in node_list:
             tmp_hostname = node.runSingleCommandBacktick("hostname")
