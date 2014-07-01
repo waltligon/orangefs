@@ -49,7 +49,7 @@ Response Format
 #include <unistd.h>
 
 /*
- * Process List 
+ * Process List
  */
 
 struct proclist
@@ -81,7 +81,7 @@ static int proclist_add(const char *const cmdline, const pid_t pid)
     }
     strncpy(new->cmdline, cmdline, len);
     new->pid = pid;
-    new->handle = prochandle++; 
+    new->handle = prochandle++;
     /* Do not allow prochandle to become negative. */
     if (prochandle < 0)
         prochandle = 0;

@@ -3234,11 +3234,6 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
 
-    /* we don't support mmap writes, or SHARED mmaps at all */
-    if ((vma->vm_flags & VM_SHARED) || (vma->vm_flags & VM_MAYSHARE))
-    {
-        return -EINVAL;
-    }
 
     /*
       for mmap on pvfs2, make sure we use pvfs2 specific address
@@ -3251,14 +3246,13 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     vma->vm_flags |= VM_SEQ_READ;
     vma->vm_flags &= ~VM_RAND_READ;
 
-    /* have the kernel enforce readonly mmap support for us */
 #ifdef PVFS2_LINUX_KERNEL_2_4
     vma->vm_flags &= ~VM_MAYWRITE;
     return generic_file_mmap(file, vma);
 #else
     /* backing_dev_info isn't present on 2.4.x */
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-    return generic_file_readonly_mmap(file, vma);
+    return generic_file_mmap(file, vma);
 #endif
 }
 

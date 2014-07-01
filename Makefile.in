@@ -881,7 +881,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools bgprocbins $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools bgprocbins $(VISS) $(KARMA) $(FUSE)
 endif
 
 # target for building admin tools
@@ -1066,16 +1066,16 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building background process objects
 lib/libbgproc.a: $(LIBBGPROCOBJS)
-	$(Q) "  RANLIB	$@"
+	$(Q) "  RANLIB  $@"
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(LIBBGPROCOBJS)
 
 lib/libbgproc.so: $(LIBBGPROCOBJS)
-	$(Q) "  LD		$@"
+	$(Q) "  LD              $@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBBGPROCOBJS) $(LIBS) $(call modldflags,$<)
 
 $(BGPROCOBJS): %.o: %.c
-	$(Q) "  CC		$@"
+	$(Q) "  CC              $@"
 	$(E) $(CC) $(CFLAGS) -Isrc/client/bgproc $(call modcflags,$<) $< -c -o $@
 
 # rule for building development tools and its objects. don't know why db isn't
