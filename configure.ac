@@ -1865,6 +1865,7 @@ src/common/events/module.mk
 src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
+src/common/token-utils/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk

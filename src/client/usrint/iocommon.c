@@ -441,7 +441,6 @@ static int iocommon_parse_serverlist(char *serverlist,
     return 0;
 }
 
-
 /**
  * Create a file via the PVFS system interface
  * parent_ref is a PVFS object so we should be all
@@ -484,11 +483,13 @@ int iocommon_create_file(const char *filename,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
 #ifdef PVFS_USER_ENV_VARS_ENABLED
-    env_vars_struct_dump(&env_vars);
+
+    /* env_vars_struct_dump(&env_vars); */
+
     if(env_vars.env_var_present && !file_creation_param)
     {
-        printf("env_var_present && no hint detected!\n");
         /* TODO */
+        printf("env_var_present && no hint detected!\n");
     }
 #endif /* PVFS_USER_ENV_VARS_ENABLED */
     /* ====================================================================== */
@@ -503,16 +504,27 @@ int iocommon_create_file(const char *filename,
                                             &length);
         if (value)
         {
+#if 0
+            printf("HINT DETECTED:\n"
+                   "\tPINT_HINT_DISTRIBUTION -> value = %s\n", (char *) value);
+#endif
             dist = PVFS_sys_dist_lookup((char *)value);
             if (dist)
             {
-                /* TODO add distribution parameters */
-#if 0
                 value = PINT_hint_get_value_by_type(file_creation_param,
                                                     PINT_HINT_DISTRIBUTION_PV,
                                                     &length);
-                printf("value = %s\n", value);
+                /* This should come in as a string here and get tokenized into 
+                 * potentially multiple param:value pairs delimited by a '+'.*/
+                if(value)
+                {
+#if 0
+                    printf("\tPINT_HINT_DISTRIBUTION_PV -> value = %s\n",
+                           (char *) value);
 #endif
+                    /* Uses inplace iterator */
+                    PVFS_dist_pv_pairs_extract_and_add(value, (void *) dist);
+                }
             }
             else /* distribution not found */
             {
