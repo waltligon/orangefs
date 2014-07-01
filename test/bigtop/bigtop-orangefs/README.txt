@@ -51,7 +51,7 @@ http://www.orangefs.org/svn/orangefs/branches/denton.hadoop2.trunk/src/client/ha
 https://cwiki.apache.org/confluence/display/BIGTOP/How+to+install+Hadoop+distribution+from+Bigtop#HowtoinstallHadoopdistributionfromBigtop-RunningHadoop
 
 9. Deploy OrangeFS-Bigtop trunk:
-svn co http://www.orangefs.org/svn/orangefs/branches/orangefs.bigtop.trunk
+svn co http://www.orangefs.org/svn/orangefs/branches/orangefs.bigtop.trunk/test/bigtop/ 
 
 10. Build tests:
 mvn clean install -DskipTests -DskipITs -DperformRelease -f ./bigtop-test-framework/pom.xml
