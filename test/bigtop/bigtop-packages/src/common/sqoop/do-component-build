@@ -1,0 +1,33 @@
+#!/bin/bash
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -ex
+
+. `dirname ${0}`/bigtop.bom
+
+export MAVEN_OPTS='-Xmx512m -XX:MaxPermSize=512m'
+mvn -DskipTests=true -Dhadoop.profile=200 -Dhadoop.2.version=$HADOOP_VERSION install package -P=binary $@
+
+cd dist/target
+for file in `find ./ -name 'sqoop-*-bin-hadoop*' -type d`; do
+    mv $file sqoop-$SQOOP_VERSION
+done
+tar czf sqoop-$SQOOP_VERSION.tar.gz sqoop-$SQOOP_VERSION
+cd ../..
+
+mkdir build
+mv dist/target/sqoop-$SQOOP_VERSION.tar.gz build/
+

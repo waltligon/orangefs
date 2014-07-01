@@ -1,0 +1,13 @@
+build
+dl
+dist
+output
+target
+*~
+*.project
+*.settings
+*.classpath
+*.iml
+.idea
+.gradle
+gradle*

@@ -1,0 +1,46 @@
+#!/bin/bash
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -ex
+
+. `dirname ${0}`/bigtop.bom
+
+bom2props() {
+cat <<__EOT__ 
+hbase.version=$HBASE_VERSION
+zookeeper.version=$ZOOKEEPER_VERSION
+hadoop.version=$HADOOP_VERSION
+hadoop.security.version=$HADOOP_VERSION
+hadoop-0.23.version=$HADOOP_VERSION
+__EOT__
+}
+
+HIVE_MAVEN_OPTS=" -Dhbase.version=$HBASE_VERSION \
+-Dzookeeper.version=$ZOOKEEPER_VERSION \
+-Dhadoop.mr.rev=23 \
+-Dhadoop.security.version=$HADOOP_VERSION \
+-Dhadoop-23.version=$HADOOP_VERSION \
+-Dhbase.hadoop2.version=$HBASE_VERSION \
+-Dmvn.hadoop.profile=hadoop23 \
+-Dmaven.test.skip=true \
+-Dhbase.version.with.hadoop.version=$HBASE_VERSION \
+"
+
+export MAVEN_OPTS="-Xmx1500m -Xms1500m -XX:MaxPermSize=256m"
+mvn ${HIVE_MAVEN_OPTS} clean install -Phadoop-2,dist "$@"
+
+mkdir -p build/dist
+tar -C build/dist --strip-components=1 -xzf packaging/target/apache-hive-${HIVE_VERSION}-bin.tar.gz
