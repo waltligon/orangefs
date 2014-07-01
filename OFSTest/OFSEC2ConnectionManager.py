@@ -4,10 +4,11 @@
 #import os
 from boto import ec2
 from datetime import datetime, timedelta
+import logging
+import os
 from pprint import pprint
 import re
 import time
-import logging
 
 import OFSCloudConnectionManager
 import OFSTestRemoteNode
@@ -109,7 +110,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     def readCloudConfigFile(self,filename):
         
         #open ec2 file
-        ec2conf_rc = open(filename,'r')
+        ec2conf_rc = open(os.path.expandvars(filename),'r')
         
         for line in ec2conf_rc:
             if "export EC2_ACCESS_KEY" in line:

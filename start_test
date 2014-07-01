@@ -23,7 +23,7 @@ def mkdir_p(path):
 config_file = None
 output_dir = "."
 #print sys.argv
-optlist, args = getopt.getopt(sys.argv[1:], 'hf:d:c:')
+optlist, args = getopt.getopt(sys.argv[1:], 'htf:d:c:')
 #print optlist
 #print args
 
@@ -36,6 +36,8 @@ for o, a  in optlist:
     if o == "-h":
         print "start_test -f <path to config file> -d <output directory> config1=value1 config2=value2...configN=valueN"
         exit()
+    if o == "-t":
+        terminate_servers = True
 
 # Convert arguments to a dictionary
 #argd = dict([my_arg.split('=') for my_arg in args])
@@ -90,4 +92,9 @@ if rc != 0:
     
 # Ok, now we have a good OrangeFS installation. Let's test it!    
 if rc == 0:
-    test_driver.runTest()
+    rc = test_driver.runTest()
+
+
+test_driver.doPostTest(rc)
+
+exit(rc)

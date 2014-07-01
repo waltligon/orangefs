@@ -407,42 +407,59 @@ def iozone(testing_node,output=[]):
 def ltp(testing_node,output=[]):
     
     LTP_ARCHIVE_VERSION = "ltp-full-20120903"
-    LTP_ARCHIVE_TYPE = ".bz2"
+    LTP_ARCHIVE_VERSION = "20140422"
+    #LTP_ARCHIVE_TYPE = ".bz2"
+    LTP_ARCHIVE_TYPE = ".tar.gz"
     LTP_ARCHIVE = "%s%s" % (LTP_ARCHIVE_VERSION,LTP_ARCHIVE_TYPE)
-    LTP_URL = "http://devorange.clemson.edu/pvfs"
+    #LTP_URL = "http://devorange.clemson.edu/pvfs"
+    LTP_PREFIX = "/opt/ltp"
+    LTP_URL = "https://github.com/linux-test-project/ltp/archive"
     vfs_type = "usrint"
     
     rc = 0
+    
+    # check for fuse
+    tmp = []
+    testing_node.checkMount(mount_point=testing_node.ofs_mount_point,output=tmp)
+    
+    if "pvfs2fuse" in tmp[1]:
+        vfs_type = "fuse"
+        print "LTP test cannot be run for filesystem mounted via fuse"
+        return -999
+    
     #make sure that the benchmarks have been installed
     if testing_node.ofs_extra_tests_location == "":
         testing_node.installBenchmarks()
         
     testing_node.changeDirectory(testing_node.ofs_extra_tests_location)
     
-    if testing_node.runSingleCommand("[ -f /tmp/ltp/runltp ]"):
-        testing_node.runSingleCommand("rm -rf " + LTP_ARCHIVE_VERSION + "*",output)
-        rc = testing_node.runSingleCommand("wget -q %s/%s" % (LTP_URL,LTP_ARCHIVE),output)
+    
+    
+    if testing_node.runSingleCommand("[ -f %s/runltp ]" % LTP_PREFIX):
+        testing_node.runSingleCommand("rm -rf ltp-" + LTP_ARCHIVE_VERSION + "*",output)
+        rc = testing_node.runSingleCommand("wget --no-check-certificate --output-document=%s %s/%s" % (LTP_ARCHIVE,LTP_URL,LTP_ARCHIVE),output)
         if rc != 0:
             
             return rc
 
-        rc = testing_node.runSingleCommand("tar -xjf %s" % LTP_ARCHIVE,output)
+        rc = testing_node.runSingleCommand("tar -xzf %s" % LTP_ARCHIVE,output)
         if rc != 0:
             
             return rc
         
-        testing_node.changeDirectory(testing_node.ofs_extra_tests_location+"/"+LTP_ARCHIVE_VERSION)
+        testing_node.changeDirectory(testing_node.ofs_extra_tests_location+"/ltp-"+LTP_ARCHIVE_VERSION)
         
-        rc = testing_node.runSingleCommand("patch -p1 < %s/test/automated/usrint-tests.d/ltp-20120903-zoo-path.patch" % testing_node.ofs_source_location,output)
+        # Patch ltp for OrangeFS support
+        rc = testing_node.runSingleCommand("patch -p1 < %s/test/automated/vfs-tests.d/ltp-20140422-zoo-path.patch" % testing_node.ofs_source_location,output)
         if rc != 0:
             
             return rc
         
-        rc = testing_node.runSingleCommand("./configure --prefix=/tmp/ltp ADD_CFLAGS='-D_GNU_SOURCE'",output)
+        rc = testing_node.runSingleCommand("CFLAGS='-g -O0' ./configure --prefix=%s" % LTP_PREFIX,output)
         #if rc != 0:
         #    return rc
 
-        rc = testing_node.runSingleCommand("export CFLAGS='-g'; make all",output)
+        rc = testing_node.runSingleCommand('make all',output)
         if rc != 0:
             
             return rc
@@ -451,17 +468,17 @@ def ltp(testing_node,output=[]):
         if rc != 0:
             return rc
         
-        
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases runtest/" % testing_node.ofs_source_location)
-    testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases /tmp/ltp/runtest/" % testing_node.ofs_source_location)
-    testing_node.runSingleCommand("mkdir -p %s/ltp-tmp" % testing_node.ofs_source_location)
-    testing_node.runSingleCommand("chmod 777 %s/ltp-tmp" % testing_node.ofs_mount_point)
+    testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases %s/runtest/" % (testing_node.ofs_source_location,LTP_PREFIX))
+    testing_node.runSingleCommand("%s mkdir -p %s/ltp-tmp-usrint" % (preload,testing_node.ofs_source_location))
+    testing_node.runSingleCommand("%s chmod 777 %s/ltp-tmp-usrint" % (preload,testing_node.ofs_mount_point))
     testing_node.runSingleCommand("umask 0")
     
-    testing_node.changeDirectory('/tmp/ltp')
+    testing_node.changeDirectory(LTP_PREFIX)
     
-    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
-    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -z %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,preload, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, preload,vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
 
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
@@ -608,10 +625,11 @@ fstest,
 fsx,
 iozone,
 mkdir_usrint,
-shelltest,
 symlink_usrint,
 tail,
 usrint_cp,
 
 dbench,
-bonnie ]
+bonnie,
+shelltest
+ ]

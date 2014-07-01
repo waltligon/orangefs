@@ -2,27 +2,27 @@
 
 
 #import os
-import time
-import re
-from pprint import pprint
 from datetime import datetime, timedelta
-import sys
-import string
-import uuid
+import glanceclient
 import json
-import os
 import keystoneclient
 import keystoneclient.exceptions
 import keystoneclient.v2_0
-import string
-import random
-import novaclient.v1_1 as novaclient
-import neutronclient.neutron.client as neutronclient
-import glanceclient
 import logging
+import os
+from pprint import pprint
+import random
+import re
+import string
+import string
+import sys
+import time
+import uuid
+
 import OFSCloudConnectionManager
 import OFSTestRemoteNode
-
+import neutronclient.neutron.client as neutronclient
+import novaclient.v1_1 as novaclient
 
 
 ## 
@@ -30,7 +30,6 @@ import OFSTestRemoteNode
 #
 # @brief This class manages the cloud connection using the OpenStack Nova API. It has no awareness of OFSTestNodes or the OFSTestNetwork.
 #
-
 class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManager):
   
     ##
@@ -105,7 +104,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         #open Cloud file
         msg = "Reading config file %s" % filename
 
-        conf_rc = open(filename,'r')
+        conf_rc = open(os.path.expandvars(filename),'r')
         
         for line in conf_rc:
             if "export OS_AUTH_URL" in line:
@@ -139,7 +138,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
     #
     
     def readCloudPasswordFile(self,filename):
-        self.nova_password = string.rstrip(open(filename).readlines()[0])
+        self.nova_password = string.rstrip(open(os.path.expandvars(filename)).readlines()[0])
         
         
                

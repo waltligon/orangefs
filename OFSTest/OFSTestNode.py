@@ -1075,7 +1075,7 @@ class OFSTestNode(object):
 
 
     def installRequiredSoftware(self):
-        
+        output = []
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             
@@ -1124,7 +1124,7 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
             ]
             
-            output = []
+            
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
@@ -1136,19 +1136,23 @@ class OFSTestNode(object):
             
             
         elif "suse" in self.distro.lower():
-            batch_commands = [
+            
+                        # download Java 6
+            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            if rc != 0:
+                logging.exception(output)
+                return rc
+            install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive patch libuuid1 uuid-devel gdb",
+                "zypper --non-interactive install patch libuuid1 uuid-devel gdb",
                 
     
-                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`",
-                "cp /boot/config-\\`uname -r\\` .config",
-                "make oldconfig &> /dev/null",
-                "make modules_prepare &>/dev/null",
-                "make prepare &>/dev/null",
+                
+                "cp /boot/config-\\`uname -r\\` /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`/.config",
+                "cd /usr/src/linux-\\`uname -r | sed s/-[\d].*//\\`; make oldconfig && make modules_prepare && make prepare",
                 "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
                 "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
@@ -1177,7 +1181,7 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            output = []
+            
             # download Java 6
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
@@ -1806,8 +1810,10 @@ class OFSTestNode(object):
         logging.debug( ofs_patch_files)
         for patch in ofs_patch_files:
             
-            logging.info( "Patching: patch -c -p1 < %s" % patch)
-            rc = self.runSingleCommand("patch -c -p1 < %s" % patch)
+            patch_name = os.path.basename(patch)
+            
+            logging.info( "Patching: patch -p0 < %s" % patch_name)
+            rc = self.runSingleCommand("patch -p0 < %s" % patch_name)
             if rc != 0:
                 logging.exception( "Patch Failed!")
        
@@ -1846,16 +1852,18 @@ class OFSTestNode(object):
             else:
                 configure_opts = "%s --with-kernel=%s/build" % (configure_opts,self.kernel_source_location)
         
-        # No reason to do this. We want debug info
-#         if enable_strict == True:
-#             # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
-#             # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
-#             
-#             # won't work for rhel 5 based distros, gcc is too old.
-#             if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
-#                 pass
-#             else:
-#                 configure_opts = configure_opts+" --enable-strict"
+        if enable_strict == True:
+            # should check gcc version, but am too lazy for that. Will work on gcc > 4.4
+            # gcc_ver = self.runSingleCommandBacktick("gcc -v 2>&1 | grep gcc | awk {'print \$3'}")
+             
+            # won't work for rhel 5 based distros, gcc is too old.
+            if ("centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower()) and " 5." in self.distro:
+                pass
+            else:
+                configure_opts = configure_opts+" --enable-strict"
+        else:
+            # otherwise, disable optimizations
+            configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
             configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
@@ -1878,6 +1886,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --enable-security-key"
         elif security_mode.lower() == "cert":
             configure_opts = configure_opts+" --enable-security-cert"
+        
         
         rc = self.runSingleCommand("./configure %s" % configure_opts, output)
         
