@@ -568,7 +568,7 @@ static PINT_sm_action setattr_setobj_attribs(
         if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
-            js_p->error_code = -PVFS_EPERM;
+            js_p->error_code = -PVFS_EACCES;
             return SM_ACTION_COMPLETE;
         }
     }
@@ -1330,7 +1330,7 @@ static int perm_setattr(PINT_server_op *s_op)
                 gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG), 
                              "%s: no permissions to set attr 0x%x\n", __func__, 
                              perm_table[i][PERM_TABLE_ATTR]);
-                return -PVFS_EPERM;
+                return -PVFS_EACCES;
             }
         }
     }
