@@ -1452,6 +1452,9 @@ class OFSTestNode(object):
         self.romio_runtests_pvfs2 = self.openmpi_source_location+"/ompi/mca/io/romio/romio/test/runtests.pvfs2"
         self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
         
+        #Add mpi libraries to LD_LIBRARY_PATH
+        self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:%s/lib:%s/lib:$LD_LIBRARY_PATH" % (self.db4_lib_dir,self.ofs_installation_location,self.openmpi_installation_location))
+        
         return 0
     
         
