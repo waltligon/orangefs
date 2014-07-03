@@ -103,6 +103,20 @@ int pvfs_open(const char *path, int flags, ...)
 }
 
 /**
+ * pvfs_open_object, opens a particular object
+ * using the file descriptor and the object number
+ * (only works with object dist currently)
+ */
+
+int pvfs_open_object(int fd, int obj_num)
+{
+    pvfs_descriptor *pd = pvfs_find_descriptor(fd);
+    pd->s->object_num = obj_num;
+    return pd->fd;
+}
+
+
+/**
  * pvfs_open64
  */
 int pvfs_open64(const char *path, int flags, ...)
@@ -254,6 +268,14 @@ int pvfs_creat(const char *path, mode_t mode)
 {
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_creat: called with %s\n", path);
     return pvfs_open(path, O_RDWR | O_CREAT | O_EXCL, mode);
+}
+
+/**
+ * pvfs_creat_object wrapper, creates file of object dist, with 4 dfiles
+ */
+int pvfs_creat_object(const char *path, mode_t mode)
+{
+    return pvfs_open(path, O_RDWR | O_CREAT | O_EXCL | O_OBJ, mode);
 }
 
 /**

@@ -64,6 +64,8 @@ public class PVFS2POSIXJNIFlags {
     public long AT_SYMLINK_NOFOLLOW;
     public long ST_RDONLY;
     public long ST_NOSUID;
+    /* 48 */
+    public long O_OBJECT;
 
     /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
     private PVFS2POSIXJNIFlags() {

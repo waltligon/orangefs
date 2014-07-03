@@ -333,8 +333,9 @@ extern int fremovexattr(int fd, const char *name);
 
 #define true   1 
 #define false  0 
-#define O_HINTS     02000000  /* PVFS hints are present */
-#define O_NOTPVFS   04000000  /* Turn off sym links from PVFS to non-PVFS */
+#define O_HINTS     020000000  /* PVFS hints are present */
+#define O_NOTPVFS   040000000  /* Turn off sym links from PVFS to non-PVFS */
+#define O_OBJ      0100000000  /* PVFS file is an object file */
 
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */

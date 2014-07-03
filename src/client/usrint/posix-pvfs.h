@@ -19,6 +19,9 @@
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 
+/* pvfs_open_object */
+extern int pvfs_open_object(int fd, int obj_num);
+
 /* pvfs_open64 */
 extern int pvfs_open64(const char *path, int flags, ...);
 
@@ -29,6 +32,9 @@ extern int pvfs_openat(int dirfd, const char *path, int flags, ...);
 extern int pvfs_openat64(int dirfd, const char *path, int flags, ...);
 
 extern int pvfs_creat(const char *path, mode_t mode);
+
+/* creates a file of object distribution and creates it with 4 dfiles */
+extern int pvfs_creat_object(const char *path, mode_t mode);
 
 extern int pvfs_creat64(const char *path, mode_t mode);
 

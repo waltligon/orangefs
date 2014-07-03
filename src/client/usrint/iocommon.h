@@ -127,7 +127,8 @@ extern int iocommon_create_file(const char *filename,
 			 mode_t file_permission,
 			 PVFS_hint file_creation_param,
                          PVFS_object_ref parent_ref,
-                         PVFS_object_ref *ref);
+                         PVFS_object_ref *ref,
+			 int flags );
 
 
 /* pvfs_open implementation, return file info in fd */
@@ -173,7 +174,7 @@ extern int iocommon_readorwrite(enum PVFS_io_type which,
                          const struct iovec *vector);
 
 extern int iocommon_vreadorwrite(enum PVFS_io_type which,
-	                 PVFS_object_ref *por,
+	                 pvfs_descriptor_status *s,
                          PVFS_size offset,
                          size_t count,
                          const struct iovec *vector);
@@ -192,7 +193,7 @@ extern int iocommon_ireadorwrite(enum PVFS_io_type which,
 /* do a blocking read or write
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-		          PVFS_object_ref *por,
+		          pvfs_descriptor_status *s,
                           PVFS_size offset,
                           void *buf,
                           PVFS_Request mem_req,

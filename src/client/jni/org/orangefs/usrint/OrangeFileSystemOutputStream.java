@@ -40,7 +40,7 @@ public class OrangeFileSystemOutputStream extends OutputStream {
         this.replication = 0;
         /* Perform open */
         ret = orange.posix.open(path, pf.O_CREAT | (append ? pf.O_APPEND : 0)
-                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO);
+                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO );
         if (ret < 0) {
             throw new IOException(path + " couldn't be opened. (open)");
         }

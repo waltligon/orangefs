@@ -330,6 +330,12 @@ extern int pvfs_munmap(void *start, size_t length);
 
 extern int pvfs_msync(void *start, size_t length, int flags);
 
+/* pvfs_open_object */
+extern int pvfs_open_object(int fd, int obj_num);
+
+/* creates a file of object distribution and creates it with 4 dfiles */
+extern int pvfs_creat_object(const char *path, mode_t mode);
+
 #endif
 
 /*

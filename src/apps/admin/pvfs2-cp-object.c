@@ -378,6 +378,8 @@ static size_t generic_write(file_object *dest, char *buffer,
 	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_io_object(dest->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, PVFS_IO_WRITE, hints, 2);
+        ret = PVFS_sys_io_object(dest->u.pvfs2.ref, file_req, offset,
+		"this is first", mem_req, credentials, &resp_io, PVFS_IO_WRITE, hints, 1);
 	if (ret == 0) 
         {
             PVFS_Request_free(&mem_req);

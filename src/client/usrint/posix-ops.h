@@ -214,7 +214,8 @@ typedef struct pvfs_descriptor_status_s
     off64_t file_pointer;     /**< offset from the beginning of the file */
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
     char *dpath;              /**< path of an open directory for fchdir */
-    struct file_ent_s *fent;  /**< reference to cached objects */            
+    struct file_ent_s *fent;  /**< reference to cached objects */   
+    int object_num;           /**< reference to which object in the file */ 
                               /**< set to NULL if not caching this file */
 } pvfs_descriptor_status;
 

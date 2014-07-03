@@ -450,7 +450,8 @@ int iocommon_create_file(const char *filename,
                          mode_t mode,
                          PVFS_hint file_creation_param,
                          PVFS_object_ref parent_ref,
-                         PVFS_object_ref *ref )
+                         PVFS_object_ref *ref,
+                         int flags )
 {
     int rc = 0;
     int orig_errno = errno;
@@ -599,6 +600,17 @@ int iocommon_create_file(const char *filename,
     if (rc != 0)
     {
         goto errorout;
+    }
+
+    /* if the user selects to create an object file
+       we create a file of object distribution and
+       give it a default of 4 dfiles*/
+
+    if(flags & O_OBJ)
+    { 
+        dist = PVFS_sys_dist_lookup("object_dist");
+        attr.dfile_count = 4;
+        attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     }
 
     /* Contact server */
@@ -1195,7 +1207,8 @@ createfile:
                               mode,
                               file_creation_param,
                               parent_ref,
-                              &file_ref);
+                              &file_ref,
+                              flags);
     if (rc >= 0)
     {
         goto finish;
@@ -1262,7 +1275,8 @@ finish:
         goto errorout;
     }
     pd->s->flags = flags;           /* open flags */
-    pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
+    pd->is_in_use = PVFS_FS;        /* indicate fd is valid! */
+    pd->s->object_num = -1;         /* default value for the object number */
 
     /* Get the file's type information from its attributes */
     errno = 0;
@@ -1954,7 +1968,7 @@ unsigned char read_full_block_into_ucache(
     struct iovec cache_vec = {req->ublk_ptr, CACHE_BLOCK_SIZE};
     lock_lock(get_lock(req->ublk_index));
     vread_count = iocommon_vreadorwrite(PVFS_IO_READ,
-                                        &pd->s->pvfs_ref,
+                                        pd->s,
                                         req->ublk_tag,
                                         1,
                                         &cache_vec);
@@ -2029,7 +2043,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /* Bypass the ucache */
         errno = 0;
         rc = iocommon_vreadorwrite(which,
-                                   &pd->s->pvfs_ref,
+                                   pd->s,
                                    offset,
                                    iovec_count,
                                    vector);
@@ -2088,7 +2102,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 
         /* Bypass the ucache */
         rc = iocommon_vreadorwrite(which,
-                                   &pd->s->pvfs_ref,
+                                   pd->s,
                                    offset,
                                    iovec_count,
                                    vector);
@@ -2170,7 +2184,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                     }
                     /* Bypass the ucache */
                     rc = iocommon_vreadorwrite(which,
-                                               &pd->s->pvfs_ref,
+                                               pd->s,
                                                offset,
                                                iovec_count,
                                                vector);
@@ -2236,7 +2250,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                     }
                     /* Bypass the ucache */
                     rc = iocommon_vreadorwrite(which,
-                                               &pd->s->pvfs_ref,
+                                               pd->s,
                                                offset,
                                                iovec_count,
                                                vector);
@@ -2380,7 +2394,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  *  RorW_nocache below
  */
 int iocommon_vreadorwrite(enum PVFS_io_type which,
-                         PVFS_object_ref *por,
+                         pvfs_descriptor_status *s,
                          PVFS_size offset,
                          size_t count,
                          const struct iovec *vector)
@@ -2404,7 +2418,7 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
     rc = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
     rc = pvfs_convert_iovec(vector, count, &mem_req, &buf);
     rc = iocommon_readorwrite_nocache(which,
-                                      por,
+                                      s,
                                       offset, 
                                       buf,
                                       mem_req,
@@ -2419,12 +2433,13 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
  *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-                                 PVFS_object_ref *por,
+                                 pvfs_descriptor_status *s,
                                  PVFS_size offset,
                                  void *buf,
                                  PVFS_Request mem_req,
                                  PVFS_Request file_req)
 {
+    PVFS_object_ref *por = &s->pvfs_ref;  //ended up sending the status down to this function in order to get the object number
     int rc = 0;
     int orig_errno = errno;
     PVFS_credential *creds;
@@ -2448,15 +2463,36 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     }
 
     errno = 0;
-    rc = PVFS_sys_io(*por,
-                     file_req,
-                     offset,
-                     buf,
-                     mem_req,
-                     creds,
-                     &io_resp,
-                     which,
-                     PVFS_HINT_NULL);
+
+    /** added in conditional statement to allow individual object access
+      * object number is set to -1 initially, but can be modified to any
+      * other number in the pvfs_open_object function in posix-pvfs.c
+      */
+    if((int)s->object_num >= 0)
+    {
+        rc = PVFS_sys_io_object(*por,
+                                file_req,
+                                offset,
+                                buf,
+                                mem_req,
+                                creds,
+                                &io_resp,
+                                which,
+                                PVFS_HINT_NULL,
+                                s->object_num);
+    }
+    else
+    {
+        rc = PVFS_sys_io(*por,
+                         file_req,
+                         offset,
+                         buf,
+                         mem_req,
+                         creds,
+                         &io_resp,
+                         which,
+                         PVFS_HINT_NULL);
+    }
     IOCOMMON_CHECK_ERR(rc);
     return io_resp.total_completed;
 
@@ -3403,7 +3439,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
 
     errno = 0;
     rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
-                                      &pd->s->pvfs_ref,
+                                      pd->s,
                                       *offset + bytes_read,
                                       buffer,
                                       mem_req,
@@ -3423,7 +3459,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
         }
         errno = 0;
         rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
-                                          &pd->s->pvfs_ref,
+                                          pd->s,
                                           *offset + bytes_read,
                                           buffer,
                                           mem_req,

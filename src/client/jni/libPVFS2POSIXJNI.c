@@ -432,7 +432,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
         jobject obj)
 {
     jclass cls = (jobject) 0;
-    int num_fields = 48;
+    int num_fields = 49;
     jfieldID fids[num_fields];
 
     char *field_names[] =
@@ -455,7 +455,10 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
 
         /* index 40-47 */
         "SEEK_SET", "SEEK_CUR", "SEEK_END", "AT_FDCWD", "AT_REMOVEDIR",
-        "AT_SYMLINK_NOFOLLOW", "ST_RDONLY", "ST_NOSUID" };
+        "AT_SYMLINK_NOFOLLOW", "ST_RDONLY", "ST_NOSUID",
+
+	/* index 48 */
+	"O_OBJECT" };
 
     char *field_types[] =
     {
@@ -468,7 +471,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
         /* index 30-39 */
         "J", "J", "J", "J", "J", "J", "J", "J", "J", "J",
         /* index 40-47 */
-        "J", "J", "J", "J", "J", "J", "J", "J" };
+        "J", "J", "J", "J", "J", "J", "J", "J",
+	/* index 48 */
+	"J" };
 
     char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNIFlags";
     cls = (*env)->FindClass(env, cls_name);
@@ -561,6 +566,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
     /* statvfs mount flags */
     (*env)->SetLongField(env, inst, fids[46], ST_RDONLY);
     (*env)->SetLongField(env, inst, fids[47], ST_NOSUID);
+
+    /* object file creation flag(s) */
+    (*env)->SetLongField(env, inst, fids[48], O_OBJECT);
     return inst;
 }
 
