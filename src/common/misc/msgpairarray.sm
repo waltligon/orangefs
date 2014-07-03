@@ -200,7 +200,13 @@ static PINT_sm_action msgpairarray_post(
                 msg_p->enc_type = cur_fs->encoding;
             }
 
-            if (!ENCODING_IS_SUPPORTED(msg_p->enc_type))
+            if (!ENCODING_IS_VALID(msg_p->enc_type))
+            {
+                PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
+                must_loop_encodings = 1;
+                msg_p->enc_type = (ENCODING_INVALID_MIN + 1);
+            }
+            else if (!ENCODING_IS_SUPPORTED(msg_p->enc_type))
             {
                 PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
                 must_loop_encodings = 1;
@@ -208,6 +214,8 @@ static PINT_sm_action msgpairarray_post(
             }
 
           try_next_encoding:
+            assert(ENCODING_IS_VALID(msg_p->enc_type));
+
             ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
                               &msg_p->encoded_req, msg_p->svr_addr,
                               msg_p->enc_type);
@@ -216,10 +224,11 @@ static PINT_sm_action msgpairarray_post(
                 if (must_loop_encodings)
                 {
                     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
-                                 "encodings [%d]\n", msg_p->enc_type);
+                                 "encodings [%d/%d]\n", msg_p->enc_type,
+                                 ENCODING_INVALID_MAX);
 
                     msg_p->enc_type++;
-                    if (ENCODING_IS_SUPPORTED(msg_p->enc_type))
+                    if (ENCODING_IS_VALID(msg_p->enc_type))
                     {
                         goto try_next_encoding;
                     }

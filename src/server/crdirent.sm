@@ -33,6 +33,7 @@ enum
     SPLIT_REQUIRED,
     NO_SPLIT_REQUIRED,
     SPLIT_FATAL_ERROR,
+    NOTIFY_DIRDATA,
     LOCAL_METAHANDLE,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
@@ -200,7 +201,8 @@ machine pvfs2_crdirent_sm
     state notify_dirdata_servers_setup
     {
         run crdirent_notify_dirdata_servers_setup;
-        success => notify_dirdata_servers_xfer;
+        NOTIFY_DIRDATA => notify_dirdata_servers_xfer;
+        success => remove_local_copies;
         default => backout_dirdata_attrs;
     }
 
@@ -208,6 +210,7 @@ machine pvfs2_crdirent_sm
     {
         jump pvfs2_msgpairarray_sm;
         success => remove_local_copies;
+        default => backout_dirdata_attrs;
     }
 
     state backout_dirdata_attrs
@@ -990,7 +993,7 @@ static PINT_sm_action crdirent_send_server_attrs(
         *attr_p,
         PVFS_ATTR_DISTDIR_ATTR,
         s_op->req->hints);
-
+    PINT_copy_object_attr(&(msg_p->req).u.setattr.attr, &(*attr_p));
 
     msg_p->fs_id = s_op->req->u.crdirent.fs_id;
     msg_p->handle = handle;
@@ -1122,37 +1125,44 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         }
     }
 
-    PINT_msgpair_init(&s_op->msgarray_op);
-    msg_p = &s_op->msgarray_op.msgpair;
-    PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
-
-    PINT_SERVREQ_TREE_SETATTR_FILL(
-        msg_p->req,
-        s_op->u.crdirent.capability,
-        s_op->req->u.crdirent.credential,
-        s_op->req->u.crdirent.fs_id,
-        PVFS_TYPE_DIRDATA,
-        s_op->attr,
-        num_remote_dirdata_handles,
-        remote_dirdata_handles,
-        NULL);
-
-    msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-    msg_p->handle = remote_dirdata_handles[0];
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
+    if (num_remote_dirdata_handles > 0)
     {
-        gossip_err("Failed to map dirdata server address\n");
-        js_p->error_code = ret;
-    }
+        PINT_msgpair_init(&s_op->msgarray_op);
+        msg_p = &s_op->msgarray_op.msgpair;
+        PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
-    js_p->error_code = 0;
+        PINT_SERVREQ_TREE_SETATTR_FILL(
+            msg_p->req,
+            s_op->u.crdirent.capability,
+            s_op->req->u.crdirent.credential,
+            s_op->req->u.crdirent.fs_id,
+            PVFS_TYPE_DIRDATA,
+            s_op->attr,
+            num_remote_dirdata_handles,
+            remote_dirdata_handles,
+            NULL);
+
+        msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+        msg_p->handle = remote_dirdata_handles[0];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
+
+        ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map dirdata server address\n");
+            js_p->error_code = ret;
+        }
+
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        js_p->error_code = NOTIFY_DIRDATA;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
     return SM_ACTION_COMPLETE;
 }
 

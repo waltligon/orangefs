@@ -120,8 +120,13 @@ enum PVFS_encoding_type
 };
 
 /* these values must correspond to the defined encoding types above */
+#define ENCODING_INVALID_MIN                    0
+#define ENCODING_INVALID_MAX                    4
 #define ENCODING_SUPPORTED_MIN ENCODING_LE_BFIELD
 #define ENCODING_SUPPORTED_MAX ENCODING_LE_BFIELD
+#define ENCODING_IS_VALID(enc_type)      \
+((enc_type > ENCODING_INVALID_MIN) &&    \
+ (enc_type < ENCODING_INVALID_MAX))
 #define ENCODING_IS_SUPPORTED(enc_type)  \
 ((enc_type >= ENCODING_SUPPORTED_MIN) && \
  (enc_type <= ENCODING_SUPPORTED_MAX))

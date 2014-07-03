@@ -117,7 +117,7 @@ char * PVFS_debug_mask_to_eventlog(uint64_t mask);
 char * PVFS_kmod_mask_to_eventlog(uint64_t mask);
 
 /* a private internal type */
-typedef struct
+typedef struct 
 {
     const char *keyword;
     uint64_t mask_val;
@@ -180,13 +180,13 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "readdir", GOSSIP_READDIR_DEBUG },
     /* Debug the mkdir operation (server only) */
     { "mkdir", GOSSIP_MKDIR_DEBUG },
-    /* Debug the io operation (reads and writes)
+    /* Debug the io operation (reads and writes) 
      * for both the client and server */
     { "io", GOSSIP_IO_DEBUG },
     /* Debug the server's open file descriptor cache */
-    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG },
+    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     /* Debug permissions checking on the server */
-    { "permissions", GOSSIP_PERMISSIONS_DEBUG },
+    { "permissions", GOSSIP_PERMISSIONS_DEBUG }, 
     /* Debug the cancel operation */
     { "cancel", GOSSIP_CANCEL_DEBUG },
     /* Debug the msgpair state machine */
@@ -197,7 +197,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "clientcore_timing", GOSSIP_CLIENTCORE_TIMING_DEBUG },
     /* network encoding */
     { "endecode", GOSSIP_ENDECODE_DEBUG },
-    /* Show server file (metadata) accesses (both modify and read-only). */
+    /* Show server file (metadata) accesses (both modify and read-only). */ 
     { "access", GOSSIP_ACCESS_DEBUG },
     /* Show more detailed server file accesses */
     { "access_detail", GOSSIP_ACCESS_DETAIL_DEBUG },

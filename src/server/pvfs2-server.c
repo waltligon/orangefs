@@ -2473,7 +2473,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     }
 
     /* release the decoding of the unexpected request */
-    if (ENCODING_IS_SUPPORTED(s_op->decoded.enc_type))
+    if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
         PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
 

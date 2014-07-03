@@ -52,7 +52,20 @@
 /* Sane maximum values for these parameters (128 MB) */
 #define PVFS2_BUFMAP_MAX_TOTAL_SIZE      (128ULL * (1024 * 1024))
 
-int LOG2(int number);
+/* log to base 2 when we know that number is a power of 2 */
+static inline int LOG2(int number)
+{
+    int count = 0;
+    if (number == 0 || (number & (number - 1))) 
+    {
+        return -1;
+    }
+    while (number >>= 1)
+    {
+        count++;
+    }
+    return count;
+}
 
 #define PVFS2_READDIR_DEFAULT_DESC_COUNT  5
 #define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)

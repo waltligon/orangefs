@@ -77,7 +77,7 @@ static int threaded_queues_init(struct PINT_manager_s *manager,
         }
 
 /* On Darwin, thread_id is a structure, not a value. */
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
         gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p:thread #%d.\n"
                                       ,__func__
                                       ,w->threads[i].thread_id,i);
@@ -350,7 +350,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     gen_mutex_unlock(&thread->mutex);
 
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %p:worker location is %p: manager location is %p.\n"
                                   ,__func__
                                   ,thread->thread_id
@@ -374,7 +374,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     }
     gen_mutex_unlock(&worker->mutex);
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread-id %p:op-count is %d:timeout is %d.\n"
                                   ,__func__
                                   ,thread->thread_id
@@ -399,7 +399,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     gen_mutex_lock(&thread->mutex);
     thread->running = 1;
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
     gossip_debug(GOSSIP_MGMT_DEBUG,"%s: starting thread function for thread_id %p\n"
                                   ,__func__
                                   ,thread->thread_id);
@@ -474,7 +474,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
             if(op_count > 0)
             {
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
                 gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: op_count is %d.\n"
                                               ,__func__
                                               ,thread->thread_id,op_count);
@@ -488,7 +488,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
                 {
                     struct PINT_op_entry *op_entry;
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: i is %d.\n"
                                                   ,__func__
                                                   ,thread->thread_id,i);
@@ -501,7 +501,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
                     op = PINT_op_from_qentry(qentries[i]);
                     /* service the operation */
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: calling PINT_manager_service_op.\n"
                                                   ,__func__
                                                   ,thread->thread_id);
@@ -520,7 +520,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
                     }
 
 
-#if defined(__APPLE__)
+#if defined(__DARWIN__)
                     gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %p: calling PINT_manager_complete_op.\n"
                                                   ,__func__
                                                   ,thread->thread_id);

@@ -429,7 +429,7 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
         assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
 
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "cancelling I/O req %p "
-                     "from tag %lld\n", (void *)vfs_request, lld(tag));
+                     "from tag %lld\n", vfs_request, lld(tag));
 
         ret = PINT_client_io_cancel(vfs_request->op_id);
         if (ret < 0)
@@ -558,7 +558,7 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_TIMING_DEBUG, "%s complete (vfs_request "
         "%p)\n\twtime = %f, utime=%f, stime=%f (seconds)\n",
         get_vfs_op_name_str(vfs_request->in_upcall.type),
-        (void *)vfs_request, wtime, utime, stime);
+        vfs_request, wtime, utime, stime);
 #else
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request %p)\n",
@@ -2006,7 +2006,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %lld\n",
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %Ld\n",
             vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
             (unsigned long) vfs_request->in_upcall.req.io.offset,
             (unsigned long) vfs_request->in_upcall.req.io.count,
@@ -2129,7 +2129,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     /* trailer is interpreted as struct read_write_x */
     if (vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) != 0)
     {
-        gossip_err("post_iox_request: trailer size (%lld) is not a multiple of read_write_x structure (%ld)\n",
+        gossip_err("post_iox_request: trailer size (%Ld) is not a multiple of read_write_x structure (%ld)\n",
             lld(vfs_request->in_upcall.trailer_size),
             (long) sizeof(struct read_write_x));
         goto out;
@@ -2932,7 +2932,7 @@ static inline void package_downcall_members(
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                     (size_t)vfs_request->response.io.total_completed;
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %lld\n", lld(vfs_request->info.tag));
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %Ld\n", lld(vfs_request->info.tag));
 #endif
             }
 #ifdef USE_MMAP_RA_CACHE
@@ -3131,7 +3131,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     else
     {
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[-] reposted unexp "
-                     "req [%p] due to %s\n", (void *)vfs_request,
+                     "req [%p] due to %s\n", vfs_request,
                      completion_handle_desc);
     }
     return ret;
@@ -3187,7 +3187,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     }
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "[*] handling new unexp vfs_request %p\n", (void *)vfs_request);
+                 "[*] handling new unexp vfs_request %p\n", vfs_request);
 
     /*
       make sure the operation is not currently in progress.  if it is,
@@ -3458,7 +3458,7 @@ static PVFS_error process_vfs_requests(void)
             if (vfs_request->num_ops == 1 &&
                     vfs_request->op_id != op_id_array[i])
             {
-                gossip_err("op_id %lld != completed op id %lld\n",
+                gossip_err("op_id %Ld != completed op id %Ld\n",
                         lld(vfs_request->op_id), lld(op_id_array[i]));
                 continue;
             }
@@ -3472,7 +3472,7 @@ static PVFS_error process_vfs_requests(void)
                 }
                 if (j == vfs_request->num_ops)
                 {
-                    gossip_err("completed op id (%lld) is weird\n",
+                    gossip_err("completed op id (%Ld) is weird\n",
                             lld(op_id_array[i]));
                     continue;
                 }
@@ -3491,7 +3491,7 @@ static PVFS_error process_vfs_requests(void)
                 */
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                              " returned unexp vfs_request %p, tag: %llu\n",
-                             (void *)vfs_request,
+                             vfs_request,
                              llu(vfs_request->info.tag));
                 ret = handle_unexp_vfs_request(vfs_request);
                 assert(ret == 0);
@@ -3515,7 +3515,7 @@ static PVFS_error process_vfs_requests(void)
 
             gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                          " returned completed vfs_request %p\n",
-                         (void *)vfs_request);
+                         vfs_request);
             /*
                if this is not a dev unexp msg, it's a non-blocking
                sysint operation that has just completed
@@ -3645,7 +3645,7 @@ int main(int argc, char **argv)
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
-    segv_action.sa_sigaction = client_segfault_handler;
+    segv_action.sa_sigaction = (void *)client_segfault_handler;
     sigemptyset (&segv_action.sa_mask);
     segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
     sigaction (SIGSEGV, &segv_action, NULL);

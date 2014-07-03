@@ -1,5 +1,5 @@
-/* 
- * (C) 2003 Clemson University and The University of Chicago 
+/*
+ * (C) 2003 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -327,14 +327,14 @@ static int get_eattr_comp_fn(
                         /* record an error, but keep going */
                         ret = -PVFS_EMSGSIZE;
                     }
-    
+
                     /* seems ok - decode the eattrs we know about */
                     decode_ret = PINT_eattr_decode(
                         &sm_p->u.geteattr.key_array[k],
                         &sm_p->u.geteattr.resp_p->val_array[k]);
                     if(decode_ret != 0)
                     {
-                        gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                        gossip_debug(GOSSIP_GETATTR_DEBUG,
                                 "failed decode of eattr: %s\n",
                                 (char *)sm_p->u.geteattr.key_array[k].buffer);
                         return decode_ret;
