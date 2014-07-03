@@ -8,6 +8,10 @@
  * Utility for displaying PVFS Berkeley DBs in textual form for debugging
  *   */
 
+/* This is a kludge to keep calloc and free from being redefined
+   to our PINT_ versions. That way we can keep from having a depency
+   on the pvfs library. */
+#define PINT_MALLOC_H
 
 #include <stdlib.h>
 #include <string.h>
