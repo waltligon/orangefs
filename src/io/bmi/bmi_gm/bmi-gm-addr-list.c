@@ -11,7 +11,6 @@
 #include "bmi-gm-addressing.h"
 #include "bmi-gm-addr-list.h"
 #include "gossip.h"
-#include "pvfs2-internal.h"
 
 #include<gm.h>
 

@@ -7,8 +7,6 @@
 #ifndef EXTENTLIST_H
 #define EXTENTLIST_H
 
-#include <pvfs2-internal.h>
-
 #include <sys/time.h>
 
 #include <trove.h>

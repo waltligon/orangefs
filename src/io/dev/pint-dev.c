@@ -38,8 +38,7 @@ struct iovec {
 };
 #endif
 
-#include "pvfs2-internal.h"
-/* #include "pint-mem.h" obsolete */
+#include "pint-mem.h"
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
@@ -47,6 +46,7 @@ struct iovec {
 #ifndef WIN32
 #include "pvfs2-dev-proto.h"
 #endif
+#include "pvfs2-internal.h"
 
 #ifdef WITH_LINUX_KMOD
 static int setup_dev_entry(
@@ -246,8 +246,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         /* we would like to use a memaligned region that is a multiple
          * of the system page size
          */
-        /* ptr = PINT_mem_aligned_alloc(total_size, page_size); */
-        posix_memalign(&ptr, page_size, total_size);
+        ptr = PINT_mem_aligned_alloc(total_size, page_size);
         if (!ptr)
         {
             desc[i].ptr = NULL;
@@ -292,8 +291,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         int j;
         for (j = 0; j < i; j++) {
             if (desc[j].ptr) {
-                /* PINT_mem_aligned_free(desc[j].ptr); */
-                free(desc[j].ptr);
+                PINT_mem_aligned_free(desc[j].ptr);
                 desc[j].ptr = NULL;
             }
         }
@@ -330,8 +328,7 @@ void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
            gossip_err("Error: FAILED to munlock shared buffer\n");
         }
 #endif
-        /* PINT_mem_aligned_free(ptr); */
-        free(ptr);
+        PINT_mem_aligned_free(ptr);
     }
 }
 

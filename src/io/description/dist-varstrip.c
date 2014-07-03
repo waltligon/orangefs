@@ -13,7 +13,6 @@
 #include "pvfs2-dist-varstrip.h"
 #include "dist-varstrip-parser.h"
 
-#include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
 

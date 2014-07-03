@@ -67,13 +67,6 @@
 #include <ctype.h>
 #include "./dotconf.h"
 
-#include "pvfs2-internal.h"
-
-#ifdef WIN32
-#define snprintf    _snprintf
-#define strcasecmp  stricmp
-#endif
-
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
@@ -409,8 +402,9 @@ char *PINT_dotconf_get_here_document(
     return (char *) realloc(here_doc, offset);
 }
 
-const char *PINT_dotconf_invoke_command(configfile_t *configfile,
-                                        command_t *cmd)
+const char *PINT_dotconf_invoke_command(
+    configfile_t * configfile,
+    command_t * cmd)
 {
     const char *error = 0;
 
@@ -418,8 +412,9 @@ const char *PINT_dotconf_invoke_command(configfile_t *configfile,
     return error;
 }
 
-const char *PINT_dotconf_set_defaults(configfile_t *configfile,
-                                      unsigned long context)
+const char *PINT_dotconf_set_defaults(
+    configfile_t * configfile,
+    unsigned long context)
 {
     const char *error = 0;
     const configoption_t *option;
@@ -697,19 +692,16 @@ static void PINT_dotconf_free_command(
     int i;
 
     if (command->data.str)
-    {
-	free(command->data.str);
-    }
+        free(command->data.str);
 
     for (i = 0; i < command->arg_count; i++)
-    {
-	free(command->data.list[i]);
-    }
+        free(command->data.list[i]);
     free(command->data.list);
 }
 
-const char *PINT_dotconf_handle_command(configfile_t * configfile,
-                                        char *buffer)
+const char *PINT_dotconf_handle_command(
+    configfile_t * configfile,
+    char *buffer)
 {
     char *cp1, *cp2;                /* generic char pointer      */
     char *eob;                        /* end of buffer; end of string  */
@@ -731,15 +723,11 @@ const char *PINT_dotconf_handle_command(configfile_t * configfile,
 
     /* ignore comments and empty lines */
     if (!cp1 || !*cp1 || *cp1 == '#' || *cp1 == '\n' || *cp1 == (char) EOF)
-    {
-	return NULL;
-    }
+        return NULL;
 
     /* skip line if it only contains whitespace */
     if (cp1 == eob)
-    {
-	return NULL;
-    }
+        return NULL;
 
     /* get first token: read the name of a possible option */
     cp2 = name;
@@ -769,10 +757,8 @@ const char *PINT_dotconf_handle_command(configfile_t * configfile,
             }
         }
 
-	if (!option)
-        {
-	    option = get_argname_fallback(configfile->config_options[1]);
-        }
+        if (!option)
+            option = get_argname_fallback(configfile->config_options[1]);
 
         if (!option || !option->callback)
         {
@@ -792,25 +778,21 @@ const char *PINT_dotconf_handle_command(configfile_t * configfile,
             break;
         }
 
-	if (configfile->contextchecker)
-        {
-	    context_error =
-		configfile->contextchecker(&command, command.option->context);
-        }
+        if (configfile->contextchecker)
+            context_error =
+                configfile->contextchecker(&command, command.option->context);
 
-	if (!context_error)
+        if (!context_error)
+            error = PINT_dotconf_invoke_command(configfile, &command);
+        else
         {
-	    error = PINT_dotconf_invoke_command(configfile, &command);
+            if (!error)
+            {
+                /* avoid returning another error then the first. This makes it easier to
+                   reproduce problems. */
+                error = context_error;
+            }
         }
-	else
-	{
-	    if (!error)
-	    {
-		/* avoid returning another error then the first.
-                 * This makes it easier to reproduce problems. */
-		error = context_error;
-	    }
-	}
 
         PINT_dotconf_free_command(&command);
 
@@ -841,7 +823,7 @@ const char *PINT_dotconf_command_loop_until_error(
 int PINT_dotconf_command_loop(
     configfile_t * configfile)
 {
-    /* ------ returns: 0 for failure -- !0 for success ---------------- */
+    /* ------ returns: 0 for failure -- !0 for success ------------------------------------------ */
     char buffer[CFG_BUFSIZE];
 
     while (!(PINT_dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile)))

@@ -7,7 +7,6 @@
 #ifndef __SERVER_CONFIG_MGR_H
 #define __SERVER_CONFIG_MGR_H
 
-#include "pvfs2-internal.h"
 #include "server-config.h"
 
 int PINT_server_config_mgr_initialize(void);

@@ -16,9 +16,6 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-#define USRINT_SOURCE 1
-#include "usrint.h"
-
 #ifdef	HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -29,7 +26,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stddef.h>
-
 
 /* Outcomment the following line for production quality code.  */
 /* #define NDEBUG 1 */

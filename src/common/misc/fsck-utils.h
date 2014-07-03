@@ -7,9 +7,9 @@
 #ifndef __FSCK_UTILS_H
 #define __FSCK_UTILS_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "pint-sysint-utils.h"
 

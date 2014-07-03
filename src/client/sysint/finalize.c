@@ -9,7 +9,6 @@
 #include <malloc.h>
 #endif
 
-#include "pvfs2-internal.h"
 #include "pint-sysint-utils.h"
 #include "acache.h"
 #include "ncache.h"
@@ -32,27 +31,11 @@ extern PINT_smcb *g_smcb;
 /* PVFS_finalize
  *
  * shuts down the PVFS system interface
- * should not be recursive so simple run-once mechanism
  *
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_finalize()
 {
-    static int finiflag = 0;
-    static gen_mutex_t finimutex = GEN_MUTEX_INITIALIZER;
-
-    /* first time runs, other wait until completed then exit */
-    if (finiflag)
-    {
-        return 0;
-    }
-    gen_mutex_lock(&finimutex);
-    if (finiflag)
-    {
-        gen_mutex_unlock(&finimutex);
-        return 0;
-    }
-
     id_gen_safe_finalize();
 
     PINT_ncache_finalize();
@@ -90,8 +73,6 @@ int PVFS_sys_finalize()
 
     PINT_client_state_machine_release(g_smcb);
 
-    finiflag = 1;
-    gen_mutex_unlock(&finimutex);
     return 0;
 }
 

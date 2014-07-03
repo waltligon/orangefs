@@ -1120,12 +1120,12 @@ sub get_client_job_timeout
 
 sub get_logfile
 {
-    my $logfile = "/var/log/orangefs-server.log";
+    my $logfile = "${fs_path}/log/orangefs-server.log";
     if ($opt_logfile) {
         $logfile = $opt_logfile;
     } elsif (!$opt_quiet) {
             print $OUT "Choose a file for each server to write log messages to.\n";
-            $logfile = prompt_word("Enter log file location [Default is $logfile]: ","$logfile");
+            $logfile = prompt_word("Enter log file location [Default is ${fs_path}/log/orangefs-server.log]: ","${fs_path}/log/orangefs-server.log");
     }
     return $logfile;
 }

@@ -3,162 +3,143 @@
  *
  * See COPYING in top-level directory.
  */
+
 package org.orangefs.usrint;
 
-import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-
+import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /* An OFS compatible File Output Stream */
 public class OrangeFileSystemOutputStream extends OutputStream {
-    /* Interface Related Fields */
-    private Orange orange;
-    private PVFS2POSIXJNIFlags pf;
-    /* File Related Fields */
-    private OrangeFileSystemOutputChannel outChannel;
-    private String path;
-    /* TODO */
-    @SuppressWarnings("unused")
-    private short replication;
-    private static final Log OFSLOG = LogFactory
-            .getLog(OrangeFileSystemOutputStream.class);
 
-    /* TODO: comments */
-    public OrangeFileSystemOutputStream(String path, int bufferSize,
-            short replication, boolean append) throws IOException {
-        int ret = -1;
+    /* Interface Related Fields*/
+    public Orange orange;
+    public PVFS2POSIXJNIFlags pf;
+    public PVFS2STDIOJNIFlags sf;
+
+    /* File Related Fields */
+    public String path;
+    public short replication;
+    public long bufferSize;
+    public long filePtr;
+    public long bufferPtr;
+    public boolean append;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemOutputStream.class);
+
+    public OrangeFileSystemOutputStream (
+        String path,
+        int bufferSize,
+        short replication, 
+        boolean append) throws IOException 
+    {
+        displayMethodInfo(true, false);
+
         /* Initialize Interface and Flags */
         this.orange = Orange.getInstance();
         pf = orange.posix.f;
+        sf = orange.stdio.f;
+
         this.path = path;
-        /*
-         * TODO: replication
-         */
-        this.replication = 0;
-        /* Perform open */
-        ret = orange.posix.open(path, pf.O_CREAT | (append ? pf.O_APPEND : 0)
-                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO);
-        if (ret < 0) {
-            throw new IOException(path + " couldn't be opened. (open)");
+        this.filePtr = 0;
+        this.bufferPtr = 0;
+        this.bufferSize = bufferSize;
+        /* TODO: replication, also think about appends rep. */
+        this.replication = (short) 0; //replication;
+        this.append = append;
+        String fopenMode = append ? "a" : "w";
+
+        /* Perform fopen */
+        filePtr = orange.stdio.fopen(path, fopenMode);
+        if(filePtr == 0) {
+            throw new IOException(path + 
+                " couldn't be opened. (fopen)");
         }
-        outChannel = new OrangeFileSystemOutputChannel(ret, bufferSize);
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
+        /* Allocate Space for Buffer based on bufferSize */
+        bufferPtr = orange.stdio.calloc(1, bufferSize);
+        if(bufferPtr == 0) {
+            throw new IOException(path +
+                "couldn't be opened. (calloc for setvbuf)");
         }
-        OFSLOG.debug(path + " opened successfully. fd = " + ret
-                + " , bufferSize = " + bufferSize);
+        /* Set buffering as desired */
+        if(orange.stdio.setvbuf(filePtr,
+            bufferPtr, sf._IOFBF, bufferSize) != 0)
+        {
+            throw new IOException(path + "couldn't be opened. (setvbuf)");
+        }
     }
 
-    /*
-     * Closes this output stream and releases any system resources associated
-     * with this stream. The general contract of close is that it closes the
-     * output stream. A closed stream cannot perform output operations and
-     * cannot be reopened. The close method of OutputStream does nothing.
-     */
-    @Override
     public synchronized void close() throws IOException {
-        if (outChannel == null) {
-            return;
+        displayMethodInfo(true, false);
+
+        if(filePtr == 0 ) {
+            return; 
         }
-        /* Note: flush occurs when the outChannel is closed. */
-        outChannel.close();
-        outChannel = null;
+        if(orange.stdio.fclose(filePtr) != 0) {
+            throw new IOException("Couldn't close stream: " + path);
+        }
+        filePtr = 0;
+        /* Free buffer */
+        if(bufferPtr != 0) {
+            orange.stdio.free(bufferPtr);
+        }
+        bufferPtr = 0;
     }
 
-    /*
-     * Flushes this output stream and forces any buffered output bytes to be
-     * written out. The general contract of flush is that calling it is an
-     * indication that, if any bytes previously written have been buffered by
-     * the implementation of the output stream, such bytes should immediately be
-     * written to their intended destination. If the intended destination of
-     * this stream is an abstraction provided by the underlying operating
-     * system, for example a file, then flushing the stream guarantees only that
-     * bytes previously written to the stream are passed to the operating system
-     * for writing; it does not guarantee that they are actually written to a
-     * physical device such as a disk drive. The flush method of OutputStream
-     * does nothing.
-     */
-    @Override
     public void flush() throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
+        displayMethodInfo(true, false);
+
+        int ret = orange.stdio.fflush(filePtr);
+        if(ret != 0) {
+            throw new IOException("Couldn't flush stream: " + path);
         }
-        outChannel.flush();
     }
 
-    public String getPath() throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
-        }
-        return path;
+    public void write(int b) throws IOException {
+        displayMethodInfo(true, false);
+
+        byte [] bytes = { (byte) b };
+        write(bytes, 0, 1);
     }
 
-    /* Returns current position within the file */
-    public long tell() throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null.");
-        }
-        return outChannel.tell();
-    }
-
-    /*
-     * Writes len bytes from the specified byte array starting at offset off to
-     * this output stream. The general contract for write(b, off, len) is that
-     * some of the bytes in the array b are written to the output stream in
-     * order; element b[off] is the first byte written and b[off+len-1] is the
-     * last byte written by this operation. If b is null, a NullPointerException
-     * is thrown. If off is negative, or len is negative, or off+len is greater
-     * than the length of the array b, then an IndexOutOfBoundsException is
-     * thrown.
-     */
-    @Override
-    public void write(byte b[], int off, int len) throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
-        }
-        if (b == null) {
-            throw new NullPointerException("b is null");
-        }
-        if (off < 0 || len < 0 || (off + len) > b.length) {
-            throw new IndexOutOfBoundsException(
-                    "off or length is < 0; or  off + len is > b.length: off = "
-                            + off + ", len = " + len);
-        }
-        if (off < 0) {
-            return;
-        }
-        outChannel.write(ByteBuffer.wrap(b, off, len));
-    }
-
-    /*
-     * Writes b.length bytes from the specified byte array to this output
-     * stream. The general contract for write(b) is that it should have exactly
-     * the same effect as the call write(b, 0, b.length).
-     */
-    @Override
     public void write(byte[] b) throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
-        }
+        displayMethodInfo(true, false);
+
         write(b, 0, b.length);
     }
 
-    /*
-     * Writes the specified byte to this output stream. The general contract for
-     * write is that one byte is written to the output stream. The byte to be
-     * written is the eight low-order bits of the argument b. The 24 high-order
-     * bits of b are ignored. Subclasses of OutputStream must provide an
-     * implementation for this method.
-     */
-    @Override
-    public void write(int b) throws IOException {
-        if (outChannel == null) {
-            throw new IOException("outChannel is null");
+    public void write(byte b[], int off, int len) throws IOException {
+        displayMethodInfo(true, false);
+
+        if(len <= 0)
+            return;
+
+        byte c[] = new byte[len];
+        System.arraycopy(b, off, c, 0, len);
+        long ret = orange.stdio.fwrite(c, 1, (long) len, filePtr);
+        if(ret < (long) len) {
+            /* Check for stream error indicator */
+            if(orange.stdio.ferror(filePtr) != 0) {
+                orange.stdio.clearerr(filePtr);
+                throw new IOException("Error: Bytes not written to file ( " +
+                    ret + " of " + len + "): " + path);
+            }        
         }
-        byte[] byteArray = { (byte) (b & 0x000000ff) };
-        write(byteArray, 0, 1);
+    }
+
+    public void displayMethodInfo(boolean showName, boolean showStack) {
+        if(showName || showStack) {
+            String methodName =
+                Thread.currentThread().getStackTrace()[2].getMethodName();
+            if(showName) {
+                OFSLOG.debug("method=[" + methodName + "]");
+            }
+            if(showStack) {
+                //System.out.print("\t");
+                //Thread.currentThread().dumpStack();
+            }
+        }
     }
 }

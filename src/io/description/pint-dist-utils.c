@@ -11,7 +11,6 @@
 #include "pvfs2-dist-varstrip.h"
 #include "pvfs2-dist-twod-stripe.h"
 #include "pint-dist-utils.h"
-#include "pvfs2-internal.h"
 
 /* Default distributions */
 extern PINT_dist basic_dist;

@@ -34,18 +34,6 @@
  * segment one at a time so we only do this if we feel
  * we might have a sym link.
  *
- * Values set on a pvfs_path
- * PATH_LOOKEDUP - the path points to an existing fs object
- * PATH_RESOLVED - the path points into a PVFS volume
- * PATH_MNTPOINT - the mount point of the PVFS volume
- * PATH_ERROR - an error occured in the process
- * PATH_EXPANDED - indicates this routine was run successfully
- *
- * Paths can be looked up and not resolved (a non-pvfs object)
- * or resolved and not looked up (a pvfs path but object not found)
- * or neither (not an existing path at all) or both (a pvfs object).
- * mntpoint only valid if resolved.  error contains the errno value.
- *
  * NOTE:  if you make changes to this function after
  * 08/08/2012, remember to make changes to PVFS_qualify_path()
  * in pvfs-qualify-path.c
@@ -269,33 +257,16 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                         PVFS_PATH_MAX);
             if (n < 0)
             {
-                struct stat sbuf;
+                //fprintf(stderr,"errno = %d EINVAL = %d ", errno, EINVAL);
                 if (errno != EINVAL)
                 {
+                    //fprintf(stderr," bailing out\n");
                     /* an error so we bail out */
                     Ppath->rc = -errno;
                     goto err;
                 }
-                /* else not a sym link 
-                 * check to see if it is a valid object
-                 */
-                n = syscall(SYS_stat,
-                            Ppath->expanded_path,
-                            &sbuf);
-                if (n < 0)
-                {
-                    /* Failed to look this up so this is either an
-                     * erroneous path or it is a path to an object
-                     * we are creating.  
-                     */
-                    *npath++ = '/';
-                    break; /* out of while (*opath != '\0') */
-                }
-                /* mark path up to here as existing  - though not PVFS */
-                SET_LOOKEDUP(Ppath);
-                /* Ppath->filename = npath; */
-                /* cover the error code */
-                errno = 0;
+                //fprintf(stderr," continuing\n");
+                /* else not a sym link so do nothing */
             }
             else
             {
@@ -391,13 +362,10 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                                        NULL,
                                        0);
         Ppath->rc = ret; /* save this return code */
-        if (ret == 0)
-        {
-            Ppath->fs_id = obj_ref.fs_id;
-            Ppath->handle = obj_ref.handle;
-            Ppath->filename = npath;
-            SET_LOOKEDUP(Ppath);
-        }
+        Ppath->fs_id = obj_ref.fs_id;
+        Ppath->handle = obj_ref.handle;
+        Ppath->filename = npath;
+        SET_LOOKEDUP(Ppath);
     }
     /* if this was already a PVFS_path then this is
      * the same path that was passed in
@@ -439,8 +407,7 @@ int is_pvfs_path(const char **path, int skip_last_lookup)
     
     if(pvfs_sys_init())
     {
-        return 0; /* assume non-PVFS because we haven't initialized yet */
-                  /* see comments in openfile-util.c */
+        return 0;
     }
 
     if (!path || !*path)

@@ -17,7 +17,6 @@
 #include "gossip.h"
 #include "id-generator.h"
 #include "pint-util.h"
-#include "pvfs2-internal.h"
 
 #ifdef WIN32
 typedef enum job_type job_type_t;

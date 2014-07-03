@@ -7,7 +7,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "dbpf-op.h"
 #include "dbpf-bstream.h"
 #include "gossip.h"

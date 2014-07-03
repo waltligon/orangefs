@@ -10,7 +10,6 @@
 #include "mx.h"
 #include "pint-hint.h"
 #include "pint-event.h"
-#include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 
 

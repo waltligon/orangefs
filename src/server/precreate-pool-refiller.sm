@@ -13,7 +13,6 @@
 #include <assert.h>
 
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 #include "server-config.h"
 #include "pint-util.h"

@@ -343,14 +343,13 @@ static void __exit pvfs2_exit(void)
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 
-/* simply return an index valid for the table_size */
 static int hash_func(void *key, int table_size)
 {
-    uint64_t ret, *tag = (uint64_t *) key;
-
-    ret = *tag % ((unsigned int) table_size);
-
-    return (int) ret;
+    int tmp = 0;
+    uint64_t *real_tag = (uint64_t *)key;
+    tmp += (int)(*real_tag);
+    tmp = (tmp % table_size);
+    return tmp;
 }
 
 static int hash_compare(void *key, struct qhash_head *link)
@@ -376,8 +375,8 @@ void purge_inprogress_ops(void)
         {
             pvfs2_kernel_op_t *op = qhash_entry(tmp_link, pvfs2_kernel_op_t, list);
             spin_lock(&op->lock);
-            gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2-client-core: purging in-progress op tag %llu %s\n",
-                    llu(op->tag), get_opname_string(op));
+            gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2-client-core: purging in-progress op tag %lld %s\n",
+                    lld(op->tag), get_opname_string(op));
             set_op_state_purged(op);
             spin_unlock(&op->lock);
             wake_up_interruptible(&op->waitq);

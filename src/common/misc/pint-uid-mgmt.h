@@ -1,7 +1,6 @@
 #ifndef __PINT_UID_MGMT_H
 #define __PINT_UID_MGMT_H
 
-#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "quickhash.h"
 #include "pvfs2-types.h"

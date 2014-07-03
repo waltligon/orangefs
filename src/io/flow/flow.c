@@ -22,7 +22,6 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "flow-ref.h"
-#include "pvfs2-internal.h"
 
 /* mutex lock used to prevent more than one process from entering the
  * interface at a time

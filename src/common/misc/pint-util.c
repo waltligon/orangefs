@@ -22,7 +22,6 @@
 #include <unistd.h>
 #endif
 
-#include "pvfs2-internal.h"
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
 #include "pint-util.h"

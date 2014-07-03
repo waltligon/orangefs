@@ -14,7 +14,6 @@
 
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "bmi.h"

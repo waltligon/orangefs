@@ -21,11 +21,10 @@
 #ifndef __TROVE_H
 #define __TROVE_H
 
-#include "pvfs2-internal.h"
-
 #include <limits.h>
 #include <errno.h>
 
+#include "pvfs2-config.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-req-proto.h"
 

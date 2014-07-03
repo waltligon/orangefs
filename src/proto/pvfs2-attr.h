@@ -10,7 +10,6 @@
 #ifndef __PVFS2_ATTR_H
 #define __PVFS2_ATTR_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"

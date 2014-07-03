@@ -14,7 +14,6 @@
 #ifndef __REFERENCE_LIST_H
 #define __REFERENCE_LIST_H
 
-#include "pvfs2-internal.h"
 #include "bmi-types.h"
 #include "bmi-method-support.h"
 #include "quicklist.h"

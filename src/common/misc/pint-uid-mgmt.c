@@ -1,12 +1,3 @@
-
-/* 
- * (C) 2013 Clemson University and The University of Chicago 
- *
- * See COPYING in top-level directory.
- *
- */
-
-#include "pvfs2-internal.h"
 #include "pint-uid-mgmt.h"
 #include "pint-util.h"
 #include "gen-locks.h"
@@ -205,12 +196,3 @@ void PINT_dump_all_uid_stats(PVFS_uid_info_s *uid_array)
 
     return;
 }
-
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=4 sts=4 sw=4 expandtab
- */

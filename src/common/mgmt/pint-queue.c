@@ -11,7 +11,6 @@
 #include <errno.h>
 #include "pint-util.h"
 #include "pvfs2-debug.h"
-#include "pvfs2-internal.h"
 
 struct PINT_queue_trigger
 {

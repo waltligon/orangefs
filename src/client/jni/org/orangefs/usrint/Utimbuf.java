@@ -12,17 +12,15 @@ import java.lang.reflect.Field;
 public class Utimbuf {
     long actime;
     long modtime;
-
-    /*
-     * This probably won't get called much since we're depending upon a native
-     * method to initialize this object.
+    
+    /* This probably won't get called much since we're depending upon a 
+     * native method to initialize this object.
      */
     Utimbuf() {
 
     }
 
     /* Generic Object Dump to String */
-    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -33,19 +31,18 @@ public class Utimbuf {
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for (Field field : fields) {
+        for(Field field : fields ) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch(IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);
         }
         result.append("}");
         return result.toString();
-    }
+    }  
 }

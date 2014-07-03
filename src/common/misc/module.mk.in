@@ -20,7 +20,6 @@ LIBSRC += $(DIR)/server-config.c \
           $(DIR)/state-machine-fns.c \
           $(DIR)/fsck-utils.c \
           $(DIR)/pint-eattr.c \
- 	      $(DIR)/pint-malloc.c \
           $(DIR)/pint-hint.c \
           $(DIR)/pint-mem.c \
           $(DIR)/replication-client-utils.c \
@@ -47,7 +46,6 @@ SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/msgpairarray.c \
              $(DIR)/pint-eattr.c \
              $(DIR)/pint-mem.c \
-	  		 $(DIR)/pint-malloc.c \
              $(DIR)/pint-hint.c \
              $(DIR)/replication-common-utils.c \
              $(DIR)/pint-uid-mgmt.c \
@@ -57,8 +55,7 @@ SERVERSRC += $(DIR)/server-config.c \
 LIBBMISRC += $(DIR)/str-utils.c \
              $(DIR)/pint-event.c \
              $(DIR)/errno-mapping.c \
-             $(DIR)/pint-mem.c \
-	  		 $(DIR)/pint-malloc.c
+             $(DIR)/pint-mem.c
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

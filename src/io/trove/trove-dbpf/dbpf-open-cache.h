@@ -7,8 +7,6 @@
 #ifndef __DBPF_OPEN_CACHE_H__
 #define __DBPF_OPEN_CACHE_H__
 
-#include "pvfs2-internal.h"
-
 #include <db.h>
 
 #include "trove.h"

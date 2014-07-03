@@ -10,7 +10,6 @@
 #include "pint-distribution.h"
 #include "pint-dist-utils.h"
 #include "pvfs2-types.h"
-#include "pvfs2-internal.h"
 #include "pvfs2-dist-basic.h"
 
 #define CONTIGBLOCKSZ 65536

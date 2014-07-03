@@ -7,7 +7,6 @@
 #ifndef __THREAD_MGR_H
 #define __THREAD_MGR_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "bmi.h"
 #include "pint-dev.h"

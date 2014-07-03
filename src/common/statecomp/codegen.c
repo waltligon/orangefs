@@ -15,8 +15,6 @@
 #include <string.h>
 #include <assert.h>
 
-#define PVFS_MALLOC_REDEF_OVERRIDE 1
-#include "pvfs2-internal.h"
 #include "../quicklist/quicklist.h"
 #include "../quickhash/quickhash.h"
 

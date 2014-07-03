@@ -11,7 +11,6 @@
 #ifndef __JOB_DESC_QUEUE_H
 #define __JOB_DESC_QUEUE_H
 
-#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "job.h"
 #include "pvfs2-types.h"

@@ -25,7 +25,7 @@
 #include <sys/time.h>
 #endif
 
-#include "pvfs2-internal.h"
+#include "pvfs2-config.h"
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
@@ -407,13 +407,9 @@ int gossip_err(
 }
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
-#  ifndef GOSSIP_BACKTRACE_DEPTH
-#    define GOSSIP_BACKTRACE_DEPTH 24
-#  endif
-#  ifndef GOSSIP_MAX_BT
-#    define GOSSIP_MAX_BT 8
-#  endif
-
+    #ifndef GOSSIP_BACKTRACE_DEPTH
+    #define GOSSIP_BACKTRACE_DEPTH 12
+    #endif
 /** Prints out a dump of the current stack (excluding this function)
  *  using gossip_err.
  */
@@ -422,7 +418,6 @@ void gossip_backtrace(void)
     void *trace[GOSSIP_BACKTRACE_DEPTH];
     char **messages = NULL;
     int i, trace_size;
-    static int btcnt = 0;
 
     trace_size = backtrace(trace, GOSSIP_BACKTRACE_DEPTH);
     messages = backtrace_symbols(trace, trace_size);
@@ -430,20 +425,13 @@ void gossip_backtrace(void)
     {
         gossip_err("\t[bt] %s\n", messages[i]);
     }
-    /* backtrace_symbols is a libc call that mallocs */
-    /* we need to free it with clean_free, not our free */
-    clean_free(messages);
-    if (++btcnt >= GOSSIP_MAX_BT)
-    {
-        /* something is really wrong, time to bail out */
-        exit(-1);
-    }
+    free(messages);
 }
 #else
 void gossip_backtrace(void)
 {
 }
-#endif /* GOSSIP_ENABLE_BACKTRACE */
+#endif
 
 /****************************************************************
  * Internal functions
@@ -555,7 +543,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
                            GetThreadId(GetCurrentThread()));
 #else
             temp_size = sprintf(bptr, ".%06ld (%ld)] ", (long)tv.tv_usec, 
-                           (long int)gen_thread_self());
+                           gen_thread_self());
 #endif
             bptr += temp_size;
             bsize -= temp_size;

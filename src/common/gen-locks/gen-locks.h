@@ -9,7 +9,6 @@
  * programmers should use the following interface for portability rather
  * than directly calling specific lock implementations:
  *
- * int gen_mutex_init(gen_mutex_t* mut);
  * int gen_mutex_lock(gen_mutex_t* mut);
  * int gen_mutex_unlock(gen_mutex_t* mut);
  * int gen_mutex_trylock(gen_mutex_t* mut);
@@ -20,8 +19,6 @@
 
 #ifndef __GEN_LOCKS_H
 #define __GEN_LOCKS_H
-
-#include "pvfs2-internal.h"
 
 #include <stdlib.h>
 #ifndef WIN32
@@ -48,22 +45,18 @@
 #include <pthread.h>
 
 	/* function prototypes for specific locking implementations */
-int gen_posix_mutex_lock(pthread_mutex_t *mutex);
-int gen_posix_mutex_unlock(pthread_mutex_t *mutex);
-int gen_posix_mutex_trylock(pthread_mutex_t *mutex);
+int gen_posix_mutex_lock(pthread_mutex_t * mut);
+int gen_posix_mutex_unlock(pthread_mutex_t * mut);
+int gen_posix_mutex_trylock(pthread_mutex_t * mut);
 pthread_mutex_t *gen_posix_mutex_build(void);
-int gen_posix_mutex_destroy(pthread_mutex_t *mutex);
-int gen_posix_mutex_init(pthread_mutex_t *mutex);
-int gen_posix_recursive_mutex_init(pthread_mutex_t *mutex);
-int gen_posix_shared_mutex_init(pthread_mutex_t *mutex);
+int gen_posix_mutex_destroy(pthread_mutex_t * mut);
+int gen_posix_mutex_init(pthread_mutex_t * mut);
 pthread_t gen_posix_thread_self(void);
 
 int gen_posix_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr);
-int gen_posix_shared_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr);
 int gen_posix_cond_destroy(pthread_cond_t *cond);
-int gen_posix_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
-int gen_posix_cond_timedwait(pthread_cond_t *cond,
-                             pthread_mutex_t *mutex,
+int gen_posix_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mut);
+int gen_posix_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mut,
                              const struct timespec *abstime);
 int gen_posix_cond_signal(pthread_cond_t *cond);
 int gen_posix_cond_broadcast(pthread_cond_t *cond);
@@ -79,46 +72,31 @@ typedef pthread_cond_t  gen_cond_t;
 # if _POSIX_THREAD_PROCESS_SHARED != -1
 #  if __WORDSIZE == 64
 #   define GEN_SHARED_MUTEX_INITIALIZER_NP \
-           { { 0, 0, 0, 0, 128, 0, { 0, 0 } } }
+     { { 0, 0, 0, 0, 128, 0, { 0, 0 } } }
 #  else
 #   define GEN_SHARED_MUTEX_INITIALIZER_NP \
-           { { 0, 0, 0, 0, 128, { 0 } } }
+     { { 0, 0, 0, 0, 128, { 0 } } }
 #  endif /* __WORDSIZE */   
 # endif /* _POSIX_THREAD_PROCESS_SHARED */
 
 /* Support for custom static initializer for a recursive pthread mutex */
-/* Newer pthread.h provide this, use what is there if we can */
-# if defined PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+# if __WORDSIZE == 64
 #  define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
-          PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+    { { 0, 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0, 0 } } }
 # else
-#  if __WORDSIZE == 64
-#   define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
-           { { 0, 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0, 0 } } }
-#  else
-#   define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
-           { { 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0 } } }
-#  endif /* __WORDSIZE */
-# endif /* PTHREAD_RECURSIVE */
+#  define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+    { { 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0 } } }
+# endif /* __WORDSIZE */
 #endif /* __USE_GNU */
-
-
-#ifdef __DARWIN__
-# define GEN_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-#endif
-
 
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_posix_mutex_trylock(m)
 #define gen_mutex_destroy(m) gen_posix_mutex_destroy(m)
 #define gen_mutex_init(m) gen_posix_mutex_init(m)
-#define gen_recursive_mutex_init(m) gen_posix_recursive_mutex_init(m)
-#define gen_shared_mutex_init(m) gen_posix_shared_mutex_init(m)
 #define gen_thread_self() gen_posix_thread_self()
 
 #define gen_cond_init(c) gen_posix_cond_init(c, NULL)
-#define gen_shared_cond_init(c) gen_posix_shared_cond_init(c, NULL)
 #define gen_cond_destroy(c) gen_posix_cond_destroy(c)
 #define gen_cond_wait(c, m) gen_posix_cond_wait(c, m)
 #define gen_cond_timedwait(c, m, s) gen_posix_cond_timedwait(c, m, s)
@@ -131,8 +109,6 @@ typedef pthread_cond_t  gen_cond_t;
 
 typedef HANDLE gen_mutex_t;
 typedef HANDLE gen_thread_t;
-
-#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP INVALID_HANDLE_VALUE
 
 /* Implementation based on Pthreads-win32 - POSIX Threads Library for Win32
  * Copyright (C) 1998 John E. Bossom
@@ -157,12 +133,12 @@ struct gen_cond_t_
     gen_cond_t prev;
 };
 
-int gen_win_mutex_lock(HANDLE *mutex);
-int gen_win_mutex_unlock(HANDLE *mutex);
-int gen_win_mutex_trylock(HANDLE *mutex);
+int gen_win_mutex_lock(HANDLE *mut);
+int gen_win_mutex_unlock(HANDLE *mut);
+int gen_win_mutex_trylock(HANDLE *mut);
 HANDLE *gen_win_mutex_build(void);
-int gen_win_mutex_destroy(HANDLE *mutex);
-int gen_win_mutex_init(HANDLE *mutex);
+int gen_win_mutex_destroy(HANDLE *mut);
+int gen_win_mutex_init(HANDLE *mut);
 HANDLE gen_win_thread_self(void);
 
 #define GEN_MUTEX_INITIALIZER ((gen_mutex_t) -1)
@@ -176,8 +152,8 @@ HANDLE gen_win_thread_self(void);
 
 int gen_win_cond_init(gen_cond_t *cond);
 int gen_win_cond_destroy(gen_cond_t *cond);
-int gen_win_cond_wait(gen_cond_t *cond, HANDLE *mutex);
-int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mutex,
+int gen_win_cond_wait(gen_cond_t *cond, HANDLE *mut);
+int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mut,
                              const struct timespec *abstime);
 int gen_win_cond_signal(gen_cond_t *cond);
 int gen_win_cond_broadcast(gen_cond_t *cond);
@@ -201,17 +177,20 @@ typedef int gen_cond_t;
 #define GEN_RECURSIVE_MUTEX_INITIALIZER_NP 0
 #define GEN_COND_INITIALIZER 0
 
-static inline int gen_mutex_lock(gen_mutex_t *mutex_p)
+static inline int gen_mutex_lock(
+    gen_mutex_t * mutex_p)
 {
     (void) mutex_p;
     return 0;
 }
-static inline int gen_mutex_unlock(gen_mutex_t *mutex_p)
+static inline int gen_mutex_unlock(
+    gen_mutex_t * mutex_p)
 {
     (void) mutex_p;
     return 0;
 }
-static inline int gen_mutex_trylock(gen_mutex_t *mutex_p)
+static inline int gen_mutex_trylock(
+    gen_mutex_t * mutex_p)
 {
     (void) mutex_p;
     return 0;
@@ -221,12 +200,9 @@ static inline gen_thread_t gen_thread_self(void)
     return 0;
 }
 #define gen_mutex_init(m) do{}while(0)
-#define gen_recursive_mutex_init(m) do{}while(0)
-#define gen_shared_mutex_init(m) do{}while(0)
 #define gen_mutex_destroy(m) do{}while(0)
 
 #define gen_cond_init(c) do{}while(0)
-#define gen_shared_cond_init(c) do{}while(0)
 #define gen_cond_destroy(c) do{}while(0)
 
 static inline int gen_cond_wait(gen_cond_t *cond, gen_mutex_t *mut)
@@ -235,8 +211,7 @@ static inline int gen_cond_wait(gen_cond_t *cond, gen_mutex_t *mut)
     return 0;
 }
 
-static inline int gen_cond_timedwait(gen_cond_t *cond,
-                                     gen_mutex_t *mutex`,
+static inline int gen_cond_timedwait(gen_cond_t *cond, gen_mutex_t *mut,
                                      const struct timespec *abstime)
 {
     (void) cond;

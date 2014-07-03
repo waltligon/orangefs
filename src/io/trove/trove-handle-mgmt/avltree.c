@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include "trove-extentlist.h"		/* declares the AVL types  */
 #include "avltree.h"
-#include "pvfs2-internal.h"
 
 /*
  *  avlrotleft: perform counterclockwise rotation

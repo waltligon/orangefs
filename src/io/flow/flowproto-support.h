@@ -11,7 +11,6 @@
 #ifndef __FLOWPROTO_SUPPORT_H
 #define __FLOWPROTO_SUPPORT_H
 
-#include "pvfs2-internal.h"
 #include "src/io/flow/flow.h"
 
 /* flow protocol interface */

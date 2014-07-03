@@ -7,7 +7,6 @@
 #ifndef __DBPF_ATTR_CACHE_H
 #define __DBPF_ATTR_CACHE_H
 
-#include "pvfs2-internal.h"
 #include "dbpf.h"
 #include "trove-types.h"
 #include "quickhash.h"

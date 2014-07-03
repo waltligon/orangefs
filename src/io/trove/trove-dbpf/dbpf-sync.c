@@ -5,7 +5,6 @@
  */
 
 #include "dbpf-op-queue.h"
-#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pint-perf-counter.h"
 #include "dbpf-sync.h"

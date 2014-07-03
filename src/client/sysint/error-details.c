@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 #include "pvfs2-types.h"
-#include "pvfs2-internal.h"
 
 /* PVFS2 error details functions
  *

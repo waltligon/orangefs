@@ -37,10 +37,8 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-
-#include "pvfs2-internal.h"
 #include "realpath.h"
-#include "pvfs2-types.h"
+#include <pvfs2-types.h>
 #include "pvfs2-util.h"
 
 #define MAX_READLINKS 32

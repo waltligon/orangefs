@@ -7,8 +7,6 @@
 #ifndef TROVE_LEDGER_H
 #define TROVE_LEDGER_H
 
-#include "pvfs2-internal.h"
-
 #include <sys/types.h>
 #include "trove-types.h"
 

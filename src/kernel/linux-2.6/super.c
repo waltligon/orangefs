@@ -947,9 +947,10 @@ struct super_operations pvfs2_s_ops =
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
-struct super_block* pvfs2_get_sb(struct super_block *sb,
-                                 void *data,
-                                 int silent)
+struct super_block* pvfs2_get_sb(
+    struct super_block *sb,
+    void *data,
+    int silent)
 {
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
@@ -999,16 +1000,14 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
         goto error_exit;
     }
     strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
-            dev_name,
-            PVFS_MAX_SERVER_ADDR_LEN);
+            dev_name, PVFS_MAX_SERVER_ADDR_LEN);
 
     gossip_debug(GOSSIP_SUPER_DEBUG, "Attempting PVFS2 Mount via host %s\n",
-                 new_op->upcall.req.fs_mount.pvfs2_config_server);
+                new_op->upcall.req.fs_mount.pvfs2_config_server);
 
     ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
-    gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "%s: mount got return value of %d\n", __func__, ret);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "%s: mount got return value of %d\n", __func__, ret);
     if (ret)
     {
         goto error_exit;
@@ -1023,7 +1022,8 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
         goto error_exit;
     }
 
-    PVFS2_SB(sb)->root_handle = new_op->downcall.resp.fs_mount.root_handle;
+    PVFS2_SB(sb)->root_handle =
+        new_op->downcall.resp.fs_mount.root_handle;
     PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
     PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
 
@@ -1042,18 +1042,15 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
                  root_object.handle, root_object.fs_id);
     /* alloc and initialize our root directory inode by explicitly requesting
      * the sticky bit to be set */
-    root = pvfs2_get_custom_core_inode(sb,
-                                       NULL,
-                                       (S_IFDIR | 0755 | S_ISVTX),
-                                       0,
-                                       root_object);
+    root = pvfs2_get_custom_core_inode(
+        sb, NULL, (S_IFDIR | 0755 | S_ISVTX), 0, root_object);
     if (!root)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
     gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %o\n",
-                 root, root->i_mode);
+            root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);
@@ -1076,7 +1073,7 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     op_release(new_op);
     return sb;
 
-error_exit:
+  error_exit:
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
     if (ret == -EINVAL)
     {
@@ -1108,9 +1105,9 @@ error_exit:
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
 #ifdef HAVE_FHTODENTRY_EXPORT_OPERATIONS
-struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
-                                  struct fid *fid,
-                                  int fh_len, int fh_type)
+struct dentry *
+pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
+                   int fh_len, int fh_type)
 {
    PVFS_object_ref refn;
    struct inode *inode;
@@ -1162,11 +1159,7 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
 #endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
 
 #ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
-#ifdef PVFS_ENCODE_FS_USES_DENTRY
-int pvfs2_encode_fh(struct dentry *dentry,
-                    __u32 *fh,
-                    int *max_len,
-                    int connectable)
+int pvfs2_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len, int connectable)
 {
    struct inode *inode = dentry->d_inode;
    int len = *max_len;
@@ -1178,8 +1171,7 @@ int pvfs2_encode_fh(struct dentry *dentry,
     * if connectable is specified, parent handle identity has to be stashed
     * as well.
     */
-   if (len < 3 || (connectable && len < 6))
-   {
+   if (len < 3 || (connectable && len < 6)) {
       gossip_lerr("fh buffer is too small for encoding\n");
       type = 255;
       goto out;
@@ -1187,8 +1179,7 @@ int pvfs2_encode_fh(struct dentry *dentry,
 
    handle = PVFS2_I(inode)->refn;
    generation = inode->i_generation;
-   gossip_debug(GOSSIP_SUPER_DEBUG,
-                "Encoding fh: handle %llu, gen %u, fsid %u\n",
+   gossip_debug(GOSSIP_SUPER_DEBUG, "Encoding fh: handle %llu, gen %u, fsid %u\n",
                 handle.handle, generation, handle.fs_id);
 
    len = 3;
@@ -1196,8 +1187,7 @@ int pvfs2_encode_fh(struct dentry *dentry,
    fh[1] = handle.handle & 0xffffffff;
    fh[2] = handle.fs_id;
 
-   if (connectable && !S_ISDIR(inode->i_mode))
-   {
+   if (connectable && !S_ISDIR(inode->i_mode)) {
       struct inode *parent;
 
       spin_lock(&dentry->d_lock);
@@ -1212,63 +1202,17 @@ int pvfs2_encode_fh(struct dentry *dentry,
       spin_unlock(&dentry->d_lock);
       len = 6;
       type = 2;
-      gossip_debug(GOSSIP_SUPER_DEBUG,
-                   "Encoding parent: handle %llu, gen %u, fsid %u\n",
-                   handle.handle, generation, handle.fs_id);
+      gossip_debug(GOSSIP_SUPER_DEBUG, "Encoding parent: handle %llu, gen %u, fsid %u\n",
+                  handle.handle, generation, handle.fs_id);
    }
    *max_len = len;
 
 out:
    return type;
 }
-#else
-int pvfs2_encode_fh(struct inode *inode,
-                    __u32 *fh,
-                    int *max_len,
-                    struct inode *parent)
-{
-   int len = parent ? 6 : 3;
-   int type = 1;
-   PVFS_object_ref handle;
-
-   if (*max_len < len) {
-     gossip_lerr("fh buffer is too small for encoding\n");
-     *max_len = len;
-     type =  255;
-     goto out;
-   }
-
-   handle = PVFS2_I(inode)->refn;
-   gossip_debug(GOSSIP_SUPER_DEBUG,
-                "Encoding fh: handle %llu, fsid %u\n",
-                handle.handle, handle.fs_id);
-
-   fh[0] = handle.handle >> 32;
-   fh[1] = handle.handle & 0xffffffff;
-   fh[2] = handle.fs_id;
-
-   if (parent)
-   {
-      handle = PVFS2_I(parent)->refn;
-      fh[3] = handle.handle >> 32;
-      fh[4] = handle.handle & 0xffffffff;
-      fh[5] = handle.fs_id;
-
-      type = 2;
-      gossip_debug(GOSSIP_SUPER_DEBUG,
-                   "Encoding parent: handle %llu, fsid %u\n",
-                   handle.handle, handle.fs_id);
-   }
-   *max_len = len;
-
-out:
-   return type;
-}
-#endif /* PVFS_ENCODE_FS_USES_DENTRY */
 #endif /* HAVE_ENCODEFH_EXPORT_OPERATIONS */
 
-static struct export_operations pvfs2_export_ops =
-{
+static struct export_operations pvfs2_export_ops = {
 #ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
    .encode_fh    = pvfs2_encode_fh,
 #endif
@@ -1277,9 +1221,10 @@ static struct export_operations pvfs2_export_ops =
 #endif
 };
 
-int pvfs2_fill_sb(struct super_block *sb,
-                  void *data,
-                  int silent)
+int pvfs2_fill_sb(
+    struct super_block *sb,
+    void *data,
+    int silent)
 {
     int ret = -EINVAL;
     struct inode *root = NULL;
@@ -1302,7 +1247,8 @@ int pvfs2_fill_sb(struct super_block *sb,
 
     if (mount_sb_info->data)
     {
-        ret = parse_mount_options((char *)mount_sb_info->data, sb, silent);
+        ret = parse_mount_options(
+            (char *)mount_sb_info->data, sb, silent);
         if (ret)
         {
             return ret;
@@ -1315,8 +1261,7 @@ int pvfs2_fill_sb(struct super_block *sb,
         sb->s_flags = ((sb->s_flags & ~MS_NODIRATIME) |
             ((PVFS2_SB(sb)->mnt_options.nodiratime == 1) ? MS_NODIRATIME : 0));
     }
-    else
-    {
+    else {
         sb->s_flags = (sb->s_flags & ~(MS_POSIXACL | MS_NOATIME | MS_NODIRATIME));
     }
 
@@ -1338,25 +1283,16 @@ int pvfs2_fill_sb(struct super_block *sb,
                  root_object.handle, root_object.fs_id);
     /* alloc and initialize our root directory inode. be explicit about sticky
      * bit */
-    root = pvfs2_get_custom_core_inode(sb,
-                                       NULL,
-                                       (S_IFDIR | 0755 | S_ISVTX),
-                                       0,
-                                       root_object);
+    root = pvfs2_get_custom_core_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
+                                  0, root_object);
     if (!root)
     {
         return -ENOMEM;
     }
-    gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "Allocated root inode [%p] with mode %x\n",
-                 root, root->i_mode);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
-#ifdef HAVE_D_ALLOC_ROOT
     root_dentry = d_alloc_root(root);
-#else
-    root_dentry = d_make_root(root);
-#endif
     if (!root_dentry)
     {
         iput(root);
@@ -1373,23 +1309,26 @@ int pvfs2_fill_sb(struct super_block *sb,
     return 0;
 }
 #ifdef HAVE_FSTYPE_MOUNT_ONLY
-struct dentry *pvfs2_mount(struct file_system_type *fst,
-                           int flags,
-                           const char *devname,
-                           void *data)
+struct dentry *pvfs2_mount(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data)
 #else
-# ifdef HAVE_VFSMOUNT_GETSB
-int pvfs2_get_sb(struct file_system_type *fst,
-                 int flags,
-                 const char *devname,
-                 void *data,
-                 struct vfsmount *mnt)
-# else
-struct super_block *pvfs2_get_sb(struct file_system_type *fst,
-                                 int flags,
-                                 const char *devname,
-                                 void *data)
-# endif /* HAVE_VFSMOUNT_GETSB */
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data,
+    struct vfsmount *mnt)
+#else
+struct super_block *pvfs2_get_sb(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data)
+#endif /* HAVE_VFSMOUNT_GETSB */
 #endif /* HAVE_FSTYPE_MOUNT_ONLY */
 {
     int ret = -EINVAL;
@@ -1400,8 +1339,7 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
     struct dentry *mnt_sb_d = ERR_PTR(-EINVAL);
 #endif
 
-    gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "pvfs2_get_sb: called with devname %s\n", devname);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: called with devname %s\n", devname);
 
     if (devname)
     {
@@ -1416,16 +1354,14 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 #endif
         }
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
-                devname,
-                PVFS_MAX_SERVER_ADDR_LEN);
+                devname, PVFS_MAX_SERVER_ADDR_LEN);
 
         gossip_debug(GOSSIP_SUPER_DEBUG, "Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
         ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
-        gossip_debug(GOSSIP_SUPER_DEBUG,
-                     "pvfs2_get_sb: mount got return value of %d\n", ret);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
         {
             goto error_exit;
@@ -1442,7 +1378,8 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 
         /* fill in temporary structure passed to fill_sb method */
         mount_sb_info.data = data;
-        mount_sb_info.root_handle = new_op->downcall.resp.fs_mount.root_handle;
+        mount_sb_info.root_handle =
+            new_op->downcall.resp.fs_mount.root_handle;
         mount_sb_info.fs_id = new_op->downcall.resp.fs_mount.fs_id;
         mount_sb_info.id = new_op->downcall.resp.fs_mount.id;
 
@@ -1457,29 +1394,9 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
          * mount_nodev. if the kernel still has get_sb_nodev use that in
          * favor of mount_nodev to minimize changes for currently working
          * kernels. */
-#ifdef HAVE_GETSB_NODEV
-# ifdef HAVE_VFSMOUNT_GETSB
-        ret = get_sb_nodev(fst,
-                           flags,
-                           (void *)&mount_sb_info,
-                           pvfs2_fill_sb,
-                           mnt);
-        if (ret)
-        {
-            goto free_op;
-        }
-        sb = mnt->mnt_sb;
-# else
-        sb = get_sb_nodev(fst,
-                          flags,
-                          (void *)&mount_sb_info,
-                          pvfs2_fill_sb);
-# endif /* HAVE_VFSMOUNT_GETSB */
-#else /* HAVE_GETSB_NODEV */
-        mnt_sb_d = mount_nodev(fst,
-                               flags,
-                               (void *)&mount_sb_info,
-                               pvfs2_fill_sb);
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+        mnt_sb_d = mount_nodev(
+                    fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
         if( !IS_ERR(mnt_sb_d) )
         {
             sb = mnt_sb_d->d_sb;
@@ -1489,7 +1406,18 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
             sb = ERR_CAST(mnt_sb_d);
             goto free_op;
         }
-#endif /* HAVE_GETSB_NODEV */
+#else
+#ifdef HAVE_VFSMOUNT_GETSB
+        ret = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
+        if (ret)
+            goto free_op;
+        sb = mnt->mnt_sb;
+#else
+        sb = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+#endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
@@ -1501,18 +1429,15 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
                 sb->s_flags |= MS_NOATIME;
             }
             /* on successful mount, store the devname and data used */
-            strncpy(PVFS2_SB(sb)->devname,
-                    devname,
+            strncpy(PVFS2_SB(sb)->devname, devname,
                     PVFS_MAX_SERVER_ADDR_LEN);
             if (data)
             {
-                strncpy(PVFS2_SB(sb)->data,
-                        data,
+                strncpy(PVFS2_SB(sb)->data, data,
                         PVFS2_MAX_MOUNT_OPT_LEN);
             }
 #ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
-            /* Issue an upcall to pre-fetch the fs key so
-             * that subsequent calls would be hits */
+            /* Issue an upcall to pre-fetch the fs key so that subsequent calls would be hits */
             pvfs2_sb_get_fs_key(sb, NULL, NULL);
 #endif
 
@@ -1521,11 +1446,9 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
         }
-        else
-        {
+        else {
             ret = -EINVAL;
-            gossip_err("Invalid superblock obtained from get_sb_nodev (%p)\n",
-                       sb);
+            gossip_err("Invalid superblock obtained from get_sb_nodev (%p)\n", sb);
         }
         op_release(new_op);
     }
@@ -1536,11 +1459,11 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 #ifdef HAVE_FSTYPE_MOUNT_ONLY
     return mnt_sb_d;
 #else
-# ifdef HAVE_VFSMOUNT_GETSB
+#ifdef HAVE_VFSMOUNT_GETSB
     return ret;
-# else
+#else
     return sb;
-# endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_VFSMOUNT_GETSB */
 #endif /* HAVE_FSTYPE_MOUNT_ONLY */
 
 error_exit:
@@ -1556,10 +1479,8 @@ free_op:
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
     if (ret == -EINVAL)
     {
-        gossip_err("Ensure that all pvfs2-servers have the "
-                   "same FS configuration files\n");
-        gossip_err("Look at pvfs2-client-core log file "
-                   "(typically /tmp/pvfs2-client.log) for more details\n");
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
     }
 
     if (new_op)
@@ -1581,7 +1502,8 @@ free_op:
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-static void pvfs2_flush_sb(struct super_block *sb)
+static void pvfs2_flush_sb(
+        struct super_block *sb)
 {
 #ifdef HAVE_SB_DIRTY_LIST
     if (!list_empty(&sb->s_dirty))
@@ -1596,7 +1518,8 @@ static void pvfs2_flush_sb(struct super_block *sb)
     return;
 }
 
-void pvfs2_kill_sb( struct super_block *sb)
+void pvfs2_kill_sb(
+    struct super_block *sb)
 {
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: called\n");
 
@@ -1634,16 +1557,13 @@ void pvfs2_kill_sb( struct super_block *sb)
             count2 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_dealloc_count));
             if (count1 != count2) 
             {
-                gossip_err("pvfs2_kill_sb: (WARNING) number of inode allocs "
-                           "(%d) != number of inode deallocs (%d)\n",
-                           count1, count2);
+                gossip_err("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",
+                        count1, count2);
             }
             else
             {
-                gossip_debug(GOSSIP_SUPER_DEBUG,
-                             "pvfs2_kill_sb: (OK) number of inode allocs "
-                             "(%d) = number of inode deallocs (%d)\n",
-                             count1, count2);
+                gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: (OK) number of inode allocs (%d) = number of inode deallocs (%d)\n",
+                        count1, count2);
             }
         }
         /* free the pvfs2 superblock private data */
@@ -1654,8 +1574,7 @@ void pvfs2_kill_sb( struct super_block *sb)
     }
     else
     {
-        gossip_debug(GOSSIP_SUPER_DEBUG,
-                     "pvfs2_kill_sb: skipping due to invalid sb\n");
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: skipping due to invalid sb\n");
     }
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: returning normally\n");
 }

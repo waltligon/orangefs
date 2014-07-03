@@ -44,7 +44,7 @@ int open(const char *path, int flags, ...)
     PVFS_hint hints;  /* need to figure out how to set default */
     pvfs_descriptor *pd;
     
-    gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c open: called with %s\n", path);
+    debug("posix.c open: called with %s\n", path);
     va_start(ap, flags); 
     if (flags & O_CREAT)
         mode = va_arg(ap, mode_t); 
@@ -60,8 +60,7 @@ int open(const char *path, int flags, ...)
     if (!path)
     {
         errno = EFAULT;
-        gossip_debug(GOSSIP_USRINT_DEBUG,
-                     "\tposix.c open: returns with %d\n", -1);
+        debug("\tposix.c open: returns with %d\n", -1);
         return -1;
     }
     if (is_pvfs_path(&path, 0))
@@ -79,8 +78,7 @@ int open(const char *path, int flags, ...)
             goto errorout;
         }
         /* set up the descriptor manually */
-        gossip_debug(GOSSIP_USRINT_DEBUG,
-                     "posix.c open calls pvfs_alloc_descriptor %d\n", rc);
+        debug("posix.c open calls pvfs_alloc_descriptor %d\n", rc);
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         if (!pd)
         {
@@ -93,7 +91,9 @@ int open(const char *path, int flags, ...)
         if (S_ISDIR(sbuf.st_mode))
         {
             /* we assume path was qualified by is_pvfs_path() */
-            pd->s->dpath = pvfs_dpath_insert(path);
+            int len = strnlen(path, PVFS_PATH_MAX);
+            pd->s->dpath = (char *)malloc(len + 1);
+            strncpy(pd->s->dpath, path, len);
         }
         gen_mutex_unlock(&pd->s->lock);
         gen_mutex_unlock(&pd->lock);
@@ -104,7 +104,7 @@ errorout:
     rc = -1;
 cleanup:
     PVFS_free_expanded(path);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "\tposix.c open: returns with %d\n", rc);
+    debug("\tposix.c open: returns with %d\n", rc);
     return rc;
 }
 
@@ -150,8 +150,7 @@ int openat(int dirfd, const char *path, int flags, ...)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             fd = pd->s->fsops->openat(pd->true_fd, path, flags, mode);
         }
@@ -207,7 +206,7 @@ int unlink(const char *path)
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(&path, 0))
+    if (is_pvfs_path(&path,0))
     {
         rc = pvfs_ops.unlink(path);
     }
@@ -231,21 +230,12 @@ int unlinkat(int dirfd, const char *path, int flag)
     }
     if (dirfd == AT_FDCWD || (path && path[0] == '/'))
     {
-        if (is_pvfs_path(&path,0))
-        {
-            rc = pvfs_ops.unlinkat(AT_FDCWD, path, flag);
-        }
-        else
-        {
-            rc = glibc_ops.unlinkat(AT_FDCWD, path, flag);
-        }
-        PVFS_free_expanded(path);
+        unlink(path);
     }
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->unlinkat(pd->true_fd, path, flag);
         }
@@ -309,13 +299,9 @@ int renameat (int oldfd, const char *old, int newfd, const char *new)
         errno = EBADF;
         return -1;
     }
-    if (oldpd->s && oldpd->s->fsops && newpd->s &&
-        oldpd->s->fsops == newpd->s->fsops)
+    if (oldpd->s->fsops == newpd->s->fsops)
     {
-        return oldpd->s->fsops->renameat(oldpd->true_fd,
-                                         old,
-                                         newpd->true_fd,
-                                         new);
+        return oldpd->s->fsops->renameat(oldpd->true_fd, old, newpd->true_fd, new);
     }
     else
     {
@@ -335,8 +321,7 @@ ssize_t read(int fd, void *buf, size_t count)
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->read(pd->true_fd, buf, count);
     }
@@ -357,8 +342,7 @@ ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset)
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd); 
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->pread(pd->true_fd, (void *)buf, nbytes, offset); 
     }
@@ -379,8 +363,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd); 
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->readv(pd->true_fd, iov, iovcnt); 
     }
@@ -401,8 +384,7 @@ ssize_t pread64(int fd, void *buf, size_t nbytes, off64_t offset)
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd); 
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->pread64(pd->true_fd, (void *)buf, nbytes, offset); 
     }
@@ -423,8 +405,7 @@ ssize_t write(int fd, const void *buf, size_t count)
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->write(pd->true_fd, (void *)buf, count);
     }
@@ -445,8 +426,7 @@ ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->pwrite(pd->true_fd, buf, nbytes, offset);
     }
@@ -467,7 +447,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd)
+    if (pd)
     {
         rc = pd->s->fsops->writev(fd, iov, iovcnt);
         if (rc > 0)
@@ -494,8 +474,7 @@ ssize_t pwrite64(int fd, const void *buf, size_t nbytes, off64_t offset)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->pwrite64(pd->true_fd, buf, nbytes, offset);
     }
@@ -532,8 +511,7 @@ off64_t lseek64(int fd, off64_t offset, int whence)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->lseek64(pd->true_fd, offset, whence);
     }
@@ -591,8 +569,7 @@ int ftruncate(int fd, off_t length)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->ftruncate(pd->true_fd, length);
     }
@@ -610,8 +587,7 @@ int ftruncate64(int fd, off64_t length)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->ftruncate64(pd->true_fd, length);
     }
@@ -630,8 +606,7 @@ int posix_fallocate(int fd, off_t offset, off_t length)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fallocate(pd->true_fd, offset, length);
     }
@@ -650,10 +625,10 @@ int posix_fallocate(int fd, off_t offset, off_t length)
 int close(int fd)
 {
     int rc = 0;
-    gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c close: called with %d\n", fd);
+    debug("posix.c close: called with %d\n", fd);
     
-    rc = pvfs_close(fd);
-    gossip_debug(GOSSIP_USRINT_DEBUG, "\tposix.c close: returns %d\n", rc);
+    rc = pvfs_free_descriptor(fd);
+    debug("\tposix.c close: returns %d\n", rc);
     return rc;
 }
 
@@ -734,8 +709,7 @@ int fstat(int fd, struct stat *buf)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fstat(pd->true_fd, buf);
     }
@@ -758,8 +732,7 @@ int fstat64(int fd, struct stat64 *buf)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fstat64(pd->true_fd, buf);
     }
@@ -785,18 +758,17 @@ int fstatat(int fd, const char *path, struct stat *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = lstat(path, buf);
+            rc = pvfs_lstat(path, buf);
         }
         else
         {
-            rc = stat(path, buf);
+            rc = pvfs_stat(path, buf);
         }
     }
     else
     {
         pd = pvfs_find_descriptor(fd);
-        if (pd && pd->is_in_use && fd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->fstatat(pd->true_fd, path, buf, flag);
         }
@@ -823,18 +795,17 @@ int fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
     {
         if (flag & AT_SYMLINK_NOFOLLOW)
         {
-            rc = lstat64(path, buf);
+            rc = pvfs_lstat64(path, buf);
         }
         else
         {
-            rc = stat64(path, buf);
+            rc = pvfs_stat64(path, buf);
         }
     }
     else
     {
         pd = pvfs_find_descriptor(fd);
-        if (pd && pd->is_in_use && fd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->fstatat64(pd->true_fd, path, buf, flag);
         }
@@ -914,8 +885,7 @@ int futimesat(int dirfd, const char *path, const struct timeval times[2])
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->futimesat(pd->true_fd, path, times);
         }
@@ -974,8 +944,7 @@ int futimes(int fd, const struct timeval times[2])
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->futimes(pd->true_fd, times);
     }
@@ -993,8 +962,7 @@ int dup(int oldfd)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(oldfd);
-    if (pd && pd->is_in_use && oldfd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->dup(pd->true_fd);
     }
@@ -1012,29 +980,9 @@ int dup2(int oldfd, int newfd)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(oldfd);
-    if (pd && pd->is_in_use && oldfd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->dup2(pd->true_fd, newfd);
-    }
-    else
-    {
-        errno = EBADF;
-        rc = -1;
-    }
-    return rc;
-}
-
-int dup3(int oldfd, int newfd, int flags)
-{
-    int rc = 0;
-    pvfs_descriptor *pd;
-    
-    pd = pvfs_find_descriptor(oldfd);
-    if (pd && pd->is_in_use && oldfd == pd->fd &&
-        pd->s && pd->s->fsops)
-    {
-        rc = pd->s->fsops->dup3(pd->true_fd, newfd, flags);
     }
     else
     {
@@ -1070,8 +1018,7 @@ int fchown(int fd, uid_t owner, gid_t group)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fchown(pd->true_fd, owner, group);
     }
@@ -1095,8 +1042,7 @@ int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flag)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->fchownat(pd->true_fd, path, owner, group, flag);
         }
@@ -1155,8 +1101,7 @@ int fchmod(int fd, mode_t mode)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fchmod(pd->true_fd, mode);
     }
@@ -1185,8 +1130,7 @@ int fchmodat(int dirfd, const char *path, mode_t mode, int flag)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->fchmodat(pd->true_fd, path, mode, flag);
         }
@@ -1236,8 +1180,7 @@ int mkdirat(int dirfd, const char *path, mode_t mode)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->mkdirat(pd->true_fd, path, mode);
         }
@@ -1311,8 +1254,7 @@ ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->readlinkat(pd->true_fd, path, buf, bufsiz);
         }
@@ -1362,8 +1304,7 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
     else
     {
         pd = pvfs_find_descriptor(newdirfd);
-        if (pd && pd->is_in_use && newdirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->symlinkat(oldpath, pd->true_fd, newpath);
         }
@@ -1407,20 +1348,15 @@ int linkat(int olddirfd, const char *old,
         errno = EFAULT;
         return -1;
     }
-    if ((!oldpd) || (!oldpd->is_in_use) || (olddirfd != oldpd->fd) ||
-        (!newpd) || (!newpd->is_in_use) || (newdirfd != newpd->fd) ||
-        (!oldpd->s) || (!newpd->s) || (!oldpd->s->fsops))
+    if (!oldpd || !newpd)
     {
         errno = EBADF;
         return -1;
     }
     if (oldpd->s->fsops == newpd->s->fsops)
     {
-        return oldpd->s->fsops->linkat(oldpd->true_fd,
-                                       old,
-                                       newpd->true_fd,
-                                       new,
-                                       flags);
+        return oldpd->s->fsops->linkat(oldpd->true_fd, old,
+                                    newpd->true_fd, new, flags);
     }
     else
     {
@@ -1443,8 +1379,7 @@ int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->readdir(pd->true_fd, dirp, count);
     }
@@ -1473,8 +1408,7 @@ int getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->getdents(pd->true_fd, dirp, size);
     }
@@ -1497,8 +1431,7 @@ int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->getdents64(pd->true_fd, dirp, size);
     }
@@ -1552,8 +1485,7 @@ int faccessat(int dirfd, const char *path, int mode, int flags)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->faccessat(pd->true_fd, path, mode, flags);
         }
@@ -1573,8 +1505,7 @@ int flock(int fd, int op)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->flock(pd->true_fd, op);
     }
@@ -1596,8 +1527,7 @@ int fcntl(int fd, int cmd, ...)
     
     va_start(ap, cmd);
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         switch (cmd)
         {
@@ -1634,8 +1564,7 @@ int fsync(int fd)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fsync(pd->true_fd);
     }
@@ -1653,8 +1582,7 @@ int fdatasync(int fd)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fdatasync(pd->true_fd);
     }
@@ -1672,8 +1600,7 @@ int posix_fadvise(int fd, off_t offset, off_t length, int advice)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fadvise(pd->true_fd, offset, length, advice);
     }
@@ -1698,7 +1625,7 @@ int fadvise(int fd, off_t offset, off_t len, int advice)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd & pd->is_in_use && fd == pd->fd)
+    if (pd)
     {
         rc = pd->s->fsops->fadvise(pd->true_fd, offset, len, advice);
     }
@@ -1717,8 +1644,7 @@ int fadvise64(int fd, off64_t offset, off64_t len, int advice)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fadvise64(pd->true_fd, offset, len, advice);
     }
@@ -1781,8 +1707,7 @@ int fstatfs(int fd, struct statfs *buf)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fstatfs(pd->true_fd, buf);
     }
@@ -1805,8 +1730,7 @@ int fstatfs64(int fd, struct statfs64 *buf)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fstatfs64(pd->true_fd, buf);
     }
@@ -1849,8 +1773,7 @@ int fstatvfs(int fd, struct statvfs *buf)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         rc = pd->s->fsops->fstatvfs(pd->true_fd, buf);
     }
@@ -1899,8 +1822,7 @@ int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
     else
     {
         pd = pvfs_find_descriptor(dirfd);
-        if (pd && pd->is_in_use && dirfd == pd->fd &&
-            pd->s && pd->s->fsops)
+        if (pd)
         {
             rc = pd->s->fsops->mknodat(pd->true_fd, path, mode, dev);
         }
@@ -1925,9 +1847,7 @@ ssize_t sendfile64(int outfd, int infd, off64_t *offset, size_t count)
     
     inpd = pvfs_find_descriptor(infd);
     outpd = pvfs_find_descriptor(outfd);
-    if (inpd && inpd->is_in_use && infd == inpd->fd &&
-        outpd && outpd->is_in_use && outfd == outpd->fd &&
-        inpd->s && inpd->s->fsops)
+    if (inpd && outpd)
     {
         rc = inpd->s->fsops->sendfile64(outpd->true_fd, inpd->true_fd,
                                      offset, count);
@@ -2013,8 +1933,7 @@ int fsetxattr(int fd, const char *name,
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         if (pd->s->fsops->fsetxattr)
         {
@@ -2107,8 +2026,7 @@ ssize_t fgetxattr(int fd, const char *name, void *value,
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         if (pd->s->fsops->fgetxattr)
         {
@@ -2198,8 +2116,7 @@ ssize_t flistxattr(int fd, char *list, size_t size)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         if (pd->s->fsops->flistxattr)
         {
@@ -2289,8 +2206,7 @@ int fremovexattr(int fd, const char *name)
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
-        pd->s && pd->s->fsops)
+    if (pd)
     {
         if (pd->s->fsops->fremovexattr)
         {
@@ -2362,148 +2278,6 @@ int getdtablesize(void)
 }
 
 #endif /* PVFS_USRINT_CWD */
-
-/* add a configure option to enable this */
-#if 0
-struct posix_ops_s ofs_sys_ops =
-{ 
-    .snprintf = NULL,
-    .open = open,
-    .open64 = open64,
-    .openat = openat,
-    .openat64 = openat64,
-    .creat = creat,
-    .creat64 = creat64,
-    .unlink = unlink,
-    .unlinkat = unlinkat,
-    .rename = rename,
-    .renameat = renameat,
-    .read = read,
-    .pread = pread,
-    .readv = readv,
-    .pread64 = pread64,
-    .write = write,
-    .pwrite = pwrite,
-    .writev = writev,
-    .pwrite64 = pwrite64,
-    .lseek = lseek,
-    .lseek64 = lseek64,
-    .perror = perror,
-    .truncate = truncate,
-    .truncate64 = truncate64,
-    .ftruncate = ftruncate,
-    .ftruncate64 = ftruncate64,
-    .fallocate = posix_fallocate,
-    .close = close,
-    .stat = stat,
-    .stat64 = stat64,
-    .fstat = fstat,
-    .fstat64 = fstat64,
-    .fstatat = fstatat,
-    .fstatat64 = fstatat64,
-    .lstat = lstat,
-    .lstat64 = lstat64,
-    .futimesat = futimesat,
-    .utimes = utimes,
-    .utime = utime,
-    .futimes = futimes,
-    .dup = dup,
-    .dup2 = dup2,
-    .dup3 = dup3,
-    .chown = chown,
-    .fchown = fchown,
-    .fchownat = fchownat,
-    .lchown = lchown,
-    .chmod = chmod,
-    .fchmod = fchmod,
-    .fchmodat = fchmodat,
-    .mkdir = mkdir,
-    .mkdirat = mkdirat,
-    .rmdir = rmdir,
-    .readlink = readlink,
-    .readlinkat = readlinkat,
-    .symlink = symlink,
-    .symlinkat = symlinkat,
-    .link = link,
-    .linkat = linkat,
-    .readdir = posix_readdir,
-    .getdents = getdents,
-    .getdents64 = getdents64,
-    .access = access,
-    .faccessat = faccessat,
-    .flock = flock,
-    .fcntl = fcntl,
-    .sync = sync,
-    .fsync = fsync,
-    .fdatasync = fdatasync,
-    .fadvise = posix_fadvise,
-    .fadvise64 = fadvise64,
-    .statfs = statfs,
-    .statfs64 = statfs64,
-    .fstatfs = fstatfs,
-    .fstatfs64 = fstatfs64,
-    .statvfs = statvfs,
-    .fstatvfs = fstatvfs,
-    .mknod = mknod,
-    .mknodat = mknodat,
-    .sendfile = sendfile,
-    .sendfile64 = sendfile64,
-#ifdef HAVE_ATTR_XATTR_H
-    .setxattr = setxattr,
-    .lsetxattr = lsetxattr,
-    .fsetxattr = fsetxattr,
-    .getxattr = getxattr,
-    .lgetxattr = lgetxattr,
-    .fgetxattr = fgetxattr,
-    .listxattr = listxattr,
-    .llistxattr = llistxattr,
-    .flistxattr = flistxattr,
-    .removexattr = removexattr,
-    .lremovexattr = lremovexattr,
-    .fremovexattr = fremovexattr,
-#endif
-    .socket = NULL,
-    .accept = NULL,
-    .bind = NULL,
-    .connect = NULL,
-    .getpeername = NULL,
-    .getsockname = NULL,
-    .getsockopt = NULL,
-    .setsockopt = NULL,
-    .ioctl = NULL,
-    .listen = NULL,
-    .recv = NULL,
-    .recvfrom = NULL,
-    .recvmsg = NULL,
-    .send = NULL,
-    .sendto = NULL,
-    .sendmsg = NULL,
-    .shutdown = NULL,
-    .socketpair = NULL,
-    .pipe = NULL,
-    .umask = umask,
-    .getumask = getumask,
-    .getdtablesize = getdtablesize,
-    .mmap = mmap,
-    .munmap = munmap,
-    .msync = msync
-#if 0
-    , .acl_delete_def_file = acl_delete_def_file
-    , .acl_get_fd = acl_get_fd
-    , .acl_get_file = acl_get_file
-    , .acl_set_fd = acl_set_fd
-    , .acl_set_file = acl_set_file
-#endif
-    , .getfscreatecon =  getfscreatecon
-    , .getfilecon = getfilecon
-    , .lgetfilecon = lgetfilecon
-    , .fgetfilecon = fgetfilecon
-    , .setfscreatecon = setfscreatecon
-    , .setfilecon = setfilecon
-    , .lsetfilecon = lsetfilecon
-    , .fsetfilecon = fsetfilecon
-};
-#endif
 
 /*
  * Local variables:

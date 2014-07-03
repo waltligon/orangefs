@@ -28,9 +28,9 @@ extern int pvfs_openat(int dirfd, const char *path, int flags, ...);
 /* pvfs_openat64 */
 extern int pvfs_openat64(int dirfd, const char *path, int flags, ...);
 
-extern int pvfs_creat(const char *path, mode_t mode);
+extern int pvfs_creat(const char *path, mode_t mode, ...);
 
-extern int pvfs_creat64(const char *path, mode_t mode);
+extern int pvfs_creat64(const char *path, mode_t mode, ...);
 
 /* pvfs_unlink */
 extern int pvfs_unlink (const char *path);
@@ -108,15 +108,6 @@ extern int pvfs_lstat64(const char *path, struct stat64 *buf);
 
 extern int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask);
 
-#ifdef __USE_GLIBC__
-extern int pvfs_utimensat(int dirfd,
-                          const char *path,
-                          const struct timespec times[2],
-                          int flags);
-
-extern int pvfs_futimens(int fd, const struct timespec times[2]);
-#endif
-
 extern int pvfs_futimesat(int dirfd, const char *path, const struct timeval times[2]);
 
 extern int pvfs_utimes(const char *path, const struct timeval times[2]);
@@ -128,8 +119,6 @@ extern int pvfs_futimes(int fd, const struct timeval times[2]);
 extern int pvfs_dup(int oldfd);
 
 extern int pvfs_dup2(int oldfd, int newfd);
-
-extern int pvfs_dup3(int oldfd, int newfd, int flags);
 
 extern int pvfs_chown (const char *path, uid_t owner, gid_t group);
 
@@ -295,22 +284,6 @@ extern int pvfs_acl_set_fd(int fd, acl_t acl);
 
 extern int pvfs_acl_set_file(const char *path_p, acl_type_t type, acl_t acl);
 #endif
-
-int pvfs_getfscreatecon(security_context_t *con);
-
-int pvfs_getfilecon(const char *path, security_context_t *con);
-
-int pvfs_lgetfilecon(const char *path, security_context_t *con);
-
-int pvfs_fgetfilecon(int fd, security_context_t *con);
-
-int pvfs_setfscreatecon(security_context_t con);
-
-int pvfs_setfilecon(const char *path, security_context_t con);
-
-int pvfs_lsetfilecon(const char *path, security_context_t con);
-
-int pvfs_fsetfilecon(int fd, security_context_t con);
 
 
 #endif

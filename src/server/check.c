@@ -15,7 +15,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
@@ -24,7 +23,6 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
-#include "gen-locks.h"
 #include "gossip.h"
 #include "bmi-byteswap.h"
 #include "check.h"

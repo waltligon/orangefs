@@ -8,7 +8,6 @@
 #define __MMAP_RA_CACHE_H
 
 #include "quickhash.h"
-#include "pvfs2-internal.h"
 
 typedef struct
 {

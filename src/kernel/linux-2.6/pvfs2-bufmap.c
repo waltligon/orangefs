@@ -357,16 +357,6 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
     int ret = -1, i = 0;
     DECLARE_WAITQUEUE(my_wait, current);
 
-    down_read(&bufmap_init_sem);
-    if (bufmap_init == 0)
-    {
-        gossip_err("pvfs_bufmap_get: not yet "
-                    "initialized.\n");
-        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
-        up_read(&bufmap_init_sem);
-        return -EIO;
-    }
-
     add_wait_queue_exclusive(slargs->slot_wq, &my_wait);
 
     while(1)
@@ -399,17 +389,15 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
             gossip_debug(GOSSIP_BUFMAP_DEBUG,
                          "[BUFMAP]: waiting %d seconds for a slot\n",
                          slot_timeout_secs);
-            up_read(&bufmap_init_sem);
             if (!schedule_timeout(timeout))
             {
                 gossip_debug(GOSSIP_BUFMAP_DEBUG, 
                              "*** wait_for_a_slot timed out\n");
                 ret = -ETIMEDOUT;
-                goto exit_without_upread;
+                break;
             }
             gossip_debug(GOSSIP_BUFMAP_DEBUG,
-                         "[BUFMAP]: woken up by a slot becoming available.\n");
-            down_read(&bufmap_init_sem);
+                         "[BUFMAP]: acquired slot\n");
             continue;
         }
 
@@ -419,39 +407,25 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
         break;
     }
 
-    up_read(&bufmap_init_sem);
-
-exit_without_upread:
     set_current_state(TASK_RUNNING);
     remove_wait_queue(slargs->slot_wq, &my_wait);
+
     return ret;
 }
 
 static void put_back_slot(struct slot_args *slargs, int buffer_index)
 {
-    down_read(&bufmap_init_sem);
-    if (bufmap_init == 0)
-    {
-        gossip_err("pvfs_bufmap_put: not yet "
-                    "initialized.\n");
-        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
-        up_read(&bufmap_init_sem);
-        return;
-    }
 
     /* slot_lock is the appropriate index_lock */ 
     spin_lock(slargs->slot_lock);
     if (buffer_index < 0 || buffer_index >= slargs->slot_count)
     {
         spin_unlock(slargs->slot_lock);
-        up_read(&bufmap_init_sem);
         return;
     }
-
    /* put the desc back on the queue */
     slargs->slot_array[buffer_index] = 0;
     spin_unlock(slargs->slot_lock);
-    up_read(&bufmap_init_sem);
 
     /* wake up anyone who may be sleeping on the queue */
     wake_up_interruptible(slargs->slot_wq);
@@ -469,12 +443,22 @@ int pvfs_bufmap_get(int *buffer_index)
     struct slot_args slargs;
     int ret;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return -EIO;
+    }
+
     slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
     ret = wait_for_a_slot(&slargs, buffer_index);
-
+    up_read(&bufmap_init_sem);
     return(ret);
 }
 
@@ -488,12 +472,22 @@ void pvfs_bufmap_put(int buffer_index)
 {
     struct slot_args slargs;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_put: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return;
+    }
+
     slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
     put_back_slot(&slargs, buffer_index);
-
+    up_read(&bufmap_init_sem);
     return;
 }
 
@@ -512,12 +506,22 @@ int readdir_index_get(int *buffer_index)
     struct slot_args slargs;
     int ret;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return -EIO;
+    }
+
     slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;
     ret = wait_for_a_slot(&slargs, buffer_index);
-
+    up_read(&bufmap_init_sem);
     return(ret);
 }
 
@@ -525,12 +529,22 @@ void readdir_index_put(int buffer_index)
 {
     struct slot_args slargs;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return;
+    }
+
     slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;
     put_back_slot(&slargs, buffer_index);
-
+    up_read(&bufmap_init_sem);
     return;
 }
 

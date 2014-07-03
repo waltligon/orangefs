@@ -26,7 +26,7 @@
 #ifndef __BMI_BYTESWAP_H
 #define __BMI_BYTESWAP_H 
 
-#include "pvfs2-internal.h"
+#include "pvfs2-config.h"
 
 #ifndef __bswap_16
 /* Swap bytes in 16 bit value.  */

@@ -12,7 +12,6 @@
 #include <sys/time.h>
 
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 #include "pint-event.h"
 #include "pint-security.h"
 

@@ -6,7 +6,6 @@
 #include <stdio.h>
 
 #include "pvfs2-server.h"
-#include "pvfs2-internal.h"
 #include "pint-uid-mgmt.h"
 #include "pint-util.h"
 

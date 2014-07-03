@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 #include "pint-util.h"
 #include "gossip.h"

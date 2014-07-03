@@ -1,10 +1,3 @@
-
-/*
- * (C) 2001 Clemson University and The University of Chicago
- *
- * See COPYING in top-level directory.
- */
-
 #include <string.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -13,7 +6,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2-hint.h"
 #include "gossip.h"
 

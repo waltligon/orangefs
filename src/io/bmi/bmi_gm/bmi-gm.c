@@ -29,7 +29,6 @@
 #ifdef ENABLE_GM_REGCACHE
 #include "bmi-gm-regcache.h"
 #endif
-#include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;

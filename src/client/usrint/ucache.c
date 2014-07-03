@@ -12,14 +12,14 @@
  *
  */
 #include <pvfs2-config.h>
-#include <gen-locks.h>
-#include <malloc.h>
+#if PVFS_UCACHE_ENABLE
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
-#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#include <gen-locks.h>
+#include <malloc.h>
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
@@ -542,13 +542,13 @@ int wipe_ucache(void)
     int ucache_shmid = shmget(key, 0, shmflg);
     if(ucache_shmid == -1)
     {
-        glibc_ops.perror("wipe_ucache - ucache shmget");
+        perror("wipe_ucache - ucache shmget");
         return -1;
     }
     ucache = (union ucache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1)
     {
-        glibc_ops.perror("wipe ucache - ucache shmat");
+        perror("wipe ucache - ucache shmat");
         return -1;
     }
 

@@ -29,9 +29,6 @@
 #include <unistd.h>
 #endif
 
-/* force malloc to not be redefined for statecomp */
-#define PVFS_MALLOC_REDEF_OVERRIDE 1
-#include "pvfs2-internal.h"
 #include "statecomp.h"
 
 #ifdef __GNUC__

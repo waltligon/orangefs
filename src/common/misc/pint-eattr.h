@@ -6,7 +6,6 @@
 #ifndef PINT_EATTR_H
 #define PINT_EATTR_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 
 /* Extended Attributes

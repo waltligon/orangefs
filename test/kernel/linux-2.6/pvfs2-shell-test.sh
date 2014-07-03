@@ -1138,7 +1138,7 @@ PVFS2_TESTDIR=$PVFS2_MNT/__testdir
 
 cd $PVFS2_MNT
 
-if test "x$ORIG_DIR" = "x`pwd`" && test "x$PVFS2_MNT" != "x$ORIG_DIR"; then
+if test "x$ORIG_DIR" = "x`pwd`"; then
     echo "Cannot change directory to $PVFS_MNT"
     error_exit;
 fi

@@ -6,8 +6,6 @@
 
 #include "pvfs2-server.h"
 #include <assert.h>
-#include "pvfs2-internal.h"
-#include "assert.h"
 
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;

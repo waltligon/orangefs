@@ -218,10 +218,7 @@ enum PVFS_sys_layout_algorithm
     PVFS_SYS_LAYOUT_RANDOM = 3,
 
     /* order the datafiles based on the list specified */
-    PVFS_SYS_LAYOUT_LIST = 4,
-
-    /* order the datafiles based on the list specified */
-    PVFS_SYS_LAYOUT_LOCAL = 5
+    PVFS_SYS_LAYOUT_LIST = 4
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
@@ -1086,8 +1083,6 @@ struct profiler
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
 #define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
-#define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
-        "/orangefs-service-users"
 
 typedef unsigned char *PVFS_cert_data;
 

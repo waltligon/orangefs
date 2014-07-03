@@ -1160,10 +1160,11 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
     return ret;
 }
 
-static inline struct inode *pvfs2_create_file(struct inode *dir,
-                                              struct dentry *dentry,
-                                              int mode,
-                                              int *error_code)
+static inline struct inode *pvfs2_create_file(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    int *error_code)
 {
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -1177,52 +1178,43 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
         return NULL;
     }
 
-    if (parent &&
-        parent->refn.handle != PVFS_HANDLE_NULL &&
-        parent->refn.fs_id != PVFS_FS_ID_NULL)
+    if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.create.parent_refn = parent->refn;
     }
     else
     {
 #if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
-        gossip_lerr("Critical error: i_ino cannot be relied on "
-                    "when using iget4/5\n");
+        gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
         *error_code = -EINVAL;
         op_release(new_op);
         return NULL;
 #endif
         new_op->upcall.req.create.parent_refn.handle =
-                        get_handle_from_ino(dir);
+            get_handle_from_ino(dir);
         new_op->upcall.req.create.parent_refn.fs_id =
-                        PVFS2_SB(dir->i_sb)->fs_id;
+            PVFS2_SB(dir->i_sb)->fs_id;
     }
 
     /* macro defined in pvfs2-kernel.h */
     fill_default_sys_attrs(new_op->upcall.req.create.attributes,
-                           PVFS_TYPE_METAFILE,
-                           mode);
+                           PVFS_TYPE_METAFILE, mode);
 
     strncpy(new_op->upcall.req.create.d_name,
-            dentry->d_name.name,
-            PVFS2_NAME_LEN);
+            dentry->d_name.name, PVFS2_NAME_LEN);
 
-    ret = service_operation(new_op,
-                            "pvfs2_create_file", 
-                            get_interruptible_flag(dir));
+    ret = service_operation(
+        new_op, "pvfs2_create_file", 
+        get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG,
-                 "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
     if (ret > -1)
     {
-        inode = pvfs2_get_custom_inode(dir->i_sb,
-                                       dir,
-                                       (S_IFREG | mode),
-                                       0,
-                                       new_op->downcall.resp.create.refn);
+        inode = pvfs2_get_custom_inode(
+            dir->i_sb, dir, (S_IFREG | mode), 0, new_op->downcall.resp.create.refn);
         if (!inode)
         {
             gossip_err("*** Failed to allocate pvfs2 file inode\n");
@@ -1231,13 +1223,12 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG,
-                     "Assigned file inode new number of %llu\n",
-                     llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned file inode new number of %llu\n",
+                    llu(get_handle_from_ino(inode)));
         /* finally, add dentry with this new inode to the dcache */
-        gossip_debug(GOSSIP_UTILS_DEBUG,
-                     "pvfs2_create_file: Instantiating\n *negative* "
-                    "dentry %p for %s\n", dentry, dentry->d_name.name);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: Instantiating\n *negative* "
+                    "dentry %p for %s\n", dentry,
+                    dentry->d_name.name);
 
 #ifdef HAVE_D_SET_D_OP
         d_set_d_op(dentry, &pvfs2_dentry_operations);
@@ -1246,14 +1237,13 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
 #endif
         d_instantiate(dentry, inode);
         gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Regular File) %llu -> %s\n",
-                     llu(get_handle_from_ino(inode)), dentry->d_name.name);
+                llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
         *error_code = ret;
 
-        gossip_debug(GOSSIP_UTILS_DEBUG,
-                     "pvfs2_create_file: failed with error code %d\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: failed with error code %d\n",
                     *error_code);
     }
 
@@ -1261,10 +1251,11 @@ static inline struct inode *pvfs2_create_file(struct inode *dir,
     return inode;
 }
 
-static inline struct inode *pvfs2_create_dir(struct inode *dir,
-                                             struct dentry *dentry,
-                                             int mode,
-                                             int *error_code)
+static inline struct inode *pvfs2_create_dir(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    int *error_code)
 {
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -1464,12 +1455,13 @@ static inline struct inode *pvfs2_create_symlink(
 
   symname should be null unless mode is PVFS_VFS_OP_SYMLINK
 */
-struct inode *pvfs2_create_entry(struct inode *dir,
-                                 struct dentry *dentry,
-                                 const char *symname,
-                                 int mode,
-                                 int op_type,
-                                 int *error_code)
+struct inode *pvfs2_create_entry(
+    struct inode *dir,
+    struct dentry *dentry,
+    const char *symname,
+    int mode,
+    int op_type,
+    int *error_code)
 {
     if (dir && dentry && error_code)
     {
@@ -1482,21 +1474,14 @@ struct inode *pvfs2_create_entry(struct inode *dir,
         switch (op_type)
         {
             case PVFS2_VFS_OP_CREATE:
-                return pvfs2_create_file(dir,
-                                         dentry,
-                                         mode,
-                                         error_code);
+                return pvfs2_create_file(
+                    dir, dentry, mode, error_code);
             case PVFS2_VFS_OP_MKDIR:
-                return pvfs2_create_dir(dir,
-                                        dentry,
-                                        mode,
-                                        error_code);
+                return pvfs2_create_dir(
+                    dir, dentry, mode, error_code);
             case PVFS2_VFS_OP_SYMLINK:
-                return pvfs2_create_symlink(dir,
-                                            dentry,
-                                            symname,
-                                            mode,
-                                            error_code);
+                return pvfs2_create_symlink(
+                    dir, dentry, symname, mode, error_code);
         }
     }
 
@@ -1977,12 +1962,12 @@ int pvfs2_unmount_sb(struct super_block *sb)
   NOTE: on successful cancellation, be sure to return -EINTR, as
   that's the return value the caller expects
 */
-int pvfs2_cancel_op_in_progress(uint64_t tag)
+int pvfs2_cancel_op_in_progress(unsigned long tag)
 {
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_cancel_op_in_progress called on tag %llu\n", llu(tag));
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_cancel_op_in_progress called on tag %lu\n", tag);
 
     new_op = op_alloc(PVFS2_VFS_OP_CANCEL);
     if (!new_op)

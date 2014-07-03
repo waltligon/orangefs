@@ -7,8 +7,6 @@
 #ifndef __DBPF_OP_H__
 #define __DBPF_OP_H__
 
-#include "pvfs2-internal.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif

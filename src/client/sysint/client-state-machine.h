@@ -17,7 +17,6 @@
 */
 /** leave first **/
 #include "pvfs2-config.h"
-#include "pvfs2-internal.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"

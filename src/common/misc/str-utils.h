@@ -7,8 +7,8 @@
 #ifndef __STR_UTILS_H
 #define __STR_UTILS_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
+#include "pvfs2-config.h"
 
 void PINT_string_rm_extra_slashes(
     char *s);

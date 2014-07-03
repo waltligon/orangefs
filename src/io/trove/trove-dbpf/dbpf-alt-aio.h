@@ -7,8 +7,6 @@
 #ifndef __DBPF_ALT_AIO_H__
 #define __DBPF_ALT_AIO_H__
 
-#include "trove-internal.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -28,6 +26,7 @@ extern "C" {
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "trove.h"
+#include "trove-internal.h"
 #include "dbpf.h"
 #include "aio.h"
 

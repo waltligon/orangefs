@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "../quicklist/quicklist.h"
-#include "../misc/pvfs2-internal.h"
 
 #define qhash_malloc(x)            malloc(x)
 #define qhash_free(x)              free(x)

@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "gossip.h"
-#include "pvfs2-internal.h"
 #include "pint-distribution.h"
 #include "pvfs2-sysint.h"
 

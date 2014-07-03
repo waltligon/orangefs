@@ -30,7 +30,7 @@ void purge_waiting_ops(void)
     spin_lock(&pvfs2_request_list_lock);
     list_for_each_entry(op, &pvfs2_request_list, list)
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2-client-core: purging op tag %llu %s\n", llu(op->tag), get_opname_string(op));
+        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2-client-core: purging op tag %lld %s\n", lld(op->tag), get_opname_string(op));
         spin_lock(&op->lock);
         set_op_state_purged(op);
         spin_unlock(&op->lock);
@@ -168,8 +168,8 @@ retry_servicing:
     /* retry if operation has not been serviced and if requested */
     if (!op_state_serviced(op) && op->downcall.status == -EAGAIN)
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: tag %llu (%s) -- operation to be retried (%d attempt)\n", 
-                llu(op->tag), op_name, op->attempts + 1);
+        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: tag %lld (%s) -- operation to be retried (%d attempt)\n", 
+                lld(op->tag), op_name, op->attempts + 1);
 
         if (!op->uses_shared_memory)
         {
@@ -333,8 +333,8 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
                 if (!schedule_timeout(MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
                 {
                     gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation timed "
-                                 "out (tag %llu, %p, att %d)\n", __func__,
-                                 llu(op->tag), op, op->attempts);
+                                 "out (tag %lld, %p, att %d)\n", __func__,
+                                 lld(op->tag), op, op->attempts);
                     ret = -ETIMEDOUT;
                     pvfs2_clean_up_interrupted_operation(op);
                     break;
@@ -352,7 +352,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
                 ret = (op->attempts < PVFS2_PURGE_RETRY_COUNT) ? -EAGAIN : -EIO;
                 spin_unlock(&op->lock);
                 gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation purged "
-                             "(tag %llu, %p, att %d)\n", __func__, llu(op->tag),
+                             "(tag %lld, %p, att %d)\n", __func__, lld(op->tag),
                              op, op->attempts);
                 pvfs2_clean_up_interrupted_operation(op);
                 break;
@@ -362,7 +362,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 	}
 
         gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation interrupted by a "
-                     "signal (tag %llu, op %p)\n", __func__, llu(op->tag), op);
+                     "signal (tag %lld, op %p)\n", __func__, lld(op->tag), op);
         pvfs2_clean_up_interrupted_operation(op);
         ret = -EINTR;
         break;
@@ -410,9 +410,9 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
 
         if (signal_pending(current))
         {
-           gossip_debug(GOSSIP_WAIT_DEBUG,"%s:operation interrupted by a signal (tag %llu, op %p)\n"
+           gossip_debug(GOSSIP_WAIT_DEBUG,"%s:operation interrupted by a signal (tag %lld, op %p)\n"
                                          ,__func__
-                                         ,llu(op->tag)
+                                         ,lld(op->tag)
                                          ,op);
            pvfs2_clean_up_interrupted_operation(op);
            ret = -EINTR;

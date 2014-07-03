@@ -16,7 +16,6 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2.h"
 #include "server-config-mgr.h"
 #include "quickhash.h"
@@ -73,7 +72,8 @@ int PINT_server_config_mgr_initialize(void)
 
     if (s_fsid_to_config_table == NULL)
     {
-        s_fsid_to_config_table = qhash_init(hash_fsid_compare, hash_fsid, 17);
+        s_fsid_to_config_table =
+            qhash_init(hash_fsid_compare, hash_fsid, 17);
         if (s_fsid_to_config_table)
         {
             s_min_handle_recycle_timeout_in_sec = -1;
@@ -103,11 +103,11 @@ int PINT_server_config_mgr_finalize(void)
             do
             {
                 hash_link = qhash_search_and_remove_at_index(
-                                                     s_fsid_to_config_table,
-                                                     i);
+                    s_fsid_to_config_table, i);
                 if (hash_link)
                 {
-                    config = qlist_entry(hash_link, server_config_t, hash_link);
+                    config = qlist_entry(
+                        hash_link, server_config_t, hash_link);
                     assert(config);
                     assert(config->server_config);
 
@@ -161,7 +161,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
         {
             qhash_for_each(hash_link, &s_fsid_to_config_table->array[i])
             {
-                config = qlist_entry(hash_link, server_config_t, hash_link);
+                config = qlist_entry(
+                    hash_link, server_config_t, hash_link);
                 assert(config);
                 assert(config->server_config);
 
@@ -173,7 +174,6 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
                 cur_fs = PINT_llist_head(cur);
                 assert(cur_fs);
-                /* should this be error handling instead? */
                 assert(cur_fs->handle_recycle_timeout_sec.tv_sec > -1);
 
                 /* find the minimum handle recycle timeout here */
@@ -182,7 +182,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                     (s_min_handle_recycle_timeout_in_sec == -1))
                 {
                     s_min_handle_recycle_timeout_in_sec =
-                                cur_fs->handle_recycle_timeout_sec.tv_sec;
+                        cur_fs->handle_recycle_timeout_sec.tv_sec;
 
                     gossip_debug(GOSSIP_CLIENT_DEBUG, "Set min handle "
                                  "recycle time to %d seconds\n",
@@ -193,9 +193,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
 
-                ret = PINT_cached_config_handle_load_mapping(
-                                                     cur_fs,
-                                                     config->server_config);
+                ret = PINT_cached_config_handle_load_mapping(cur_fs);
                 if (ret)
                 {
                     PVFS_perror(
@@ -211,9 +209,10 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
     return ret;
 }
 
-int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
-                                      PVFS_fs_id fs_id,
-                                      int* free_config_flag)
+int PINT_server_config_mgr_add_config(
+    struct server_configuration_s *config_s,
+    PVFS_fs_id fs_id,
+    int* free_config_flag)
 {
     int ret = -PVFS_EINVAL;
     server_config_t *config = NULL;
@@ -259,7 +258,8 @@ int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
         config->fs_id = fs_id;
         config->ref_count = 1;
 
-        qhash_add(s_fsid_to_config_table, &fs_id, &config->hash_link);
+        qhash_add(s_fsid_to_config_table, &fs_id,
+                  &config->hash_link);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "\tmapped fs_id %d => "
                      "config %p\n", fs_id, config_s);
@@ -270,7 +270,7 @@ int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
     }
     return ret;
 
-add_failure:
+  add_failure:
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_config_mgr_add_"
                  "config: add_failure reached\n");
 
@@ -283,7 +283,8 @@ add_failure:
     return ret;
 }
 
-int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
+int PINT_server_config_mgr_remove_config(
+    PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
     server_config_t *config = NULL;
@@ -297,7 +298,8 @@ int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
         gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
-        hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
+        hash_link = qhash_search(
+            s_fsid_to_config_table, &fs_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -339,7 +341,7 @@ int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
 }
 
 struct server_configuration_s *__PINT_server_config_mgr_get_config(
-                                                        PVFS_fs_id fs_id)
+    PVFS_fs_id fs_id)
 {
     struct server_configuration_s *ret = NULL;
     server_config_t *config = NULL;
@@ -375,7 +377,7 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
 }
 
 void __PINT_server_config_mgr_put_config(
-                              struct server_configuration_s *config_s)
+    struct server_configuration_s *config_s)
 {
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -392,7 +394,8 @@ void __PINT_server_config_mgr_put_config(
         cur_fs = PINT_llist_head(cur);
         assert(cur_fs);
 
-        hash_link = qhash_search(s_fsid_to_config_table, &cur_fs->coll_id);
+        hash_link = qhash_search(
+            s_fsid_to_config_table, &cur_fs->coll_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);

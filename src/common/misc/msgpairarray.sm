@@ -10,8 +10,6 @@
  * receive a collection of request/response pairs (msgpairs).
  */
 
-#include "pvfs2-internal.h"
-
 #include <string.h>
 #include <assert.h>
 
@@ -24,6 +22,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "server-config-mgr.h"
+#include "pvfs2-internal.h"
 #include "state-machine.h"
 
 #ifdef WIN32

@@ -7,7 +7,6 @@
 #ifndef __PINT_EVENT_H
 #define __PINT_EVENT_H
 
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "quickhash.h"
 

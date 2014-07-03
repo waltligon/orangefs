@@ -13,7 +13,6 @@
 
 #define __util_c
 #include "ib.h"
-#include "pvfs2-internal.h"
 
 /*
  * Utility functions.

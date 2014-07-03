@@ -109,11 +109,6 @@ int PINT_security_initialize(void)
 {
     const struct server_configuration_s *config = PINT_get_server_config();
     int ret;
-#ifdef ENABLE_SECURITY_KEY
-    PINT_llist_p l;
-    host_alias_s *host_alias;
-    char buf[HOST_NAME_MAX+2];
-#endif
 
     gen_mutex_lock(&security_init_mutex);
     if (security_init_status)
@@ -142,15 +137,24 @@ int PINT_security_initialize(void)
         return ret;
     }    
 
-    PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error,
-                             "ServerKey not defined in configuration file... "
-                             "aborting\n");
+    /* check for server private key */
+    if (config->serverkey_path == NULL)
+    {
+        gossip_err("ServerKey not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error);
+    }
 
 #ifdef ENABLE_SECURITY_KEY
 
-    PINT_SECURITY_CHECK_NULL(config->keystore_path, init_error,
-                             "Keystore not defined in configuration file... "
-                             "aborting\n");
+    if (config->keystore_path == NULL)
+    {
+        gossip_err("Keystore not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->keystore_path, init_error);
+    }
 
     security_privkey = EVP_PKEY_new();
     ret = load_private_key(config->serverkey_path);
@@ -176,57 +180,37 @@ int PINT_security_initialize(void)
         return -PVFS_EIO;
     }
 
-    l = config->host_aliases;
-    if (!PINT_llist_empty(l))
-        do {
-            if (PINT_llist_empty(l))
-                break;
-            host_alias = PINT_llist_head(l);
-            snprintf(buf, HOST_NAME_MAX+2, "S:%s",
-                     host_alias->host_alias);
-            if (SECURITY_lookup_pubkey(buf) == NULL) {
-                gossip_err("Could not find public key for alias "
-                           "'%s'\n", buf);
-                SECURITY_hash_finalize();
-                EVP_cleanup();
-                ERR_free_strings();
-                cleanup_threading();
-                gen_mutex_unlock(&security_init_mutex);
-                return -PVFS_EIO;
-            }
-        } while ((l = PINT_llist_next(l)));
-
 #elif ENABLE_SECURITY_CERT
 
     /* load the CA cert */
     ret = PINT_init_trust_store();
-    PINT_SECURITY_CHECK(ret, init_error, "could not initialize trust store\n");
+    PINT_SECURITY_CHECK(ret, init_error);
 
-    PINT_SECURITY_CHECK_NULL(config->ca_file, init_error,
-                             "CAFile not defined in configuration file... "
-                             "aborting\n");
+    if (config->ca_file == NULL)
+    {
+        gossip_err("CAPath not defined in configuration file... "
+                   "aborting\n");
+
+        PINT_SECURITY_CHECK_NULL(config->ca_file, init_error);
+    }
 
     ret = PINT_load_cert_from_file(config->ca_file, &ca_cert);
-    PINT_SECURITY_CHECK(ret, init_error, "could not open cert file %s:\n", 
-                        config->ca_file);
-    
+    PINT_SECURITY_CHECK(ret, init_error);
+
     ret = PINT_add_trusted_certificate(ca_cert);
-    PINT_SECURITY_CHECK(ret, init_error, 
-                        "could not add CA cert to trust store\n");
+    PINT_SECURITY_CHECK(ret, init_error);
 
     /* load private key */
     ret = PINT_load_key_from_file(config->serverkey_path, &security_privkey);
-    PINT_SECURITY_CHECK(ret, init_error, "could not load private key file %s\n",
-                        config->serverkey_path);
+    PINT_SECURITY_CHECK(ret, init_error);
 
     /* get public key */
     security_pubkey = X509_get_pubkey(ca_cert);
-    PINT_SECURITY_CHECK_NULL(security_pubkey, init_error, "could not load "
-                             "CA cert public key\n");
+    PINT_SECURITY_CHECK_NULL(security_pubkey, init_error);
 
     /* initialize LDAP */
     ret = PINT_ldap_initialize();
-    PINT_SECURITY_CHECK(ret, init_error, "could not initialize LDAP\n");
+    PINT_SECURITY_CHECK(ret, init_error);
 
 #endif /* ENABLE_SECURITY_CERT */
 
@@ -322,7 +306,7 @@ int PINT_security_cache_ca_cert(void)
     }
 
     /* insert cert into cache as root user */
-    ret = PINT_certcache_insert(pcert, 0, 1, group_array);
+    ret = PINT_certcache_insert_entry(pcert, 0, 1, group_array);
 
     PINT_cleanup_cert(pcert);
 
@@ -821,11 +805,10 @@ int PINT_verify_credential(const PVFS_credential *cred)
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
-    char buf[256], sigbuf[16];
+    char buf[256];
     int ret;
 #ifdef ENABLE_SECURITY_CERT
     X509 *cert;
-    int certcache_hit;
 #endif
 
     if (!cred)
@@ -834,11 +817,10 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
-                 PINT_util_bytes2str(cred->signature, sigbuf, 4));
-
     if (PINT_util_get_current_time() >= cred->timeout)
     {
+        char sigbuf[16]; 
+
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
                      "(timeout %llu)\n", 
                      PINT_util_bytes2str(cred->signature, sigbuf, 4),
@@ -852,7 +834,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 #endif
 
 #ifdef ENABLE_SECURITY_CERT
-    /* get X509 cert from certificate buffer */
+    /* get X509 cert from certificate buffer */        
     ret = PINT_cert_to_X509(&cred->certificate, &cert);
     if (ret != 0)
     {
@@ -860,28 +842,15 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-#ifdef ENABLE_CERTCACHE
-    /* check cert cache for cert */
-    certcache_hit = 
-        (PINT_certcache_lookup(
-            (PVFS_certificate *) &cred->certificate) != NULL);
-#else
-    certcache_hit = 0;
-#endif
-
-    if (!certcache_hit)
+    /* verify the certificate (using the trust store) */
+    ret = PINT_verify_certificate(cert);
+    if (ret != 0)
     {
-        /* verify the certificate (using the trust store)
-         * note: we don't cache a verified cert at this stage 
-         */
-        ret = PINT_verify_certificate(cert);
-        if (ret != 0)
-        {
-            /* Note: errors already logged */
-            X509_free(cert);
-            return 0;
-        }
+        /* Note: errors already logged */
+        X509_free(cert);
+        return 0;
     }
+
     /* get certificate public key */
     pubkey = X509_get_pubkey(cert);
     if (pubkey == NULL)
@@ -1209,13 +1178,6 @@ static int load_public_keys(const char *path)
         }
         buf[ptr] = '\0';
 
-        if (buf[1] != ':' || (buf[0] != 'C' && buf[0] != 'S')) {
-            gossip_err("Error loading keystore: Issuer must start with "
-                       "'C:' or 'C:' but is '%s'\n", buf);
-            fclose(keyfile);
-            return -1;
-        }
-
         do
         {
             ch = fgetc(keyfile);
@@ -1280,7 +1242,7 @@ void PINT_security_error(const char *prefix, int err)
         break;
     default:
         /* debug PVFS/errno error */
-        PVFS_strerror_r(err, errstr, 256);
+        PVFS_strerror_r((int) err, errstr, 256);
         errstr[255] = '\0';
         gossip_err("%s: %s\n", prefix, errstr);
     }

@@ -3,85 +3,129 @@
  *
  * See COPYING in top-level directory.
  */
+
 package org.orangefs.usrint;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-
+import java.io.IOException;
+import java.io.Closeable;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class OrangeFileSystemInputStream extends InputStream implements
-        Closeable {
-    /* Interface Related Fields */
-    private Orange orange;
-    private PVFS2POSIXJNIFlags pf;
-    /* File Related Fields */
-    private OrangeFileSystemInputChannel inChannel;
-    private String path;
-    private long fileSize;
-    private static final Log OFSLOG = LogFactory
-            .getLog(OrangeFileSystemInputStream.class);
+public class OrangeFileSystemInputStream 
+        extends InputStream 
+        implements Closeable {
 
-    public OrangeFileSystemInputStream(String path, int bufferSize)
-            throws IOException {
-        int fd = -1;
+    /* Interface Related Fields*/
+    public Orange orange;
+    public PVFS2POSIXJNIFlags pf;
+    public PVFS2STDIOJNIFlags sf;
+
+    /* File Related Fields*/
+    public String path;
+    public int bufferSize;
+    public long filePtr;
+    public long bufferPtr;
+    public long fileSize;
+
+    public static final Log OFSLOG = LogFactory.getLog(OrangeFileSystemInputStream.class);
+
+
+    public OrangeFileSystemInputStream(
+            String path,
+            int bufferSize) throws IOException {
+
+        displayMethodInfo(true, false);
+        
+        int rc = 0;        
+
         this.orange = Orange.getInstance();
         pf = orange.posix.f;
+        sf = orange.stdio.f;
+
+
         this.path = path;
-        /* Perform open */
-        fd = orange.posix.open(path, pf.O_RDONLY, 0);
-        if (fd < 0) {
-            throw new IOException(path + " couldn't be opened. (open)");
+        this.filePtr = 0;
+        this.bufferPtr = 0;
+        this.bufferSize = bufferSize;
+        String fopenMode = "r";
+
+        /* Get current file size by calling stat */
+        Stat fileStat = orange.posix.stat(this.path);
+        if(fileStat == null) {
+            fileSize = 0;
         }
-        /* Obtain the fileSize */
-        fileSize = orange.posix.lseek(fd, 0, pf.SEEK_END);
-        if (fileSize < 0 || orange.posix.lseek(fd, 0, pf.SEEK_SET) < 0) {
-            throw new IOException("Error determining fileSize: lseek: "
-                    + fileSize);
+        else {
+            fileSize = fileStat.st_size;
         }
-        /* Open the input channel */
-        inChannel = new OrangeFileSystemInputChannel(fd, bufferSize);
+        /* Perform fopen */
+        filePtr = orange.stdio.fopen(path, fopenMode);
+        if(filePtr == 0) {
+            throw new IOException(path +
+                " couldn't be opened. (fopen)");
+        }
+        /* Allocate Space for Buffer based on bufferSize */
+        bufferPtr = orange.stdio.calloc(1, bufferSize);
+        if(bufferPtr == 0) {
+            throw new IOException(path + 
+                "couldn't be opened. (calloc for setvbuf)");
+        }
+        /* Set buffering as desired */
+        if(orange.stdio.setvbuf(filePtr, 
+            bufferPtr, sf._IOFBF, bufferSize) != 0)
+        {
+            throw new IOException(path + "couldn't be opened. (setvbuf)");
+        }
     }
 
-    @Override
+    /* This method has an implementation in abstract class InputStream */
+    /* */
     public synchronized int available() throws IOException {
-        if (inChannel == null) {
-            throw new IOException("InputChannel is null.");
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
         }
-        return (int) (fileSize - inChannel.tell());
+        return (int) (fileSize - orange.stdio.ftell(filePtr));
     }
 
-    @Override
-    public synchronized void close() throws IOException {
-        if (inChannel == null) {
+    /* This method has an implementation in abstract class InputStream */
+    public void close() throws IOException {
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
             return;
         }
-        inChannel.close();
-        inChannel = null;
+        if(orange.stdio.fclose(filePtr) != 0) {
+            throw new IOException("Couldn't close stream: " + path);
+        }
+        filePtr = 0;
+        /* Free buffer */        
+        if(bufferPtr != 0) {
+            orange.stdio.free(bufferPtr);
+        }
+        bufferPtr = 0;
     }
 
-    public String getPath() throws IOException {
-        return path;
-    }
-
-    @Override
+    /* This method has an implementation in abstract class InputStream */
     public void mark(int readLimit) {
+        displayMethodInfo(true, false);
     }
 
-    @Override
+    /* This method has an implementation in abstract class InputStream */
     public boolean markSupported() {
+        displayMethodInfo(true, false);
         return false;
     }
 
-    @Override
+    /* *** This method declared abstract in InputStream *** */
     public synchronized int read() throws IOException {
-        byte[] b = new byte[1];
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
+        }
+        byte [] b = new byte[1];
         int rc = read(b, 0, 1);
-        if (rc == 1) {
-            int retVal = 0xff & b[0];
+        if(rc == 1) {
+            int retVal = (int) (0xff & b[0]);
             /* Return byte as int */
             return retVal;
         }
@@ -89,69 +133,82 @@ public class OrangeFileSystemInputStream extends InputStream implements
         return -1;
     }
 
-    @Override
+    /* This method has an implementation in abstract class InputStream */
     public synchronized int read(byte[] b) throws IOException {
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
+        }
         return read(b, 0, b.length);
     }
 
-    @Override
+    /* This method has an implementation in abstract class InputStream */
     public synchronized int read(byte[] b, int off, int len) throws IOException {
-        if (inChannel == null) {
-            throw new IOException("InputChannel is null.");
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Couldn't read, invalid filePtr.");
         }
-        if (len == 0) {
+        if(len == 0) {
             return 0;
         }
-        int ret = inChannel.read(ByteBuffer.wrap(b, off, len));
-        OFSLOG.debug("inChannel.read ret = " + ret);
-        if (ret <= 0) {
+        byte c[] = new byte[len];
+        int ret = (int) orange.stdio.fread(c, 1, (long) len, filePtr);
+        OFSLOG.debug("orange.stdio.fread ret = " + ret);
+
+        /* TODO make this == 0 ? */
+        if(ret <= 0) {
             OFSLOG.debug("Nothing read -> " + ret + " / " + len);
-            return -1;
+            /* Check for EOF */
+            if(orange.stdio.feof(filePtr) != 0) {
+                orange.stdio.clearerr(filePtr);
+                return -1;
+            }
+            /* Check for stream error indicator */
+            if(orange.stdio.ferror(filePtr) != 0) {
+                orange.stdio.clearerr(filePtr);
+                throw new IOException("Error: Bytes not read from file ( " +
+                    ret + " of " + len + "): " + path);
+            }
         }
+
+        if(ret < len) {
+            OFSLOG.debug("Short item count!-> " + ret + " / " + len);
+        }
+
+        System.arraycopy(c, 0, b, off, ret);
         return ret;
     }
 
-    @Override
+    /* This method has an implementation in abstract class InputStream */
     public void reset() throws IOException {
+        displayMethodInfo(true, false);
         throw new IOException("No support for marking.");
     }
 
-    public synchronized void seek(long pos) throws IOException {
-        if (inChannel == null) {
-            throw new IOException("InputChannel is null.");
+    /* This method has an implementation in abstract class InputStream */
+    public long skip(long n) throws IOException {
+        displayMethodInfo(true, false);
+        if(filePtr == 0) {
+            throw new IOException("Invalid filePtr");
         }
-        if (pos >= fileSize) {
-            throw new IOException("Attempted to seek past EOF: fileSize = "
-                    + fileSize + ", pos = " + pos);
+        int rc = orange.stdio.fseek(filePtr, n, sf.SEEK_CUR);
+        if(rc != 0) {
+            throw new IOException("Fseek failed.");
         }
-        inChannel.seek(pos);
-    }
-
-    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
-        return false;
-    }
-
-    @Override
-    public synchronized long skip(long n) throws IOException {
-        if (n < 0) {
-            return 0;
-        }
-        if (inChannel == null) {
-            throw new IOException("InputChannel is null.");
-        }
-        long fileBytesAvailable = available();
-        if (n > fileBytesAvailable) {
-            n = fileBytesAvailable;
-        }
-        inChannel.seek(n);
         return n;
     }
 
-    /* Returns current position within the file */
-    public long tell() throws IOException {
-        if (inChannel == null) {
-            throw new IOException("InputChannel is null.");
+    public void displayMethodInfo(boolean showName, boolean showStack) {
+        if(showName || showStack) {
+            String methodName =
+                Thread.currentThread().getStackTrace()[2].getMethodName();
+            if(showName) {
+                OFSLOG.debug("method=[" + methodName + "]");
+            }
+            if(showStack) {
+                //System.out.print("\t");
+                //Thread.currentThread().dumpStack();
+            }
         }
-        return inChannel.tell();
     }
 }

@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-#include "pvfs2-internal.h"
+#include "pvfs2-config.h"
 
 #include <unistd.h>
 #include <errno.h>

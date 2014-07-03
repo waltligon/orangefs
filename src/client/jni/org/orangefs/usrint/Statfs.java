@@ -9,7 +9,7 @@ package org.orangefs.usrint;
 import java.lang.reflect.Field;
 
 /* Class representing C struct: 'struct statfs' */
-public class Statfs {
+public class Statfs{
 
     long f_type;
     long f_bsize;
@@ -21,18 +21,16 @@ public class Statfs {
     long f_flags;
     long f_namelen;
     long f_frsize;
-    long[] f_spare = new long[5];
+    long [] f_spare = new long[5];
 
-    /*
-     * This probably won't get called much since we're depending upon a native
-     * method to initialize this object.
+    /* This probably won't get called much since we're depending upon a 
+     * native method to initialize this object.
      */
     Statfs() {
 
     }
 
     /* Generic Object Dump to String */
-    @Override
     public String toString() {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -43,14 +41,13 @@ public class Statfs {
 
         Field[] fields = this.getClass().getDeclaredFields();
 
-        for (Field field : fields) {
+        for(Field field : fields ) {
             result.append("  ");
             try {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch(IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

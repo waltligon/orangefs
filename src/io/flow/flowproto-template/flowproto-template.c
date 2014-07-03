@@ -9,7 +9,6 @@
 #include <errno.h>
 
 #include "gossip.h"
-#include "pvfs2-internal.h"
 #include "src/io/flow/flowproto-support.h"
 
 /* interface prototypes */

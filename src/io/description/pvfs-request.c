@@ -11,7 +11,6 @@
 #include <unistd.h>
 #endif
 #include "string.h"
-#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pint-request.h"
 #include "pvfs2-request.h"

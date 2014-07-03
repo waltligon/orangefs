@@ -8,37 +8,22 @@ LIBSRC += $(DIR)/security-util.c \
 
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \
-             $(DIR)/security-hash.c \
-             $(DIR)/seccache.c
-
+             $(DIR)/security-hash.c
 ifdef ENABLE_CAPCACHE
 SERVERSRC += $(DIR)/capcache.c
 endif
-
-ifdef ENABLE_CREDCACHE
-SERVERSRC += $(DIR)/credcache.c
-endif
-
 else ifdef ENABLE_SECURITY_CERT
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c \
-	     $(DIR)/seccache.c \
              $(DIR)/pint-cert.c \
              $(DIR)/cert-util.c \
              $(DIR)/pint-ldap-map.c
-
 ifdef ENABLE_CAPCACHE
 SERVERSRC += $(DIR)/capcache.c
 endif
-
-ifdef ENABLE_CREDCACHE
-SERVERSRC += $(DIR)/credcache.c
-endif
-
 ifdef ENABLE_CERTCACHE
 SERVERSRC += $(DIR)/certcache.c
 endif
-
 # compile/link ldap
 MODCFLAGS_$(DIR)/pint-ldap-map.c := -DLDAP_DEPRECATED=1
 else

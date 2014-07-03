@@ -20,7 +20,6 @@
 #ifndef __BMI_H
 #define __BMI_H
 
-#include "pvfs2-internal.h"
 #include "bmi-types.h"
 
 /** used to describe unexpected message arrivals. */

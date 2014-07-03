@@ -10,12 +10,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
-#include <stdio.h>
-
-#include "pvfs2-internal.h"
 #include "pint-hint.h"
 #include "gossip.h"
-#include "pvfs2-debug.h"
+#include <stdio.h>
+#include <pvfs2-debug.h>
 
 DEFINE_STATIC_ENDECODE_FUNCS(uint64_t, uint64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int64_t, int64_t);
@@ -27,7 +25,7 @@ struct PINT_hint_info
 {
     enum PINT_hint_type type;
     int flags;
-    const char *name;
+    const char * name;
     void (*encode)(char **pptr, void *value);
     void (*decode)(char **pptr, void *value);
     int length;
@@ -107,9 +105,9 @@ static const struct PINT_hint_info hint_types[] = {
      decode_func_uint32_t,
      sizeof(uint32_t)},
 
-    {PINT_HINT_CACHE,
+    {PINT_HINT_NOCACHE,
      0,
-     PVFS_HINT_CACHE_NAME,
+     PVFS_HINT_NOCACHE_NAME,
      encode_func_uint32_t,
      decode_func_uint32_t,
      sizeof(uint32_t)},
@@ -208,18 +206,18 @@ int PVFS_hint_add_internal(
 
 int PVFS_hint_replace(
     PVFS_hint *hint,
-    const char *name,
+    const char *type,
     int length,
     void *value)
 {
     const struct PINT_hint_info *info;
 
-    info = PINT_hint_get_info_by_name(name);
+    info = PINT_hint_get_info_by_name(type);
     if(info)
     {
         return PVFS_hint_replace_internal(hint, info->type, length, value);
     }
-    return PVFS_hint_add(hint, name, length, value);
+    return PVFS_hint_add(hint, type, length, value);
 }
 
 int PVFS_hint_replace_internal(
@@ -258,7 +256,7 @@ int PVFS_hint_replace_internal(
 
 int PVFS_hint_add(
     PVFS_hint *hint,
-    const char *name,
+    const char *type,
     int length,
     void *value)
 {
@@ -266,7 +264,7 @@ int PVFS_hint_add(
     const struct PINT_hint_info *info;
     PINT_hint *new_hint;
 
-    info = PINT_hint_get_info_by_name(name);
+    info = PINT_hint_get_info_by_name(type);
     if(info)
     {
         ret = PINT_hint_check(hint, info->type);
@@ -302,7 +300,7 @@ int PVFS_hint_add(
     else
     {
         new_hint->type = PINT_HINT_UNKNOWN;
-        new_hint->type_string = strdup(name);
+        new_hint->type_string = strdup(type);
 
         /* always transfer unknown hints */
         new_hint->flags = PINT_HINT_TRANSFER;
@@ -316,11 +314,11 @@ int PVFS_hint_add(
     return 0;
 }
 
-int PVFS_hint_check(PVFS_hint *hints, const char *name)
+int PVFS_hint_check(PVFS_hint *hints, const char *type)
 {
     const struct PINT_hint_info *info;
 
-    info = PINT_hint_get_info_by_name(name);
+    info = PINT_hint_get_info_by_name(type);
     return PINT_hint_check(hints, info->type);
 }
 
@@ -350,10 +348,7 @@ static int PINT_hint_check(PVFS_hint *hints, enum PINT_hint_type type)
 {
     PINT_hint *tmp;
 
-    if(!hints)
-    {
-        return 0;
-    }
+    if(!hints) return 0;
 
     tmp = *hints;
     while(tmp)
@@ -511,7 +506,7 @@ void PVFS_hint_free(PVFS_hint hint)
  * PVFS2_HINTS =
  *'pvfs.hint.request_id:10+pvfs.hint.client_id:30'
  */
-int PVFS_hint_import_env(PVFS_hint *out_hint)
+int PVFS_hint_import_env(PVFS_hint * out_hint)
 {
     char * env;
     char * env_copy;
@@ -618,9 +613,8 @@ int PVFS_hint_import_env(PVFS_hint *out_hint)
     return 0;
 }
 
-void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint,
-                                  enum PINT_hint_type type,
-                                  int *length)
+void *PINT_hint_get_value_by_type(
+    struct PVFS_hint_s *hint, enum PINT_hint_type type, int *length)
 {
     PINT_hint *h;
 
@@ -642,9 +636,8 @@ void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint,
     return NULL;
 }
 
-void *PINT_hint_get_value_by_name(struct PVFS_hint_s *hint,
-                                  const char *name,
-                                  int *length)
+void *PINT_hint_get_value_by_name(
+    struct PVFS_hint_s *hint, const char *name, int *length)
 {
     PINT_hint *h;
 

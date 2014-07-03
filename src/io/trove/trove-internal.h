@@ -7,7 +7,6 @@
 #ifndef __TROVE_INTERNAL_H
 #define __TROVE_INTERNAL_H
 
-#include "pvfs2-internal.h"
 #include "trove-types.h"
 
 PVFS_error trove_errno_to_trove_error(int errno_value);

@@ -14,7 +14,6 @@
 
 #define PINT_HINT_TRANSFER 0x01
 
-#include "pvfs2-internal.h"
 #include "pvfs2-hint.h"
 
 enum PINT_hint_type
@@ -30,7 +29,7 @@ enum PINT_hint_type
     PINT_HINT_LAYOUT,
     PINT_HINT_DFILE_COUNT,
     PINT_HINT_SERVERLIST,
-    PINT_HINT_CACHE,
+    PINT_HINT_NOCACHE,
     PINT_HINT_BMI_QUEUE
 };
 

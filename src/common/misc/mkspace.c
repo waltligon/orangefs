@@ -12,9 +12,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <assert.h>
-#include <sys/stat.h>
 
-#include "pvfs2-internal.h"
 #include "pvfs2-attr.h"
 #include "trove.h"
 #include "mkspace.h"
@@ -24,6 +22,7 @@
 #include "str-utils.h"
 #include "extent-utils.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
 #include "dist-dir-utils.h"
@@ -45,6 +44,7 @@ do {                                                \
  else if (v == PVFS2_MKSPACE_STDERR_VERBOSE)        \
    fprintf(stderr,format, ##f);                     \
 } while(0)
+
 
 #if 0
 static int handle_is_excluded(
@@ -116,15 +116,16 @@ static void get_handle_extent_from_ranges(
 }
 #endif
 
-int pvfs2_mkspace(char *data_path,
-                  char *meta_path,
-                  char *collection,
-                  TROVE_coll_id coll_id,
-                  TROVE_handle root_handle,
-                  char *meta_handle_ranges,
-                  char *data_handle_ranges,
-                  int create_collection_only,
-                  int verbose)
+int pvfs2_mkspace(
+    char *data_path,
+    char *meta_path,
+    char *collection,
+    TROVE_coll_id coll_id,
+    TROVE_handle root_handle,
+    char *meta_handle_ranges,
+    char *data_handle_ranges,
+    int create_collection_only,
+    int verbose)
 {
     int ret = - 1, count = 0;
     TROVE_op_id op_id;
@@ -137,9 +138,6 @@ int pvfs2_mkspace(char *data_path,
     TROVE_context_id trove_context = -1;
     char *merged_handle_ranges = NULL;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
-    struct stat root_stat;
-    struct stat meta_stat;
-    struct stat data_stat;
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -155,56 +153,10 @@ int pvfs2_mkspace(char *data_path,
 
     new_root_handle = root_handle;
 
-
-    /* init stat buffers */
-    memset(&root_stat, 0, sizeof(root_stat));
-    memset(&meta_stat, 0, sizeof(meta_stat));
-
-    /* call stat on root, meta, and data paths */
-    stat("/", &root_stat);
-    stat(meta_path, &meta_stat);
-
-    /* see if the metadata path is located on the root device */
-    if (meta_stat.st_dev == root_stat.st_dev)
-    {
-        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                      "*** WARNING *** *** WARNING *** *** WARNING ***\n");
-        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                      "*The MetadataStorageSpace path %s appears\n"
-                      "      to be on the root device.\n", meta_path);
-        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                      "*It is recommended that the meta data be\n"
-                      "      stored on a dedicated partition.\n");
-        mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                      "*If you have a dedicated partition setup,\n"
-                      "      please be sure it is mounted.\n\n");   
-    }
-
-    if (!create_collection_only)
-    {
-        memset(&data_stat, 0, sizeof(data_stat));
-        stat(data_path, &data_stat);
-        /* see if the data path is located on the root device */
-        if (data_stat.st_dev == root_stat.st_dev)
-        {
-            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                          "*** WARNING *** *** WARNING *** *** WARNING ***\n");
-            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                          "*The DataStorageSpace path %s appears\n"
-                          "      to be on the root device.\n", data_path);
-            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                          "*It is recommended that the data be\n"
-                          "      stored on a dedicated partition.\n");
-            mkspace_print(PVFS2_MKSPACE_STDERR_VERBOSE,
-                          "*If you have a dedicated partition setup,\n"
-                          "      please be sure it is mounted.\n\n");   
-        }
-    }
-
     /*
-     * if we're only creating a collection inside an existing
-     * storage space, we need to assume that it exists already
-     */
+      if we're only creating a collection inside an existing
+      storage space, we need to assume that it exists already
+    */
     if (!create_collection_only)
     {
         /*
@@ -232,11 +184,9 @@ int pvfs2_mkspace(char *data_path,
     }
 
     /* now that the storage space exists, initialize trove properly */
-    ret = trove_initialize(TROVE_METHOD_DBPF,
-                           NULL, 
-	                   data_path,
-                           meta_path,
-                           0);
+    ret = trove_initialize(
+	TROVE_METHOD_DBPF, NULL, 
+	data_path, meta_path, 0);
     if (ret < 0)
     {
 	gossip_err("error: trove initialize failed; aborting!\n");
@@ -249,11 +199,8 @@ int pvfs2_mkspace(char *data_path,
                   meta_path);
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(TROVE_METHOD_DBPF,
-                                  collection,
-                                  &coll_id,
-                                  NULL,
-                                  &op_id);
+    ret = trove_collection_lookup(
+	TROVE_METHOD_DBPF, collection, &coll_id, NULL, &op_id);
     if (ret == 1)
     {
 	mkspace_print(verbose, "warning: collection lookup succeeded "
@@ -316,10 +263,9 @@ int pvfs2_mkspace(char *data_path,
       set the trove handle ranges; this initializes the handle
       allocator with the ranges we were told to use
     */ 
-    ret = trove_collection_setinfo(coll_id,
-                                   trove_context,
-                                   TROVE_COLLECTION_HANDLE_RANGES,
-                                   merged_handle_ranges);
+    ret = trove_collection_setinfo(
+        coll_id, trove_context, TROVE_COLLECTION_HANDLE_RANGES,
+        merged_handle_ranges);
 
     if (ret < 0)
     {
@@ -329,7 +275,7 @@ int pvfs2_mkspace(char *data_path,
 	return -1;
     }
 
-    mkspace_print(verbose, "info: set handle ranges to %s\n",
+    mkspace_print(verbose,"info: set handle ranges to %s\n",
                   merged_handle_ranges);
 
     free(merged_handle_ranges);
@@ -347,26 +293,16 @@ int pvfs2_mkspace(char *data_path,
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
-        ret = trove_dspace_create(coll_id,
-                                  &extent_array,
-                                  &new_root_handle,
-                                  PVFS_TYPE_DIRECTORY,
-                                  NULL,
-                                  (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-                                  NULL,
-                                  trove_context,
-                                  &op_id,
-                                  NULL);
+        ret = trove_dspace_create(
+            coll_id, &extent_array, &new_root_handle,
+            PVFS_TYPE_DIRECTORY, NULL,
+            (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
+            NULL, trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
+                                    &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
@@ -386,23 +322,13 @@ int pvfs2_mkspace(char *data_path,
         key.buffer_sz = ROOT_HANDLE_KEYLEN;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
-        ret = trove_collection_seteattr(coll_id,
-                                        &key,
-                                        &val,
-                                        0,
-                                        NULL,
-                                        trove_context,
-                                        &op_id);
+        ret = trove_collection_seteattr(coll_id, &key, &val, 0,
+                                        NULL, trove_context, &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -421,23 +347,15 @@ int pvfs2_mkspace(char *data_path,
 	attr.atime = attr.ctime = PINT_util_get_current_time();
         attr.mtime = PINT_util_mktime_version(attr.ctime);
 
-        ret = trove_dspace_setattr(coll_id,
-                                   new_root_handle,
-                                   &attr,
-                                   TROVE_SYNC,
-                                   NULL,
+        ret = trove_dspace_setattr(
+            coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
             trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id,
-                                    op_id,
-                                    trove_context,
-                                    &count,
-                                    NULL,
-                                    NULL,
-                                    &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -446,6 +364,7 @@ int pvfs2_mkspace(char *data_path,
                        "attributes failed; aborting!\n");
             return -1;
         }
+
 
         /* The creation of dirdata objects for the root directory is 
          * moved to pvfs2_server.c to setup distributed directory struct.

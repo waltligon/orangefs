@@ -10,7 +10,6 @@
 #include<stdlib.h>
 #include<gm.h>
 
-#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "quicklist.h"
 #include "bmi-gm-bufferpool.h"

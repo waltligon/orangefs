@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -13,7 +12,6 @@
 #include <ctype.h>
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "fsck-utils.h"
 #include "security-util.h"
 

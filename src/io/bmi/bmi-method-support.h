@@ -11,7 +11,6 @@
 #ifndef __BMI_METHOD_SUPPORT_H
 #define __BMI_METHOD_SUPPORT_H
 
-#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "bmi-types.h"
 #include "pint-event.h"

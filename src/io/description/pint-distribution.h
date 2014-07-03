@@ -7,7 +7,6 @@
 #ifndef __PINT_DISTRIBUTION_H
 #define __PINT_DISTRIBUTION_H
 
-#include "pvfs2-internal.h"
 #include "pint-request.h"
 #include "pvfs2-types.h"
 

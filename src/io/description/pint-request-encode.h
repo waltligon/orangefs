@@ -2,8 +2,6 @@
 #ifndef _PINT_REQUEST_ENCODE_H_
 #define _PINT_REQUEST_ENCODE_H_
 
-#include "pvfs2-internal.h"
-
 /* max depth of a PINT_Request used in anything, just servreq IO now */
 #define PVFS_REQ_LIMIT_PINT_REQUEST_NUM  100
 

@@ -9,7 +9,6 @@
 #include <errno.h>
 
 #include "flow-ref.h"
-#include "pvfs2-internal.h"
 
 /* flow_ref_new()
  *

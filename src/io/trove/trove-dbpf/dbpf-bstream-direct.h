@@ -7,7 +7,6 @@
 #ifndef __DBPF_BSTREAM_DIRECT_H
 #define __DBPF_BSTREAM_DIRECT_H
 
-#include "pvfs2-internal.h"
 #include "trove-types.h"
 
 int dbpf_bstream_direct_read_op_svc(void *ptr, TROVE_hint *hints);

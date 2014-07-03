@@ -8,7 +8,6 @@
 
 #include "ncac-list.h"
 
-#include "pvfs2-internal.h"
 #include "internal.h"
 #include "radix.h"
 
