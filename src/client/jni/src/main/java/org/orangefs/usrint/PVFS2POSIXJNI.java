@@ -5,10 +5,11 @@
  */
 package org.orangefs.usrint;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 
-public class PVFS2POSIXJNI {
+public class PVFS2POSIXJNI implements PVFS2POSIX {
     public PVFS2POSIXJNIFlags f;
     static {
         String ldlPath = System.getenv("JNI_LIBRARY_PATH");
@@ -38,7 +39,7 @@ public class PVFS2POSIXJNI {
 
     public PVFS2POSIXJNI() {
         /* Instantiate PVFS2POSIXJNIFlags */
-        this.f = this.fillPVFS2POSIXJNIFlags();
+        this.f = fillPVFS2POSIXJNIFlags();
     }
 
     public native int access(String path, long mode);
@@ -49,8 +50,10 @@ public class PVFS2POSIXJNI {
 
     public native int chown(String path, int owner, int group);
 
+    @Override
     public native int close(int fd);
 
+    @Override
     public native int creat(String path, long mode);
 
     public native int cwdInit(String buf, long size);
@@ -119,6 +122,7 @@ public class PVFS2POSIXJNI {
 
     public native int lremovexattr(String path, String name);
 
+    @Override
     public native long lseek(int fd, long offset, long whence);
 
     public native Stat lstat(String path);
@@ -131,7 +135,19 @@ public class PVFS2POSIXJNI {
 
     public native int mknodat(int dirfd, String path, long mode, int dev);
 
+    @Override
     public native int open(String path, long flags, long mode);
+
+    @Override
+    /* TODO: this is a wrapper for JNI open in order to catch IOException; we should implement IOException in c side. */
+    public int openWrapper(String path, long flags, long mode) throws IOException {
+      int fd = -1;
+      fd = open(path, flags, mode);
+      if (fd < 0) {
+        throw new IOException(path + " couldn't be opened. (open)");
+      }
+      return fd;
+    }
 
     public native int openat(int dirfd, String path, long flags, long mode);
 

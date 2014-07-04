@@ -5,18 +5,25 @@
  */
 package org.orangefs.usrint;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryProxy;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class OrangeFileSystemInputStream extends InputStream implements
         Closeable {
     /* Interface Related Fields */
     private Orange orange;
+    private PVFS2POSIX orangePosix;
     private PVFS2POSIXJNIFlags pf;
     /* File Related Fields */
     private OrangeFileSystemInputChannel inChannel;
@@ -28,17 +35,27 @@ public class OrangeFileSystemInputStream extends InputStream implements
     public OrangeFileSystemInputStream(String path, int bufferSize)
             throws IOException {
         int fd = -1;
+        PVFS2POSIXJNI orangePosixJni = new PVFS2POSIXJNI();
+        pf = orangePosixJni.f;
+        /* Apply Hadoop I/O retry policy: keep retrying 10 times and waiting a growing amount of time between attempts,
+           and then fail by re-throwing the exception.
+        */
+        Map<Class<? extends Exception>,RetryPolicy> exceptionToPolicyMap =
+            new HashMap<Class<? extends Exception>, RetryPolicy>();
+        exceptionToPolicyMap.put(IOException.class, RetryPolicies.exponentialBackoffRetry(10, 500, TimeUnit.MILLISECONDS));
+
+        this.orangePosix = (PVFS2POSIX) RetryProxy.create(PVFS2POSIX.class, orangePosixJni,
+            RetryPolicies.retryByException(RetryPolicies.exponentialBackoffRetry(10, 500, TimeUnit.MILLISECONDS), exceptionToPolicyMap));
         this.orange = Orange.getInstance();
-        pf = orange.posix.f;
         this.path = path;
         /* Perform open */
-        fd = orange.posix.open(path, pf.O_RDONLY, 0);
+        fd = orangePosix.openWrapper(path, pf.O_RDONLY, 0);
         if (fd < 0) {
-            throw new IOException(path + " couldn't be opened. (open)");
+            throw new IOException(path + " couldn't be opened. All retries are failed!");
         }
         /* Obtain the fileSize */
-        fileSize = orange.posix.lseek(fd, 0, pf.SEEK_END);
-        if (fileSize < 0 || orange.posix.lseek(fd, 0, pf.SEEK_SET) < 0) {
+        fileSize = orangePosix.lseek(fd, 0, pf.SEEK_END);
+        if (fileSize < 0 || orangePosix.lseek(fd, 0, pf.SEEK_SET) < 0) {
             throw new IOException("Error determining fileSize: lseek: "
                     + fileSize);
         }
