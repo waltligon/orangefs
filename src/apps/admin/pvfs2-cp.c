@@ -161,7 +161,7 @@ int main (int argc, char ** argv)
     ret = generic_open(&src, &credentials, 0, 0, NULL, OPEN_SRC);
     if (ret < 0)
     {
-	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
+	fprintf(stderr, "Could not open source %s\n", user_opts->srcfile);
 	goto main_out;
     }
 
@@ -170,7 +170,7 @@ int main (int argc, char ** argv)
 
     if (ret < 0)
     {
-	fprintf(stderr, "Could not open %s\n", user_opts->destfile);
+	fprintf(stderr, "Could not open dest %s\n", user_opts->destfile);
 	goto main_out;
     }
 
@@ -434,14 +434,14 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 	if (obj->u.ufs.fd < 0)
 	{
 	    perror("open");
-	    fprintf(stderr, "could not open %s\n", obj->u.ufs.path);
+	    fprintf(stderr, "could not open unix %s\n", obj->u.ufs.path);
 	    return (-1);
 	}
     }
     else
     {
 	memset(&stat_buf, 0, sizeof(struct stat));
-	pvfs_stat(obj->u.pvfs2.pvfs2_path, &stat_buf);
+	pvfs_stat(obj->u.pvfs2.user_path, &stat_buf);
 	if(open_type == OPEN_SRC)
 	{
 		if(S_ISDIR(stat_buf.st_mode))
@@ -449,7 +449,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 			fprintf(stderr, "Source cannot be a directory\n");
 			return(-1);
 		}
-		obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path, O_RDONLY, hints);
+		obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.user_path, O_RDONLY, hints);
 		obj->u.pvfs2.mode = (int)stat_buf.st_mode;
 	}
 	else
@@ -458,7 +458,11 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		{
 			if (srcname)
                 	{
-		    		strncat(obj->u.pvfs2.pvfs2_path, basename(srcname), NAME_MAX);
+                                if(obj->u.pvfs2.user_path[strlen(obj->u.pvfs2.user_path)-1] != '/')
+                                {
+                                    strncat(obj->u.pvfs2.user_path, "/", NAME_MAX);
+                                }
+                                strncat(obj->u.pvfs2.user_path, basename(srcname), NAME_MAX);
                 	}
 			else
 			{
@@ -467,13 +471,13 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		    		return(-1);
 			}
 	    	}
-	    	obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path,
+	    	obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.user_path,
 				   O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC, 0666, hints);
 	}
 	if (obj->u.pvfs2.fd < 0)
 	{
 	    perror("open");
-	    fprintf(stderr, "could not open %s\n", obj->u.pvfs2.pvfs2_path);
+	    fprintf(stderr, "could not open pvfs %s\n", obj->u.pvfs2.user_path);
 	    return (-1);
 	}
     }
