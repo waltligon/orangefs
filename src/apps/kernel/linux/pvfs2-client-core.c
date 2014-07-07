@@ -18,6 +18,7 @@
 #include <getopt.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <syslog.h>
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
