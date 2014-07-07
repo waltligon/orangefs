@@ -18,6 +18,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "pvfs2-usrint.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -39,7 +40,7 @@ int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
     struct options *user_opts = NULL;
-    PVFS_sysresp_getattr resp_getattr;
+    //PVFS_sysresp_getattr resp_getattr;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -61,16 +62,16 @@ int main(int argc, char **argv)
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
-        int num_segs;
+        //int num_segs;
         char *working_file = user_opts->filenames[i];
-        char directory[PVFS_NAME_MAX];
-        char filename[PVFS_SEGMENT_MAX];
+        //char directory[PVFS_NAME_MAX];
+        //char filename[PVFS_SEGMENT_MAX];
 
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
-        PVFS_sysresp_lookup resp_lookup;
+        //PVFS_sysresp_lookup resp_lookup;
         PVFS_credential credentials;
-        PVFS_object_ref parent_ref;
+        //PVFS_object_ref parent_ref;
         int tmp_len = 0;
 
         rc = PVFS_util_gen_credential_defaults(&credentials);
@@ -104,7 +105,9 @@ int main(int argc, char **argv)
                 tmp_len--;
             }
 
-            memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+            /*Following code is to check if the object is directory or not*/
+	    /*
+	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
             rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
                                  &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
             if (rc)
@@ -128,10 +131,26 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Error: object is not a directory.\n");
                 ret = -1;
                 break;
-            }
+            }*/
+	    struct stat stat_buf;
+	    memset(&stat_buf, 0 , sizeof(struct stat));
+	    pvfs_stat(pvfs_path, &stat_buf);
+	    if (!S_ISDIR(stat_buf.st_mode))
+	    {
+                fprintf(stderr, "Error: object is not a directory.\n");
+                ret = -1;
+                break;
+	    }
         }
-
+	rc = pvfs_unlink(pvfs_path);
+	if (rc)
+	{
+		PVFS_perror("PVFS_unlink",rc);
+		ret = -1;
+		break;
+	}
         /* break into file and directory */
+	/*Previous RM code
         rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
         if(rc < 0)
         {
@@ -169,12 +188,11 @@ int main(int argc, char **argv)
             PVFS_perror("PVFS_sys_remove", rc);
             ret = -1;
             break;
-        }
+        }*/
     }
 
     PVFS_sys_finalize();
     free(user_opts);
-
     return ret;
 }
 
