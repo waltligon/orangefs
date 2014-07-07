@@ -89,9 +89,9 @@ static size_t generic_write(file_object *dest, char *buffer,
 	int64_t offset, size_t count, PVFS_credential *credentials);
 static int generic_cleanup(file_object *src, file_object *dest,
                            PVFS_credential *credentials);
-static void make_attribs(PVFS_sys_attr *attr,
+/*static void make_attribs(PVFS_sys_attr *attr,
                          PVFS_credential *credentials, 
-                         int nr_datafiles, int mode);
+                         int nr_datafiles, int mode);*/
 
 static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
 {
@@ -330,32 +330,13 @@ static void print_timings( double time, int64_t total)
 static size_t generic_read(file_object *src, char *buffer, 
 	int64_t offset, size_t count, PVFS_credential *credentials)
 {
-    PVFS_Request mem_req, file_req;
-    PVFS_sysresp_io resp_io;
-    int ret;
+    int ret = -1;
 
     if(src->fs_type == UNIX_FILE)
 	return (read(src->u.ufs.fd, buffer, count));
     else
     {
 	return (pvfs_read(src->u.pvfs2.fd, buffer, count));
-	file_req = PVFS_BYTE;
-	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
-	if (ret < 0)
-	{
-	    fprintf(stderr, "Error: PVFS_Request_contiguous failure\n");
-	    return (ret);
-	}
-	PVFS_util_refresh_credential(credentials);
-	ret = PVFS_sys_read(src->u.pvfs2.ref, file_req, offset,
-		buffer, mem_req, credentials, &resp_io, hints);
-	if (ret == 0)
-	{
-            PVFS_Request_free(&mem_req);
-	    return (resp_io.total_completed);
-	} 
-	else 
-	    PVFS_perror("PVFS_sys_read", ret);
     }
     return (ret);
 }
@@ -364,32 +345,13 @@ static size_t generic_read(file_object *src, char *buffer,
 static size_t generic_write(file_object *dest, char *buffer, 
     int64_t offset, size_t count, PVFS_credential *credentials)
 {
-    PVFS_Request mem_req, file_req;
-    PVFS_sysresp_io resp_io;
-    int ret;
+    int ret = -1;
 
     if (dest->fs_type == UNIX_FILE)
 	return(write(dest->u.ufs.fd, buffer, count));
     else
     {	
 	return(write(dest->u.pvfs2.fd, buffer, count));
-	file_req = PVFS_BYTE;
-	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
-	if (ret < 0)
-	{
-	    PVFS_perror("PVFS_Request_contiguous", ret);
-	    return(ret);
-	}
-	PVFS_util_refresh_credential(credentials);
-	ret = PVFS_sys_write(dest->u.pvfs2.ref, file_req, offset,
-		buffer, mem_req, credentials, &resp_io, hints);
-	if (ret == 0) 
-        {
-            PVFS_Request_free(&mem_req);
-	    return(resp_io.total_completed);
-        }
-	else
-	    PVFS_perror("PVFS_sys_write", ret);
     }
     return ret;
 }
@@ -432,14 +394,9 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
                         char *srcname, int open_type)
 {
     struct stat stat_buf;
-    PVFS_sysresp_lookup resp_lookup;
-    PVFS_sysresp_getattr resp_getattr;
-    PVFS_sysresp_create resp_create;
-    PVFS_object_ref parent_ref;
-    PVFS_sys_dist   *new_dist;
-    int ret = -1;
-    char *entry_name;		    /* name of the pvfs2 file */
-    char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
+    //int ret = -1;
+    //char *entry_name;		    /* name of the pvfs2 file */
+    //char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
  
     if (obj->fs_type == UNIX_FILE)
     {
@@ -492,7 +449,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 			fprintf(stderr, "Source cannot be a directory\n");
 			return(-1);
 		}
-		obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path, O_RDONLY);
+		obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path, O_RDONLY, hints);
 		obj->u.pvfs2.mode = (int)stat_buf.st_mode;
 	}
 	else
@@ -511,187 +468,13 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 			}
 	    	}
 	    	obj->u.pvfs2.fd = pvfs_open(obj->u.pvfs2.pvfs2_path,
-				   O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC,0666);
+				   O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC, 0666, hints);
 	}
 	if (obj->u.pvfs2.fd < 0)
 	{
 	    perror("open");
 	    fprintf(stderr, "could not open %s\n", obj->u.pvfs2.pvfs2_path);
 	    return (-1);
-	}
-
-	entry_name = str_buf;
-	/* it's a PVFS2 file */
-	if (strcmp(obj->u.pvfs2.pvfs2_path, "/") == 0)
-	{
-	    /* special case: PVFS2 root file system, so stuff the end of
-	     * srcfile onto pvfs2_path */
-	    char *segp = NULL, *prev_segp = NULL;
-	    void *segstate = NULL;
-	    
-	    /* can only perform this special case if we know srcname */
-	    if (srcname == NULL)
-	    {
-		fprintf(stderr, "unable to guess filename in "
-                        "toplevel PVFS2\n");
-		return -1;
-	    }
-
-	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-	    ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, obj->u.pvfs2.pvfs2_path,
-                                  credentials, &resp_lookup,
-                                  PVFS2_LOOKUP_LINK_FOLLOW, hints);
-	    if (ret < 0)
-	    {
-		PVFS_perror("PVFS_sys_lookup", ret);
-		return (-1);
-	    }
-	    parent_ref.handle = resp_lookup.ref.handle;
-	    parent_ref.fs_id = resp_lookup.ref.fs_id;
-
-	    while (!PINT_string_next_segment(srcname, &segp, &segstate))
-	    {
-		prev_segp = segp;
-	    }
-	    entry_name = prev_segp; /* see... points to basename of srcname */
-	}
-	else /* given either a pvfs2 directory or a pvfs2 file */
-	{
-	    /* get the absolute path on the pvfs2 file system */
-	    
-	    /*parent_ref.fs_id = obj->pvfs2.fs_id; */
-
-	    if (PINT_remove_base_dir(obj->u.pvfs2.pvfs2_path,str_buf, 
-                                     PVFS_NAME_MAX))
-	    {
-		if(obj->u.pvfs2.pvfs2_path[0] != '/')
-		{
-		    fprintf(stderr, "Error: poorly formatted path.\n");
-		}
-		fprintf(stderr, "Error: cannot retrieve entry name for "
-			"creation on %s\n", obj->u.pvfs2.user_path);
-		return(-1);
-	    }
-	    ret = PINT_lookup_parent(obj->u.pvfs2.pvfs2_path, 
-                                     obj->u.pvfs2.fs_id, credentials,
-                                     &parent_ref.handle);
-	    if (ret < 0)
-	    {
-		PVFS_perror("PVFS_util_lookup_parent", ret);
-		return (-1);
-	    }
-	    else /* parent lookup succeeded. if the pvfs2 path is just a
-		    directory, use basename of src for the new file */
-	    {
-		int len = strlen(obj->u.pvfs2.pvfs2_path);
-		if (obj->u.pvfs2.pvfs2_path[len - 1] == '/')
-		{
-		    char *segp = NULL, *prev_segp = NULL;
-		    void *segstate = NULL;
-
-		    if (srcname == NULL)
-		    {
-			fprintf(stderr, "unable to guess filename\n");
-			return(-1);
-		    }
-		    while (!PINT_string_next_segment(srcname, 
-				&segp, &segstate))
-		    {
-			prev_segp = segp;
-		    }
-		    strncat(obj->u.pvfs2.pvfs2_path, prev_segp, PVFS_NAME_MAX);
-		    entry_name = prev_segp;
-		}
-		parent_ref.fs_id = obj->u.pvfs2.fs_id;
-	    }
-	}
-
-	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
-                                  parent_ref, credentials, &resp_lookup,
-                                  PVFS2_LOOKUP_LINK_FOLLOW, hints);
-
-        if ((ret == 0) && (open_type == OPEN_SRC))
-        {
-            memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                                   credentials, &resp_getattr, hints);
-            if (ret)
-            {
-                fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
-                        entry_name);
-                return -1;
-            }
-
-            if (resp_getattr.attr.objtype == PVFS_TYPE_SYMLINK)
-            {
-                free(resp_getattr.attr.link_target);
-                resp_getattr.attr.link_target = NULL;
-            }
-            obj->u.pvfs2.perms = resp_getattr.attr.perms;
-            memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr,
-                   sizeof(PVFS_sys_attr));
-            obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        }
-
-	/* at this point, we have looked up the file in the parent directory.
-	 * . If we found something, and we are the SRC, then we're done. 
-	 * . We will maintain the semantic of pvfs2-import and refuse to
-	 *   overwrite existing PVFS2 files, so if we found something, and we
-	 *   are the DEST, then that's an error.  
-	 * . Otherwise, we found nothing and we will create the destination. 
-	 */
-	if (open_type == OPEN_SRC)
-	{
-	    if (ret == 0)
-	    {
-		obj->u.pvfs2.ref = resp_lookup.ref;
-		return 0;
-	    }
-	    else
-	    {
-		PVFS_perror("PVFS_sys_ref_lookup", ret);
-		return (ret);
-	    }
-	}
-	if (open_type == OPEN_DEST)
-	{
-	    if (ret == 0)
-	    {
-		fprintf(stderr, "Target file %s already exists\n", entry_name);
-		return (-1);
-	    } 
-	    else 
-	    {
-                memset(&stat_buf, 0, sizeof(struct stat));
-
-                /* preserve permissions doing a unix => pvfs2 copy */
-                stat(srcname, &stat_buf);
-		make_attribs(&(obj->u.pvfs2.attr), credentials, nr_datafiles,
-                             (int)stat_buf.st_mode);
-                if (strip_size > 0) {
-                    new_dist = PVFS_sys_dist_lookup("simple_stripe");
-                    ret = PVFS_sys_dist_setparam(new_dist, "strip_size", &strip_size);
-                    if (ret < 0)
-                    {
-                       PVFS_perror("PVFS_sys_dist_setparam", ret); 
-		       return -1; 
-                    }
-                }
-                else {
-                    new_dist=NULL;
-                }
-            
-		ret = PVFS_sys_create(entry_name, parent_ref, 
-                                      obj->u.pvfs2.attr, credentials,
-                                      new_dist, &resp_create, NULL, hints);
-		if (ret < 0)
-		{
-		    PVFS_perror("PVFS_sys_create", ret); 
-		    return -1; 
-		}
-		obj->u.pvfs2.ref = resp_create.ref;
-	    }
 	}
     }
     return 0;
@@ -733,7 +516,7 @@ static int generic_cleanup(file_object *src, file_object *dest,
     return 0;
 }
 
-void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
+/*void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
                   int nr_datafiles, int mode)
 {
     attr->owner = credentials->userid; 
@@ -746,7 +529,7 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
     {
 	attr->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     }
-}    
+}*/    
 
 /*
  * Local variables:
