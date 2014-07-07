@@ -141,8 +141,15 @@ int main(int argc, char **argv)
                 ret = -1;
                 break;
 	    }
+	    rc = pvfs_rmdir(pvfs_path);
+	    if (rc) 
+	    {
+		    PVFS_perror("PVFS_rmdir",rc);
+		    ret = -1;
+		    break;
+	    }
         }
-	rc = pvfs_unlink(pvfs_path);
+	rc = pvfs_unlink(working_file);
 	if (rc)
 	{
 		PVFS_perror("PVFS_unlink",rc);
