@@ -62,17 +62,9 @@ int main(int argc, char **argv)
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
-        //int num_segs;
         char *working_file = user_opts->filenames[i];
-        //char directory[PVFS_NAME_MAX];
-        //char filename[PVFS_SEGMENT_MAX];
 
-        char pvfs_path[PVFS_NAME_MAX] = {0};
-        PVFS_fs_id cur_fs;
-        //PVFS_sysresp_lookup resp_lookup;
         PVFS_credential credentials;
-        //PVFS_object_ref parent_ref;
-        int tmp_len = 0;
 
         rc = PVFS_util_gen_credential_defaults(&credentials);
         if (rc < 0)
@@ -82,120 +74,29 @@ int main(int argc, char **argv)
             break;
         }
 
-        /* Translate path into pvfs2 relative path */
-        rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path,
-            PVFS_NAME_MAX);
-        if(rc < 0)
-        {
-            PVFS_perror("PVFS_util_resolve", rc);
-            ret = -1;
-            break;
-        }
-
-        tmp_len = strlen(pvfs_path);
-        if(pvfs_path[tmp_len - 1] == '/')
-        {
-            /* User requested removal of something with a trailing slash.
-             * Strip slashes, but then confirm that the target is in fact a
-             * directory, or else the request is invalid
-             */
-            while(tmp_len > 1 && pvfs_path[tmp_len - 1] == '/')
-            {
-                pvfs_path[tmp_len - 1] = '\0';
-                tmp_len--;
-            }
-
-            /*Following code is to check if the object is directory or not*/
-	    /*
-	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-            rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
-                                 &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-            if (rc)
-            {
-                PVFS_perror("PVFS_sys_lookup", rc);
-                ret = -1;
-                break;
-            }
-
-            memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-            rc = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_TYPE,
-                                   &credentials, &resp_getattr, NULL);
-            if (rc)
-            {
-                PVFS_perror("PVFS_sys_getattr", rc);
-                ret = -1;
-                break;
-            }
-            if (resp_getattr.attr.objtype != PVFS_TYPE_DIRECTORY)
-            {
-                fprintf(stderr, "Error: object is not a directory.\n");
-                ret = -1;
-                break;
-            }*/
-	    struct stat stat_buf;
-	    memset(&stat_buf, 0 , sizeof(struct stat));
-	    pvfs_stat(pvfs_path, &stat_buf);
-	    if (!S_ISDIR(stat_buf.st_mode))
-	    {
-                fprintf(stderr, "Error: object is not a directory.\n");
-                ret = -1;
-                break;
-	    }
-	    rc = pvfs_rmdir(pvfs_path);
+	struct stat stat_buf;
+	memset(&stat_buf, 0 , sizeof(struct stat));
+	pvfs_stat(working_file, &stat_buf);
+	if (S_ISDIR(stat_buf.st_mode))
+	{
+            rc = pvfs_rmdir(working_file);
 	    if (rc) 
 	    {
-		    PVFS_perror("PVFS_rmdir",rc);
-		    ret = -1;
-		    break;
+	        PVFS_perror("PVFS_rmdir",rc);
+	        ret = -1;
+	        break;
 	    }
-        }
-	rc = pvfs_unlink(working_file);
-	if (rc)
-	{
+	}
+	else
+        {
+	    rc = pvfs_unlink(working_file);
+	    if (rc)
+    	    {
 		PVFS_perror("PVFS_unlink",rc);
 		ret = -1;
 		break;
-	}
-        /* break into file and directory */
-	/*Previous RM code
-        rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
-        if(rc < 0)
-        {
-            PVFS_perror("PINT_get_base_dir", rc);
-            ret = -1;
-            break;
+	    }
         }
-        num_segs = PINT_string_count_segments(pvfs_path);
-        rc = PINT_get_path_element(pvfs_path, num_segs - 1,
-                                   filename, PVFS_SEGMENT_MAX);
-
-        if (rc)
-        {
-            PVFS_perror("PINT_get_path_element", rc);
-            ret = -1;
-            break;
-        }
-
-        memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
-                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-        if (rc)
-        {
-            PVFS_perror("PVFS_sys_lookup", rc);
-            ret = -1;
-            break;
-        }
-
-        parent_ref = resp_lookup.ref;
-        rc = PVFS_sys_remove(filename, parent_ref, &credentials, NULL);
-        if (rc)
-        {
-            fprintf(stderr, "Error: An error occurred while "
-                    "removing %s\n", working_file);
-            PVFS_perror("PVFS_sys_remove", rc);
-            ret = -1;
-            break;
-        }*/
     }
 
     PVFS_sys_finalize();
