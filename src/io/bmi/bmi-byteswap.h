@@ -7,9 +7,11 @@
 #ifndef BMI_BYTESWAP_H
 #define BMI_BYTESWAP_H
 
+#ifndef __KERNEL__
 #include <stdint.h>
 #ifdef HAVE_BYTESWAP_H
 #include <byteswap.h>
+#endif
 #endif
 
 /* Byte swapping is only necessary on big endian systems. */
@@ -19,7 +21,7 @@
 /* On Linux glibc, byteswap.h will exist and contain fast machine-dependent
  * byteswapping functions. */
 
-#ifdef HAVE_BYTESWAP_H
+#if defined(HAVE_BYTESWAP_H) || !defined(__KERNEL__)
 
 #define htobmi16 bswap_16(x)
 #define htobmi32 bswap_32(x)
@@ -32,7 +34,6 @@
  * functions, so we will use these and hope the optimizer is good. These
  * are functions so that the argument only gets evaluated once.
  */
-
 #else /* HAVE_BYTESWAP_H */
 
 static inline uint16_t PVFS_bswap16(uint16_t x)
