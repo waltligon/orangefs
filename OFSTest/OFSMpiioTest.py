@@ -83,7 +83,7 @@ def romio_testsuite(testing_node,output=[]):
     
     rc = 0
     print "%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point)
-    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output,debug)
+    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=pvfs2:%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
     
     #TODO: Compare actual results with expected.
     
