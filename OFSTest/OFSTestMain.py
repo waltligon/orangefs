@@ -488,7 +488,7 @@ class OFSTestMain(object):
             import OFSSysintTest
             
             # Start the OrangeFS Client on the head node
-            rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
         
             # print section header in output file.
             self.writeOutputHeader(filename,"Sysint Tests")
@@ -516,16 +516,17 @@ class OFSTestMain(object):
             mount_type = "kmod"
             # Start the OrangeFS Client on the head node
 
-            rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
 
 
             # OrangeFS must be mounted to run kmod tests.
             # unmount, just in case.
-            head_node.unmountOFSFilesystem()
+            self.ofs_network.unmountOFSFilesystemAllNodes();
             # mount, not with fuse.
-            head_node.mountOFSFilesystem(mount_fuse=False)
+            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=False)
             # Make sure filesystem is mounted or we will get false positives.
             rc = head_node.checkMount()
+            
 
             # if everything is good, run the test.
             if rc == 0:
@@ -582,9 +583,9 @@ class OFSTestMain(object):
             mount_type = "fuse"
             # OrangeFS must be mounted to run kmod tests.
             # unmount, just in case.
-            head_node.unmountOFSFilesystem()
-            # mount, with fuse.
-            head_node.mountOFSFilesystem(mount_fuse=True)
+            self.ofs_network.unmountOFSFilesystemAllNodes();
+            # mount, not with fuse.
+            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=False)
             # Make sure filesystem is mounted or we will get false positives.
             rc = head_node.checkMount()
 
@@ -640,8 +641,8 @@ class OFSTestMain(object):
                 self.writeOutputHeader(filename,"Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
-                head_node.unmountOFSFilesystem()
-                head_node.stopOFSClient()
+                head_node.unmountOFSFilesystemAllNodes()
+                head_node.stopOFSClientAllNodes()
                 self.writeOutputHeader(filename,"Usrint Tests")
                 
                 # The list of usrint tests to run is found in OFSUsrintTest.test.
@@ -662,8 +663,8 @@ class OFSTestMain(object):
             import OFSMpiioTest
 
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            head_node.unmountOFSFilesystemAllNodes()
+            head_node.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"MPI-IO Tests")
 
@@ -686,8 +687,8 @@ class OFSTestMain(object):
             import OFSHadoopTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            head_node.unmountOFSFilesystemAllNodes()
+            head_node.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Hadoop Tests")
             
@@ -711,8 +712,8 @@ class OFSTestMain(object):
             import OFSMiscPostTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            head_node.unmountOFSFilesystemAllNodes()
+            head_node.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Misc Tests (Post run)")
             
@@ -785,8 +786,8 @@ class OFSTestMain(object):
         self.ofs_network.stopOFSClientAllNodes()
         self.ofs_network.stopOFSServers()
         self.ofs_network.startOFSServers()
-        self.ofs_network.startOFSClient(security=self.config.security_mode) 
-        self.ofs_network.mountOFSFilesystem()
+        self.ofs_network.startOFSClientAllNodes(security=self.config.security_mode) 
+        self.ofs_network.mountOFSFilesystemAllNodes()
     
     def doPostTest(self,rc):
         if rc == 0:
