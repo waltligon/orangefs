@@ -544,6 +544,23 @@ class OFSTestMain(object):
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
                         pass
+
+                # run the mpi tests, if required.
+                if self.config.run_mpi_tests == True:
+
+                    self.writeOutputHeader(filename,"MPI VFS Tests (%s)" % mount_type)
+                    
+                    import OFSMpiVFSTest
+                    
+                    for callable in OFSMpiVFSTest.tests:
+                        try:
+                            rc = head_node.runOFSTest("mpivfs-%s" % mount_type,callable)
+                            self.writeOutput(filename,callable,rc)
+                        except:
+                            print "Unexpected error:", sys.exc_info()[0]
+                            traceback.print_exc()
+                            pass
+
             
             # if not, print failure.
             else:
@@ -559,7 +576,7 @@ class OFSTestMain(object):
             # the filesystem is mounted with the fuse module instead of kmod.
             # The same tests are used for both kmod-vfs and fuse.
             import OFSVFSTest
-        
+            
             
             # specify "kmod" tests.
             mount_type = "fuse"
@@ -587,8 +604,23 @@ class OFSTestMain(object):
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
                         pass
+                
+                # run the mpi tests, if required.
+                if self.config.run_mpi_tests == True:
+                    
+                    import OFSMpiVFSTest
+                    self.writeOutputHeader(filename,"MPI VFS Tests (%s)" % mount_type)
+                    
+                    for callable in OFSMpiVFSTest.tests:
+                        try:
+                            rc = head_node.runOFSTest("mpivfs-%s" % mount_type,callable)
+                            self.writeOutput(filename,callable,rc)
+                        except:
+                            print "Unexpected error:", sys.exc_info()[0]
+                            traceback.print_exc()
+                            pass
 
-            # if not, print failure.
+        
             else:
                 self.writeOutputHeader(filename,"VFS Tests (%s) could not run. Mount failed." % mount_type)           
                 # Each test should fail. Use error -999 to indicate mount failure.

@@ -22,10 +22,10 @@
 #
 
 
-header = "OFS MPI-IO Test"
-prefix = "mpiio"
-mount_fs = False
-run_client = False
+header = "OFS MPI-VFS Test"
+prefix = "mpivfs"
+mount_fs = True
+run_client = True
 mount_as_fuse = False
 debug = True
 
@@ -82,8 +82,8 @@ def romio_testsuite(testing_node,output=[]):
     testing_node.changeDirectory("/opt/mpi/openmpi-1.6.5/ompi/mca/io/romio/romio/test")
     
     rc = 0
-    print "%s -machinefile=%s -fname=pvfs2:%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point)
-    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=pvfs2:%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
+    print "%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point)
+    rc = testing_node.runSingleCommand("%s -machinefile=%s -fname=%s/romioruntests" % (testing_node.romio_runtests_pvfs2,testing_node.created_openmpihosts,testing_node.ofs_mount_point),output)
     
     #TODO: Compare actual results with expected.
     
