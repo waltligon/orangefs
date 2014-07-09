@@ -191,7 +191,7 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
 # ifdef LOOKUP_RCU
     if (flags & LOOKUP_RCU)
     {
-        return -ECHILD;
+       return -ECHILD;
     }
 # endif
 
@@ -218,10 +218,9 @@ static int pvfs2_d_revalidate(struct dentry *dentry,
 # endif
 #endif
     /* All 3 implementations call this */
-    /* NOTE:  we should always revalidate a directory entry.  If we don't, then stale information may be kept in
-     * Linux's directory cache, and, in some cases, causing the inode to be marked as "bad", resulting in an
-     * EIO error.
-     */ 
+    /* NOTE: We should ALWAYS revalidate a directory entry.  If we don't, then stale information is kept in 
+     * Linux's directory cache, and, in some cases, causing the inode to be marked as "bad", resulting in an EIO error.
+     */  
     return(pvfs2_d_revalidate_common(dentry));
 }
 

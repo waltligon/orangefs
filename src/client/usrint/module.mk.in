@@ -1,16 +1,14 @@
-ifeq ($(build_usrint),yes)
-
 DIR := src/client/usrint
 
-SRC := \
-	$(DIR)/posix-pvfs.c \
-	$(DIR)/request.c \
-	$(DIR)/iocommon.c \
-	$(DIR)/openfile-util.c \
-	$(DIR)/ucache.c \
-	$(DIR)/mmap.c \
+ifeq ($(build_usrint),yes)
+
+OSRC := \
 	$(DIR)/pvfs-path.c \
-	$(DIR)/pvfs-qualify-path.c
+	$(DIR)/openfile-util.c \
+	$(DIR)/iocommon.c \
+	$(DIR)/request.c \
+	$(DIR)/ucache.c \
+	$(DIR)/posix-pvfs.c 
 
 USRC := \
 	$(DIR)/posix.c \
@@ -18,17 +16,17 @@ USRC := \
 	$(DIR)/selinux.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
+	$(DIR)/mmap.c \
 	$(DIR)/error.c
 
 # list of all .c files (generated or otherwise) that belong in library
-LIBSRC += $(SRC)
+OLIBSRC += $(OSRC)
 ULIBSRC += $(USRC)
 
-else
-DIR := src/client/usrint
+endif # build_usrint
+
 SRC := \
 	$(DIR)/pvfs-qualify-path.c
 
 LIBSRC += $(SRC)
 
-endif # build_usrint

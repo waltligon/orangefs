@@ -1234,7 +1234,18 @@ static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry,
     return d_splice_alias(inode, dentry);
 }
 
-#ifdef HAVE_CURRENT_FSUID 
+#ifdef HAVE_FROM_KUID
+#define fill_default_sys_attrs(sys_attr,type,mode)\
+do \
+{ \
+    sys_attr.owner = from_kuid(&init_user_ns, current_fsuid()); \
+    sys_attr.group = from_kgid(&init_user_ns, current_fsgid()); \
+    sys_attr.size = 0; \
+    sys_attr.perms = PVFS_util_translate_mode(mode,0); \
+    sys_attr.objtype = type; \
+    sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE; \
+} while(0)
+#elif defined(HAVE_CURRENT_FSUID)
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \

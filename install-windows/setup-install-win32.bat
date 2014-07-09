@@ -51,3 +51,4 @@ rem Create zip
 del ..\orangefs-windows-client-2.8.8-win32.zip
 winrar a ..\orangefs-windows-client-2.8.8-win32.zip Dokan OrangeFS
 
+cd ..

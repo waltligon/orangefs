@@ -760,7 +760,18 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             }
             else
             {
+                int orig_errno = errno;
+                errno = 0;
+
                 stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                if (errno == ESPIPE)
+                {
+                    /* This stream cannot seek, leave offset BAD and
+                     * reset errno, we do not consider this an error
+                     */
+                    errno = orig_errno;
+                }
+                /* if there was a real error we will leave it in errno */
             }
 #endif
             return rc / size;
@@ -842,7 +853,18 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
         else
         {
+            int orig_errno = errno;
+            errno = 0;
+
             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            if (errno == ESPIPE)
+            {
+                /* This stream cannot seek, leave offset BAD and
+                 * reset errno, we do not consider this an error
+                 */
+                errno = orig_errno;
+            }
+            /* if there was a real error we will leave it in errno */
         }
 #endif
         /* TODO: check for a short write */
@@ -985,7 +1007,18 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
         else
         {
-             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            int orig_errno = errno;
+            errno = 0;
+
+            stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            if (errno == ESPIPE)
+            {
+                /* This stream cannot seek, leave offset BAD and
+                 * reset errno, we do not consider this an error
+                 */
+                errno = orig_errno;
+            }
+            /* if there was a real error we will leave it in errno */
         }
 #endif
         /* reset write pointer */
@@ -1020,7 +1053,20 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
         else
         {
-             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            int orig_errno = errno;
+            errno = 0;
+
+            stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            if (errno == ESPIPE)
+            {
+                /* This stream cannot seek, leave offset BAD and
+                 * reset errno, we do not consider this an error
+                 */
+                errno = orig_errno;
+            }
+            /* if there was a real error
+             * we will leave it in errno 
+             */
         }
 #endif
         /* indicate end of read area */
@@ -1075,7 +1121,20 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     }
                     else
                     {
+                        int orig_errno = errno;
+                        errno = 0;
+
                         stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                        if (errno == ESPIPE)
+                        {
+                           /* This stream cannot seek, leave offset BAD and
+                            * reset errno, we do not consider this an error
+                            */
+                            errno = orig_errno;
+                        }
+                        /* if there was a real error
+                         * we will leave it in errno 
+                         */
                     }
 #endif
                 if (bytes_read == rsz_extra)
@@ -1100,7 +1159,20 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     }
                     else
                     {
-                        stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
+                        int orig_errno = errno;
+                        errno = 0;
+
+                        stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                        if (errno == ESPIPE)
+                        {
+                           /* This stream cannot seek, leave offset BAD and
+                            * reset errno, we do not consider this an error
+                            */
+                            errno = orig_errno;
+                        }
+                        /* if there was a real error
+                         * we will leave it in errno 
+                         */
                     }
 #endif
                     stream->_IO_read_end = stream->_IO_read_base + bytes_read;
@@ -1131,7 +1203,20 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             }
             else
             {
-                 stream->_offset = lseek(stream->_fileno, 0, SEEK_CUR);
+                int orig_errno = errno;
+                errno = 0;
+
+                stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                if (errno == ESPIPE)
+                {
+                    /* This stream cannot seek, leave offset BAD and
+                     * reset errno, we do not consider this an error
+                     */
+                    errno = orig_errno;
+                }
+                /* if there was a real error
+                 * we will leave it in errno 
+                 */
             }
 #endif
             stream->_IO_read_end = stream->_IO_read_base + bytes_read;
@@ -1637,7 +1722,20 @@ int fflush_unlocked(FILE *stream)
         }
         else
         {
+            int orig_errno = errno;
+            errno = 0;
+
             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            if (errno == ESPIPE)
+            {
+                /* This stream cannot seek, leave offset BAD and
+                 * reset errno, we do not consider this an error
+                 */
+                errno = orig_errno;
+            }
+            /* if there was a real error
+             * we will leave it in errno 
+             */
         }
 #endif
         /* reset write pointer */

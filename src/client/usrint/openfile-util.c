@@ -761,6 +761,7 @@ static void cleanup_usrint_internal(void)
     }
     /* unlink our area - remains until all others have unmapped */
     glibc_ops.unlink(shmobjpath);
+    /* ignore error here - should not be there anyway */
     /* clear globals */
     shmobj = -1;
     shmctrl = NULL;
@@ -1519,6 +1520,9 @@ static void init_descriptor_area_internal(void)
     glibc_ops.close(shmobj);
     shmobj = PVFS_SHMOBJ;
 
+    /* unlink the /dev/shm entry - noone should need to open it again */
+    glibc_ops.unlink(shmobjpath);
+
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);
 
@@ -2142,6 +2146,7 @@ static pvfs_descriptor *get_desc_table_entry(int newfd,
     pd->s->fent = NULL; /* not caching if left NULL */
     pd->s->flags = 0;
     pd->s->mode = 0;
+    pd->s->mode_deferred = 0;
 
 #if PVFS_UCACHE_ENABLE
     if (ucache_enabled && use_cache)
@@ -2435,6 +2440,16 @@ int pvfs_free_descriptor(int fd)
     if (dup_cnt <= 0 && !pd->shared_status)
     {
         /* not shared and last dup */
+        if (pd->s->mode & pd->s->mode_deferred)
+        {
+            PVFS_sys_attr attr;
+            /* there were deferred mode bits */
+            iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_DEFAULT_MASK);
+            attr.perms &= ~(pd->s->mode_deferred);
+            attr.mask = PVFS_ATTR_SYS_PERM;
+            iocommon_setattr(pd->s->pvfs_ref, &attr);
+        }
+        /* free up dpsth space */
         if (pd->s->dpath)
         {
             pvfs_dpath_remove(pd->s->dpath);

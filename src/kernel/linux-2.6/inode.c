@@ -324,17 +324,16 @@ int pvfs2_getattr(
     {
         /* In this case, an interrupt signal was pending when we wanted to wait for the getattr op.
          * So, instead of going to sleep with a pending interrupt, we allow the interrupt to take
-         * precedence.  However, we don't want to mark the inode "bad" in this case, we want the
+         * precedence.  However, we don't want to mark the inode "bad" in this case; we want the 
          * getattr to be retried.
          */
-        gossip_debug(GOSSIP_INODE_DEBUG,"%s:%s:%d Received EINTR(%d)\n",__FILE__,__func__,__LINE__,ret);
-        ret = -EAGAIN; 
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d Received EINTR(%d)\n",__FILE__,__func__,__LINE__,ret);
+        ret = -EAGAIN;
     }
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode with return code(%d)\n"
-                                       , __FILE__,  __func__, __LINE__,ret);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode with return code(%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -616,7 +615,7 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
-#ifdef HAVE_CURRENT_FSUID
+#if defined(HAVE_CURRENT_FSUID) || defined(HAVE_FROM_KUID)
         inode->i_uid = current_fsuid();
         inode->i_gid = current_fsgid();
 #else

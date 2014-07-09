@@ -18,11 +18,6 @@
 #include "iocommon.h"
 #include "pvfs-path.h"
 
-#define PVFS_ATTR_DEFAULT_MASK \
-        (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE |\
-         PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET |\
-         PVFS_ATTR_SYS_DIRENT_COUNT)
-
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
 /* static char pvfs_cwd[PVFS_PATH_MAX];
  */
@@ -735,7 +730,7 @@ int pvfs_truncate64(const char *path, off64_t length)
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
-    rc = iocommon_truncate(pd->s->pvfs_ref, length);
+    rc = iocommon_truncate(pd, length);
     pvfs_close(pd->fd);
 
 errorout:
@@ -799,7 +794,7 @@ int pvfs_ftruncate64(int fd, off64_t length)
     {
         return -1;
     }
-    return iocommon_truncate(pd->s->pvfs_ref, length);
+    return iocommon_truncate(pd, length);
 }
 
 /**

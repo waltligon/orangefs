@@ -1,4 +1,4 @@
-OrangeFS 2.8.8 * October 30, 2013
+OrangeFS 2.8.8 * March 14, 2014
 
 Installing the OrangeFS Windows Client
 --------------------------------------

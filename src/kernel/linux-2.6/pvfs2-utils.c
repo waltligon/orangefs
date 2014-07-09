@@ -19,7 +19,10 @@ int pvfs2_gen_credentials(
     if (credentials)
     {
         memset(credentials, 0, sizeof(PVFS_credentials));
-#ifdef HAVE_CURRENT_FSUID
+#ifdef HAVE_FROM_KUID
+        credentials->uid = from_kuid(&init_user_ns, current_fsuid());
+        credentials->gid = from_kgid(&init_user_ns, current_fsgid());
+#elif defined(HAVE_CURRENT_FSUID)
         credentials->uid = current_fsuid();
         credentials->gid = current_fsgid();
 #else
@@ -218,8 +221,13 @@ int copy_attributes_to_inode(
             inode->i_size = PAGE_CACHE_SIZE;
         }
 
+#ifdef HAVE_FROM_KUID
+        inode->i_uid = make_kuid(&init_user_ns, attrs->owner);
+        inode->i_gid = make_kgid(&init_user_ns, attrs->group);
+#else
         inode->i_uid = attrs->owner;
         inode->i_gid = attrs->group;
+#endif
 #ifdef PVFS2_LINUX_KERNEL_2_4
         inode->i_atime = (time_t)attrs->atime;
         inode->i_mtime = (time_t)attrs->mtime;
@@ -353,13 +361,21 @@ static inline int copy_attributes_from_inode(
     attrs->mask = 0;
     if (iattr->ia_valid & ATTR_UID) 
     {
+#ifdef HAVE_FROM_KUID
+        attrs->owner = from_kuid(&init_user_ns, iattr->ia_uid);
+#else
         attrs->owner = iattr->ia_uid;
+#endif
         attrs->mask |= PVFS_ATTR_SYS_UID;
         gossip_debug(GOSSIP_UTILS_DEBUG, "(UID) %d\n", attrs->owner);
     }
     if (iattr->ia_valid & ATTR_GID)
     {
-        attrs->group = iattr->ia_gid; 
+#ifdef HAVE_FROM_KUID
+        attrs->group = from_kgid(&init_user_ns, iattr->ia_gid);
+#else
+        attrs->group = iattr->ia_gid;
+#endif
         attrs->mask |= PVFS_ATTR_SYS_GID;
         gossip_debug(GOSSIP_UTILS_DEBUG, "(GID) %d\n", attrs->group);
     }
@@ -770,7 +786,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
-#ifdef HAVE_CURRENT_FSUID
+#ifdef HAVE_FROM_KUID
+        fsuid = from_kuid(&init_user_ns, current_fsuid());
+        fsgid = from_kgid(&init_user_ns, current_fsgid());
+#elif defined(HAVE_CURRENT_FSUID)
         fsuid = current_fsuid();
         fsgid = current_fsgid();
 #else
