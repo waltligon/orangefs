@@ -641,8 +641,8 @@ class OFSTestMain(object):
                 self.writeOutputHeader(filename,"Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
-                head_node.unmountOFSFilesystemAllNodes()
-                head_node.stopOFSClientAllNodes()
+                self.ofs_network.unmountOFSFilesystemAllNodes()
+                self.ofs_network.stopOFSClientAllNodes()
                 self.writeOutputHeader(filename,"Usrint Tests")
                 
                 # The list of usrint tests to run is found in OFSUsrintTest.test.
@@ -663,8 +663,8 @@ class OFSTestMain(object):
             import OFSMpiioTest
 
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystemAllNodes()
-            head_node.stopOFSClientAllNodes()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"MPI-IO Tests")
 
@@ -687,8 +687,8 @@ class OFSTestMain(object):
             import OFSHadoopTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystemAllNodes()
-            head_node.stopOFSClientAllNodes()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Hadoop Tests")
             
@@ -712,8 +712,8 @@ class OFSTestMain(object):
             import OFSMiscPostTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystemAllNodes()
-            head_node.stopOFSClientAllNodes()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Misc Tests (Post run)")
             
