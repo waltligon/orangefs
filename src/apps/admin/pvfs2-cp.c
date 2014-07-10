@@ -351,7 +351,7 @@ static size_t generic_write(file_object *dest, char *buffer,
 	return(write(dest->u.ufs.fd, buffer, count));
     else
     {	
-	return(write(dest->u.pvfs2.fd, buffer, count));
+	return(pvfs_write(dest->u.pvfs2.fd, buffer, count));
     }
     return ret;
 }
