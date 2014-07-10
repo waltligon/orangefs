@@ -473,8 +473,9 @@ class OFSTestMain(object):
         
         # Set the LD_LIBRARY_PATH and LIBRARY_PATH on the head node
         # TODO: Do we still need to do this?
-        head_node.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
-        head_node.setEnvironmentVariable("LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
+        #if self.config.run_mpi_tests == True:
+        #    head_node.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
+        #        head_node.setEnvironmentVariable("LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
     
         # Go home.
         head_node.changeDirectory("~")

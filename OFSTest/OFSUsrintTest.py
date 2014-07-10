@@ -454,7 +454,7 @@ def ltp(testing_node,output=[]):
         if rc != 0:
             
             return rc
-        
+        rc = testing_node.runSingleCommand("make autotools" % LTP_PREFIX,output)
         rc = testing_node.runSingleCommand("CFLAGS='-g -O0' ./configure --prefix=%s" % LTP_PREFIX,output)
         #if rc != 0:
         #    return rc
@@ -478,7 +478,7 @@ def ltp(testing_node,output=[]):
     testing_node.changeDirectory(LTP_PREFIX)
     
     print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,preload, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
-    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, preload,vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, preload,vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
 
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
@@ -542,7 +542,8 @@ def shelltest(testing_node,output=[]):
     #hack to workaround bug in pvfs2-shell-test.sh
     #testing_node.changeDirectory("~")
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
-    rc = testing_node.runSingleCommand("export %s; cd %s; %s bash %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s" % (preload,testing_node.ofs_mount_point,preload,testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
+    testing_node.runSingleCommand("chmod a+x %s/test/kernel/linux-2.6/pvfs2-shell-test.sh" % testing_node.ofs_source_location)
+    rc = testing_node.runSingleCommand("export %s; cd %s; %s/test/kernel/linux-2.6/pvfs2-shell-test.sh %s" % (preload,testing_node.ofs_mount_point,testing_node.ofs_source_location,testing_node.ofs_mount_point),output)
     return rc
 
 ##
@@ -587,10 +588,11 @@ def tail(testing_node,output=[]):
         test_string = "%s line%d\n" % (test_string,i)
     
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
-    testing_node.runSingleCommand("bash -c '%s %s > %s'" % (preload,test_string,tail_test))
+    testing_node.runSingleCommand('%s bash -c \'echo "%s" > %s\'' % (preload,test_string,tail_test))
+
    
     # now diff it
-    rc = testing_node.runSingleCommand("bash -c '%s tail %s'" % (preload,tail_test),output)
+    rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,tail_test,local_reference),output)
     return rc
 
 ##
@@ -628,8 +630,7 @@ mkdir_usrint,
 symlink_usrint,
 tail,
 usrint_cp,
-
+shelltest,
 dbench,
-bonnie,
-shelltest
+bonnie
  ]
