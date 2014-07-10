@@ -2426,6 +2426,9 @@ class OFSTestNode(object):
         # Clear the shared memory objects
         self.clearSHM()
         
+        # install the kernel module, if necessary
+        self.installKernelModule()
+        
         # TODO: Add cert-based security.
         keypath = ""
         if security==None:
