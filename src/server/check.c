@@ -79,6 +79,7 @@ int PINT_get_capabilities(void *acl_buf,
     /* root has every possible capability */
     if (userid == 0)
     {
+      /* TODO: do not set REMOVE and CREATE if a file */
         *op_mask = ~((uint32_t)0);
         return 0;
     }
@@ -153,15 +154,24 @@ int PINT_get_capabilities(void *acl_buf,
     /* only the owner can set attributes */
     if (userid == attr->owner)
     {
-        *op_mask |= PINT_CAP_SETATTR;
+      *op_mask |= PINT_CAP_SETATTR;
     }
-
-    /* write and exec access to directories allows create and remove */
-    if (attr->objtype == PVFS_TYPE_DIRECTORY &&
-        *op_mask & PINT_CAP_WRITE &&
-        *op_mask & PINT_CAP_EXEC)
+    
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
+      /* owner of directory may always create/remove */
+      if (userid == attr->owner)
+      {
         *op_mask |= PINT_CAP_CREATE | PINT_CAP_REMOVE;
+      }
+      else if (!(attr->perms & PVFS_U_VTX))
+      {
+	/* if directory not sticky, write/exec access allows create/remove */
+	if (*op_mask & PINT_CAP_WRITE &&
+	    *op_mask & PINT_CAP_READ) {
+	  *op_mask |= PINT_CAP_CREATE | PINT_CAP_REMOVE;
+	}
+      }
     }
 
     return 0;
