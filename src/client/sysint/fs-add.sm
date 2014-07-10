@@ -128,7 +128,9 @@ PVFS_error PVFS_isys_fs_add(
     void* user_ptr)
 {
     int ret = -PVFS_EINVAL;
-    int i;
+    int i,try_again_count
+         ,try_again
+         ,try_again_limit=3;
     struct server_configuration_s *new_server_config = NULL;
     PVFS_BMI_addr_t test_addr;
     PINT_smcb *smcb = NULL;
@@ -157,13 +159,37 @@ PVFS_error PVFS_isys_fs_add(
     /* make sure BMI knows how to handle this method, else fail quietly */
     for(i = 0; i < mntent->num_pvfs_config_servers; i++)
     {
-        ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
-        if (ret == 0)
-        {
+       ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+       if (ret == 0)
+       {
             /* Bail out when first valid BMI method is found */
             break;
-        }
-    }
+       }
+
+       try_again_count = 0;
+       try_again = 1;
+       do
+       {
+          gossip_err("%s:Retrying BMI_addr_lookup for %s.\n",__func__,mntent->pvfs_config_servers[i]);
+          ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+          if (ret == 0)
+          {
+             try_again=0;
+          }
+          else
+          {
+             try_again_count++;
+             if (try_again_count == try_again_limit)
+             {
+                try_again=0;
+             }
+          }
+       } while (try_again);
+       if (try_again_count != try_again_limit)
+       {
+          break;
+       }
+    }/*end for*/
 
     if (i == mntent->num_pvfs_config_servers)
     {
@@ -513,7 +539,10 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s
                  (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
     /*
      * Force the connection to the config server down so future transfers
-     * will get the new buffer size.
+     * will get the new buffer size.  Retries of BMI_addr_lookup is not needed
+     * here, since a non-zero return code indicates that the connection is
+     * gone (or never existed), and this section of code is trying to cleanup
+     * the connection.
      */
     ret = BMI_addr_lookup(&addr,
                           sm_p->u.get_config.mntent->the_pvfs_config_server);

@@ -2356,7 +2356,6 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
 	    if ((ret < 0) || (poll_conn.revents & POLLERR))
 	    {
 		tmp_errno = errno;
-		gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
 		return (bmi_tcp_errno_to_pvfs(-tmp_errno));
 	    }
 	    if (poll_conn.revents & POLLOUT)
