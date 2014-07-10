@@ -21,6 +21,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-usrint.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -43,39 +44,40 @@ int check_group(char *group);
 
 int main(int argc, char **argv)
 {
-  int ret = 0;
-  struct options* user_opts = NULL;
-  int i;
+    int ret = 0;
+    struct options* user_opts = NULL;
+    int i;
 
-  /* look at command line arguments */
-  user_opts = parse_args(argc, argv);
-  if(!user_opts)
-  {
-    fprintf(stderr, "Error: failed to parse "
-            "command line arguments.\n");
-    return(-1);
-  }
-
-  ret = PVFS_util_init_defaults();
-  if(ret < 0)
-  {
-    PVFS_perror("PVFS_util_init_defaults", ret);
-    return(-1);
-  }
-
-  /*
-   * for each file the user specified
-   */
-  for (i = 0; i < user_opts->target_count; i++) {
-    ret = pvfs2_chown(user_opts->owner, user_opts->group,
-		      user_opts->destfiles[i]);
-    if (ret != 0) {
-      break;
+    /* look at command line arguments */
+    user_opts = parse_args(argc, argv);
+    if(!user_opts)
+    {
+        fprintf(stderr, "Error: failed to parse "
+                "command line arguments.\n");
+        return(-1);
     }
-    /* TODO: need to free the request descriptions */
-  }
-  PVFS_sys_finalize();
-  return(ret);
+
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
+    {
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return(-1);
+    }
+
+    /*
+    * for each file the user specified
+    */
+    for (i = 0; i < user_opts->target_count; i++) {
+        ret = pvfs2_chown(user_opts->owner, user_opts->group,
+		      user_opts->destfiles[i]);
+        if (ret != 0) {
+            perror("chown failed");
+            break;
+        }
+        /* TODO: need to free the request descriptions */
+    }
+    PVFS_sys_finalize();
+    return(ret);
 }
 
 /* pvfs2_chown()
@@ -85,109 +87,7 @@ int main(int argc, char **argv)
  * returns zero on success and negative one on failure
  */
 int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
-  int ret = -1;
-  char str_buf[PVFS_NAME_MAX] = {0};
-  char pvfs_path[PVFS_NAME_MAX] = {0};
-  PVFS_fs_id cur_fs;
-  PVFS_sysresp_lookup resp_lookup;
-  PVFS_object_ref parent_ref;
-  PVFS_credential credentials;
-  PVFS_sysresp_getattr resp_getattr;
-  PVFS_sys_attr old_attr;
-  PVFS_sys_attr new_attr;
-  uint32_t attrmask;
-  /* translate local path into pvfs2 relative path */
-  ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
-  if(ret < 0)
-  {
-    PVFS_perror("PVFS_util_resolve", ret);
-    return -1;
-  }
-
-  ret = PVFS_util_gen_credential_defaults(&credentials);
-  if (ret < 0)
-  {
-    PVFS_perror("PVFS_util_gen_credential_defaults", ret);
-    return -1;
-  }
-
-  /* this if-else statement just pulls apart the pathname into its
-   * parts....I think...this should be a function somewhere
-   */
-  if (strcmp(pvfs_path,"/") == 0)
-  {
-    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-    ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
-    if (ret < 0)
-    {
-      PVFS_perror("PVFS_sys_lookup", ret);
-      return -1;
-    }
-    parent_ref.handle = resp_lookup.ref.handle;
-    parent_ref.fs_id = resp_lookup.ref.fs_id;
-  }
-  else
-  {
-    /* get the absolute path on the pvfs2 file system */
-    if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
-    {
-      if (pvfs_path[0] != '/')
-      {
-        fprintf(stderr, "Error: poorly formatted path.\n");
-      }
-      fprintf(stderr, "Error: cannot retrieve entry name for "
-              "creation on %s\n",pvfs_path);
-      return -1;
-    }
-
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
-                                  &parent_ref.handle);
-    if(ret < 0)
-    {
-      PVFS_perror("PINT_lookup_parent", ret);
-      return -1;
-    }
-    else
-    {
-      parent_ref.fs_id = cur_fs;
-    }
-  }
-  memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-
-  ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, &credentials, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-  if (ret != 0)
-  {
-    fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
-    return -1;
-  }
-  memset(&resp_getattr,0,sizeof(PVFS_sysresp_getattr));
-  attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
-    
-  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,&credentials,&resp_getattr, NULL);
-  if (ret < 0) 
-  {
-    PVFS_perror("PVFS_sys_getattr",ret);
-    return -1;
-  }
-  old_attr = resp_getattr.attr;
-  new_attr=old_attr;
-
-  new_attr.owner = owner;
-  new_attr.group = group;
-  new_attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
- 
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials, NULL);
-  if (ret < 0) 
-  {
-    PVFS_perror("PVFS_sys_setattr",ret);
-    return -1;
-  }
-
-  return 0;
+    return pvfs_chown(destfile, (uid_t) owner, (gid_t) group);
 }
 
 
