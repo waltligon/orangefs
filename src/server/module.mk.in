@@ -52,10 +52,14 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-uid.c \
                 $(DIR)/mgmt-get-dirent.c \
                 $(DIR)/mgmt-create-root-dir.c \
-                $(DIR)/mgmt-split-dirent.c \
+                $(DIR)/mgmt-split-dirent.c
+
+ifdef ENABLE_SECURITY_CERT
+	SERVER_SMCGEN += \
 		$(DIR)/replicate-prime.c \
 		$(DIR)/replicate-next.c \
 		$(DIR)/mgmt-get-user-cert.c
+endif
 
 	# c files that should be added to server library
 	SERVERSRC += \

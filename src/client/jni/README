@@ -1,55 +1,44 @@
 # (C) 2012 Clemson University
 # See COPYING in top-level directory.
 ===============================================================================
-Documentation - OrangeFS JNI and Hadoop Extensions
+Brief Documentation - OrangeFS JNI and Hadoop Client
 
   Exposing OrangeFS Direct Client User Interface Calls to Java Developers 
   through JNI.
 
 ===============================================================================
-Step 1:
-
-  Prior to the configure/make steps of OrangeFS installation, add the "Position
-  Independent Code option" to the environment variable 'CFLAGS'.
-  
-  See for more info: http://en.wikipedia.org/wiki/Environment_variable/.
-
-  example for Bourne, bash, and related shells:
-
-    export CFLAGS="-fPIC"
-
-===============================================================================
-Step 2: 
+Step 1: 
 
   JNI Only Instructions:
 
-    ./configure --enable-jni --with-jdk=<path_to_jdk>
+    ./configure --prefix=/opt/orangefs --enable-shared \
+            --enable-jni --with-jdk=<path_to_jdk>
     make
     sudo make install
-    make jni
-    sudo make jni_install
 
   JNI and Hadoop Instructions:
 
-    ./configure --enable-jni --with-jdk=<path_to_jdk> --enable-hadoop \
-      --with-hadoop=<path_to_hadoop>
+    ./configure --prefix=/opt/orangefs --enable-shared \
+            --enable-jni --with-jdk=<path_to_jdk> \
+            --enable-hadoop --with-hadoop=<path_to_hadoop_src>
     make
     sudo make install
-    make hadoop
-    sudo make hadoop_install
+
+  For comprehensive documentation on using Hadoop with OrangeFS, please see:
+    http://www.omnibond.com/orangefs/docs/v_2_8_8/index.htm#Hadoop_Client.htm
+
+===============================================================================
+Step 2:
+
+  *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
+    contain the path of your JNI libraries and other required library paths. 
+
+  ex:     
+    export LD_LIBRARY_PATH=/opt/orangefs/lib
+    export JNI_LIBRARY_PATH=/opt/orangefs/lib
 
 ===============================================================================
 Step 3:
-
-  *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
-    contain the path of your JNI libraries. 
-
-  ex:     
-    export LD_LIBRARY_PATH="$OFS_INSTALL/lib"
-    export JNI_LIBRARY_PATH="$OFS_INSTALL/lib"
-
-===============================================================================
-Step 4:
 
   Use the .jar files in your Java applications. Be sure to include the full
     path names of the .jar files needed by passing the -cp option to javac
@@ -63,12 +52,12 @@ Step 4:
     {
         public static final void main(String args[])
         {
-          Orange fs = Orange.getInstance();
-          fs.posix.mkdir("/mnt/orangefs/test", fs.posix.f.S_IRWXU);
+            Orange fs = Orange.getInstance();
+            fs.posix.mkdir("/mnt/orangefs/test", fs.posix.f.S_IRWXU);
         }
     }
 
-  example of building Main.java:
+  example of building and running Main.java:
 
-    javac -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main.java
-    java -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main
+    javac -cp ".:/opt/orangefs/lib/ofs_jni.jar" Main.java
+    java -cp ".:/opt/orangefs/lib/ofs_jni.jar" Main

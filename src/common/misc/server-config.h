@@ -7,6 +7,7 @@
 #ifndef __SERVER_CONFIG_H
 #define __SERVER_CONFIG_H
 
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "src/common/llist/llist.h"
 #include "src/common/gossip/gossip.h"
@@ -202,6 +203,7 @@ typedef struct server_configuration_s
     void  *security;                /* BMI module specific information */
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
 #endif /* USE_TRUSTED */
+    int  prev_context;              /* currently only used for security */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type

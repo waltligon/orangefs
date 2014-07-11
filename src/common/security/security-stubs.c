@@ -33,7 +33,7 @@ int PINT_security_finalize(void)
 
 int PINT_init_capability(PVFS_capability *cap)
 {
-    memset(cap, 0, sizeof(cap));
+    memset(cap, 0, sizeof(*cap));
     
     return 0;
 }
@@ -45,13 +45,7 @@ int PINT_sign_capability(PVFS_capability *cap)
     config = PINT_get_server_config();
     assert(config && config->server_alias);
 
-    cap->issuer = (char *) malloc(strlen(config->server_alias) + 3);
-    if (cap->issuer == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    strcpy(cap->issuer, "S:");
-    strcat(cap->issuer, config->server_alias);
+    /* cap->issuer is set in get-attr.sm in the server. */
 
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
@@ -120,7 +114,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
 int PINT_init_credential(PVFS_credential *cred)
 {
-    memset(cred, 0, sizeof(cred));
+    memset(cred, 0, sizeof(*cred));
 
     return 0;
 }

@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-perf-counter.h"
 #include "pint-security.h"
@@ -112,7 +113,6 @@ static PINT_sm_action perf_mon_do_work(
     if(ret < 0)
     {
         return SM_ACTION_COMPLETE;
-        return(ret);
     }
     
     /* get no more counters than exist, and no more than requested */

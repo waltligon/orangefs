@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "tcache.h"
 #include "gossip.h"
 
@@ -39,9 +40,9 @@ static int tcache_lookup_oldest(
  * \return pointer to tcache on success, NULL on failure
  */
 struct PINT_tcache* PINT_tcache_initialize(
-    int (*compare_key_entry) (void *key, struct qhash_head* link), /**< function 
+    int (*compare_key_entry) (const void *key, struct qhash_head* link), /**< function 
     to compare keys with payloads within entry, return 1 on match, 0 if not match */
-    int (*hash_key) (void *key, int table_size), /**< function to hash keys */
+    int (*hash_key) (const void *key, int table_size), /**< function to hash keys */
     int (*free_payload) (void* payload), /**< function to free payload members (used during reclaim) */
     int table_size) /**< size of hash table to use */
 {
@@ -93,6 +94,12 @@ void PINT_tcache_finalize(
     struct PINT_tcache_entry* tmp_entry;
 
     /* TODO: simplify by iterating LRU list instead of hash table */
+
+    if (!tcache)
+    {
+        gossip_err("PINT_tcache_finalize called with NULL pointer\n");
+        return;
+    }
 
     /* iterate through hash table and destroy all entries */
     for(i = 0; i < tcache->h_table->table_size; i++)

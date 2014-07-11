@@ -20,6 +20,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "pint-event.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
@@ -28,8 +29,6 @@
 #include "quickhash.h"
 #include "id-generator.h"
 #include "str-utils.h"
-
-#include "pvfs2-config.h"
 
 #ifdef HAVE_TAU
 #include "pvfs_tau_api.h"
@@ -106,22 +105,22 @@ static void PINT_group_free( struct PINT_group *g )
 }
 
 
-static int PINT_group_compare(void *key, struct qhash_head *link)
+static int PINT_group_compare(const void *key, struct qhash_head *link)
 {
     struct PINT_group *eg = qhash_entry(link, struct PINT_group, link);
 
-    if(!strcmp(eg->name, (char *)key))
+    if(!strcmp(eg->name, (const char *)key))
     {
         return 1;
     }
     return 0;
 }
 
-static int PINT_events_compare(void *key, struct qhash_head *link)
+static int PINT_events_compare(const void *key, struct qhash_head *link)
 {
     struct PINT_event *e = qhash_entry(link, struct PINT_event, link);
 
-    if(!strcmp(e->name, (char *)key))
+    if(!strcmp(e->name, (const char *)key))
     {
         return 1;
     }

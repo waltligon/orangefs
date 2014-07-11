@@ -1,3 +1,12 @@
+
+/* 
+ * (C) 2013 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ *
+ */
+
+#include "pvfs2-internal.h"
 #include "pint-uid-mgmt.h"
 #include "pint-util.h"
 #include "gen-locks.h"
@@ -7,7 +16,7 @@ static hash_table_t *uid_hash_table = NULL;
 
 static gen_mutex_t uid_mgmt_mutex = GEN_MUTEX_INITIALIZER;
 
-static int uid_hash_compare_keys(void* key, list_head_t *link);
+static int uid_hash_compare_keys(const void* key, list_head_t *link);
 
 /* PINT_uid_mgmt_initialize()
  *
@@ -157,9 +166,9 @@ int PINT_add_user_to_uid_mgmt(PVFS_uid userID)
  *
  * Compare will return true if hash entry has same uid as a given key.
  */
-static int uid_hash_compare_keys(void* key, list_head_t *link)
+static int uid_hash_compare_keys(const void* key, list_head_t *link)
 {
-    PVFS_uid uid = *(PVFS_uid *)key;
+    PVFS_uid uid = *(const PVFS_uid *)key;
     PINT_uid_mgmt_s *tmp_entry = NULL;
 
     tmp_entry = qhash_entry(link, PINT_uid_mgmt_s, hash_link);
@@ -196,3 +205,12 @@ void PINT_dump_all_uid_stats(PVFS_uid_info_s *uid_array)
 
     return;
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4 sts=4 sw=4 expandtab
+ */

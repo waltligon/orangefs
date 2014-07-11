@@ -200,7 +200,7 @@ int PINT_decode(void* input_buffer,
 	gossip_err("   Protocol version mismatch: received major version %d when "
 	    "expecting %d.\n", (int)proto_major_recved,
 	    PVFS2_PROTO_MAJOR);
-	gossip_err("   Please verify your PVFS2 installation\n");
+	gossip_err("   Please verify your OrangeFS installation\n");
         gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
@@ -213,7 +213,7 @@ int PINT_decode(void* input_buffer,
 	    "expecting %d or lower.\n", (int)proto_minor_recved,
 	    PVFS2_PROTO_MINOR);
         gossip_err("   Client is too new for server.\n");
-	gossip_err("   Please verify your PVFS2 installation\n");
+	gossip_err("   Please verify your OrangeFS installation\n");
         gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
@@ -226,7 +226,7 @@ int PINT_decode(void* input_buffer,
 	    "expecting %d or higher.\n", (int)proto_minor_recved,
 	    PVFS2_PROTO_MINOR);
         gossip_err("   Server is too old for client.\n");
-	gossip_err("   Please verify your PVFS2 installation\n");
+	gossip_err("   Please verify your OrangeFS installation\n");
         gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
@@ -236,8 +236,8 @@ int PINT_decode(void* input_buffer,
 	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
             == enc_type_recved))
        	{
-	    struct PVFS_server_req* tmp_req;
-	    struct PVFS_server_req* tmp_resp;
+	    struct PVFS_server_req* tmp_req GCC_UNUSED;
+	    struct PVFS_server_req* tmp_resp GCC_UNUSED;
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {

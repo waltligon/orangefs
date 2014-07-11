@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "pvfs2-internal.h"
 #include "gossip.h"
 #include "socket-collection.h"
 #include "bmi-method-support.h"

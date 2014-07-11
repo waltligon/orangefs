@@ -6,6 +6,7 @@
 
 
 #include "llist.h"
+#include "pvfs2-internal.h"
 
 /* PINT_llist_new() - returns a pointer to an empty list
  */

@@ -22,6 +22,7 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "flow-ref.h"
+#include "pvfs2-internal.h"
 
 /* mutex lock used to prevent more than one process from entering the
  * interface at a time
@@ -74,14 +75,13 @@ static struct flowproto_ops *static_flowprotos[] = {
  *
  * flowproto_list specifies which flow protocols to initialize; if NULL,
  * all compiled in flowprotocols will be started
+ *
  * TODO: change this so that we can add flowprotocols on the fly as needed
  * rather than having to make the decision on what to init right now
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_initialize(
-    const char *flowproto_list,
-    int flags)
+int PINT_flow_initialize( const char *flowproto_list, int flags)
 {
     int ret = -1;
     int i = 0, j = 0, already_exists = 0, active_flow_index = 0, 
@@ -94,8 +94,8 @@ int PINT_flow_initialize(
     if(flowproto_list)
     {
 	/* seperate out the list of flowprotos to activate */
-	active_flowproto_count = PINT_split_string_list(
-            &requested_flowprotos, flowproto_list);
+	active_flowproto_count = PINT_split_string_list(&requested_flowprotos,
+                                                        flowproto_list);
 	if (active_flowproto_count < 1)
 	{
 	    gossip_lerr("Error: bad flow protocol list.\n");
@@ -119,13 +119,14 @@ int PINT_flow_initialize(
 
     /* create table to keep up with active flow protocols */
     active_flowproto_table =
-        malloc((active_flowproto_count * sizeof(struct flowproto_ops *)));
+            malloc((active_flowproto_count * sizeof(struct flowproto_ops *)));
     if (!active_flowproto_table)
     {
 	ret = -ENOMEM;
 	goto PINT_flow_initialize_failure;
     }
-    memset(active_flowproto_table, 0,
+    memset(active_flowproto_table,
+           0,
            (active_flowproto_count * sizeof(struct flowproto_ops *)));
 
     /* find the interface for each requested method and load it into the
@@ -163,7 +164,7 @@ int PINT_flow_initialize(
             if(!already_exists)
             {
                 active_flowproto_table[active_flow_index++] = 
-                    (*tmp_flowproto_ops);
+                                (*tmp_flowproto_ops);
             }
             else
             {
@@ -174,7 +175,7 @@ int PINT_flow_initialize(
     else
     {
 	tmp_flowproto_ops = static_flowprotos;
-	for(i=0; i<active_flowproto_count; i++)
+	for(i = 0; i < active_flowproto_count; i++)
 	{
 	    active_flowproto_table[i] = (*tmp_flowproto_ops);
 	    tmp_flowproto_ops++;
@@ -231,6 +232,7 @@ int PINT_flow_initialize(
 	flow_ref_cleanup(flow_mapping);
     }
     gen_mutex_unlock(&interface_mutex);
+    gossip_lerr("PINT_flow_initialize fails\n");
     return (ret);
 }
 

@@ -6,6 +6,8 @@
 
 /* TCP/IP implementation of a BMI method */
 
+#include "pvfs2-internal.h"
+
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,9 +21,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "pint-mem.h"
+/* #include "pint-mem.h" obsolete */
 
-#include "pvfs2-config.h"
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
@@ -180,25 +181,33 @@ struct tcp_msg_header
     char enc_hdr[TCP_ENC_HDR_SIZE];  /* encoded version of header info */
 };
 
-#define BMI_TCP_ENC_HDR(hdr)						\
-    do {								\
-        uint32_t *tmp32;                                                \
-        tmp32 = (uint32_t *)&(hdr).enc_hdr[0];                          \
-	*(tmp32) = htobmi32((hdr).magic_nr);	                        \
-	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
-	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
-	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
-    } while(0)						    
+#define BMI_TCP_ENC_HDR(hdr)                        \
+    do {                                            \
+        uint32_t *tmp32;                            \
+        uint64_t *tmp64;                            \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[0];     \
+        *(tmp32) = htobmi32((hdr).magic_nr);        \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[4];     \
+        *(tmp32) = htobmi32((hdr).mode);            \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[8];     \
+        *(tmp64) = htobmi64((hdr).tag);             \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[16];    \
+        *(tmp64) = htobmi64((hdr).size);            \
+    } while(0)
 
-#define BMI_TCP_DEC_HDR(hdr)						\
-    do {								\
-        uint32_t tmp32;                                                 \
-        memcpy(&tmp32,&(hdr).enc_hdr[0],sizeof(uint32_t));              \
-        (hdr).magic_nr = bmitoh32(tmp32);                               \
-        (hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));       \
-        (hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));        \
-        (hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));      \
-    } while(0)						    
+#define BMI_TCP_DEC_HDR(hdr)                                     \
+    do {                                                         \
+        uint64_t tmp64;                                          \
+        uint32_t tmp32;                                          \
+        memcpy(&tmp32, &(hdr).enc_hdr[0], sizeof(uint32_t));     \
+        (hdr).magic_nr = bmitoh32(tmp32);                        \
+        memcpy(&tmp32, &(hdr).enc_hdr[4], sizeof(uint32_t));     \
+        (hdr).mode = bmitoh32(tmp32);                            \
+        memcpy(&tmp64, &(hdr).enc_hdr[8], sizeof(uint64_t));     \
+        (hdr).tag = bmitoh64(tmp64);                             \
+        memcpy(&tmp64, &(hdr).enc_hdr[16], sizeof(uint64_t));    \
+        (hdr).size = bmitoh64(tmp64);                            \
+    } while(0)
 
 
 /* enumerate states that we care about */
@@ -665,12 +674,15 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 void *BMI_tcp_memalloc(bmi_size_t size,
 		       enum bmi_op_type send_recv)
 {
+    void *ptr;
     /* we really don't care what flags the caller uses, TCP/IP has no
      * preferences about how the memory should be configured.
      */
 
-/*    return (calloc(1,(size_t) size)); */
-    return PINT_mem_aligned_alloc(size, 4096);
+    /* return (calloc(1,(size_t) size)); */
+    /* return PINT_mem_aligned_alloc(size, 4096); */
+    posix_memalign(&ptr, 4096, size);
+    return ptr;
 }
 
 
@@ -684,7 +696,8 @@ int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv)
 {
-    PINT_mem_aligned_free(buffer);
+    /*PINT_mem_aligned_free(buffer);*/
+    free(buffer);
     return (0);
 }
 
@@ -2435,7 +2448,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
       always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
     }
 
-    gossip_lerr("%s:always_queue(%d).\n",__func__,always_queue);
+    gossip_err("%s:always_queue(%d).\n",__func__,always_queue);
 
     /* short out immediately if the address is bad and we have no way to
      * reconnect
@@ -2469,7 +2482,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
          */ 
         if (always_queue)
         {
-           gossip_lerr("%s:Moving query_op from RECV_EAGER_DONE_BUFFERING to completion array.\n"
+           gossip_err("%s:Moving query_op from RECV_EAGER_DONE_BUFFERING to completion array.\n"
                       ,__func__);
            op_list_remove(query_op);
            op_list_add(completion_array[context_id],query_op);
@@ -2627,7 +2640,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
              */
             if (always_queue)
             {
-               gossip_lerr("%s:Moving query_op from RECV INFLIGHT to completion array.\n"
+               gossip_err("%s:Moving query_op from RECV INFLIGHT to completion array.\n"
                           ,__func__);
                op_list_remove(query_op);
                op_list_add(completion_array[context_id],query_op);
@@ -2670,12 +2683,15 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         bogus_header.mode = TCP_MODE_REND;
     }
     bogus_header.tag = tag;
-    gossip_lerr("%s:Adding op to IND_RECV array.\n",__func__);
+    gossip_err("%s:Adding op to IND_RECV array.\n",__func__);
     ret = enqueue_operation(op_list_array[IND_RECV],
                             BMI_RECV, src, buffer_list, size_list,
                             list_count, 0, 0, id, BMI_TCP_INPROGRESS,
                             bogus_header, user_ptr, 0,
                             expected_size, context_id, eid);
+
+
+    gossip_err("%s: just returned from enqueue_operation(%d)...\n",__func__,ret);
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
     /* TODO: figure out why this causes deadlocks; observable in 2
@@ -3808,7 +3824,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     struct tcp_addr *tcp_addr_data = dest->method_data;
     method_op_p query_op = NULL;
     int ret = -1;
-    bmi_size_t total_size = 0;
     bmi_size_t amt_complete = 0;
     bmi_size_t env_amt_complete = 0;
     struct op_list_search_key key;
@@ -3817,14 +3832,13 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     PINT_event_id eid = 0;
     uint32_t always_queue=0;
 
-    if(PINT_EVENT_ENABLED)
+#if PINT_EVENT_ENABLED
+    int i = 0;
+    for(; i < list_count; ++i)
     {
-        int i = 0;
-        for(; i < list_count; ++i)
-        {
-            total_size += size_list[i];
-        }
+        total_size += size_list[i];
     }
+#endif
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
@@ -3843,7 +3857,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
       always_queue = *(uint32_t *)(PINT_hint_get_value_by_type(hints,PINT_HINT_BMI_QUEUE,NULL));
     }
 
-    gossip_lerr("%s:always_queue(%d).\n",__func__,always_queue);
+    gossip_err("%s:always_queue(%d).\n",__func__,always_queue);
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just

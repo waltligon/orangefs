@@ -16,6 +16,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-security.h"
+#include "security-util.h"
 
 #ifdef ENABLE_SECURITY_CERT
 #include <openssl/err.h>
@@ -99,7 +100,8 @@ int PINT_map_credential(PVFS_credential *cred,
 {
     int ret = 0; 
 #ifdef ENABLE_CERTCACHE
-    struct certcache_entry_s *entry;
+    seccache_entry_t *entry;
+    certcache_data_t *data;
 #endif
 
     if (cred == NULL || uid == NULL || num_groups == NULL)
@@ -109,18 +111,30 @@ int PINT_map_credential(PVFS_credential *cred,
 
 #ifdef ENABLE_SECURITY_CERT
 
+    /* do not map unsigned credential (fields won't be used) */
+    if (IS_UNSIGNED_CRED(cred))
+    {
+        *uid = PVFS_UID_MAX;
+        *num_groups = 1;
+        group_array[0] = PVFS_GID_MAX;
+
+        return 0;
+    }
+
 #ifdef ENABLE_CERTCACHE
     /* check certificate cache -- note: CA cert is cached as root */
-    entry = PINT_certcache_lookup_entry(&cred->certificate);
+    entry = PINT_certcache_lookup(&cred->certificate);
     if (entry != NULL)
-    {
+    {        
         /* cache hit */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: certificate cache hit (%s)!\n",
-                     __func__, entry->subject);
-        *uid = entry->uid;
-        *num_groups = entry->num_groups;
-        memcpy(group_array, entry->group_array, 
-               entry->num_groups * sizeof(PVFS_gid));
+        data = (certcache_data_t *) entry->data;
+
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: certificate cache hit (%s)\n",
+                     __func__, data->subject);
+        *uid = data->uid;
+        *num_groups = data->num_groups;
+        memcpy(group_array, data->group_array, 
+               data->num_groups * sizeof(PVFS_gid));
         ret = 0;
     }
     else {
@@ -128,7 +142,7 @@ int PINT_map_credential(PVFS_credential *cred,
         /* cache certificate info */
         if (ret == 0)
         {
-            ret = PINT_certcache_insert_entry(&cred->certificate, *uid, 
+            ret = PINT_certcache_insert(&cred->certificate, *uid, 
                                               *num_groups, group_array);
             if (ret < 0)
             {

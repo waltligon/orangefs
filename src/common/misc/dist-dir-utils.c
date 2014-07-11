@@ -10,6 +10,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
 #include "md5.h"
 
@@ -110,15 +111,12 @@ int PINT_init_dist_dir_state(
 		dist_dir_attr->bitmap_size = 1;
 	}
 
-	*bitmap_ptr = (PVFS_dist_dir_bitmap) malloc(
-			dist_dir_attr->bitmap_size * sizeof(PVFS_dist_dir_bitmap_basetype));
+	*bitmap_ptr = calloc(dist_dir_attr->bitmap_size,
+                sizeof(PVFS_dist_dir_bitmap_basetype));
 	if ((*bitmap_ptr) == NULL)
 	{
 		return -1;
 	}
-
-	memset((*bitmap_ptr), 0,
-			dist_dir_attr->bitmap_size * sizeof(PVFS_dist_dir_bitmap_basetype));
 
 	for(i = pre_dsg_num_server-1; i >= 0; i--)
 	{

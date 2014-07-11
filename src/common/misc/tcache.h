@@ -8,10 +8,11 @@
 #ifndef __TCACHE_H
 #define __TCACHE_H
 
+#include "pvfs2-internal.h"
 #ifndef WIN32
-#include <sys/time.h>
+# include <sys/time.h>
 #else
-#include "wincommon.h"
+# include "wincommon.h"
 #endif
 #include "pvfs2-types.h"
 #include "quicklist.h"
@@ -96,9 +97,9 @@ struct PINT_tcache_entry
 struct PINT_tcache
 {
     /** comparison function */
-    int (*compare_key_entry)(void* key, struct qhash_head* link);
+    int (*compare_key_entry)(const void* key, struct qhash_head* link);
     /** hash function */
-    int (*hash_key)(void* key, int table_size);
+    int (*hash_key)(const void* key, int table_size);
     /** function that can be used to free payload pointer */
     int (*free_payload)(void* payload);
 
@@ -107,7 +108,7 @@ struct PINT_tcache
     unsigned int num_entries;   /**< current number of entries in tcache */
     unsigned int hard_limit;    /**< hard limit on number of entries */
     unsigned int soft_limit;    /**< soft limit on number of entries */
-    unsigned int reclaim_percentage;    /**< what percentage to reclaim at soft limit */
+    unsigned int reclaim_percentage; /**< what percentage to reclaim at soft limit */
     enum PINT_tcache_replace_algorithms replacement_algorithm; /**< what algorithm to use to find entry to replace */
     unsigned int enable;        /**< is the cache enabled? */
 
@@ -136,8 +137,8 @@ enum PINT_tcache_options
 };
 
 struct PINT_tcache* PINT_tcache_initialize(
-    int (*compare_key_entry) (void *key, struct qhash_head* link),
-    int (*hash_key) (void *key, int table_size),
+    int (*compare_key_entry) (const void *key, struct qhash_head* link),
+    int (*hash_key) (const void *key, int table_size),
     int (*free_payload) (void* payload),
     int table_size);
 

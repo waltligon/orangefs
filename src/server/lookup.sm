@@ -184,6 +184,12 @@ static PINT_sm_action lookup_init(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
+    s_op->u.lookup.attr.dist_dir_bitmap = NULL;
+    s_op->u.lookup.attr.dirdata_handles = NULL;
+    s_op->key_a = NULL;
+    s_op->val_a = NULL;
+    s_op->error_a = NULL;
+
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
@@ -437,6 +443,12 @@ static PINT_sm_action lookup_check_perms(
     PINT_debug_credential(cred, "  lookup_check_perms", uid, num_groups,
                           group_array);
 
+#ifdef ENABLE_SECURITY_CERT
+    op_mask = 0;
+    /* no capabilities for unsigned credential */
+    if (!IS_UNSIGNED_CRED(cred))
+    {
+#endif
     /* retrieve the capabilities of the credential as a mask */
     ret = PINT_get_capabilities(NULL, 0, uid, group_array, num_groups, 
                                 a_p, &op_mask);
@@ -451,6 +463,9 @@ static PINT_sm_action lookup_check_perms(
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
+#ifdef ENABLE_SECURITY_CERT
+    } /* if */
+#endif
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  lookup_check_perms: op mask = %s\n",
                  PINT_print_op_mask(op_mask, mask_buf));
@@ -459,7 +474,12 @@ static PINT_sm_action lookup_check_perms(
     if ((op_mask & PINT_CAP_EXEC) == 0)
     {
         /* no file-mode permission--check ACLs */
+#ifdef ENABLE_SECURITY_CERT
+        /* don't check ACLs for unsigned cred */
+        js_p->error_code = IS_UNSIGNED_CRED(cred) ? 0 : LOOKUP_CHECK_DIR_ACLS;
+#else
         js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
+#endif
         return SM_ACTION_COMPLETE;
     }
 
@@ -702,6 +722,8 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     if(!attr->dist_dir_bitmap ||
             !attr->dirdata_handles)
     {
+        free(attr->dist_dir_bitmap);
+        free(attr->dirdata_handles);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -712,6 +734,8 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
     {
+        free(attr->dist_dir_bitmap);
+        free(attr->dirdata_handles);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -719,6 +743,8 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->val_a)
     {
+        free(attr->dist_dir_bitmap);
+        free(attr->dirdata_handles);
         free(s_op->key_a);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -744,6 +770,10 @@ static PINT_sm_action lookup_read_directory_entry_handles(
         sizeof(PVFS_error));
     if (s_op->error_a == NULL)
     {
+        free(attr->dist_dir_bitmap);
+        free(attr->dirdata_handles);
+        free(s_op->key_a);
+        free(s_op->val_a);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -1024,6 +1054,18 @@ static PINT_sm_action lookup_cleanup(
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
+
+    free(s_op->u.lookup.attr.dist_dir_bitmap);
+    s_op->u.lookup.attr.dist_dir_bitmap = NULL;
+    free(s_op->u.lookup.attr.dirdata_handles);
+    s_op->u.lookup.attr.dirdata_handles = NULL;
+
+    free(s_op->key_a);
+    s_op->key_a = NULL;
+    free(s_op->val_a);
+    s_op->val_a = NULL;
+    free(s_op->error_a);
+    s_op->error_a = NULL;
 
     return(server_state_machine_complete(smcb));
 }

@@ -82,10 +82,10 @@ struct acache_payload
 static struct PINT_tcache* acache = NULL;
 static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
   
-static int acache_compare_key_entry(void* key, struct qhash_head* link);
+static int acache_compare_key_entry(const void* key, struct qhash_head* link);
 static int acache_free_payload(void* payload);
 
-static int acache_hash_key(void* key, int table_size);
+static int acache_hash_key(const void* key, int table_size);
 static struct PINT_perf_counter* acache_pc = NULL;
 
 static int set_tcache_defaults(struct PINT_tcache* instance);
@@ -755,9 +755,9 @@ err:
  *
  * returns 1 on match, 0 otherwise
  */
-static int acache_compare_key_entry(void* key, struct qhash_head* link)
+static int acache_compare_key_entry(const void* key, struct qhash_head* link)
 {
-    PVFS_object_ref* real_key = (PVFS_object_ref*)key;
+    const PVFS_object_ref* real_key = (const PVFS_object_ref*)key;
     struct acache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
@@ -780,9 +780,9 @@ static int acache_compare_key_entry(void* key, struct qhash_head* link)
  *
  * returns hash index 
  */
-static int acache_hash_key(void* key, int table_size)
+static int acache_hash_key(const void* key, int table_size)
 {
-    PVFS_object_ref* real_key = (PVFS_object_ref*)key;
+    const PVFS_object_ref* real_key = (const PVFS_object_ref*)key;
     int tmp_ret = 0;
 
     tmp_ret = (real_key->handle)%table_size;

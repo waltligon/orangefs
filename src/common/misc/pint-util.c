@@ -22,6 +22,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
 #include "pint-util.h"
@@ -425,84 +426,73 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             }
             attr->capability.issuer = NULL;
         }
-
-        if (attr->objtype == PVFS_TYPE_METAFILE)
+        if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            if (attr->mask & PVFS_ATTR_META_DFILES)
+            if (attr->u.meta.dfile_array)
             {
-                if (attr->u.meta.dfile_array)
-                {
-                    free(attr->u.meta.dfile_array);
-                    attr->u.meta.dfile_array = NULL;
-                }
+                free(attr->u.meta.dfile_array);
+                attr->u.meta.dfile_array = NULL;
             }
-            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        }
+        if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        {
+            if (attr->u.meta.mirror_dfile_array)
             {
-                if (attr->u.meta.mirror_dfile_array)
-                {
-                    free(attr->u.meta.mirror_dfile_array);
-                    attr->u.meta.mirror_dfile_array = NULL;
-                }
+                free(attr->u.meta.mirror_dfile_array);
+                attr->u.meta.mirror_dfile_array = NULL;
                 
             }
-            if (attr->mask & PVFS_ATTR_META_REPLICATION)
+        }
+        if (attr->mask & PVFS_ATTR_META_REPLICATION)
+        {
+           if (attr->u.meta.replication_dfile_array)
+           {
+              free(attr->u.meta.replication_dfile_array);
+              attr->u.meta.replication_dfile_array = NULL;
+           }
+        }
+        if (attr->mask & PVFS_ATTR_META_DIST)
+        {
+            if (attr->u.meta.dist)
             {
-               if (attr->u.meta.replication_dfile_array)
-               {
-                  free(attr->u.meta.replication_dfile_array);
-                  attr->u.meta.replication_dfile_array = NULL;
-               }
-            }
-       
-            if (attr->mask & PVFS_ATTR_META_DIST)
-            {
-                if (attr->u.meta.dist)
-                {
-                    PINT_dist_free(attr->u.meta.dist);
-                    attr->u.meta.dist = NULL;
-                }
+                PINT_dist_free(attr->u.meta.dist);
+                attr->u.meta.dist = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_SYMLINK)
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+            if ((attr->u.sym.target_path_len > 0) &&
+                attr->u.sym.target_path)
             {
-                if ((attr->u.sym.target_path_len > 0) &&
-                    attr->u.sym.target_path)
-                {
-                    free(attr->u.sym.target_path);
-                    attr->u.sym.target_path = NULL;
-                }
+                free(attr->u.sym.target_path);
+                attr->u.sym.target_path = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_DIRECTORY)
+        if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
+            (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
-                (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if (attr->u.dir.hint.dist_name)
             {
-                if (attr->u.dir.hint.dist_name)
-                {
-                    free(attr->u.dir.hint.dist_name);
-                    attr->u.dir.hint.dist_name = NULL;
-                }
-                if (attr->u.dir.hint.dist_params)
-                {
-                    free(attr->u.dir.hint.dist_params);
-                    attr->u.dir.hint.dist_params = NULL;
-                }
+                free(attr->u.dir.hint.dist_name);
+                attr->u.dir.hint.dist_name = NULL;
             }
-            if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
+            if (attr->u.dir.hint.dist_params)
+            {
+                free(attr->u.dir.hint.dist_params);
+                attr->u.dir.hint.dist_params = NULL;
+            }
+        }
+        if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
+        {   
+            if (attr->dist_dir_bitmap)
             {   
-                if (attr->dist_dir_bitmap)
-                {   
-                    free(attr->dist_dir_bitmap);
-                    attr->dist_dir_bitmap = NULL;
-                }
-                if (attr->dirdata_handles)
-                {
-                    free(attr->dirdata_handles);
-                    attr->dirdata_handles = NULL;
-                }
+                free(attr->dist_dir_bitmap);
+                attr->dist_dir_bitmap = NULL;
+            }
+            if (attr->dirdata_handles)
+            {
+                free(attr->dirdata_handles);
+                attr->dirdata_handles = NULL;
             }
         }
     }

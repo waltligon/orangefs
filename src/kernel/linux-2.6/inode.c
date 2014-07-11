@@ -107,11 +107,22 @@ static int pvfs2_readpages(
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+static void pvfs2_invalidatepage(struct page *page, 
+                                 unsigned int offset,
+                                 unsigned int length)
+#else
 static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
+#endif
 {
+#ifdef HAVE_THREE_ARGUMENT_INVALIDATEPAGE
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
+                "(offset is %u)\n", page, offset);
+#else
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
+#endif
 
     ClearPageUptodate(page);
     ClearPageMappedToDisk(page);
@@ -205,7 +216,15 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         if ((iattr->ia_valid & ATTR_SIZE) &&
            iattr->ia_size != i_size_read(inode)) 
         {
+#ifdef HAVE_VMTRUNCATE
             ret = vmtruncate(inode, iattr->ia_size);
+#else
+            ret = inode_newsize_ok(inode, iattr->ia_size);
+            if (!ret) {
+              truncate_setsize(inode,iattr->ia_size);
+              pvfs2_truncate(inode);
+            }
+#endif
             if (ret)
                 return ret;
         }
@@ -301,10 +320,20 @@ int pvfs2_getattr(
         pvfs2_inode = PVFS2_I(inode);
         kstat->blksize = pvfs2_inode->blksize;
     }
+    else if (ret == -EINTR)
+    {
+        /* In this case, an interrupt signal was pending when we wanted to wait for the getattr op.
+         * So, instead of going to sleep with a pending interrupt, we allow the interrupt to take
+         * precedence.  However, we don't want to mark the inode "bad" in this case; we want the
+         * getattr to be retried.
+         */
+         gossip_debug(GOSSIP_INODE_DEBUG,"%s:%s:%d Received EINTR(%d)\n",__FILE__,__func__,__LINE__,ret);
+         ret = -EAGAIN; 
+    }
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode with return code(%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -352,7 +381,7 @@ int pvfs2_getattr_lite(
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode (ret:%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -374,7 +403,9 @@ struct inode_operations pvfs2_file_inode_operations =
     listxattr: pvfs2_listxattr,
 #endif
 #else
+#ifdef HAVE_VMTRUNCATE
     .truncate = pvfs2_truncate,
+#endif
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
 #ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
@@ -392,6 +423,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .listxattr = pvfs2_listxattr,
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
+# if defined(PVFS_KMOD_HAVE_GET_ACL)
+    .get_acl = pvfs2_get_acl,
+# endif
 #endif
 #ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
     .fill_handle = pvfs2_fill_handle,
@@ -581,7 +615,7 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
-#ifdef HAVE_CURRENT_FSUID
+#if defined(HAVE_CURRENT_FSUID) || defined(HAVE_FROM_KUID)
         inode->i_uid = current_fsuid();
         inode->i_gid = current_fsgid();
 #else

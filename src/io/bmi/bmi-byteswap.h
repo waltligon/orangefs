@@ -26,7 +26,7 @@
 #ifndef __BMI_BYTESWAP_H
 #define __BMI_BYTESWAP_H 
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 
 #ifndef __bswap_16
 /* Swap bytes in 16 bit value.  */
@@ -65,6 +65,7 @@ __bswap_32 (unsigned int __bsx)
 #ifndef __bswap_64
 #if defined __GNUC__ && __GNUC__ >= 2
 /* Swap bytes in 64 bit value.  */
+#ifndef __bswap_constant_64
 # define __bswap_constant_64(x) \
      ((((x) & 0xff00000000000000ull) >> 56)				      \
       | (((x) & 0x00ff000000000000ull) >> 40)				      \
@@ -74,7 +75,9 @@ __bswap_32 (unsigned int __bsx)
       | (((x) & 0x0000000000ff0000ull) << 24)				      \
       | (((x) & 0x000000000000ff00ull) << 40)				      \
       | (((x) & 0x00000000000000ffull) << 56))
+#endif
 
+#ifndef BSWAP_64_IS_A_FUNC
 # define __bswap_64(x) \
      (__extension__							      \
       ({ union { __extension__ unsigned long long int __ll;		      \
@@ -88,6 +91,7 @@ __bswap_32 (unsigned int __bsx)
 	     __r.__l[1] = __bswap_32 (__w.__l[0]);			      \
 	   }								      \
 	 __r.__ll; }))
+#endif
 #else
 #ifdef WORDS_BIGENDIAN
 #error FIX ME: no 64 bit bswap routine for non GNUC preprocessor.

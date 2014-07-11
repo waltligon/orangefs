@@ -16,6 +16,9 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
+#define USRINT_SOURCE 1
+#include "usrint.h"
+
 #ifdef	HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -26,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stddef.h>
+
 
 /* Outcomment the following line for production quality code.  */
 /* #define NDEBUG 1 */
@@ -204,7 +208,11 @@
 # define GET_LOGIN_NAME_MAX()	(-1)
 #endif
 
+#ifdef __THROWNL
+static const char *next_brace_sub (const char *begin, int flags) __THROWNL;
+#else
 static const char *next_brace_sub (const char *begin, int flags) __THROW;
+#endif /* __THROWNL */
 
 #endif /* !defined _LIBC || !defined GLOB_ONLY_P */
 
@@ -219,8 +227,13 @@ extern int __glob_pattern_type (const char *pattern, int quote)
     attribute_hidden;
 
 #if !defined _LIBC || !defined GLOB_ONLY_P
+#ifdef __THROWNL
+static int prefix_array (const char *prefix, char **array, size_t n) __THROWNL;
+static int collated_compare (const void *, const void *) __THROWNL;
+#else
 static int prefix_array (const char *prefix, char **array, size_t n) __THROW;
 static int collated_compare (const void *, const void *) __THROW;
+#endif /* __THROWNL */
 
 
 /* Find the end of the sub-pattern in a brace expression.  */

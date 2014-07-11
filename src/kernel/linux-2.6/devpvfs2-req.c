@@ -121,7 +121,7 @@ static ssize_t pvfs2_devreq_read(
             /* Check if this op's fsid is known and needs remounting */
             if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+                gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %llu %s\n", llu(op->tag), get_opname_string(op));
                 continue;
             }
             /* op does not belong to any particular fsid or already 
@@ -154,7 +154,7 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
+        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %llu %s\n", llu(cur_op->tag), get_opname_string(cur_op));
         if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
             if (cur_op->op_linger == 1)
@@ -1121,13 +1121,8 @@ static unsigned int pvfs2_devreq_poll(
 {
     int poll_revent_mask = 0;
 
-    gossip_debug(GOSSIP_WAIT_DEBUG,"%s:Is daemon in service(%d).\n"
-                                  ,__func__
-                                  ,is_daemon_in_service());
-
     if (open_access_count == 1)
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call poll_wait.\n",__func__);
         poll_wait(file, &pvfs2_request_list_waitq, poll_table);
 
         spin_lock(&pvfs2_request_list_lock);

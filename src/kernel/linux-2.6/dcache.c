@@ -74,19 +74,20 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             goto invalid_exit;
 #endif
             new_op->upcall.req.lookup.parent_refn.handle =
-                get_handle_from_ino(parent_inode);
+                            get_handle_from_ino(parent_inode);
             new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(parent_inode->i_sb)->fs_id;
+                            PVFS2_SB(parent_inode->i_sb)->fs_id;
         }
         strncpy(new_op->upcall.req.lookup.d_name,
-                dentry->d_name.name, PVFS2_NAME_LEN);
+                dentry->d_name.name,
+                PVFS2_NAME_LEN);
 
         gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d interrupt flag [%d]\n", 
             __FILE__, __func__, __LINE__, get_interruptible_flag(parent_inode));
 
-        ret = service_operation(
-            new_op, "pvfs2_lookup", 
-            get_interruptible_flag(parent_inode));
+        ret = service_operation(new_op,
+                                "pvfs2_lookup", 
+                                get_interruptible_flag(parent_inode));
 
         if((new_op->downcall.status != 0) || 
            !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
@@ -96,7 +97,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                 "%s:%s:%d lookup failure |%s| or no match |%s|.\n", 
                 __FILE__, __func__, __LINE__,
                 (new_op->downcall.status != 0) ? "true" : "false",
-                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode)) ? "true" : "false");
+                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+                                ? "true" : "false");
             op_release(new_op);
 
             /* Avoid calling make_bad_inode() in this situation.  On 2.4
@@ -111,7 +113,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
              */
             pvfs2_make_bad_inode(inode);
 #endif
-            gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d setting revalidate_failed = 1\n", __FILE__, __func__, __LINE__);
+            gossip_debug(GOSSIP_DCACHE_DEBUG,
+                         "%s:%s:%d setting revalidate_failed = 1\n",
+                         __FILE__, __func__, __LINE__);
             /* set a flag that we can detect later in d_delete() */
             PVFS2_I(inode)->revalidate_failed = 1;
             d_drop(dentry);
@@ -153,10 +157,9 @@ invalid_exit:
 
 static int pvfs2_d_delete (
 #ifdef HAVE_D_DELETE_CONST
-const
+                           const
 #endif /* HAVE_D_DELETE_CONST */
-struct dentry * dentry
-)
+                           struct dentry * dentry)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: called on dentry %p.\n", __func__, dentry);
@@ -177,39 +180,42 @@ struct dentry * dentry
     }
 }
 
-/* should return 1 if dentry can still be trusted, else 0 */
+/** Verify that dentry is valid.
+ *
+ * should return 1 if dentry can still be trusted, else 0 
+ */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_d_revalidate(
-    struct dentry *dentry,
-    int flags)
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              int flags)
 {
-    return(pvfs2_d_revalidate_common(dentry));
-}
+#elif defined(PVFS_KMOD_D_REVALIDATE_TAKES_NAMEIDATA)
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              struct nameidata *nd)
+{
+# ifdef LOOKUP_RCU
+    if (nd->flags & LOOKUP_RCU)
+    {
+        return -ECHILD;
+    }
+# endif
 
 #else
-
-/** Verify that dentry is valid.
- */
-static int pvfs2_d_revalidate(
-    struct dentry *dentry,
-    struct nameidata *nd)
+static int pvfs2_d_revalidate(struct dentry *dentry,
+                              unsigned int flags)
 {
-#ifdef LOOKUP_RCU
-    if (nd->flags & LOOKUP_RCU)
-        return -ECHILD;
-#endif
-
-    if (nd && (nd->flags & LOOKUP_FOLLOW) &&
-        ((!nd->flags) & (LOOKUP_CREATE)) )
+# ifdef LOOKUP_RCU
+    if (flags & LOOKUP_RCU)
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG,
-                     "\n%s: Trusting intent; skipping getattr\n", __func__);
-        return 1;
+        return -ECHILD;
     }
+# endif
+#endif
+    /* All 3 implementations call this */
+    /* NOTE:  We should ALWAYS revalidate a directory entry.  If we don't, then stale information is kept in
+     * Linux's directory cache, and, in some cases, causing the inode to be marked as "bad", resulting in an EIO error.
+     */
     return(pvfs2_d_revalidate_common(dentry));
 }
-
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /*
   to propagate an error, return a value < 0, as this causes
@@ -219,6 +225,9 @@ static int pvfs2_d_hash(
 #ifdef HAVE_THREE_PARAM_D_HASH
     const struct dentry *parent,
     const struct inode *inode,
+    struct qstr *hash
+#elif defined(HAVE_TWO_PARAM_D_HASH_WITH_CONST)
+    const struct dentry *parent,
     struct qstr *hash
 #else
     struct dentry *parent,
@@ -232,15 +241,22 @@ static int pvfs2_d_hash(
     return 0;
 }
 
-#ifdef HAVE_SEVEN_PARAM_D_COMPARE
-static int pvfs2_d_compare(
-                            const struct dentry *parent, 
-                            const struct inode * pinode,
-                            const struct dentry *dentry, 
-                            const struct inode *inode,
-                            unsigned int len, 
-                            const char *str, 
-                            const struct qstr *name)
+#if defined  HAVE_SEVEN_PARAM_D_COMPARE || defined HAVE_FIVE_PARAM_D_COMPARE
+#if defined HAVE_SEVEN_PARAM_D_COMPARE
+static int pvfs2_d_compare(const struct dentry *parent, 
+                           const struct inode * pinode,
+                           const struct dentry *dentry, 
+                           const struct inode *inode,
+                           unsigned int len, 
+                           const char *str, 
+                           const struct qstr *name)
+#else /* HAVE_FIVE_PARAM_D_COMPARE */
+static int pvfs2_d_compare(const struct dentry *parent, 
+                           const struct dentry *dentry, 
+                           unsigned int len, 
+                           const char *str, 
+                           const struct qstr *name)
+#endif /* HAVE_SEVEN_PARAM_D_COMPARE */
 {
     int i = 0;
     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_compare: "
@@ -271,7 +287,7 @@ static int pvfs2_d_compare(
              (d_name->hash == name->hash) &&
              (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
-#endif /* HAVE_SEVEN_PARAM_D_COMPARE */
+#endif /* HAVE_SEVEN_PARAM_D_COMPARE || HAVE_FIVE_PARAM_D_COMPARE */
 
 
 /** PVFS2 implementation of VFS dentry operations */
@@ -313,7 +329,11 @@ static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
   local_count = atomic_read(&entry->d_count);
 #else
   spin_lock(&entry->d_lock);
+#ifdef HAVE_DENTRY_LOCKREF_STRUCT
+  local_count = entry->d_lockref.count;
+#else
   local_count = entry->d_count;
+#endif /* HAVE_DENTRY_LOCKREF_STRUCT */
   spin_unlock(&entry->d_lock);
 #endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
 

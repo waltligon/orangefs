@@ -1,0 +1,46 @@
+ifdef BUILD_JNI
+
+DIR := src/client/jni
+ORGDIR := $(DIR)/org/orangefs/usrint
+
+USRC := \
+    $(DIR)/libPVFS2POSIXJNI.c \
+    $(DIR)/libPVFS2STDIOJNI.c
+
+JNIPOSIXJAVA := \
+	$(ORGDIR)/PVFS2POSIXJNI.java \
+	$(ORGDIR)/PVFS2POSIXJNIFlags.java \
+	$(ORGDIR)/Stat.java \
+# TODO
+#	$(ORGDIR)/Statfs.java \
+#	$(ORGDIR)/Statvfs.java \
+
+JNISTDIOJAVA := \
+	$(ORGDIR)/PVFS2STDIOJNI.java \
+	$(ORGDIR)/PVFS2STDIOJNIFlags.java \
+	$(ORGDIR)/Dirent.java \
+
+JNISTREAMSCHANNELSJAVA := \
+	$(ORGDIR)/Orange.java \
+	$(ORGDIR)/OrangeFileSystemInputStream.java \
+	$(ORGDIR)/OrangeFileSystemOutputStream.java \
+	$(ORGDIR)/OrangeFileSystemInputChannel.java \
+	$(ORGDIR)/OrangeFileSystemOutputChannel.java
+	
+
+# list of all .c files (generated or otherwise) that belong in library
+ULIBSRC += $(USRC)
+
+endif # BUILD_JNI
+
+# TODO: Remove BUILD_HADOOP after OrangeFS Hadoop code is commited to Apache 
+#         Hadoop.
+ifdef BUILD_HADOOP
+
+HADOOP_ORGDIR := src/client/jni/org/orangefs/hadoop/fs/ofs
+
+HADOOPJAVA := \
+	$(HADOOP_ORGDIR)/OrangeFileSystem.java \
+	$(HADOOP_ORGDIR)/OrangeFileSystemFSInputStream.java
+
+endif #BUILD_HADOOP

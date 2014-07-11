@@ -12,6 +12,7 @@
 #ifndef __FLOW_REF_H
 #define __FLOW_REF_H
 
+#include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "flow.h"
 

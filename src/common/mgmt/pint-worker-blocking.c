@@ -8,6 +8,7 @@
 #include "pint-worker-blocking.h"
 #include "pint-worker.h"
 #include "pint-mgmt.h"
+#include "pvfs2-internal.h"
 
 static int blocking_post(struct PINT_manager_s *manager,
                          PINT_worker_inst *inst,

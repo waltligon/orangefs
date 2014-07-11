@@ -7,6 +7,7 @@
 #ifndef _SECURITY_UTIL_H_
 #define _SECURITY_UTIL_H_
 
+#define IS_UNSIGNED_CRED(cred)    ((cred)->sig_size == 0)
 
 char *PINT_print_op_mask(uint32_t op_mask, char *out_buf);
 

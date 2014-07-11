@@ -3,6 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,14 +15,14 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "pvfs2.h"
 #include "gossip.h"
 #include "gen-locks.h"
 #include "mmap-ra-cache.h"
-#include "pvfs2-internal.h"
 
-static int hash_key(void *key, int table_size);
-static int hash_key_compare(void *key, struct qlist_head *link);
+static int hash_key(const void *key, int table_size);
+static int hash_key_compare(const void *key, struct qlist_head *link);
 
 static gen_mutex_t s_mmap_ra_cache_mutex = GEN_MUTEX_INITIALIZER;
 static struct qhash_table *s_key_to_data_table = NULL;
@@ -259,10 +260,10 @@ int pvfs2_mmap_ra_cache_finalize(void)
  *
  * returns integer offset into table
  */
-static int hash_key(void *key, int table_size)
+static int hash_key(const void *key, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_object_ref *refn = (PVFS_object_ref *)key;
+    const PVFS_object_ref *refn = (const PVFS_object_ref *)key;
 
     tmp += ((refn->handle << 2) | (refn->fs_id));
     tmp = (tmp % table_size);
@@ -277,10 +278,10 @@ static int hash_key(void *key, int table_size)
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_key_compare(void *key, struct qlist_head *link)
+static int hash_key_compare(const void *key, struct qlist_head *link)
 {
     mmap_ra_cache_elem_t *cache_elem = NULL;
-    PVFS_object_ref *refn = (PVFS_object_ref *)key;
+    const PVFS_object_ref *refn = (const PVFS_object_ref *)key;
 
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);

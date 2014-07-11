@@ -7,6 +7,8 @@
 #ifndef __DBPF_KEYVAL_PCACHE_H
 #define __DBPF_KEYVAL_PCACHE_H
 
+#include "pvfs2-internal.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

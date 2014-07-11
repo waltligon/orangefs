@@ -10,7 +10,7 @@
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
 
-#include "pvfs2-config.h"
+#include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pint-distribution.h"
@@ -96,11 +96,13 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
-    PVFS_SERV_MGMT_GET_USER_CERT = 50,
-    PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
-    PVFS_SERV_REPLICATE_PRIME = 52,
-    PVFS_SERV_REPLICATE_NEXT = 53,
-    PVFS_SERV_REPL_WRITE_COMPLETION = 54,
+    PVFS_SERV_REPLICATE_PRIME = 50,
+    PVFS_SERV_REPLICATE_NEXT = 51,
+    PVFS_SERV_REPL_WRITE_COMPLETION = 52,
+#ifdef ENABLE_SECURITY_CERT
+    PVFS_SERV_MGMT_GET_USER_CERT = 53,
+    PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 54,
+#endif
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -465,15 +467,13 @@ do {                                                  \
 
 struct PVFS_servreq_mgmt_remove_dirent
 {
-    PVFS_handle handle;
-    PVFS_handle dirent_handle; /* Handle of directory entries */
+    PVFS_handle handle;        /* Handle of directory entries */
     PVFS_fs_id fs_id;
     char *entry;
 };
-endecode_fields_5_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_remove_dirent,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     skip4,,
     string, entry);
@@ -484,7 +484,6 @@ endecode_fields_5_struct(
                                              __cap,   \
                                              __fsid,  \
                                              __handle,\
-                                             __dirent_handle,\
                                              __entry, \
                                              __hints) \
 do {                                                  \
@@ -494,7 +493,6 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.mgmt_remove_dirent.fs_id = (__fsid);    \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
-    (__req).u.mgmt_remove_dirent.dirent_handle = (__dirent_handle); \
     (__req).u.mgmt_remove_dirent.entry = (__entry);   \
 } while (0)
 
@@ -1124,15 +1122,13 @@ do {                                                \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle handle; /* handle of directory */
-    PVFS_handle dirent_handle; /* handle of directory entries */
+    PVFS_handle handle;        /* handle of directory entries */
     PVFS_fs_id fs_id;          /* file system */
 };
-endecode_fields_4_struct(
+endecode_fields_3_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id);
 #define extra_size_PVFS_servreq_rmdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -1141,7 +1137,6 @@ endecode_fields_4_struct(
                                    __cap,         \
                                    __fsid,        \
                                    __handle,      \
-                                   __dirent_handle,\
                                    __entry,       \
                                    __hints)       \
 do {                                              \
@@ -1151,7 +1146,6 @@ do {                                              \
     (__req).hints = (__hints);                    \
     (__req).u.rmdirent.fs_id = (__fsid);          \
     (__req).u.rmdirent.handle = (__handle);       \
-    (__req).u.rmdirent.dirent_handle = (__dirent_handle);\
     (__req).u.rmdirent.entry = (__entry);         \
 } while (0);
 
@@ -1165,21 +1159,22 @@ endecode_fields_1_struct(
 
 /* chdirent ****************************************************/
 /* - modifies an existing directory entry on a particular file system */
+/* This is only used when sys-rename.sm notices that the destination
+   already exists and the directory entry should be updated in place
+   rather than a new one created. */
 
 struct PVFS_servreq_chdirent
 {
-    char *entry;                   /* name of entry to remove */
-    PVFS_handle new_dirent_handle; /* handle of directory */
-    PVFS_handle handle;     /* handle of directory */
-    PVFS_handle dirent_handle; /* handle of directory entries */
+    char *entry;                   /* name of entry to change */
+    PVFS_handle new_dirent_handle; /* handle to be newly-associated with entry */
+    PVFS_handle handle;            /* handle of bucket */
     PVFS_fs_id fs_id;              /* file system */
 };
-endecode_fields_5_struct(
+endecode_fields_4_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id);
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -1188,7 +1183,6 @@ endecode_fields_5_struct(
                                    __cap,          \
                                    __fsid,         \
                                    __handle,       \
-                                   __dirent_handle,\
                                    __new_dirent,   \
                                    __entry,        \
                                    __hints)        \
@@ -1200,8 +1194,6 @@ do {                                               \
     (__req).u.chdirent.fs_id = (__fsid);           \
     (__req).u.chdirent.handle =                    \
         (__handle);                                \
-    (__req).u.chdirent.dirent_handle =             \
-        (__dirent_handle);                         \
     (__req).u.chdirent.new_dirent_handle =         \
         (__new_dirent);                            \
     (__req).u.chdirent.entry = (__entry);          \
@@ -1220,8 +1212,7 @@ endecode_fields_1_struct(
 
 struct PVFS_servreq_readdir
 {
-    PVFS_handle handle;     /* handle of dir object */
-    PVFS_handle dirent_handle;     /* handle of directory entries */
+    PVFS_handle handle;     /* handle of directory entries */
     PVFS_fs_id fs_id;       /* file system */
     PVFS_ds_position token; /* dir offset */
     uint32_t dirent_count;  /* desired # of entries */
@@ -1229,16 +1220,15 @@ struct PVFS_servreq_readdir
 endecode_fields_5_struct(
     PVFS_servreq_readdir,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     uint32_t, dirent_count,
+    skip4,,
     PVFS_ds_position, token);
 
 #define PINT_SERVREQ_READDIR_FILL(__req,              \
                                   __cap,              \
                                   __fsid,             \
                                   __handle,           \
-                                  __dirent_handle,    \
                                   __token,            \
                                   __dirent_count,     \
                                   __hints)            \
@@ -1249,7 +1239,6 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.readdir.fs_id = (__fsid);               \
     (__req).u.readdir.handle = (__handle);            \
-    (__req).u.readdir.dirent_handle = (__dirent_handle);\
     (__req).u.readdir.token = (__token);              \
     (__req).u.readdir.dirent_count = (__dirent_count);\
 } while (0);
@@ -2533,6 +2522,7 @@ do {                                                                 \
     (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);     \
 } while (0)
 
+#ifdef ENABLE_SECURITY_CERT
 /* get_user_cert ******************************************************/
 /* - retrieve user certificate/key from server given user id/password */
 
@@ -2545,6 +2535,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     char *enc_pwd;
     PVFS_size enc_key_size;
     char *enc_key;
+    uint32_t exp;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2557,6 +2548,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     encode_PVFS_size(pptr, &(x)->enc_key_size); \
     memcpy((*pptr), (char *) (x)->enc_key, (x)->enc_key_size); \
     (*pptr) += (x)->enc_key_size; \
+    encode_uint32_t(pptr, &(x)->exp); \
 } while (0)
 
 #define decode_PVFS_servreq_mgmt_get_user_cert(pptr,x) do { \
@@ -2568,6 +2560,7 @@ struct PVFS_servreq_mgmt_get_user_cert
     decode_PVFS_size(pptr, &(x)->enc_key_size); \
     (x)->enc_key = (*pptr); \
     (*pptr) += (x)->enc_key_size; \
+    decode_uint32_t(pptr, &(x)->exp); \
 } while (0)
 #endif
 
@@ -2582,7 +2575,8 @@ struct PVFS_servreq_mgmt_get_user_cert
                                              __pwdsize,      \
                                              __pwd,          \
                                              __keysize,      \
-                                             __key)          \
+                                             __key,          \
+                                             __exp)          \
 do {                                                         \
     memset(&(__req), 0, sizeof(__req));                      \
     (__req).op = PVFS_SERV_MGMT_GET_USER_CERT;               \
@@ -2595,6 +2589,7 @@ do {                                                         \
     (__req).u.mgmt_get_user_cert.enc_key_size = (__keysize); \
     (__req).u.mgmt_get_user_cert.enc_key =                   \
         (char *) (__key);                                    \
+    (__req).u.mgmt_get_user_cert.exp     = (__exp);          \
 } while (0)
 
 struct PVFS_servresp_mgmt_get_user_cert
@@ -2637,6 +2632,8 @@ endecode_fields_1_struct(
     PVFS_security_key, public_key);
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
+
+#endif /* ENABLE_SECURITY_CERT */
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -2690,8 +2687,10 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
+#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+#endif
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2754,8 +2753,10 @@ struct PVFS_server_resp
         struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
+#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+#endif
     } u;
 };
 endecode_fields_2_struct(
