@@ -24,6 +24,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-usrint.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -54,14 +55,8 @@ static int read_mode(struct options * opts, const char * buffer);
 static int read_init_num_dirdata(struct options * opts, const char * buffer);
 static int read_max_num_dirdata(struct options * opts, const char * buffer);
 static int read_split_size(struct options * opts, const char * buffer);
-static int make_directory(PVFS_credential      * credentials,
-                          const PVFS_fs_id       fs_id,
-                          const int              mode,
-                          const int              init_num_dirdata,
-                          const int              max_num_dirdata,
-                          const int              split_size,
+static int make_directory(const int              mode,
                           const char           * dir,
-                          const char           * pvfs_path,
                           const int              make_parent_dirs,
                           const int              verbose);
 
@@ -69,14 +64,10 @@ int main(int argc, char **argv)
 {
     int ret = -1, status = 0; /* Get's set if error */
     int i = 0;
-    char           **pvfs_path = NULL;
-    PVFS_fs_id      *pfs_id = NULL;
     struct options   user_opts;
-    PVFS_credential credentials;
 
     /* Initialize any memory */
     memset(&user_opts,   0, sizeof(user_opts));
-    memset(&credentials, 0, sizeof(credentials));
     
     /* look at command line arguments */
     ret = parse_args(argc, argv, &user_opts);
@@ -86,83 +77,16 @@ int main(int argc, char **argv)
         return (-1);
     }
 
-    /* Allocate space to hold the relative pvfs2 path & fs_id for each 
-     * requested file 
-     */
-    pvfs_path = (char **)calloc(user_opts.numdirs, sizeof(char *));
-
-    if(pvfs_path == NULL)
-    {
-        fprintf(stderr, "Unable to allocate memory\n");
-        return(-1);
-    }
-
     for(i = 0; i < user_opts.numdirs; i++)
     {
-        pvfs_path[i] = (char *)calloc(PVFS_PATH_MAX, sizeof(char));
-        if(pvfs_path[i] == NULL)
-        {
-            fprintf(stderr, "Unable to allocate memory\n");
-            return(-1);
-        }
-    }
-
-    /* Allocate enough space to hold file system id for each directory */
-    pfs_id = (PVFS_fs_id *)calloc(user_opts.numdirs, sizeof(PVFS_fs_id));
-
-    if(pfs_id == NULL)
-    {
-        fprintf(stderr, "Unable to allocate memory\n");
-        return(-1);
-    }
- 
-    ret = PVFS_util_init_defaults();
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
-    }
-
-    /* Let's verify that all the given files reside on a PVFS2 filesytem */
-    for(i = 0; i < user_opts.numdirs; i++)
-    {
-        ret = PVFS_util_resolve(user_opts.dir_array[i], 
-                                &pfs_id[i], 
-                                pvfs_path[i], 
-                                PVFS_PATH_MAX-1);
- 
-        if (ret < 0)
-        {
-            fprintf(stderr, "Error: could not find file system for %s\n",
-                    user_opts.dir_array[i]);
-            PVFS_sys_finalize();
-            return(-1);
-       }
-    }
-
-    /* We will re-use the same credentials for each call */
-    ret = PVFS_util_gen_credential_defaults(&credentials);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
-        return(-1);
-    }
-
-    for(i = 0; i < user_opts.numdirs; i++)
-    {
-        ret = make_directory(&credentials,
-                             pfs_id[i],
-                             user_opts.mode,
-                             user_opts.init_num_dirdata,
-                             user_opts.max_num_dirdata,
-                             user_opts.split_size,
+        ret = make_directory(user_opts.mode,
                              user_opts.dir_array[i],
-                             pvfs_path[i],
                              user_opts.make_parent_dirs,
                              user_opts.verbose);
         if(ret != 0)
         {
             fprintf(stderr, "cannot create [%s]\n", user_opts.dir_array[i]);
+            perror("mkdir failed");
             status = -1;
         }
     }
@@ -175,64 +99,31 @@ int main(int argc, char **argv)
     {
         free(user_opts.dir_array);
     }
-    
-    
-    if(pvfs_path != NULL)
-    {
-        for(i=0;i<user_opts.numdirs;i++)
-        {
-            if(pvfs_path[i] != NULL)
-            {
-                free(pvfs_path[i]);
-            }
-        }
-    
-        free(pvfs_path);
-    }
-    
-    if(pfs_id != NULL)
-    {
-        free(pfs_id);
-    }
-    
+     
     return(status);
 }
 
-static int make_directory(PVFS_credential      * credentials,
-                          const PVFS_fs_id       fs_id,
-                          const int              mode,
-                          const int              init_num_dirdata,
-                          const int              max_num_dirdata,
-                          const int              split_size,
+static int make_directory(const int              mode,
                           const char           * dir,
-                          const char           * pvfs_path,
                           const int              make_parent_dirs,
                           const int              verbose)
 {
     int ret = 0;
     char parent_dir[PVFS_PATH_MAX] = "";
     char base[PVFS_PATH_MAX]  = "";
-    char realpath[PVFS_PATH_MAX]  = "";
     char * parentdir_ptr = NULL;
     char * basename_ptr = NULL;
-    PVFS_sys_attr       attr;
-    PVFS_sysresp_lookup resp_lookup;
-    PVFS_object_ref     parent_ref;
-    PVFS_sysresp_mkdir  resp_mkdir;
+    struct stat stat_buf;
 
-    /* Initialize any variables */
-    memset(&attr,        0, sizeof(attr));
-    memset(&resp_lookup, 0, sizeof(resp_lookup));
-    memset(&parent_ref,  0, sizeof(parent_ref));
-    memset(&resp_mkdir,  0, sizeof(resp_mkdir));
+    memset(&stat_buf, 0, sizeof(struct stat));
 
     /* Copy the file name into structures to be passed to dirname and basename
     * These calls change the parameter, so we don't want to mess with original
     * TODO: We need to change the PINT_lookup_parent to a API call, and we  
     * need to change this to use it 
     */
-    strcpy(parent_dir, pvfs_path);
-    strcpy(base,  pvfs_path);
+    strcpy(parent_dir, dir);
+    strcpy(base,  dir);
     
     parentdir_ptr = dirname(parent_dir);
     basename_ptr  = basename(base);
@@ -243,46 +134,37 @@ static int make_directory(PVFS_credential      * credentials,
         fprintf(stderr, "directory exists\n");
         return(-1);
     }
-    
-    /* Set the attributes for the new directory */
-    attr.owner = credentials->userid;
-    attr.group = credentials->group_array[0];
-    attr.perms = mode;
-    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
-    /* sys_attr.distr_dir_servers_max is meant to be the total number of dirdata handles.
-     * introduced for pvfs2_fs_dump & pvfs2_fsck.
-     * here it's used to pass the initial number of dirdata handles
-     */
-    attr.distr_dir_servers_initial = init_num_dirdata;
-    attr.distr_dir_servers_max = max_num_dirdata;
-    attr.distr_dir_split_size = split_size;
-        
-    /* Clear out any info from previous calls */
-    memset(&resp_lookup,  0, sizeof(resp_lookup));
-
-    ret = PVFS_sys_lookup(fs_id, 
-                          parentdir_ptr, 
-                          credentials, 
-                          &resp_lookup, 
-                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
-
-    if( ret < 0 &&
-        !make_parent_dirs)
+    pvfs_stat(parent_dir, &stat_buf);
+    if (make_parent_dirs && !S_ISDIR(stat_buf.st_mode))
     {
-        PVFS_perror("PVFS_sys_lookup", ret);
-        return(ret);
-    }
-
-    if( ret < 0         && 
-        make_parent_dirs && 
-        ret != -PVFS_ENOENT)
-    {
-        PVFS_perror("PVFS_sys_lookup", ret);
-        return(ret);
+        ret = make_directory((mode_t) mode, parent_dir, make_parent_dirs, verbose);
     }
     
+    
+
+    if(verbose)
+    {
+        fprintf(stderr, "Attempting to create Directory\n");
+        fprintf(stderr, "\t basename_ptr    = [%s]\n", basename_ptr);
+        fprintf(stderr, "\t Mode            = [%o]\n", mode);
+        fprintf(stderr, "\t DirName         = [%s]\n", dir);
+
+        fprintf(stdout, "Directory Attributes\n");
+        fprintf(stdout, "\t perms [%o]\n",  mode);
+    }
+    
+    ret = pvfs_mkdir(dir, (mode_t) mode);
+    /*if (ret != 0 && errno == ENOENT && make_parent_dirs)
+    {
+        ret = make_directory((mode_t) mode, parent_dir, make_parent_dirs, verbose);
+    }*/
+    if (verbose && ret == 0)
+    {
+       fprintf(stdout, "Created directory [%s]\n", dir); 
+    }
+    return ret;
     /* The parent directory did not exist. Let's create the parent directory */
-    if(ret == -PVFS_ENOENT &&
+    /*if(ret == -PVFS_ENOENT &&
        make_parent_dirs)
     {
         strcpy(parent_dir, pvfs_path);
@@ -319,29 +201,7 @@ static int make_directory(PVFS_credential      * credentials,
         }
     }
     
-    parent_ref.handle = resp_lookup.ref.handle;
-    parent_ref.fs_id  = resp_lookup.ref.fs_id;
-
-    /* Clear out any info from previous calls */
-    memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
-
-    if(verbose)
-    {
-        fprintf(stderr, "Creating Directory\n");
-        fprintf(stderr, "\t basename_ptr    = [%s]\n", basename_ptr);
-        fprintf(stderr, "\t fs_id           = [%d]\n", fs_id);
-        fprintf(stderr, "\t Mode            = [%o]\n", mode);
-        fprintf(stderr, "\t InitNumDirdata  = [%d]\n", init_num_dirdata);
-        fprintf(stderr, "\t MaxNumDirdata   = [%d]\n", max_num_dirdata);
-        fprintf(stderr, "\t SplitSizes      = [%d]\n", split_size);
-        fprintf(stderr, "\t DirName         = [%s]\n", dir);
-        fprintf(stderr, "\t pvfs path       = [%s]\n", pvfs_path);
-
-        fprintf(stdout, "Directory Attributes\n");
-        fprintf(stdout, "\t owner [%d]\n",  attr.owner);
-        fprintf(stdout, "\t group [%d]\n",  attr.group);
-        fprintf(stdout, "\t perms [%o]\n",  attr.perms);
-    }
+    
 
     ret = PVFS_sys_mkdir(basename_ptr, 
                          parent_ref, 
@@ -355,7 +215,7 @@ static int make_directory(PVFS_credential      * credentials,
         return(ret);
     }
     
-    return(0);
+    return(0);*/
 }
 
 /* parse_args()
