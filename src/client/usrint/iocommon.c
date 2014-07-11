@@ -2523,7 +2523,8 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     rc = PVFS_sys_getattr(obj,
                           mask,
                           credentials,
-                          &getattr_response, NULL);
+                          &getattr_response,
+                          NULL);
     IOCOMMON_CHECK_ERR(rc);
     *attr = getattr_response.attr;
     if (attr->objtype == PVFS_TYPE_DIRECTORY)

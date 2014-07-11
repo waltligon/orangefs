@@ -8,6 +8,7 @@ OSRC := \
 	$(DIR)/iocommon.c \
 	$(DIR)/request.c \
 	$(DIR)/ucache.c \
+	$(DIR)/mmap.c \
 	$(DIR)/posix-pvfs.c 
 
 USRC := \
@@ -16,7 +17,6 @@ USRC := \
 	$(DIR)/selinux.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
-	$(DIR)/mmap.c \
 	$(DIR)/error.c
 
 # list of all .c files (generated or otherwise) that belong in library
