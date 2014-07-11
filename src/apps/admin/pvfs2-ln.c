@@ -17,6 +17,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-usrint.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -38,6 +39,7 @@ static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
+                     const char           * pszLinkName,
                      const int              nVerbose);
 
 int main(int argc, char **argv)
@@ -79,7 +81,7 @@ int main(int argc, char **argv)
                 user_opts.pszLinkTarget);
         PVFS_sys_finalize();
         return(-1);
-   }
+    }
 
     /* We will re-use the same credentials for each call */
     ret = PVFS_util_gen_credential_defaults(&credentials);
@@ -93,6 +95,7 @@ int main(int argc, char **argv)
                     fs_id,
                     user_opts.pszLinkTarget,
                     szPvfsPath,
+                    user_opts.pszLinkName,
                     user_opts.nVerbose);
     if(ret != 0)
     {
@@ -112,6 +115,7 @@ static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
+                     const char           * pszLinkName,
                      const int              nVerbose)
 {
     int                  ret                        = 0;
@@ -177,6 +181,7 @@ static int make_link(PVFS_credential      * pCredentials,
         fprintf(stderr, "\t fs_id       = [%d]\n", fs_id);
         fprintf(stderr, "\t Target      = [%s]\n", pszLinkTarget);
         fprintf(stderr, "\t pvfs path   = [%s]\n", pszPvfsPath);
+        fprintf(stderr, "\t Link Name   = [%s]\n", pszLinkName);
 
         fprintf(stdout, "Directory Attributes\n");
         fprintf(stdout, "\t owner [%d]\n",  attr.owner);
@@ -187,16 +192,11 @@ static int make_link(PVFS_credential      * pCredentials,
         fprintf(stdout, "\t ctime [%llu]\n", llu(attr.ctime));
     }
 
-    ret = PVFS_sys_symlink(szBaseName, 
-                           parent_ref, 
-                           (char *) pszLinkTarget,
-                           attr, 
-                           pCredentials, 
-                           &resp_sym, NULL);
+    ret = pvfs_symlink(pszLinkTarget, pszLinkName); 
 
     if (ret < 0)
     {
-        PVFS_perror("PVFS_sys_symlink", ret);
+        perror("Symlink");
         return(ret);
     }
     
@@ -258,7 +258,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
                 exit(0);
                 break;
 
-            case 's': /* --help */ 
+            case 's':  
                 create_softlink = 1;
                 break;
 
