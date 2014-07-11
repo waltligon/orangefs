@@ -29,6 +29,8 @@
 #define PINT_CAP_BATCH_CREATE (1 << 7)
 /* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
+/* sticky permission flag */
+#define PINT_CAP_STICKY (1 << 9)
 
 #ifdef WIN32
 #define PINT_SECURITY_CHECK(rc, label, format, ...) \
