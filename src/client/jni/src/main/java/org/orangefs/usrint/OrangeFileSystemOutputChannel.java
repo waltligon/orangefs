@@ -1,11 +1,11 @@
 package org.orangefs.usrint;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 public class OrangeFileSystemOutputChannel implements WritableByteChannel {
     /* Interface Related Fields */
@@ -33,9 +33,26 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         }
         flush();
         int ret = orange.posix.close(fd);
+        channelBuffer = null;
         if (ret < 0) {
             throw new IOException("close failed");
         }
+    }
+
+    /* Help cleanup unreleased file descriptor. Should find a better to do this */
+    protected void finalize() throws Throwable
+    {
+      try {
+        if (orange != null && fd != -1 ) {
+          flush();
+          orange.posix.close(fd);
+          orange = null;
+          fd = -1;
+          channelBuffer = null;
+        }
+      } finally {
+        super.finalize();
+      }
     }
 
     /* Flush what's left in the channelBuffer to the file system */

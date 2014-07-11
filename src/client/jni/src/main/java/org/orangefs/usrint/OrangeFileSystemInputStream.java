@@ -37,16 +37,17 @@ public class OrangeFileSystemInputStream extends InputStream implements
         int fd = -1;
         PVFS2POSIXJNI orangePosixJni = new PVFS2POSIXJNI();
         pf = orangePosixJni.f;
-        /* Apply Hadoop I/O retry policy: keep retrying 10 times and waiting a growing amount of time between attempts,
-           and then fail by re-throwing the exception.
+        /* Apply Hadoop I/O retry policy: keep retrying 10 times and waiting a growing amount of time (random N * 50ms)
+           between attempts, and then fail by re-throwing the exception.
         */
         Map<Class<? extends Exception>,RetryPolicy> exceptionToPolicyMap =
             new HashMap<Class<? extends Exception>, RetryPolicy>();
-        exceptionToPolicyMap.put(IOException.class, RetryPolicies.exponentialBackoffRetry(10, 500, TimeUnit.MILLISECONDS));
+        exceptionToPolicyMap.put(IOException.class, RetryPolicies.exponentialBackoffRetry(10, 50, TimeUnit.MILLISECONDS));
+        //exceptionToPolicyMap.put(IOException.class, RetryPolicies.RETRY_FOREVER);
 
         this.orangePosix = (PVFS2POSIX) RetryProxy.create(PVFS2POSIX.class, orangePosixJni,
-            RetryPolicies.retryByException(RetryPolicies.exponentialBackoffRetry(10, 500, TimeUnit.MILLISECONDS), exceptionToPolicyMap));
-        this.orange = Orange.getInstance();
+            RetryPolicies.retryByException(RetryPolicies.exponentialBackoffRetry(10, 50, TimeUnit.MILLISECONDS), exceptionToPolicyMap));
+        //this.orange = Orange.getInstance();
         this.path = path;
         /* Perform open */
         fd = orangePosix.openWrapper(path, pf.O_RDONLY, 0);
@@ -120,6 +121,7 @@ public class OrangeFileSystemInputStream extends InputStream implements
             return 0;
         }
         int ret = inChannel.read(ByteBuffer.wrap(b, off, len));
+        //int ret = inChannel.read(b, off, len);
         OFSLOG.debug("inChannel.read ret = " + ret);
         if (ret <= 0) {
             OFSLOG.debug("Nothing read -> " + ret + " / " + len);

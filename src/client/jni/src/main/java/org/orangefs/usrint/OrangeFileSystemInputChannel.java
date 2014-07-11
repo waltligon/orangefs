@@ -5,12 +5,12 @@
  */
 package org.orangefs.usrint;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /* Seekable OrangeFS channel for reading bytes. */
 public class OrangeFileSystemInputChannel implements ReadableByteChannel {
@@ -44,6 +44,25 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
             throw new IOException("close error: ret = " + ret + ", fd = " + fd);
         }
         fd = -1;
+        pf = null;
+        channelBuffer.clear();
+        channelBuffer = null;
+    }
+
+    /* Help cleanup the unreleased file descriptors. Should find a better to do this */
+    protected void finalize() throws Throwable
+    {
+      try {
+        if (orange != null && fd != -1 ) {
+          orange.posix.close(fd);
+          orange = null;
+          fd = -1;
+          pf = null;
+          channelBuffer = null;
+        }
+      } finally {
+        super.finalize();
+      }
     }
 
     @Override
@@ -107,6 +126,42 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
             return -1;
         }
     }
+
+
+  /* This is reserved method to provide a Zero-Copy between byte array and ByteBuffer */
+  public synchronized int read(byte[] dst, int off, int len) throws IOException {
+    if (fd < 0) {
+      throw new IOException("file descriptor isn't open.");
+    }
+    long ret = 0;
+      /* Attempt to directly read bufferSize bytes from OrangeFS into Byte Buffer. */
+    if (!channelBuffer.hasRemaining() || channelBuffer.limit() == 0) {
+      /* clear buffer then readOFS */
+      channelBuffer.clear();
+      //channelBuffer.flip();
+      ret = orange.posix.read(fd, channelBuffer, len);
+      channelBuffer.position((int) ret);
+      channelBuffer.flip();
+
+    }
+
+//    OFSLOG.warn("dst[] size is: " + dst.length);
+//    OFSLOG.warn("off is: " + off);
+//    OFSLOG.warn("length is: " + len);
+//    OFSLOG.warn("bytebuffer capacity: " + channelBuffer.capacity());
+//    OFSLOG.warn("bytebuffer remaining: " + channelBuffer.remaining());
+//    OFSLOG.warn("bytebuffer limit: " + channelBuffer.limit());
+//    OFSLOG.warn("1 bytebuffer position: " + channelBuffer.position());
+
+    if (ret < 0) {
+      throw new IOException("orange.posix.read failed.");
+    } else if (ret == 0) {
+      return -1;
+    } else {
+      channelBuffer.get(dst, off, len);
+      return (int) ret;
+    }
+  }
 
     /*
      * When this method is called, the position should equal 0, and the limit

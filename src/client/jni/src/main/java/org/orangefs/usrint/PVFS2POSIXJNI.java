@@ -15,6 +15,7 @@ public class PVFS2POSIXJNI implements PVFS2POSIX {
         String ldlPath = System.getenv("JNI_LIBRARY_PATH");
         String libFirst = "libpvfs2.so";
         String libSecond = "libofs.so";
+        //String libThird = "liborangefs.so";
         try {
             System.load(ldlPath + "/" + libFirst);
         }
@@ -35,6 +36,16 @@ public class PVFS2POSIXJNI implements PVFS2POSIX {
                     + ldlPath);
             System.exit(-1);
         }
+//        try {
+//          System.load(ldlPath + "/" + libThird);
+//        }
+//        catch (UnsatisfiedLinkError error) {
+//          error.printStackTrace();
+//          System.err.println("Couldn't load " + libThird);
+//          System.err.println("JNI_LIBRARY_PATH = "
+//              + ldlPath);
+//          System.exit(-1);
+//        }
     }
 
     public PVFS2POSIXJNI() {
