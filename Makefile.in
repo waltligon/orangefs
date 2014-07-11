@@ -977,7 +977,7 @@ lib/liborangefs.a: $(OLIBOBJS)
 lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
