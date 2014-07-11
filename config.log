@@ -10049,7 +10049,7 @@ configure:11906: $? = 0
 configure:11907: result: yes
 configure:11979: checking if user library needs -lrt
 configure:11992: gcc -o conftest -g -O0  -I/usr/include   -L/usr/lib conftest.c  >&5
-/tmp/ccRmtFcr.o: In function `main':
+/tmp/ccXx8AYf.o: In function `main':
 /home/aberk/software/aberk.stickybit/conftest.c:135: undefined reference to `shm_open'
 collect2: ld returned 1 exit status
 configure:11992: $? = 1
@@ -10201,7 +10201,7 @@ configure:12190: $? = 0
 configure:12191: result: yes
 configure:12204: checking if dlfns needs explicit library request
 configure:12214: gcc -o conftest -g -O0  -I/usr/include   -L/usr/lib conftest.c  >&5
-/tmp/ccBeHo7w.o: In function `main':
+/tmp/ccwP4ihp.o: In function `main':
 /home/aberk/software/aberk.stickybit/conftest.c:142: undefined reference to `dlsym'
 collect2: ld returned 1 exit status
 configure:12214: $? = 1
@@ -11658,7 +11658,7 @@ configure:13078: $? = 0
 configure:13079: result: yes
 configure:13565: checking if server lib needs -lrt
 configure:13580: gcc -o conftest -g -O0  -I/usr/include -L/usr/local/db4.8.30/lib   -L/usr/lib conftest.c  -ldl >&5
-/tmp/ccExKLvJ.o: In function `main':
+/tmp/ccUncRyh.o: In function `main':
 /home/aberk/software/aberk.stickybit/conftest.c:155: undefined reference to `lio_listio'
 collect2: ld returned 1 exit status
 configure:13580: $? = 1
@@ -13583,6 +13583,7 @@ config.status:1123: creating examples/orangefs-server
 config.status:1123: creating examples/orangefs-client
 config.status:1123: creating doc/doxygen/pvfs2-doxygen.conf
 config.status:1123: creating pvfs2-config.h
+config.status:1298: pvfs2-config.h is unchanged
 configure:16398: result: 
 configure:16400: result: ***** Displaying PVFS Configuration Information *****
 configure:16402: result: ------------------------------------------------------
@@ -13611,7 +13612,7 @@ configure:16579: result: Malloc will be redefined                          : yes
 configure:16590: result: PVFS2 client JNI enabled                          :  no
 configure:16598: result: OrangeFS/Hadoop libraries enabled                 :  no
 configure:16664: result: 
-configure:16666: result: PVFS2 version string: 2.9.0-orangefs-2014-07-11-171611
+configure:16666: result: PVFS2 version string: 2.9.0-orangefs-2014-07-07-170608
 configure:16669: result: 
 
 ## ---------------- ##
@@ -13821,7 +13822,7 @@ PATH_SEPARATOR=':'
 PORTALS_INCS=''
 PORTALS_LIBS=''
 PVFS2_SEGV_BACKTRACE='1'
-PVFS2_VERSION='2.9.0-orangefs-2014-07-11-171611'
+PVFS2_VERSION='2.9.0-orangefs-2014-07-07-170608'
 PVFS2_VERSION_MAJOR='2'
 PVFS2_VERSION_MINOR='9'
 PVFS2_VERSION_SUB='0'
