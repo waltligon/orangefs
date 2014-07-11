@@ -292,7 +292,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
                                    new_dfile_size,
                                    attr->u.meta.dfile_array[i],
                                    attr->u.meta.sid_count,
-                                   attr->u.meta.sid_array,
+                                   attr->u.meta.sid_array[i * attr->u.meta.sid_count],
                                    sm_p->hints);
         /*
           no callback. the status will be in the generic response
@@ -304,10 +304,9 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = attr->u.meta.dfile_array[i];
-        msg_p->sid_count = attr->u.meta.sid_count / attr->u.meta.dfile_count;
+        msg_p->sid_count = attr->u.meta.sid_count;
         msg_p->sid_index = 0;
-        msg_p->sid_array = &attr->u.meta.sid_array[i * 
-                         (attr->u.meta.sid_count / attr->u.meta.dfile_count)];
+        msg_p->sid_array = &attr->u.meta.sid_array[i * attr->u.meta.sid_count];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
