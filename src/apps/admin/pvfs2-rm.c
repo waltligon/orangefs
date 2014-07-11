@@ -82,7 +82,7 @@ int main(int argc, char **argv)
             rc = pvfs_rmdir(working_file);
 	    if (rc) 
 	    {
-	        PVFS_perror("PVFS_rmdir",rc);
+	        perror("PVFS_rmdir");
 	        ret = -1;
 	        break;
 	    }
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 	    rc = pvfs_unlink(working_file);
 	    if (rc)
     	    {
-		PVFS_perror("PVFS_unlink",rc);
+		perror("PVFS_unlink");
 		ret = -1;
 		break;
 	    }
