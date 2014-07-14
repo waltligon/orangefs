@@ -295,7 +295,7 @@ int trove_keyval_read(
             return -TROVE_EINVAL;
         }
     }
-    gossip_lerr("Calling keyval_read...\n");
+    gossip_err("Calling keyval_read...\n");
     return keyval_method_table[method_id]->keyval_read(
            coll_id,
            handle,

@@ -390,7 +390,7 @@ static PINT_sm_action getattr_verify_attribs(
     switch(resp_attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            gossip_lerr("Requested attribute mask(%08x).\n"
+            gossip_err("Requested attribute mask(%08x).\n"
                        ,s_op->u.getattr.attrmask);
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
             gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -443,7 +443,7 @@ static PINT_sm_action getattr_verify_attribs(
             }
             if (s_op->u.getattr.attrmask & PVFS_ATTR_META_REPLICATION)
             {
-                gossip_lerr("Replication data will be retrieved.\n");
+                gossip_err("Replication data will be retrieved.\n");
                 gossip_debug(GOSSIP_GETATTR_DEBUG,"client wants replication data.\n");
                 resp_attr->mask |= PVFS_ATTR_META_REPLICATION;
                 resp_attr->u.meta.replication_dfile_array_count=0;
@@ -1182,8 +1182,8 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
 
-    gossip_lerr("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
-    gossip_lerr("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
+    gossip_err("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
+    gossip_err("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
 
     /*
       there *should* be some distribution information.  if not, dump
@@ -1214,10 +1214,10 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     }
     s_op->free_val = 1;
 
-    gossip_lerr("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
-    gossip_lerr("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
-    gossip_lerr("val.buffer_sz(%d)\n",s_op->val.buffer_sz);
-    gossip_lerr("s_op->u.getattr.fs_id:(%d) \ts_op->u.getattr.handle:(%llu)\n"
+    gossip_err("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
+    gossip_err("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
+    gossip_err("val.buffer_sz(%d)\n",s_op->val.buffer_sz);
+    gossip_err("s_op->u.getattr.fs_id:(%d) \ts_op->u.getattr.handle:(%llu)\n"
                ,s_op->u.getattr.fs_id
                ,llu(s_op->u.getattr.handle));
 
@@ -1229,7 +1229,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
         NULL,
         smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
-    gossip_lerr("ret(%d)\n",ret);
+    gossip_err("ret(%d)\n",ret);
 
     return ret;
 }
@@ -2502,7 +2502,7 @@ static PINT_sm_action check_replication_data(
     PVFS_object_attr *attr = &s_op->resp.u.getattr.attr;
 
 
-    gossip_lerr("js_p->error_code(%d).\n",js_p->error_code);
+    gossip_err("js_p->error_code(%d).\n",js_p->error_code);
 
 
     /* Check error codes for each replication keyval attempt. */
@@ -2518,16 +2518,16 @@ static PINT_sm_action check_replication_data(
         }
     }
 
-    gossip_lerr("Error codes are okay.\n");
+    gossip_err("Error codes are okay.\n");
 
     if ( *(enum MIRROR_MODE_t *)s_op->val_a[REPLICATION_MODE].buffer != MIRROR_ON_WRITE )
     {
-       gossip_lerr("Replication requested but mirror mode on file is not MIRROR_ON_WRITE.\n");
+       gossip_err("Replication requested but mirror mode on file is not MIRROR_ON_WRITE.\n");
        js_p->error_code = 0;
        goto err_out;
     } 
 
-    gossip_lerr("Replication mode is correct\n");
+    gossip_err("Replication mode is correct\n");
 
     attr->u.meta.replication_number_of_copies = *(uint32_t *)s_op->val_a[REPLICATION_COPIES].buffer;
     attr->u.meta.replication_dfile_array_count = attr->u.meta.dfile_count *
@@ -2545,7 +2545,7 @@ static PINT_sm_action check_replication_data(
           ,s_op->val_a[REPLICATION_HANDLES].buffer
           ,attr->u.meta.replication_dfile_array_count * sizeof(*attr->u.meta.replication_dfile_array));
 
-    gossip_lerr("Response Values:\n");
+    gossip_err("Response Values:\n");
     gossip_err("Replication Number of Copies(%d)\n",attr->u.meta.replication_number_of_copies);
     gossip_err("Replication dfile array count(%d)\n",attr->u.meta.replication_dfile_array_count);
     for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)

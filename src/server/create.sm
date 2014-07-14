@@ -219,7 +219,7 @@ static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = s_op->u.create.saved_error_code;
     }
 
-    gossip_lerr("Value of stuffed (%d) returned to the client.\n"
+    gossip_err("Value of stuffed (%d) returned to the client.\n"
                ,s_op->resp.u.create.stuffed);
 
     /* otherwise propagate the js_p->error code */
@@ -279,7 +279,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     int i;
 
     s_op->resp.u.create.metafile_handle = js_p->handle;
-    gossip_lerr("s_op->resp.u.create.metafile_handle:%llu\n",llu(s_op->resp.u.create.metafile_handle));
+    gossip_err("s_op->resp.u.create.metafile_handle:%llu\n",llu(s_op->resp.u.create.metafile_handle));
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
         llu(js_p->handle));
@@ -1158,7 +1158,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
               }
           }
 
-          gossip_lerr("printing the replication servers...\n");
+          gossip_err("printing the replication servers...\n");
           for (copy=0; copy<copies; copy++)
           {
              for (i=0; i<servers_per_copy; i++)
@@ -1214,7 +1214,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
        }
    }
 
-   gossip_lerr("Remote Array...\n");
+   gossip_err("Remote Array...\n");
    for (i=0; i<remote_array_size; i++)
    {
       gossip_err("remote_array[%d]:%s.\n",i,remote_array[i]);
@@ -1367,12 +1367,12 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
 
    js_p->error_code = 0;
 
-   gossip_lerr("Local replication handles...\n");
+   gossip_err("Local replication handles...\n");
    for (i=0; i<local_count; i++)
    {
       gossip_err("local_handles[%d]:%llu\n",i,llu(local_handles[i]));
    }
-   gossip_lerr("Remote replication handles...\n");
+   gossip_err("Remote replication handles...\n");
    for (i=0; i<remote_count; i++)
    {
       gossip_err("remote_handles[%d]:%llu\n",i,llu(remote_handles[i]));
@@ -1448,16 +1448,16 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
 
    /* save merged handles to frame */
    s_op->u.create.replication_handles_1d = merged_handles;
-   gossip_lerr("s_op->u.create.replication_handles_1d : %p \t"
+   gossip_err("s_op->u.create.replication_handles_1d : %p \t"
                "merged_handles : %p \t"
                "xattr_req->u.seteattr.val[key_count].buffer : %p\n"
                ,s_op->u.create.replication_handles_1d
                ,merged_handles
                ,xattr_req->u.seteattr.val[key_count].buffer);
 
-   gossip_lerr("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+   gossip_err("key[%d].buffer:%s \tsize:%d.\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                                ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("Buffer of handles...\n");
+   gossip_err("Buffer of handles...\n");
    for (i=0; i<total_servers; i++)
    {
        gossip_err("merged_handles[%d]:%llu\n",i,llu(merged_handles[i]));
@@ -1486,10 +1486,10 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
    memcpy(xattr_req->u.seteattr.val[key_count].buffer, &req->u.create.replication_number_of_copies,
           sizeof(req->u.create.replication_number_of_copies));
 
-   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count
+   gossip_err("key[%d]:%s \tsize:%d\n",key_count
                                        ,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count
+   gossip_err("val[%d]:%d \tsize:%d\n",key_count
                                        ,*(int *)xattr_req->u.seteattr.val[key_count].buffer
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
 
@@ -1509,7 +1509,7 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
       goto err_out;
    }
 
-   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+   gossip_err("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
    
 
@@ -1530,9 +1530,9 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
    }
    *(MIRROR_MODE *)xattr_req->u.seteattr.val[key_count].buffer = MIRROR_ON_WRITE;
 
-   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+   gossip_err("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d]:%d \tsize:%d\n",key_count,*(int *)xattr_req->u.seteattr.val[key_count].buffer
+   gossip_err("val[%d]:%d \tsize:%d\n",key_count,*(int *)xattr_req->u.seteattr.val[key_count].buffer
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
 
    key_count++;
@@ -1568,10 +1568,10 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
          ,&xattr_req->u.seteattr.val[key_count].buffer_sz
          ,sizeof(xattr_req->u.seteattr.val[key_count].buffer_sz));
 
-   gossip_lerr("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
+   gossip_err("key[%d]:%s \tsize:%d\n",key_count,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
 
-   gossip_lerr("val[%d]:%d \tsize:%lu\n",key_count
+   gossip_err("val[%d]:%d \tsize:%lu\n",key_count
                                        ,*(int32_t *)xattr_req->u.seteattr.val[key_count].buffer
                                        ,sizeof(xattr_req->u.seteattr.val[key_count].buffer_sz));
 
@@ -1599,10 +1599,10 @@ static int write_replication_xattrs( struct PINT_smcb *smcb,
                                );
 
    xattr_layout=(PVFS_sys_layout *)xattr_req->u.seteattr.val[key_count].buffer;
-   gossip_lerr("val[%d]:%s \tsize:%d\n",key_count
+   gossip_err("val[%d]:%s \tsize:%d\n",key_count
                                        ,(char *)xattr_req->u.seteattr.key[key_count].buffer
                                        ,xattr_req->u.seteattr.key[key_count].buffer_sz);
-   gossip_lerr("val[%d]:%s \tsize:%d\n",key_count
+   gossip_err("val[%d]:%s \tsize:%d\n",key_count
                                        ,get_algorithm_string_value(xattr_layout->algorithm)
                                        ,xattr_req->u.seteattr.val[key_count].buffer_sz);
    

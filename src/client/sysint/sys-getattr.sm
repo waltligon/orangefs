@@ -635,7 +635,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                               &resp_p->u.getattr.attr);
     if (ret)
     {
-       gossip_lerr("Error copying attributes from getattr response.\n");
+       gossip_err("Error copying attributes from getattr response.\n");
        return ret;
     }
 
@@ -643,8 +643,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     if ( attr->mask & PVFS_ATTR_CAPABILITY )
     {
-       gossip_lerr("attr mask (%08x)\n",attr->mask);
-       gossip_lerr("Print handles(%d) found in capability...\n",attr->capability.num_handles);
+       gossip_err("attr mask (%08x)\n",attr->mask);
+       gossip_err("Print handles(%d) found in capability...\n",attr->capability.num_handles);
        for (i=0; i<attr->capability.num_handles; i++)
            gossip_err("Capability handle[%d]:(%llu)\n",i,llu(attr->capability.handle_array[i]));
     }
@@ -715,10 +715,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             }
             if (attr->mask & PVFS_ATTR_META_REPLICATION)
             {
-               gossip_lerr("Replication data returned.\n");
-               gossip_lerr("attr->u.meta.replication_number_of_copies(%d)\n"
+               gossip_err("Replication data returned.\n");
+               gossip_err("attr->u.meta.replication_number_of_copies(%d)\n"
                           ,attr->u.meta.replication_number_of_copies);
-               gossip_lerr("attr->u.meta.replication_dfile_array_count(%d)\n"
+               gossip_err("attr->u.meta.replication_dfile_array_count(%d)\n"
                           ,attr->u.meta.replication_dfile_array_count);
                for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
                {
@@ -1561,8 +1561,6 @@ static PINT_sm_action getattr_acache_insert(
                                                  , lld(*tmp_size));
             }
         }
-
-        gossip_lerr("Executing PINT_acache_update from %s.\n",__func__);
 
         PINT_acache_update(sm_p->getattr.object_ref,
             &sm_p->getattr.attr,

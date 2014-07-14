@@ -59,7 +59,7 @@ int replication_calculate_layout_size( int32_t *layout_size
                       sizeof(*replication_layout->server_list.servers);
    }
 
-   gossip_lerr("layout size is %d\n",*(int *)layout_size);
+   gossip_err("layout size is %d\n",*(int *)layout_size);
 
    return(0);
 }/*end replication_calculate_layout_size*/

@@ -491,7 +491,7 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
     /* If we have replication turned on for this file, then we know that
      * file stuffing is not being used.
      */
-    gossip_lerr("Replication is turned %s for this file.\n"
+    gossip_err("Replication is turned %s for this file.\n"
                ,sm_p->getattr.attr.mask & PVFS_ATTR_META_REPLICATION?"ON":"OFF");
 
     /* first make sure this is an appropriate object */
@@ -751,7 +751,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                              sm_p->u.io.contexts[i].replication_number_of_copies,
                              sm_p->u.io.contexts[i].replication_handles,
                              sm_p->hints);
-       gossip_lerr("sm_p->u.io.contexts[%d].msg.req.u.io.replication_number_of_copies(%d)\n"
+       gossip_err("sm_p->u.io.contexts[%d].msg.req.u.io.replication_number_of_copies(%d)\n"
                   ,i,(int)sm_p->u.io.contexts[i].msg.req.u.io.replication_number_of_copies);
        
        /* if replication is turned on, then use PVFS_SERV_REPLICATE_PRIME instead of PVFS_SERV_IO */
@@ -1666,7 +1666,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                 assert(cur_ctx);
 
 
-                gossip_lerr("%s:sm_p->u.io.total_size(%d).\n",__func__,(int)sm_p->u.io.total_size);
+                gossip_err("%s:sm_p->u.io.total_size(%d).\n",__func__,(int)sm_p->u.io.total_size);
                 ret = io_check_context_status(cur_ctx,
                                               sm_p->u.io.io_type,
                                               &sm_p->u.io.total_size);
@@ -2364,7 +2364,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
     cur_ctx->write_ack_in_progress = 1;
     sm_p->u.io.write_ack_completion_count++;
 
-    gossip_lerr("%s:write_ack_completion_count(%d).\n",__func__
+    gossip_err("%s:write_ack_completion_count(%d).\n",__func__
                                                       ,sm_p->u.io.write_ack_completion_count);
     return 0;
 }
@@ -2573,7 +2573,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                                     &cur_ctx->msg.svr_addr,
                                     cur_ctx->write_ack.recv_status.actual_size,
                                     &resp);
-            gossip_lerr("%s:resp->op(%d).\n",__func__,resp->op);
+            gossip_err("%s:resp->op(%d).\n",__func__,resp->op);
             if (ret == 0)
             {
                 gossip_debug(GOSSIP_IO_DEBUG,
@@ -2591,7 +2591,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
 
                 if (resp->op == PVFS_SERV_REPL_WRITE_COMPLETION)
                 {
-                   gossip_lerr("%s:resp->u.repl_write_completion.endpt_status_count(%d).\n"
+                   gossip_err("%s:resp->u.repl_write_completion.endpt_status_count(%d).\n"
                               ,__func__,(int)resp->u.repl_write_completion.endpt_status_count);
                    replication_endpoint_status_print(resp->u.repl_write_completion.endpt_status
                                                     ,resp->u.repl_write_completion.endpt_status_count);
@@ -2606,7 +2606,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                    }
                    i = resp->u.repl_write_completion.endpt_status_count-1; 
                    *total_size += resp->u.repl_write_completion.endpt_status[i].writes_completed_bytes;
-                   gossip_lerr("%s:total_size(%d).\n",__func__,(int)(*total_size));
+                   gossip_err("%s:total_size(%d).\n",__func__,(int)(*total_size));
                 }
 
 
@@ -3242,7 +3242,7 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         return -PVFS_ENOMEM;
     }
 
-    gossip_lerr("Dumping replica handles(%d)...\n",attr->u.meta.replication_dfile_array_count);
+    gossip_err("Dumping replica handles(%d)...\n",attr->u.meta.replication_dfile_array_count);
     for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
     {
         gossip_err("handle[%d]:(%llu)\n",i,llu(attr->u.meta.replication_dfile_array[i]));
@@ -3297,13 +3297,13 @@ static int io_contexts_init(PINT_client_sm *sm_p,
            {
                cur_ctx->replication_handles[copy] = 
                   attr->u.meta.replication_dfile_array[(copy*attr->u.meta.dfile_count) + cur_ctx->server_nr];
-               gossip_lerr("cur_ctx->replication_handles[%d]:(%llu):context(%d) \tdfile_count(%d)\n"
+               gossip_err("cur_ctx->replication_handles[%d]:(%llu):context(%d) \tdfile_count(%d)\n"
                           ,copy
                           ,llu(cur_ctx->replication_handles[copy])
                           ,i
                           ,attr->u.meta.dfile_count);         
            }
-           gossip_lerr("cur_ctx->replication_number_of_copies(%d):context(%d)\n"
+           gossip_err("cur_ctx->replication_number_of_copies(%d):context(%d)\n"
                       ,(int)cur_ctx->replication_number_of_copies,i);
         }
 

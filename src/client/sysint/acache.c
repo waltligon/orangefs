@@ -445,7 +445,7 @@ int PINT_acache_get_cached_entry(
                   ,tmp_payload->replication_dfile_array_count * sizeof(*tmp_payload->replication_dfile_array));
             attr->u.meta.replication_dfile_array_count = tmp_payload->replication_dfile_array_count;
             attr->u.meta.replication_number_of_copies  = tmp_payload->replication_number_of_copies;
-            gossip_lerr("Replica handles from acache...\n");
+            gossip_err("Replica handles from acache...\n");
             int i;
             for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
             {
@@ -635,7 +635,7 @@ int PINT_acache_update(
         if(attr->mask & PVFS_ATTR_META_REPLICATION)
         {
            int i;
-           gossip_lerr("Dumping replication from attr...\n");
+           gossip_err("Dumping replication from attr...\n");
            for (i=0; i<attr->u.meta.replication_dfile_array_count; i++)
            {
                gossip_err("handle[%d]:(%llu)\n",i,llu(attr->u.meta.replication_dfile_array[i]));

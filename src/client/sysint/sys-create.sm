@@ -436,7 +436,7 @@ static int create_comp_fn(void *v_p,
            resp_p->u.create.datafile_handles,
            (sizeof(*sm_p->u.create.datafile_handles) *
            resp_p->u.create.datafile_count));
-    gossip_lerr("Value of stuffed (%d) as seen by the client.\n",resp_p->u.create.stuffed);
+    gossip_err("Value of stuffed (%d) as seen by the client.\n",resp_p->u.create.stuffed);
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
 
 
@@ -453,7 +453,7 @@ static int create_comp_fn(void *v_p,
        }
        memcpy(sm_p->u.create.replication_handles,resp_p->u.create.replication_handles,
               sm_p->u.create.total_number_of_replication_handles * sizeof(*sm_p->u.create.replication_handles));
-       gossip_lerr("Looking at returned replication handles...\n");
+       gossip_err("Looking at returned replication handles...\n");
        gossip_err("total_number_of_replication_handles is %d.\n",sm_p->u.create.total_number_of_replication_handles);
        for (i=0; i<sm_p->u.create.total_number_of_replication_handles; i++)
            gossip_err("replication_handles[%d] is %llu.\n",i,llu(sm_p->u.create.replication_handles[i]));
@@ -524,7 +524,7 @@ static PINT_sm_action create_create_setup_msgpair(
                 &server_type));
     }
 
-    gossip_lerr("sm_p->getattr.attr.capability:\n");
+    gossip_err("sm_p->getattr.attr.capability:\n");
     gossip_err("issuer:(%s)\n",sm_p->getattr.attr.capability.issuer);
     gossip_err("fsid:(%d)\n",sm_p->getattr.attr.capability.fsid);
     gossip_err("op_mask:(%08x)\n",sm_p->getattr.attr.capability.op_mask);
@@ -551,7 +551,7 @@ static PINT_sm_action create_create_setup_msgpair(
     msg_p->req.u.create.attr.u.meta.dist_size =
         PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
-    gossip_lerr("msg_p->req.u.create.attr.mask : 0x%08x.\n",msg_p->req.u.create.attr.mask);
+    gossip_err("msg_p->req.u.create.attr.mask : 0x%08x.\n",msg_p->req.u.create.attr.mask);
 
     ret=PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     if (ret)
@@ -722,7 +722,7 @@ static PINT_sm_action create_cleanup(
                sm_p->u.create.replication.replication_number_of_copies;
         }
 
-        gossip_lerr("Value of stuffed(%d) in %s.\n",sm_p->u.create.stuffed,__FUNCTION__);
+        gossip_err("Value of stuffed(%d) in %s.\n",sm_p->u.create.stuffed,__FUNCTION__);
         if(sm_p->u.create.stuffed)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created stuffed file\n");
@@ -750,7 +750,7 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_MTIME));
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_CTIME));
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
-        gossip_lerr("Calling PINT_acache_update with mask(%08x)\n"
+        gossip_err("Calling PINT_acache_update with mask(%08x)\n"
                    ,sm_p->u.create.attr.mask);
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
@@ -1406,7 +1406,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array (
         msgpair_handle = (i==local_count)?metafile_handle  :local_handles[i];
         msgpair_addr   = (i==local_count)?metafile_bmi_addr:local_bmi_addrs[i];
 
-        gossip_lerr("Creating msgpair for handle(%llu)\n",llu(msgpair_handle));
+        gossip_err("Creating msgpair for handle(%llu)\n",llu(msgpair_handle));
 
         PINT_SERVREQ_REMOVE_FILL(
             msg_p->req,
