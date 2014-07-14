@@ -314,9 +314,7 @@ typedef struct extra_s
 #if PVFS_MALLOC_MAGIC
     uint32_t magic;
 #endif
-#if PVFS_MALLOC_FREE_ZERO
     size_t   size;
-#endif
 #if PVFS_MALLOC_CHECK_ALIGN
     size_t   align;
 #endif
