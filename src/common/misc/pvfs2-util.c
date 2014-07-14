@@ -2089,7 +2089,6 @@ static int parse_encoding_string(
     for (++cp; isspace(*cp); cp++);        /* optional spaces */
     for (cq = cp; *cq && *cq != ','; cq++);/* find option end */
 
-    *et = -1;
     for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
     {
         int n = strlen(enc_str[i].name);
@@ -2098,16 +2097,12 @@ static int parse_encoding_string(
         if (!strncmp(enc_str[i].name, cp, n))
         {
             *et = enc_str[i].val;
-            break;
+            return 0;
         }
     }
-    if (*et == -1)
-    {
-        gossip_err("Error: %s: unknown encoding type in tab file.\n",
-                   __func__);
-        return -PVFS_EINVAL;
-    }
-    return 0;
+    gossip_err("Error: %s: unknown encoding type in tab file.\n",
+            __func__);
+    return -PVFS_EINVAL;
 }
 
 /* PINT_release_pvfstab()

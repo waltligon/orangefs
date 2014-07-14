@@ -8,25 +8,6 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-static int pvfs2_readlink(
-    struct dentry *dentry, char __user *buffer, int buflen)
-{
-    pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
-    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
-
-    gossip_debug(GOSSIP_INODE_DEBUG,
-                 "pvfs2_readlink called on inode %s\n",
-                 k2s(get_khandle_from_ino(dentry->d_inode),s));
-    kfree(s);
-
-    /*
-      if we're getting called, the vfs has no doubt already done a
-      getattr, so we should always have the link_target string
-      available in the pvfs2_inode private data
-    */
-    return vfs_readlink(dentry, buffer, buflen, pvfs2_inode->link_target);
-}
-
 #ifdef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
@@ -59,17 +40,7 @@ static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 
 struct inode_operations pvfs2_symlink_inode_operations =
 {
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    readlink : pvfs2_readlink,
-    follow_link : pvfs2_follow_link,
-    setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate,
-#ifdef HAVE_XATTR
-    setxattr: pvfs2_setxattr,
-    listxattr: pvfs2_listxattr,
-#endif
-#else
-    .readlink = pvfs2_readlink,
+    .readlink = generic_readlink,
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
@@ -81,7 +52,6 @@ struct inode_operations pvfs2_symlink_inode_operations =
 #endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
-#endif
 #endif
 };
 
