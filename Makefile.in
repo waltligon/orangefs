@@ -638,9 +638,6 @@ endif
 ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/liborangefs.a
 LIBRARIES_SHARED += lib/liborangefs.so
-endif
-
-ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
 endif
