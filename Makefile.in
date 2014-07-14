@@ -642,10 +642,10 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
+LIBRARIES_STATIC := lib/libpvfs2.a
 ifdef TARGET_OS_DARWIN
 LIBRARIES_LIBTOOL := lib/liborangefs.la
-
-LIBRARIES_STATIC := lib/libpvfs2.a
+else
 LIBRARIES_SHARED := lib/libpvfs2.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
@@ -660,9 +660,6 @@ endif
 ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/liborangefs.a
 LIBRARIES_SHARED += lib/liborangefs.so
-endif
-
-ifeq ($(build_usrint),yes)
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
 endif
