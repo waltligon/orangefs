@@ -107,6 +107,9 @@ PVFS_error PVFS_isys_statfs(PVFS_fs_id fs_id,
     }
 
     /* generate default list of servers */
+    /* V3: Probably needs to be updated to use SIDs instead
+     * of server addresses.  Need to make a decision on where
+     * to handle conversion */
     ret = PINT_cached_config_get_server_array(
                                 fs_id,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
@@ -222,7 +225,7 @@ static PINT_sm_action sys_statfs_cleanup(struct PINT_smcb *smcb,
                 += sm_p->u.statfs_list.stat_array[i].handles_total_count;
     }
     sm_p->u.statfs_list.resp->statfs_buf.bytes_available = 
-            min_bytes_available*num_io_servers;
+            min_bytes_available * num_io_servers;
     sm_p->u.statfs_list.resp->statfs_buf.bytes_total = 
             min_bytes_total*num_io_servers;
     sm_p->u.statfs_list.resp->server_count = sm_p->u.statfs_list.count;
