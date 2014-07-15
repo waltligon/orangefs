@@ -2392,6 +2392,10 @@ class OFSTestNode(object):
         rc = self.runSingleCommand('/sbin/lsmod | grep pvfs2')
         if rc == 0:
             return 0
+        
+        # get the kernel version if it has been updated
+        self.kernel_version = self.runSingleCommandBacktick("uname -r")
+        
         self.runSingleCommandAsRoot("/sbin/insmod %s/lib/modules/%s/kernel/fs/pvfs2/pvfs2.ko 2>&1 | tee pvfs2-kernel-module.log" % (self.ofs_installation_location,self.kernel_version))
         self.runSingleCommandAsRoot("/sbin/lsmod >> pvfs2-kernel-module.log")
         
