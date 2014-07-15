@@ -1255,6 +1255,10 @@ class OFSTestNode(object):
         # Download from a helluva open source mirror.
         self.runSingleCommand("wget --quiet  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
         self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+        
+        # Add DB4 to the library path.
+        self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
+
 
 
     ##
