@@ -314,7 +314,9 @@ typedef struct extra_s
 #if PVFS_MALLOC_MAGIC
     uint32_t magic;
 #endif
+#if PVFS_MALLOC_ZERO || PVFS_MALLOC_FREE_ZERO
     size_t   size;
+#endif
 #if PVFS_MALLOC_CHECK_ALIGN
     size_t   align;
 #endif
@@ -474,21 +476,29 @@ void *PINT_realloc(void *mem, size_t size)
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
         gossip_err("PINT_realloc: realloc fails magic number test\n");
+#if PVFS_MALLOC_ZERO || PVFS_MALLOC_FREE_ZERO
         gossip_err("mem = %p size = %d, emem = %p, esize = %d\n",
                    mem, (int) size, extra->mem, (int)extra->size);
+#else
+        gossip_err("mem = %p size = %d, emem = %p\n",
+                   mem, (int) size, extra->mem);
+#endif
         return NULL;
     }
 #endif
     region_offset = (ptrint_t)mem - (ptrint_t)extra->mem;
     newsize = region_offset + size;
-    if (newsize > extra->size)
+    /* glibc realloc will keep our extra structures in place */
+    ptr =  my_glibc_realloc(extra->mem, newsize);
+    if (ptr == NULL)
     {
-        extra->size = newsize;
-        /* glibc realloc will keep our extra structures in place */
-        ptr =  my_glibc_realloc(extra->mem, newsize);
-        extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
-        extra->mem = ptr;
+        return NULL;
     }
+    extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
+    extra->mem = ptr;
+#if PVFS_MALLOC_ZERO || PVFS_MALLOC_FREE_ZERO
+    extra->size = newsize;
+#endif
 
     memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
              (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
