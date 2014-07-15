@@ -35,11 +35,11 @@ export HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-"/etc/hadoop"}
 export OFS_PREFIX=/opt/orangefs-denton.hadoop2.trunk
 export LD_LIBRARY_PATH=$OFS_PREFIX/lib
 export JNI_LIBRARY_PATH=$OFS_PREFIX/lib
-export PVFS2TAB_FILE=$OFS_PREFIX/etc/pvfs2tab
+export PVFS2TAB_FILE=/tmp/orangefs_hadoop_storage/pvfs2tab
 if [ "$HADOOP_CLASSPATH" ]; then
-    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.jar:$JNI_LIBRARY_PATH/ofs_jni.jar"
+    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar"
 else
-    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.jar:$JNI_LIBRARY_PATH/ofs_jni.jar"
+    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar"
 fi
 #end of custom additions for OrangeFS
 

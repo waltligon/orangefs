@@ -37,7 +37,7 @@
     <name>yarn.resourcemanager.admin.address</name>
     <value>localhost:8033</value>
   </property>
-  
+
   <property>
     <name>yarn.web-proxy.address</name>
     <value>localhost:8034</value>
@@ -47,7 +47,7 @@
     <name>yarn.resourcemanager.webapp.address</name>
     <value>localhost:8088</value>
   </property>
-  
+
 
 <!-- Configurations for NodeManager -->
 
@@ -88,12 +88,12 @@
     <name>yarn.scheduler.minimum-allocation-mb</name>
     <value>682</value>
   </property>
-  
+
   <property>
     <name>yarn.scheduler.maximum-allocation-mb</name>
     <value>2046</value>
   </property>
-  
+
   <property>
     <name>yarn.nodemanager.localizer.fetch.thread-count</name>
     <value>3</value>
@@ -118,7 +118,7 @@
 
 
 
-<!-- other optional configurations 
+<!-- other optional configurations
 
   <property>
     <name>yarn.resourcemanager.hostname</name>
@@ -141,7 +141,7 @@
     <name>yarn.scheduler.capacity.node-locality-delay</name>
     <value>1</value>
   </property>
-  
+
   <property>
     <name>yarn.nodemanager.address</name>
     <value>localhost:8050</value>
@@ -156,8 +156,8 @@
     <description>CLASSPATH for YARN applications. A comma-separated list of CLASSPATH entries</description>
     <name>yarn.application.classpath</name>
     <value>
-      /opt/orangefs-denton.hadoop2.trunk/lib/orangefs-hadoop2-2.9.jar,
-      /opt/orangefs-denton.hadoop2.trunk/lib/ofs_jni.jar,
+      /opt/orangefs-denton.hadoop2.trunk/lib/orangefs-hadoop2-2.9.0.jar,
+      /opt/orangefs-denton.hadoop2.trunk/lib/orangefs-jni-2.9.0.jar,
       $HADOOP_CONF_DIR,
       $HADOOP_COMMON_HOME/share/hadoop/common/*,
       $HADOOP_COMMON_HOME/share/hadoop/common/lib/*,

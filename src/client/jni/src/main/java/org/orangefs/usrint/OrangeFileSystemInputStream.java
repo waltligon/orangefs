@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2012 Clemson University
  *
  * See COPYING in top-level directory.
@@ -7,60 +7,40 @@ package org.orangefs.usrint;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryProxy;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class OrangeFileSystemInputStream extends InputStream implements
         Closeable {
     /* Interface Related Fields */
-    private Orange orange;
-    private PVFS2POSIX orangePosix;
-    private PVFS2POSIXJNIFlags pf;
+    private Orange orange = Orange.getInstance();
+    private PVFS2POSIXJNIFlags pf = orange.posix.f;
+    private static final Log OFSLOG = LogFactory
+            .getLog(OrangeFileSystemInputStream.class);
     /* File Related Fields */
     private OrangeFileSystemInputChannel inChannel;
     private String path;
     private long fileSize;
-    private static final Log OFSLOG = LogFactory
-            .getLog(OrangeFileSystemInputStream.class);
 
-    public OrangeFileSystemInputStream(String path, int bufferSize)
+    public OrangeFileSystemInputStream(String path, int bufferSize) //TODO Add blockSize
             throws IOException {
         int fd = -1;
-        PVFS2POSIXJNI orangePosixJni = new PVFS2POSIXJNI();
-        pf = orangePosixJni.f;
-        /* Apply Hadoop I/O retry policy: keep retrying 10 times and waiting a growing amount of time (random N * 50ms)
-           between attempts, and then fail by re-throwing the exception.
-        */
-        Map<Class<? extends Exception>,RetryPolicy> exceptionToPolicyMap =
-            new HashMap<Class<? extends Exception>, RetryPolicy>();
-        exceptionToPolicyMap.put(IOException.class, RetryPolicies.exponentialBackoffRetry(10, 50, TimeUnit.MILLISECONDS));
-        //exceptionToPolicyMap.put(IOException.class, RetryPolicies.RETRY_FOREVER);
-
-        this.orangePosix = (PVFS2POSIX) RetryProxy.create(PVFS2POSIX.class, orangePosixJni,
-            RetryPolicies.retryByException(RetryPolicies.exponentialBackoffRetry(10, 50, TimeUnit.MILLISECONDS), exceptionToPolicyMap));
-        //this.orange = Orange.getInstance();
         this.path = path;
         /* Perform open */
-        fd = orangePosix.openWrapper(path, pf.O_RDONLY, 0);
+        fd = orange.posix.open(path, pf.O_RDONLY, 0);
         if (fd < 0) {
-            throw new IOException(path + " couldn't be opened. All retries are failed!");
+            throw new IOException(path + " couldn't be opened.");
         }
         /* Obtain the fileSize */
-        fileSize = orangePosix.lseek(fd, 0, pf.SEEK_END);
-        if (fileSize < 0 || orangePosix.lseek(fd, 0, pf.SEEK_SET) < 0) {
+        fileSize = orange.posix.lseek(fd, 0, pf.SEEK_END);
+        if (fileSize < 0 || orange.posix.lseek(fd, 0, pf.SEEK_SET) < 0) {
             throw new IOException("Error determining fileSize: lseek: "
                     + fileSize);
         }
-        /* Open the input channel */
+        /* Instantiate the input channel object */
         inChannel = new OrangeFileSystemInputChannel(fd, bufferSize);
     }
 
@@ -121,7 +101,6 @@ public class OrangeFileSystemInputStream extends InputStream implements
             return 0;
         }
         int ret = inChannel.read(ByteBuffer.wrap(b, off, len));
-        //int ret = inChannel.read(b, off, len);
         OFSLOG.debug("inChannel.read ret = " + ret);
         if (ret <= 0) {
             OFSLOG.debug("Nothing read -> " + ret + " / " + len);

@@ -1274,6 +1274,12 @@ AC_ARG_ENABLE(
             if test "x$JAVA_HOME" = "x"; then
                 AC_MSG_ERROR(--enable-jni must be used in conjunction with --with-jdk=jdk_path.)
             fi
+
+            AC_CHECK_PROG(HAVE_MAVEN, mvn, yes, no)
+            if test $HAVE_MAVEN = "no"; then
+                AC_MSG_ERROR("maven (mvn) required in PATH to complete JNI client build")
+            fi
+
             AC_DEFINE(PVFS_JNI_ENABLE, 1,
                 [Should we enable PVFS Client JNI.])
             BUILD_JNI=1

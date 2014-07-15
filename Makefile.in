@@ -533,18 +533,15 @@ endif
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
-JAVAC := $(JAVA_HOME)/bin/javac -J-Xmx256m
 JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
-JAR := $(JAVA_HOME)/bin/jar -J-Xmx256m
-JNI_C_DIR := $(srcdir)/src/client/jni
+MVN := `which mvn`
+JNI_DIR := $(srcdir)/src/client/jni
 JNI_JAVA_DIR := $(srcdir)/src/client/jni/src/main/java
 ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint
 ORGDOT := org.orangefs.usrint
-COMMONS_LOGGING_JAR := `ls $(JNI_C_DIR)/lib/commons-logging-api-*.jar`
-JUNIT_JAR := `ls $(JNI_C_DIR)/lib/junit-?.*.jar`
-OFS_JNI_JAR := $(JNI_C_DIR)/lib/ofs_jni.jar
-JNIPOSIXHEADER := $(JNI_C_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
-JNISTDIOHEADER := $(JNI_C_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
+OFS_JNI_JAR := $(JNI_DIR)/target/orangefs-jni-$(SO_FULLVER).jar
+JNIPOSIXHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
+JNISTDIOHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
 endif
 
 #################################################################
@@ -596,6 +593,7 @@ MISCSRC :=
 SMCGEN :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
+
 # JNIPOSIXJAVA represents posix.c related JAVA files
 JNIPOSIXJAVA :=
 # JNISTDIOJAVA represents stdio.c related JAVA files
@@ -818,14 +816,6 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
-# JNIPOSIXCLS is a list of posix.c related JNI compiled classes
-JNIPOSIXCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNIPOSIXJAVA)))
-# JNISTDIOCLS is a list of stdio.c related JNI compiled classes
-JNISTDIOCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTDIOJAVA)))
-# JNISTREAMSCHANNELSCLS is a list of compiled classes representing Java
-#         Input and Ouput Streams and Channels.
-JNISTREAMSCHANNELSCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTREAMSCHANNELSJAVA)))
-
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
@@ -1033,39 +1023,27 @@ $(DEVELTOOLS): %: %.o $(LIBRARIES)
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
 ifdef BUILD_JNI
-$(JNISTREAMSCHANNELSCLS): $(JNISTREAMSCHANNELSJAVA)
-	$(Q) "  JAVAC		$(JNISTREAMSCHANNELSCLS)"
-	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_JAVA_DIR)" $(JNISTREAMSCHANNELSJAVA)
-	
-$(OFS_JNI_JAR): $(JNIPOSIXCLS) $(JNISTDIOCLS) $(JNISTREAMSCHANNELSCLS)
-	$(Q) "  JAR		$@"
-	$(E)$(JAR) cf $@ $(JNI_JAVA_DIR)
-
-$(JNIPOSIXCLS): $(JNIPOSIXJAVA)
-	$(Q) "  JAVAC		$(JNIPOSIXCLS)"
-	$(E)$(JAVAC) -cp "$(JUNIT_JAR):$(JNI_JAVA_DIR)" $(JNIPOSIXJAVA)
+$(OFS_JNI_JAR): $(JNIPOSIXJAVA) $(JNISTDIOJAVA) $(JNISTREAMSCHANNELSJAVA)
+	$(Q) "  MVN		$@"
+	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -DskipTests -Dmaven.test.skip=true -f $(JNI_DIR)/pom.xml clean package
 
 # Force the JNI posix .class files to be a dependency of the header file. 
-$(JNIPOSIXHEADER): $(JNI_C_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
+$(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(OFS_JNI_JAR)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_C_DIR) $(ORGDOT).PVFS2POSIXJNI
+	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
 
 # Force the required javah generated header file to be a dependency of the 
 # dependency file. 
-$(JNI_C_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR)
-
-$(JNISTDIOCLS): $(JNISTDIOJAVA)
-	$(Q) "  JAVAC		$(JNISTDIOCLS)"
-	$(E)$(JAVAC) -cp "$(JUNIT_JAR):$(JNI_JAVA_DIR)" $(JNISTDIOJAVA)
+$(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR)
 
 # Force the JNI stdio .class files to be a dependency of the header file.
-$(JNISTDIOHEADER): $(JNI_C_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
+$(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(OFS_JNI_JAR)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_C_DIR) $(ORGDOT).PVFS2STDIOJNI
+	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
 
 # Force the required javah generated header file to be a dependency of the 
 # dependency file.
-$(JNI_C_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR)
+$(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR)
 endif # BUILD_JNI
 
 # default rule for building executables from object files
@@ -1240,9 +1218,9 @@ clean::
 
 ifdef BUILD_JNI
 clean::
-	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
-				$(ORGDIR)/*.class \
-    			$(OFS_JNI_JAR)
+	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER)
+	$(E)rm -rf $(JNI_DIR)/target
+
 endif
 
 ifndef DIST_RELEASE
@@ -1457,8 +1435,7 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all $(sbindir)
 
 ifdef BUILD_JNI
-	install -m 755 $(OFS_JNI_JAR) $(libdir)
-	install -m 755 $(COMMONS_LOGGING_JAR) $(libdir)
+	install -m 644 $(OFS_JNI_JAR) $(libdir)
 endif
 
 ifdef BUILD_SERVER

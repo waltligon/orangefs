@@ -57,7 +57,7 @@ public class OrangeFileSystem extends FileSystem {
         OFSLOG.debug("append parameters: {\n\tPath f= " + fOFS
                 + "\n\tint bufferSize= " + bufferSize);
         OrangeFileSystemOutputStream ofsOutputStream = new OrangeFileSystemOutputStream(
-                fOFS.toString(), bufferSize, (short) 0, true);
+                fOFS.toString(), bufferSize, (short) 0, 0L, true);
         return new FSDataOutputStream(ofsOutputStream, statistics);
     }
 
@@ -124,7 +124,7 @@ public class OrangeFileSystem extends FileSystem {
                 /* Create missing parent dirs with default dir permissions */
                 if (!mkdirs(fParent)) {
                     OFSLOG.debug("mkdir on fParent failed = " + fParent);
-                    /* mkdirs could fail if another task creates the parent 
+                    /* mkdirs could fail if another task creates the parent
                      * directory after we checked to see if the parent exists.
                      * So, check if the parent exists again to make sure
                      * mkdirs didn't fail because another task already
@@ -140,7 +140,7 @@ public class OrangeFileSystem extends FileSystem {
             }
         }
         fsdos = new FSDataOutputStream(new OrangeFileSystemOutputStream(fOFS
-                .toString(), bufferSize, replication, false), statistics);
+                .toString(), bufferSize, replication, blockSize, false), statistics);
         /* Set the desired permission. */
         setPermission(f, permission);
         return fsdos;
@@ -402,7 +402,7 @@ public class OrangeFileSystem extends FileSystem {
 
         OFSLOG.debug("uri: " + this.uri.toString());
         OFSLOG.debug("conf: " + conf.toString());
-        
+
         /* Get OFS statistics */
         statistics = getStatistics(uri.getScheme(), getClass());
         OFSLOG.debug("OrangeFileSystem.statistics: "
@@ -441,7 +441,7 @@ public class OrangeFileSystem extends FileSystem {
         	/* Not a directory */
         	return fStatus;
         }
-        
+
         ArrayList<String> arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
         if(arrayList == null) {
             return null;

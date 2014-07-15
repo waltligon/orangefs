@@ -3,6 +3,7 @@ package org.orangefs.usrint;
 
 import java.io.IOException;
 
+/* TODO use this interface when complete... */
 public interface PVFS2POSIX {
   PVFS2POSIXJNIFlags f = null;
   //public PVFS2POSIXJNIFlags f = null;

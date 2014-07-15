@@ -63,7 +63,7 @@ public class OrangeFileSystemUnderlying extends FileSystem {
         OFSLOG.debug("append parameters: {\n\tPath f= " + fOFS
                 + "\n\tint bufferSize= " + bufferSize);
         OrangeFileSystemOutputStream ofsOutputStream = new OrangeFileSystemOutputStream(
-                fOFS.toString(), bufferSize, (short) 0, true);
+                fOFS.toString(), bufferSize, (short) 0, 0L, true);
         return new FSDataOutputStream(ofsOutputStream, statistics);
     }
 
@@ -149,7 +149,8 @@ public class OrangeFileSystemUnderlying extends FileSystem {
 //            }
 //        }
         fsdos = new FSDataOutputStream(new OrangeFileSystemOutputStream(fOFS
-                .toString(), bufferSize, replication, false), statistics);
+                .toString(), bufferSize, replication, blockSize, false),
+                statistics);
         /* Set the desired permission. */
         setPermission(f, permission);
         return fsdos;
@@ -427,7 +428,7 @@ public class OrangeFileSystemUnderlying extends FileSystem {
 
         OFSLOG.debug("uri: " + this.uri.toString());
         OFSLOG.debug("conf: " + conf.toString());
-        
+
         /* Get OFS statistics */
         statistics = getStatistics(uri.getScheme(), getClass());
         OFSLOG.debug("OrangeFileSystem.statistics: "
@@ -466,7 +467,7 @@ public class OrangeFileSystemUnderlying extends FileSystem {
         	/* Not a directory */
         	return fStatus;
         }
-        
+
         ArrayList<String> arrayList = orange.stdio.getEntriesInDir(fOFS.toString());
         if(arrayList == null) {
             return null;

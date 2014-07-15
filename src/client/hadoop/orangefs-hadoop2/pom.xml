@@ -14,15 +14,16 @@
   <groupId>org.apache.hadoop.fs.ofs</groupId>
   <artifactId>orangefs-hadoop2</artifactId>
   <packaging>jar</packaging>
-  <version>2.9</version>
+  <version>2.9.0</version>
   <name>orangefs-hadoop2</name>
 
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <hadoop.version>2.3.0</hadoop.version>
-    <orangefs-jni.version>2.9</orangefs-jni.version>
+    <orangefs-jni.version>2.9.0</orangefs-jni.version>
     <log4j.version>1.2.17</log4j.version>
+    <junit.version>4.9</junit.version>
   </properties>
 
   <dependencies>
@@ -31,27 +32,27 @@
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
     </dependency>
+    <!--
     <dependency>
       <groupId>org.orangefs.usrint</groupId>
       <artifactId>orangefs-jni</artifactId>
       <version>${orangefs-jni.version}</version>
     </dependency>
-    <!--
+    -->
     <dependency>
       <groupId>org.orangefs.usrint</groupId>
       <artifactId>orangefs-jni</artifactId>
-      <version>2.9</version>
+      <version>${orangefs-jni.version}</version>
       <scope>system</scope>
-      <systemPath>${jni.library.path}/ofs_jni.jar</systemPath>
+      <systemPath>${jni.library.path}/orangefs-jni-${orangefs-jni.version}.jar</systemPath>
     </dependency>
-    -->
-
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.9</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
+<!-- WHY is this a dependency of this pom? -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-test</artifactId>
@@ -59,122 +60,4 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-    <build>
-
-    <testResources>
-        <testResource>
-            <directory>conf</directory>
-        </testResource>
-    </testResources>
-
-    <extensions>
-        <extension>
-            <groupId>org.springframework.build</groupId>
-            <artifactId>aws-maven</artifactId>
-            <version>5.0.0.RELEASE</version>
-        </extension>
-    </extensions>
-
-
-    <plugins>
-
-
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>2.3.2</version>
-            <configuration>
-                <source>1.5</source>
-                <target>1.5</target>
-            </configuration>
-        </plugin>
-
-        <plugin>
-            <groupId>pl.project13.maven</groupId>
-            <artifactId>git-commit-id-plugin</artifactId>
-            <version>2.1.4</version>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>revision</goal>
-                    </goals>
-                </execution>
-            </executions>
-
-            <configuration>
-                <!-- that's the default value, you don't have to set it -->
-                <prefix>git</prefix>
-
-                <!-- that's the default value -->
-                <dateFormat>dd.MM.yyyy '@' HH:mm:ss z</dateFormat>
-
-                <!-- true is default here, it prints some more information during the
-                    build -->
-                <verbose>true</verbose>
-
-                <!-- If you'd like to tell the plugin where your .git directory is,
-                    use this setting, otherwise we'll perform a search trying to figure out the
-                    right directory. It's better to add it explicite IMHO. -->
-                <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
-
-                <!-- ALTERNATE SETUP - GENERATE FILE -->
-                <!-- If you want to keep git information, even in your WAR file etc,
-                    use this mode, which will generate a properties file (with filled out values)
-                    which you can then normally read using new Properties().load(/**/) -->
-
-                <!-- this is true by default; You may want to set this to false, if
-                    the plugin should run inside a <packaging>pom</packaging> project. Most projects
-                    won't need to override this property. For an use-case for this kind of behaviour
-                    see: https://github.com/ktoso/maven-git-commit-id-plugin/issues/21 -->
-                <skipPoms>true</skipPoms>
-
-                <!-- this is false by default, forces the plugin to generate the git.properties
-                    file -->
-                <generateGitPropertiesFile>true</generateGitPropertiesFile>
-
-                <!-- The path for the to be generated properties file, it's relative
-                    to ${project.basedir} -->
-                <generateGitPropertiesFilename>src/main/resources/git.properties</generateGitPropertiesFilename>
-
-                <!-- true by default, controls whether the plugin will fail when no
-                    .git directory is found, when set to false the plugin will just skip execution -->
-                <!-- @since 2.0.4 -->
-                <failOnNoGitDirectory>false</failOnNoGitDirectory>
-
-                <!-- @since 2.1.0 -->
-                <!-- read up about git-describe on the in man, or it's homepage - it's
-                    a really powerful versioning helper and the recommended way to use git-commit-id-plugin.
-                    The configuration bellow is optional, by default describe will run "just
-                    like git-describe on the command line", even though it's a JGit reimplementation. -->
-                <gitDescribe>
-                    <!-- This will show the available tags -->
-                    <tags>true</tags>
-
-                    <!-- don't generate the describe property -->
-                    <skip>false</skip>
-                    <!-- if no tag was found "near" this commit, just print the commit's
-                        id instead, helpful when you always expect this field to be not-empty -->
-                    <always>false</always>
-                    <!-- how many chars should be displayed as the commit object id? 7
-                        is git's default, 0 has a special meaning (see end of this README.md), and
-                        40 is the maximum value here -->
-                    <abbrev>7</abbrev>
-
-                    <!-- when the build is triggered while the repo is in "dirty state",
-                        append this suffix -->
-                    <dirty>-dirty</dirty>
-
-                    <!-- always print using the "tag-commits_from_tag-g_commit_id-maybe_dirty"
-                        format, even if "on" a tag. The distance will always be 0 if you're "on"
-                        the tag. -->
-                    <forceLongFormat>false</forceLongFormat>
-                </gitDescribe>
-            </configuration>
-
-        </plugin>
-
-    </plugins>
-    </build>
-
 </project>

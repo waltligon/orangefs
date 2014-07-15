@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2011 Clemson University
  *
  * See COPYING in top-level directory.
@@ -20,15 +20,12 @@ public class OrangeFileSystemOutputStream extends OutputStream {
     /* File Related Fields */
     private OrangeFileSystemOutputChannel outChannel;
     private String path;
-    /* TODO */
-    @SuppressWarnings("unused")
-    private short replication;
     private static final Log OFSLOG = LogFactory
             .getLog(OrangeFileSystemOutputStream.class);
 
     /* TODO: comments */
     public OrangeFileSystemOutputStream(String path, int bufferSize,
-            short replication, boolean append) throws IOException {
+            short replication, long blockSize, boolean append) throws IOException {
         int ret = -1;
         /* Initialize Interface and Flags */
         this.orange = Orange.getInstance();
@@ -37,10 +34,10 @@ public class OrangeFileSystemOutputStream extends OutputStream {
         /*
          * TODO: replication
          */
-        this.replication = 0;
         /* Perform open */
-        ret = orange.posix.open(path, pf.O_CREAT | (append ? pf.O_APPEND : 0)
-                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO);
+        ret = orange.posix.openWithHints(path, (append ? pf.O_APPEND : pf.O_CREAT)
+                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO,
+                replication, blockSize);
         if (ret < 0) {
             throw new IOException(path + " couldn't be opened. (open)");
         }
@@ -49,7 +46,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
             throw new IOException("outChannel is null");
         }
         OFSLOG.debug(path + " opened successfully. fd = " + ret
-                + " , bufferSize = " + bufferSize);
+                + " , bufferSize = " + bufferSize + " , blockSize = "
+                + blockSize);
     }
 
     /*

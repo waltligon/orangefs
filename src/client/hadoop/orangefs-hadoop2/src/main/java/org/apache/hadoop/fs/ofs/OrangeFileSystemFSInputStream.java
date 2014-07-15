@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2012 Clemson University
  *
  * See COPYING in top-level directory.
@@ -7,12 +7,18 @@ package org.apache.hadoop.fs.ofs;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.orangefs.usrint.OrangeFileSystemInputStream;
 
 public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream

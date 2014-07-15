@@ -7,4 +7,4 @@ PROJECT_DIR=$THIS_DIR/../../../../..
 cd $PROJECT_DIR
 #pwd
 #ls
-sudo cp target/orangefs-hadoop2-2.9.jar "${ORANGEFS_PREFIX}/lib/"
+sudo cp target/orangefs-hadoop2-2.9.0.jar "${ORANGEFS_PREFIX}/lib/"

@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2011 Clemson University
  *
  * See COPYING in top-level directory.
@@ -12,23 +12,23 @@ public class PVFS2STDIOJNI {
     public PVFS2STDIOJNIFlags f;
     static {
         String ldlPath = System.getenv("JNI_LIBRARY_PATH");
-        String libFirst = "libpvfs2.so";
-        String libSecond = "libofs.so";
+        String libofs = "libofs.so";
+        String libpvfs2 = "libpvfs2.so";
         try {
-            System.load(ldlPath + "/" + libFirst);
+            System.load(ldlPath + "/" + libpvfs2);
         }
         catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
-            System.err.println("Couldn't load " + libFirst);
+            System.err.println("Couldn't load " + libpvfs2);
             System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }
         try {
-            System.load(ldlPath + "/" + libSecond);
+            System.load(ldlPath + "/" + libofs);
         }
         catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
-            System.err.println("Couldn't load " + libSecond);
+            System.err.println("Couldn't load " + libofs);
             System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }
@@ -167,7 +167,7 @@ public class PVFS2STDIOJNI {
     /* public native void setbuffer(long stream, String buf, long size); */
     /* public native void setlinebuf(long stream); */
     /* public native int setvbuf(long stream, long buf, long mode, long size); */
-    
+
     public native long telldir(long dir);
 
     public native long tmpfile();

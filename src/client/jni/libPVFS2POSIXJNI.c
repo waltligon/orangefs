@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2011 Clemson University
  *
  * See COPYING in top-level directory.
@@ -8,7 +8,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pvfs2-hint.h>
 #include <pvfs2-types.h>
+#include <pvfs2-usrint.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -450,7 +452,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
         "J", "J", "J", "J", "J", "J", "J", "J", "J", "J",
         /* index 40-49 */
         "J", "J", "J", "J", "J", "J", "J", "J", "J", "J",
-        /* index 50-51 */        
+        /* index 50-51 */
         "J", "J" };
 
     char *cls_name = "org/orangefs/usrint/PVFS2POSIXJNIFlags";
@@ -544,7 +546,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_fillPVFS2POSIXJNIFlags(JNIEnv *env,
     /* statvfs mount flags */
     (*env)->SetLongField(env, inst, fids[46], ST_RDONLY);
     (*env)->SetLongField(env, inst, fids[47], ST_NOSUID);
-    
+
     /*Access flags*/
     (*env)->SetLongField(env, inst, fids[48], F_OK);
     (*env)->SetLongField(env, inst, fids[49], R_OK);
@@ -1070,6 +1072,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     int ret = 0;
+    jclass io_exception_cls = (*env)->FindClass(env, "java/io/IOException");
     int cpath_len = (*env)->GetStringLength(env, path);
     char cpath[cpath_len + 1];
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
@@ -1088,6 +1091,72 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(JNIEnv *env, jobject obj,
     if (ret < 0)
     {
         JNI_PERROR();
+        (*env)->ThrowNew(env, io_exception_cls, "PVFS2POSIXJNI_open failed!");
+        ret = -1;
+    }
+    return ret;
+}
+
+/* openWithHints */
+JNIEXPORT int JNICALL
+Java_org_orangefs_usrint_PVFS2POSIXJNI_openWithHints(JNIEnv *env, jobject obj,
+        jstring path, jlong flags, jlong mode, jshort replicationFactor,
+        jlong blockSize)
+{
+    JNI_PFI();
+    PVFS_hint hint = NULL;
+    char * distribution_name = "simple_stripe";
+    char distribution_pv[1024] = { 0 }; /* distribution param:value string */
+    int ret = 0;
+    jclass io_exception_cls = (*env)->FindClass(env, "java/io/IOException");
+    int cpath_len = (*env)->GetStringLength(env, path);
+    char cpath[cpath_len + 1];
+    (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
+
+    JNI_PRINT("\tpath = %s\n", cpath);
+    if (((int) flags & O_CREAT) == O_CREAT)
+    {
+        JNI_PRINT("\tO_CREAT detected!\n");
+        if(blockSize > 0)
+        {
+            PVFS_hint_add(&hint,
+                          PVFS_HINT_DISTRIBUTION_NAME,
+                          strlen(distribution_name) + 1,
+                          (void *) distribution_name);
+            snprintf(distribution_pv,
+                     1024,
+                     "strip_size:%llu",
+                     (long long unsigned int) blockSize);
+            PVFS_hint_add(&hint,
+                          PVFS_HINT_DISTRIBUTION_PV_NAME,
+                          strlen(distribution_pv) + 1,
+                          (void *) distribution_pv);
+        }
+        /* TODO: add hint for replication when available.
+        if(replicationFactor > 1)
+        {
+
+        }
+        */
+        if(hint)
+        {
+            ret = open(cpath, (int) flags | O_HINTS, (mode_t) mode, hint);
+            PVFS_hint_free(hint);
+        }
+        else
+        {
+            ret = open(cpath, (int) flags, (mode_t) mode);
+        }
+    }
+    else
+    {
+        JNI_PRINT("\tNo O_CREAT detected\n");
+        ret = open(cpath, (int) flags);
+    }
+    if (ret < 0)
+    {
+        JNI_PERROR();
+        (*env)->ThrowNew(env, io_exception_cls, "PVFS2POSIXJNI_open failed!");
         ret = -1;
     }
     return ret;
