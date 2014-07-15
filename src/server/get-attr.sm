@@ -390,6 +390,7 @@ static PINT_sm_action getattr_verify_attribs(
     switch(resp_attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
+/*REMOVE THIS*/
             gossip_err("Requested attribute mask(%08x).\n"
                        ,s_op->u.getattr.attrmask);
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
@@ -443,6 +444,7 @@ static PINT_sm_action getattr_verify_attribs(
             }
             if (s_op->u.getattr.attrmask & PVFS_ATTR_META_REPLICATION)
             {
+/* REMOVE THIS */
                 gossip_err("Replication data will be retrieved.\n");
                 gossip_debug(GOSSIP_GETATTR_DEBUG,"client wants replication data.\n");
                 resp_attr->mask |= PVFS_ATTR_META_REPLICATION;
@@ -1182,6 +1184,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
 
+/* REMOVE THIS */
     gossip_err("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
     gossip_err("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
 
@@ -1214,6 +1217,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     }
     s_op->free_val = 1;
 
+/* REMOVE THIS - REMEMBER TO REMOVE ALL DEBUGGING GOSSIP_ERR STATEMENTS*/
     gossip_err("s_op->key.buffer:%s\n",(char *)s_op->key.buffer);
     gossip_err("s_op->key.buffer_sz:%d\n",s_op->key.buffer_sz);
     gossip_err("val.buffer_sz(%d)\n",s_op->val.buffer_sz);

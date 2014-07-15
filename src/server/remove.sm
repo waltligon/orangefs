@@ -1064,7 +1064,8 @@ static PINT_sm_action remove_remove_dspace(
                  "object %llu,%d\n", s_op, llu(s_op->req->u.remove.handle),
                  s_op->req->u.remove.fs_id);
     */
-    gossip_lerr("(%p) remove: removing dspace "
+/* REMOVE THIS */
+    gossip_err("(%p) remove: removing dspace "
                  "object %llu,%d\n", s_op, llu(s_op->req->u.remove.handle),
                  s_op->req->u.remove.fs_id);
 
@@ -1103,7 +1104,7 @@ static PINT_sm_action return_handles_to_pools( struct PINT_smcb *smcb,
 
    js_p->error_code = 0;
 
-   gossip_lerr("Replication handles returned from client...\n");
+   gossip_err("Replication handles returned from client...\n");
    for (i=0; i<s_op->req->u.remove.pool_count; i++)
        gossip_err("handle[%d]:(%llu)\n",i,llu(s_op->req->u.remove.pool_handles[i]));
 
@@ -1111,7 +1112,7 @@ static PINT_sm_action return_handles_to_pools( struct PINT_smcb *smcb,
     * out where they live!
     */
 
-   gossip_lerr("PVFS_MAX_SERVER_ADDR_LEN(%d) \tpool_handle(%llu) \tfs_id(%d)\n"
+   gossip_err("PVFS_MAX_SERVER_ADDR_LEN(%d) \tpool_handle(%llu) \tfs_id(%d)\n"
               ,PVFS_MAX_SERVER_ADDR_LEN
               ,llu(s_op->req->u.remove.pool_handles[*index])
               ,s_op->target_fs_id);
@@ -1128,7 +1129,7 @@ static PINT_sm_action return_handles_to_pools( struct PINT_smcb *smcb,
       return SM_ACTION_COMPLETE;
    } 
 
-   gossip_lerr("data_server_name(%s) \tfs_id(%d)\n",data_server_name,s_op->target_fs_id);
+   gossip_err("data_server_name(%s) \tfs_id(%d)\n",data_server_name,s_op->target_fs_id);
 
 
    /* this function DOES NOT call the job system. */

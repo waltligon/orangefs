@@ -188,6 +188,7 @@ int main (int argc, char ** argv)
 	
 	ret = generic_write(&dest, buffer, total_written, 
 		buffer_size, &credentials);
+/* REMOVE THIS PRINTF */
         printf("Amount just written:%lld.\n",(long long int)ret);
 	if (ret != current_size)
 	{

@@ -222,6 +222,7 @@ static struct options *parse_args(int argc, char **argv)
     }
 
 
+/* REMOVE THIS PRINTF */
     printf("argv[argc-1] is %s.\n",argv[argc-1]);
     tmp_opts->debug_mask = PVFS_debug_eventlog_to_mask(argv[argc-1]);
     tmp_opts->debug_mask_set = 1;

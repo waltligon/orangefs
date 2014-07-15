@@ -2475,6 +2475,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
+/* REMOVE THIS */
         gossip_err("%s:freeing hints.\n",__func__);
         PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
 
