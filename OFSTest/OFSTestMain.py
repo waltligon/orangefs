@@ -587,7 +587,7 @@ class OFSTestMain(object):
             # unmount, just in case.
             self.ofs_network.unmountOFSFilesystemAllNodes();
             # mount, not with fuse.
-            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=False)
+            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=True)
             # Make sure filesystem is mounted or we will get false positives.
             rc = head_node.checkMount()
 
