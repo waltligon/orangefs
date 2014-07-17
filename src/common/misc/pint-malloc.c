@@ -346,9 +346,7 @@ void *PINT_malloc(size_t size)
 #if PVFS_MALLOC_MAGIC
     extra->magic = PVFS_MALLOC_MAGIC_NUM;
 #endif
-#if PVFS_MALLOC_ZERO
     extra->size  = sizeplus;
-#endif
 #if PVFS_MALLOC_CHECK_ALIGN
     extra->align = 0;
 #endif
@@ -407,9 +405,7 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
 #if PVFS_MALLOC_MAGIC
     extra->magic = PVFS_MALLOC_MAGIC_NUM;
 #endif
-#if PVFS_MALLOC_FREE_ZERO
     extra->size  = sizeplus;
-#endif
 #if PVFS_MALLOC_CHECK_ALIGN
     extra->align = alignment;
 #endif
@@ -481,14 +477,15 @@ void *PINT_realloc(void *mem, size_t size)
 #endif
     region_offset = (ptrint_t)mem - (ptrint_t)extra->mem;
     newsize = region_offset + size;
-    if (newsize > extra->size)
+    /* glibc realloc will keep our extra structures in place */
+    ptr =  my_glibc_realloc(extra->mem, newsize);
+    if (ptr == NULL)
     {
-        extra->size = newsize;
-        /* glibc realloc will keep our extra structures in place */
-        ptr =  my_glibc_realloc(extra->mem, newsize);
-        extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
-        extra->mem = ptr;
+        return NULL;
     }
+    extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
+    extra->mem = ptr;
+    extra->size = newsize;
 
     memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
              (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
@@ -551,9 +548,7 @@ void PINT_free(void *mem)
     orig_mem = extra->mem;
 
     memdebug(stderr, "call to FREE addr %p real addr %p", mem, orig_mem);
-#if PVFS_MALLOC_FREE_ZERO
     memdebug(stderr, " size %d", (int)extra->size);
-#endif
 #if PVFS_MALLOC_CHECK_ALIGN
     memdebug(stderr, " align %d", (int)extra->align);
 #endif
