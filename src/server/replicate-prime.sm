@@ -150,13 +150,13 @@ static int io_send_ack(
     struct server_configuration_s *user_opts = get_server_config_struct();
     PVFS_handle *handle = NULL;
 
-    gossip_lerr("Replication Number of Copies (%d)\n",(int)s_op->req->u.io.replication_number_of_copies);
+    gossip_err("Replication Number of Copies (%d)\n",(int)s_op->req->u.io.replication_number_of_copies);
     for (i=0; i<s_op->req->u.io.replication_number_of_copies; i++)
-        gossip_lerr("replication handle[%d]:(%llu)\n",i,llu(s_op->req->u.io.replication_handles[i]));   
+        gossip_err("replication handle[%d]:(%llu)\n",i,llu(s_op->req->u.io.replication_handles[i]));   
 
     handle = (PVFS_handle *)PINT_hint_get_value_by_type(s_op->req->hints,PINT_HINT_HANDLE,NULL);
 
-    gossip_lerr("Metadata handle(%llu)found in hints.\n",handle?llu(*handle):0);
+    gossip_err("Metadata handle(%llu)found in hints.\n",handle?llu(*handle):0);
 
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
@@ -245,7 +245,7 @@ static PINT_sm_action io_start_flow(
     s_op->u.io.flow_d->repl_d_total_count      = s_op->u.io.replicate_d_total_count;
     s_op->u.io.flow_d->repl_d_local_flow_index = s_op->u.io.replicate_d_local_flow_index;
 
-    gossip_lerr("%s:s_op->u.io.flow_d->repl_d(%p) s_op->u.io.replicate_d(%p)\n"
+    gossip_err("%s:s_op->u.io.flow_d->repl_d(%p) s_op->u.io.replicate_d(%p)\n"
                ,__func__,s_op->u.io.flow_d->repl_d,s_op->u.io.replicate_d);
     for (i=0; i<s_op->u.io.flow_d->repl_d_repl_count; i++)
     {
@@ -277,7 +277,7 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->file_data.extend_flag = 0;
     }
 
-    gossip_lerr("file_req_offset:%lld\n",(long long int)s_op->req->u.io.file_req_offset);
+    gossip_err("file_req_offset:%lld\n",(long long int)s_op->req->u.io.file_req_offset);
     s_op->u.io.flow_d->file_req        = s_op->req->u.io.file_req;
     s_op->u.io.flow_d->file_req_offset = s_op->req->u.io.file_req_offset;
     s_op->u.io.flow_d->mem_req         = NULL;
@@ -464,7 +464,7 @@ static PINT_sm_action io_send_completion_ack(
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
     
 
-    gossip_lerr("js_p->error_code:(%d)\n",(int)js_p->error_code);
+    gossip_err("js_p->error_code:(%d)\n",(int)js_p->error_code);
 
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
@@ -490,8 +490,8 @@ static PINT_sm_action io_send_completion_ack(
      * from the "next" flows.
      */
 
-    gossip_lerr("Primary Error Code:(%d)\n",s_op->u.io.primary_error_code);
-    gossip_lerr("Total Transferred(%lld)\n",(long long int)s_op->u.io.flow_d->total_transferred);
+    gossip_err("Primary Error Code:(%d)\n",s_op->u.io.primary_error_code);
+    gossip_err("Total Transferred(%lld)\n",(long long int)s_op->u.io.flow_d->total_transferred);
 
     for (i=0; i<s_op->u.io.replicate_d_total_count; i++)
     {
@@ -637,7 +637,7 @@ static PINT_sm_action contact_setup_msgpairs(struct PINT_smcb *smcb, job_status_
         PINT_SERVREQ_REPLICATE_NEXT_FILL(*replicate_prime_req
                                          ,msg_p->req
                                          ,io->replication_handles[i]);
-        gossip_lerr("%s(%d):msg_p->req.u.io.flow_type(%d).\n",__func__,i,(int)msg_p->req.u.io.flow_type);
+        gossip_err("%s(%d):msg_p->req.u.io.flow_type(%d).\n",__func__,i,(int)msg_p->req.u.io.flow_type);
 
         /* save handle for each replica for later use */
         s_op->u.io.replicate_d[i].endpt_status.handle   = msg_p->handle;
@@ -678,11 +678,11 @@ static int contact_replicate_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
 
     /* store status and session tag. */
 
-    gossip_lerr("Response %d of %d.\n",i,s_op->msgarray_op.count);
-    gossip_lerr("Bstream size(%d) for handle(%llu)\n",(int)resp_p->u.io.bstream_size
+    gossip_err("Response %d of %d.\n",i,s_op->msgarray_op.count);
+    gossip_err("Bstream size(%d) for handle(%llu)\n",(int)resp_p->u.io.bstream_size
                                                      ,llu(msg_p->handle));
-    gossip_lerr("Response status (%d).\n",resp_p->status);
-    gossip_lerr("Session tag (%d).\n",msg_p->session_tag);    
+    gossip_err("Response status (%d).\n",resp_p->status);
+    gossip_err("Session tag (%d).\n",msg_p->session_tag);    
     
     s_op->u.io.replicate_d[i].endpt_status.error_code  = resp_p->status;
     s_op->u.io.replicate_d[i].session_tag              = msg_p->session_tag;
@@ -746,7 +746,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                            server_job_context,
                            server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
                            s_op->req->hints);
-        gossip_lerr("%s:job_bmi_recv:ret(%d) \trecv_status[%d].error_code:(%d).\n"
+        gossip_err("%s:job_bmi_recv:ret(%d) \trecv_status[%d].error_code:(%d).\n"
                    ,__func__,ret,i,replicate_recv_status.error_code);
         if (ret == 1 && replicate_recv_status.error_code)
         {
@@ -805,7 +805,7 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     int index, ret, i;
 
 
-    gossip_lerr("js_p->error_code(%d):js_p->status_user_tag(%d):js_p->actual_size(%d)\n",(int)js_p->error_code
+    gossip_err("js_p->error_code(%d):js_p->status_user_tag(%d):js_p->actual_size(%d)\n",(int)js_p->error_code
                                                                                         ,(int)js_p->status_user_tag
                                                                                         ,(int)js_p->actual_size);
 
@@ -837,13 +837,13 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     /* Which job just finished? Local? */
     if (js_p->status_user_tag == PRIMARY_FLOW)
     {
-       gossip_lerr("Primary flow has completed..Actual amount written to local server's storage(%lld)\n"
+       gossip_err("Primary flow has completed..Actual amount written to local server's storage(%lld)\n"
                   ,(long long int)js_p->actual_size);
        for (index=0; index<s_op->u.io.replicate_d_repl_count && s_op->u.io.replicate_d[index].endpt_status.state >= RUNNING; index++)
        {
            if ( !s_op->u.io.replicate_d[index].received )
            {
-              gossip_lerr("Primary flow completed BEFORE replicate flow (%llu) having state(%s).\n"
+              gossip_err("Primary flow completed BEFORE replicate flow (%llu) having state(%s).\n"
                          ,llu(s_op->u.io.replicate_d[index].handle)
                          ,get_replication_endpoint_state_as_string(s_op->u.io.replicate_d[index].endpt_status.state));
            }
@@ -890,9 +890,9 @@ static PINT_sm_action replicate_check_flow_completion(struct PINT_smcb *smcb, jo
     /* set the number of bytes handled by this replica server */
     s_op->u.io.replicate_d[index].endpt_status.writes_completed_bytes = resp->u.write_completion.total_completed;
 
-    gossip_lerr("Completion ACK returned from NEXT server for handle(%llu).\n"
+    gossip_err("Completion ACK returned from NEXT server for handle(%llu).\n"
                ,llu(s_op->u.io.replicate_d[index].handle));
-    gossip_lerr("Amount of data written(%lld).\n",(long long int)resp->u.write_completion.total_completed);
+    gossip_err("Amount of data written(%lld).\n",(long long int)resp->u.write_completion.total_completed);
 
 
     /* not sure if this is necessary; check on it */

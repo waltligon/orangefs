@@ -290,7 +290,7 @@ int main(int argc, char **argv)
                    ,user_opts->key[0].buffer_sz) == 0)
         {
             int32_t *myLayoutSize = (int32_t *)user_opts->val[0].buffer;
-            printf("Layout Size : %d\n",*myLayoutSize);
+            printf("Layout Size in bytes: %d\n",*myLayoutSize);
         } else if ( strncmp(user_opts->key[0].buffer
                    ,"user.pvfs2.mirror.layout"
                    ,user_opts->key[0].buffer_sz) == 0)

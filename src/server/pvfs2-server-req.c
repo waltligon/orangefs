@@ -114,19 +114,19 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 40 */ {PVFS_SERV_IMM_COPIES, &pvfs2_create_immutable_copies_params},
     /* 41 */ {PVFS_SERV_TREE_REMOVE, &pvfs2_tree_remove_params},
     /* 42 */ {PVFS_SERV_TREE_GET_FILE_SIZE, &pvfs2_tree_get_file_size_params},
-    /* 43 */ {PVFS_SERV_MGMT_GET_UID, &pvfs2_uid_mgmt_params},
+    /* 4 */ {PVFS_SERV_MGMT_GET_UID, &pvfs2_uid_mgmt_params},
     /* 44 */ {PVFS_SERV_TREE_SETATTR, &pvfs2_tree_setattr_params},
     /* 45 */ {PVFS_SERV_MGMT_GET_DIRENT, &pvfs2_mgmt_get_dirent_params},
     /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
     /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
     /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
-    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params}
+    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
+    /* 50 */ {PVFS_SERV_REPLICATE_PRIME, &pvfs2_replicate_prime_params},
+    /* 51 */ {PVFS_SERV_REPLICATE_NEXT, &pvfs2_replicate_next_params},
+    /* 52 */ {PVFS_SERV_REPL_WRITE_COMPLETION, NULL},
 #ifdef ENABLE_SECURITY_CERT    
-    /* 50 */ ,{PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
-    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params},
-    /* 52 */ {PVFS_SERV_REPLICATE_PRIME, &pvfs2_replicate_prime_params},
-    /* 53 */ {PVFS_SERV_REPLICATE_NEXT, &pvfs2_replicate_next_params},
-    /* 54 */ {PVFS_SERV_REPL_WRITE_COMPLETION, NULL}
+    /* 53 */ ,{PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
+    /* 54 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params}
 #endif
 };
 
