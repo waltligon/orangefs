@@ -105,7 +105,6 @@ static int do_stat(const char             * pszFile,
     int                  ret = 0;
     struct stat stat_buf;
    /* Do we want to follow if the file is a symbolic link */
-    //TODO: Is this usage of stat correct?
    if(opts->nFollowLink)
    {
         ret = pvfs_stat(pszFile, &stat_buf);
@@ -257,7 +256,9 @@ void print_stats(const char  * pszName,
 {
     char a_time[100] = "", 
          m_time[100] = "",  
-         c_time[100] = "";
+         c_time[100] = "",
+         target_name[PVFS_NAME_MAX + 1];
+    int rc = 0;
     struct passwd * user;
     struct group  * group;
 
@@ -278,12 +279,15 @@ void print_stats(const char  * pszName,
     else if(S_ISLNK(stat_buf->st_mode))
     {
         fprintf(stdout, "  Type          : Symbolic Link\n");
-        /* TODO: How to get link target from stat*/
-        /*
-        if(attr->mask &  PVFS_ATTR_SYS_LNK_TARGET)
+        rc = pvfs_readlink(pszName, target_name, sizeof(target_name)-1);
+        if (rc == -1)
         {
-            fprintf(stdout, "  Link Target   : %s\n", attr->link_target);
-        }*/
+            perror("Link target not found");
+        }
+        else
+        {
+            fprintf(stdout, "  Link Target   : %s\n", target_name);
+        }
     }
     
     /* Print size for non-block and character devices */
