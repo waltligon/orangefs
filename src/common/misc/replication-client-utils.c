@@ -28,17 +28,26 @@ int get_replication_from_config(replication_s *replication_p, PVFS_object_ref *p
 
     if (!fs)
     {
-        gossip_err("%s:Unable to retrieve information from the config file for "
+        gossip_lerr("%s:Unable to retrieve information from the config file for "
                    "filesystem (%d).\n"
                    ,__func__
                    ,parent->fs_id);
         return(-PVFS_EINVAL);
     }
 
+    /* if replication is turned off, then we do NOT need to continue. */
+    if (fs->replication_switch == 0)
+    {
+       replication_p->replication_switch=0;
+       PINT_put_server_config_struct(server_config);
+       return(0);
+    }
+
     ret = copy_replication_info_from_config(fs,replication_p);
     if (ret)
     {
-       gossip_err("%s:Error copying replication data from the config file.\n",__func__);
+       gossip_lerr("%s:Error copying replication data from the config file.\n",__func__);
+       PINT_put_server_config_struct(server_config);
        return(ret);
     }
 

@@ -2846,7 +2846,15 @@ DOTCONF_CB(get_layout_algorithm)
     }
     else
     {
-        return("Given LayoutAlgorithm is currently unsupported.\n");
+        char *err_resp=NULL;
+        err_resp=calloc(1,128);
+        if (!err_resp)
+        {
+           return("Error allocating memory in get_layout_algorithm.\n");
+        }
+        sprintf(err_resp,"Given LayoutAlgorithm is currently unsupported(%s)\n"
+                        ,cmd->data.str);
+        return(err_resp);
     }
 
     gossip_err("Value of fs_conf->replication_layout.algorithm:%d.\n"
