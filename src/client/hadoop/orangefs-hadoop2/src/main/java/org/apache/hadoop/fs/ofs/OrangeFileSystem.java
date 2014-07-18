@@ -149,6 +149,7 @@ public class OrangeFileSystem extends FileSystem {
     /* Delete a file/folder, potentially recursively */
     @Override
     public boolean delete(Path f, boolean recursive) throws IOException {
+    	statistics.incrementWriteOps(1);
         boolean ret;
         FileStatus status;
         Path fOFS = new Path(getOFSPathName(f));
@@ -224,6 +225,7 @@ public class OrangeFileSystem extends FileSystem {
 
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("f = " + makeAbsolute(f));
+        statistics.incrementReadOps(1);
         stats = orange.posix.stat(fOFS.toString());
         if (stats == null) {
             OFSLOG.debug("stat(" + makeAbsolute(f) + ") returned null");
@@ -279,7 +281,7 @@ public class OrangeFileSystem extends FileSystem {
     /*
      * Returns a Path array representing parent directories of a given a path
      */
-    public Path[] getParentPaths(Path f) throws IOException {
+    private Path[] getParentPaths(Path f) throws IOException {
         String[] split;
         Path[] ret;
         String currentPath = "";
@@ -416,6 +418,7 @@ public class OrangeFileSystem extends FileSystem {
     }
 
     public boolean isDir(Path f) throws FileNotFoundException {
+    	statistics.incrementReadOps(1);
         Path fOFS = new Path(getOFSPathName(f));
         Stat stats = orange.posix.stat(fOFS.toString());
         if (stats == null) {
@@ -517,6 +520,7 @@ public class OrangeFileSystem extends FileSystem {
                 }
                 else {
                     // Create the missing parent and setPermission.
+                	statistics.incrementWriteOps(1);
                     ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
@@ -531,6 +535,7 @@ public class OrangeFileSystem extends FileSystem {
             }
         }
         // Now create the directory f
+        statistics.incrementWriteOps(1);
         ret = orange.posix.mkdir(getOFSPathName(f), 0700);
         if (ret == 0) {
             setPermission(f, permission);
@@ -555,6 +560,7 @@ public class OrangeFileSystem extends FileSystem {
     /* Renames Path src to Path dst. */
     @Override
     public boolean rename(Path src, Path dst) throws IOException {
+    	statistics.incrementWriteOps(1);
         int ret = orange.posix.rename(getOFSPathName(src), getOFSPathName(dst));
         return ret == 0;
     }
@@ -564,6 +570,7 @@ public class OrangeFileSystem extends FileSystem {
             throws IOException {
         int mode;
         Path fOFS;
+        statistics.incrementWriteOps(1);
         if (permission == null) {
             return;
         }
