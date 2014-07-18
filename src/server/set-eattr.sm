@@ -29,6 +29,10 @@ enum {
 
 %%
 
+/* pvfs2_seteattr_fast_sm is called when setting xattrs for
+ * replication.  It is "fast" because we don't need the
+ * mirroring mode states and most of prelude will be bypassed.
+ */
 nested machine pvfs2_seteattr_fast_sm
 {
     state fast_prelude

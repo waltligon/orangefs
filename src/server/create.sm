@@ -1176,7 +1176,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
       }
    }/*end switch*/
 
-   /* Now that we have a set of replication servers, how many of each, local or remote, do we have. */
+   /* Now that we have a set of replication servers, how many of each, local and remote, do we have. */
    for (copy=0; copy<copies; copy++)
    {
        for (i=0; i<servers_per_copy; i++)
@@ -1192,12 +1192,21 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
        }
    }
 
-   local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
-   remote_array   = calloc(remote_array_size,sizeof(*remote_array));
-
-   if ( !remote_array || !local_dh_array)
+   if (local_array_size > 0)
    {
-      gossip_lerr("Error allocating memeory.\n");
+      local_dh_array = calloc(local_array_size,sizeof(*local_dh_array));
+      if ( !local_dh_array )
+      {
+         gossip_err("%s:Error allocating memory.\n",__func__);
+         js_p->error_code = -PVFS_ENOMEM;
+         goto err_out;
+      }
+   }
+
+   remote_array   = calloc(remote_array_size,sizeof(*remote_array));
+   if ( !remote_array )
+   {
+      gossip_err("%s:Error allocating memory.\n",__func__);
       js_p->error_code = -PVFS_ENOMEM;
       goto err_out;
    }
@@ -1242,6 +1251,7 @@ static int get_local_replication_datahandles(struct PINT_smcb *smcb,
                                        &data_handle_ext_array);
    if (ret < 0)
    {
+      gossip_err("%s:PINT_cached_config_get_server failure(%d).\n",__func__,ret);
       js_p->error_code = ret;
       goto err_out;
    }
