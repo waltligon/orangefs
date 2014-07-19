@@ -8,7 +8,7 @@ SHOW_LOGS=${2:-false}
 # - HADOOP_LOG_DIR
 . setenv
 
-ALL_LOGS=$(find ${HADOOP_LOG_DIR} -name "${LOG_NAME}")
+ALL_LOGS=$(find ${HADOOP_LOG_DIR} -name "${LOG_NAME}" | sort)
 WIDTH=-20
 
 echo

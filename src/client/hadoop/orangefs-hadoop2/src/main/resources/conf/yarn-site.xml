@@ -114,9 +114,14 @@
     </value>
   </property>
 
+<!-- 
+<property>
+  <name>yarn.log-aggregation-enable</name>
+  <value>true</value>
+</property>
+-->
+
 </configuration>
-
-
 
 <!-- other optional configurations
 

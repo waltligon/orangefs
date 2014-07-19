@@ -1,3 +1,7 @@
+# *** User should set JAVA_HOME environment variable elsewhere. For example:
+# export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+#
+
 # Common Variables sourced by other scripts in this directory
 HADOOP_PREFIX=/opt/hadoop-2.2.0
 HADOOP_CONFIG_DIR=/home/$USER/projects/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf

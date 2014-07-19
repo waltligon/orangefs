@@ -79,6 +79,9 @@
     <description>An extension of FileSystem for OrangeFS URIs.</description>
   </property>
 
+<!-- You probably want to use compression with OrangeFS. See below. -->
+
+<!--
   <property>
     <name>io.compression.codecs</name>
     <value>
@@ -88,5 +91,6 @@
     org.apache.hadoop.io.compress.SnappyCodec
     </value>
   </property>
+-->
 
 </configuration>

@@ -104,6 +104,9 @@
     </description>
   </property>
 
+<!-- You probably want to use compression with OrangeFS. See below. -->
+
+<!--
   <property>
     <name>mapreduce.map.output.compress</name>
     <value>true</value>
@@ -123,6 +126,7 @@
     If the map outputs are compressed, how should they be compressed?
     </description>
   </property>
+-->
 
 </configuration>
 

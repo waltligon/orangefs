@@ -26,6 +26,9 @@
 # The java implementation to use.
 export JAVA_HOME=${JAVA_HOME}
 
+# For explanation, see: https://issues.apache.org/jira/browse/HADOOP-7154
+export MALLOC_ARENA_MAX=4
+
 # The jsvc implementation to use. Jsvc is required to run secure datanodes.
 #export JSVC_HOME=${JSVC_HOME}
 
