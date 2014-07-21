@@ -63,7 +63,6 @@ static int mgmt_get_dirdata_handle_from_parent(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
-    /* TJS: fill in with proper function call */
     ret = PINT_cached_config_get_metadata_sid_count(
                                          s_op->req->u.readdir.fs_id, 
                                          &(s_op->metasidcnt));
