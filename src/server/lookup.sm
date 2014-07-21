@@ -234,6 +234,11 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
 
+    /* V3: Get metadata sid count for keyval lookups */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                          s_op->req->u.lookup_path.fs_id,
+                                          &(s_op->metasidcnt));
+
     s_op->resp.u.lookup_path.handle_array = (PVFS_handle *)ptr;
     ptr += (s_op->u.lookup.seg_ct * sizeof(PVFS_handle));
 
@@ -265,16 +270,24 @@ static PINT_sm_action lookup_read_object_metadata(
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    int i = 0;
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
-    /* TJS: memcpy each the SIDs taht are in keyval_temp_store
+    /* TJS: copy each of the SIDs that are in keyval_temp_store
      * into the resp sid array, making sure to index to the point
      * in the response sid array that corresponds to our segment number */
-     
-    s_op->resp.u.lookup_path.handle_array[
+     if(s_op->u.lookup.keyval_temp_store){
+        s_op->resp.u.lookup_path.handle_array[
                             s_op->u.lookup.seg_nr - 1] =
             (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
+        for(i = 0; i < s_op->metasidcnt; i++){
+            s_op->resp.u.lookup_path.sid_array[(
+                (s_op->u.lookup.seg_nr - 1) * s_op->metasidcnt) + i] =
+                (PVFS_SID) s_op->u.lookup.keyval_temp_store[1 + i].sid;
+        }
+     }
+     
     /*s_op->resp.u.lookup_path.sid_*/
 
     /* use the base handle if we haven't looked up a segment yet */
@@ -763,12 +776,10 @@ static PINT_sm_action lookup_read_directory_entry_handles(
                     sizeof(PVFS_dist_dir_bitmap_basetype));
 
     attr->u.dir.dirdata_handles =
-            malloc((attr->u.dir.dist_dir_attr.dirdata_count *
-                    sizeof(PVFS_handle)) +
-                   (attr->u.dir.dist_dir_attr.sid_count *
-                    attr->u.dir.dist_dir_attr.dirdata_count *
-                    sizeof(PVFS_handle)));
+            malloc(OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+                         attr->u.dir.dist_dir_attr.sid_count));
 
+    /* TJS: Check pointer math here */
     attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles + 
                                 (attr->u.dir.dist_dir_attr.dirdata_count *
                                 sizeof(PVFS_handle)));
@@ -797,6 +808,15 @@ static PINT_sm_action lookup_read_directory_entry_handles(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    /* Set up temporary keyval storage space to sort out handles/sids */
+    if(s_op->u.lookup.keyval_temp_store){
+        free(s_op->u.lookup.keyval_temp_store);
+    }
+    s_op->u.lookup.keyval_temp_store = (PVFS_ID *) malloc(
+            OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+            attr->u.dir.dist_dir_attr.sid_count));
+
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
 
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -810,12 +830,9 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
-    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[1].buffer_sz = (attr->u.dir.dist_dir_attr.dirdata_count *
-                                sizeof(PVFS_handle)) +
-                               (attr->u.dir.dist_dir_attr.sid_count *
-                                attr->u.dir.dist_dir_attr.dirdata_count *
-                                sizeof(PVFS_handle));
+    s_op->val_a[1].buffer = s_op->u.lookup.keyval_temp_store;
+    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+                               attr->u.dir.dist_dir_attr.sid_count);
 
     s_op->error_a = (PVFS_error*)calloc(keyval_count, sizeof(PVFS_error));
     if (s_op->error_a == NULL)
@@ -855,8 +872,9 @@ static PINT_sm_action lookup_read_directory_entry(
         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i = 0, j = 0;
     PVFS_dist_dir_hash_type dirdata_hash;
+    PVFS_object_attr *attr = &s_op->u.lookup.attr;
     /* V3 */
 #if 0
     server_configuration_t *config = get_server_config_struct();
@@ -867,6 +885,25 @@ static PINT_sm_action lookup_read_directory_entry(
     ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
                                    &s_op->u.lookup.segp,
                                    &s_op->u.lookup.segstate);
+
+    /* Unpack keyval information from temp_store back 
+     * into handle/sid arrays */
+    for(i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++){
+        /* Index to number of SIDs per dd handle + 1 for dd handle,
+         * mult by number of handles processed */
+        attr->u.dir.dirdata_handles[i] = 
+            s_op->u.lookup.keyval_temp_store[
+                i * (attr->u.dir.dist_dir_attr.sid_count + 1)].oid;
+        for(j = 1; j < attr->u.dir.dist_dir_attr.sid_count + 1; j++){
+            /* Index to number of SIDs per dd handle + 1 for each dd handle,
+             * mult by number of handles processed, add the index
+             * of the current SID being processed */
+            attr->u.dir.dirdata_sids[
+                j + (i * (attr->u.dir.dist_dir_attr.sid_count + 1))] =
+                s_op->u.lookup.keyval_temp_store[
+                i * attr->u.dir.dist_dir_attr.dirdata_count + j];
+        }
+    }
 
     if (ret != 0)
     {
@@ -943,22 +980,13 @@ static PINT_sm_action lookup_read_directory_entry_local(
     /* TJS: Read in SID information to temporary location.  Copy back into
      * response array in next state */
 
-
-    ret = PINT_cached_config_get_metadata_sid_count(
-                                          s_op->req->u.lookup_path.fs_id,
-                                          &(s_op->metasidcnt));
-
-    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
-                                                sizeof(PVFS_handle) +
-                                                (sizeof(PVFS_SID) * 
-                                                 s_op->metasidcnt));
+    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(OSASZ(1, s_op->metasidcnt));
 
 
     
     s_op->val.buffer = s_op->u.lookup.keyval_temp_store;
 
-    s_op->val.buffer_sz = sizeof(PVFS_handle) + 
-                          (s_op->metasidcnt * sizeof(PVFS_SID));
+    s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
     /*
       NOTE: if this operation fails, seg_nr will indicate one too many
@@ -1001,6 +1029,8 @@ static PINT_sm_action lookup_read_directory_entry_remote(
 
     PINT_null_capability(&null_cap);
 
+
+    /* V3: This needs to be updated to fill SID info */
     PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
             msg_p->req,
             null_cap,
