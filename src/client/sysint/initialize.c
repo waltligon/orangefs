@@ -66,7 +66,7 @@ typedef enum
  * data structures.  Must be called before any other system interface
  * function.
  *
- * This should run once and only one even in multithreaded environment.
+ * This should run once and only once even in multithreaded environment.
  *
  * the default_debug_mask is used if not overridden by the
  * PVFS2_DEBUGMASK environment variable at run-time.  allowable string

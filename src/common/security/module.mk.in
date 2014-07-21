@@ -17,7 +17,8 @@ SERVERSRC += $(DIR)/revlist.c
 endif
 
 LIBSRC += $(DIR)/security-util.c \
-          $(DIR)/getugroups.c
+          $(DIR)/getugroups.c \
+	  $(DIR)/client-capcache.c
 
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \

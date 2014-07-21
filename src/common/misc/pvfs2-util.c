@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -186,6 +187,34 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 }
 
 #ifdef ENABLE_SECURITY_MODE
+void debug_gencred(char *args[])
+{
+    char **p = args, *str;
+    size_t slen = 0;
+
+    while (*p)
+    {
+        slen += strlen(*p++) + 1;
+    }
+
+    str = calloc(1, slen + 1);
+    if (str == NULL)
+    {
+        return;
+    }
+
+    p = args;
+    while (*p)
+    {
+        strcat(str, *p++);
+        strcat(str, " ");
+    }
+    
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Executing pvfs2-gencred: %s\n", str);
+
+    free(str);
+}
+
 /* PVFS_util_gen_credential
  * 
  * Generate signed credential object using external app pvfs2-gencred.
@@ -242,8 +271,11 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char **ptr = args;
         char timearg[16];
 
+        int fd = open("/tmp/stderr.out", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
+
         close(STDERR_FILENO);
-        dup(errordes[1]);
+        /* TODO: temp dup(errordes[1]); */
+        dup(fd);
         close(STDOUT_FILENO);
         dup(filedes[1]);
         close(STDIN_FILENO);
@@ -280,6 +312,9 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         }
 #endif
         *ptr++ = NULL;
+
+        debug_gencred(args);
+
         execv(BINDIR"/pvfs2-gencred", args);
 
         _exit(100);
@@ -348,18 +383,21 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             {
                 do
                 {
-                    ecnt = read(errordes[0], ebuf+etotal, 
+                    /* TODO: temp */
+                    /* ecnt = read(errordes[0], ebuf+etotal, 
                                 (sizeof(ebuf) - etotal));
+                                */
+                    ecnt = read(errordes[0], ebuf, sizeof(ebuf));
                 } while (ecnt == -1 && errno == EINTR);
                 etotal += ecnt;
-            } while (ecnt > 0 && etotal < sizeof(ebuf));
+            } while (ecnt > 0 /* && etotal < sizeof(ebuf) */);
             /* null terminate */
-            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
+            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)-1] = '\0';
 
             /* print errors */
             if (etotal > 0)
             {
-                gossip_err("pvfs2_gencred: %s", ebuf);
+                gossip_err("pvfs2_gencred: (%llu)\n", /*ebuf,*/ llu(etotal));
             }
         }
     }
