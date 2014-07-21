@@ -184,7 +184,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
-
+    int ret = 0;
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
@@ -192,6 +192,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
                     s_op->req->u.lookup_path.path);
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
+
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  " STARTING LOOKUP REQUEST "
@@ -901,7 +902,7 @@ static PINT_sm_action lookup_read_directory_entry(
             attr->u.dir.dirdata_sids[
                 j + (i * (attr->u.dir.dist_dir_attr.sid_count + 1))] =
                 s_op->u.lookup.keyval_temp_store[
-                i * attr->u.dir.dist_dir_attr.dirdata_count + j];
+                i * attr->u.dir.dist_dir_attr.dirdata_count + j].sid;
         }
     }
 
