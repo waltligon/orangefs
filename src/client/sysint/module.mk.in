@@ -17,6 +17,7 @@ CSRC := \
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \
 	$(DIR)/sys-getattr.c \
+	$(DIR)/sys-gethandles.c \
 	$(DIR)/sys-setattr.c \
 	$(DIR)/sys-get-eattr.c \
 	$(DIR)/sys-set-eattr.c \

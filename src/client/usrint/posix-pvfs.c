@@ -112,6 +112,7 @@ int pvfs_open_object(int fd, int obj_num)
 {
     pvfs_descriptor *pd = pvfs_find_descriptor(fd);
     pd->s->object_num = obj_num;
+    pd->s->file_pointer = 0;
     return pd->fd;
 }
 

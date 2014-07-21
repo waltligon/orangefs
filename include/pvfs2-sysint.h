@@ -112,6 +112,14 @@ struct PVFS_sysresp_getattr_s
 };
 typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 
+struct PVFS_sysresp_gethandles_s
+{
+    PVFS_handle* handle_array;
+    PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+};
+
+typedef struct PVFS_sysresp_gethandles_s PVFS_sysresp_gethandles;
+
 /* setattr */
 /* no data returned in setattr response */
 
@@ -305,6 +313,14 @@ PVFS_error PVFS_sys_getattr(
     const PVFS_credential *credential,
     PVFS_sysresp_getattr *resp,
     PVFS_hint hints);
+
+PVFS_error PVFS_sys_gethandles(
+    PVFS_object_ref ref,
+    uint32_t attrmask,
+    const PVFS_credential *credential,
+    PVFS_sysresp_getattr *resp,
+    PVFS_hint hints,
+    int *num_dfiles);
 
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,

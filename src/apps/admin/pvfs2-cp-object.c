@@ -378,8 +378,6 @@ static size_t generic_write(file_object *dest, char *buffer,
 	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_io_object(dest->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, PVFS_IO_WRITE, hints, 2);
-        ret = PVFS_sys_io_object(dest->u.pvfs2.ref, file_req, offset,
-		"this is first", mem_req, credentials, &resp_io, PVFS_IO_WRITE, hints, 1);
 	if (ret == 0) 
         {
             PVFS_Request_free(&mem_req);
@@ -435,6 +433,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     PVFS_object_ref parent_ref;
     PVFS_sys_dist   *new_dist;
     int ret = -1;
+    int var = 0;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
 
@@ -576,7 +575,9 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
         if ((ret == 0) && (open_type == OPEN_SRC))
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
+            ret = PVFS_sys_gethandles(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                                   credentials, &resp_getattr, hints, &var);
+            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_META_ALL,
                                    credentials, &resp_getattr, hints);
             if (ret)
             {

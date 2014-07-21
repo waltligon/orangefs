@@ -124,6 +124,43 @@ typedef struct PINT_sm_getattr_state
     
 } PINT_sm_getattr_state;
 
+typedef struct PINT_sm_gethandles_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+
+    /* mirror retry information */
+    PINT_client_getattr_mirror_ctx *mir_ctx_array;
+    uint32_t mir_ctx_count;
+    uint32_t retry_count;
+    uint32_t *index_to_server;
+
+    PVFS_ds_type ref_type;
+
+    /* used with sys-readdir to get dirent_count of all dirdata handles,
+     * will be set to 0 in PINT_SM_GETATTR_STATE_FILL,
+     * now only used with sys-readdir.sm */
+    int keep_size_array;
+    int *active_dirdata_index;
+
+    PVFS_size * size_array;
+    PVFS_size size;
+
+    int flags;
+    
+} PINT_sm_gethandles_state;
+
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
     do { \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
@@ -139,6 +176,17 @@ typedef struct PINT_sm_getattr_state
     do { \
         PINT_free_object_attr(&(_state).attr); \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
+#define PINT_SM_GETHANDLES_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_gethandles_state)); \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
+        (_state).flags = _flags; \
+        (_state).keep_size_array = 0; \
     } while(0)
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
@@ -237,6 +285,11 @@ struct PINT_client_symlink_sm
 struct PINT_client_getattr_sm
 {
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
+};
+
+struct PINT_client_gethandles_sm
+{
+    PVFS_sysresp_gethandles *gethandles_resp_p; /* destination for output */
 };
 
 struct PINT_client_setattr_sm
@@ -664,6 +717,7 @@ typedef struct PINT_client_sm
 
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
+    PINT_sm_gethandles_state gethandles;
     /* generic dirent array used by both readdir and readdirplus state machines */
     PINT_sm_readdir_state readdir_state;
     struct PINT_client_readdir_sm readdir;
@@ -690,6 +744,7 @@ typedef struct PINT_client_sm
         struct PINT_client_mkdir_sm mkdir;
         struct PINT_client_symlink_sm sym;
         struct PINT_client_getattr_sm getattr;
+        struct PINT_client_gethandles_sm gethandles;
         struct PINT_client_setattr_sm setattr;
         struct PINT_client_io_sm io;
         struct PINT_client_flush_sm flush;
@@ -805,6 +860,7 @@ enum
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
     PVFS_SYS_ATOMICEATTR           = 21,
+    PVFS_SYS_GETHANDLES            = 22,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -827,7 +883,7 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
-#define PVFS_OP_SYS_MAXVALID  22
+#define PVFS_OP_SYS_MAXVALID  23
 #define PVFS_OP_SYS_MAXVAL 69
 #ifdef ENABLE_SECURITY_CERT
 #define PVFS_OP_MGMT_MAXVALID 84
@@ -904,6 +960,9 @@ extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_gethandles_sm;
+extern struct PINT_state_machine_s pvfs2_client_gethandles_sm;
+extern struct PINT_state_machine_s pvfs2_client_datafile_gethandles_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
