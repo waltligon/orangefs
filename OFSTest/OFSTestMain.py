@@ -473,9 +473,10 @@ class OFSTestMain(object):
         
         # Set the LD_LIBRARY_PATH and LIBRARY_PATH on the head node
         # TODO: Do we still need to do this?
-        #if self.config.run_mpi_tests == True:
-        #    head_node.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
-        #        head_node.setEnvironmentVariable("LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
+        if self.config.run_mpi_tests == True:
+            head_node.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:%s/lib:%s/lib" % (head_node.ofs_installation_location,head_node.openmpi_installation_location))
+        else:
+            head_node.setEnvironmentVariable("LD_LIBRARY_PATH","/opt/db4/lib:%s/lib" % head_node.ofs_installation_location)
     
         # Go home.
         head_node.changeDirectory("~")
@@ -489,7 +490,7 @@ class OFSTestMain(object):
             import OFSSysintTest
             
             # Start the OrangeFS Client on the head node
-            rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
         
             # print section header in output file.
             self.writeOutputHeader(filename,"Sysint Tests")
@@ -517,16 +518,17 @@ class OFSTestMain(object):
             mount_type = "kmod"
             # Start the OrangeFS Client on the head node
 
-            rc = self.ofs_network.startOFSClient(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
 
 
             # OrangeFS must be mounted to run kmod tests.
             # unmount, just in case.
-            head_node.unmountOFSFilesystem()
+            self.ofs_network.unmountOFSFilesystemAllNodes();
             # mount, not with fuse.
-            head_node.mountOFSFilesystem(mount_fuse=False)
+            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=False)
             # Make sure filesystem is mounted or we will get false positives.
             rc = head_node.checkMount()
+            
 
             # if everything is good, run the test.
             if rc == 0:
@@ -545,6 +547,23 @@ class OFSTestMain(object):
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
                         pass
+
+                # run the mpi tests, if required.
+                if self.config.run_mpi_tests == True:
+
+                    self.writeOutputHeader(filename,"MPI VFS Tests (%s)" % mount_type)
+                    
+                    import OFSMpiVFSTest
+                    
+                    for callable in OFSMpiVFSTest.tests:
+                        try:
+                            rc = head_node.runOFSTest("mpivfs-%s" % mount_type,callable)
+                            self.writeOutput(filename,callable,rc)
+                        except:
+                            print "Unexpected error:", sys.exc_info()[0]
+                            traceback.print_exc()
+                            pass
+
             
             # if not, print failure.
             else:
@@ -560,15 +579,15 @@ class OFSTestMain(object):
             # the filesystem is mounted with the fuse module instead of kmod.
             # The same tests are used for both kmod-vfs and fuse.
             import OFSVFSTest
-        
+            
             
             # specify "kmod" tests.
             mount_type = "fuse"
             # OrangeFS must be mounted to run kmod tests.
             # unmount, just in case.
-            head_node.unmountOFSFilesystem()
-            # mount, with fuse.
-            head_node.mountOFSFilesystem(mount_fuse=True)
+            self.ofs_network.unmountOFSFilesystemAllNodes();
+            # mount, not with fuse.
+            self.ofs_network.mountOFSFilesystemAllNodes(mount_fuse=True)
             # Make sure filesystem is mounted or we will get false positives.
             rc = head_node.checkMount()
 
@@ -588,8 +607,23 @@ class OFSTestMain(object):
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
                         pass
+                
+                # run the mpi tests, if required.
+                if self.config.run_mpi_tests == True:
+                    
+                    import OFSMpiVFSTest
+                    self.writeOutputHeader(filename,"MPI VFS Tests (%s)" % mount_type)
+                    
+                    for callable in OFSMpiVFSTest.tests:
+                        try:
+                            rc = head_node.runOFSTest("mpivfs-%s" % mount_type,callable)
+                            self.writeOutput(filename,callable,rc)
+                        except:
+                            print "Unexpected error:", sys.exc_info()[0]
+                            traceback.print_exc()
+                            pass
 
-            # if not, print failure.
+        
             else:
                 self.writeOutputHeader(filename,"VFS Tests (%s) could not run. Mount failed." % mount_type)           
                 # Each test should fail. Use error -999 to indicate mount failure.
@@ -609,8 +643,8 @@ class OFSTestMain(object):
                 self.writeOutputHeader(filename,"Usrint Tests not compatible with fuse=====================================\n")
             else:
                 # Unmount OrangeFS and stop the OrangeFS client.
-                head_node.unmountOFSFilesystem()
-                head_node.stopOFSClient()
+                self.ofs_network.unmountOFSFilesystemAllNodes()
+                self.ofs_network.stopOFSClientAllNodes()
                 self.writeOutputHeader(filename,"Usrint Tests")
                 
                 # The list of usrint tests to run is found in OFSUsrintTest.test.
@@ -631,8 +665,8 @@ class OFSTestMain(object):
             import OFSMpiioTest
 
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"MPI-IO Tests")
 
@@ -655,8 +689,8 @@ class OFSTestMain(object):
             import OFSHadoopTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Hadoop Tests")
             
@@ -680,8 +714,8 @@ class OFSTestMain(object):
             import OFSMiscPostTest
             
             # Unmount OrangeFS and stop the OrangeFS client.
-            head_node.unmountOFSFilesystem()
-            head_node.stopOFSClient()
+            self.ofs_network.unmountOFSFilesystemAllNodes()
+            self.ofs_network.stopOFSClientAllNodes()
 
             self.writeOutputHeader(filename,"Misc Tests (Post run)")
             
@@ -754,8 +788,8 @@ class OFSTestMain(object):
         self.ofs_network.stopOFSClientAllNodes()
         self.ofs_network.stopOFSServers()
         self.ofs_network.startOFSServers()
-        self.ofs_network.startOFSClient(security=self.config.security_mode) 
-        self.ofs_network.mountOFSFilesystem()
+        self.ofs_network.startOFSClientAllNodes(security=self.config.security_mode) 
+        self.ofs_network.mountOFSFilesystemAllNodes()
     
     def doPostTest(self,rc):
         if rc == 0:

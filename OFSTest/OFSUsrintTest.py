@@ -454,7 +454,8 @@ def ltp(testing_node,output=[]):
         if rc != 0:
             
             return rc
-        rc = testing_node.runSingleCommand("make autotools" % LTP_PREFIX,output)
+        
+        rc = testing_node.runSingleCommand("make autotools")
         rc = testing_node.runSingleCommand("CFLAGS='-g -O0' ./configure --prefix=%s" % LTP_PREFIX,output)
         #if rc != 0:
         #    return rc
@@ -589,7 +590,6 @@ def tail(testing_node,output=[]):
     
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand('%s bash -c \'echo "%s" > %s\'' % (preload,test_string,tail_test))
-
    
     # now diff it
     rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,tail_test,local_reference),output)
