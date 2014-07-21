@@ -455,7 +455,7 @@ def ltp(testing_node,output=[]):
             
             return rc
         
-        rc = testing_node.runSingleCommand("make autotools" % LTP_PREFIX,output)
+        rc = testing_node.runSingleCommand("make autotools")
         rc = testing_node.runSingleCommand("CFLAGS='-g -O0' ./configure --prefix=%s" % LTP_PREFIX,output)
         #if rc != 0:
         #    return rc
