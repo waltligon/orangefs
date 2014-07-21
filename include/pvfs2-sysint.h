@@ -314,13 +314,21 @@ PVFS_error PVFS_sys_getattr(
     PVFS_sysresp_getattr *resp,
     PVFS_hint hints);
 
+PVFS_error PVFS_isys_gethandles(
+    PVFS_object_ref ref,
+    uint32_t attrmask,
+    const PVFS_credential *credential,
+    PVFS_sysresp_gethandles *resp,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
 PVFS_error PVFS_sys_gethandles(
     PVFS_object_ref ref,
     uint32_t attrmask,
     const PVFS_credential *credential,
-    PVFS_sysresp_getattr *resp,
-    PVFS_hint hints,
-    int *num_dfiles);
+    PVFS_sysresp_gethandles *resp,
+    PVFS_hint hints);
 
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,

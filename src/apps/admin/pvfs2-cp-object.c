@@ -429,6 +429,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
+    PVFS_sysresp_gethandles resp_gethandles;
     PVFS_sysresp_create resp_create;
     PVFS_object_ref parent_ref;
     PVFS_sys_dist   *new_dist;
@@ -575,9 +576,10 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
         if ((ret == 0) && (open_type == OPEN_SRC))
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
+            memset(&resp_gethandles, 0, sizeof(PVFS_sysresp_gethandles));
             ret = PVFS_sys_gethandles(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                                   credentials, &resp_getattr, hints, &var);
-            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_META_ALL,
+                                   credentials, &resp_gethandles, hints);
+            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
                                    credentials, &resp_getattr, hints);
             if (ret)
             {
