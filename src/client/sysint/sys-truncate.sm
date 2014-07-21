@@ -292,7 +292,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
                                    new_dfile_size,
                                    attr->u.meta.dfile_array[i],
                                    attr->u.meta.sid_count,
-                                   attr->u.meta.sid_array[i * attr->u.meta.sid_count],
+                                   attr->u.meta.sid_array + 
+                                            (i * attr->u.meta.sid_count),
                                    sm_p->hints);
         /*
           no callback. the status will be in the generic response
