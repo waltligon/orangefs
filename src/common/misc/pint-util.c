@@ -382,7 +382,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
-	dest->mask = src->mask;
+        dest->mask = src->mask;
+        /* put capability mask back in if valid 
+           TODO: may need more involved solution */
+        if (!(dest->mask & PVFS_ATTR_CAPABILITY) &&
+            dest->capability.issuer != NULL && 
+            strlen(dest->capability.issuer) > 0)
+        {
+            dest->mask |= PVFS_ATTR_CAPABILITY;
+        }
         ret = 0;
     }
     return ret;

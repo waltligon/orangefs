@@ -119,14 +119,6 @@ int PINT_client_capcache_initialize(void)
         return -PVFS_ENOMEM;
     }
 
-    if (ret < 0)
-    {
-        PINT_tcache_finalize(client_capcache);
-        /* PINT_tcache_finalize(static_client_capcache); */
-        gen_mutex_unlock(&client_capcache_mutex);
-        return ret;
-    }
-
     /* fill in defaults that are common to both */
     ret = set_client_capcache_defaults(client_capcache);
     if (ret < 0)
@@ -253,7 +245,7 @@ int PINT_client_capcache_get_cached_entry(
 
     /* Check to see if cap has expired 
        TODO: buffer time? */
-    if (current_time.tv_sec > tmp_payload->cap.timeout)
+    if (current_time.tv_sec <= (time_t) tmp_payload->cap.timeout)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: hit: H=%llu uid=%d\n",
                      llu(refn.handle), uid);
@@ -266,6 +258,7 @@ int PINT_client_capcache_get_cached_entry(
         ret = -PVFS_ETIME;
         gossip_debug(GOSSIP_CLIENT_DEBUG, "client_capcache: hit: H=%llu uid=%d "
                      "EXPIRED\n", llu(refn.handle), uid);
+        /* TODO: remove from cache here? */
 
     }
     
@@ -326,10 +319,9 @@ int PINT_client_capcache_update(
 {
     int ret = -1, ret2, status, purged;
     struct client_capcache_key key;
-    struct client_capcache_payload tmp_payload;
+    struct client_capcache_payload *tmp_payload = NULL;
     struct PINT_tcache_entry *tmp_entry;
-    /* Storage of current time */
-    struct timeval timev = { 0, 0 };
+    struct timeval timev = { 0, 0 }, now = { 0, 0 };
 
     if (cap == NULL)
     {
@@ -381,9 +373,17 @@ int PINT_client_capcache_update(
             gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: "
                          "updating entry H=%llu uid=%d\n", llu(refn.handle), uid);
             /* build new payload */
-            tmp_payload.refn = refn;
-            tmp_payload.uid = uid;
-            if ((ret2 = PINT_copy_capability(cap, &tmp_payload.cap)) != 0)
+            tmp_payload = (struct client_capcache_payload *) 
+                              calloc(1, sizeof(*tmp_payload));
+            if (tmp_payload == NULL)
+            {
+                /* TODO: gossip */
+                gen_mutex_unlock(&client_capcache_mutex);
+                return -PVFS_ENOMEM;
+            }
+            tmp_payload->refn = refn;
+            tmp_payload->uid = uid;
+            if ((ret2 = PINT_copy_capability(cap, &tmp_payload->cap)) != 0)
             {
                 gossip_err("client_capcache update: could not copy capability\n");
                 gen_mutex_unlock(&client_capcache_mutex);
@@ -392,7 +392,7 @@ int PINT_client_capcache_update(
 
             timev.tv_sec = cap->timeout;
             timev.tv_usec = 0;
-            ret = PINT_tcache_insert_entry_ex(client_capcache, &key, &tmp_payload,
+            ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                           &timev, &purged);
 
             /* this counts as an update of an existing entry */
@@ -416,12 +416,27 @@ int PINT_client_capcache_update(
     }
     else
     {
+        gettimeofday(&now, NULL);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: inserting "
-                     "new entry H=%llu uid=%d\n", llu(refn.handle), uid);
+                     "new entry H=%llu uid=%d now=%d timeout=%d\n", llu(refn.handle),
+                     uid, now.tv_sec, cap->timeout);
         /* not found in cache; insert new payload*/
         timev.tv_sec = cap->timeout;
         timev.tv_usec = 0;
-        ret = PINT_tcache_insert_entry_ex(client_capcache, &refn, &tmp_payload,
+        /* build new payload */
+        tmp_payload = (struct client_capcache_payload *) 
+                          calloc(1, sizeof(*tmp_payload));
+        if (tmp_payload == NULL)
+        {
+            /* TODO: gossip */
+            gen_mutex_unlock(&client_capcache_mutex);
+            return -PVFS_ENOMEM;
+        }
+        tmp_payload->refn = refn;
+        tmp_payload->uid = uid;
+        PINT_copy_capability(cap, &tmp_payload->cap);
+        /* TODO: error-checking */
+        ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                           &timev, &purged);
         /* the purged variable indicates how many entries had to be purged
          * from the tcache to make room for this new one
@@ -476,6 +491,9 @@ static int client_capcache_compare_key_entry(const void *key, struct qhash_head 
     }
   
     tmp_payload = (struct client_capcache_payload *) tmp_entry->payload;
+    /* TODO: temp */
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: checking payload: H=%llu F=%llu uid=%d\n",
+                 __func__, llu(tmp_payload->refn.handle), llu(tmp_payload->refn.fs_id), tmp_payload->uid);
     if (real_key->uid == tmp_payload->uid &&
         real_key->refn.handle == tmp_payload->refn.handle &&
         real_key->refn.fs_id == tmp_payload->refn.fs_id)
@@ -498,6 +516,8 @@ static int client_capcache_hash_key(const void *key, int table_size)
     int tmp_ret = 0;
 
     tmp_ret = (real_key->refn.handle + real_key->uid) % table_size;
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: index: %d H=%llu uid=%d\n",
+                 __func__, tmp_ret, llu(real_key->refn.handle), real_key->uid);
     return tmp_ret;
 }
 

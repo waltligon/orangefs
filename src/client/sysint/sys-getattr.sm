@@ -11,6 +11,7 @@
  *  (file or directory).
  */
 #include <string.h>
+#include <sys/types.h>
 #include <assert.h>
 
 #include "client-state-machine.h"
@@ -26,6 +27,7 @@
 #include "pvfs2-types-debug.h"
 #include "security-util.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -46,7 +48,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    GETATTR_ACACHE_MISS = 1,
+    GETATTR_CACHE_MISS = 1,
     GETATTR_NEED_DATAFILE_SIZES = 2,
     GETATTR_IO_RETRY = 3,
     GETATTR_NEED_DIRDATA_ATTRS = 4
@@ -115,10 +117,10 @@ nested machine pvfs2_client_dirdata_getattr_sm
 
 nested machine pvfs2_client_getattr_sm
 {
-    state acache_lookup
+    state cache_lookup
     {
-        run getattr_acache_lookup;
-        GETATTR_ACACHE_MISS => object_getattr_setup_msgpair;
+        run getattr_cache_lookup;
+        GETATTR_CACHE_MISS => object_getattr_setup_msgpair;
         GETATTR_NEED_DATAFILE_SIZES => datafile_get_sizes;
         default => cleanup;
     }
@@ -133,15 +135,15 @@ nested machine pvfs2_client_getattr_sm
     state object_getattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => acache_insert;
+        success => cache_insert;
         GETATTR_NEED_DATAFILE_SIZES => datafile_get_sizes;
         GETATTR_NEED_DIRDATA_ATTRS => dirdata_get_attrs;
         default => object_getattr_failure;
     }
 
-    state acache_insert
+    state cache_insert
     {
-        run getattr_acache_insert;
+        run getattr_cache_insert;
         default => cleanup;
     }
 
@@ -154,14 +156,14 @@ nested machine pvfs2_client_getattr_sm
     state datafile_get_sizes
     {
         jump pvfs2_client_datafile_getattr_sizes_sm;
-        success => acache_insert;
+        success => cache_insert;
         default => cleanup;
     }
 
     state dirdata_get_attrs
     {
         jump pvfs2_client_dirdata_getattr_sm;
-        success => acache_insert;
+        success => cache_insert;
         default => cleanup;
     }
 
@@ -235,9 +237,11 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     sm_p->u.getattr.getattr_resp_p = resp_p;
+
+    /* hint handling */
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle)
-                 ,&ref.handle);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle),
+                  &ref.handle);
     
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                ref,
@@ -297,7 +301,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
 
 
 /**
- * getattr_acache_lookup
+ * getattr_cache_lookup
  * @ingroup client_sm_getattr
  * 
  * This function is invoked as the first state action of the
@@ -315,7 +319,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
  * to in the getattr-dowork state machine.  Possible values for js_p->error_code
  * are:
  * <ul>
- * <li><b>GETATTR_ACACHE_MISS</b> - The requested attribute was not found
+ * <li><b>GETATTR_CACHE_MISS</b> - The requested attribute was not found
  * in the attribute cache, or the attribute was found, but the attribute's
  * mask did not include values required by the requested mask (req_attrmask).
  * </li>
@@ -330,7 +334,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
  * @return This function should always return 1 unless an error occurred
  * within the internals of the state machine.
  */
-static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
+static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -377,7 +381,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
                     " [%llu]\n",
                       llu(object_ref.handle));
-        js_p->error_code = GETATTR_ACACHE_MISS;
+        js_p->error_code = GETATTR_CACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
 
@@ -392,28 +396,46 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                     " [%llu]\n",
                       llu(object_ref.handle));
   
-        js_p->error_code = GETATTR_ACACHE_MISS;
+        js_p->error_code = GETATTR_CACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
 
     /* Report a miss if capability is expired or within 
      * CAP_TIMEOUT_BUFFER of expiration
      *
-     * sampson: TODO: in practice the acache timeout is likely 
-     * much less than the capability timeout. Therefore it is
-     * unlikely the capability will have expired. Additionally
-     * this code may not be needed when more sophisticated caches
-     * are added. 
+     * TODO: temporary change for fixing prior to update of acache
      */
     if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
     {
-        PVFS_time now = PINT_util_get_current_time();
-        if (now > (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
+        PVFS_uid local_uid;
+
+        /* retrieve the uid for cache indexing purposes */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+        /* check for the local UID hint; the kernel module (etc.) will 
+          supply this hint -- otherwise we add the current user
+          TODO: Windows */
+        if (local_uid == (PVFS_uid) -1)
         {
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: cache miss due to "
-                         "capability timeout [%llu]\n", 
-                         llu(object_ref.handle));
-            js_p->error_code = GETATTR_ACACHE_MISS;
+            local_uid = (PVFS_uid) getuid();
+            
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        ret = PINT_client_capcache_get_cached_entry(object_ref, local_uid,
+                  &sm_p->getattr.attr.capability);
+        if (ret == 0)
+        {
+            /* hit - no need to request cap */
+            sm_p->getattr.req_attrmask &= ~PVFS_ATTR_CAPABILITY;
+        }
+        if (ret < 0)
+        {
+            /* TODO: error reporting if not -PVFS_ENOENT */
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache miss\n", 
+                         __func__);
+            js_p->error_code = GETATTR_CACHE_MISS;
             return SM_ACTION_COMPLETE;
         }
     }
@@ -540,7 +562,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         " [%llu]\n",
           llu(object_ref.handle));
 
-    js_p->error_code = GETATTR_ACACHE_MISS;
+    js_p->error_code = GETATTR_CACHE_MISS;
     return SM_ACTION_COMPLETE;
 }
 
@@ -1486,7 +1508,7 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_acache_insert(
+static PINT_sm_action getattr_cache_insert(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {   
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1505,7 +1527,7 @@ static PINT_sm_action getattr_acache_insert(
                 /* stuffed file case */
                 sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
                 tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert "
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_cache_insert "
                   "calculated stuffed logical size of %lld\n", lld(*tmp_size));
             }
             else
@@ -1522,18 +1544,40 @@ static PINT_sm_action getattr_acache_insert(
                     sm_p->getattr.size_array);
 
                 tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG,"getattr_acache_insert calculated"
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"getattr_cache_insert calculated"
                                                   " unstuffed logical size of %lld\n"
                                                  , lld(*tmp_size));
             }
         }
 
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
+                     "reference to acache\n");
+
         PINT_acache_update(sm_p->getattr.object_ref,
             &sm_p->getattr.attr,
             tmp_size);
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
-                     "reference to acache\n");
+        /* Cache capability 
+           TODO: possibly temporary solution */
+        if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
+        {
+            int ret;
+            PVFS_uid local_uid;
+
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+            if (local_uid != (PVFS_uid) -1)
+            {
+                ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
+                          local_uid, &sm_p->getattr.attr.capability);
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: PINT_client_capcache_update "
+                             "returned %d\n", __func__, ret);
+            }
+            else
+            {
+                gossip_err("%s: could not get local uid for client capcache\n",
+                           __func__);
+            }
+        }
     }
 
     return SM_ACTION_COMPLETE;
