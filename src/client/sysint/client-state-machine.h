@@ -178,6 +178,12 @@ typedef struct PINT_sm_gethandles_state
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
     } while(0)
 
+#define PINT_SM_GETHANDLES_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        memset(&(_state), 0, sizeof(PINT_sm_gethandles_state)); \
+    } while(0)
+
 #define PINT_SM_GETHANDLES_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
     do { \
         memset(&(_state), 0, sizeof(PINT_sm_gethandles_state)); \
@@ -961,8 +967,6 @@ extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_gethandles_sm;
-extern struct PINT_state_machine_s pvfs2_client_gethandles_sm;
-extern struct PINT_state_machine_s pvfs2_client_datafile_gethandles_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;

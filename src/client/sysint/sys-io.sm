@@ -480,12 +480,6 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                IO_ATTR_MASKS, 
                                PVFS_TYPE_METAFILE,
                                0);
-
-    PINT_SM_GETHANDLES_STATE_FILL(sm_p->gethandles,
-                               sm_p->object_ref,
-                               IO_ATTR_MASKS, 
-                               PVFS_TYPE_METAFILE,
-                               0);
     
        
     if (js_p->error_code == IO_RETRY ||
