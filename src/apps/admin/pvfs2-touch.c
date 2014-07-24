@@ -20,7 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "bmi.h"
-
+#include "pvfs2-usrint.h"
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
@@ -41,8 +41,6 @@ int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
     struct options *user_opts = NULL;
-    char* tmp_server;
-    int tmp_server_index;
     PVFS_sys_layout layout;
 
     layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
@@ -69,10 +67,7 @@ int main(int argc, char **argv)
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
-        int num_segs;
         char *working_file = user_opts->filenames[i];
-        char directory[PVFS_NAME_MAX] = {0};
-        char filename[PVFS_SEGMENT_MAX] = {0};
 
         layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
         layout.server_list.count = 0;
@@ -82,146 +77,22 @@ int main(int argc, char **argv)
         }
         layout.server_list.servers = NULL;
 
-        char pvfs_path[PVFS_NAME_MAX] = {0};
-        PVFS_fs_id cur_fs;
-        PVFS_sysresp_lookup resp_lookup;
-        PVFS_sysresp_create resp_create;
-        PVFS_credential credentials;
-        PVFS_object_ref parent_ref;
-        PVFS_sys_attr attr;
-
-
-        /* Translate the working file into a pvfs2 relative path*/
-        rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path, PVFS_NAME_MAX);
-        if (rc)
-        {
-            PVFS_perror("PVFS_util_resolve", rc);
-            ret = -1;
-            break;
-        }
-
-        /* Get the parent directory of the working file */
-        rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
-
-        /* Determine the filename from the working */
-        num_segs = PINT_string_count_segments(working_file);
-        rc = PINT_get_path_element(working_file, num_segs - 1,
-                                   filename, PVFS_SEGMENT_MAX);
-        if (rc)
-        {
-            fprintf(stderr, "Unknown path format: %s\n", working_file);
-            ret = -1;
-            break;
-        }
-
-        ret = PVFS_util_gen_credential_defaults(&credentials);
-        if (ret < 0)
-        {
-            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
-            ret = -1;
-            break;
-        }
-
-        memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
-                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-        if (rc)
-        {
-            PVFS_perror("PVFS_sys_lookup", rc);
-            ret = -1;
-            break;
-        }
-
-        /* Set attributes */
-        memset(&attr, 0, sizeof(PVFS_sys_attr));
-        attr.owner = credentials.userid;
-        attr.group = credentials.group_array[0];
-        attr.perms = PVFS_util_translate_mode(
+        mode_t mode = (mode_t) PVFS_util_translate_mode(
                        (S_IROTH|S_IWOTH|S_IRGRP|S_IWGRP|S_IRUSR|S_IWUSR)
                        & ~PVFS_util_get_umask(), 0);
-        attr.atime = time(NULL);
-        attr.mtime = attr.atime;
-        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.dfile_count = 0;
 
-        parent_ref = resp_lookup.ref;
-
-        if(user_opts->random)
-        {
-            layout.algorithm = PVFS_SYS_LAYOUT_RANDOM;
-        }
-        else if(user_opts->server_list)
-        {
-            layout.algorithm = PVFS_SYS_LAYOUT_LIST;
-            layout.server_list.count = 1;
-            tmp_server = user_opts->server_list;
-
-            /* iterate once to count servers */
-            while((tmp_server = index(tmp_server, ',')))
-            {
-                layout.server_list.count++;
-                tmp_server++;
-            }
-
-            layout.server_list.servers = 
-                malloc(layout.server_list.count*sizeof(PVFS_BMI_addr_t));
-            if(!(layout.server_list.servers))
-            {
-                perror("malloc");
-                ret = -1;
-                break;
-            }
-
-            /* split servers out and resolve each addr */
-            tmp_server_index = 0;
-            for(tmp_server = strtok(user_opts->server_list, ","); 
-                tmp_server != NULL;
-                tmp_server = strtok(NULL, ","))
-            {
-                assert(tmp_server_index < layout.server_list.count);
-                
-                /* TODO: is there a way to do this without internal BMI
-                 * functions? The address lookups should be done within the create
-                 * state machine.  This program should only have to send in
-                 * a list of server aliases from the config file.
-                 */
-                rc = BMI_addr_lookup(
-                    &layout.server_list.servers[tmp_server_index],
-                    tmp_server);
-                if(rc < 0)
-                {
-                    PVFS_perror("BMI_addr_lookup", rc);
-                    break;
-                }
-                tmp_server_index++;
-            }
-            if(tmp_server_index != layout.server_list.count)
-            {
-                fprintf(stderr, "Error: unable to resolve server list.\n");
-                ret = -1;
-                break;
-            }
-        }
-
-        rc = PVFS_sys_create(filename,
-                             parent_ref,
-                             attr,
-                             &credentials,
-                             NULL,
-                             &resp_create,
-                             &layout,
-                             NULL);
-        if (rc)
+        rc = pvfs_creat(working_file, mode);
+        if (rc < 0)
         {
             fprintf(stderr, "Error: An error occurred while creating %s\n",
                     working_file);
-            PVFS_perror("PVFS_sys_create", rc);
+            perror("pvfs_creat");
             ret = -1;
             break;
         }
     }
 
-    PVFS_sys_finalize();
+    PVFS_sys_finalize();    
 
     if(user_opts->server_list)
     {
