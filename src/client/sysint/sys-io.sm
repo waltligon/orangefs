@@ -26,6 +26,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
@@ -3344,6 +3345,8 @@ static int unstuff_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
+    PVFS_capability *cap = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff/getattr completion fn: unstuff_comp_fn\n");
@@ -3364,6 +3367,8 @@ static int unstuff_comp_fn(void *v_p,
     
     if(resp_p->op == PVFS_SERV_UNSTUFF)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
+
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL);
@@ -3371,6 +3376,8 @@ static int unstuff_comp_fn(void *v_p,
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+        cap = &resp_p->u.unstuff.attr.capability;
     }
     else 
     {
@@ -3383,6 +3390,21 @@ static int unstuff_comp_fn(void *v_p,
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.getattr.attr);
+
+        cap = &resp_p->u.getattr.attr.capability;
+    }
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = getuid(); /* TODO: temp */
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid, cap);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
     }
 
     return(0);

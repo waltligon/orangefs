@@ -400,10 +400,9 @@ static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* Report a miss if capability is expired or within 
-     * CAP_TIMEOUT_BUFFER of expiration
-     *
-     * TODO: temporary change for fixing prior to update of acache
+    /* 
+     * TODO: client capcache - temporary change for fixing prior
+     * to update of acache
      */
     if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
     {
@@ -432,9 +431,16 @@ static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
         }
         if (ret < 0)
         {
-            /* TODO: error reporting if not -PVFS_ENOENT */
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache miss\n", 
-                         __func__);
+            if (ret == -PVFS_ENOENT)
+            {
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache miss\n", 
+                             __func__);
+            }
+            else
+            {
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cache error %d\n",
+                             ret);
+            }
             js_p->error_code = GETATTR_CACHE_MISS;
             return SM_ACTION_COMPLETE;
         }

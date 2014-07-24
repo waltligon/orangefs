@@ -377,7 +377,7 @@ int PINT_client_capcache_update(
                               calloc(1, sizeof(*tmp_payload));
             if (tmp_payload == NULL)
             {
-                /* TODO: gossip */
+                gossip_err("%s: out of memory\n", __func__);
                 gen_mutex_unlock(&client_capcache_mutex);
                 return -PVFS_ENOMEM;
             }
@@ -418,8 +418,8 @@ int PINT_client_capcache_update(
     {
         gettimeofday(&now, NULL);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: inserting "
-                     "new entry H=%llu uid=%d now=%d timeout=%d\n", llu(refn.handle),
-                     uid, now.tv_sec, cap->timeout);
+                     "new entry H=%llu uid=%d now=%llu timeout=%llu\n",
+                     llu(refn.handle), uid, llu(now.tv_sec), llu(cap->timeout));
         /* not found in cache; insert new payload*/
         timev.tv_sec = cap->timeout;
         timev.tv_usec = 0;
@@ -428,16 +428,21 @@ int PINT_client_capcache_update(
                           calloc(1, sizeof(*tmp_payload));
         if (tmp_payload == NULL)
         {
-            /* TODO: gossip */
+            gossip_err("%s: out of memory\n", __func__);
             gen_mutex_unlock(&client_capcache_mutex);
             return -PVFS_ENOMEM;
         }
         tmp_payload->refn = refn;
         tmp_payload->uid = uid;
-        PINT_copy_capability(cap, &tmp_payload->cap);
-        /* TODO: error-checking */
+        PINT_copy_capability(cap, &tmp_payload->cap);        
         ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                           &timev, &purged);
+        if (ret < 0)
+        {
+            gossip_err("%s: error inserting client_capcache entry: %d\n",
+                       __func__, ret);
+        }
+
         /* the purged variable indicates how many entries had to be purged
          * from the tcache to make room for this new one
          */
@@ -491,9 +496,6 @@ static int client_capcache_compare_key_entry(const void *key, struct qhash_head 
     }
   
     tmp_payload = (struct client_capcache_payload *) tmp_entry->payload;
-    /* TODO: temp */
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: checking payload: H=%llu F=%llu uid=%d\n",
-                 __func__, llu(tmp_payload->refn.handle), llu(tmp_payload->refn.fs_id), tmp_payload->uid);
     if (real_key->uid == tmp_payload->uid &&
         real_key->refn.handle == tmp_payload->refn.handle &&
         real_key->refn.fs_id == tmp_payload->refn.fs_id)
@@ -516,8 +518,7 @@ static int client_capcache_hash_key(const void *key, int table_size)
     int tmp_ret = 0;
 
     tmp_ret = (real_key->refn.handle + real_key->uid) % table_size;
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: index: %d H=%llu uid=%d\n",
-                 __func__, tmp_ret, llu(real_key->refn.handle), real_key->uid);
+
     return tmp_ret;
 }
 

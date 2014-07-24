@@ -29,11 +29,118 @@
 #include <openssl/x509.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #include "pvfs2-config.h"
+
+/* avoid using PINT_malloc etc. so that the shared library libpvfs2 is 
+   not linked--doing so causes problems with the input/output pipes 
+*/
+#define PVFS_MALLOC_REDEF_OVERRIDE
 #include "pvfs2-types.h"
+
+#undef PVFS_MALLOC_REDEF
 #include "src/proto/pvfs2-req-proto.h"
+
 #include "src/common/security/getugroups.h"
 
+/* We use our own endecode functions to avoid using PINT_malloc.
+   This prevents pvfs2-gencred being linked with the shared library libpvfs2,
+   which causes input/output problems on its pipes.
+   */
+/* TODO: needed?
+static inline void gencred_encode_PVFS_certificate(char **pptr,
+                                                   const struct PVFS_certificate *x)
+{ 
+    uint32_t i;
+
+    *(pptr) += 4;
+    *(u_int32_t*) *(pptr) = *(&x->buf_size);
+    *(pptr) += 4;
+    for (i=0; i<x->buf_size; i++) 
+    { 
+        *(char *) *(pptr) = *(&(x)->buf[i]);
+        *(pptr) += 1; 
+    }
+}
+
+static inline void gencred_encode_PVFS_credential(char **pptr, const struct PVFS_credential *x)
+{
+    int i;
+
+    *(pptr) += 4;
+    *(pptr) += 4;
+    *(u_int32_t*) *(pptr) = *(&x->userid);
+    *(pptr) += 4;
+    *(u_int32_t*) *(pptr) = *(&x->num_groups);
+    *(pptr) += 4;
+    if (x->num_groups > 0)
+    {
+        for (i=0; i<x->num_groups; i++)
+        {
+            *(u_int32_t*) *(pptr) = *(&(x)->group_array[i]);
+            *(pptr) += 4;
+        }
+    }
+    { 
+        int _pad = ((((uintptr_t) *(pptr))+7) & ~7) - (uintptr_t) *(pptr);
+        *(pptr) += _pad;
+    }
+    {
+        u_int32_t len = 0;
+        if (*&x->issuer)
+        {
+            len = strlen(*&x->issuer);
+        }
+        *(u_int32_t *) *(pptr) = len;
+        if (len)
+        {
+            memcpy(*(pptr)+4, *&x->issuer, len+1);
+            *(pptr) += (((4 + len + 1)+7) & ~7);
+        }
+        else
+        {
+            *(u_int32_t *) *(pptr) = 0;
+            *(pptr) += 8;
+        }
+    }
+    *(int64_t*) *(pptr) = *(&x->timeout);
+    *(pptr) += 8;
+    *(u_int32_t*) *(pptr) = *(&x->sig_size);
+    *(pptr) += 4;
+    if (x->sig_size > 0)
+    {
+        for (i=0; i<x->sig_size; i++)
+        {
+            *(char *) *(pptr) = *(&(x)->signature[i]);
+            *(pptr) += 1;
+        }
+    }
+    { 
+        int _pad = ((((uintptr_t) *(pptr))+7) & ~7) - (uintptr_t) *(pptr);
+        *(pptr) += _pad;
+    }
+    gencred_encode_PVFS_certificate(pptr, &x->certificate);
+    {
+        int _pad = ((((uintptr_t) *(pptr))+7) & ~7) - (uintptr_t) *(pptr);
+        *(pptr) += _pad;
+    }
+}
+
+static inline void gencred_decode_PVFS_certificate(char **pptr, struct PVFS_certificate *x)
+{ 
+    uint32_t i;
+
+    *(pptr) += 4;
+    *(&x->buf_size) = *(u_int32_t*) *(pptr);
+    *(pptr) += 4;
+    x->buf = ((x->buf_size * sizeof(*x->buf)) ? malloc(x->buf_size * sizeof(*x->buf)) : 0);
+    for (i=0; i<x->buf_size; i++)
+    {
+        *(&(x)->buf[i]) = *(char *) *(pptr);
+        *(pptr) += 1;
+    }
+}
+*/
 
 typedef struct {
     const char *user;
@@ -717,10 +824,7 @@ int main(int argc, char **argv)
     }
 
     ret = write_credential(&credential, pwd);
-    if (ret != EXIT_SUCCESS)
-    {
-        goto main_exit;
-    }
+
 main_exit:
 
     free(credential.issuer);
@@ -728,6 +832,9 @@ main_exit:
 #ifdef ENABLE_SECURITY_CERT
     free(credential.certificate.buf);
 #endif
+
+    ERR_free_strings();
+    EVP_cleanup();
 
     return ret;
 }

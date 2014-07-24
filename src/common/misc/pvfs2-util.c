@@ -271,11 +271,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char **ptr = args;
         char timearg[16];
 
-        int fd = open("/tmp/stderr.out", O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
-
         close(STDERR_FILENO);
-        /* TODO: temp dup(errordes[1]); */
-        dup(fd);
+        dup(errordes[1]);
         close(STDOUT_FILENO);
         dup(filedes[1]);
         close(STDIN_FILENO);
@@ -383,21 +380,17 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             {
                 do
                 {
-                    /* TODO: temp */
-                    /* ecnt = read(errordes[0], ebuf+etotal, 
-                                (sizeof(ebuf) - etotal));
-                                */
-                    ecnt = read(errordes[0], ebuf, sizeof(ebuf));
+                    ecnt = read(errordes[0], ebuf+etotal, (sizeof(ebuf) - etotal));                    
                 } while (ecnt == -1 && errno == EINTR);
                 etotal += ecnt;
-            } while (ecnt > 0 /* && etotal < sizeof(ebuf) */);
+            } while (ecnt > 0 && etotal < sizeof(ebuf));
             /* null terminate */
             ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)-1] = '\0';
 
             /* print errors */
             if (etotal > 0)
             {
-                gossip_err("pvfs2_gencred: (%llu)\n", /*ebuf,*/ llu(etotal));
+                gossip_err("pvfs2_gencred: %s\n", ebuf);
             }
         }
     }
@@ -642,6 +635,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 }
 #endif /* ENABLE_SECURITY_MODE */
 
+#define PINT_REFRESH_CREDENTIAL_TIME    3
 /*
  * This function checks to see if the credential is still valid
  * and is not about to time out - if so then it does nothing,
@@ -652,8 +646,9 @@ int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
-    /* if the credential is valid for at least an hour */
-    if (PINT_util_get_current_time() <= cred->timeout - 3600)
+    /* check if the credential is about to expire */
+    if (PINT_util_get_current_time() <= 
+        cred->timeout - PINT_REFRESH_CREDENTIAL_TIME)
     {
         ret = 0;
     }

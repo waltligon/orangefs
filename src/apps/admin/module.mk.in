@@ -32,10 +32,12 @@ ADMINSRC := \
 #       Not currently supported
 #	$(DIR)/pvfs2-get-uid.c
 
+# pvfs2-gencred is a user program
 ifdef ENABLE_SECURITY_KEY
-	ADMINSRC += $(DIR)/pvfs2-gencred.c
+	USERSRC += $(DIR)/pvfs2-gencred.c
 else ifdef ENABLE_SECURITY_CERT
-	ADMINSRC += $(DIR)/pvfs2-gencred.c $(DIR)/pvfs2-get-user-cert.c
+	USERSRC += $(DIR)/pvfs2-gencred.c
+	ADMINSRC += $(DIR)/pvfs2-get-user-cert.c
 endif
 
 ADMINSRC_SERVER := \

@@ -4792,7 +4792,12 @@ inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
     int32_t mac;
 
     *hints = NULL;
-    if(!s_opts.events) return;
+
+    /* add uid hint for client capcache functionality */
+    PVFS_hint_add(hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid),
+                  &req->in_upcall.uid);
+
+    if (!s_opts.events) return;
 
     mac = get_mac();
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);
