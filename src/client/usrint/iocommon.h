@@ -220,6 +220,8 @@ extern int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
 
 extern int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask);
 
+extern int iocommon_getobject(PVFS_object_ref obj, PVFS_sysresp_gethandles *gethandles_resp_p);
+
 extern int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
 
 extern int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);

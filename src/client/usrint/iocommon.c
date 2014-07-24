@@ -2606,6 +2606,30 @@ errorout:
     return rc;
 }
 
+/*used to retrive the metadata of a file and encode it so that the user can put it into a buffer */
+
+int iocommon_getobject(PVFS_object_ref obj, PVFS_sysresp_gethandles *gethandles_resp_p) 
+{
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_credential *credential;
+
+    memset(gethandles_resp_p, 0, sizeof(*gethandles_resp_p));
+    
+    rc = iocommon_cred(&credential);
+    if(rc != 0)
+    {
+        goto errorout;
+    }
+
+    errno = 0;
+    rc = PVFS_sys_gethandles(obj, credential, gethandles_resp_p, NULL);
+    IOCOMMON_CHECK_ERR(rc);
+    
+errorout:
+    return rc;
+}
+
 /** Implelments an object attribute get or read
  *
  */

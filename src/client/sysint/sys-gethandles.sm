@@ -7,7 +7,7 @@
 /** \file
  *  \ingroup sysint
  *
- *  PVFS2 system interface routines for obtaining attributes of an object
+ *  PVFS2 system interface routines for obtaining metadata (handles/dfile count) of an object
  *  (file or directory).
  */
 #include <string.h>
@@ -30,8 +30,8 @@
 /* pvfs2_client_gethandles_sm
  *
  * The sm_p->msgpair structure is used to get the attributes of the
- * object itself.  We convert the original attribute mask (in
- * sm_p->u.gethandles.attrmask) to ask for datafile and distribution info
+ * object itself.  We convert the original attribute mask
+ * to ask for datafile and distribution info
  * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows
  * us to obtain this information (if the object turns out to be a
  * metafile) so that we can later look up the datafile sizes and
@@ -141,11 +141,11 @@ PVFS_error PVFS_isys_gethandles(PVFS_object_ref ref,
 /** Retrieve object attributes.
  */
 PVFS_error PVFS_sys_gethandles(PVFS_object_ref ref,
-                            uint32_t attrmask,
                             const PVFS_credential *credential,
                             PVFS_sysresp_gethandles *resp_p,
                             PVFS_hint hints)
 {
+    uint32_t attrmask = PVFS_ATTR_SYS_ALL_NOHINT;
     PVFS_error ret, error;
     PVFS_sys_op_id op_id;
 
@@ -205,6 +205,10 @@ static PINT_sm_action PVFS_transfer_handles(struct PINT_smcb *smcb, job_status_s
     
     return SM_ACTION_COMPLETE;
 }
+
+/* this is used as a state to call a fill for the getattr 
+ *
+ */
 
 static PINT_sm_action PVFS_io_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {

@@ -325,7 +325,6 @@ PVFS_error PVFS_isys_gethandles(
 
 PVFS_error PVFS_sys_gethandles(
     PVFS_object_ref ref,
-    uint32_t attrmask,
     const PVFS_credential *credential,
     PVFS_sysresp_gethandles *resp,
     PVFS_hint hints);

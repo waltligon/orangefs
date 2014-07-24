@@ -434,7 +434,6 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     PVFS_object_ref parent_ref;
     PVFS_sys_dist   *new_dist;
     int ret = -1;
-    int var = 0;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
 
@@ -577,7 +576,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
             memset(&resp_gethandles, 0, sizeof(PVFS_sysresp_gethandles));
-            ret = PVFS_sys_gethandles(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
+            ret = PVFS_sys_gethandles(resp_lookup.ref,
                                    credentials, &resp_gethandles, hints);
             ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
                                    credentials, &resp_getattr, hints);
