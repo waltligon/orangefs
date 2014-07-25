@@ -5,17 +5,12 @@
  */
 package org.orangefs.usrint;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.junit.*;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class PVFS2POSIXJNITest 
 {
@@ -400,8 +395,7 @@ public class PVFS2POSIXJNITest
 	}
 
 	@Test
-	public void testLseek() 
-	{
+	public void testLseek() throws IOException {
 		int ret = posix.symlink("/mnt/orangefs/test_file_0", "/mnt/orangefs/test_link");
 		assertEquals(0 , ret);
 		int fd = posix.open("/mnt/orangefs/test_link", posix.f.O_RDONLY, posix.f.S_IRUSR);
@@ -444,8 +438,7 @@ public class PVFS2POSIXJNITest
 	}
 
 	@Test
-	public void testMkdirat() 
-	{	
+	public void testMkdirat() throws IOException {
 		
 		int dirfd = posix.open("/mnt/orangefs/test_dir_1", posix.f.O_DIRECTORY, posix.f.S_IRWXU);
 	    //Test with absolute path	
@@ -485,8 +478,7 @@ public class PVFS2POSIXJNITest
 
 	 
 	@Test
-	public void testOpen() 
-	{
+	public void testOpen() throws IOException {
 		 //open a file using O_CREAT
 		 int fd = posix.open("/mnt/orangefs/test_open_creat", posix.f.O_CREAT, posix.f.S_IRWXU);
 		 assertTrue(fd >= 0);		 
@@ -625,8 +617,7 @@ public class PVFS2POSIXJNITest
 
 	
 	@Test
-	public void testRenameat() 
-	{			
+	public void testRenameat() throws IOException {
 	
 		int dirfd = posix.open("/mnt/orangefs/test_dir_0", posix.f.O_DIRECTORY, posix.f.S_IRWXU);
 		int dirfd_tmp = posix.open("/mnt/orangefs/test_dir_1", posix.f.O_DIRECTORY, posix.f.S_IRWXU);
@@ -686,8 +677,7 @@ public class PVFS2POSIXJNITest
 	}
 
 	@Test
-	public void testSymlinkat() 
-	{
+	public void testSymlinkat() throws IOException {
 		int newfd = posix.open("/mnt/orangefs/test_dir_1", posix.f.O_RDONLY, posix.f.S_IRWXU);
 		int ret = posix.symlinkat("/mnt/ornagefs/test_dir_1/test_file1", newfd, "/mnt/orangefs/test_dir_1/posix_creat_softlink");
 		assertEquals(0 , ret);
