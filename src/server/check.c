@@ -287,9 +287,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     }
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
-                 "attr mask %d (capability mask = %s)\n",
+                 "perms %o (capability mask = %s)\n",
                  PINT_map_server_op_to_string(s_op->req->op),
-                 s_op->attr.mask, PINT_print_op_mask(cap->op_mask, op_mask));
+                 s_op->attr.perms, PINT_print_op_mask(cap->op_mask, op_mask));
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun)

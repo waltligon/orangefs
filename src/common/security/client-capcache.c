@@ -212,8 +212,8 @@ int PINT_client_capcache_get_cached_entry(
     int status;
     struct timeval current_time = { 0, 0 };
   
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: H=%llu uid=%d\n",
-                 __func__, llu(refn.handle), uid);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: H=%llu uid=%d "
+                 "id=%llx\n", llu(refn.handle), uid, llu(cap->cap_id));
     
     gen_mutex_lock(&client_capcache_mutex);
   
@@ -224,8 +224,7 @@ int PINT_client_capcache_get_cached_entry(
     if (ret < 0 || status != 0)
     {
         PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: miss: H=%llu uid=%d\n",
-                     llu(refn.handle), uid);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: miss\n");
     }
     else
     {
@@ -247,8 +246,7 @@ int PINT_client_capcache_get_cached_entry(
        TODO: buffer time? */
     if (current_time.tv_sec <= (time_t) tmp_payload->cap.timeout)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: hit: H=%llu uid=%d\n",
-                     llu(refn.handle), uid);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: hit\n");
         /* copy capability */
         ret = PINT_copy_capability((const PVFS_capability *) &tmp_payload->cap, 
                                    cap);
@@ -256,10 +254,10 @@ int PINT_client_capcache_get_cached_entry(
     else
     {
         ret = -PVFS_ETIME;
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "client_capcache: hit: H=%llu uid=%d "
-                     "EXPIRED\n", llu(refn.handle), uid);
-        /* TODO: remove from cache here? */
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "client_capcache lookup: expired\n");
 
+        /* remove from cache */
+        PINT_client_capcache_invalidate(refn, uid);
     }
     
     gen_mutex_unlock(&client_capcache_mutex);
@@ -321,23 +319,22 @@ int PINT_client_capcache_update(
     struct client_capcache_key key;
     struct client_capcache_payload *tmp_payload = NULL;
     struct PINT_tcache_entry *tmp_entry;
-    struct timeval timev = { 0, 0 }, now = { 0, 0 };
+    struct timeval timev = { 0, 0 };
 
     if (cap == NULL)
     {
         return -PVFS_EINVAL;
     }
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: H=%llu uid=%d\n",
-                 __func__, llu(refn.handle), uid);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: H=%llu "
+                 "uid=%d id=%llx\n", llu(refn.handle), uid, llu(cap->cap_id));
 
     /* don't cache expired cap TODO: buffer? */
     gettimeofday(&timev, NULL);
     if (timev.tv_sec > cap->timeout)
     {
-        gen_mutex_unlock(&client_capcache_mutex);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: not caching "
-                     "expired cap (%llu > %llu)\n", llu(timev.tv_sec), 
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: cap "
+                     "expired (%llu > %llu)\n", llu(timev.tv_sec),
                      llu(cap->timeout));
         return -PVFS_ETIME;
     }
@@ -357,7 +354,7 @@ int PINT_client_capcache_update(
         PVFS_time tmp_timeout;
 
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: entry "
-                     "found H=%llu uid=%d\n", llu(refn.handle), uid);
+                     "found\n");
         
         /* only update the entry if the timeout is newer TODO: buffer? */
         ret = -1;
@@ -371,7 +368,7 @@ int PINT_client_capcache_update(
         if (ret == 0)
         {
             gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: "
-                         "updating entry H=%llu uid=%d\n", llu(refn.handle), uid);
+                         "updating entry\n");
             /* build new payload */
             tmp_payload = (struct client_capcache_payload *) 
                               calloc(1, sizeof(*tmp_payload));
@@ -402,24 +399,21 @@ int PINT_client_capcache_update(
         else if (ret == -1)
         {
             gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: "
-                         "ignoring update as timeout is not later (%llu <= %llu)"
-                         " H=%llu uid=%d\n", llu(cap->timeout), llu(tmp_timeout),
-                         llu(refn.handle), uid);
+                         "ignoring update as timeout is not later "
+                         "(%llu <= %llu)\n",
+                         llu(cap->timeout), llu(tmp_timeout));
             ret = 0;
         }
         else
         {
             gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: could "
-                         "not remove entry (%d) H=%llu uid=%d\n", ret,
-                         llu(refn.handle), uid);
+                         "not remove entry (%d)\n", ret);
         }
     }
     else
     {
-        gettimeofday(&now, NULL);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: inserting "
-                     "new entry H=%llu uid=%d now=%llu timeout=%llu\n",
-                     llu(refn.handle), uid, llu(now.tv_sec), llu(cap->timeout));
+                     "new entry\n");
         /* not found in cache; insert new payload*/
         timev.tv_sec = cap->timeout;
         timev.tv_usec = 0;
@@ -470,8 +464,8 @@ int PINT_client_capcache_update(
 
     gen_mutex_unlock(&client_capcache_mutex);
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: returning %d\n",
-                 ret);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: returning "
+                 "%d\n", ret);
   
     return ret;
 }

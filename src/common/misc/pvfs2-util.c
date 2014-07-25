@@ -2268,7 +2268,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "attrmask being passed to server: ");
+                 "attrmask being passed to server: \n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
 
     return attrmask;

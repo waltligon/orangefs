@@ -396,8 +396,7 @@ static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
                     " [%llu]\n",
                       llu(object_ref.handle));
   
-        js_p->error_code = GETATTR_CACHE_MISS;
-        return SM_ACTION_COMPLETE;
+        js_p->error_code = GETATTR_CACHE_MISS;        
     }
 
     /* 
@@ -438,12 +437,16 @@ static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
             }
             else
             {
-                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cache error %d\n",
-                             ret);
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache error "
+                             "%d\n", __func__, ret);
             }
-            js_p->error_code = GETATTR_CACHE_MISS;
-            return SM_ACTION_COMPLETE;
         }
+    }
+
+    /* if acache missed, get attributes */
+    if (js_p->error_code == GETATTR_CACHE_MISS)
+    {
+        return SM_ACTION_COMPLETE;
     }
 
     /* acache hit, check results */
@@ -596,6 +599,10 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
 
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
     assert(object_ref.handle != PVFS_HANDLE_NULL);
+
+    /* TODO: temp */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "getattr: req_attrmask = %0x\n",
+                 sm_p->getattr.req_attrmask);
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
