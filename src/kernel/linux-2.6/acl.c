@@ -651,6 +651,17 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
     struct posix_acl *acl = NULL;
     int error = 0;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+#if defined(HAVE_POSIX_ACL_CREATE_3) 
+        umode_t mode;
+#elif defined(HAVE_POSIX_ACL_CREATE_4)
+        umode_t mode = inode->i_mode;
+        struct posix_acl *default_acl;
+#elif defined(HAVE_POSIX_ACL_CLONE)
+        struct posix_acl *clone = NULL;
+        mode_t mode;
+#else
+	#error No posix_acl_create or posix_acl_clone defined
+#endif /* HAVE_POSIX_ACL_CREATE_3 */ 
 
     if (dir == NULL)
         dir = inode;
@@ -678,15 +689,6 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
     }
     if (get_acl_flag(inode) == 1 && acl)
     {
-#ifdef HAVE_POSIX_ACL_CREATE
-        umode_t mode;
-#elif defined(HAVE_POSIX_ACL_CLONE)
-        struct posix_acl *clone = NULL;
-        mode_t mode;
-#else
-	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */ 
-
         if (S_ISDIR(inode->i_mode)) 
         {
             error = pvfs2_set_acl(inode, ACL_TYPE_DEFAULT, acl);
@@ -697,8 +699,10 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
                 goto cleanup;
             }
         }
-#ifdef HAVE_POSIX_ACL_CREATE
+#ifdef HAVE_POSIX_ACL_CREATE_3
         error = posix_acl_create(&acl, GFP_KERNEL, &mode);
+#elif defined(HAVE_POSIX_ACL_CREATE_4)
+        error = posix_acl_create(dir, &mode, &default_acl, &acl);
 #elif defined(HAVE_POSIX_ACL_CLONE)
         clone = posix_acl_clone(acl, GFP_KERNEL);
         error = -ENOMEM;
@@ -711,16 +715,23 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         error = posix_acl_create_masq(clone, &mode);
 #else
 	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */
+#endif /* HAVE_POSIX_ACL_CREATE_3 */
         if (error >= 0)
         {
-#ifdef HAVE_POSIX_ACL_CREATE
+#ifdef HAVE_POSIX_ACL_CREATE_3
             gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create changed mode "
                     "from %o to %o\n", inode->i_mode, mode);
+#elif defined(HAVE_POSIX_ACL_CREATE_4)
+            if (mode != inode->i_mode) {
+               gossip_debug(GOSSIP_ACL_DEBUG,
+                 "posix_acl_create changed mode from %o to %o\n",
+                 inode->i_mode,
+                 mode);
+            }
 #else
             gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create_masq changed mode "
                     "from %o to %o\n", inode->i_mode, mode);
-#endif /* HAVE_POSIX_ACL_CREATE */
+#endif /* HAVE_POSIX_ACL_CREATE_3 */
             /*
              * Dont do a needless ->setattr() if mode has not changed 
              */
@@ -733,25 +744,46 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
              */
             if (error > 0)
             {
-#ifdef HAVE_POSIX_ACL_CREATE
+#ifdef HAVE_POSIX_ACL_CREATE_3
                 error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
+#elif defined(HAVE_POSIX_ACL_CREATE_4)
+                if (default_acl) {
+                  error = pvfs2_set_acl(inode, ACL_TYPE_DEFAULT, default_acl);
+                  posix_acl_release(default_acl);
+                }
+
+                if (acl) {
+                  if (!error)
+                     error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
+                posix_acl_release(acl);
+                }
 #elif defined(HAVE_POSIX_ACL_CLONE)
                 error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
 #else 
 	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */
+#endif /* HAVE_POSIX_ACL_CREATE_3 */
                 gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl (access) returned %d\n", error);
             }
         }
 #ifdef HAVE_POSIX_ACL_CLONE
         posix_acl_release(clone);
-#endif /* HAVE_POSIX_ACL_CREATE */
+#endif /* HAVE_POSIX_ACL_CREATE_3 */
     }
     /* If mode of the inode was changed, then do a forcible ->setattr */
+#ifdef HAVE_POSIX_ACL_CREATE_4
+    if (mode != inode->i_mode) {
+       SetModeFlag(pvfs2_inode);
+       inode->i_mode = mode;
+       pvfs2_flush_inode(inode);
+    }
+#else
     if (ModeFlag(pvfs2_inode))
-        pvfs2_flush_inode(inode);
+       pvfs2_flush_inode(inode);
+#endif
 cleanup:
+#ifndef HAVE_POSIX_ACL_CREATE_4
     posix_acl_release(acl);
+#endif
     return error;
 }
 
@@ -794,11 +826,13 @@ int pvfs2_acl_chmod(struct inode *inode)
         error = 0;
         goto out;
     }
-#ifdef HAVE_POSIX_ACL_CHMOD
+#ifdef HAVE_POSIX_ACL_CHMOD_3
     error = posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode);
+#elif defined(HAVE_POSIX_ACL_CHMOD_2)
+    error = posix_acl_chmod(inode, inode->i_mode);
 #else
     error = posix_acl_chmod_masq(acl, inode->i_mode);
-#endif /* HAVE_POSIX_ACL_CHMOD */
+#endif
     if (!error)
     {
         error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
@@ -815,13 +849,18 @@ int pvfs2_acl_chmod(struct inode *inode)
     }
 #endif /* HAVE_POSIX_CLONE */
 
-#ifdef HAVE_POSIX_ACL_CHMOD
+#ifdef HAVE_POSIX_ACL_CHMOD_3
     error = posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode);
     if (!error)
     {
         error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
                       "(access) returned %d\n", error);
+    }
+#elif defined(HAVE_POSIX_ACL_CHMOD_2)
+    error = posix_acl_chmod(inode, inode->i_mode);
+    if (!error)
+    {
     }
 #elif defined(HAVE_POSIX_ACL_CLONE)
     error = posix_acl_chmod_masq(clone, inode->i_mode);
@@ -834,7 +873,7 @@ int pvfs2_acl_chmod(struct inode *inode)
     posix_acl_release(clone);
 #else
 	#error No posix_acl_chmod or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CHMOD */
+#endif
 
 out:
     posix_acl_release(acl);
