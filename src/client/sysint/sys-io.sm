@@ -707,7 +707,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
      * percentage of the target_datafile_count, then do small I/O to
      * the sio_array servers, etc.
      *
-     * For now (OrangeFS 2.8.9), if replication is turned on, then we MUST do flows.
+     * For now (OrangeFS 3.0), if replication is turned on, then we MUST do flows.
      * Changes for small-io will come later.     
      */
 

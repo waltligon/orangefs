@@ -48,16 +48,23 @@ machine pvfs2_replicate_prime_sm
     state contact_replicate_servers
     {
         jump pvfs2_contact_replicate_servers_sm;
-        default => send_initial_ack_to_client;
+        success => send_initial_ack_to_client;
+        default => send_nak_to_client;
+    }
+
+    state send_nak_to_client
+    {
+        run io_send_nak_to_client;
+        default => release;
     }
 
     state send_initial_ack_to_client
     {
-        /* right now, we will always send a positive ack back to the client,
-         * because we will always attempt to write to the local server, which
-         * hasn't been attempted at this point in the code.  we may change
-         * this response later, once we know how we are going to handle replicate
-         * servers that are unreachable.
+        /* as long as recoverable errors occurred in pvfs2_contact_replicate_servers_sm, 
+         * then we will always send a positive ack back to the client, because we will 
+         * always attempt to write to the local server, which hasn't been attempted at 
+         * this point in the code.  we may change this response later, once we know how 
+         * we are going to handle replicate servers that are unreachable.
          */
         run io_send_ack;
         success => start_flow;
@@ -121,6 +128,53 @@ nested machine pvfs2_contact_replicate_servers_sm
 
 
 %%
+
+/*
+ * Function: io_send_nak_to_client()
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s* js_p
+ *
+ * Pre:      error code has been set in job status for us to
+ *           report to client
+ *
+ * Post:     response has been sent to client
+ *            
+ * Returns:  int
+ *
+ * Synopsis: fills in a response to the I/O request, encodes it,
+ *           and sends it to the client via BMI.  
+ */
+static int io_send_nak_to_client(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+
+    s_op->resp.status = js_p->error_code;
+
+    ret = PINT_encode(&s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
+                      s_op->addr, s_op->decoded.enc_type);
+    if (ret < 0)
+    {
+        gossip_lerr("Server: IO SM: PINT_encode() failure(%d). Could not send NAK to client\n",ret);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = job_bmi_send_list(
+        s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
+        s_op->encoded.list_count, s_op->encoded.total_size,
+        s_op->tag, s_op->encoded.buffer_type, 0, smcb, 0, js_p,
+        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout,
+        s_op->req->hints);
+
+    return ret;
+}/* end function io_send_nak_to_client */
+
+
 
 /*
  * Function: io_send_ack()
@@ -709,13 +763,28 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
     int max_resp_sz=0;
     struct server_configuration_s *server_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_config;
-    int i, ret;
+    int i, ret, error_index, j;
     job_status_s replicate_recv_status = {0};
-    job_id_t replicate_recv_job_id = 0;
+    job_id_t *replicate_recv_job_id = NULL;
 
 
+    /* clean up msgpairarray from the previous setp */
+    PINT_msgpairarray_destroy(&(s_op->msgarray_op));
+
+    /* allocate space for the bmi recv job id's */
+    replicate_recv_job_id = calloc(s_op->u.io.replicate_d_repl_count,sizeof(*replicate_recv_job_id));
+    if ( !replicate_recv_job_id )
+    {
+       /* can't continue if server is having memory issues */
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+
+
+    /* get encoding info for this filesystem */
     fs_config = PINT_config_find_fs_id(server_opts,s_op->target_fs_id);
 
+    /* calculate how much space is needed to receive the final ack from the replicate servers */
     max_resp_sz = PINT_encode_calc_max_size( PINT_ENCODE_RESP
                                             ,PVFS_SERV_WRITE_COMPLETION
                                             ,fs_config->encoding );
@@ -732,7 +801,8 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
         {
             gossip_lerr("Error allocating memory for encoded response.\n");
             js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
+            error_index = i;
+            goto error_exit;
         }
         ret = job_bmi_recv(s_op->u.io.replicate_d[i].svr_addr,
                            s_op->u.io.replicate_d[i].encoded_resp_p,
@@ -742,7 +812,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                            smcb,
                            NEXT_FLOW + i, /*the status_user_tag contains the index into the replicate_d array */
                            &replicate_recv_status,
-                           &replicate_recv_job_id,
+                           &(replicate_recv_job_id[i]),
                            server_job_context,
                            server_opts->server_job_flow_timeout * s_op->req->u.io.replication_number_of_copies,
                            s_op->req->hints);
@@ -752,20 +822,21 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
         {
            /* error posting job */
 
-           /* Cancel the replicate-next request? */
+           /* Replicate-next requests will be cancelled by the job timer on their respective servers. Currently, */
+           /* we have no way of cancelling a job on another server.                                              */
            s_op->u.io.replicate_d[i].endpt_status.error_code = replicate_recv_status.error_code;
            s_op->u.io.replicate_d[i].endpt_status.state      = FAILED_INITIAL_BMI_RECV_POST;
            ret=BMI_memfree(s_op->u.io.replicate_d[i].svr_addr
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id[i],server_job_context);
            continue;
         }
         else if (ret == 1)
         {
            /* immediate completion.  since we haven't started the flows yet, something is 
-            * wrong with this picture! Need to cancel replicate-next request?             
+            * wrong with this picture! Replicate-next requests will cancel when their jobs timeout.
             */
            s_op->u.io.replicate_d[i].endpt_status.error_code = -PVFS_EINVAL;
            s_op->u.io.replicate_d[i].endpt_status.state = FAILED_INITIAL_BMI_RECV_POST;
@@ -773,7 +844,7 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id[i],server_job_context);
            continue;
         }
         else if (ret != 0)
@@ -785,12 +856,34 @@ static PINT_sm_action contact_post_bmi_recv_for_final_ack(struct PINT_smcb *smcb
                           ,s_op->u.io.replicate_d[i].encoded_resp_p
                           ,max_resp_sz
                           ,BMI_RECV);
-           ret=job_bmi_cancel(replicate_recv_job_id,server_job_context);
+           ret=job_bmi_cancel(replicate_recv_job_id[i],server_job_context);
            continue;
         }
     }/*end for*/
 
     js_p->error_code = 0;
+    
+    return SM_ACTION_COMPLETE;
+
+
+error_exit:
+    /* we only hit this exit when we are unable to allocate memory. For such a severe error, we 
+     * must shutdown everything for this request.
+     */
+    for (j=0; j<error_index; j++)
+    {
+       if (s_op->u.io.replicate_d[j].endpt_status.state != RUNNING)
+       {
+          /* this replicate prime request has already been shutdown */
+          continue;
+       }
+       ret=BMI_memfree(s_op->u.io.replicate_d[j].svr_addr
+                      ,s_op->u.io.replicate_d[j].encoded_resp_p
+                      ,max_resp_sz
+                      ,BMI_RECV);
+       ret=job_bmi_cancel(replicate_recv_job_id[j],server_job_context);
+    }    
+
     return SM_ACTION_COMPLETE;
 }/*end contact_post_bmi_recv_for_final_ack*/
 

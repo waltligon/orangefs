@@ -63,6 +63,8 @@ enum replication_endpoint_states
    FLOW_CANCELLED,
    FAILED_TO_REPLICATE,
    FAILED_FINAL_DECODE,
+
+/* put all states above this one */
    NUMBER_OF_STATES
 };
 
