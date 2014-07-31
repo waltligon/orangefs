@@ -538,7 +538,7 @@ int main(int argc, char **argv)
     int ret = EXIT_SUCCESS;
 
 #if HAVE_GETGROUPLIST
-#   if HAVE_GETGROUPLIST_INT
+#   ifdef HAVE_GETGROUPLIST_INT
        int groups_int[PVFS_REQ_LIMIT_GROUPS];
        int i;
 #   endif
@@ -636,7 +636,7 @@ int main(int argc, char **argv)
 
     ngroups = sizeof(groups)/sizeof(*groups);
 
-#if HAVE_GETGROUPLIST_INT
+#ifdef HAVE_GETGROUPLIST_INT
     /* The returned list of groups in groups_int is a list of signed integers; however,
      * gid_t is defined as an unsigned 32-bit integer.  So, we take steps to convert the 
      * signed integer into a proper uint32_t type.
