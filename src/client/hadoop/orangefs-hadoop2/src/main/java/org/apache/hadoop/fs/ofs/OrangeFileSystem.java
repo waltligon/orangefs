@@ -211,8 +211,7 @@ public class OrangeFileSystem extends FileSystem {
 
     /* Return a file status object that represents the path. */
     @Override
-    public FileStatus getFileStatus(Path f) throws FileNotFoundException,
-            IOException {
+    public FileStatus getFileStatus(Path f) throws IOException {
         Stat stats;
         FileStatus fileStatus;
         boolean isdir;
@@ -396,7 +395,7 @@ public class OrangeFileSystem extends FileSystem {
                     + "following authority: " + uriAuthority);
             throw new IOException(
                     "There was no matching authority found in"
-                            + " fs.ofs.systems. Check your configuration.");
+                            + " fs.ofs.systems. Check your configuration. -->" + uriAuthority + " = " + ofsSystems[index-1]);
         }
 
         OFSLOG.debug("URI authority = " + uriAuthority);
@@ -414,6 +413,7 @@ public class OrangeFileSystem extends FileSystem {
         workingDirectory = new Path("/user/" + System.getProperty("user.name"))
                 .makeQualified(this.uri, null);
         OFSLOG.debug("workingDirectory = " + workingDirectory.toString());
+        super.initialize(uri, conf);
         this.initialized = true;
     }
 
