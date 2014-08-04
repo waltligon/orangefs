@@ -406,17 +406,15 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.signature);
             }            
-            attr->capability.signature = NULL;
             if (attr->capability.handle_array)
             {
                 free(attr->capability.handle_array);
             }            
-            attr->capability.handle_array = NULL;
             if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
-            attr->capability.issuer = NULL;
+            memset(&attr->capability, 0, sizeof(PVFS_capability));
         }
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
