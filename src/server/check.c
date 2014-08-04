@@ -79,6 +79,11 @@ int PINT_get_capabilities(void *acl_buf,
     if (userid == 0)
     {
         *op_mask = ~((uint32_t)0);
+        /* remove dir-only capabilities */
+        if (attr->objtype != PVFS_TYPE_DIRECTORY)
+        {
+            *op_mask &= ~(PINT_CAP_CREATE|PINT_CAP_REMOVE);
+        }
         return 0;
     }
 
