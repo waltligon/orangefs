@@ -1,0 +1,36 @@
+From e568f2b11e14a3cf6dac9a80683dc0727bc26acc Mon Sep 17 00:00:00 2001
+From: Zhang Jingwang <jingwang.zhang@emc.com>
+Date: Mon, 18 Mar 2013 03:00:10 -0400
+Subject: [PATCH 2/6] Fix potential connection starvation in bmi_ib
+
+The new coming connection are handled in the function
+ib_tcp_server_check_new_connections(); and this is called inside the
+function ib_block_for_activity(). However the ib_block_for_activity()
+is only called when the network is idle in BMI_ib_testcontext() or
+BMI_ib_testunexpected().
+
+As a result, when the server is busy serving one client process, the
+other processes can't make a new connections to the server and thus
+they can't transfer data to the server concurrently.
+
+Change-Id: Ib9c28e0e5c38cf03741c2220a9a95e2c9ffbe5a1
+---
+ src/io/bmi/bmi_ib/ib.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/src/io/bmi/bmi_ib/ib.c b/src/io/bmi/bmi_ib/ib.c
+index 0808797..b349938 100644
+--- a/src/io/bmi/bmi_ib/ib.c
++++ b/src/io/bmi/bmi_ib/ib.c
+@@ -1436,6 +1436,8 @@ restart:
+ 	}
+     }
+ 
++    ib_tcp_server_check_new_connections();
++
+     *outcount = n;
+     return activity + n;
+ }
+-- 
+1.7.2.5
+
