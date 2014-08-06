@@ -869,7 +869,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -1520,6 +1520,7 @@ endif
 
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
     ifeq ($(NPTL_WORKAROUND),)
 	install -m 755 $(SERVER) $(sbindir)
     else
