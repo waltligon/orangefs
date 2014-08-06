@@ -51,13 +51,6 @@ nested machine pvfs2_mkdir_work_sm
     state create_local_dirdata_dspace
     {
         run mkdir_create_local_dirdata_dspace;
-        success => request_remote_dirdata_dspace;
-        default => err_msg;
-    }
-
-    state request_remote_dirdata_dspace
-    {
-        run mkdir_request_remote_dirdata_dspace;
         success => fill_handles_to_dist_dir_struct;
         default => err_msg;
     }
@@ -411,6 +404,7 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
      * from ECQ: This code (or above in mkdir_create_dist_dir_struct) should
      * allocate these OIDs. If it were done by trove then choosing of
      * local and remote OIDs would have to be handled differently.
+     * TJS: we should get the handles from the client, right?
      */
 
 /* no extents in V3 */
@@ -444,12 +438,13 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
 }
 
 /* V3 remove this state action */
+#if 0
+
 static PINT_sm_action mkdir_request_remote_dirdata_dspace(
                                                    struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
 /* No pools in V3 */
-#if 0
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
@@ -477,11 +472,12 @@ static PINT_sm_action mkdir_request_remote_dirdata_dspace(
                                  server_job_context,
                                  s_op->req->hints);
     return ret;
-#endif
 
     return(SM_ACTION_COMPLETE);
 
 }
+#endif
+
 
 /* V3 this nolonger needs a request - we generate OIDs and SIDs locally */
 static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
@@ -555,7 +551,7 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->u.mkdir.fs_id);
 
-
+    /* V3: Make sure this dirdata_sids is set correctly */
     PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
                                    s_op->req->capability,
                                    s_op->req->u.mkdir.credential,
@@ -568,6 +564,7 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                    s_op->attr.u.dir.dirdata_sids,
                                    NULL);
 
+    /* V3: add additional V3 fields for Meta/etc. */
     msg_p->fs_id = s_op->u.mkdir.fs_id;
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
