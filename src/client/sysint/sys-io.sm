@@ -26,6 +26,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
@@ -782,6 +783,9 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         PINT_sm_msgpair_state *msg = &cur_ctx->msg;
+
+        /* reset op_status */
+        msg->op_status = 0;
 
         /* do not do this one again in retry case */
         if (cur_ctx->msg_recv_has_been_posted &&
@@ -1649,7 +1653,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                     else
                     {
                         gossip_debug(GOSSIP_IO_DEBUG, 
-                            "io_check_context_status found error: %d", ret);
+                            "io_check_context_status found error: %d\n", ret);
                     }
                     break;
                 }
@@ -2053,7 +2057,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_process_context_recv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "%s called\n", __func__);
 
     assert(cur_ctx && decoded_resp && resp);
 
@@ -2083,13 +2087,13 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
         if (cur_ctx->msg.recv_status.error_code)
         {
             PVFS_perror_gossip(
-                    "io_process_context_recv (recv_status.error_code)",
+                    "io_decode_ack_response (recv_status.error_code)",
                     cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
         {
-            PVFS_perror_gossip("io_process_context_recv (op_status)",
+            PVFS_perror_gossip("io_decode_ack_response (op_status)",
                                cur_ctx->msg.op_status);
             gossip_err("server: %s\n"
                       , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
@@ -2101,7 +2105,6 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          decoded_resp,
                                          &cur_ctx->msg.svr_addr,
                                          cur_ctx->msg.max_resp_sz);
-        memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
         cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
@@ -2456,7 +2459,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     {
         {
             char buf[1024];
-            PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+            PVFS_strerror_r(ret, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
@@ -2510,6 +2513,14 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                      cur_ctx->msg.recv_status.error_code,
                      cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
+    }
+    else if (cur_ctx->msg.op_status)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in op_status for context %p\n",
+                     cur_ctx->msg.op_status,
+                     cur_ctx);
+        ret = cur_ctx->msg.op_status;
     }
     else if (io_type == PVFS_IO_WRITE)
     {
@@ -3334,6 +3345,8 @@ static int unstuff_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
+    PVFS_capability *cap = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff/getattr completion fn: unstuff_comp_fn\n");
@@ -3354,6 +3367,8 @@ static int unstuff_comp_fn(void *v_p,
     
     if(resp_p->op == PVFS_SERV_UNSTUFF)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
+
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL);
@@ -3361,6 +3376,8 @@ static int unstuff_comp_fn(void *v_p,
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+        cap = &resp_p->u.unstuff.attr.capability;
     }
     else 
     {
@@ -3373,6 +3390,21 @@ static int unstuff_comp_fn(void *v_p,
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.getattr.attr);
+
+        cap = &resp_p->u.getattr.attr.capability;
+    }
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = getuid(); /* TODO: temp */
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid, cap);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
     }
 
     return(0);

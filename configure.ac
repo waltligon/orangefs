@@ -294,7 +294,7 @@ fi],
 )
 AC_SUBST(ENABLE_SECURITY_CERT)
 
-dnl check for Capability Cache
+dnl check for capability cache
 AC_ARG_ENABLE(capcache,
 [  --disable-capcache      Disables server capability cache],
 [if test "x$enableval" = "xyes" ; then
@@ -303,16 +303,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
-    ENABLE_CAPCACHE=1
-    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
-else
-    ENABLE_CAPCACHE=
-fi]
+[ENABLE_CAPCACHE=1
+ AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
 )
 AC_SUBST(ENABLE_CAPCACHE)
 
-dnl check for Credential Cache
+
+
+dnl check for credential cache
 AC_ARG_ENABLE(credcache,
 [  --disable-credcache     Disables server credential cache],
 [if test "x$enableval" = "xyes" ; then
@@ -330,7 +328,7 @@ fi]
 )
 AC_SUBST(ENABLE_CREDCACHE)
 
-dnl check for Certificate Cache
+dnl check for certificate cache
 AC_ARG_ENABLE(certcache,
 [  --disable-certcache     Disables server certificate cache],
 [if test "x$enableval" = "xyes" ; then
@@ -358,17 +356,12 @@ if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) 
     AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
 fi
 
-dnl Capability cache only valid in security modes
-if test "x$ENABLE_CAPCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
-    AC_MSG_ERROR([capability cache can only be used in key- or certificate-based security mode])
-fi
-
-dnl Credential cache only valid in security modes
+dnl credential cache only valid in security modes
 if test "x$ENABLE_CREDCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([credential cache can only be used in key- or certificate-based security mode])
 fi
 
-dnl Certificate cache only valid in certificate-based security mode
+dnl certificate cache only valid in certificate-based security mode
 if test "x$ENABLE_CERTCACHE" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([certificate cache can only be used in certificate-based security mode])
 fi

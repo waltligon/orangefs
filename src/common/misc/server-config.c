@@ -131,7 +131,8 @@ static DOTCONF_CB(directio_timeout);
 
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
-static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(get_credential_timeout);
+static DOTCONF_CB(get_capability_timeout);
 static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
@@ -324,13 +325,13 @@ static const configoption_t options[] =
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
-    /* Security timeout in seconds
-     * Note: May be in the Defaults section for backwards-compatibility.
-     * For newly-generated configuration files it should appear in the
-     * Security section.
-     */
-    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
+    /* Credential timeout in seconds */
+    {"CredentialTimeoutSecs", ARG_INT, get_credential_timeout, NULL,
+        CTX_SECURITY, "3600"},
+
+    /* Capability timeout in seconds */
+    {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
+        CTX_SECURITY, "600"},
 
     /* Path to CA certificate file in PEM format.
      * Note: May be in the Defaults section for backwards-compatibility.
@@ -422,7 +423,7 @@ static const configoption_t options[] =
 
     /* LDAP server timeout for searches (in seconds) 
      */
-    {"SearchTimeout", ARG_INT, get_ldap_search_timeout, NULL,
+    {"SearchTimeoutSecs", ARG_INT, get_ldap_search_timeout, NULL,
         CTX_LDAP, "15"},
 
     /* This groups the Alias mapping options.
@@ -1332,14 +1333,16 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
+#endif
 
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     if (server_flag && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
         return 1;
     }
-#endif /* ENABLE_SECURITY */
+#endif
 
 #ifdef ENABLE_SECURITY_CERT
     if (server_flag && !config_s->ca_file)
@@ -3294,11 +3297,43 @@ DOTCONF_CB(get_server_key)
     return NULL;
 }
 
-DOTCONF_CB(get_security_timeout)
+DOTCONF_CB(get_credential_timeout)
 {
     struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;    
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->credential_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CredentialTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value, 
+                   config_s->credential_timeout);
+    }
+    
+    return NULL;
+}
+
+DOTCONF_CB(get_capability_timeout)
+{
+    struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
-    config_s->security_timeout = cmd->data.value;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->capability_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CapabilityTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->capability_timeout);
+    }
+
     return NULL;
 }
 

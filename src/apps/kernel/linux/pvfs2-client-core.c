@@ -2414,8 +2414,9 @@ PVFS_error write_device_response(
     int outcount = 0;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
-                 "%s: writing device response.  tag: %llu\n",
-                 __func__, llu(tag));
+                 "%s: writing device response. tag: %llu, "
+                 "error code: %d\n",
+                 __func__, llu(tag), jstat->error_code);
 
     if (buffer_list && size_list && list_size &&
         total_size && (list_size < MAX_LIST_SIZE))
@@ -2597,6 +2598,10 @@ static inline void package_downcall_members(
     int ret = -PVFS_EINVAL;
     assert(vfs_request);
     assert(error_code);
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s enter: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->in_upcall.type),
+                 *error_code);
 
     switch(vfs_request->in_upcall.type)
     {
@@ -3105,6 +3110,10 @@ static inline void package_downcall_members(
 
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s exit: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->out_downcall.type),
+                 vfs_request->out_downcall.status);
 
 }
 
@@ -4776,7 +4785,12 @@ inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
     int32_t mac;
 
     *hints = NULL;
-    if(!s_opts.events) return;
+
+    /* add uid hint for client capcache functionality */
+    PVFS_hint_add(hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid),
+                  &req->in_upcall.uid);
+
+    if (!s_opts.events) return;
 
     mac = get_mac();
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);

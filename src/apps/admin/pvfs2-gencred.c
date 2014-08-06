@@ -29,11 +29,19 @@
 #include <openssl/x509.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
-#include "pvfs2-config.h"
-#include "pvfs2-types.h"
-#include "src/proto/pvfs2-req-proto.h"
-#include "src/common/security/getugroups.h"
 
+#include "pvfs2-config.h"
+
+/* avoid using PINT_malloc etc. so that the shared library libpvfs2 is 
+   not linked--doing so causes problems with the input/output pipes 
+*/
+#define PVFS_MALLOC_REDEF_OVERRIDE
+#include "pvfs2-types.h"
+
+#undef PVFS_MALLOC_REDEF
+#include "src/proto/pvfs2-req-proto.h"
+
+#include "src/common/security/getugroups.h"
 
 typedef struct {
     const char *user;
@@ -717,10 +725,7 @@ int main(int argc, char **argv)
     }
 
     ret = write_credential(&credential, pwd);
-    if (ret != EXIT_SUCCESS)
-    {
-        goto main_exit;
-    }
+
 main_exit:
 
     free(credential.issuer);
@@ -728,6 +733,9 @@ main_exit:
 #ifdef ENABLE_SECURITY_CERT
     free(credential.certificate.buf);
 #endif
+
+    ERR_free_strings();
+    EVP_cleanup();
 
     return ret;
 }

@@ -238,6 +238,7 @@ static PINT_sm_action setup_fn(
         (char *) malloc(strlen(user_opts->server_alias) + 3);
     if (cap->issuer == NULL)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -247,7 +248,8 @@ static PINT_sm_action setup_fn(
     ret = PINT_sign_capability(cap);
     if (ret < 0)
     {
-        js_p->error_code = -PVFS_EINVAL;
+        PINT_cleanup_capability(cap);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
         
@@ -255,6 +257,7 @@ static PINT_sm_action setup_fn(
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }

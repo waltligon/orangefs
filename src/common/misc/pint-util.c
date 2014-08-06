@@ -382,7 +382,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
-	dest->mask = src->mask;
+        dest->mask = src->mask;
+        /* put capability mask back in if valid 
+           TODO: may need more involved solution */
+        if (!(dest->mask & PVFS_ATTR_CAPABILITY) &&
+            dest->capability.issuer != NULL && 
+            strlen(dest->capability.issuer) > 0)
+        {
+            dest->mask |= PVFS_ATTR_CAPABILITY;
+        }
         ret = 0;
     }
     return ret;
@@ -398,17 +406,15 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.signature);
             }            
-            attr->capability.signature = NULL;
             if (attr->capability.handle_array)
             {
                 free(attr->capability.handle_array);
             }            
-            attr->capability.handle_array = NULL;
             if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
-            attr->capability.issuer = NULL;
+            memset(&attr->capability, 0, sizeof(PVFS_capability));
         }
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {

@@ -13,7 +13,6 @@
  * Server-specific utility functions, to check modes and ACLs.
  */
 #include <string.h>
-#include <assert.h>
 
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
@@ -80,13 +79,22 @@ int PINT_get_capabilities(void *acl_buf,
     if (userid == 0)
     {
         *op_mask = ~((uint32_t)0);
+        /* remove dir-only capabilities */
+        if (attr->objtype != PVFS_TYPE_DIRECTORY)
+        {
+            *op_mask &= ~(PINT_CAP_CREATE|PINT_CAP_REMOVE);
+        }
         return 0;
     }
 
     /* if acls are present then use them */
     if (acl_size > 0)
     {
-        assert(acl_buf);
+        if (acl_buf == NULL)
+        {
+            gossip_err("%s: null ACL buffer\n", __func__);
+            return -PVFS_EINVAL;
+        }
 
         /* nlmills: errors are ignored on purpose. we don't want to
            give anyone free access.
@@ -94,23 +102,35 @@ int PINT_get_capabilities(void *acl_buf,
 
         ret = check_acls(acl_buf, acl_size, attr, userid, 
                          group_array, num_groups, PVFS2_ACL_READ);
-        if (!ret)
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_READ;
+        }
+        else if (ret < 0)
+        {
+            return ret;
         }
 
         ret = check_acls(acl_buf, acl_size, attr, userid,
                          group_array, num_groups, PVFS2_ACL_WRITE);
-        if (!ret)
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_WRITE;
+        }
+        else if (ret < 0)
+        {
+            return ret;
         }
 
         ret = check_acls(acl_buf, acl_size, attr, userid,
                          group_array, num_groups, PVFS2_ACL_EXECUTE);
-        if (!ret)
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_EXEC;
+        }
+        else if (ret < 0)
+        {
+            return ret;
         }
     }
     /* otherwise fall back to standard UNIX permissions */
@@ -120,9 +140,13 @@ int PINT_get_capabilities(void *acl_buf,
                      "PINT_get_capabilities: ACL unavailable, "
                      "using UNIX permissions\n");
         
-        assert(num_groups > 0);
-        assert(attr->mask & PVFS_ATTR_COMMON_GID);
-        
+        if (num_groups == 0 || !(attr->mask & PVFS_ATTR_COMMON_GID))
+        {
+            gossip_err("%s: no groups or PVFS_ATTR_COMMON_GID not set\n", 
+                       __func__);
+            return -PVFS_EINVAL;
+        }
+
         /* see if the user is a member of the object's group */
         active_group = group_array[0];
         for (i = 0; i < num_groups; i++)
@@ -134,19 +158,34 @@ int PINT_get_capabilities(void *acl_buf,
             }
         }
 
-        if (check_mode(READ_ACCESS, userid, active_group, attr))
+        ret = check_mode(READ_ACCESS, userid, active_group, attr);
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_READ;
         }
+        else if (ret < 0)
+        {
+            return ret;
+        }
 
-        if (check_mode(WRITE_ACCESS, userid, active_group, attr))
+        ret = check_mode(WRITE_ACCESS, userid, active_group, attr);
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_WRITE;
         }
+        else if (ret < 0)
+        {
+            return ret;
+        }
 
-        if (check_mode(EXEC_ACCESS, userid, active_group, attr))
+        ret = check_mode(EXEC_ACCESS, userid, active_group, attr);
+        if (ret > 0)
         {
             *op_mask |= PINT_CAP_EXEC;
+        }
+        else if (ret < 0)
+        {
+            return ret;
         }
     }
 
@@ -253,9 +292,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     }
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
-                 "attr mask %d (capability mask = %s)\n",
+                 "perms %o (capability mask = %s)\n",
                  PINT_map_server_op_to_string(s_op->req->op),
-                 s_op->attr.mask, PINT_print_op_mask(cap->op_mask, op_mask));
+                 s_op->attr.perms, PINT_print_op_mask(cap->op_mask, op_mask));
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun)
@@ -284,9 +323,13 @@ static int check_mode(enum access_type access,
     int group_access = 0;
     int mask;
     
-    assert(attr->mask & PVFS_ATTR_COMMON_UID &&
-           attr->mask & PVFS_ATTR_COMMON_GID &&
-           attr->mask & PVFS_ATTR_COMMON_PERM);
+    if (!(attr->mask & PVFS_ATTR_COMMON_UID) ||
+        !(attr->mask & PVFS_ATTR_COMMON_GID) ||
+        !(attr->mask & PVFS_ATTR_COMMON_PERM))
+    {
+        gossip_err("%s: invalid mask\n", __func__);
+        return -PVFS_EINVAL;
+    }
 
     mask = 0;
     if (attr->owner == userid)
@@ -346,7 +389,7 @@ static int check_mode(enum access_type access,
 
 /*
  * Return 0 if requesting clients is granted want access to the object
- * by the acl. Returns -PVFS_EIO if ACL is invalid or not found,
+ * by the acl. Returns -PVFS_EINVAL if ACL is invalid or not found,
  * returns -PVFS_EACCESS if access is denied
  */
 static int check_acls(void *acl_buf, 
@@ -361,18 +404,17 @@ static int check_acls(void *acl_buf,
     pvfs2_acl_header *ph;
 #endif
     pvfs2_acl_entry pe, *pa;
-    int i = 0, found = 0, count = 0;
-    int j;
-    assert(attr->mask & PVFS_ATTR_COMMON_UID &&
-           attr->mask & PVFS_ATTR_COMMON_GID &&
-           attr->mask & PVFS_ATTR_COMMON_PERM);
-    assert(num_groups > 0);
+    int i = 0, j = 0, found = 0, count = 0;
 
-    if (acl_size == 0)
+    if (!(attr->mask & PVFS_ATTR_COMMON_UID) ||
+        !(attr->mask & PVFS_ATTR_COMMON_GID) ||
+        !(attr->mask & PVFS_ATTR_COMMON_PERM) ||
+        num_groups == 0 ||
+        acl_size == 0 ||
+        acl_buf == NULL)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
-            "no acl's present..check metadata instead!\n");
-        return -PVFS_EIO;
+        gossip_err("%s: invalid argument\n", __func__);
+        return -PVFS_EINVAL;
     }
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
@@ -381,22 +423,22 @@ static int check_acls(void *acl_buf,
     /* remove header when calculating size */
     acl_size -= sizeof(pvfs2_acl_header);
 #endif
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
-        " %d (%d acl entries)\n",
-        (int) acl_size, (int) (acl_size / sizeof(pvfs2_acl_entry)));
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
-        uid, group_array[0], want);
-
-    assert(acl_buf);
     /* if the acl format doesn't look valid, then return an error rather than
      * asserting; we don't want the server to crash due to an invalid keyval
      */
-    if((acl_size % sizeof(pvfs2_acl_entry)) != 0)
+    if ((acl_size % sizeof(pvfs2_acl_entry)) != 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "invalid acls on object\n");
-        return(-PVFS_EIO);
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: invalid acls on object\n",
+                     __func__);
+        return -PVFS_EINVAL;
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: read keyval size "
+        " %d (%d acl entries)\n", __func__, (int) acl_size, count);
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: uid = %d, gid = %d, want = %d\n",
+        __func__, uid, group_array[0], want);
+
 
 #ifndef PVFS_USE_OLD_ACL_FORMAT
     /* point to header */
@@ -418,9 +460,9 @@ static int check_acls(void *acl_buf,
         pe.p_perm = bmitoh32(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
         pa = &pe;
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: decoded acl entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
-            i, pa->p_tag, pa->p_perm, pa->p_id);
+            __func__, i, pa->p_tag, pa->p_perm, pa->p_id);
         switch(pa->p_tag) 
         {
             case PVFS2_ACL_USER_OBJ:
@@ -461,20 +503,21 @@ static int check_acls(void *acl_buf,
             case PVFS2_ACL_OTHER:
                 if (found)
                 {
-                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
-                        "returning EIO\n");
-                    return -PVFS_EIO;
+                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning "
+                                 "EINVAL (1)\n", __func__);
+                    return -PVFS_EINVAL;
                 }
                 else
                     goto check_perm;
             default:
-                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(2) PINT_check_acls: "
-                        "returning EIO\n");
-                return -PVFS_EIO;
+                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning "
+                             "EINVAL (2)\n", __func__);
+                return -PVFS_EINVAL;
         }
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(3) PINT_check_acls: returning EIO\n");
-    return -PVFS_EIO;
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EINVAL (3)\n", 
+                 __func__);
+    return -PVFS_EINVAL;
 mask:
     /* search the remaining entries */
     i = i + 1;
@@ -493,15 +536,15 @@ mask:
         me.p_perm = bmitoh32(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
         mask_obj = &me;
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
-            "(p_tag %d, p_perm %d, p_id %d)\n",
-            i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: decoded (mask) acl entry %d "
+            "(p_tag %d, p_perm %d, p_id %d)\n", __func__, i, mask_obj->p_tag, 
+            mask_obj->p_perm, mask_obj->p_id);
         if (mask_obj->p_tag == PVFS2_ACL_MASK) 
         {
             if ((pa->p_perm & mask_obj->p_perm & want) == want)
                 return 0;
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(4) PINT_check_acls:"
-                "returning access denied (mask)\n");
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EACCES (mask)\n",
+                         __func__);
             return -PVFS_EACCES;
         }
     }
@@ -509,8 +552,8 @@ mask:
 check_perm:
     if ((pa->p_perm & want) == want)
         return 0;
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(5) PINT_check_acls: returning"
-            "access denied\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EACCES\n",
+                 __func__);
     return -PVFS_EACCES;
 }
 

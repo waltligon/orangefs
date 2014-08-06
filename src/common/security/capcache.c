@@ -10,6 +10,10 @@
 
 #ifdef ENABLE_CAPCACHE
 
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+#define ENABLE_SECURITY_MODE
+#endif
+
 #include <malloc.h>
 #include <string.h>
 
@@ -25,9 +29,10 @@
 seccache_t *capcache = NULL;
 
 /*** capability cache methods ***/
-/* static int PINT_capcache_expired(void *entry1, void *entry2); */
-static void PINT_capcache_set_expired(seccache_entry_t *entry, PVFS_time timeout);
-static uint16_t PINT_capcache_get_index(void *data, uint64_t hash_limit);
+static void PINT_capcache_set_expired(seccache_entry_t *entry,
+                                      PVFS_time timeout);
+static uint16_t PINT_capcache_get_index(void *data,
+                                        uint64_t hash_limit);
 static int PINT_capcache_compare(void *data, void *entry);
 static void PINT_capcache_cleanup(void *entry);
 static void PINT_capcache_debug(const char *prefix,
@@ -35,7 +40,6 @@ static void PINT_capcache_debug(const char *prefix,
 
 /* method table */
 static seccache_methods_t capcache_methods = {    
-    /* PINT_capcache_expired */
     PINT_seccache_expired_default,
     PINT_capcache_set_expired,
     PINT_capcache_get_index,
@@ -169,7 +173,7 @@ static void PINT_capcache_cleanup(void *entry)
 static void PINT_capcache_debug(const char *prefix,
                                 void *data)
 {
-    char sig_buf[10], mask_buf[10];
+    char sig_buf[16], mask_buf[16];
     PVFS_capability *cap;
     int i;
 
