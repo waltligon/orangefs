@@ -1653,6 +1653,9 @@ void PINT_release_pvfstab(void)
 uint32_t PVFS_util_sys_to_object_attr_mask(
     uint32_t sys_attrmask)
 {
+    /* display the original mask */
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"%s:Displaying original mask:\n",__func__);
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,sys_attrmask);
 
     /*
       adjust parameters as necessary; what's happening here

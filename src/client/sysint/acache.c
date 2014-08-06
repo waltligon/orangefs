@@ -14,6 +14,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-types-debug.h"
   
 /** \file
  *  \ingroup acache
@@ -293,6 +294,18 @@ int PINT_acache_get_cached_entry(
     ret = PINT_tcache_lookup(acache, &refn, &tmp_entry, &status);
     if(ret < 0 || status != 0)
     {
+        /* if (ret < 0) then entry is not in the acache, 
+         *    status is -PVFS_EINVAL and ret is -PVFS_ENOENT.
+         * if (ret >= 0 and status !=0) then the entry is in the acache but has expired, 
+         *    status is -PVFS_ETIME and ret is 0
+         */
+        
+        if ( ret >= 0 && status != 0 )
+        {
+           /* return a non-zero status code when the acache entry has expired. */
+           ret = status;
+        }
+
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss: H=%llu\n",
                      llu(refn.handle));
@@ -335,6 +348,11 @@ int PINT_acache_get_cached_entry(
     #endif
 
     /* Check to see if dynamic attrs have expired. */
+    gossip_debug(GOSSIP_ACACHE_DEBUG,"%s:current_time_msecs(%u)\t tmp_payload->msecs_dynamic(%u)\n"
+                                    ,__func__
+                                    ,(unsigned int)current_time_msecs
+                                    ,(unsigned int)tmp_payload->msecs_dynamic);
+
     if((current_time_msecs - tmp_payload->msecs_dynamic) >
         DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
     {
@@ -344,16 +362,15 @@ int PINT_acache_get_cached_entry(
         *attr_status = -PVFS_ETIME;
         tmp_payload->size_status = -PVFS_ETIME;
         *size_status = -PVFS_ETIME;
+        gossip_debug(GOSSIP_ACACHE_DEBUG,"%s:dynamic attrs have timed out...\n",__func__);
     }
 
     /* Reset Dynamic attrs timestamp since it was hit  */
     tmp_payload->msecs_dynamic = current_time_msecs;
 
-//#if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
                  "status=%d, attr_status=%d, size_status=%d\n",
                  status, tmp_payload->attr_status, tmp_payload->size_status);
-//#endif
 
     /* copy out non-static attributes if valid */
     if(tmp_payload && tmp_payload->attr_status == 0)
@@ -437,8 +454,10 @@ int PINT_acache_get_cached_entry(
             }
             attr->u.meta.dist_size = tmp_payload->dist_size;
         }
+
+        /* pay attention to this! */
         *attr_status = 0;
-    }
+    }/*end if static attributes found */
 
     gen_mutex_unlock(&acache_mutex);
   
@@ -447,7 +466,7 @@ int PINT_acache_get_cached_entry(
                  "size_status=%d, attr_status=%d\n",
                  llu(refn.handle), *size_status, *attr_status);
   
-    if(*size_status == 0 || *attr_status == 0) /* TODO what about the static attrs? */
+    if(*size_status == 0 || *attr_status == 0)
     {
         /* return success if we got _anything_ out of the cache */
         return(0);
@@ -657,10 +676,8 @@ int PINT_acache_update(
  
     }
 
-#if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): attr_status=%d, size_status=%d\n",
                  tmp_payload->attr_status, tmp_payload->size_status);
-#endif
 
     gen_mutex_lock(&acache_mutex);
 
@@ -805,6 +822,16 @@ static void load_payload(struct PINT_tcache* instance,
     /* Storage of current time */
     struct timeval current_time = { 0, 0};
     uint64_t current_time_msecs = 0;
+    uint32_t mask = 0;
+
+    /* what do the static and dynamic masks look like? */
+    mask = ((struct acache_payload *)payload)->mask;
+    gossip_debug(GOSSIP_ACACHE_DEBUG,"%s:Displaying the static mask(0x%08x)...\n",__func__,mask);
+    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,mask);
+
+    mask = ((struct acache_payload *)payload)->attr.mask;
+    gossip_debug(GOSSIP_ACACHE_DEBUG,"%s:Displaying the dynamic mask(0x%08x)...\n",__func__,mask);
+    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,mask);
 
     /* find out if the entry is already in the cache */
     ret = PINT_tcache_lookup(instance, 
