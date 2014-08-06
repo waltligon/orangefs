@@ -427,6 +427,10 @@ static PINT_sm_action getattr_cache_lookup(struct PINT_smcb *smcb,
         {
             /* hit - no need to request cap */
             sm_p->getattr.req_attrmask &= ~PVFS_ATTR_CAPABILITY;
+            /* TODO: temp */
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s (client_capcache): id: %llx issuer: %s\n",
+                         __func__, llu(sm_p->getattr.attr.capability.cap_id),
+                         sm_p->getattr.attr.capability.issuer);
         }
         if (ret < 0)
         {

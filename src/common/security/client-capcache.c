@@ -250,6 +250,10 @@ int PINT_client_capcache_get_cached_entry(
         /* copy capability */
         ret = PINT_copy_capability((const PVFS_capability *) &tmp_payload->cap, 
                                    cap);
+        /* TODO: temp */
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: id: %llx issuer: %s "
+                     "ptr: %p ret: %d\n", llu(cap->cap_id), (cap->issuer) ? cap->issuer : "(null)",
+                     cap, ret);
     }
     else
     {
@@ -392,6 +396,11 @@ int PINT_client_capcache_update(
             ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                           &timev, &purged);
 
+            /* TODO: temp */
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: id: %llx "
+                         "issuer: %s ptr: %p ret: %d\n", llu(tmp_payload->cap.cap_id),
+                         tmp_payload->cap.issuer ? tmp_payload->cap.issuer : "(null)",
+                         &tmp_payload->cap, ret);
             /* this counts as an update of an existing entry */
             PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_UPDATES,
                             1, PINT_PERF_ADD);

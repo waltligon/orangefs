@@ -380,7 +380,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             {
                 do
                 {
-                    ecnt = read(errordes[0], ebuf+etotal, (sizeof(ebuf) - etotal));                    
+                    ecnt = read(errordes[0], ebuf+etotal, 
+                                (sizeof(ebuf) - etotal));                    
                 } while (ecnt == -1 && errno == EINTR);
                 etotal += ecnt;
             } while (ecnt > 0 && etotal < sizeof(ebuf));
