@@ -1495,9 +1495,11 @@ DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
+
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
-    return NULL;
+
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_SECURITY);
 }
 
 DOTCONF_CB(exit_security_context)
