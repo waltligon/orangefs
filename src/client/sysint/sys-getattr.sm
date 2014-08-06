@@ -636,9 +636,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "%s: called\n", __func__);
-
     if (resp_p->status != 0)
     {
         return resp_p->status;
@@ -825,7 +822,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                      0 )
               )
             {
-                //assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
+                assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
 
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                         "  !!! need to contact dirdata to gather dirent_count and timestamps!\n");
@@ -1523,7 +1520,6 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
 static PINT_sm_action getattr_acache_insert(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: CALLED!\n", __func__);
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_size* tmp_size = NULL;
 
