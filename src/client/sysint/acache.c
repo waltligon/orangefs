@@ -321,12 +321,17 @@ int PINT_acache_get_cached_entry(
             }
             else
             {
+                *size_status = 0;
+                *size = tmp_payload->size;
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
                              "%s: size is still valid for %d usecs!\n",
                              __func__,
                              ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS * 1000
                                 - usecs_since_size_update);
-                *size_status = 0;
+                gossip_debug(GOSSIP_ACACHE_DEBUG,
+                             "%s: size = %lld\n",
+                             __func__,
+                             lld(*size));
             }
         }
         PINT_perf_count(acache_pc, PERF_ACACHE_HITS, 1, PINT_PERF_ADD);
@@ -505,6 +510,11 @@ int PINT_acache_update(
         char parsed_timeval[64] = { 0 };
 
         tmp_payload->size = *size;
+
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: tmp_payload->size = %lld\n",
+                     __func__,
+                     lld(tmp_payload->size));
 
         /* Debug output of current time. */
         PINT_util_get_current_timeval(&tmp_payload->size_updated_timeval);

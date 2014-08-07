@@ -526,6 +526,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE_SIZE HIT.\n",
                          __func__);
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: cached size = %llu\n",
+                         __func__,
+                         lld(sm_p->getattr.size));
         }
 
         /* nothing is missing, an acache hit on attrs and size! */
@@ -1579,21 +1583,20 @@ static PINT_sm_action getattr_acache_insert(
             if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
             {
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: caching stuffed file\n",
+                             "%s: caching stuffed file size\n",
                              __func__);
                 /* stuffed file case */
                 sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
                 tmp_size = &sm_p->getattr.size;
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: getattr_acache_insert "
-                             "calculated stuffed logical size of %lld\n",
+                             "%s: calculated stuffed logical size of %lld\n",
                              __func__,
                              lld(*tmp_size));
             }
             else
             {
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: unstuffed file\n",
+                             "%s: caching unstuffed file size\n",
                              __func__);
                 /* compute size as requested */
                 assert(sm_p->getattr.attr.u.meta.dist);
