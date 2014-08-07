@@ -527,7 +527,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                          "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE_SIZE HIT.\n",
                          __func__);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: cached size = %llu\n",
+                         "%s: cached size = %lld\n",
                          __func__,
                          lld(sm_p->getattr.size));
         }
