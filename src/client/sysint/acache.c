@@ -462,6 +462,7 @@ int PINT_acache_update(
     PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
+    uint32_t save_mask;
     int ret = -1;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -490,7 +491,11 @@ int PINT_acache_update(
     }
 
     tmp_payload->refn = refn;
+    /* copy attrs into payload, excluding capability */
+    save_mask = attr->mask;
+    attr->mask &= ~PVFS_ATTR_CAPABILITY;
     ret = PINT_copy_object_attr(&tmp_payload->attr, attr);
+    attr->mask = save_mask;
     if(ret != 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,

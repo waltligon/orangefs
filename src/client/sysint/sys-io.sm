@@ -3397,7 +3397,7 @@ static int unstuff_comp_fn(void *v_p,
     /* update client capcache with returned cap */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
     if (local_uid == (PVFS_uid) -1) {
-        local_uid = getuid(); /* TODO: temp */
+        local_uid = PINT_util_getuid();
     }
     PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
     ret = PINT_client_capcache_update(sm_p->object_ref, local_uid, cap);

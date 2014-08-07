@@ -119,18 +119,16 @@ int PINT_client_capcache_initialize(void)
         return -PVFS_ENOMEM;
     }
 
-    /* fill in defaults that are common to both */
+    /* fill in defaults */
     ret = set_client_capcache_defaults(client_capcache);
     if (ret < 0)
     {
         PINT_tcache_finalize(client_capcache);
-        /* PINT_tcache_finalize(static_client_capcache); */
-        gen_mutex_unlock(&client_capcache_mutex);
-        return ret;
     }
  
     gen_mutex_unlock(&client_capcache_mutex);
-    return 0;
+
+    return ret;
 }
   
 /** Finalizes and destroys the client_capcache, frees all cached entries */
@@ -142,6 +140,7 @@ void PINT_client_capcache_finalize(void)
     client_capcache = NULL;
 
     gen_mutex_unlock(&client_capcache_mutex);
+
     return;
 }
   
@@ -192,7 +191,7 @@ int PINT_client_capcache_set_info(
     
     gen_mutex_unlock(&client_capcache_mutex);
 
-    return(ret);
+    return ret;
 }
 
 /**
@@ -224,7 +223,13 @@ int PINT_client_capcache_get_cached_entry(
     if (ret < 0 || status != 0)
     {
         PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: miss\n");
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: miss (%d, %d)\n",
+                     ret, status);
+        if (ret == 0)
+        {
+            /* indicates timeout */
+            ret = status;
+        }
     }
     else
     {
@@ -242,8 +247,7 @@ int PINT_client_capcache_get_cached_entry(
     /* Get the time of day */
     gettimeofday(&current_time, NULL);
 
-    /* Check to see if cap has expired 
-       TODO: buffer time? */
+    /* Check to see if cap has expired */
     if (current_time.tv_sec <= (time_t) tmp_payload->cap.timeout)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: hit\n");
@@ -333,7 +337,7 @@ int PINT_client_capcache_update(
     gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: H=%llu "
                  "uid=%d\n", llu(refn.handle), uid);
 
-    /* don't cache expired cap TODO: buffer? */
+    /* don't cache expired cap */
     gettimeofday(&timev, NULL);
     if (timev.tv_sec > cap->timeout)
     {
@@ -360,7 +364,7 @@ int PINT_client_capcache_update(
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: entry "
                      "found\n");
         
-        /* only update the entry if the timeout is newer TODO: buffer? */
+        /* only update the entry if the timeout is newer */
         ret = -1;
         tmp_timeout = ((struct client_capcache_payload *) 
                        tmp_entry->payload)->cap.timeout;
@@ -401,6 +405,7 @@ int PINT_client_capcache_update(
                          "issuer: %s ptr: %p ret: %d\n", 
                          tmp_payload->cap.issuer ? tmp_payload->cap.issuer :
                           "(null)", &tmp_payload->cap, ret);
+
             /* this counts as an update of an existing entry */
             PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_UPDATES,
                             1, PINT_PERF_ADD);
@@ -423,6 +428,7 @@ int PINT_client_capcache_update(
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: inserting "
                      "new entry\n");
+
         /* not found in cache; insert new payload*/
         timev.tv_sec = cap->timeout;
         timev.tv_usec = 0;

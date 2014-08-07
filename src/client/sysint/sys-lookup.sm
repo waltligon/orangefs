@@ -829,9 +829,13 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* ensure a capability exists for the parent directory
-       TODO: change assertion to error check */
-    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY); 
+    /* ensure a capability exists for the parent directory */    
+    if (!(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY))
+    {
+        gossip_err("%s: missing cap\n", __func__);
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
+    }
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,

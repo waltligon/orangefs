@@ -86,6 +86,7 @@ typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
 
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
+#define PINT_SM_GETATTR_CAPCACHE_HIT 2
 
 typedef struct PINT_sm_getattr_state
 {
