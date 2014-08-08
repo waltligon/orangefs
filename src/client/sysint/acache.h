@@ -95,20 +95,26 @@
 
 enum 
 {
-   PERF_ACACHE_NUM_ENTRIES = 0,
-   PERF_ACACHE_SOFT_LIMIT = 1,
-   PERF_ACACHE_HARD_LIMIT = 2,
-   PERF_ACACHE_HITS = 3,
-   PERF_ACACHE_MISSES = 4,
-   PERF_ACACHE_UPDATES = 5,
-   PERF_ACACHE_PURGES = 6,
-   PERF_ACACHE_REPLACEMENTS = 7,
-   PERF_ACACHE_DELETIONS = 8,
-   PERF_ACACHE_ENABLED = 9,
+    PERF_ACACHE_NUM_ENTRIES = 0,
+    PERF_ACACHE_SOFT_LIMIT = 1,
+    PERF_ACACHE_HARD_LIMIT = 2,
+    PERF_ACACHE_HITS = 3,
+    PERF_ACACHE_MISSES = 4,
+    PERF_ACACHE_UPDATES = 5,
+    PERF_ACACHE_PURGES = 6,
+    PERF_ACACHE_REPLACEMENTS = 7,
+    PERF_ACACHE_DELETIONS = 8,
+    PERF_ACACHE_ENABLED = 9,
+    PERF_ACACHE_NUM_ENTRIES_W_SIZE = 10,
+    PERF_ACACHE_SIZE_HITS = 11,
+    PERF_ACACHE_SIZE_MISSES = 12,
+    PERF_ACACHE_SIZE_UPDATES = 13,
+    PERF_ACACHE_SIZE_INVALIDATIONS = 14,
 };
 
 /** acache performance counter keys */
 extern struct PINT_perf_key acache_keys[];
+extern struct PINT_perf_counter* get_acache_pc(void);
 
 void PINT_acache_enable_perf_counter(struct PINT_perf_counter* pc);
 

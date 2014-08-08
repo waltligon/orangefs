@@ -16,7 +16,7 @@
 #include <quicklist.h>
 
 /* for thread ids */
-#if WIN32
+#ifdef WIN32
 #include "wincommon.h"
 #else
 #include "gen-locks.h"
@@ -54,7 +54,10 @@ void gossip_disable(void)
         return;
     gossip_enabled = 0;
     qlist_for_each_entry(p, &gossip_config, list) {
-        p->mech.shutdown(p->data);
+        if (p->mech.shutdown)
+        {
+            p->mech.shutdown(p->data);
+        }
         free(p->data);
     }
 }

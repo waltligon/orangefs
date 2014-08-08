@@ -32,18 +32,20 @@ static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir)
 
     readdir->token = rd->token;
     readdir->pvfs_dirent_outcount = rd->pvfs_dirent_outcount;
-    readdir->dirent_array = kmalloc(readdir->pvfs_dirent_outcount *
-                                    sizeof(*readdir->dirent_array), GFP_KERNEL);
+    readdir->dirent_array =
+      kmalloc(readdir->pvfs_dirent_outcount * sizeof(*readdir->dirent_array),
+              GFP_KERNEL);
     if (readdir->dirent_array == NULL)
-    {
         return -ENOMEM;
-    }
+
     *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
     for (i = 0; i < readdir->pvfs_dirent_outcount; i++)
     {
-        dec_string(pptr, &readdir->dirent_array[i].d_name, &readdir->dirent_array[i].d_length);
-        readdir->dirent_array[i].handle = *(int64_t *) *pptr;
-        *pptr += 8;
+        dec_string(pptr,
+                   &readdir->dirent_array[i].d_name,
+                   &readdir->dirent_array[i].d_length);
+        readdir->dirent_array[i].khandle = *(PVFS_khandle *) *pptr;
+        *pptr += 16;
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);
 }
@@ -134,6 +136,7 @@ static int pvfs2_readdir(
     ino_t current_ino = 0;
     char *current_entry = NULL;
     long bytes_decoded;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
 #ifdef HAVE_READDIR_FILE_OPERATIONS
     gossip_ldebug(GOSSIP_DIR_DEBUG,
@@ -156,7 +159,8 @@ static int pvfs2_readdir(
     {
         gossip_debug(GOSSIP_DIR_DEBUG, 
                      "Skipping to graceful termination path since we are done\n");
-        return (0);
+        ret = 0;
+        goto out;
     }
 
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%llu)\n",
@@ -169,31 +173,41 @@ static int pvfs2_readdir(
     new_op = op_alloc(PVFS2_VFS_OP_READDIR);
     if (!new_op)
     {
-       return (-ENOMEM);
+       ret = -ENOMEM;
+       goto out;
     }
 
     new_op->uses_shared_memory = 1;
 
-    if (pvfs2_inode && (pvfs2_inode->refn.handle != PVFS_HANDLE_NULL)
-                    && ( pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)  )
+    if (pvfs2_inode &&
+       pvfs2_inode->refn.khandle.slice[0] +
+         pvfs2_inode->refn.khandle.slice[3] != 0 &&
+       pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
-        gossip_debug(GOSSIP_DIR_DEBUG,"%s: upcall.req.readdir.refn.handle:%llu\n"
-                                     ,__func__
-                                     ,llu(new_op->upcall.req.readdir.refn.handle));
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_DIR_DEBUG,
+                     "%s: upcall.req.readdir.refn.khandle:%s\n",
+                     __func__,
+                     k2s(&(new_op->upcall.req.readdir.refn.khandle),s));
     }
     else
     {
 #if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
         gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
         op_release(new_op);
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
 #endif
-        new_op->upcall.req.readdir.refn.handle = get_handle_from_ino(dentry->d_inode);
+        PVFS_khandle_from(&(new_op->upcall.req.readdir.refn.khandle),
+                          get_khandle_from_ino(dentry->d_inode),
+                          16);
         new_op->upcall.req.readdir.refn.fs_id  = PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
-        gossip_debug(GOSSIP_DIR_DEBUG,"%s: upcall.req.readdir.refn.handle:%llu\n"
-                                     ,__func__
-                                     ,llu(new_op->upcall.req.readdir.refn.handle));
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_DIR_DEBUG,
+                     "%s: upcall.req.readdir.refn.khandle:%s\n",
+                      __func__,
+                      k2s(&(new_op->upcall.req.readdir.refn.khandle),s));
     }
 
     new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT_READDIR;
@@ -216,7 +230,7 @@ get_new_buffer_index:
     {
         gossip_lerr("pvfs2_readdir: readdir_index_get() failure (%d)\n", ret);
         op_release(new_op);
-        return(ret);
+        goto out;
     }
     new_op->upcall.req.readdir.buf_index = buffer_index;
 
@@ -243,7 +257,7 @@ get_new_buffer_index:
          */
         gossip_err("%s: Client is down.  Aborting readdir call. \n",__func__);
         op_release(new_op);
-        return (ret);
+        goto out;
     }
 
     if ( ret < 0  || new_op->downcall.status != 0 )
@@ -253,7 +267,8 @@ get_new_buffer_index:
                       new_op->downcall.status);
          readdir_index_put(buffer_index);
          op_release(new_op);
-         return ( (ret < 0 ? ret : new_op->downcall.status) );
+         ret = ( (ret < 0 ? ret : new_op->downcall.status) );
+         goto out;
     }
 
     if ( (bytes_decoded = readdir_handle_ctor(&rhandle, 
@@ -265,7 +280,7 @@ get_new_buffer_index:
        ret = bytes_decoded;
        readdir_index_put(buffer_index);
        op_release(new_op);
-       return(ret);
+       goto out;
     }
 
     if (bytes_decoded != new_op->downcall.trailer_size)
@@ -276,12 +291,12 @@ get_new_buffer_index:
         ret = -EINVAL;
         readdir_handle_dtor(&rhandle);
         op_release(new_op);
-        return (ret);
+        goto out;
     }
 
     if (pos == 0)
     {
-       ino = get_ino_from_handle(dentry->d_inode);
+       ino = get_ino_from_khandle(dentry->d_inode);
        gossip_debug(GOSSIP_DIR_DEBUG,"%s: calling filldir of \".\" with pos = %llu\n"
                                     ,__func__
                                     ,llu(pos));
@@ -293,7 +308,7 @@ get_new_buffer_index:
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
-          return(ret);
+          goto out;
        }
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
@@ -327,7 +342,7 @@ get_new_buffer_index:
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
-          return(ret);
+          goto out;
        }
 #ifdef HAVE_READDIR_FILE_OPERATIONS
        file->f_pos++;
@@ -343,7 +358,9 @@ get_new_buffer_index:
     {
         len = rhandle.readdir_response.dirent_array[i].d_length;
         current_entry = rhandle.readdir_response.dirent_array[i].d_name;
-        current_ino   = pvfs2_handle_to_ino( rhandle.readdir_response.dirent_array[i].handle);
+        current_ino =
+          pvfs2_khandle_to_ino(
+            &(rhandle.readdir_response.dirent_array[i].khandle));
 
         gossip_debug(GOSSIP_DIR_DEBUG, 
                     "calling filldir for %s with len %d, pos %ld\n",
@@ -464,6 +481,8 @@ get_new_buffer_index:
 
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir returning %d\n",ret);
 
+out:
+    kfree(s);
     return (ret);
 }/*end pvfs2_readdir*/
 
@@ -627,8 +646,9 @@ static int pvfs2_readdirplus_common(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
     filldirplus_t filldirplus = NULL;
     filldirpluslite_t filldirplus_lite = NULL;
-    PVFS_object_ref ref;
+    PVFS_object_kref ref;
     int filldirplus_error = 0;
+    char *s;
 
     direntplus = info->direntplus;
     if (info->lite == 0)
@@ -646,7 +666,8 @@ static int pvfs2_readdirplus_common(
     if (pos == PVFS_READDIR_END)
     {
         gossip_debug(GOSSIP_DIR_DEBUG, "Skipping to graceful termination path since we are done\n");
-        return 0;
+        ret = 0;
+        goto out;
     }
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdirplus called on %s (pos=%d)\n",
                  dentry->d_name.name, (int)pos);
@@ -658,7 +679,8 @@ static int pvfs2_readdirplus_common(
     if(pos > 2)
     {
         gossip_err("pvfs2_readdirplus: invalid pos value! \n\t no re-entrance allowed because of distributed directory structure!! \n");
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
     do
@@ -673,9 +695,11 @@ static int pvfs2_readdirplus_common(
             case 0:
             {
                 struct inode *inode = NULL;
-                ino = get_ino_from_handle(dentry->d_inode);
+                ino = get_ino_from_khandle(dentry->d_inode);
                 ref.fs_id = get_fsid_from_ino(dentry->d_inode);
-                ref.handle = get_handle_from_ino(dentry->d_inode);
+                PVFS_khandle_from(&refn.khandle),
+                                  get_khandle_from_ino(dentry->d_inode),
+                                  16);
                 inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
                 if (inode)
                 {
@@ -715,7 +739,9 @@ static int pvfs2_readdirplus_common(
                 struct inode *inode = NULL;
                 ino = get_parent_ino_from_dentry(dentry);
                 ref.fs_id = get_fsid_from_ino(dentry->d_parent->d_inode);
-                ref.handle = get_handle_from_ino(dentry->d_parent->d_inode);
+                PVFS_khandle_from(&refn.khandle,
+                             get_khandle_from_ino(dentry->d_parent->d_inode),
+                             16);
                 inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
                 if (inode) 
                 {
@@ -766,8 +792,10 @@ static int pvfs2_readdirplus_common(
                 {
                     return -ENOMEM;
                 }
-                if (pvfs2_inode && pvfs2_inode->refn.handle != PVFS_HANDLE_NULL
-                        && pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
+                if (pvfs2_inode &&
+                    pvfs2_inode->refn.khandle.slice[0] +
+                      pvfs2_inode->refn.khandle.slice[0] != 0 &&
+                    pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
                 {
                     new_op->upcall.req.readdirplus.refn = pvfs2_inode->refn;
                 }
@@ -779,8 +807,10 @@ static int pvfs2_readdirplus_common(
                     op_release(new_op);
                     return -EINVAL;
 #endif
-                    new_op->upcall.req.readdirplus.refn.handle =
-                        get_handle_from_ino(dentry->d_inode);
+                    PVFS_khandle_from(
+                      &(new_op->upcall.req.readdirplus.refn.khandle),
+                      get_khandle_from_ino(dentry->d_inode),
+                      16);
                     new_op->upcall.req.readdirplus.refn.fs_id =
                         PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
                 }
@@ -852,20 +882,20 @@ static int pvfs2_readdirplus_common(
                         int dt_type, stat_error;
                         void *ptr = NULL;
                         PVFS_sys_attr *attrs = NULL;
-                        PVFS_handle handle;
+                        PVFS_khandle khandle;
                         PVFS_fs_id fs_id;
 
                         len = rhandle.readdirplus_response.dirent_array[i].d_length;
                         current_entry = rhandle.readdirplus_response.dirent_array[i].d_name;
-                        handle = rhandle.readdirplus_response.dirent_array[i].handle;
-                        current_ino = pvfs2_handle_to_ino(handle);
+                        khandle = rhandle.readdirplus_response.dirent_array[i].khandle;
+                        current_ino = pvfs2_khandle_to_ino(khandle);
                         stat_error = rhandle.readdirplus_response.stat_err_array[i];
                         fs_id  = new_op->upcall.req.readdirplus.refn.fs_id;
 
                         if (stat_error == 0)
                         {
                             ref.fs_id = get_fsid_from_ino(dentry->d_inode);
-                            ref.handle = handle;
+                            ref.khandle = khandle;
                             /* locate inode in the icache, but don't getattr() */
                             filled_inode = pvfs2_iget_locked(dentry->d_inode->i_sb, &ref);
                             if (filled_inode == NULL) {
@@ -897,7 +927,7 @@ static int pvfs2_readdirplus_common(
                                 if (filled_inode->i_state & I_NEW) {
                                     pvfs2_inode_t *filled_pvfs2_inode = PVFS2_I(filled_inode);
                                     pvfs2_inode_initialize(filled_pvfs2_inode);
-                                    filled_pvfs2_inode->refn.handle = handle;
+                                    filled_pvfs2_inode->refn.khandle = khandle;
                                     filled_pvfs2_inode->refn.fs_id  = fs_id;
                                     filled_inode->i_mapping->host = filled_inode;
                                     filled_inode->i_rdev = 0;
@@ -940,10 +970,16 @@ static int pvfs2_readdirplus_common(
                             ptr = ERR_PTR(err_num);
                             dt_type = DT_UNKNOWN;
                         }
-                        gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus for %s "
-                                " (%lu) with len %d, pos %ld kstat %p\n", 
-                                current_entry, (unsigned long) handle,
-                                len, (unsigned long) pos, ptr);
+                        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+                        gossip_debug(GOSSIP_DIR_DEBUG,
+                                     "calling filldirplus for %s "
+                                     " (%s) with len %d, pos %ld kstat %p\n", 
+                                     current_entry,
+                                     k2s(&khandle,s),
+                                     len,
+                                     (unsigned long) pos,
+                                     ptr);
+                        kfree(s);
                     
                         if (info->lite == 0)
                         {

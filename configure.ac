@@ -1750,46 +1750,6 @@ fi
 ],
 )
 
-dnl Do we have strerror_r?
-AC_MSG_CHECKING([for strerror_r])
-AC_TRY_COMPILE(
-    [
-	  #include <string.h>
-    ],
-    [
-      int errnum, buflen;
-      char *buf;
-      strerror_r(errnum, buf, buflen);
-    ],
-    [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_STRERROR_R, 1, Define if have strerror_r)
-      AC_DEFINE(HAVE_DECL_STRERROR_R, 1, Define if have strerror_r)
-    ]
-    ,
-    AC_MSG_RESULT(no)
-)
-
-dnl Which form of strerror?
-AC_MSG_CHECKING([for GNU-style strerror_r])
-AC_TRY_COMPILE(
-    [
-	  #include <string.h>
-    ],
-    [
-      int errnum, buflen;
-      char *buf, *ret;
-      ret = strerror_r(errnum, buf, buflen);
-    ],
-    [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
-      AC_DEFINE(STRERROR_R_CHAR_P, 1, Define if strerror_r return char ptr)
-    ]
-    ,
-    AC_MSG_RESULT(no)
-)
-
 dnl in our src/io/bmi/bmi-byteswap.h we check to see if __bswap_64
 dnl is defined, and if not, we define it. We probably haven't
 dnl had to use our define for a long time, __bswap_64 has been
