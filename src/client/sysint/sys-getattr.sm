@@ -635,19 +635,19 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
         sm_p->getattr.flags |= PINT_SM_GETATTR_CAPCACHE_HIT;
 
         /* TODO: temp */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s (client_capcache): issuer: %s\n",
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s (client_capcache): issuer: %s\n",
                      __func__, sm_p->getattr.attr.capability.issuer);
     }
     else
     {
         if (ret == -PVFS_ENOENT)
         {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache miss\n", 
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: client capcache miss\n", 
                          __func__);
         }
         else
         {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: client capcache error "
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: client capcache error "
                          "%d\n", __func__, ret);
         }
 

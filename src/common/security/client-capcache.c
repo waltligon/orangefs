@@ -19,9 +19,6 @@
 #include "client-capcache.h"
   
 /* compile time defaults */
-/* the default is high because it isn't used--the cap timeout
-   is used */
-#define CLIENT_CAPCACHE_DEFAULT_TIMEOUT_MSECS 1000000000LL
 #define CLIENT_CAPCACHE_DEFAULT_SOFT_LIMIT 5120
 #define CLIENT_CAPCACHE_DEFAULT_HARD_LIMIT 10240
 #define CLIENT_CAPCACHE_DEFAULT_RECLAIM_PERCENTAGE 25
@@ -29,19 +26,19 @@
 
 struct PINT_perf_key client_capcache_keys[] = 
 {
-   {"CLIENT_CAPCACHE_NUM_ENTRIES", PERF_CLIENT_CAPCACHE_NUM_ENTRIES, 
+   {"CAPCACHE_NUM_ENTRIES", PERF_CLIENT_CAPCACHE_NUM_ENTRIES, 
        PINT_PERF_PRESERVE},
-   {"CLIENT_CAPCACHE_SOFT_LIMIT", PERF_CLIENT_CAPCACHE_SOFT_LIMIT, 
+   {"CAPCACHE_SOFT_LIMIT", PERF_CLIENT_CAPCACHE_SOFT_LIMIT, 
        PINT_PERF_PRESERVE},
-   {"CLIENT_CAPCACHE_HARD_LIMIT", PERF_CLIENT_CAPCACHE_HARD_LIMIT, 
+   {"CAPCACHE_HARD_LIMIT", PERF_CLIENT_CAPCACHE_HARD_LIMIT, 
        PINT_PERF_PRESERVE},
-   {"CLIENT_CAPCACHE_HITS", PERF_CLIENT_CAPCACHE_HITS, 0},
-   {"CLIENT_CAPCACHE_MISSES", PERF_CLIENT_CAPCACHE_MISSES, 0},
-   {"CLIENT_CAPCACHE_UPDATES", PERF_CLIENT_CAPCACHE_UPDATES, 0},
-   {"CLIENT_CAPCACHE_PURGES", PERF_CLIENT_CAPCACHE_PURGES, 0},
-   {"CLIENT_CAPCACHE_REPLACEMENTS", PERF_CLIENT_CAPCACHE_REPLACEMENTS, 0},
-   {"CLIENT_CAPCACHE_DELETIONS", PERF_CLIENT_CAPCACHE_DELETIONS, 0},
-   {"CLIENT_CAPCACHE_ENABLED", PERF_CLIENT_CAPCACHE_ENABLED, 
+   {"CAPCACHE_HITS", PERF_CLIENT_CAPCACHE_HITS, 0},
+   {"CAPCACHE_MISSES", PERF_CLIENT_CAPCACHE_MISSES, 0},
+   {"CAPCACHE_UPDATES", PERF_CLIENT_CAPCACHE_UPDATES, 0},
+   {"CAPCACHE_PURGES", PERF_CLIENT_CAPCACHE_PURGES, 0},
+   {"CAPCACHE_REPLACEMENTS", PERF_CLIENT_CAPCACHE_REPLACEMENTS, 0},
+   {"CAPCACHE_DELETIONS", PERF_CLIENT_CAPCACHE_DELETIONS, 0},
+   {"CAPCACHE_ENABLED", PERF_CLIENT_CAPCACHE_ENABLED, 
        PINT_PERF_PRESERVE},
    {NULL, 0, 0},
 };
@@ -64,6 +61,7 @@ struct client_capcache_key
 
 static struct PINT_tcache *client_capcache = NULL;
 static gen_mutex_t client_capcache_mutex = GEN_MUTEX_INITIALIZER;
+static int client_capcache_timeout_flag = 0;
   
 static int client_capcache_compare_key_entry(const void *key, struct qhash_head *link);
 static int client_capcache_free_payload(void *payload);
@@ -72,6 +70,13 @@ static int client_capcache_hash_key(const void *key, int table_size);
 static struct PINT_perf_counter *client_capcache_pc = NULL;
 
 static int set_client_capcache_defaults(struct PINT_tcache *instance);
+
+/* TODO: needed? 
+extern struct PINT_perf_counter * get_client_capcache_pc(void)
+{
+    return client_capcache_pc;
+}
+*/
 
 /**
  * Enables perf counter instrumentation of the client_capcache
@@ -179,6 +184,12 @@ int PINT_client_capcache_set_info(
 
     ret = PINT_tcache_set_info(client_capcache, option, arg);
 
+    /* set timeout flag if set */
+    if (option == TCACHE_TIMEOUT_MSECS)
+    {
+        client_capcache_timeout_flag = 1;
+    }
+
     /* record any parameter changes that may have resulted*/
     PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_SOFT_LIMIT,
         client_capcache->soft_limit, PINT_PERF_SET);
@@ -209,7 +220,11 @@ int PINT_client_capcache_get_cached_entry(
     struct PINT_tcache_entry *tmp_entry = NULL;
     struct client_capcache_payload *tmp_payload = NULL;
     int status;
-    struct timeval current_time = { 0, 0 };
+
+    if (cap == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
   
     gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: H=%llu "
                  "uid=%d\n", llu(refn.handle), uid);
@@ -223,51 +238,36 @@ int PINT_client_capcache_get_cached_entry(
     if (ret < 0 || status != 0)
     {
         PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: miss (%d, %d)\n",
-                     ret, status);
+
+        /* unlock here so we can use PINT_client_capcache_invalidate */
+        gen_mutex_unlock(&client_capcache_mutex);
+
         if (ret == 0)
         {
             /* indicates timeout */
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: timed out\n");
+            /* remove from cache */
+            PINT_client_capcache_invalidate(refn, uid);
             ret = status;
         }
-    }
-    else
-    {
-        PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_HITS, 1, PINT_PERF_ADD);
-        tmp_payload = tmp_entry->payload;
-    }
+        else
+        {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: miss\n");
+        }
 
-    if (tmp_payload == NULL)
-    {
-        /* missed everything */
-        gen_mutex_unlock(&client_capcache_mutex);
         return ret;
     }
 
-    /* Get the time of day */
-    gettimeofday(&current_time, NULL);
+    PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_HITS, 1, PINT_PERF_ADD);
 
-    /* Check to see if cap has expired */
-    if (current_time.tv_sec <= (time_t) tmp_payload->cap.timeout)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: hit\n");
-        /* copy capability */
-        ret = PINT_copy_capability((const PVFS_capability *) &tmp_payload->cap, 
-                                   cap);
-        /* TODO: temp */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache: issuer: %s "
-                     "ptr: %p ret: %d\n", 
-                     (cap->issuer) ? cap->issuer : "(null)", cap, ret);
-    }
-    else
-    {
-        ret = -PVFS_ETIME;
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "client_capcache lookup: expired\n");
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: hit\n");
 
-        /* remove from cache */
-        PINT_client_capcache_invalidate(refn, uid);
-    }
-    
+    /* return a copy of the cached capability */
+    tmp_payload = tmp_entry->payload;
+
+    ret = PINT_copy_capability((const PVFS_capability *) &tmp_payload->cap,
+                               cap);
+        
     gen_mutex_unlock(&client_capcache_mutex);
   
     return ret;
@@ -327,7 +327,8 @@ int PINT_client_capcache_update(
     struct client_capcache_key key;
     struct client_capcache_payload *tmp_payload = NULL;
     struct PINT_tcache_entry *tmp_entry;
-    struct timeval timev = { 0, 0 };
+    struct timeval timev = { 0, 0 }, now = { 0, 0 };
+    unsigned int timeout;
 
     if (cap == NULL)
     {
@@ -338,11 +339,11 @@ int PINT_client_capcache_update(
                  "uid=%d\n", llu(refn.handle), uid);
 
     /* don't cache expired cap */
-    gettimeofday(&timev, NULL);
-    if (timev.tv_sec > cap->timeout)
+    PINT_util_get_current_timeval(&now);
+    if (now.tv_sec > cap->timeout)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: cap "
-                     "expired (%llu > %llu)\n", llu(timev.tv_sec),
+                     "expired (%llu > %llu)\n", llu(now.tv_sec),
                      llu(cap->timeout));
         return -PVFS_ETIME;
     }
@@ -356,6 +357,25 @@ int PINT_client_capcache_update(
                              &key,
                              &tmp_entry,
                              &status);
+
+    /* compute timeout */
+    if (client_capcache_timeout_flag)
+    {
+        /* set entry timeout to current time plus cache timeout */
+        PINT_tcache_get_info(client_capcache, TCACHE_TIMEOUT_MSECS, &timeout);
+        timev.tv_sec = now.tv_sec + (timeout / 1000);
+        /* do not set timeout past cap timeout */
+        if (timev.tv_sec > cap->timeout)
+        {
+            timev.tv_sec = cap->timeout;
+        }
+    }
+    else
+    {
+        /* use cap timeout if specific timeout not set */
+        timev.tv_sec = cap->timeout;
+    }
+    timev.tv_usec = now.tv_usec;
 
     if (ret == 0)
     {
@@ -382,7 +402,7 @@ int PINT_client_capcache_update(
                               calloc(1, sizeof(*tmp_payload));
             if (tmp_payload == NULL)
             {
-                gossip_err("%s: out of memory\n", __func__);
+                gossip_err("client_capcache update: out of memory\n");
                 gen_mutex_unlock(&client_capcache_mutex);
                 return -PVFS_ENOMEM;
             }
@@ -395,10 +415,8 @@ int PINT_client_capcache_update(
                 return ret2;
             }
 
-            timev.tv_sec = cap->timeout;
-            timev.tv_usec = 0;
             ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
-                                          &timev, &purged);
+                                              &timev, &purged);
 
             /* TODO: temp */
             gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update:  "
@@ -429,10 +447,7 @@ int PINT_client_capcache_update(
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: inserting "
                      "new entry\n");
 
-        /* not found in cache; insert new payload*/
-        timev.tv_sec = cap->timeout;
-        timev.tv_usec = 0;
-        /* build new payload */
+        /* not found - insert new payload */
         tmp_payload = (struct client_capcache_payload *) 
                           calloc(1, sizeof(*tmp_payload));
         if (tmp_payload == NULL)
@@ -557,6 +572,9 @@ static int client_capcache_free_payload(void *payload)
 static int set_client_capcache_defaults(struct PINT_tcache *instance)
 {
     int ret;
+
+    /* NOTE: no timeout is set because by default the capcache uses
+       the capability timeout */
 
     ret = PINT_tcache_set_info(instance, TCACHE_HARD_LIMIT,
                                CLIENT_CAPCACHE_DEFAULT_HARD_LIMIT);

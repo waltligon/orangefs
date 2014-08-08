@@ -57,6 +57,10 @@ typedef struct
     char *ccache_hard_limit;
     char *ccache_soft_limit;
     char *ccache_reclaim_percentage;
+    char *capcache_timeout;
+    char *capcache_hard_limit;
+    char *capcache_soft_limit;
+    char *capcache_reclaim_percentage;
     char *perf_time_interval_secs;
     char *perf_history_size;
     char *gossip_mask;
@@ -92,7 +96,7 @@ int main(int argc, char **argv)
     if ((getuid() != 0) && (geteuid() != 0))
     {
         fprintf(stderr, "Error: must be run as root\n");
-	return(-1);
+        return(-1);
     }
 
     if (opts.verbose)
@@ -349,6 +353,11 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index++] = "-c";
                 arg_list[arg_index++] = opts->ccache_timeout;
             }
+            if (opts->capcache_timeout)
+            {
+                arg_list[arg_index++] = "-b";
+                arg_list[arg_index++] = opts->capcache_timeout;
+            }
             if(opts->logtype)
             {
                 arg_list[arg_index] = "--logtype";
@@ -418,6 +427,24 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 arg_list[arg_index] = "--ccache-reclaim-percentage";
                 arg_list[arg_index+1] = opts->ccache_reclaim_percentage;
+                arg_index+=2;
+            }
+            if(opts->capcache_hard_limit)
+            {
+                arg_list[arg_index] = "--capcache-hard-limit";
+                arg_list[arg_index+1] = opts->capcache_hard_limit;
+                arg_index+=2;
+            }
+            if(opts->capcache_soft_limit)
+            {
+                arg_list[arg_index] = "--capcache-soft-limit";
+                arg_list[arg_index+1] = opts->capcache_soft_limit;
+                arg_index+=2;
+            }
+            if(opts->capcache_reclaim_percentage)
+            {
+                arg_list[arg_index] = "--capcache-reclaim-percentage";
+                arg_list[arg_index+1] = opts->capcache_reclaim_percentage;
                 arg_index+=2;
             }
             if(opts->perf_time_interval_secs)
@@ -510,11 +537,16 @@ static void print_help(char *progname)
     printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
     printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
     printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
-    printf("-c S, --ccache-timeout=S   credential cache timeout in seconds "
+    printf("-c S, --ccache-timeout=S      credential cache timeout in seconds "
            "(default is %ds)\n", PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
     printf("--ccache-soft-limit=LIMIT     credential cache soft limit\n");
     printf("--ccache-hard-limit=LIMIT     credential cache hard limit\n");
     printf("--ccache-reclaim-percentage=LIMIT credential cache reclaim percentage\n");
+    printf("-b S, --capcache-timeout=S    capability cache timeout in seconds "
+           "(default is %ds)\n", PVFS2_DEFAULT_CAPABILITY_TIMEOUT);
+    printf("--capcache-soft-limit=LIMIT   capability cache soft limit\n");
+    printf("--capcache-hard-limit=LIMIT   capability cache hard limit\n");
+    printf("--capcache-reclaim-percentage=LIMIT capability cache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
@@ -553,6 +585,9 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ccache-soft-limit",1,0,0},
         {"ccache-hard-limit",1,0,0},
         {"ccache-reclaim-percentage",1,0,0},
+        {"capcache-soft-limit",1,0,0},
+        {"capcache-hard-limit",1,0,0},
+        {"capcache-reclaim-percentage",1,0,0},
         {"desc-count",1,0,0},
         {"desc-size",1,0,0},
         {"perf-time-interval-secs",1,0,0},
@@ -567,7 +602,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "hvVfa:n:p:L:c:",
+    while((ret = getopt_long(argc, argv, "hvVfa:n:p:L:c:b:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -602,6 +637,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ccache-timeout", cur_option) == 0)
                 {
                     goto do_ccache;
+                }
+                else if (strcmp("capcache-timeout", cur_option) == 0)
+                {
+                    goto do_capcache;
                 }
                 else if (strcmp("path", cur_option) == 0)
                 {
@@ -662,6 +701,21 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ccache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->ccache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("capcache-hard-limit", cur_option) == 0)
+                {
+                    opts->capcache_hard_limit = optarg;
+                    break;
+                }
+                else if (strcmp("capcache-soft-limit", cur_option) == 0)
+                {
+                    opts->capcache_soft_limit = optarg;
+                    break;
+                }
+                else if (strcmp("capcache-reclaim-percentage", cur_option) == 0)
+                {
+                    opts->capcache_reclaim_percentage = optarg;
                     break;
                 }
                 else if (strcmp("desc-count", cur_option) == 0) 
@@ -728,6 +782,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'c':
           do_ccache:
                 opts->ccache_timeout = optarg;
+                break;
+            case 'b':
+          do_capcache:
+                opts->capcache_timeout = optarg;
                 break;
             case 'L':
           do_logfile:
