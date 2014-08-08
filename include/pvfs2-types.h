@@ -472,15 +472,48 @@ endecode_fields_12(
     uint64_t, handles_available_count,
     uint64_t, handles_total_count)
 
-/** object reference (uniquely refers to a single file, directory, or
-    symlink).
-*/
+/*
+ * object reference (uniquely refers to a single file, directory, or
+ * symlink).
+ */
 typedef struct
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     int32_t    __pad1;
 } PVFS_object_ref;
+
+/* kernel compatibility version of a PVFS_handle */
+typedef struct {
+   union {
+     unsigned char u[16];
+     unsigned int slice[4];
+   };
+} PVFS_khandle __attribute__ (( __aligned__ (8)));
+
+
+/*
+ * kernel version of an object ref.
+ */
+typedef struct
+{
+  PVFS_khandle khandle;
+  int32_t fs_id;
+  int32_t __pad1;
+} PVFS_object_kref;
+
+/*
+ * The kernel module will put the appropriate bytes of the khandle
+ * into ihash.u and perceive them as an inode number through ihash.ino.
+ * The slices are handy in encode and decode dirents...
+ */
+struct ihash {
+  union {
+    unsigned char u[8];
+    uint64_t ino;
+    unsigned int slice[2];
+  };
+};
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256

@@ -2769,7 +2769,7 @@ char *mkdtemp(char *template)
         return NULL;
     }
     len = strlen(template);
-    if (!strncmp(&template[len-6],"XXXXXX",6))
+    if (strncmp(&template[len-6],"XXXXXX",6) != 0)
     {
         errno = EINVAL;
         return NULL;
@@ -2781,12 +2781,19 @@ char *mkdtemp(char *template)
         fd = mkdir(template, 0700);
         if (fd < 0)
         {
-            if (errno == EEXIST)
+            if (errno != EEXIST)
             {
-                continue;
+                return NULL;
             }
-            return NULL;
         }
+        else
+        {
+            break;
+        }
+    }
+    if(try == MAXTRIES)
+    {
+        return NULL;
     }
     return template;
 }
@@ -2807,7 +2814,7 @@ int mkstemp(char *template)
         return -1;
     }
     len = strlen(template);
-    if (!strncmp(&template[len-6],"XXXXXX",6))
+    if (strncmp(&template[len-6],"XXXXXX",6) != 0)
     {
         errno = EINVAL;
         return -1;
@@ -2819,12 +2826,19 @@ int mkstemp(char *template)
         fd = open(template, O_RDWR|O_EXCL|O_CREAT, 0600);
         if (fd < 0)
         {
-            if (errno == EEXIST)
+            if (errno != EEXIST)
             {
-                continue;
+                return -1;
             }
-            return -1;
         }
+        else
+        {
+            break;
+        }
+    }
+    if(try == MAXTRIES)
+    {
+        return -1;
     }
     return fd;
 }

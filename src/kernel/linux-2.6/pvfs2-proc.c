@@ -372,26 +372,6 @@ static struct pvfs2_param_extra acache_rec_extra = {
     .min = 0,
     .max = 100,
 };
-static struct pvfs2_param_extra static_acache_timeout_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_TIMEOUT_MSECS,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_hard_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_soft_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_rec_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE,
-    .min = 0,
-    .max = 100,
-};
 static struct pvfs2_param_extra ncache_timeout_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS,
     .min = 0,
@@ -514,45 +494,6 @@ static ctl_table pvfs2_acache_table[] = {
     },
     { CTL_NAME(CTL_NONE) }
 };
-static ctl_table pvfs2_static_acache_table[] = {
-    /* controls static acache timeout */
-    {
-        CTL_NAME(1)
-        .procname = "timeout-msecs",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_timeout_extra
-    },
-    /* controls static acache hard limit */
-    {
-        CTL_NAME(2)
-        .procname = "hard-limit",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_hard_extra
-    },
-    /* controls static acache soft limit */
-    {
-        CTL_NAME(3)
-        .procname = "soft-limit",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_soft_extra
-    },
-    /* controls static acache reclaim percentage */
-    {
-        CTL_NAME(4)
-        .procname = "reclaim-percentage",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_rec_extra,
-    },
-    { CTL_NAME(CTL_NONE) }
-};
 
 static ctl_table pvfs2_ncache_table[] = {
     /* controls ncache timeout */
@@ -635,7 +576,6 @@ static ctl_table pvfs2_ccache_table[] = {
 };
 
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
-static int static_acache_perf_count = PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE;
 static int ncache_perf_count = PVFS2_PERF_COUNT_REQUEST_NCACHE;
 static ctl_table pvfs2_pc_table[] = {
     {
@@ -645,14 +585,6 @@ static ctl_table pvfs2_pc_table[] = {
         .mode = 0444,
         .proc_handler = pvfs2_pc_proc_handler,
         .extra1 = &acache_perf_count,
-    },
-    {
-        CTL_NAME(1)
-        .procname = "static-acache",
-        .maxlen = 4096,
-        .mode = 0444,
-        .proc_handler = pvfs2_pc_proc_handler,
-        .extra1 = &static_acache_perf_count,
     },
     {
         CTL_NAME(2)
@@ -791,14 +723,6 @@ static ctl_table pvfs2_table[] = {
         .maxlen = 0,
         .mode = 0555,
         .child = pvfs2_acache_table
-    },
-    /* subdir for static acache control */
-    {
-        CTL_NAME(9)
-        .procname = "static-acache",
-        .maxlen = 0,
-        .mode = 0555,
-        .child = pvfs2_static_acache_table
     },
     {
         CTL_NAME(10)

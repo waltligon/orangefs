@@ -23,6 +23,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     struct inode *parent_inode = NULL; 
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
+    char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: called on dentry %p.\n",
                  __func__, dentry);
@@ -60,7 +61,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         }
         new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
         parent = PVFS2_I(parent_inode);
-        if (parent && parent->refn.handle != PVFS_HANDLE_NULL &&
+        if (parent &&
+            parent->refn.khandle.slice[0] +
+              parent->refn.khandle.slice[3] != 0 &&
             parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             new_op->upcall.req.lookup.parent_refn = parent->refn;
@@ -73,8 +76,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             op_release(new_op);
             goto invalid_exit;
 #endif
-            new_op->upcall.req.lookup.parent_refn.handle =
-                            get_handle_from_ino(parent_inode);
+            PVFS_khandle_from(&(new_op->upcall.req.lookup.parent_refn.khandle),
+                              get_khandle_from_ino(parent_inode),
+                              16);
             new_op->upcall.req.lookup.parent_refn.fs_id =
                             PVFS2_SB(parent_inode->i_sb)->fs_id;
         }
@@ -90,15 +94,15 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                                 get_interruptible_flag(parent_inode));
 
         if((new_op->downcall.status != 0) || 
-           !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+           !match_handle(new_op->downcall.resp.lookup.refn.khandle, inode))
         {
             gossip_debug(
                 GOSSIP_DCACHE_DEBUG,
                 "%s:%s:%d lookup failure |%s| or no match |%s|.\n", 
                 __FILE__, __func__, __LINE__,
                 (new_op->downcall.status != 0) ? "true" : "false",
-                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
-                                ? "true" : "false");
+                (!match_handle(new_op->downcall.resp.lookup.refn.khandle,
+                               inode)) ? "true" : "false");
             op_release(new_op);
 
             /* Avoid calling make_bad_inode() in this situation.  On 2.4
@@ -132,9 +136,10 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     }
 
     /* now perform getattr */
+    memset(s,0,HANDLESTRINGSIZE);
     gossip_debug(GOSSIP_DCACHE_DEBUG,
-                 "%s: doing getattr: inode: %p, handle: %llu)\n",
-                 __func__, inode, llu(get_handle_from_ino(inode)));
+                 "%s: doing getattr: inode: %p, handle: %s)\n",
+                 __func__, inode, k2s(get_khandle_from_ino(inode),s));
     ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: getattr %s (ret = %d), returning %s for dentry i_count=%d\n",
@@ -149,9 +154,11 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     }
 
     /* dentry is valid! */
+    kfree(s);
     return 1;
 
 invalid_exit:
+    kfree(s);
     return 0;
 }
 
