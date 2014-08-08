@@ -44,7 +44,7 @@ class OFSTestConfig(object):
         
         ## @var ssh_key_filepath
         # Path of ssh key used to access all nodes
-        self.ssh_key_filepath = "" # Web Interface: auto
+        self.ssh_key_filepath = None # Web Interface: auto
         
         ## @var ssh_key_filepaths 
         # List of differing keypaths, if applicable
@@ -175,7 +175,6 @@ class OFSTestConfig(object):
         # Password of svn user. Allows checkout instead of export
         self.svn_password = None # Web Interface: not used
 
-        
         ## @var svn_options
         # Additional options for SVN
         self.svn_options = None # Web Interface: not used

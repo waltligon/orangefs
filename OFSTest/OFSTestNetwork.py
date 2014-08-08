@@ -1547,4 +1547,19 @@ class OFSTestNetwork(object):
             master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
             
         return rc
+    
+    def printNetwork(self):
+        
+        print "==========================================================================="
+        print "Virtual Cluster: Network-wide settings"
+        pprint(self.__dict__)
+        for node in self.network_nodes:
+            print "------------------------------------------------------------------------"
+            print "Node settings for %s" %  node.ip_address
+            pprint(node.__dict__)
+        
+        print "==========================================================================="
+        
+        return 0
+        
         
