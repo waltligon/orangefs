@@ -518,7 +518,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: NO ATTRS MISSING.\n", __func__);
 
-        PINT_perf_count(get_acache_pc(),
+        PINT_perf_count(PINT_acache_get_pc(),
                         PERF_ACACHE_HITS,
                         1,
                         PINT_PERF_ADD);
@@ -594,7 +594,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     }
 
     /* MISS */
-    PINT_perf_count(get_acache_pc(),
+    PINT_perf_count(PINT_acache_get_pc(),
                     PERF_ACACHE_MISSES,
                     1,
                     PINT_PERF_ADD);

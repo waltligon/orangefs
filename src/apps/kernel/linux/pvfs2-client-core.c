@@ -230,8 +230,6 @@ static int s_client_signal = 0;
 static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
 static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 
-static struct PINT_perf_counter* acache_pc = NULL;
-static struct PINT_perf_counter* ncache_pc = NULL;
 /* static char hostname[100]; */
 
 /* used only for deleting all allocated vfs_request objects */
@@ -1692,8 +1690,8 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
     switch(vfs_request->in_upcall.req.perf_count.type)
     {
         case PVFS2_PERF_COUNT_REQUEST_ACACHE:
-            tmp_str = PINT_perf_generate_text(acache_pc,
-                PERF_COUNT_BUF_SIZE);
+            tmp_str = PINT_perf_generate_text(PINT_acache_get_pc(),
+                                              PERF_COUNT_BUF_SIZE);
             if(!tmp_str)
             {
                 vfs_request->out_downcall.status = -PVFS_EINVAL;
@@ -1708,7 +1706,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             break;
 
         case PVFS2_PERF_COUNT_REQUEST_NCACHE:
-            tmp_str = PINT_perf_generate_text(ncache_pc,
+            tmp_str = PINT_perf_generate_text(PINT_ncache_get_pc(),
                 PERF_COUNT_BUF_SIZE);
             if(!tmp_str)
             {
@@ -1838,17 +1836,20 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_GET)
             {
-                ret = PINT_perf_get_info(
-                    acache_pc, PINT_PERF_HISTORY_SIZE, &tmp_perf_val);
+                ret = PINT_perf_get_info(PINT_acache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         &tmp_perf_val);
                 vfs_request->out_downcall.resp.param.value = tmp_perf_val;
             }
             else
             {
                 tmp_perf_val = vfs_request->in_upcall.req.param.value;
-                ret = PINT_perf_set_info(
-                    acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
-                ret = PINT_perf_set_info(
-                    ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
+                ret = PINT_perf_set_info(PINT_acache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         tmp_perf_val);
+                ret = PINT_perf_set_info(PINT_ncache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
             return(0);
@@ -1857,8 +1858,8 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_SET)
             {
-                PINT_perf_reset(acache_pc);
-                PINT_perf_reset(ncache_pc);
+                PINT_perf_reset(PINT_acache_get_pc());
+                PINT_perf_reset(PINT_ncache_get_pc());
             }    
             vfs_request->out_downcall.resp.param.value = 0;
             vfs_request->out_downcall.status = 0;
@@ -4082,40 +4083,45 @@ int main(int argc, char **argv)
         PINT_event_enable(s_opts.events);
     }
 
-    /* start performance counters for acache */
-    acache_pc = PINT_perf_initialize(acache_keys);
-    if(!acache_pc)
+    if(PINT_acache_get_pc())
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
+        ret = PINT_perf_set_info(PINT_acache_get_pc(),
+                                 PINT_PERF_HISTORY_SIZE,
+                                 s_opts.perf_history_size);
+        if(ret < 0)
+        {
+            gossip_err("%s: acache PINT_perf_set_info (history_size).\n",
+                       __func__);
+            finalize_perf_items(0);
+            return(ret);
+        }
+    }
+    else
+    {
+        gossip_err("%s: PINT_acache_get_pc() returned NULL.\n",
+                   __func__);
         return(-PVFS_ENOMEM);
     }
-    ret = PINT_perf_set_info(acache_pc, PINT_PERF_HISTORY_SIZE,
-        s_opts.perf_history_size);
-    if(ret < 0)
-    {
-        gossip_err("Error: PINT_perf_set_info (history_size).\n");
-        finalize_perf_items( 0 );
-        return(ret);
-    }
-    PINT_acache_enable_perf_counter(acache_pc);
 
-    /* start performance counters for ncache */
-    ncache_pc = PINT_perf_initialize(ncache_keys);
-    if(!ncache_pc)
+    if(PINT_ncache_get_pc())
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
-        finalize_perf_items( 0 );
+        ret = PINT_perf_set_info(PINT_ncache_get_pc(),
+                                 PINT_PERF_HISTORY_SIZE,
+                                 s_opts.perf_history_size);
+        if(ret < 0)
+        {
+            gossip_err("%s: ncache PINT_perf_set_info (history_size).\n",
+                       __func__);
+            finalize_perf_items(0);
+            return(ret);
+        }
+    }
+    else
+    {
+        gossip_err("%s: PINT_ncache_get_pc() returned NULL.\n",
+                   __func__);
         return(-PVFS_ENOMEM);
     }
-    ret = PINT_perf_set_info(ncache_pc, PINT_PERF_HISTORY_SIZE,
-        s_opts.perf_history_size);
-    if(ret < 0)
-    {
-        gossip_err("Error: PINT_perf_set_info (history_size).\n");
-        finalize_perf_items( 0 );
-        return(ret);
-    }
-    PINT_ncache_enable_perf_counter(ncache_pc);
 
     /* start a timer to roll over performance counters (acache) */
     PINT_smcb_alloc(&acache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
@@ -4125,18 +4131,18 @@ int main(int argc, char **argv)
             s_client_dev_context);
     if (!acache_smcb)
     {
-        finalize_perf_items( 0 );
+        finalize_perf_items(0);
         return(-PVFS_ENOMEM);
     }
     acache_timer_sm_p = PINT_sm_frame(acache_smcb, PINT_FRAME_CURRENT);
     acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
-    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
+    acache_timer_sm_p->u.perf_count_timer.pc = PINT_acache_get_pc();
     ret = PINT_client_state_machine_post(acache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting acache timer.\n");
-        finalize_perf_items( 1, acache_smcb );
+        finalize_perf_items(1, acache_smcb);
         return(ret);
     }
 
@@ -4147,35 +4153,35 @@ int main(int argc, char **argv)
             s_client_dev_context);
     if (!ncache_smcb)
     {
-        finalize_perf_items( 1, acache_smcb);
+        finalize_perf_items(1, acache_smcb);
         return(-PVFS_ENOMEM);
     }
     ncache_timer_sm_p = PINT_sm_frame(ncache_smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
-    ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
+    ncache_timer_sm_p->u.perf_count_timer.pc = PINT_ncache_get_pc();
     ret = PINT_client_state_machine_post(ncache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting ncache timer.\n");
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return(ret);
     }
 
     ret = initialize_ops_in_progress_table();
     if (ret)
     {
-	PVFS_perror("initialize_ops_in_progress_table", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        PVFS_perror("initialize_ops_in_progress_table", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return ret;
     }   
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if (ret < 0)
     {
-	PVFS_perror("PINT_dev_initialize", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return -PVFS_EDEVINIT;
+        PVFS_perror("PINT_dev_initialize", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return -PVFS_EDEVINIT;
     }
 
     /* setup a mapped region for I/O transfers */
@@ -4183,17 +4189,17 @@ int main(int argc, char **argv)
     ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_params);
     if (ret < 0)
     {
-	PVFS_perror("PINT_dev_get_mapped_region", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return ret;
+        PVFS_perror("PINT_dev_get_mapped_region", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return ret;
     }
 
     ret = job_open_context(&s_client_dev_context);
     if (ret < 0)
     {
-	PVFS_perror("device job_open_context failed", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return ret;
+        PVFS_perror("device job_open_context failed", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return ret;
     }
 
     /*
@@ -4204,8 +4210,8 @@ int main(int argc, char **argv)
 
     if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
     {
-	gossip_err("Cannot create remount thread!");
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        gossip_err("Cannot create remount thread!");
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return -1;
     }
 
@@ -4246,8 +4252,6 @@ int main(int argc, char **argv)
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
-
-    finalize_perf_items( 2, acache_smcb, ncache_smcb );
 
     gossip_err("pvfs2-client-core shutting down.\n");
     if (PVFS_sys_finalize())
@@ -4647,6 +4651,9 @@ static void reset_acache_timeout(void)
 
             PINT_acache_finalize();
             PINT_acache_initialize();
+            PINT_perf_set_info(PINT_acache_get_pc(),
+                               PINT_PERF_HISTORY_SIZE,
+                               s_opts.perf_history_size);
             s_opts.acache_timeout = max_acache_timeout_ms;
             set_acache_parameters(&s_opts);
         }
@@ -4701,32 +4708,34 @@ static void reset_ncache_timeout(void)
     }
 }
 
-static void finalize_perf_items(int n, ... )
+static void finalize_perf_items(int n, ...)
 {
+    gossip_err("%s: n = %d\n", __func__, n);
+    gossip_backtrace();
 
-    int i=0;
+    int i = 0;
     PINT_smcb *smcb;
     va_list v_args;
 
     va_start(v_args, n);
-    for( i=0; i < n; i++ )
+    for(i = 0; i < n; i++)
     {
         smcb = va_arg(v_args, PINT_smcb *);
-        if( smcb )
+        if(smcb)
         {
-            PINT_client_state_machine_release( smcb );
+            PINT_client_state_machine_release(smcb);
         }
     }
-    va_end( v_args );
+    va_end(v_args);
 
-    if( acache_pc != NULL )
+    if(PINT_acache_get_pc() != NULL)
     {
-        PINT_perf_finalize( acache_pc );
+        PINT_perf_finalize(PINT_acache_get_pc());
     }
 
-    if( ncache_pc != NULL )
+    if(PINT_ncache_get_pc() != NULL)
     {
-        PINT_perf_finalize( ncache_pc );
+        PINT_perf_finalize(PINT_ncache_get_pc());
     }
     return;
 }

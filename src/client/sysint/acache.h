@@ -107,12 +107,6 @@ enum
     PERF_ACACHE_ENABLED = 9
 };
 
-/** acache performance counter keys */
-extern struct PINT_perf_key acache_keys[];
-extern struct PINT_perf_counter* get_acache_pc(void);
-
-void PINT_acache_enable_perf_counter(struct PINT_perf_counter* pc);
-
 int PINT_acache_initialize(void);
 
 void PINT_acache_finalize(void);
@@ -145,6 +139,8 @@ void PINT_acache_invalidate(
 
 void PINT_acache_invalidate_size(
     PVFS_object_ref refn);
+
+struct PINT_perf_counter* PINT_acache_get_pc(void);
 
 #endif /* __ACACHE_H */
 

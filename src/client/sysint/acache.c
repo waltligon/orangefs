@@ -36,7 +36,23 @@
  * More dynamic attributes could be included in the future. */
 #define ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS 10000 /* 10 seconds */
 
-struct PINT_perf_key acache_keys[] = 
+/* data to be stored in a cached entry */
+struct acache_payload
+{
+    PVFS_object_ref refn;    /**< PVFS2 object reference */
+    PVFS_object_attr attr;   /**< cached attributes */
+    /**< Time when the dynamic attrs were last updated. */
+    struct timeval dynamic_attrs_last_updated;
+    PVFS_size size;          /**< cached size */
+    PVFS_size *size_array;   /**< dirent_count of every dirdata handle */
+};
+
+static struct PINT_tcache* acache = NULL;
+static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
+static struct PINT_perf_counter* acache_pc = NULL;
+
+/* static variables */
+static struct PINT_perf_key acache_keys[] = 
 {
     {"ACACHE_NUM_ENTRIES", PERF_ACACHE_NUM_ENTRIES, PINT_PERF_PRESERVE},
     {"ACACHE_SOFT_LIMIT", PERF_ACACHE_SOFT_LIMIT, PINT_PERF_PRESERVE},
@@ -51,59 +67,19 @@ struct PINT_perf_key acache_keys[] =
     {NULL, 0, 0},
 };
 
-/* data to be stored in a cached entry */
-struct acache_payload
-{
-    PVFS_object_ref refn;    /**< PVFS2 object reference */
-    PVFS_object_attr attr;   /**< cached attributes */  
-    /**< Time when the dynamic attrs were last updated. */
-    struct timeval dynamic_attrs_last_updated;
-    PVFS_size size;          /**< cached size */
-    PVFS_size *size_array;   /**< dirent_count of every dirdata handle */
-};
-
-static struct PINT_tcache* acache = NULL;
-static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
+static int PINT_acache_initialize_perf_counter(void);
 
 static int acache_compare_key_entry(const void* key, struct qhash_head* link);
+
 static int acache_free_payload(void* payload);
 
 static int acache_hash_key(const void* key, int table_size);
-static struct PINT_perf_counter* acache_pc = NULL;
 
 static int set_tcache_defaults(struct PINT_tcache* instance);
 
-static void load_payload(struct PINT_tcache* instance, 
-    PVFS_object_ref refn,
-    void* payload);
-
-extern struct PINT_perf_counter * get_acache_pc(void)
-{
-    return acache_pc;
-}
-
-/**
- * Enables perf counter instrumentation of the acache
- */
-void PINT_acache_enable_perf_counter(
-    struct PINT_perf_counter* pc_in) /**< counter for cache fields */
-{
-    gen_mutex_lock(&acache_mutex);
-
-    acache_pc = pc_in;
-    assert(acache_pc);
-
-    /* set initial values */
-    PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-        acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-        acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-        acache->enable, PINT_PERF_SET);
-
-    gen_mutex_unlock(&acache_mutex);
-    return;
-}
+static void load_payload(struct PINT_tcache* instance,
+                         PVFS_object_ref refn,
+                         void* payload);
 
 /**
  * Initializes the acache 
@@ -112,6 +88,14 @@ void PINT_acache_enable_perf_counter(
 int PINT_acache_initialize(void)
 {
     int ret = -1;
+    /* TODO */
+#if 0
+    unsigned int acache_timeout_msecs;
+    char * acache_timeout_str = NULL;
+
+    unsigned int acache_dynamic_timeout_msecs;
+    char * acache_dynamic_timeout_str = NULL;
+#endif
 
     gen_mutex_lock(&acache_mutex);
 
@@ -126,6 +110,20 @@ int PINT_acache_initialize(void)
         return(-PVFS_ENOMEM);
     }
 
+    /* TODO - handle envvar timeout values for overall acache payload and
+     * dynamic attributes. */
+#if 0
+    acache_timeout_str = getenv("PVFS2_ACACHE_TIMEOUT");
+    if (acache_timeout_str != NULL)
+    {
+        acache_timeout_msecs = (unsigned int)strtoul(acache_timeout_str,NULL,0);
+    }
+    else
+    {
+        acache_timeout_msecs = ACACHE_DEFAULT_TIMEOUT_MSECS;
+    }
+#endif
+
     ret = PINT_tcache_set_info(acache,
                                TCACHE_TIMEOUT_MSECS,
                                ACACHE_DEFAULT_TIMEOUT_MSECS);
@@ -136,7 +134,6 @@ int PINT_acache_initialize(void)
         return(ret);
     }
 
-    /* fill in defaults that are common to both */
     ret = set_tcache_defaults(acache);
     if(ret < 0)
     {
@@ -145,10 +142,21 @@ int PINT_acache_initialize(void)
         return(ret);
     }
 
+    /* initialize the perf counter for acache */
+    ret = PINT_acache_initialize_perf_counter();
+    if (ret < 0)
+    {
+        gossip_err("%s: Error initializing"
+                    "attribute cache performance counter\n",
+                    __func__);
+        gen_mutex_unlock(&acache_mutex);
+        return(ret);
+    }
+
     gen_mutex_unlock(&acache_mutex);
     return(0);
 }
-  
+
 /** Finalizes and destroys the acache, frees all cached entries */
 void PINT_acache_finalize(void)
 {
@@ -157,10 +165,13 @@ void PINT_acache_finalize(void)
     PINT_tcache_finalize(acache);
     acache = NULL;
 
+    PINT_perf_finalize(acache_pc);
+    acache_pc = NULL;
+
     gen_mutex_unlock(&acache_mutex);
     return;
 }
-  
+
 /**
  * Retrieves parameters from the acache 
  * @see PINT_tcache_options
@@ -171,7 +182,7 @@ int PINT_acache_get_info(
     unsigned int* arg)                   /**< output value */
 {
     int ret = -1;
-    
+
     gen_mutex_lock(&acache_mutex);
 
     if(option & STATIC_ACACHE_OPT)
@@ -207,15 +218,23 @@ int PINT_acache_set_info(
 
     ret = PINT_tcache_set_info(acache, option, arg);
 
-    /* record any parameter changes that may have resulted*/
-    PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-        acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-        acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-        acache->enable, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-        acache->num_entries, PINT_PERF_SET);
+    /* record any resulting parameter changes */
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_SOFT_LIMIT,
+                    acache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_HARD_LIMIT,
+                    acache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_ENABLED,
+                    acache->enable,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    acache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
 
@@ -378,10 +397,7 @@ int PINT_acache_get_cached_entry(
         goto done;
     }
 
-    /* Don't count it a hit yet. */
-#if 0
-    PINT_perf_count(acache_pc, PERF_ACACHE_HITS, 1, PINT_PERF_ADD);
-#endif
+    /* Don't count as a true hit yet. */
     gossip_debug(GOSSIP_ACACHE_DEBUG, 
                  "%s: hit on some attributes: H=%llu, "
                  "attr_status=%d, size_status=%d, size_array_status=%d\n",
@@ -620,6 +636,47 @@ int PINT_acache_update(
     return(0);
 }
 
+/**
+ * Returns the perf counter associated with this acache instance.
+ */
+struct PINT_perf_counter* PINT_acache_get_pc(void)
+{
+    return acache_pc;
+}
+
+/**
+ * Enables perf counter instrumentation of the acache.
+ *
+ * Should only be called by PINT_acache_initialize; therefore, no need to deal
+ * with the acache mutex here.
+ *
+ * \returns 0 on success, -PVFS_error on failure
+ */
+static int PINT_acache_initialize_perf_counter(void)
+{
+    acache_pc = PINT_perf_initialize(acache_keys);
+    if(!acache_pc)
+    {
+        gossip_err("Error: PINT_perf_initialize failure.\n");
+        return -PVFS_ENOMEM;
+    }
+
+    /* set initial values */
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_SOFT_LIMIT,
+                    acache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_HARD_LIMIT,
+                    acache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_ENABLED,
+                    acache->enable,
+                    PINT_PERF_SET);
+    return 0;
+}
+
 /* acache_compare_key_entry()
  *
  * compares an opaque key (object ref in this case) against a payload to see
@@ -693,19 +750,24 @@ static int set_tcache_defaults(struct PINT_tcache* instance)
 {
     int ret;
 
-    ret = PINT_tcache_set_info(instance, TCACHE_HARD_LIMIT, 
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_HARD_LIMIT,
                                ACACHE_DEFAULT_HARD_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_SOFT_LIMIT, 
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_SOFT_LIMIT,
                                ACACHE_DEFAULT_SOFT_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_RECLAIM_PERCENTAGE,
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_RECLAIM_PERCENTAGE,
                                ACACHE_DEFAULT_RECLAIM_PERCENTAGE);
     if(ret < 0)
     {
@@ -715,7 +777,7 @@ static int set_tcache_defaults(struct PINT_tcache* instance)
     return(0);
 }
 
-static void load_payload(struct PINT_tcache* instance, 
+static void load_payload(struct PINT_tcache* instance,
     PVFS_object_ref refn,
     void* payload)
 {
