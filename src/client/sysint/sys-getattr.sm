@@ -243,7 +243,7 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle)
                  ,&ref.handle);
-    
+
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                ref,
                                PVFS_util_sys_to_object_attr_mask(attrmask),
@@ -341,6 +341,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
+    int size_array_status = -1;
 
     js_p->error_code = 0;
 
@@ -348,6 +349,11 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     assert(object_ref.handle != PVFS_HANDLE_NULL);
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
+
+    /* Useful for debugging acache access. */
+#if 0
+    gossip_backtrace();
+#endif
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
                  "%s: handle %llu fsid %d\n",
@@ -393,7 +399,9 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                                        &sm_p->getattr.attr,
                                        &attr_status,
                                        &sm_p->getattr.size,
-                                       &size_status);
+                                       &size_status,
+                                       &sm_p->getattr.size_array,
+                                       &size_array_status);
     if(ret < 0 || attr_status < 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -506,25 +514,22 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
          missing_attrs &= ~PVFS_ATTR_META_MIRROR_DFILES;   
     }
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, 
-                 "%s: TRULY MISSING attrs:\n",
-                 __func__);
-    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,missing_attrs);
-
     if (missing_attrs == 0)
     {
-        if((trimmed_mask & PVFS_ATTR_DATA_SIZE) == PVFS_ATTR_DATA_SIZE)
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: NO ATTRS MISSING.\n", __func__);
+
+        PINT_perf_count(get_acache_pc(),
+                        PERF_ACACHE_HITS,
+                        1,
+                        PINT_PERF_ADD);
+        if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
         {
             /* Definitely requested size and valid size was in cache. */
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: NOTE, PVFS_ATTR_DATA_SIZE requested. \n",
                          __func__);
-            PINT_perf_count(get_acache_pc(),
-                            PERF_ACACHE_SIZE_HITS,
-                            1,
-                            PINT_PERF_ADD);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE_SIZE HIT.\n",
+                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE HIT.\n",
                          __func__);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: cached size = %lld\n",
@@ -532,10 +537,31 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                          lld(sm_p->getattr.size));
         }
 
+        if(trimmed_mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        {
+            /* Definitely requested PVFS_ATTR_DIR_DIRENT_COUNT and valid
+             * PVFS_ATTR_DIR_DIRENT_COUNT related attributes are cached.
+             */
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT requested. \n",
+                         __func__);
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
+                         "ACACHE HIT.\n",
+                         __func__);
+            /* TODO consider displaying some debug output for
+             * PVFS_ATTR_DIR_DIRENT_COUNT related attributes.
+             */
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: tmp_payload->size_array = %p\n",
+                         __func__,
+                         (void *) sm_p->getattr.size_array);
+        }
+
         /* nothing is missing, an acache hit on attrs and size! */
         gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: acache hit on everything "
-                     "needed [%llu]. Returning...\n",
+                     "%s: acache hit on all attributes requested of handle: "
+                     "[%llu]. Returning...\n",
                      __func__,
                      llu(object_ref.handle));
         js_p->error_code = 0;
@@ -544,22 +570,35 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     else
     {
         /* Some attr(s) are missing. */
+        gossip_debug(GOSSIP_ACACHE_DEBUG, 
+                     "%s: TRULY MISSING attrs:\n",
+                     __func__);
+        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,missing_attrs);
+
         /* Was the size missing? */
-        if((missing_attrs & PVFS_ATTR_DATA_SIZE) == PVFS_ATTR_DATA_SIZE)
+        if(missing_attrs & PVFS_ATTR_DATA_SIZE)
         {
-            /* The data size is one of potentially multiple missing attrs. */
-            PINT_perf_count(get_acache_pc(),
-                            PERF_ACACHE_SIZE_MISSES,
-                            1,
-                            PINT_PERF_ADD);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> "
-                         "ACACHE SIZE MISS.\n",
+                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
+                         __func__);
+        }
+
+        /* Was the size_array missing? */
+        if(missing_attrs & PVFS_ATTR_DIR_DIRENT_COUNT)
+        {
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
+                         "ACACHE MISS.\n",
                          __func__);
         }
     }
 
-    /* we missed */
+    /* MISS */
+    PINT_perf_count(get_acache_pc(),
+                    PERF_ACACHE_MISSES,
+                    1,
+                    PINT_PERF_ADD);
+
     /* clean out the attributes we got from the cache; this will be
      * overwritten when we request updated information from the server
      */
@@ -920,6 +959,10 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     /*initialize the size_array, which will hold the size of each datahandle*/
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,
                                      attr->u.meta.dfile_count);
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "%s: getattr->size_array = %p\n",
+                 __func__,
+                 (void *) getattr->size_array);
 
     /* initialize mir_ctx_array: one context for each handle in the file */
     getattr->mir_ctx_array = malloc(attr->u.meta.dfile_count *
@@ -1350,11 +1393,17 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     assert(attr);
 
     assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
-            
-    /* initialize size_array, used to store the dirent_count of every dirdata handle */      
+
+    /* Initialize size_array, used to store the dirent_count of every
+     * dirdata handle.
+     */
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
-            attr->dist_dir_attr.num_servers);
-            
+                                     attr->dist_dir_attr.num_servers);
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "%s: sm_p->getattr->size_array = %p\n",
+                 __func__,
+                 (void *) sm_p->getattr.size_array);
+
     sm_p->getattr.active_dirdata_index = (int *)malloc(
             sizeof(*sm_p->getattr.active_dirdata_index) *
             attr->dist_dir_attr.num_servers);
@@ -1435,7 +1484,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
 static int getattr_dirdata_getattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
-{   
+{
     PINT_smcb *smcb = v_p; 
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr *attr_p = NULL;
@@ -1475,7 +1524,8 @@ static int getattr_dirdata_getattr_comp_fn(
     /* update timestamp and dirent_count */
     sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dir.dirent_count;
     attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
-    /* This wasn't here before and is required for acache functionalilty. */
+    /* Flipping on PVFS_ATTR_DIR_DIRENT_COUNT here is required for acache
+     * functionalilty. */
     attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "%s: dirent_count = %lld\n",
@@ -1507,17 +1557,17 @@ static int getattr_dirdata_getattr_comp_fn(
 
 static PINT_sm_action getattr_dirdata_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
-{   
+{
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    
+
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-    
+
     if(sm_p->getattr.active_dirdata_index)
-    {   
+    {
         free(sm_p->getattr.active_dirdata_index);
     }
-    
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1561,11 +1611,19 @@ static PINT_sm_action getattr_acache_insert(
                  __func__);
     PINT_attr_dump_object_type(GOSSIP_ACACHE_DEBUG, &sm_p->getattr.attr);
     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.attr.mask);
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: Mask properties missing:\n",
-                 __func__);
-    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
-
+    if(missing_attrs)
+    {
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: Mask properties missing:\n",
+                     __func__);
+        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: No mask properties missing:\n",
+                     __func__);
+    }
 
     if( sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE || 
         sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY ||
@@ -1616,23 +1674,11 @@ static PINT_sm_action getattr_acache_insert(
                              lld(*tmp_size));
             }
         }
-        else
-        {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: objtype not metafile or PVFS_ATTR_DATA_SIZE "
-                         "wasn't in mask:\n",
-                         __func__);
-        }
-        if(tmp_size)
-        {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: size = %lld\n",
-                         __func__,
-                         lld(*tmp_size));
-        }
+
         PINT_acache_update(sm_p->getattr.object_ref,
                            &sm_p->getattr.attr,
-                           tmp_size);
+                           tmp_size,
+                           sm_p->getattr.size_array);
     }
 
     return SM_ACTION_COMPLETE;
@@ -1647,14 +1693,18 @@ static PINT_sm_action getattr_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG
-                ,"%s: js_p->error_code:%d \tgetattr->attr.mask:0x%08x\n"
-                ,__func__
-                ,js_p->error_code
-                ,getattr->attr.mask);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "%s: js_p->error_code:%d \tgetattr->attr.mask:0x%08x\n",
+                 __func__,
+                 js_p->error_code,
+                 getattr->attr.mask);
 
     sm_p->error_code = js_p->error_code;
 
+    /* TODO Should clean this up if the acache is disabled and the
+     * keep_size_array flag is not set!
+     */
+#if 0
     /* cleanup size array if not asked to keep; is allocated if datafile sizes or dirent_count are retrieved */
     /* keep_size_array is initialized outside the state machine, now only used in sys-readdir.sm */
     if (!getattr->keep_size_array && getattr->size_array)
@@ -1664,6 +1714,7 @@ static PINT_sm_action getattr_cleanup(
         free(getattr->size_array);
         getattr->size_array = NULL;
     }
+#endif
 
     /* cleanup getattr when an error occurs */
     if (js_p->error_code)
