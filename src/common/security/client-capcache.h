@@ -71,6 +71,8 @@ void PINT_client_capcache_invalidate(
     PVFS_object_ref refn,
     PVFS_uid uid);
 
+struct PINT_perf_counter* PINT_client_capcache_get_pc(void);
+
 #endif /* __CLIENT_CAPCACHE_H */
 
 /*

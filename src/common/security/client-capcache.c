@@ -62,7 +62,9 @@ struct client_capcache_key
 static struct PINT_tcache *client_capcache = NULL;
 static gen_mutex_t client_capcache_mutex = GEN_MUTEX_INITIALIZER;
 static int client_capcache_timeout_flag = 0;
-  
+
+static int PINT_client_capcache_initialize_perf_counter(void);
+
 static int client_capcache_compare_key_entry(const void *key, struct qhash_head *link);
 static int client_capcache_free_payload(void *payload);
 
@@ -71,36 +73,9 @@ static struct PINT_perf_counter *client_capcache_pc = NULL;
 
 static int set_client_capcache_defaults(struct PINT_tcache *instance);
 
-/* TODO: needed? 
-extern struct PINT_perf_counter * get_client_capcache_pc(void)
+struct PINT_perf_counter* PINT_client_capcache_get_pc(void)
 {
     return client_capcache_pc;
-}
-*/
-
-/**
- * Enables perf counter instrumentation of the client_capcache
- */
-void PINT_client_capcache_enable_perf_counter(
-    struct PINT_perf_counter *pc_in) /**< counter for cache fields */
-{
-    if (pc_in == NULL)
-        return;
-
-    gen_mutex_lock(&client_capcache_mutex);
-
-    client_capcache_pc = pc_in;
-
-    /* set initial values */
-    PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_SOFT_LIMIT,
-        client_capcache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_HARD_LIMIT,
-        client_capcache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_ENABLED,
-        client_capcache->enable, PINT_PERF_SET);
-
-    gen_mutex_unlock(&client_capcache_mutex);
-    return;
 }
 
 /**
@@ -130,12 +105,53 @@ int PINT_client_capcache_initialize(void)
     {
         PINT_tcache_finalize(client_capcache);
     }
- 
+
+    /* initialize the perf counter for acache */
+    ret = PINT_client_capcache_initialize_perf_counter();
+    if (ret < 0)
+    {
+        gossip_err("%s: Error initializing"
+                    "capcache performance counter\n",
+                    __func__);
+    }
+
     gen_mutex_unlock(&client_capcache_mutex);
 
     return ret;
 }
-  
+
+/**
+ * Enables perf counter instrumentation of the client_capcache
+ * 
+ * Called from within PINT_capcache_initialize, so assumes it
+ * owns the cache mutex.
+ */
+static int PINT_client_capcache_initialize_perf_counter(void)
+{
+    client_capcache_pc = PINT_perf_initialize(client_capcache_keys);
+    if (client_capcache_pc == NULL)
+    {
+        gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);
+        return -PVFS_ENOMEM;
+    }
+
+    /* set initial values */
+    PINT_perf_count(client_capcache_pc,
+                    PERF_CLIENT_CAPCACHE_SOFT_LIMIT,
+                    client_capcache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(client_capcache_pc,
+                    PERF_CLIENT_CAPCACHE_HARD_LIMIT,
+                    client_capcache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(client_capcache_pc,
+                    PERF_CLIENT_CAPCACHE_ENABLED,
+                    client_capcache->enable,
+                    PINT_PERF_SET);
+
+    return 0;
+}
+
 /** Finalizes and destroys the client_capcache, frees all cached entries */
 void PINT_client_capcache_finalize(void)
 {

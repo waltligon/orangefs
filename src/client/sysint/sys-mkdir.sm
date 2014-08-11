@@ -336,7 +336,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* also insert entry into attr cache */
     PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
-    PINT_acache_update(sm_p->object_ref, &attr, NULL);
+    PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",

@@ -360,7 +360,7 @@ static int symlink_setattr_comp_fn(void *v_p,
     if(resp_p->status == 0)
     {
         PINT_CONVERT_ATTR(&attr, &sm_p->u.sym.sys_attr, 0);
-        PINT_acache_update(tmp_ref, &attr, NULL);
+        PINT_acache_update(tmp_ref, &attr, NULL, NULL);
     }
 
     assert(resp_p->op == PVFS_SERV_SETATTR);

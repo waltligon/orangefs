@@ -1986,6 +1986,9 @@ static PINT_sm_action io_analyze_size_results(
 
     eor = filereq_ub_offset + sm_p->u.io.file_req_offset;
 
+    /* TODO why is sm_p->getattr.size_array used here instead of:
+     * sm_p->u.io.dfile_size_array?
+     */
     eof = attr->u.meta.dist->methods->
                                 logical_file_size(attr->u.meta.dist->params,
                                                   attr->u.meta.dfile_count,
@@ -2054,7 +2057,7 @@ static PINT_sm_action io_cleanup(
     io_datafile_index_array_destroy(sm_p);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr); 
-    
+
     if(sm_p->u.io.dfile_size_array)
     {
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
@@ -3402,7 +3405,8 @@ static int unstuff_comp_fn(void *v_p,
 
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
-                           NULL);
+                           NULL,
+                           NULL); /* TODO should we try to cache size_array here? */
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
@@ -3416,7 +3420,10 @@ static int unstuff_comp_fn(void *v_p,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
 
-        PINT_acache_update(sm_p->object_ref, &resp_p->u.getattr.attr, NULL);
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.getattr.attr,
+                           NULL,
+                           NULL); /* TODO should we try to cache size_array here? */
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */

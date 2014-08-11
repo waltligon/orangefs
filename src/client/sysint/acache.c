@@ -15,6 +15,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "client-state-machine.h"
 
 /** \file
  *  \ingroup acache
@@ -31,11 +32,27 @@
 #define ACACHE_DEFAULT_TIMEOUT_MSECS 60000 /* 60 seconds */
 
 /* The timeout used for dynamic attributes. */
-/* Currently, the only dynamic attribute is size.
- * More dynamic attributes will likely be included in the future. */
+/* Currently, the only dynamic attributes are size and size_array.
+ * More dynamic attributes could be included in the future. */
 #define ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS 10000 /* 10 seconds */
 
-struct PINT_perf_key acache_keys[] = 
+/* data to be stored in a cached entry */
+struct acache_payload
+{
+    PVFS_object_ref refn;    /**< PVFS2 object reference */
+    PVFS_object_attr attr;   /**< cached attributes */
+    /**< Time when the dynamic attrs were last updated. */
+    struct timeval dynamic_attrs_last_updated;
+    PVFS_size size;          /**< cached size */
+    PVFS_size *size_array;   /**< dirent_count of every dirdata handle */
+};
+
+static struct PINT_tcache* acache = NULL;
+static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
+static struct PINT_perf_counter* acache_pc = NULL;
+
+/* static variables */
+static struct PINT_perf_key acache_keys[] = 
 {
     {"ACACHE_NUM_ENTRIES", PERF_ACACHE_NUM_ENTRIES, PINT_PERF_PRESERVE},
     {"ACACHE_SOFT_LIMIT", PERF_ACACHE_SOFT_LIMIT, PINT_PERF_PRESERVE},
@@ -47,68 +64,22 @@ struct PINT_perf_key acache_keys[] =
     {"ACACHE_REPLACEMENTS", PERF_ACACHE_REPLACEMENTS, 0},
     {"ACACHE_DELETIONS", PERF_ACACHE_DELETIONS, 0},
     {"ACACHE_ENABLED", PERF_ACACHE_ENABLED, PINT_PERF_PRESERVE},
-    {"ACACHE_NUM_ENTRIES_W_SIZE", PERF_ACACHE_NUM_ENTRIES_W_SIZE,
-     PINT_PERF_PRESERVE},
-    {"ACACHE_SIZE_HITS", PERF_ACACHE_SIZE_HITS, 0},
-    {"ACACHE_SIZE_MISSES", PERF_ACACHE_SIZE_MISSES, 0},
-    {"ACACHE_SIZE_UPDATES", PERF_ACACHE_SIZE_UPDATES, 0},
-    {"ACACHE_SIZE_INVALIDATIONS", PERF_ACACHE_SIZE_INVALIDATIONS, 0},
     {NULL, 0, 0},
 };
 
-/* data to be stored in a cached entry */
-struct acache_payload
-{
-    PVFS_object_ref refn;    /**< PVFS2 object reference */
-    PVFS_object_attr attr;   /**< cached attributes */  
-    /**< Time when the size attr was last updated. */
-    struct timeval size_updated_timeval;
-    PVFS_size size;          /**< cached size */
-};
-
-static struct PINT_tcache* acache = NULL;
-static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
+static int PINT_acache_initialize_perf_counter(void);
 
 static int acache_compare_key_entry(const void* key, struct qhash_head* link);
+
 static int acache_free_payload(void* payload);
 
 static int acache_hash_key(const void* key, int table_size);
-static struct PINT_perf_counter* acache_pc = NULL;
 
 static int set_tcache_defaults(struct PINT_tcache* instance);
 
-static void load_payload(struct PINT_tcache* instance, 
-    PVFS_object_ref refn,
-    void* payload,
-    struct PINT_perf_counter* pc);
-
-extern struct PINT_perf_counter * get_acache_pc(void)
-{
-    return acache_pc;
-}
-
-/**
- * Enables perf counter instrumentation of the acache
- */
-void PINT_acache_enable_perf_counter(
-    struct PINT_perf_counter* pc_in) /**< counter for cache fields */
-{
-    gen_mutex_lock(&acache_mutex);
-
-    acache_pc = pc_in;
-    assert(acache_pc);
-
-    /* set initial values */
-    PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-        acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-        acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-        acache->enable, PINT_PERF_SET);
-
-    gen_mutex_unlock(&acache_mutex);
-    return;
-}
+static void load_payload(struct PINT_tcache* instance,
+                         PVFS_object_ref refn,
+                         void* payload);
 
 /**
  * Initializes the acache 
@@ -117,6 +88,14 @@ void PINT_acache_enable_perf_counter(
 int PINT_acache_initialize(void)
 {
     int ret = -1;
+    /* TODO */
+#if 0
+    unsigned int acache_timeout_msecs;
+    char * acache_timeout_str = NULL;
+
+    unsigned int acache_dynamic_timeout_msecs;
+    char * acache_dynamic_timeout_str = NULL;
+#endif
 
     gen_mutex_lock(&acache_mutex);
 
@@ -131,6 +110,20 @@ int PINT_acache_initialize(void)
         return(-PVFS_ENOMEM);
     }
 
+    /* TODO - handle envvar timeout values for overall acache payload and
+     * dynamic attributes. */
+#if 0
+    acache_timeout_str = getenv("PVFS2_ACACHE_TIMEOUT");
+    if (acache_timeout_str != NULL)
+    {
+        acache_timeout_msecs = (unsigned int)strtoul(acache_timeout_str,NULL,0);
+    }
+    else
+    {
+        acache_timeout_msecs = ACACHE_DEFAULT_TIMEOUT_MSECS;
+    }
+#endif
+
     ret = PINT_tcache_set_info(acache,
                                TCACHE_TIMEOUT_MSECS,
                                ACACHE_DEFAULT_TIMEOUT_MSECS);
@@ -141,7 +134,6 @@ int PINT_acache_initialize(void)
         return(ret);
     }
 
-    /* fill in defaults that are common to both */
     ret = set_tcache_defaults(acache);
     if(ret < 0)
     {
@@ -150,10 +142,21 @@ int PINT_acache_initialize(void)
         return(ret);
     }
 
+    /* initialize the perf counter for acache */
+    ret = PINT_acache_initialize_perf_counter();
+    if (ret < 0)
+    {
+        gossip_err("%s: Error initializing"
+                    "attribute cache performance counter\n",
+                    __func__);
+        gen_mutex_unlock(&acache_mutex);
+        return(ret);
+    }
+
     gen_mutex_unlock(&acache_mutex);
     return(0);
 }
-  
+
 /** Finalizes and destroys the acache, frees all cached entries */
 void PINT_acache_finalize(void)
 {
@@ -162,10 +165,13 @@ void PINT_acache_finalize(void)
     PINT_tcache_finalize(acache);
     acache = NULL;
 
+    PINT_perf_finalize(acache_pc);
+    acache_pc = NULL;
+
     gen_mutex_unlock(&acache_mutex);
     return;
 }
-  
+
 /**
  * Retrieves parameters from the acache 
  * @see PINT_tcache_options
@@ -176,7 +182,7 @@ int PINT_acache_get_info(
     unsigned int* arg)                   /**< output value */
 {
     int ret = -1;
-    
+
     gen_mutex_lock(&acache_mutex);
 
     if(option & STATIC_ACACHE_OPT)
@@ -212,15 +218,23 @@ int PINT_acache_set_info(
 
     ret = PINT_tcache_set_info(acache, option, arg);
 
-    /* record any parameter changes that may have resulted*/
-    PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
-        acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
-        acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
-        acache->enable, PINT_PERF_SET);
-    PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-        acache->num_entries, PINT_PERF_SET);
+    /* record any resulting parameter changes */
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_SOFT_LIMIT,
+                    acache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_HARD_LIMIT,
+                    acache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_ENABLED,
+                    acache->enable,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    acache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
 
@@ -228,8 +242,9 @@ int PINT_acache_set_info(
 }
 
 /**
- * Retrieves a _copy_ of a cached attributes structure.  Also retrieves the
- * logical file size (if the object in question is a file) and reports the
+ * Retrieves a _copy_ of a cached attributes structure.  Also retrieves the:
+ * logical file size (if the object is a file) or the 
+ * size_array (if the object is a directory) and reports the
  * status of both the attributes and size to indicate if they are valid or
  * not. All pointers passed to this function should be valid.
  * @return 0 on success, -PVFS_error on failure
@@ -239,14 +254,19 @@ int PINT_acache_get_cached_entry(
     PVFS_object_attr* attr,/**< attributes of the object */
     int* attr_status,      /**< indicates if the attributes are expired */
     PVFS_size* size,       /**< logical size of the object */
-    int* size_status)      /**< indicates if the size has expired */
+    int* size_status,      /**< indicates if the size has expired */
+    PVFS_size** size_array, /**< dirent_count of every dirdata handle */
+    int* size_array_status)/**< indicates if the size_array has expired */
+
 {
     struct PINT_tcache_entry* tmp_entry;
     struct acache_payload* tmp_payload;
     int ret = -1;
     struct timeval current_time = { 0, 0};
 
-    if(!attr || !attr_status || !size || !size_status)
+    if(!attr || !attr_status ||
+       !size || !size_status ||
+       !size_array || !size_array_status)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: Invalid arguments: "
@@ -263,6 +283,7 @@ int PINT_acache_get_cached_entry(
     /* assume everything is timed out for starters */
     *attr_status = -PVFS_ETIME;
     *size_status = -PVFS_ETIME;
+    *size_array_status = -PVFS_ETIME;
     attr->mask = 0;
 
     gen_mutex_lock(&acache_mutex);
@@ -271,11 +292,18 @@ int PINT_acache_get_cached_entry(
     ret = PINT_tcache_lookup(acache, &refn, &tmp_entry, attr_status);
     if(ret < 0 || *attr_status != 0)
     {
+        /* acache now operates under the principle that the attrs must be
+         * present/valid to be considered an acache hit.
+         *
+         * That is, at minimum the static attrs should be present and
+         * potentially some dynamic attributes.
+         */
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
         gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: miss: H=%llu\n",
                      __func__,
                      llu(refn.handle));
         tmp_payload = NULL;
+        goto done;
     }
     else
     {
@@ -284,94 +312,111 @@ int PINT_acache_get_cached_entry(
                    __func__);
         tmp_payload = tmp_entry->payload;
 
-        /* First check if size has been invalidated explicitly. */
-        if(tmp_payload->size_updated_timeval.tv_sec == 0)
-        {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, size has been explicitly invalidated or "
-                         "was never inserted with this acache payload.\n",
-                         __func__);
-            *size_status = -PVFS_ETIME;
-        }
-        /* Check if size is invalid due to size timeout */
-        else
+        if((tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE) ||
+           (tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT))
         {
             /* Get the time of day and store as milliseconds */
             PINT_util_get_current_timeval(&current_time);
-            /* Get the difference in the current time and the time the size
-             * was last refreshed. */
-            int usecs_since_size_update = PINT_util_get_timeval_diff(
-                &tmp_payload->size_updated_timeval, &current_time);
+            /* Get the difference in the current time and the time the dynamic
+             * attrs were last refreshed.
+             */
+            int usecs_since_dynamic_attrs_update = PINT_util_get_timeval_diff(
+                &tmp_payload->dynamic_attrs_last_updated, &current_time);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: usecs_since_size_update = %d\n",
+                         "%s: usecs_since_dynamic_attrs_update = %d\n",
                          __func__,
-                         usecs_since_size_update);
-            /* TODO use client specified t/o instead of default */
-            if(usecs_since_size_update >
+                         usecs_since_dynamic_attrs_update);
+            /* TODO use client specified timeout instead of default */
+            if(usecs_since_dynamic_attrs_update >
                (ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS * 1000))
             {
-                /* although payload was hit, size within has timed out */
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: size has timed out!\n",
+                             "%s: dynamic attrs have timed out!\n",
                              __func__);
-                *size_status = -PVFS_ETIME;
-                /* TODO maybe handle this in getattr sm using status of size */
-                /* Update the cached mask! */
-                tmp_payload->attr.mask ^= PVFS_ATTR_DATA_SIZE;
+                /* Strip the cached mask of the PVFS_ATTR_DATA_SIZE bitmask */
+                tmp_payload->attr.mask &= ~(PVFS_ATTR_DATA_SIZE);
+                /* Strip the cached mask of the PVFS_ATTR_DIR_DIRENT_COUNT */
+                tmp_payload->attr.mask &= ~(PVFS_ATTR_DIR_DIRENT_COUNT);
+
+                /* Should go ahead and free memory here...*/
+                if(tmp_payload->size_array)
+                {
+                    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&tmp_payload->size_array);
+                }
             }
             else
             {
-                *size_status = 0;
-                *size = tmp_payload->size;
+                /* This is just a sanity check to verify that one of the
+                 * dynamic attributes is valid. This behavior might need to
+                 * change if we change the required expectations of the acache.
+                 */
+                assert((tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE) ||
+                       (tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT));
+
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: size is still valid for %d usecs!\n",
+                             "%s: dynamic attrs are still valid for %d "
+                             "usecs!\n",
                              __func__,
                              ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS * 1000
-                                - usecs_since_size_update);
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: size = %lld\n",
-                             __func__,
-                             lld(*size));
+                                - usecs_since_dynamic_attrs_update);
+                /* No need to modify the mask here since the bits are included
+                 * when they need to be inserted. They will remain in
+                 * the mask until the dynamic attrs time out.
+                 */
+                if(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE)
+                {
+                    *size = tmp_payload->size;
+                    *size_status = 0;
+                    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                                 "%s: size = %lld\n",
+                                 __func__,
+                                 lld(*size));
+                }
+                if(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+                {
+                    /* Set the getattr size_array pointer.
+                     * Any application that uses this pointer should be aware
+                     * that only the acache should destroy this size_array.
+                     * Applications should only read this value or duplicate it
+                     * and do as they want with it.
+                     */
+                    *size_array = tmp_payload->size_array;
+                    *size_array_status = 0;
+                    /* TODO consider doing some debug output for size_array */
+                }
             }
         }
-        PINT_perf_count(acache_pc, PERF_ACACHE_HITS, 1, PINT_PERF_ADD);
     }
 
-    if(!tmp_payload)
+    /* At this point should have all pertinent static attributes and
+     * potentially some dynamic attributes. */
+    ret = PINT_copy_object_attr(attr, &(tmp_payload->attr));
+    if(ret < 0)
     {
-        /* missed everything */
-        gen_mutex_unlock(&acache_mutex);
-        return(ret);
+        /* Failed to copy object attributes. */
+        goto done;
     }
 
+    /* Don't count as a true hit yet. */
     gossip_debug(GOSSIP_ACACHE_DEBUG, 
-                 "%s: hit: H=%llu, "
-                 "attr_status=%d, size_status=%d\n",
+                 "%s: hit on some attributes: H=%llu, "
+                 "attr_status=%d, size_status=%d, size_array_status=%d\n",
                  __func__,
                  llu(refn.handle),
                  *attr_status,
-                 *size_status);
+                 *size_status,
+                 *size_array_status);
 
-    if(tmp_payload && *attr_status == 0)
-    {
-        ret = PINT_copy_object_attr(attr, &(tmp_payload->attr));
-        if(ret < 0)
-        {
-            gen_mutex_unlock(&acache_mutex);
-            return(ret);
-        }
-        *attr_status = 0;
-    }
+    *attr_status = 0;
+    /* return success if we got:
+     *     attributes OR
+     *     the attributes + some dynamic attributes
+     */
+    ret = 0;
 
-    if(*size_status == 0 || *attr_status == 0)
-    {
-        gen_mutex_unlock(&acache_mutex);
-        /* return success if we got _anything_ out of the cache */
-        return(0);
-    }
-
+done:
     gen_mutex_unlock(&acache_mutex);
-    return(-PVFS_ETIME);
+    return(ret);
 }
 
 /**
@@ -384,12 +429,12 @@ void PINT_acache_invalidate(
     struct PINT_tcache_entry* tmp_entry;
     int tmp_status;
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate(): H=%llu\n",
+    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                 "acache: invalidate(): H=%llu\n",
                  llu(refn.handle));
 
     gen_mutex_lock(&acache_mutex);
 
-    /* find out if we have non-static items cached */
     ret = PINT_tcache_lookup(acache, 
                              &refn,
                              &tmp_entry,
@@ -397,13 +442,17 @@ void PINT_acache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(acache, tmp_entry);
-        PINT_perf_count(acache_pc, PERF_ACACHE_DELETIONS, 1,
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
     }
 
     /* set the new current number of entries */
-    PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
-                    acache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    acache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -411,7 +460,7 @@ void PINT_acache_invalidate(
 
 
 /**
- * Invalidates only the logical size assocated with an entry (if present)
+ * Invalidates only the logical size associated with an entry (if present)
  */
 void PINT_acache_invalidate_size(
     PVFS_object_ref refn)
@@ -424,7 +473,8 @@ void PINT_acache_invalidate_size(
     gen_mutex_lock(&acache_mutex);
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "acache: invalidate_size(): H=%llu\n",
+                 "%s: H=%llu\n",
+                 __func__,
                  llu(refn.handle));
 
     /* find out if the entry is in the cache */
@@ -436,12 +486,11 @@ void PINT_acache_invalidate_size(
     {
         /* found match in cache; set size to invalid */
         tmp_payload = tmp_entry->payload;
-        /* Use this to indicate invalid size status. */
-        tmp_payload->size_updated_timeval.tv_sec = 0;
-        PINT_perf_count(acache_pc, PERF_ACACHE_SIZE_INVALIDATIONS, 1,
+        tmp_payload->attr.mask &= ~(PVFS_ATTR_DATA_SIZE);
+        PINT_perf_count(acache_pc,
+                        PERF_ACACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
-        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES_W_SIZE, 1,
-                        PINT_PERF_SUB);
     }
 
     gen_mutex_unlock(&acache_mutex);
@@ -459,7 +508,8 @@ void PINT_acache_invalidate_size(
 int PINT_acache_update(
     PVFS_object_ref refn,   /**< object to update */
     PVFS_object_attr *attr, /**< attributes to copy into cache */
-    PVFS_size* size)        /**< logical file size (NULL if not available) */
+    PVFS_size* size,        /**< logical file size (NULL if not available) */
+    PVFS_size* size_array)  /**< dirent_count of every dirdata handle (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
     uint32_t save_mask;
@@ -509,32 +559,69 @@ int PINT_acache_update(
         return -PVFS_ENOMEM;
     }
 
-    if(size)
+    if(size || size_array)
     {
         /* For debug output of current time. */
         char parsed_timeval[64] = { 0 };
+        /* Debug output of current time. */
+        PINT_util_get_current_timeval(&tmp_payload->dynamic_attrs_last_updated);
+        PINT_util_parse_timeval(tmp_payload->dynamic_attrs_last_updated,
+                                parsed_timeval);
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: time acache dynamic attribute last updated = %s\n",
+                     __func__,
+                     parsed_timeval);
+    }
 
+    if(size)
+    {
         tmp_payload->size = *size;
+
+        /* No need to mess with the attr bitmask here since it was updated when
+         * attr_mask_include_size was called. If this wasn't the case, then the
+         * bitmask would need to be added here.*/
 
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: tmp_payload->size = %lld\n",
                      __func__,
                      lld(tmp_payload->size));
-
-        /* Debug output of current time. */
-        PINT_util_get_current_timeval(&tmp_payload->size_updated_timeval);
-        PINT_util_parse_timeval(tmp_payload->size_updated_timeval,
-                                parsed_timeval);
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: timeval = %s\n",
-                     __func__,
-                     parsed_timeval);
     }
     else
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: NOTE, size is NULL. "
                      "No size inserted with this acache payload.\n",
+                     __func__);
+    }
+
+    if(size_array)
+    {
+        /* getattr should allocate a the size_array it wants to
+         * cache and just pass it to the acache. this way the cache doesn't
+         * have to.
+         * 
+         * Since this instance will be allocated by sys-getattr.sm and the
+         * pointer set in the acache payload. The allocated structure
+         * should be freed at the time the payload size_array is invalidated or
+         * the acache payload itself is destroyed (if it is still present at
+         * that time.) TODO If the acache is disabled, then the caller of the
+         * sys-getattr.sm is responsible for cleaning up. */
+        tmp_payload->size_array = size_array;
+
+        /* No need to mess with the attr bitmask for the same reason listed
+         * above for size...
+         */
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: tmp_payload->size_array = %p\n",
+                     __func__,
+                     (void *) tmp_payload->size_array);
+        /* TODO consider better debug output of size_array. */
+    }
+    else
+    {
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: NOTE, size_array is NULL. "
+                     "No size_array inserted with this acache payload.\n",
                      __func__);
     }
 
@@ -547,11 +634,52 @@ int PINT_acache_update(
 
     if(tmp_payload)
     {
-        load_payload(acache, refn, tmp_payload, acache_pc);
+        load_payload(acache, refn, tmp_payload);
     }
 
     gen_mutex_unlock(&acache_mutex);
     return(0);
+}
+
+/**
+ * Returns the perf counter associated with this acache instance.
+ */
+struct PINT_perf_counter* PINT_acache_get_pc(void)
+{
+    return acache_pc;
+}
+
+/**
+ * Enables perf counter instrumentation of the acache.
+ *
+ * Should only be called by PINT_acache_initialize; therefore, no need to deal
+ * with the acache mutex here.
+ *
+ * \returns 0 on success, -PVFS_error on failure
+ */
+static int PINT_acache_initialize_perf_counter(void)
+{
+    acache_pc = PINT_perf_initialize(acache_keys);
+    if(!acache_pc)
+    {
+        gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);
+        return -PVFS_ENOMEM;
+    }
+
+    /* set initial values */
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_SOFT_LIMIT,
+                    acache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_HARD_LIMIT,
+                    acache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_ENABLED,
+                    acache->enable,
+                    PINT_PERF_SET);
+    return 0;
 }
 
 /* acache_compare_key_entry()
@@ -610,6 +738,14 @@ static int acache_free_payload(void* payload)
         {
             PINT_free_object_attr(&payload_p->attr);
         }
+        if(payload_p->size_array)
+        {
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: size_array = %p\n",
+                         __func__,
+                         (void *) payload_p->size_array);
+            PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&payload_p->size_array);
+        }
         free(payload_p);
     }
     return(0);
@@ -619,19 +755,24 @@ static int set_tcache_defaults(struct PINT_tcache* instance)
 {
     int ret;
 
-    ret = PINT_tcache_set_info(instance, TCACHE_HARD_LIMIT, 
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_HARD_LIMIT,
                                ACACHE_DEFAULT_HARD_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_SOFT_LIMIT, 
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_SOFT_LIMIT,
                                ACACHE_DEFAULT_SOFT_LIMIT);
     if(ret < 0)
     {
         return(ret);
     }
-    ret = PINT_tcache_set_info(instance, TCACHE_RECLAIM_PERCENTAGE,
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_RECLAIM_PERCENTAGE,
                                ACACHE_DEFAULT_RECLAIM_PERCENTAGE);
     if(ret < 0)
     {
@@ -641,10 +782,9 @@ static int set_tcache_defaults(struct PINT_tcache* instance)
     return(0);
 }
 
-static void load_payload(struct PINT_tcache* instance, 
+static void load_payload(struct PINT_tcache* instance,
     PVFS_object_ref refn,
-    void* payload,
-    struct PINT_perf_counter* pc)
+    void* payload)
 {
     int status;
     int purged;
@@ -666,13 +806,18 @@ static void load_payload(struct PINT_tcache* instance,
         tmp_entry->payload = payload;
         ret = PINT_tcache_refresh_entry(instance, tmp_entry);
         /* this counts as an update of an existing entry */
-        PINT_perf_count(pc, PERF_ACACHE_UPDATES, 1, PINT_PERF_ADD);
+        PINT_perf_count(acache_pc, PERF_ACACHE_UPDATES, 1, PINT_PERF_ADD);
     }
     else
     {
         /* not found in cache; insert new payload*/
         ret = PINT_tcache_insert_entry(instance, 
-            &refn, payload, &purged);
+                                       &refn,
+                                       payload,
+                                       &purged);
+        /* I think this should count as an update of the cache, regardless of
+         * if the payload had previously been inserted. */
+        PINT_perf_count(acache_pc, PERF_ACACHE_UPDATES, 1, PINT_PERF_ADD);
         /* the purged variable indicates how many entries had to be purged
          * from the tcache to make room for this new one
          */
@@ -681,21 +826,27 @@ static void load_payload(struct PINT_tcache* instance,
             /* since only one item was purged, we count this as one item being
              * replaced rather than as a purge and an insert 
              */
-            PINT_perf_count(pc, PERF_ACACHE_REPLACEMENTS, purged, 
-                PINT_PERF_ADD);
+            PINT_perf_count(acache_pc,
+                            PERF_ACACHE_REPLACEMENTS,
+                            purged, 
+                            PINT_PERF_ADD);
         }
         else
         {
-            /* otherwise we just purged as part of reclaimation */
+            /* otherwise we just purged as part of reclamation */
             /* if we didn't purge anything, then the "purged" variable will
              * be zero and this counter call won't do anything.
              */
-            PINT_perf_count(pc, PERF_ACACHE_PURGES, purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(acache_pc,
+                            PERF_ACACHE_PURGES,
+                            purged,
+                            PINT_PERF_ADD);
         }
     }
-    PINT_perf_count(pc, PERF_ACACHE_NUM_ENTRIES,
-        instance->num_entries, PINT_PERF_SET);
+    PINT_perf_count(acache_pc,
+                    PERF_ACACHE_NUM_ENTRIES,
+                    instance->num_entries,
+                    PINT_PERF_SET);
     return;
 }
 

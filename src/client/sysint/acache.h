@@ -104,19 +104,8 @@ enum
     PERF_ACACHE_PURGES = 6,
     PERF_ACACHE_REPLACEMENTS = 7,
     PERF_ACACHE_DELETIONS = 8,
-    PERF_ACACHE_ENABLED = 9,
-    PERF_ACACHE_NUM_ENTRIES_W_SIZE = 10,
-    PERF_ACACHE_SIZE_HITS = 11,
-    PERF_ACACHE_SIZE_MISSES = 12,
-    PERF_ACACHE_SIZE_UPDATES = 13,
-    PERF_ACACHE_SIZE_INVALIDATIONS = 14,
+    PERF_ACACHE_ENABLED = 9
 };
-
-/** acache performance counter keys */
-extern struct PINT_perf_key acache_keys[];
-extern struct PINT_perf_counter* get_acache_pc(void);
-
-void PINT_acache_enable_perf_counter(struct PINT_perf_counter* pc);
 
 int PINT_acache_initialize(void);
 
@@ -135,18 +124,23 @@ int PINT_acache_get_cached_entry(
     PVFS_object_attr* attr,
     int* attr_status,
     PVFS_size* size,
-    int* size_status);
+    int* size_status,
+    PVFS_size** size_array,
+    int* size_array_status);
 
 int PINT_acache_update(
     PVFS_object_ref refn, 
     PVFS_object_attr *attr,
-    PVFS_size* size);
+    PVFS_size* size,
+    PVFS_size* size_array);
 
 void PINT_acache_invalidate(
     PVFS_object_ref refn);
 
 void PINT_acache_invalidate_size(
     PVFS_object_ref refn);
+
+struct PINT_perf_counter* PINT_acache_get_pc(void);
 
 #endif /* __ACACHE_H */
 
