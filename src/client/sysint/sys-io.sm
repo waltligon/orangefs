@@ -48,6 +48,7 @@ enum
     IO_MIRRORING,
     IO_NO_MIRRORING,
     IO_FATAL_ERROR,
+    IO_RENEW_CAPABILITY,
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -240,7 +241,21 @@ machine pvfs2_client_io_sm
         run io_datafile_complete_operations;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         IO_RETRY => io_datafile_post_msgpairs_retry;
+        IO_RENEW_CAPABILITY => io_renew_capability;
         default => io_datafile_complete_operations;
+    }
+
+    state io_renew_capability
+    {
+        run io_init;
+        default => io_renew_getattr;
+    }
+
+    state io_renew_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => io_datafile_setup_msgpairs;
+        default => io_cleanup;
     }
 
     state io_analyze_results
@@ -440,8 +455,10 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
     assert((js_p->error_code == 0) ||
-           (js_p->error_code == IO_RETRY));
+           (js_p->error_code == IO_RETRY) ||
+           (js_p->error_code == IO_RENEW_CAPABILITY));
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                IO_ATTR_MASKS, 
@@ -449,9 +466,9 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                0);
        
     if (js_p->error_code == IO_RETRY ||
-        (js_p->error_code == IO_RETRY_NODELAY))
+        (js_p->error_code == IO_RETRY_NODELAY) ||
+        (js_p->error_code == IO_RENEW_CAPABILITY))
     {
-        js_p->error_code = 0;
 
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
@@ -462,13 +479,20 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
 
+        if (js_p->error_code == IO_RENEW_CAPABILITY)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "  sys-io renewing capability.\n");
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        }
         if(js_p->error_code == IO_RETRY_NODELAY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying without delay.\n");
             js_p->error_code = 0;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
+        js_p->error_code = 0;
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
                                         smcb,
                                         0,
@@ -1581,7 +1605,14 @@ check_next_step:
     {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
-        js_p->error_code = IO_RETRY;
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            js_p->error_code = IO_RENEW_CAPABILITY;
+        }
+        else
+        {
+            js_p->error_code = IO_RETRY;
+        }
     }
     else
     {
