@@ -66,14 +66,18 @@ void sec_error(const char *msg, int err)
         /* debug OpenSSL error queue */
         while ((sslerr = ERR_get_error()) != 0)
         {
-            ERR_error_string_n(sslerr, errstr, 256);
-            errstr[255] = '\0';
+            ERR_error_string_n(sslerr, errstr, sizeof(errstr));
+            errstr[sizeof(errstr)-1] = '\0';
             gossip_err("OpenSSL error: %s\n", errstr);
         }
     }
     else if (err != 0)
     {
-        PVFS_perror("Error", err);
+        errstr[0] = '\0';
+        PVFS_strerror_r(err, errstr, sizeof(errstr));
+        errstr[sizeof(errstr)-1] = '\0';
+
+        fprintf(stderr, "Error: %s\n", errstr);
     }
 }
 

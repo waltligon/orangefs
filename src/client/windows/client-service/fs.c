@@ -797,11 +797,12 @@ int fs_find_files(char *fs_path,
             if (resp_readdirplus.stat_err_array[i] == 0)
             {
                 memcpy(&attr_array[i], &resp_readdirplus.attr_array[i], sizeof(PVFS_sys_attr));
-                /* TODO: DEBUG */
+                /* DEBUG
                 if (resp_readdirplus.attr_array[i].link_target)
                 {
                     DbgPrint("    %s link: %s\n", filename_array[i], resp_readdirplus.attr_array[i].link_target);                    
                 }
+                */
             }
             else
             {

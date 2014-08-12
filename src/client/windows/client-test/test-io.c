@@ -58,7 +58,9 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
         }
         total += real_size;
 
+        /* debugging 
         printf("%s %u: %u\n", (imode == 0) ? "read" : "write", size, total);
+        */
     }
 
     fclose(f);
@@ -67,20 +69,20 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
 }
 
 
-#define NUM_SIZES    1
+#define NUM_SIZES    5
 
 int io_file(global_options *options, int fatal)
 {
     char *file_name, *buffer = NULL, *copy = NULL;
     int i, j, code, code_flag;
-    size_t sizes[] = {/*4*1024, 100*1024, 1024*1024, 100*1024*1024,*/ 1024*1024*1024};
+    size_t sizes[] = {4*1024, 100*1024, 1024*1024, 100*1024*1024, 1024*1024*1024};
     size_t buf_size;
-    char *perftests[] = {/*"io_file_write_4kb", "io_file_read_4kb", 
+    char *perftests[] = {"io_file_write_4kb", "io_file_read_4kb", 
                          "io_file_write_100kb", "io_file_read_100kb", 
                          "io_file_write_1mb", "io_file_read_1mb",
-                         "io_file_write_100mb", "io_file_read_100mb",*/
+                         "io_file_write_100mb", "io_file_read_100mb",
                          "io_file_write_1gb", "io_file_read_1gb"};
-    char *subtests[] = {/*"4kb", "100kb", "1mb", "100mb", */ "1gb"};
+    char *subtests[] = {"4kb", "100kb", "1mb", "100mb", "1gb"};
 #ifdef WIN32
     unsigned __int64 start;
 #else

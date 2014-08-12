@@ -62,7 +62,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
 #elif defined(WIN32)
         ret = (int) strerror_s(buf, (size_t) limit, map_err);
 #else 
-        ret = (int)strerror_r(map_err, buf, (size_t)limit);
+        ret = (int) strerror_r(map_err, buf, (size_t)limit);
 #endif
     }
 
@@ -78,26 +78,33 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
  */
 void PVFS_perror(const char *text, int retcode)
 {
-    if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
-    {
-        char buf[MAX_PVFS_STRERROR_LEN] = {0};
-        int index = PVFS_get_errno_mapping(-retcode);
+    int abscode = abs(retcode);
+    char buf[MAX_PVFS_STRERROR_LEN] = {0};
 
-        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s (error class: %d)\n",text,
-                 PINT_non_errno_strerror_mapping[index], PVFS_ERROR_CLASS(-retcode));
+    if (IS_PVFS_NON_ERRNO_ERROR(abscode))
+    {
+        int index = PVFS_get_errno_mapping(abscode);
+
+        snprintf(buf, MAX_PVFS_STRERROR_LEN, "%s: %s (error class: %d)\n", 
+                 text, PINT_non_errno_strerror_mapping[index], 
+                 PVFS_ERROR_CLASS(abscode));
         fprintf(stderr, "%s", buf);
     }
-    else if (IS_PVFS_ERROR(-retcode))
+    else if (IS_PVFS_ERROR(abscode))
     {
-	fprintf(stderr, "%s: %s (error class: %d)\n", text,
-	strerror(PVFS_ERROR_TO_ERRNO(-retcode)),
-        PVFS_ERROR_CLASS(-retcode));
+        
+        PVFS_strerror_r(PVFS_ERROR_TO_ERRNO(abscode), buf, sizeof(buf));
+
+        fprintf(stderr, "%s: %s (error class: %d)\n", text, buf, 
+                PVFS_ERROR_CLASS(abscode));
     }
     else
     {
-	fprintf(stderr, "Warning: non PVFS2 error code (%d):\n",
-                -retcode);
-	fprintf(stderr, "%s: %s\n", text, strerror(-retcode));
+        fprintf(stderr, "Warning: non PVFS2 error code (%d):\n", retcode);
+
+        PVFS_strerror_r(abscode, buf, sizeof(buf));
+
+        fprintf(stderr, "%s: %s\n", text, buf);
     }
     return;
 }
@@ -125,28 +132,37 @@ void PVFS_perror_gossip_verbose(void)
  */
 void PVFS_perror_gossip(const char *text, int retcode)
 {
+    int abscode = abs(retcode);
+    char buf[MAX_PVFS_STRERROR_LEN] = {0};
+
     if (pvfs_perror_gossip_silent)
     {
         return;
     }
-    if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
-    {
-        char buf[MAX_PVFS_STRERROR_LEN] = {0};
-        int index = PVFS_get_errno_mapping(-retcode);
 
-        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s\n",text,
-                 PINT_non_errno_strerror_mapping[index]);
-	gossip_err("%s", buf);
-    }
-    else if (IS_PVFS_ERROR(-retcode))
+    if (IS_PVFS_NON_ERRNO_ERROR(abscode))
     {
-	gossip_err("%s: %s\n", text,
-                   strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+        int index = PVFS_get_errno_mapping(abscode);
+
+        snprintf(buf, MAX_PVFS_STRERROR_LEN, "%s: %s (error class: %d)\n", 
+                 text, PINT_non_errno_strerror_mapping[index], 
+                 PVFS_ERROR_CLASS(abscode));
+        gossip_err("%s", buf);
+    }
+    else if (IS_PVFS_ERROR(abscode))
+    {
+        PVFS_strerror_r(PVFS_ERROR_TO_ERRNO(abscode), buf, sizeof(buf));
+
+        gossip_err("%s: %s (error class: %d)\n", text, buf, 
+                   PVFS_ERROR_CLASS(abscode));
     }
     else
     {
-	gossip_err("Warning: non PVFS2 error code (%d):\n", -retcode);
-	gossip_err("%s: %s\n", text, strerror(-retcode));
+        gossip_err("Warning: non PVFS2 error code (%d):\n", retcode);
+
+        PVFS_strerror_r(abscode, buf, sizeof(buf));
+
+        gossip_err("%s: %s\n", text, buf);
     }
     return;
 }

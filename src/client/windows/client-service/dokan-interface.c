@@ -1304,18 +1304,6 @@ PVFS_Dokan_read_file(
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credential);
 
-    /* set the access time */
-    /* TODO: don't do until cleanup?
-	   TODO2: not fully supported?
-    if (ret == 0)
-    {
-        attr.mask = PVFS_ATTR_SYS_ATIME;
-        attr.atime = time(NULL);
-        ret2 = fs_setattr(fs_path, &attr, &credential);
-        if (ret2 != 0)
-            DbgPrint("   fs_setattr returned %d\n", ret2);
-    }
-	*/
 #endif
 
     *ReadLength = (DWORD) len64;
