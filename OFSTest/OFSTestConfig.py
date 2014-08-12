@@ -162,6 +162,10 @@ class OFSTestConfig(object):
         ## @var ofs_compile_debug
         # Compile with -g debugging option?
         self.ofs_compile_debug = True # Web Interface: user
+        
+        ## @var ofs_disable_acache
+        # Disable acache
+        self.ofs_disable_acache = False # Web Interface: user
 
         ## @var ofs_patch_files
         # List of patches to patch OrangeFS source
@@ -307,6 +311,8 @@ class OFSTestConfig(object):
         # Suffix to add to instance name.
         # usually the same as the output directory.
         self.instance_suffix = "" # Web Interface: auto
+        
+        
         
     
     ##
@@ -597,6 +603,13 @@ class OFSTestConfig(object):
         temp = d.get('install_shared')
         if temp != None:
             self.install_shared = temp
+
+        # add --enable=shared
+        temp = d.get('ofs_disable_acache')
+        if temp != None:
+            self.ofs_disable_acache = temp
+
+
         
         # --enable-strict
         temp = d.get('enable_strict')

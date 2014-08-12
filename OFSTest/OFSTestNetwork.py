@@ -751,11 +751,11 @@ class OFSTestNetwork(object):
     #    @param node_list List of nodes in network.
      
 
-    def startOFSClientAllNodes(self,security=None,node_list=None):
+    def startOFSClientAllNodes(self,security=None,node_list=None,disable_acache=False):
         if node_list == None:
             node_list = self.network_nodes
         for node in node_list:
-            self.startOFSClient(node,security)
+            self.startOFSClient(client_node=node,security=security,disable_acache=disable_acache)
    
     ##    
     #    @fn startOFSClient(self,client_node=None,security=None):
@@ -768,14 +768,14 @@ class OFSTestNetwork(object):
     #    @param node_list List of nodes in network.
 
             
-    def startOFSClient(self,client_node=None,security=None,node_list=None):
+    def startOFSClient(self,client_node=None,security=None,node_list=None,disable_acache=False):
         if node_list == None:
             node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         client_node.installKernelModule()
         #client_node.runSingleCommand('/sbin/lsmod | grep pvfs')
-        client_node.startOFSClient(security=security)
+        client_node.startOFSClient(security=security,disable_acache=disable_acache)
 
 
         time.sleep(10)

@@ -2420,7 +2420,7 @@ class OFSTestNode(object):
     # @param self The object pointer
     # @param security OFS security level None,"Key","Cert"
 
-    def startOFSClient(self,security=None):
+    def startOFSClient(self,security=None,disable_acache=False):
         # Starting the OFS Client is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
         '''
@@ -2455,13 +2455,17 @@ class OFSTestNode(object):
         elif security.lower() == "cert":
             pass
 
+        acache_flag = ""
+        #print "disable acache is %r" % disable_acache
+        if disable_acache:
+            acache_flag =  "--acache-timeout=0"
         
         print "Starting pvfs2-client: "
-        print "sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath)
+        print "sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,acache_flag,keypath)
         print ""
         
         # start the client 
-        self.runSingleCommandAsRoot("LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
+        self.runSingleCommandAsRoot("LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,acache_flag,keypath))
         # change the protection on the logfile to 644
         self.runSingleCommandAsRoot("chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         

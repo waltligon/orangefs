@@ -427,7 +427,7 @@ class OFSTestMain(object):
             print ""
             print "==================================================================="
             print "Start OFS Client"
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
    
 
 
@@ -538,7 +538,7 @@ class OFSTestMain(object):
             import OFSSysintTest
             
             # Start the OrangeFS Client on the head node
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
         
             # print section header in output file.
             self.writeOutputHeader(filename,"Sysint Tests")
@@ -566,7 +566,7 @@ class OFSTestMain(object):
             mount_type = "kmod"
             # Start the OrangeFS Client on the head node
 
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
 
 
             # OrangeFS must be mounted to run kmod tests.
@@ -836,7 +836,7 @@ class OFSTestMain(object):
         self.ofs_network.stopOFSClientAllNodes()
         self.ofs_network.stopOFSServers()
         self.ofs_network.startOFSServers()
-        self.ofs_network.startOFSClientAllNodes(security=self.config.security_mode) 
+        self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache) 
         self.ofs_network.mountOFSFilesystemAllNodes()
     
     def doPostTest(self,rc):
