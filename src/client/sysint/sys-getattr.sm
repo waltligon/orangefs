@@ -119,9 +119,6 @@ nested machine pvfs2_client_getattr_sm
     state acache_lookup
     {
         run getattr_acache_lookup;
-        /* TODO
-        GETATTR_ACACHE_MISS => client_capcache_lookup;
-        default => cleanup; */
         default => client_capcache_lookup;
     }
 
@@ -466,17 +463,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     {
         trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
     }
-    /* TODO (remove): stored attrs never actually include capability -- it goes in capcache
-    if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
-    {
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: req_attrmask and trimmed_mask both have "
-                     "PVFS_ATTR_CAPABILITY\n",
-                     __func__);
-        * add back the capability flag 
-        trimmed_mask |= PVFS_ATTR_CAPABILITY;
-    }
-    */
 
     gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: trimmed attrmask:\n", __func__);
     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, trimmed_mask);
@@ -672,10 +658,6 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
         /* mark capability available */
         sm_p->getattr.attr.mask |= PVFS_ATTR_CAPABILITY;
         sm_p->getattr.flags |= PINT_SM_GETATTR_CAPCACHE_HIT;
-
-        /* TODO: temp */
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s (client_capcache): issuer: %s\n",
-                     __func__, sm_p->getattr.attr.capability.issuer);
     }
     else
     {
@@ -1721,7 +1703,7 @@ static PINT_sm_action getattr_acache_insert(
     {
         /* see if we have a size value to cache */
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
-            sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE)
+            sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: NOTE, objtype is metafile and "

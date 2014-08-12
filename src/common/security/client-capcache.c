@@ -434,15 +434,13 @@ int PINT_client_capcache_update(
             ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                               &timev, &purged);
 
-            /* TODO: temp */
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update:  "
-                         "issuer: %s ptr: %p ret: %d\n", 
-                         tmp_payload->cap.issuer ? tmp_payload->cap.issuer :
-                          "(null)", &tmp_payload->cap, ret);
 
-            /* this counts as an update of an existing entry */
-            PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_UPDATES,
-                            1, PINT_PERF_ADD);
+            if (ret == 0)
+            {
+                /* this counts as an update of an existing entry */
+                PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_UPDATES,
+                                1, PINT_PERF_ADD);
+            }
         }
         else if (ret == -1)
         {

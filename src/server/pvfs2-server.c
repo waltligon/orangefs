@@ -1923,7 +1923,7 @@ static void server_sig_handler(int sig)
     {
         if (sig != SIGSEGV)
         {
-            gossip_err("\nPVFS2 server got signal %d "
+            gossip_err("PVFS2 server got signal %d "
                        "(server_status_flag: %d)\n",
                        sig, (int)server_status_flag);
         }
