@@ -518,7 +518,8 @@ class OFSTestNetwork(object):
         
             resource_type = "BUILDNODE"
             resource_location = download_location+dir_list
-        rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list,svn_options)
+            
+        rc = build_node.copyOFSSource(resource_type=resource_type,resource=resource_location,dest_dir=download_location+dir_list,options=svn_options)
         
         if rc != 0:
             return rc
