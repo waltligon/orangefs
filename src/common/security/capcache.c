@@ -19,6 +19,7 @@
 
 #include "capcache.h"
 #include "security-util.h"
+#include "server-config.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "murmur3.h"
@@ -298,6 +299,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
  */
 int PINT_capcache_init(void)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing capability cache...\n");
 
@@ -308,7 +310,7 @@ int PINT_capcache_init(void)
     }
 
     /* Set timeout */
-    PINT_seccache_set(capcache, SECCACHE_TIMEOUT, CAPCACHE_TIMEOUT);
+    PINT_seccache_set(capcache, SECCACHE_TIMEOUT, config->capcache_timeout);
 
     return 0;
 }

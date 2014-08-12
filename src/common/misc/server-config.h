@@ -227,8 +227,12 @@ typedef struct server_configuration_s
     char *ldap_gid_attr;             /* attribute that stores GID */
     int ldap_search_timeout;         /* search timeout in seconds */
 
-    int credential_timeout;
-    int capability_timeout;
+    int credential_timeout;          /* credential timeout in seconds */
+    int capability_timeout;          /* capability timeout in seconds */
+
+    int credcache_timeout;           /* credential cache timeout in seconds */
+    int capcache_timeout;            /* capability cache timeout in seconds */
+    int certcache_timeout;           /* certificate cache timeout in seconds */
 
     void *private_data;
     int32_t tree_width;

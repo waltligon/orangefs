@@ -133,6 +133,9 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_credential_timeout);
 static DOTCONF_CB(get_capability_timeout);
+static DOTCONF_CB(get_credcache_timeout);
+static DOTCONF_CB(get_capcache_timeout);
+static DOTCONF_CB(get_certcache_timeout);
 static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
@@ -332,6 +335,18 @@ static const configoption_t options[] =
     /* Capability timeout in seconds */
     {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
         CTX_SECURITY, "600"},
+
+    /* Credential cache timeout in seconds */
+    {"CredentialCacheTimeoutSecs", ARG_INT, get_credcache_timeout, NULL,
+        CTX_SECURITY, "3600"},
+
+    /* Capability cache timeout in seconds */
+    {"CapabilityCacheTimeoutSecs", ARG_INT, get_capcache_timeout, NULL,
+        CTX_SECURITY, "600"},
+
+    /* Certificate cache timeout in seconds */
+    {"CertificateCacheTimeoutSecs", ARG_INT, get_certcache_timeout, NULL,
+        CTX_SECURITY, "3600"},
 
     /* Path to CA certificate file in PEM format.
      * Note: May be in the Defaults section for backwards-compatibility.
@@ -3338,6 +3353,67 @@ DOTCONF_CB(get_capability_timeout)
 
     return NULL;
 }
+
+DOTCONF_CB(get_credcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->credcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CredentialCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->credcache_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_capcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->capcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CapabilityCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->capcache_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_certcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->certcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CertificateCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->certcache_timeout);
+    }
+
+    return NULL;
+}
+
 
 DOTCONF_CB(get_ca_file)
 { 

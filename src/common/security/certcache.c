@@ -274,9 +274,7 @@ static void PINT_certcache_debug(const char *prefix,
  */
 int PINT_certcache_init(void)
 {
-    struct server_configuration_s *config;
-
-    config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_get_server_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing certificate cache...\n");
 
@@ -286,8 +284,8 @@ int PINT_certcache_init(void)
         return -PVFS_ENOMEM;
     }
 
-    /* Set properties - use the credential timeout */
-    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->credential_timeout);
+    /* Set timeout */
+    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->certcache_timeout);
 
     return 0;
 }
