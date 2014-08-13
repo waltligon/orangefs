@@ -3,7 +3,7 @@
  *
  * Changes by Acxiom Corporation to add relative path support to
  * PVFS_util_resolve(),
- * Copyright © Acxiom Corporation, 2005
+ * Copyright ï¿½ Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */
@@ -182,7 +182,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
                                     PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
-                                    NULL, cred);
+                                    NULL, NULL, cred);
 }
 
 #ifdef ENABLE_SECURITY_MODE
@@ -194,18 +194,17 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
  * group - string representation of numeric gid
  * timeout - in seconds; value of 0 will result in default (1 hour)
  * keypath - path to client private key file
+ * certpath - path to client certificate file
  * cred - the credential object
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
     int filedes[2], errordes[2];
     int ret;
-#ifdef ENABLE_SECURITY_CERT
-    char *certpath;
-#endif
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
@@ -213,7 +212,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     }
 
 #ifdef ENABLE_SECURITY_CERT
-    certpath = getenv("PVFS2CERT_FILE");
+    if (!certpath && getenv("PVFS2CERT_FILE"))
+    {
+        certpath = getenv("PVFS2CERT_FILE");
+    }
 #endif
 
     memset(&newsa, 0, sizeof(newsa));
@@ -239,7 +241,6 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char *args[7];
         char **ptr = args;
         char timearg[16];
-        char *envp[] = { NULL };
 
         close(STDERR_FILENO);
         dup(errordes[1]);
@@ -275,11 +276,11 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         if (certpath)
         {
             *ptr++ = "-c";
-            *ptr++ = certpath;
+            *ptr++ = (char*)certpath;
         }
 #endif
         *ptr++ = NULL;
-        execve(BINDIR"/pvfs2-gencred", args, envp);
+        execv(BINDIR"/pvfs2-gencred", args);
 
         _exit(100);
     }
@@ -588,7 +589,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
  * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+    unsigned int timeout, const char *keypath, const char *certpath,
+    PVFS_credential *cred)
 {
     if (cred == NULL)
     {
@@ -596,7 +598,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         return -PVFS_EINVAL;
     }
 
-    memset(cred, 0, sizeof(cred));
+    memset(cred, 0, sizeof(*cred));
 
     return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
@@ -2087,7 +2089,6 @@ static int parse_encoding_string(
     for (++cp; isspace(*cp); cp++);        /* optional spaces */
     for (cq = cp; *cq && *cq != ','; cq++);/* find option end */
 
-    *et = -1;
     for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
     {
         int n = strlen(enc_str[i].name);
@@ -2096,16 +2097,12 @@ static int parse_encoding_string(
         if (!strncmp(enc_str[i].name, cp, n))
         {
             *et = enc_str[i].val;
-            break;
+            return 0;
         }
     }
-    if (*et == -1)
-    {
-        gossip_err("Error: %s: unknown encoding type in tab file.\n",
-                   __func__);
-        return -PVFS_EINVAL;
-    }
-    return 0;
+    gossip_err("Error: %s: unknown encoding type in tab file.\n",
+            __func__);
+    return -PVFS_EINVAL;
 }
 
 /* PINT_release_pvfstab()

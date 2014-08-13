@@ -690,7 +690,8 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
-                                 &tmp_size);
+                                 &tmp_size,
+                                 NULL);
         if(ret < 0)
         {
             js_p->error_code = ret;

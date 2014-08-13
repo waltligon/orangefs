@@ -3055,7 +3055,7 @@ DOTCONF_CB(get_param)
 
     if (NULL != param)
     {
-        memset(param, 0, sizeof(param));
+        memset(param, 0, sizeof(*param));
         param->name = (cmd->data.str ? strdup(cmd->data.str) : NULL);
         PINT_llist_add_to_tail(config_s->default_dist_config.param_list,
                                param);
@@ -4550,7 +4550,10 @@ int PINT_config_get_meta_handle_extent_array(
                         extent_array->extent_array = malloc(
                             (extent_array->extent_count *
                              sizeof(PVFS_handle_extent)));
-                        assert(extent_array->extent_array);
+                        if (extent_array->extent_array == NULL)
+                        {
+                            return -1;
+                        }
                         memcpy(extent_array->extent_array,
                                cur_h_mapping->handle_extent_array.extent_array,
                                (extent_array->extent_count *

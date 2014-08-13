@@ -4,6 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+/* for POSIX strerror_r */
+#define _XOPEN_SOURCE 600
+#undef _GNU_SOURCE
 
 #include <errno.h>
 #include <stdio.h>
@@ -49,17 +52,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     else
     {
 
-#if defined(__DARWIN__)
-        ret = strerror_r(map_err, buf, (size_t)limit);
-#elif defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
-        char *tmpbuf = strerror_r(map_err, buf, limit);
-        if (tmpbuf && (strcmp(tmpbuf, buf)))
-        {
-            limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
-            strncpy(buf, tmpbuf, (size_t)limit);
-        }
-        ret = (tmpbuf ? 0 : -1);
-#elif defined(WIN32)
+#if defined(WIN32)
         ret = (int) strerror_s(buf, (size_t) limit, map_err);
 #else 
         ret = (int) strerror_r(map_err, buf, (size_t)limit);

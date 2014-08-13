@@ -36,8 +36,8 @@ typedef struct
 static struct qhash_table *s_fsid_to_ledger_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
-static int hash_fsid(void *fsid, int table_size);
-static int hash_fsid_compare(void *key, struct qlist_head *link);
+static int hash_fsid(const void *fsid, int table_size);
+static int hash_fsid_compare(const void *key, struct qlist_head *link);
 
 static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
 
@@ -216,14 +216,14 @@ static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
  *
  * returns integer offset into table
  */
-static int hash_fsid(void *fsid, int table_size)
+static int hash_fsid(const void *fsid, int table_size)
 {
     /* TODO: update this later with a better hash function,
      * depending on what fsids look like, for now just modding
      *
      */
     unsigned long tmp = 0;
-    TROVE_coll_id *real_fsid = (TROVE_coll_id *)fsid;
+    const TROVE_coll_id *real_fsid = (const TROVE_coll_id *)fsid;
 
     tmp += (*(real_fsid));
     tmp = tmp%table_size;
@@ -238,10 +238,10 @@ static int hash_fsid(void *fsid, int table_size)
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_fsid_compare(void *key, struct qlist_head *link)
+static int hash_fsid_compare(const void *key, struct qlist_head *link)
 {
     handle_ledger_t *ledger = NULL;
-    TROVE_coll_id *real_fsid = (TROVE_coll_id *)key;
+    const TROVE_coll_id *real_fsid = (const TROVE_coll_id *)key;
 
     ledger = qlist_entry(link, handle_ledger_t, hash_link);
     assert(ledger);

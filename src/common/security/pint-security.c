@@ -418,15 +418,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     config = PINT_get_server_config();
 
-    /* Moved to get-attr.sm 
-    cap->issuer = (char *) malloc(strlen(config->server_alias) + 3);
-    if (cap->issuer == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    strcpy(cap->issuer, "S:");
-    strcat(cap->issuer, config->server_alias);
-    */
+    /* cap->issuer is set in get-attr.sm in the server. */
 
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
@@ -833,6 +825,18 @@ int PINT_verify_credential(const PVFS_credential *cred)
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Null credential\n");
         return 0;
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    /* check if this is an unsigned credential... in this case 
+       it will be verified, but it does not provide any rights other 
+       than basic ops like statfs */
+    if (IS_UNSIGNED_CRED(cred))
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsigned credential from %s "
+                     "received\n", cred->issuer);
+        return 1;
+    }
+#endif
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));

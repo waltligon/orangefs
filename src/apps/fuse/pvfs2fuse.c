@@ -108,7 +108,7 @@ static int pvfs_fuse_gen_credential(
    ret = PVFS_util_gen_credential(uid, 
                                   gid, 
                                   PVFS2_DEFAULT_CREDENTIAL_TIMEOUT, 
-                                  NULL,
+                                  NULL, NULL,
                                   new_cred);
 
    if (ret == 0)

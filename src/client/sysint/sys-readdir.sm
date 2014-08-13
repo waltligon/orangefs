@@ -274,7 +274,7 @@ static PINT_sm_action readdir_init(
         PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);
-    
+
     /* keep dirent_count of all dirdata server in
        sm_p->getattr.size_array */
     sm_p->getattr.keep_size_array = 1;
@@ -327,7 +327,6 @@ static PINT_sm_action readdir_finish_partial_read(
             msg_p->req,
             sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
             sm_p->getattr.attr.dirdata_handles[sm_p->readdir_state.dirdata_index],
             sm_p->readdir_state.pos_token,
             sm_p->readdir_state.dirent_limit,
@@ -503,7 +502,6 @@ static PINT_sm_action readdir_msg_setup_msgpair(
                 msg_p->req,
                 sm_p->getattr.attr.capability,
                 sm_p->object_ref.fs_id,
-                sm_p->object_ref.handle,
                 sm_p->getattr.attr.dirdata_handles[tmp_dirdata_index_array[i]],
                 token_array[i],
                 tmp_dirent_limit_array[i],
@@ -671,18 +669,20 @@ static PINT_sm_action readdir_cleanup(
 
     }
 
-    /* deliberately free sm_p->getattr.size_array */
-    if (sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
+    /* TODO Should not free it, unless acache is disabled.
+     * App should copy and acache should destroy it
+     * when necessary. */
+#if 0
+    if (!sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
     {
         gossip_debug(GOSSIP_READDIR_DEBUG, 
                 "readdir_cleanup: freeing sm_p->getattr.size_array. \n");
-        free(sm_p->getattr.size_array);
-        sm_p->getattr.size_array = NULL;
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
     }
+#endif
 
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     if(js_p->error_code != 0)

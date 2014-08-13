@@ -244,7 +244,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;
     }
     client_status_flag |= CLIENT_JOB_CTX_INIT;
-        
+
     /* initialize the attribute cache and set the default timeout */
     ret = PINT_acache_initialize();
     if (ret < 0)

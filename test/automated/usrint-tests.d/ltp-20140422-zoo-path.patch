@@ -1,0 +1,53 @@
+--- ltp-20140422/runltp	2014-05-30 15:59:37.288777102 -0400
++++ ltp-20140422-patched/runltp	2014-05-30 15:58:27.124773706 -0400
+@@ -84,6 +84,7 @@
+     export LTP_BIG_DEV=""
+     export LTP_DEV_FS_TYPE="ext2"
+     export LTP_BIG_DEV_FS_TYPE="ext2"
++    export ZOOFILE="$$"
+ 
+     [ -d "$LTPROOT/testcases/bin" ] ||
+     {
+@@ -171,6 +172,7 @@
+     -z BIG_DEVICE   Some tests require a big unmounted block device
+                     to run correctly.
+     -Z  LTP_BIG_DEV_FS_TYPE The file system of the big device
++	-A ZOOFILE      Specify an alternate path to zoo file.
+ 
+ 
+ 
+@@ -219,7 +221,7 @@
+ 
+     version_date=$(cat "$LTPROOT/Version")
+ 
+-    while getopts a:c:C:d:D:f:F:ehi:K:g:l:m:M:Nno:pqr:s:S:t:T:w:x:b:B:z:Z: arg
++    while getopts a:c:C:d:D:f:F:ehi:K:g:l:m:M:Nno:pqr:s:S:t:T:w:x:b:B:z:Z:A: arg
+     do  case $arg in
+         a)  EMAIL_TO=$OPTARG
+             ALT_EMAIL_OUT=1;;
+@@ -434,6 +436,7 @@
+         B) LTP_DEV_FS_TYPE=$OPTARG;;
+         z) BIG_DEVICE=$OPTARG;;
+         Z) LTP_BIG_DEV_FS_TYPE=$OPTARG;;
++		A)  ZOOFILE=$OPTARG;;
+         \?) usage;;
+         esac
+     done
+@@ -712,7 +715,7 @@
+     fi
+ 
+     [ ! -z "$QUIET_MODE" ] && { echo "INFO: Test start time: $(date)" ; }
+-    PAN_COMMAND="${LTPROOT}/bin/ltp-pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ \
++    PAN_COMMAND="${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE \
+     -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE"
+     echo "COMMAND:    $PAN_COMMAND"
+     if [ ! -z "$TAG_RESTRICT_STRING" ] ; then
+@@ -805,7 +808,7 @@
+ 	fi
+     # Some tests need to run inside the "bin" directory.
+     cd "${LTPROOT}/testcases/bin"
+-    "${LTPROOT}/bin/ltp-pan" $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
++    "${LTPROOT}/bin/ltp-pan" $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
+ 
+     if [ $? -eq 0 ]; then
+       echo "INFO: ltp-pan reported all tests PASS"

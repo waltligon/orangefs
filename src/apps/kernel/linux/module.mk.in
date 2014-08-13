@@ -2,8 +2,6 @@ DIR := src/apps/kernel/linux
 
 PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
 
-ifdef BUILD_KERNEL
-
 KERNAPPSRC += \
 	$(DIR)/pvfs2-client.c 
 
@@ -29,5 +27,3 @@ endif
 # explicitly uses pthreads both threaded and not-threaded versions, even if
 # threading is turned off in the rest of libpvfs
 MODLDFLAGS_$(DIR)/pvfs2-client-core.o = -lpthread
-
-endif

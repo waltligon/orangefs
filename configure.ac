@@ -730,7 +730,7 @@ AC_ARG_WITH(kernel,
            AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
     fi
     if ! test -r $withval/include/linux/version.h && ! test -r $withval/include/generated/uapi/linux/version.h; then
-       AC_MSG_ERROR(The kernel source tree must have been configured.)
+       AC_MSG_ERROR(The kernel source tree must not have been configured.)
     fi
 
     if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
@@ -1747,45 +1747,73 @@ fi
 ],
 )
 
-dnl Do we have strerror_r?
-AC_MSG_CHECKING([for strerror_r])
+dnl in our src/io/bmi/bmi-byteswap.h we check to see if __bswap_64
+dnl is defined, and if not, we define it. We probably haven't
+dnl had to use our define for a long time, __bswap_64 has been
+dnl defined in some glibc package (wherever /usr/include/bits/byteswap.h
+dnl comes from) for a long time. We could probably get rid of our
+dnl check in bmi-byteswap.h: even as far back as Red Hat 7.3 where
+dnl /usr/include/bits/byteswap.h came from glibc-devel-2.2.5.34, __bswap_64
+dnl would be defined for anyone using gcc > 2.0.
+dnl
+dnl Anyhow, more recently (for example: when /usr/include/bits/byteswap.h
+dnl comes from glibc-headers-2.17-11.fc19.x86_64), dnl __bswap_64 is
+dnl an inline function in most situations. This causes our define of
+dnl __bswap_64 to kick in (since __bswap_64 is NOT defined) and this
+dnl is a problem - our stinky old define overrides the inline function.
+dnl This test sets a define if __bswap_64 is a function. We can use
+dnl this define in src/io/bmi/bmi-byteswap.h to avoid defining __bswap_64
+dnl if it is an inline function. This way, we can leave the test in 
+dnl src/io/bmi/bmi-byteswap.h in case there's anyone out there who
+dnl still needs it.
+AC_MSG_CHECKING([for __bswap_64 is a function])
 AC_TRY_COMPILE(
     [
-	  #include <string.h>
+      #include <byteswap.h>
+      #include <bits/types.h>
     ],
     [
-      int errnum, buflen;
-      char *buf;
-      strerror_r(errnum, buf, buflen);
+      __uint64_t x;
+      #ifndef  __bswap_64
+        __bswap_64(x);
+      #else
+         __bswap_64_is_not_a_function(not a function);
+      #endif
     ],
     [
       AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_STRERROR_R, 1, Define if have strerror_r)
-      AC_DEFINE(HAVE_DECL_STRERROR_R, 1, Define if have strerror_r)
+      AC_DEFINE(BSWAP_64_IS_A_FUNC, 1, Define if __bswap_64 is a function)
     ]
     ,
     AC_MSG_RESULT(no)
 )
 
-dnl Which form of strerror?
-AC_MSG_CHECKING([for GNU-style strerror_r])
+dnl gets has been officially removed in ISO C11
+dnl     - /usr/include/stdio.h
+dnl     - glibc-headers-2.17-11.fc19.x86_64
+dnl
+dnl glibc 2.15 and later don't declare gets anymore for ISO C11 mode 
+dnl and if _GNU_SOURCE is defined.
+dnl     - http://gcc.gnu.org/bugzilla/show_bug.cgi?id=51785
+AC_MSG_CHECKING([for gets])
+oldcflags="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
 AC_TRY_COMPILE(
     [
-	  #include <string.h>
+      #include <stdio.h>
     ],
     [
-      int errnum, buflen;
-      char *buf, *ret;
-      ret = strerror_r(errnum, buf, buflen);
+      char *s;
+      gets(s);
     ],
-    [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
-      AC_DEFINE(STRERROR_R_CHAR_P, 1, Define if strerror_r return char ptr)
-    ]
+    AC_MSG_RESULT(yes)
     ,
-    AC_MSG_RESULT(no)
+    [
+      AC_MSG_RESULT(no)
+      AC_DEFINE(GETS_IS_GONE, 1, Define if gets is gone from stdio.h)
+    ]
 )
+CFLAGS="$oldcflags"
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
@@ -1852,7 +1880,8 @@ doc/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
-examples/pvfs2-server.rc
+examples/orangefs-server
+examples/orangefs-client
 doc/doxygen/pvfs2-doxygen.conf
 )
 

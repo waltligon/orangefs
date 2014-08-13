@@ -181,25 +181,33 @@ struct tcp_msg_header
     char enc_hdr[TCP_ENC_HDR_SIZE];  /* encoded version of header info */
 };
 
-#define BMI_TCP_ENC_HDR(hdr)						\
-    do {								\
-        uint32_t *tmp32;                                                \
-        tmp32 = (uint32_t *)&(hdr).enc_hdr[0];                          \
-	*(tmp32) = htobmi32((hdr).magic_nr);	                        \
-	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
-	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
-	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
-    } while(0)						    
+#define BMI_TCP_ENC_HDR(hdr)                        \
+    do {                                            \
+        uint32_t *tmp32;                            \
+        uint64_t *tmp64;                            \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[0];     \
+        *(tmp32) = htobmi32((hdr).magic_nr);        \
+        tmp32 = (uint32_t *) &(hdr).enc_hdr[4];     \
+        *(tmp32) = htobmi32((hdr).mode);            \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[8];     \
+        *(tmp64) = htobmi64((hdr).tag);             \
+        tmp64 = (uint64_t *) &(hdr).enc_hdr[16];    \
+        *(tmp64) = htobmi64((hdr).size);            \
+    } while(0)
 
-#define BMI_TCP_DEC_HDR(hdr)						\
-    do {								\
-        uint32_t tmp32;                                                 \
-        memcpy(&tmp32,&(hdr).enc_hdr[0],sizeof(uint32_t));              \
-        (hdr).magic_nr = bmitoh32(tmp32);                               \
-        (hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));       \
-        (hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));        \
-        (hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));      \
-    } while(0)						    
+#define BMI_TCP_DEC_HDR(hdr)                                     \
+    do {                                                         \
+        uint64_t tmp64;                                          \
+        uint32_t tmp32;                                          \
+        memcpy(&tmp32, &(hdr).enc_hdr[0], sizeof(uint32_t));     \
+        (hdr).magic_nr = bmitoh32(tmp32);                        \
+        memcpy(&tmp32, &(hdr).enc_hdr[4], sizeof(uint32_t));     \
+        (hdr).mode = bmitoh32(tmp32);                            \
+        memcpy(&tmp64, &(hdr).enc_hdr[8], sizeof(uint64_t));     \
+        (hdr).tag = bmitoh64(tmp64);                             \
+        memcpy(&tmp64, &(hdr).enc_hdr[16], sizeof(uint64_t));    \
+        (hdr).size = bmitoh64(tmp64);                            \
+    } while(0)
 
 
 /* enumerate states that we care about */
@@ -2150,7 +2158,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
 	    if ((ret < 0) || (poll_conn.revents & POLLERR))
 	    {
 		tmp_errno = errno;
-		gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
+		//gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
 		return (bmi_tcp_errno_to_pvfs(-tmp_errno));
 	    }
 	    if (poll_conn.revents & POLLOUT)
@@ -3773,7 +3781,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     struct tcp_addr *tcp_addr_data = dest->method_data;
     method_op_p query_op = NULL;
     int ret = -1;
-    bmi_size_t total_size = 0;
     bmi_size_t amt_complete = 0;
     bmi_size_t env_amt_complete = 0;
     struct op_list_search_key key;
@@ -3781,14 +3788,13 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
 
-    if(PINT_EVENT_ENABLED)
+#if PINT_EVENT_ENABLED
+    int i = 0;
+    for(; i < list_count; ++i)
     {
-        int i = 0;
-        for(; i < list_count; ++i)
-        {
-            total_size += size_list[i];
-        }
+        total_size += size_list[i];
     }
+#endif
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,

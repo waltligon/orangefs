@@ -16,6 +16,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-security.h"
+#include "security-util.h"
 
 #ifdef ENABLE_SECURITY_CERT
 #include <openssl/err.h>
@@ -109,6 +110,16 @@ int PINT_map_credential(PVFS_credential *cred,
     }
 
 #ifdef ENABLE_SECURITY_CERT
+
+    /* do not map unsigned credential (fields won't be used) */
+    if (IS_UNSIGNED_CRED(cred))
+    {
+        *uid = PVFS_UID_MAX;
+        *num_groups = 1;
+        group_array[0] = PVFS_GID_MAX;
+
+        return 0;
+    }
 
 #ifdef ENABLE_CERTCACHE
     /* check certificate cache -- note: CA cert is cached as root */

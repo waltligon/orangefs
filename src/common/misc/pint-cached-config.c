@@ -80,8 +80,8 @@ struct config_fs_cache_s
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
-static int hash_fsid(void *fsid, int table_size);
-static int hash_fsid_compare(void *key, struct qlist_head *link);
+static int hash_fsid(const void *fsid, int table_size);
+static int hash_fsid_compare(const void *key, struct qlist_head *link);
 
 static int cache_server_array(PVFS_fs_id fsid);
 static int handle_lookup_entry_compare(const void *p1, const void *p2);
@@ -1737,10 +1737,10 @@ cleanup_allocations:
  *
  * returns integer offset into table
  */
-static int hash_fsid(void *fsid, int table_size)
+static int hash_fsid(const void *fsid, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_fs_id *real_fsid = (PVFS_fs_id *)fsid;
+    const PVFS_fs_id *real_fsid = (const PVFS_fs_id *)fsid;
 
     assert(PINT_fsid_config_cache_table);
 
@@ -1757,10 +1757,10 @@ static int hash_fsid(void *fsid, int table_size)
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_fsid_compare(void *key, struct qlist_head *link)
+static int hash_fsid_compare(const void *key, struct qlist_head *link)
 {
     struct config_fs_cache_s *fs_info = NULL;
-    PVFS_fs_id *real_fsid = (PVFS_fs_id *)key;
+    const PVFS_fs_id *real_fsid = (const PVFS_fs_id *)key;
 
     assert(PINT_fsid_config_cache_table);
 

@@ -177,7 +177,10 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         new_op->attempts = 0;
         gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %llu %s)\n", new_op, llu(new_op->tag), get_opname_string(new_op));
 
-#ifdef HAVE_CURRENT_FSUID
+#ifdef HAVE_FROM_KUID
+       new_op->upcall.uid = from_kuid(&init_user_ns, current_fsuid());
+       new_op->upcall.gid = from_kgid(&init_user_ns, current_fsgid());
+#elif defined(HAVE_CURRENT_FSUID)
         new_op->upcall.uid = current_fsuid();
         new_op->upcall.gid = current_fsgid();
 #else

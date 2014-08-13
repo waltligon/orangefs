@@ -43,6 +43,74 @@ AC_DEFUN([AX_BERKELEY_DB],
 	CFLAGS=$oldcflags
 	
     else
+        dnl Typically a distro's db-devel package (or whatever
+        dnl they might call it) includes /usr/include/db.h. 
+        dnl Sometimes /usr/include/db.h is just a sym-link to
+        dnl the real db.h, which might be in /usr/include/xyzzy/db.h
+        dnl or somesuch. Sometimes /usr/include/db.h is a real file
+        dnl that contains a single line: #include <xyzzy/db.h>.
+        dnl Sometimes /usr/include/db.h is the actual db include
+        dnl file. 
+        dnl
+        dnl In the Schrödinger’s Cat release of Fedora (relase 19),
+        dnl the db-devel package (libdb4-devel-4.8.30-10.fc19.x86_64)
+        dnl has no /usr/include/db.h, only /usr/include/libdb4/db.h.
+        dnl
+        dnl And libdb.so is not in /usr/lib(64), rather it is in
+        dnl /usr/lib(64)/libdb4...
+        dnl
+        dnl The next few lines try to find db.h and libdb.so where ever
+        dnl they might be stashed below /usr/include and /usr/lib(64)
+        dnl and add those locations to CFLAGS and LDFLAGS.
+	dnl
+        dnl when we have rpm, we can use it to insure that the 
+        dnl db.h and libdb that we find are from the same package.
+        dnl If we don't have rpm, we'll just hope they're from the same
+        dnl package...
+        RPMPATH=`which rpm`
+        if test "$RPMPATH" != ""
+        then
+          RPMCOMMAND="rpm -qf "
+        else
+          RPMCOMMAND=": # "
+        fi
+        DBDOTH=""
+        for i in `find /usr/include -name db.h`
+        do
+          if test "$i" = "/usr/include/db.h"
+          then
+            DBDOTH=""
+            break
+          else
+            DBDOTH="$i"
+          fi
+        done
+        if test "$DBDOTH" != ""
+        then
+          DB_CFLAGS="-I `dirname $DBDOTH`"
+          CFLAGS="$CFLAGS $DB_CFLAGS"
+          DBPACKAGE=`$RPMCOMMAND -qf $DBDOTH`
+        else
+          DBPACKAGE=""
+        fi
+
+        strings /etc/ld.so.cache | grep -q /lib64
+        if test "$?" = "0"
+        then
+          LIBPATH="/usr/lib64"
+        else
+          LIBPATH="/usr/lib"
+        fi
+      
+        for i in `find "$LIBPATH" -name libdb.so`
+        do
+          LIBPACKAGE=`$RPMCOMMAND -qf $i`
+          if test "$DBPACKAGE" = "$LIBPACKAGE"
+          then
+            LDFLAGS="$LDFLAGS -L"`dirname $i`
+          fi
+        done
+
         for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib -lpthread"
            DB_LIB="-l$lib"

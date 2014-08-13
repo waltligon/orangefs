@@ -15,6 +15,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <assert.h>
+#include <sys/wait.h>
 
 #include "test-common.h"
 #include "libgen.h"
@@ -30,7 +31,8 @@ static void copy_pvfs2_to_stat(
     const PVFS_sys_attr * attr,
     struct stat         * fileStats);
 static void display_common_usage(char* exeName);
- 
+
+#define WHITE_SPACE "\t \n\r"
 
 /**
  * Sets a local char array containing the path to prefix all pvfs2 utilities
@@ -309,7 +311,7 @@ int stat_file(
     const int     verbose)       /**< Turns on verbose prints if set to non-zero value */
 {
     int  ret=0;
-    char cmd[PATH_MAX] = { 0 };
+
     char szPvfsPath[PVFS_NAME_MAX] = { 0 };
     PVFS_sysresp_lookup  lk_response;
     PVFS_object_ref      ref;
@@ -317,21 +319,57 @@ int stat_file(
     PVFS_credential      credential;
     PVFS_fs_id           fs_id;
 
+
+    char cmd[PATH_MAX] = "";
+    char *args[7];
+    char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
+
+
+
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
    
     if(use_pvfs2_lib && (fileStats == NULL) )
     {
-        snprintf(cmd, sizeof(cmd), "%spvfs2-stat %s %s %s",
-                 pvfsEXELocation,
-                 (followLink ? "-L" : ""),
-                 fileName, 
-                 (verbose ? " >/dev/null 2>&1" : ""));
-        if( verbose ) { printf("\tExecuting [%s]\n", cmd); }
-        ret = system(cmd);
+
+    	// pvfs2-stat <followLink> <fileName>
+    	snprintf(cmd, sizeof(cmd), "%spvfs2-stat",pvfsEXELocation);
+        *ptr++ = cmd;
+
+        if (followLink)
+        {
+        	*ptr++ = "-L";
+        }
+
+        *ptr++ = (char *)fileName;
+
+
+        if( verbose )
+        {
+        	if (followLink)
+        	{
+        		printf("\tExecuting [%s %s %s]\n", cmd, args[1], args[2]);
+        	}
+        	else
+        	{
+        		printf("\tExecuting [%s %s]\n", cmd, args[1]);
+        	}
+
+        }
+        else
+        {
+        	*ptr++ = " >/dev/null 2>&1";
+        }
+
+        ret = run_external_command(cmd,args);
+
+
         if(ret < 0)
         {
             return(TEST_COMMON_FAIL);
         }
+
     }
     else if( use_pvfs2_lib && (fileStats != NULL) )
     {
@@ -541,74 +579,93 @@ int create_file(
  * \retval  errno FAILURE using VFS layer
  * \retval  -ENODATA FAILURE using PVFS2 API
  */
-int create_directory(
+int create_directory_intl(
     const char * directory, /**< Directory Name */
     const int    mode,      /**< directory permissions */
     const int    use_pvfs2_lib, /**< determines use of pvfs2 library */
-    const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
+    const int    verbose,   /**< Turns on verbose prints if set to non-zero value */
+	const int	create_path)
 {
     int  ret=0;
     char cmd[PATH_MAX] = "";
+    char mode_str[8] = "";
+    char *args[7];
+    char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
+
+
+    char * token = NULL;
    
     if(verbose) { printf("\tCreating [%s] using mode [%o]:\n", directory, mode); }
-   
-    if(use_pvfs2_lib)
-    {
+
 	/* Remove the directory before creating it. */
 	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
-	if(verbose) 
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, directory);
-        }
-        else
-        {
-            /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, directory);
-        }
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
-        if(verbose)
-        {
-            printf("RETURNS->%d\n",ret);
-        }
 
-	
-        if(verbose) 
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir -m %o %s", pvfsEXELocation, mode, directory);
-        }
-        else
-        {
-            /* Make sure nothing prints to STDOUT/STDERR if verbose mode is off */
-            snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir -m %o %s >/dev/null 2>&1", pvfsEXELocation, mode, directory);
-        }
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
-        if(verbose)
-        {
-            printf("RETURNS->%d\n",ret);
-        }
-        if(ret != 0)
-        {
-            ret = -ENODATA; /* Set to a generic return code, since errno not 
-                             * appropriate for command line utility */
-            if(verbose)  
-            {
-                print_error("\tUnable to create [%s] using mode [%o]\n", directory, mode);
-            }
-        }
+	remove_directory(directory,use_pvfs2_lib,verbose);
+
+    if(use_pvfs2_lib)
+    {
+
+		snprintf(cmd, sizeof(cmd), "%spvfs2-mkdir",pvfsEXELocation);
+
+
+		*ptr++ = cmd;
+		if (create_path)
+		{
+			*ptr++ = "-p";
+		}
+
+		*ptr++ = "-m";
+		snprintf(mode_str, sizeof(mode_str),"%o",mode);
+		*ptr++ = mode_str;
+		//*ptr++ = (char*)directory;
+
+		/* Use strtok to support multiple directories */
+		/* TODO: Make this smart enough to recognize escaped and quoted spaces */
+		token = strtok((char*)directory,WHITE_SPACE);
+		do
+		{
+			*ptr++ = token;
+		} while (( token = strtok(NULL,WHITE_SPACE)) != NULL);
+
+
+		if(!verbose)
+		{
+			*ptr++ = ">/dev/null 2>&1";
+		}
+		else
+		{
+			if (create_path)
+			{
+				printf("\nRUNNING->%s %s %s %s ", cmd, args[1], args[2], directory);
+			}
+			else
+			{
+				printf("\nRUNNING->%s %s %s %s %s ", cmd, args[1], args[2], args[3], directory);
+			}
+		}
+
+		ret = run_external_command(cmd,args);
+
+		if(verbose)
+		{
+			printf("RETURNS->%d\n",ret);
+		}
+
+		if(ret != 0)
+		{
+			ret = -ENODATA; /* Set to a generic return code, since errno not
+							 * appropriate for command line utility */
+			if(verbose)
+			{
+				print_error("\tUnable to create [%s] using mode [%o]\n", directory, mode);
+			}
+		}
     }
     else
     {
-	/* A bit naive, but these test directories should be empty*/
-	printf("\tRemoving directory if it exists. Any errors may be safely ignored.");
-	ret = rmdir(directory);
+
 	
 	ret = mkdir(directory, mode);
         if(ret != 0)
@@ -630,6 +687,27 @@ int create_directory(
    return ret; 
 }
 
+int create_directory(
+    const char * directory, /**< Directory Name */
+    const int    mode,      /**< directory permissions */
+    const int    use_pvfs2_lib, /**< determines use of pvfs2 library */
+    const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
+
+{
+	return create_directory_intl(directory,mode,use_pvfs2_lib,verbose,0);
+}
+
+
+int create_path(
+    const char * fullPath, /**< fullPath to directory */
+    const int    mode,      /**< directory permissions */
+    const int    use_pvfs2_lib, /**< determines use of pvfs2 library */
+    const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
+
+{
+	return create_directory_intl(fullPath,mode,use_pvfs2_lib,verbose,1);
+}
+
 /**
  * \retval  0  SUCCESS
  * \retval  errno FAILURE using VFS layer
@@ -641,38 +719,12 @@ int remove_directory(
     const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
 {
     int  ret=0;
-    char cmd[PATH_MAX] = "";
     
     if(verbose) { printf("\tRemoving [%s]\n", directory); }
     
     if(use_pvfs2_lib)
     {
-        if(verbose)
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, directory);
-        }
-        else
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s  >/dev/null 2>&1", pvfsEXELocation, directory);
-        }
-
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
-        if(verbose)
-        {
-            printf("RETURNS->%d\n",ret);
-        }
-        if(ret != 0)
-        {
-            ret = -ENODATA; /* Save the error number */
-            if(verbose)
-            {
-                print_error("\tUnable to remove [%s]\n", directory);
-            }
-        }
+    	ret = pvfs2_remove(directory,verbose);
     }
     else
     {
@@ -692,6 +744,92 @@ int remove_directory(
         }
     }
     return ret; 
+}
+
+/**
+ * \retval  0  SUCCESS
+ * \retval  errno FAILURE using VFS layer
+ * \retval  -ENODATA FAILURE using PVFS2 API
+ */
+int pvfs2_remove(
+    const char * filename, /**< filename or directory Name */
+    const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
+{
+    int  ret=0;
+    char cmd[PATH_MAX] = "";
+    char *args[7];
+    char **ptr = args;
+    char * token = NULL;
+
+    memset(&args,        0, sizeof(args));
+
+	snprintf(cmd, sizeof(cmd), "%spvfs2-rm", pvfsEXELocation);
+
+	*ptr++ = cmd;
+	//*ptr++ = (char*)filename;
+
+	/* Use strtok to support multiple directories */
+	/* TODO: Make this smart enough to recognize escaped and quoted spaces */
+	token = strtok((char*)filename,WHITE_SPACE);
+	do
+	{
+		*ptr++ = token;
+	} while (( token = strtok(NULL,WHITE_SPACE)) != NULL);
+
+
+	if(!verbose)
+	{
+		*ptr++ = ">/dev/null 2>&1";
+	}
+	else
+	{
+		printf("\nRUNNING->%s %s ", cmd, filename);
+	}
+
+	ret = run_external_command(cmd,args);
+
+	if(verbose)
+	{
+		printf("RETURNS->%d\n",ret);
+	}
+	return ret;
+
+}
+
+/**
+ * @fn run_external_command(const char * cmd, const char * args[])
+ * @brief Run external command as a separate pid via execv
+ *
+ * @param cmd = Command to run.
+ * @param args = Command line parameters.
+ *
+ * @return return value of external command
+ */
+
+int run_external_command(const char * cmd, char * const args[])
+{
+
+	int ret = 0;
+	pid_t pid;
+
+	pid = fork();
+
+	if (pid == 0)
+	{
+		execv(cmd,args);
+		_exit(100);
+
+	}
+	else if (pid < 0)
+	{
+		printf("Could not launch %s ",cmd);
+	}
+	else
+	{
+		waitpid(pid, &ret, 0);
+	}
+
+	return ret;
 }
 
 /**
@@ -720,34 +858,13 @@ int remove_file(
     const int    verbose)   /**< Turns on verbose prints if set to non-zero value */
 {
     int  ret=0;
-    char cmd[PATH_MAX] = "";
+
    
     if(verbose) { printf("\tRemoving [%s]\n", fileName); }
    
     if(use_pvfs2_lib)
     {
-        if(verbose)
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s", pvfsEXELocation, fileName);
-        }
-        else
-        {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-rm %s >/dev/null 2>&1", pvfsEXELocation, fileName);
-        }
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
-        if(verbose)
-        {
-            printf("RETURNS->%d\n",ret);
-        }
-        if(ret != 0)
-        {
-            ret = -ENODATA;
-            if(verbose) { print_error("\tUnable to remove [%s]\n", fileName); }
-        }
+    	ret = pvfs2_remove(fileName,verbose);
     }
     else
     {
@@ -783,30 +900,43 @@ int change_mode(
 {
     int  ret=0;
     char cmd[PATH_MAX] = "";
+    char mode_str[8] = "";
+    char *args[7];
+    char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
+
    
     if(verbose) { printf("\tChanging mode on [%s] to [%o]\n", fileName, mode); }
    
     if(use_pvfs2_lib)
     {
+
+        snprintf(cmd, sizeof(cmd), "%spvfs2-chmod",pvfsEXELocation);
+        snprintf(mode_str, sizeof(mode_str),"%o",mode);
+
+        // pvfs2-chmod <mode> <filename>
+        *ptr++ = cmd;
+		*ptr++ = mode_str;
+		*ptr++ = (char *)fileName;
+
+
         if(verbose)
         {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-chmod %o %s", 
-                     pvfsEXELocation, mode, fileName);
+            printf("\nRUNNING->%s %s %s ", cmd, mode_str, fileName);
         }
         else
         {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-chmod %o %s >/dev/null 2>&1", 
-                     pvfsEXELocation, mode, fileName);
+            *ptr++ = ">/dev/null 2>&1";
         }
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
+
+        ret = run_external_command(cmd,args);
+
         if(verbose)
         {
             printf("RETURNS->%d\n",ret);
         }
+
         if(ret != 0)
         {
             ret = -ENODATA; 
@@ -852,6 +982,11 @@ int change_owner(
 {
     int  ret=0;
     char cmd[PATH_MAX] = "";
+    char *args[7];
+    char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
+
    
     if(verbose)
     {
@@ -864,76 +999,37 @@ int change_owner(
             printf("\tChanging owner on [%s] to [%d].[%d]\n", fileName, owner_id, group_id);
         }
     }
-   
+    /* Determine if we need to use sudo to change owner/group */
+    if(geteuid() != owner_id ||
+       geteuid() != group_id)
+    {
+    	*ptr++ = "sudo";
+    }
+
+    /* pvfs2-chown if using pvfs2_lib, otherwise chown */
     if(use_pvfs2_lib)
     {
-        /* Determine if we need to use sudo to change owner/group */
-        if(geteuid() != owner_id ||
-           geteuid() != group_id)
-        {
-            if(verbose)
-            {
-                snprintf(cmd, sizeof(cmd), "sudo %spvfs2-chown %s %s %s",  
-                         pvfsEXELocation, ownerName, groupName, fileName);
-            }
-            else
-            {
-                snprintf(cmd, sizeof(cmd), "sudo %spvfs2-chown %s %s %s >/dev/null 2>&1",  
-                         pvfsEXELocation, ownerName, groupName, fileName);
-            }
-        }
-        else
-        {
-            if(verbose)
-            {
-                snprintf(cmd, sizeof(cmd), "%spvfs2-chown %s %s %s", 
-                         pvfsEXELocation, ownerName, groupName, fileName);
-            }
-            else
-            {
-                snprintf(cmd, sizeof(cmd), "%spvfs2-chown %s %s %s >/dev/null 2>&1", 
-                         pvfsEXELocation, ownerName, groupName, fileName);
-            }
-        }
+    	snprintf(cmd, sizeof(cmd), "%spvfs2-chown",pvfsEXELocation);
     }
     else
     {
-    
-        /* Determine if we need to use sudo to change owner/group */
-        if(geteuid() != owner_id &&
-           geteuid() != group_id)
-        {
-            if(verbose)
-            {
-                snprintf(cmd, sizeof(cmd), "sudo chown %s:%s %s", 
-                         ownerName, groupName, fileName);
-            }
-            else
-            {
-                snprintf(cmd, sizeof(cmd), "sudo chown %s:%s %s >/dev/null 2>&1", 
-                         ownerName, groupName, fileName);
-            }
-        }
-        else
-        {
-            if(verbose)
-            {
-                snprintf(cmd, sizeof(cmd), "chown %s:%s %s", 
-                         ownerName, groupName, fileName);
-            }
-            else
-            {
-                snprintf(cmd, sizeof(cmd), "chown %s:%s %s >/dev/null 2>&1", 
-                         ownerName, groupName, fileName);
-            }
-        }
+    	snprintf(cmd, sizeof(cmd), "chown");
     }
+    
+    *ptr++ = cmd;
+    *ptr++ = (char*) ownerName;
+    *ptr++ = (char*) groupName;
+    *ptr++ = (char*) fileName;
   
     if(verbose)
     {
-        printf("\nRUNNING->%s ", cmd);
+        printf("\nRUNNING->%s %s %s %s ", cmd, ownerName,groupName,fileName);
     }
-    ret = system(cmd);
+    else
+    {
+    	*ptr++ = ">/dev/null 2>&1";
+    }
+    ret = run_external_command(cmd,args);
     if(verbose)
     {
         printf("RETURNS->%d\n",ret);
@@ -1425,6 +1521,10 @@ int create_symlink(
 {
     int  ret=0;
     char cmd[PATH_MAX] = "";
+    char *args[7];
+    char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
     
     /* Remove symlink first */ 
     remove_symlink(linkName,use_pvfs2_lib,verbose); 
@@ -1434,21 +1534,23 @@ int create_symlink(
     
     if(use_pvfs2_lib)
     {
+    	// pvfs2-ln -s <linkTarget> <linkName>
+        snprintf(cmd, sizeof(cmd), "%spvfs2-ln",pvfsEXELocation);
+        *ptr++ = cmd;
+        *ptr++ = "-s";
+        *ptr++ = (char*)linkTarget;
+        *ptr++ = (char*)linkName;
+
+
         if(verbose)
         {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-ln -s %s %s", 
-                     pvfsEXELocation, linkTarget, linkName);
+            printf("\nRUNNING->%s -s %s %s ", cmd,  linkTarget, linkName);
         }
         else
         {
-            snprintf(cmd, sizeof(cmd), "%spvfs2-ln -s %s %s >/dev/null 2>&1", 
-                     pvfsEXELocation, linkTarget, linkName);
+        	*ptr++ = ">/dev/null 2>&1";
         }
-        if(verbose)
-        {
-            printf("\nRUNNING->%s ", cmd);
-        }
-        ret = system(cmd);
+        ret = run_external_command(cmd,args);
         if(verbose)
         {
             printf("RETURNS->%d\n",ret);

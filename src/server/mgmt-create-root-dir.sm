@@ -401,7 +401,7 @@ static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
+    PVFS_object_attr *attr GCC_UNUSED;
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;
@@ -785,10 +785,15 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
             dirdata_server_index);
 
     /* Update capability to send with request. */
-    s_op->u.mgmt_create_root_dir.capability.num_handles = 1;
+    s_op->u.mgmt_create_root_dir.capability.num_handles =
+        s_op->attr.dist_dir_attr.num_servers + 1;
     s_op->u.mgmt_create_root_dir.capability.handle_array =
-        malloc(sizeof(PVFS_handle));
+        malloc(s_op->u.mgmt_create_root_dir.capability.num_handles *
+               sizeof(PVFS_handle));
     s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
+    memcpy((s_op->u.mgmt_create_root_dir.capability.handle_array + 1),
+           s_op->attr.dirdata_handles,
+           s_op->attr.dist_dir_attr.num_servers* sizeof(PVFS_handle));
 
     config = PINT_get_server_config();
     s_op->u.mgmt_create_root_dir.capability.issuer = 

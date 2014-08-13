@@ -40,7 +40,7 @@
  */
 char *PVFS_qualify_path(const char *path)
 {
-    int ret = 0;
+    int ret GCC_UNUSED = 0;
     char *opath = NULL;
     char *npath = NULL;
     PVFS_path_t *Ppath;

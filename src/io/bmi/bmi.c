@@ -994,17 +994,21 @@ construct_poll_plan(struct method_usage_t * method_usage,
         if ((method_usage[i].iters_active <= usage_iters_active) &&
             (!(method_usage[i].flags & BMI_METHOD_FLAG_NO_POLLING))){
             /* recently busy, poll */
-            if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling active meth %d: %d / %d\n", __func__, i,
                          method_usage[i].iters_active, usage_iters_active);
+#endif
             method_usage[i].plan = 1;
             ++numplan;
             *idle_time_ms = 0;  /* busy polling */
         } else if (method_usage[i].iters_polled >= usage_iters_starvation) {
             /* starving, time to poke this one */
-            if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling starving meth %d: %d / %d\n", __func__, i,
                          method_usage[i].iters_polled, usage_iters_starvation);
+#endif
             method_usage[i].plan = 1;
             ++numplan;
         } 
@@ -1023,9 +1027,11 @@ construct_poll_plan(struct method_usage_t * method_usage,
                 *idle_time_ms = 1;
         }
         /* note that BMI_testunexpected is always called with idle_time 0 */
-        if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+#if 0
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                      "%s: polling all %d methods, idle %d ms\n", __func__,
                      numplan, *idle_time_ms);
+#endif
     }
 }
 
@@ -1571,7 +1577,56 @@ int BMI_get_info(BMI_addr_t addr,
             return ret;
         }
         break;
+    case BMI_TRANSPORT_METHODS_STRING:
+        {
+            /*
+             * [OUT] inout_parameter : contains comma-separated list of transport
+             *                         protocols, memory allocated here and must
+             *                         be free'd by the caller.
+             * @return               : total number of transport protocols
+             *                         supported by bmi.
+             */
+            
+            int kmstring_length = 0;
+            int kmc = sizeof(static_methods) / sizeof(static_methods[0]) - 1;
+            int i = 0;
+            char **stringptr = (char **) &(*(char*) inout_parameter);
 
+            /* Check if there are any transport protocol supported, else return */
+            if (kmc <= 0)
+            {
+                return 0;
+            }
+            
+            /* Find out the length the output string will be. */
+            for (i = 0; i < kmc; ++i)
+            {
+                kmstring_length += strlen(static_methods[i]->method_name)
+                    - strlen("bmi_") + sizeof(",");
+            }
+
+            /* +1 for null character */
+            (*stringptr) = malloc(kmstring_length + 1);
+
+            if ((*stringptr) == NULL)
+            {
+                return bmi_errno_to_pvfs(-ENOMEM);
+            }
+
+            memset((*stringptr), 0, kmstring_length);
+            
+            /* The transport protocol's names begins with bmi_, offset the
+             * method name when concatenating.
+             */
+            for (i = 0; i < kmc; ++i)
+            {
+                strcat((*stringptr), static_methods[i]->method_name + strlen("bmi_"));
+                strcat((*stringptr), ",");
+            }
+
+            return kmc;
+        }
+        break;
     default:
         return (bmi_errno_to_pvfs(-ENOSYS));
     }

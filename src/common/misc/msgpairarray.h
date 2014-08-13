@@ -62,7 +62,7 @@ typedef struct PINT_sm_msgpair_state_s
     /* the encoding type to use for the req */
     enum PVFS_encoding_type enc_type;
 
-    /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
+    /* max_resp_sz, and encoded_resp_p used to recv a response */
     int max_resp_sz;
     void *encoded_resp_p;
 

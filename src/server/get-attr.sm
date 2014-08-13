@@ -522,6 +522,7 @@ static PINT_sm_action getattr_verify_attribs(
                 "handle %llu.\n", 
                 llu(s_op->u.getattr.handle));
             js_p->error_code = -PVFS_ENXIO;
+js_p->error_code = -PVFS_ENOENT;
             break;
     }
 
@@ -1439,6 +1440,13 @@ static PINT_sm_action getattr_create_capability(
         resp_attr->capability.num_handles += resp_attr->u.meta.dfile_count;
     }
 
+    if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (resp_attr->mask & PVFS_ATTR_DISTDIR_ATTR))
+    {
+        resp_attr->capability.num_handles +=
+            resp_attr->dist_dir_attr.num_servers;
+    }
+
     resp_attr->capability.handle_array = 
         calloc(resp_attr->capability.num_handles, sizeof(PVFS_handle));
     if (!resp_attr->capability.handle_array)
@@ -1457,6 +1465,15 @@ static PINT_sm_action getattr_create_capability(
                resp_attr->u.meta.dfile_count * sizeof(PVFS_handle));
     }
 
+    if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (resp_attr->mask & PVFS_ATTR_DISTDIR_ATTR))
+    {
+        /* copy dirdata handles after the metafile handle */
+        memcpy((resp_attr->capability.handle_array + 1),
+               resp_attr->dirdata_handles,
+               resp_attr->dist_dir_attr.num_servers * sizeof(PVFS_handle));
+    }
+
     /* map credential based on credential certificate */
     ret = PINT_map_credential(&s_op->u.getattr.credential, &uid, &num_groups,
                               group_array);
@@ -1467,6 +1484,12 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
+#ifdef ENABLE_SECURITY_CERT
+    /* no capabilities for unsigned credential; some operations
+       still allowed */
+    if (!IS_UNSIGNED_CRED(&s_op->u.getattr.credential))
+    {
+#endif
     /* generate permissions mask based on uid and (optional) ACLs */
     ret = PINT_get_capabilities(acl_buf,
                                 acl_size,
@@ -1481,6 +1504,9 @@ static PINT_sm_action getattr_create_capability(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#ifdef ENABLE_SECURITY_CERT
+    } /* if */
+#endif
     
     resp_attr->capability.fsid = s_op->u.getattr.fs_id;
 

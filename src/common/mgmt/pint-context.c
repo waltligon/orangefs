@@ -42,8 +42,8 @@ struct PINT_context
 
 static struct PINT_context * PINT_context_lookup(PINT_context_id context_id);
 
-static int PINT_context_compare(void *key, struct qhash_head *link);
-static int PINT_context_hash(void *key, int tablesize);
+static int PINT_context_compare(const void *key, struct qhash_head *link);
+static int PINT_context_hash(const void *key, int tablesize);
 
 /**
  * PINT_context_init
@@ -546,12 +546,12 @@ int PINT_context_test(PINT_context_id context_id,
     return ret;
 }
 
-static int PINT_context_hash(void *key, int tablesize)
+static int PINT_context_hash(const void *key, int tablesize)
 {
     unsigned long ret = 0;
-    PINT_context_id *id;
+    const PINT_context_id *id;
 
-    id = (PINT_context_id *)key;
+    id = (const PINT_context_id *)key;
 
     ret += *id;
     ret = ret & (tablesize - 1);
@@ -559,9 +559,9 @@ static int PINT_context_hash(void *key, int tablesize)
     return (int) ret;
 }
 
-static int PINT_context_compare(void *key, struct qhash_head *link)
+static int PINT_context_compare(const void *key, struct qhash_head *link)
 {
-    PINT_context_id *id = (PINT_context_id *)key;
+    const PINT_context_id *id = (const PINT_context_id *)key;
     struct PINT_context *context;
 
     context = qhash_entry(link, struct PINT_context, link);
