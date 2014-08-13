@@ -217,9 +217,13 @@ int PINT_get_capabilities(void *acl_buf,
 int PINT_perm_check(struct PINT_server_op *s_op)
 {
     PVFS_capability *cap = &s_op->req->capability;
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL;
     char op_mask[16];
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: enter\n", __func__);
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -235,10 +239,19 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
     }
 
-    if (s_op->target_handle != PVFS_HANDLE_NULL && 
-        !PINT_capability_is_null(cap))
+    if (!PINT_capability_is_null(cap))
     {
         int index = 0, op_i;
+
+        /* get object handle */
+        PINT_server_req_get_object_ref(s_op->req, &fs_id, &handle);
+
+        if (handle == PVFS_HANDLE_NULL || fs_id == PVFS_FS_ID_NULL)
+        {
+            gossip_err("%s: called for operation %d with no handle\n", __func__,
+                       (int) s_op->req->op);
+            return -PVFS_EINVAL;
+        }
 
         /* check if operation is one where parent's permissions are checked */
         for (op_i = 0; op_i < PARENT_CHECK_OP_COUNT; op_i++)
@@ -254,7 +267,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             /* ensure we have a capability for the target handle */
             for (index = 0; index < cap->num_handles; index++)
             {
-                if (cap->handle_array[index] == s_op->target_handle)
+                if (cap->handle_array[index] == handle)
                 {
                     break;
                 }
@@ -270,7 +283,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             {
                 gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Could not retrieve "
                              "parent handle for %llu from hint\n", 
-                             llu(s_op->target_handle));
+                             llu(handle));
                 return -PVFS_EACCES;
             }
             for (index = 0; index < cap->num_handles; index++)
@@ -286,12 +299,12 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
                          "an operation on target handle %llu that was "
-                         "not in the capability\n", llu(s_op->target_handle));
+                         "not in the capability\n", llu(handle));
             return -PVFS_EACCES;
         }
     }
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "PVFS operation \"%s\" got "
                  "perms %o (capability mask = %s)\n",
                  PINT_map_server_op_to_string(s_op->req->op),
                  s_op->attr.perms, PINT_print_op_mask(cap->op_mask, op_mask));
@@ -306,7 +319,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         ret = -PVFS_EINVAL;
     }
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, 
                  "Final permission check for \"%s\" set error code to %d\n", 
                  PINT_map_server_op_to_string(s_op->req->op),
                  ret);
