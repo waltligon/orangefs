@@ -16,6 +16,7 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "client-state-machine.h"
+#include "pvfs2-types-debug.h"
 
 /** \file
  *  \ingroup acache
@@ -341,7 +342,12 @@ int PINT_acache_get_cached_entry(
                 /* Should go ahead and free memory here...*/
                 if(tmp_payload->size_array)
                 {
-                    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&tmp_payload->size_array);
+                    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                                 "%s: about to free: size_array = %p\n",
+                                 __func__,
+                                 (void *) tmp_payload->size_array);
+                    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(
+                            &tmp_payload->size_array);
                 }
             }
             else
@@ -374,15 +380,26 @@ int PINT_acache_get_cached_entry(
                 }
                 if(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
                 {
-                    /* Set the getattr size_array pointer.
-                     * Any application that uses this pointer should be aware
-                     * that only the acache should destroy this size_array.
-                     * Applications should only read this value or duplicate it
-                     * and do as they want with it.
+                    assert(tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY);
+
+                    /* NOTE: TODO for v3 
+                     * will eventually use num_servers value integrated with:
+                     *         attr.u.dir
                      */
-                    *size_array = tmp_payload->size_array;
+                    PINT_SM_DATAFILE_SIZE_ARRAY_DUP(
+                            size_array,
+                            tmp_payload->size_array,
+                            tmp_payload->attr.dist_dir_attr.num_servers);
+
+                    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                                 "%s: duplicated <-acache: size_array handle=%llu "
+                                 "size_array=%p num_servers=%d\n",
+                                 __func__,
+                                 llu(tmp_payload->refn.handle),
+                                 (void *) *size_array,
+                                 tmp_payload->attr.dist_dir_attr.num_servers);
+
                     *size_array_status = 0;
-                    /* TODO consider doing some debug output for size_array */
                 }
             }
         }
@@ -430,7 +447,8 @@ void PINT_acache_invalidate(
     int tmp_status;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "acache: invalidate(): H=%llu\n",
+                 "%s: H=%llu\n",
+                 __func__,
                  llu(refn.handle));
 
     gen_mutex_lock(&acache_mutex);
@@ -594,33 +612,35 @@ int PINT_acache_update(
                      __func__);
     }
 
-    if(size_array)
+    if(size_array && tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY)
     {
-        /* getattr should allocate a the size_array it wants to
-         * cache and just pass it to the acache. this way the cache doesn't
-         * have to.
-         * 
-         * Since this instance will be allocated by sys-getattr.sm and the
-         * pointer set in the acache payload. The allocated structure
-         * should be freed at the time the payload size_array is invalidated or
-         * the acache payload itself is destroyed (if it is still present at
-         * that time.) TODO If the acache is disabled, then the caller of the
-         * sys-getattr.sm is responsible for cleaning up. */
-        tmp_payload->size_array = size_array;
+        assert(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT);
+
+        /* NOTE: TODO for v3 
+         * will eventually use num_servers value integrated with:
+         *         attr.u.dir
+         */
+        PINT_SM_DATAFILE_SIZE_ARRAY_DUP(
+                &tmp_payload->size_array,
+                size_array,
+                tmp_payload->attr.dist_dir_attr.num_servers);
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: duplicated ->acache: size_array handle=%llu "
+                     "tmp_payload->size_array=%p num_servers=%d\n",
+                     __func__,
+                     llu(tmp_payload->refn.handle),
+                     (void *) tmp_payload->size_array,
+                     tmp_payload->attr.dist_dir_attr.num_servers);
 
         /* No need to mess with the attr bitmask for the same reason listed
          * above for size...
          */
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: tmp_payload->size_array = %p\n",
-                     __func__,
-                     (void *) tmp_payload->size_array);
-        /* TODO consider better debug output of size_array. */
     }
     else
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: NOTE, size_array is NULL. "
+                     "%s: NOTE, size_array is NULL or "
+                     "objtype is != PVFS_TYPE_DIRECTORY. "
                      "No size_array inserted with this acache payload.\n",
                      __func__);
     }
@@ -741,7 +761,7 @@ static int acache_free_payload(void* payload)
         if(payload_p->size_array)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: size_array = %p\n",
+                         "%s: about to free: size_array = %p\n",
                          __func__,
                          (void *) payload_p->size_array);
             PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&payload_p->size_array);

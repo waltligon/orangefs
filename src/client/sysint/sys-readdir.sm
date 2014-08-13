@@ -668,17 +668,23 @@ static PINT_sm_action readdir_cleanup(
 
     }
 
-    /* TODO Should not free it, unless acache is disabled.
-     * App should copy and acache should destroy it
-     * when necessary. */
-#if 0
     if (!sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
     {
-        gossip_debug(GOSSIP_READDIR_DEBUG, 
-                "readdir_cleanup: freeing sm_p->getattr.size_array. \n");
+        gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "%s: about to free: getattr->size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
     }
-#endif
+
+    /* TODO this is debug only. */
+    if(sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
+    {
+        gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "%s: keeping: getattr->size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);  
+    }
 
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
