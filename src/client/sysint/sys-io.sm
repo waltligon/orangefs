@@ -2025,6 +2025,10 @@ static PINT_sm_action io_cleanup(
 
     if(sm_p->u.io.dfile_size_array)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: about to free: sm_p->u.io.dfile_size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
     }
 

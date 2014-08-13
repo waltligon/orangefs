@@ -1630,8 +1630,13 @@ static PINT_sm_action getattr_acache_insert(
         sm_p->getattr.attr.objtype == PVFS_TYPE_SYMLINK )
     {
         /* see if we have a size value to cache */
+
+        /* TODO: we should not be using the req_attrmask here. */
+        /* Apparently, using the attr.mask here causes problems.
+         * This should not be the case, so some more debugging is needed.
+         */
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
-            sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE)
+            sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: NOTE, objtype is metafile and "
@@ -1675,6 +1680,19 @@ static PINT_sm_action getattr_acache_insert(
             }
         }
 
+        if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY &&
+            sm_p->getattr.attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        {
+            /* size_array SHOULD be valid here if the proper bit was flipped */
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: getattr should cache size array! "
+                         "handle=%llu size_array=%p dfile_count=%d\n",
+                         __func__,
+                         llu(sm_p->getattr.object_ref.handle),
+                         (void *) sm_p->getattr.size_array,
+                         sm_p->getattr.attr.dist_dir_attr.num_servers);
+        }
+
         PINT_acache_update(sm_p->getattr.object_ref,
                            &sm_p->getattr.attr,
                            tmp_size,
@@ -1701,20 +1719,16 @@ static PINT_sm_action getattr_cleanup(
 
     sm_p->error_code = js_p->error_code;
 
-    /* TODO Should clean this up if the acache is disabled and the
-     * keep_size_array flag is not set!
-     */
-#if 0
-    /* cleanup size array if not asked to keep; is allocated if datafile sizes or dirent_count are retrieved */
-    /* keep_size_array is initialized outside the state machine, now only used in sys-readdir.sm */
+    /* Clean up size array if not asked to keep.
+     * It is allocated if datafile sizes or dirent_count are retrieved */
     if (!getattr->keep_size_array && getattr->size_array)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "getattr_cleanup: freeint getattr->size_array. \n");
-        free(getattr->size_array);
-        getattr->size_array = NULL;
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "%s: about to free: getattr->size_array = %p\n",
+                     __func__,
+                     (void *) getattr->size_array);
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&getattr->size_array);
     }
-#endif
 
     /* cleanup getattr when an error occurs */
     if (js_p->error_code)
