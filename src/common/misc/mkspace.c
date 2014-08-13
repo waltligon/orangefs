@@ -536,7 +536,7 @@ int pvfs2_mkspace(char *data_path,
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
         /* fs_id and handle filled in by call */
         attr.type = PVFS_TYPE_DIRDATA;
-        attr.u.dirdata.count = 0;
+        attr.u.dirdata.dirent_count = 0;
         attr.u.dirdata.tree_height = DEFAULT_ROOTDIR_TREE_HEIGHT;
         attr.u.dirdata.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
         attr.u.dirdata.sid_count = root_sid_count;

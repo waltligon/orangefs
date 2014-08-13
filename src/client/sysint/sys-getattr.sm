@@ -385,6 +385,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 assert(attr->mask & PVFS_ATTR_META_DIST);
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
             }
+/* V3 remove */
+#if 0
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_MIRROR_DFILES)
             {
@@ -404,6 +406,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                    ,__func__);
                 }
             }
+#endif
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
             {
@@ -1462,8 +1465,15 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* We run this state if we are doing getattr on a direcotry AND we need
+ * the up-to-date timestamps and total dirdate count.  Unlink the
+ * earlier request this sends multiple getattr requests to the dirdate
+ * objects (not the directory object) and only asks for the partial data
+ * which will be combined afterwards.
+ */
 static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+                                                    struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {           
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -1480,7 +1490,9 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
     assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
             
-    /* initialize size_array, used to store the dirent_count of every dirdata handle */      
+    /* initialize size_array, used to store the dirent_count
+     * of every dirdata handle
+     */      
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
             attr->u.dir.dist_dir_attr.dirdata_count);
             
@@ -1755,6 +1767,8 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
             }
         }
 
+/* V3 remove */
+#if 0
         if (getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             if (getattr->attr.u.meta.mirror_dfile_array)
@@ -1762,6 +1776,7 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
                 free(getattr->attr.u.meta.mirror_dfile_array);
             }
         }
+#endif
 
         if (getattr->attr.mask & PVFS_ATTR_META_DIST)
         {
@@ -1827,10 +1842,13 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
         {
             sysresp->attr.dfile_count = attr->u.meta.dfile_count;
         }
+/* V3 remove */
+#if 0
         if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             sysresp->attr.mirror_copies_count = attr->u.meta.mirror_copies_count;
         }
+#endif
     }
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {

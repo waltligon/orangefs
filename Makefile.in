@@ -233,7 +233,8 @@ ifdef LIB_NEEDS_LIBRT
 	DEPLIBS += -lrt
 endif
 DEPLIBS += -lm @LIBS@ @THREAD_LIB@
-ULIBDEPLIBS := -lpvfs2
+ULIBDEPLIBS := -lorangefs -lpvfs2
+OLIBDEPLIBS := -lpvfs2
 # Misc defines
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
@@ -590,6 +591,8 @@ ADMINSRC_SERVER :=
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
+# OLIBSRC is source code for liborangefs
+OLIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
@@ -668,8 +671,8 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifeq ($(build_usrint),yes)
-LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
-LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
+LIBRARIES_STATIC += lib/libofs.a lib/liborangefs.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangefs.so
 # ifeq ($(build_symbolic),yes)
 # LIBRARIES_SHARED += lib/libofs-s.so
 # endif
@@ -717,14 +720,20 @@ include $(patsubst %, %/module.mk, $(MODULES))
 
 # LIBOBJS is a list of objects to put in the client lib
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# OLIBOBJS is a list of objects to put in the ofs lib
+OLIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(OLIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
+# OLIBPICOBJS are the same, but compiled for use in a shared library
+OLIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(OLIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+# OLIBDEPENDS is a list of dependency files for the client lib
+OLIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(OLIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
@@ -739,18 +748,10 @@ endif
 
 # LIBTHREADEDOBJS is a list of objects to put in the multithreaded client lib
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
-ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
-
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
-ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
-
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
-ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -877,7 +878,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
     $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
-    $(POLICYCOMPDEPS) )
+    $(POLICYCOMPDEPS) $(OLIBDEPENDS) )
 endif
 
 ####################################################################
@@ -1007,6 +1008,18 @@ lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
+# rule for building the orangefs library
+lib/liborangefs.a: $(OLIBOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(OLIBOBJS)
+
+# rule for building the shared ofs library
+lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
 	$(Q) "  RANLIB	$@"
@@ -1014,40 +1027,25 @@ lib/libofs.a: $(ULIBOBJS)
 	$(E)ar rcs $@ $(ULIBOBJS)
 
 # rule for building the shared ofs library
-lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
+lib/libofs.so: $(ULIBPICOBJS) lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-# ifeq ($(build_symbolic),yes)
-# rule for building the shared ofs library
-# lib/libofs-s.so: $(ULIBPICOBJS) lib/libpvfs2.so
-# 	$(Q) "  LDSO		$@"
-# 	$(E)$(INSTALL) -d lib
-# 	$(E)$(LDSHARED) -Wl,-soname,libofs-s.so,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
-# endif
-
-# rules for building virtual libraries
-lib/liborangefs.a: lib/libpvfs2.a
-	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.a
-
+# rules for building libtool libraries
 lib/liborangefs.la: lib/libpvfs2.a
-	$(Q) "  VLIB		$@"
+	$(Q) "  GLT		$@"
 	$(E)glibtool --mode=link --tag=CC gcc -o lib/libpvfs2.la $^ -lcrypto -lssl -static
 	mv lib/libpvfs2.la $@
 
-lib/liborangefs.so: lib/libpvfs2.so
-	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.so
-
+# rules for building virtual libraries
 lib/liborangefsposix.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.a
+	$(E)printf "GROUP ( -lofs -lorangefs $(LIBS) )\n" > lib/liborangefsposix.a
 
 lib/liborangefsposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
+	$(E)printf "GROUP ( -lofs -lorangefs $(LIBS) )\n" > lib/liborangefsposix.so
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -1283,9 +1281,9 @@ clean::
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
                 $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
-                $(ULIBOBJS) $(ULIBTHREADEDOBJS) \
-                $(ULIBPICOBJS) $(ULIBDEPENDS) $(ULIBTHREADEDOBJS) \
-                $(ULIBTHREADEDPICOBJS) $(ULIBTHREADEDDEPENDS) \
+                $(ULIBOBJS) $(OLIBOBJS) \
+                $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
+                $(OLIBDEPENDS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
                 $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \

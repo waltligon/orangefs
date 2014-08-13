@@ -1,5 +1,5 @@
 /* 
- * Copyright © Acxiom Corporation, 2006
+ * Copyright Â© Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
  */
@@ -28,6 +28,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
 #include "sid.h"
+#include "pvfs-sid.h"
 #include "dist-dir-utils.h"
 #include "server-config.h"
 
@@ -486,10 +487,14 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
 
+    /* set up to read the attributes of the parent,
+     * which must be a directory 
+     */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
-                               (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
-                                                       PVFS_ATTR_CAPABILITY), 
+                               (PVFS_ATTR_COMMON_NOTIME |
+                                PVFS_ATTR_DIR_HINT |
+                                PVFS_ATTR_CAPABILITY), 
                                PVFS_TYPE_DIRECTORY,
                                0);
 
@@ -508,8 +513,12 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
    return SM_ACTION_COMPLETE;
 }
 
-/** looks at the attributes of the parent directory and decides if it impacts
- *  the file creation in any way
+/** create_parent_getattr_inspect
+ * Looks at the attributes of the parent directory and decides if it impacts
+ * the file creation in any way
+ *
+ * Determine the number of dfiles and sids involved, which may be
+ * impacted by the parent dir attrs
  */
 static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
                                                     job_status_s *js_p)
@@ -695,7 +704,22 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
     }
 
-    /* priority for determining user's preference for number of data files:
+    /* Replication for metadata is always set in the configuration for
+     * the file system as it is not user setable, so al we have to go is
+     * grab it, but we will check and make sure it is reasonable and
+     * default to 1 if not.
+     * TODO There should be a reasonable max also, not implemented yet.
+     */
+    PINT_cached_config_get_metadata_sid_count(
+                                sm_p->parent_ref.fs_id, 
+                                &sm_p->u.create.metadata_sid_count);
+    if (sm_p->u.create.metadata_sid_count <= 0)
+    {
+        sm_p->u.create.metadata_sid_count = 1;
+    }
+
+    /* Determining the number of dfiles.
+     * priority for determining user's preference for number of data files:
      * 1) count specified in attr's passed into sys_create
      * 2) directory hints
      * 3) mount options
@@ -726,9 +750,11 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
     }
 
-    /* Determine the number of dfiles.   Pass in the number requested by the
-     * client, but will be overridden by default configuration and/or
-     * distribution if necessary 
+    /* Final determination based on config and distribution.
+     * Pass in the number requested by the client, but will 
+     * e overridden by default configuration and/or
+     * distribution if necessary.  Distribution determines
+     * if there is a reasonable max or not.
      */
     ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
                                             sm_p->u.create.dist,
@@ -745,10 +771,30 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
                  "Setting number of datafiles to %d [requested %d]\n", 
                  sm_p->u.create.datafile_count, num_dfiles_requested);
 
+    /*
+     * Set up default replication for defiles. Again, can be set by
+     * a directory hint, the configuration and has a final default
+     * of 1 (no replication).
+     * TODO There should be a reasonable max also, not implemented yet.
+     */
+
+    /* check for user supplied dfile_sid_count - not implemented yet */
     /* check for directory override of dfile replication */
     if(attr->u.dir.hint.dfile_sid_count > 0)
     {
-         sm_p->u.create.datafile_sid_count = attr->u.dir.hint.dfile_sid_count;
+        /* V3 not implemented yet - TODO */
+    }
+    /* check for configured default datafile_sid_count */
+    if(sm_p->u.create.datafile_sid_count <= 0)
+    {
+         PINT_cached_config_get_default_dfile_sid_count(
+                                sm_p->parent_ref.fs_id, 
+                                &sm_p->u.create.datafile_sid_count);
+    }
+    /* otherwise hard default to no replication */
+    if(sm_p->u.create.datafile_sid_count <= 0)
+    {
+         sm_p->u.create.datafile_sid_count = 1;
     }
 
     return SM_ACTION_COMPLETE;
@@ -763,7 +809,6 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -815,58 +860,60 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /* resolve and print selected server only if gossip debugging enabled 
      * should we print more details here - OIDs and SIDs, etc.
      */
-    if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
+    if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                      "PVFS_isys_create() selected meta server: %s\n", 
                      PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
     }
 
-    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-    {
-        PINT_SERVREQ_CREATE_FILL(msg_p->req,
-                                 sm_p->getattr.attr.capability,
-                                 *sm_p->cred_p,
-                                 sm_p->u.create.attr,
-                                 sm_p->parent_ref.fs_id,
-                                 sm_p->u.create.metadata_handle, 
-                                 sm_p->u.create.metadata_sid_count,
-                                 sm_p->u.create.metadata_sid_array, 
-                                 &sm_p->parent_ref.handle, /* back ptr */
-                                 sm_p->parent_ref.sid_array, 
-                                 sm_p->u.create.datafile_count,
-                                 sm_p->u.create.datafile_handles,
-                                 sm_p->u.create.datafile_sid_count,
-                                 sm_p->u.create.datafile_sid_array,
-                                 sm_p->hints);
+    PINT_SERVREQ_CREATE_FILL(msg_p->req,
+                             sm_p->getattr.attr.capability,
+                             *sm_p->cred_p,
+                             sm_p->u.create.attr,
+                             sm_p->parent_ref.fs_id,
+                             sm_p->u.create.metadata_handle, 
+                             sm_p->u.create.metadata_sid_count,
+                             sm_p->u.create.metadata_sid_array, 
+                             &sm_p->parent_ref.handle, /* back ptr */
+                             sm_p->parent_ref.sid_array, 
+                             sm_p->u.create.datafile_count,
+                             sm_p->u.create.datafile_handles,
+                             sm_p->u.create.datafile_sid_count,
+                             sm_p->u.create.datafile_sid_array,
+                             sm_p->hints);
 
-        msg_p->msgclass = PVFS_IO_METADATA;
-        msg_p->msgdir = PVFS_IO_WRITE;
-        msg_p->fs_id = sm_p->parent_ref.fs_id;
-        msg_p->handle = *sm_p->u.create.metadata_handle;
-        msg_p->sid_count = sm_p->u.create.metadata_sid_count;
-        msg_p->sid_index = 0;
-        msg_p->sid_array = sm_p->u.create.metadata_sid_array;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = create_comp_fn;
-        /* we are creating so we need to send a complete attr */
-        msg_p->req.u.create.attr.u.meta.dfile_count =
-                                     sm_p->u.create.datafile_count;
-        msg_p->req.u.create.attr.u.meta.dist = sm_p->u.create.dist;
-        msg_p->req.u.create.attr.u.meta.dist_size =
-                        PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = *sm_p->u.create.metadata_handle;
+    msg_p->sid_count = sm_p->u.create.metadata_sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->u.create.metadata_sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = create_comp_fn;
+    /* we are creating so we need to send attr */
+    /* server will fill in object specific fields */
+    msg_p->req.u.create.attr.u.meta.dist = sm_p->u.create.dist;
+    msg_p->req.u.create.attr.u.meta.dist_size =
+                                    PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+    msg_p->req.u.create.attr.u.meta.dfile_count  = 0; /* TODO */
+    msg_p->req.u.create.attr.u.meta.sid_count    = 0; /* TODO */
+    msg_p->req.u.create.attr.u.meta.mirror_mode  = 0; /* TODO */
+    msg_p->req.u.create.attr.u.meta.stuffed      = 0; /* TODO */
+    msg_p->req.u.create.attr.u.meta.stuffed_size = 0; /* TODO */
 
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-        /* V3 how to handle failure here ?
-         * If we have to do a SID lookup we need to have SM block on
-         * that action, or call a nested SM or something
-         */
-    }
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    /* V3 how to handle failure here ?
+     * If we have to do a SID lookup we need to have SM block on
+     * that action, or call a nested SM or something
+     */
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -883,6 +930,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    int dirdata_sid_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -901,6 +949,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             PINT_find_dist_dir_bucket(dirdata_hash,
                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    dirdata_sid_index = dirdata_server_index *
+                        sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
@@ -921,14 +971,15 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 msg_p->req,
                 sm_p->getattr.attr.capability,
                 *sm_p->cred_p,
-                sm_p->u.create.object_name,
                 sm_p->parent_ref.fs_id,
-                sm_p->parent_ref.handle,
                 sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
                 sm_p->parent_ref.sid_count,
-                sm_p->parent_ref.sid_array,
+                &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
+                sm_p->u.create.object_name,
                 sm_p->object_ref.handle,
                 sm_p->object_ref.sid_array,
+                sm_p->parent_ref.handle,
+                sm_p->parent_ref.sid_array,
                 sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -938,7 +989,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = sm_p->parent_ref.sid_array;
+    msg_p->sid_array = 
+            &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 

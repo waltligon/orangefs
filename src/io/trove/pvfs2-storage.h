@@ -10,6 +10,7 @@
 #include "pvfs2-internal.h"
 #include <time.h>
 #include "pvfs2-types.h"
+#include "security-util.h"
 
 /************************************************************
  * Types and structures specific to the storage interface
@@ -29,26 +30,18 @@ struct PVFS_vtag_s
 #endif
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
-/* key/value descriptor definition moved to include/pvfs2-types.h */
-#if 0
-/* key/value descriptors */
-struct PVFS_ds_keyval_s
-{
-    void *buffer;
-    /* size of memory region pointed to by buffer */
-    int32_t buffer_sz;
-    /* size of data read into buffer (only valid after a read) */
-    int32_t read_sz;
-};
-
-typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
-#endif
 
 struct PVFS_ds_metadata_attr_s
 {
+    PVFS_size size;        /* global file size, volatile */
     uint32_t dfile_count;
-    uint32_t sid_count;  /* total, must be even multiple of dfile_count */
     uint32_t dist_size;
+    uint32_t sid_count;    /* sids per dfile */
+    uint32_t mirror_mode;  /* sync model for replication */
+    uint32_t stuffed;      /* is this file stuffed */
+    uint32_t stuffed_size; /* size threshold for unstuffing */
+    uint32_t hint_flags; ; /* various hint modes */
+    int32_t __pad1;
 };
 
 struct PVFS_ds_datafile_attr_s
@@ -59,10 +52,11 @@ struct PVFS_ds_datafile_attr_s
 /* this is the same as the client/memory side attr structure */
 struct PVFS_ds_directory_attr_s
 {
+    uint64_t dirent_count; /* number of dirents in this dir - volatile */
     /* global info */
     int32_t tree_height;   /* ceil(log2(dirdata_count)) */
-    int32_t dirdata_count; /* total number of servers */
-    int32_t sid_count;     /* number of SIDs total */
+    int32_t dirdata_count; /* number of servers that are part of this dir */
+    int32_t sid_count;     /* number of SIDs per dirdata */
     int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
                            /* stored under the key DIST_DIR_BITMAP */
     int32_t split_size;    /* maximum number of entries before a split */
@@ -70,15 +64,16 @@ struct PVFS_ds_directory_attr_s
     int32_t server_no;     /* 0 to dirdata_count-1, indicates */
                            /* which server is running this code */
     int32_t branch_level;  /* level of branching on this server */
+    int32_t __pad1;
 };
 
 struct PVFS_ds_dirdata_attr_s
 {
-    uint64_t count;        /* number of dirents in this dirdata */
+    uint64_t dirent_count; /* number of dirents in this dirdata */
     /* global info */
     int32_t tree_height;   /* ceil(log2(dirdata_count)) */
     int32_t dirdata_count; /* total number of servers */
-    int32_t sid_count;     /* number of SIDs total */
+    int32_t sid_count;     /* number of SIDs per dirdata */
     int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
                            /* stored under the key DIST_DIR_BITMAP */
     int32_t split_size;    /* maximum number of entries before a split */
@@ -86,6 +81,7 @@ struct PVFS_ds_dirdata_attr_s
     int32_t server_no;     /* 0 to dirdata_count-1, indicates */
                            /* which server is running this code */
     int32_t branch_level;  /* level of branching on this server */
+    int32_t __pad1;
 };
 
 /* dataspace attributes that are not explicitly stored within the
@@ -115,9 +111,10 @@ struct PVFS_ds_attributes_s
     PVFS_permissions mode;
     int32_t   __pad1;
 
-    PVFS_time ctime;
-    PVFS_time mtime;
-    PVFS_time atime;
+    PVFS_time ctime; /* change (metadata) time */
+    PVFS_time mtime; /* modify (data) time */
+    PVFS_time atime; /* access (read) time */
+    PVFS_time ntime; /* new (create) time */
 
     union
     {
@@ -144,18 +141,28 @@ do {                                                                   \
     (__oa)->ctime = (__dsa)->ctime;                                    \
     (__oa)->mtime = (__dsa)->mtime;                                    \
     (__oa)->atime = (__dsa)->atime;                                    \
+    (__oa)->ntime = (__dsa)->ntime;                                    \
     (__oa)->objtype = (__dsa)->type;                                   \
+    /* force a null capability */                                      \
+    PINT_null_capability(&(__oa)->capability);                         \
     switch ((__dsa)->type)                                             \
     {                                                                  \
     case PVFS_TYPE_METAFILE :                                          \
         (__oa)->u.meta.dfile_count = (__dsa)->u.metafile.dfile_count;  \
         (__oa)->u.meta.sid_count = (__dsa)->u.metafile.sid_count;      \
         (__oa)->u.meta.dist_size = (__dsa)->u.metafile.dist_size;      \
+        (__oa)->u.meta.size = (__dsa)->u.metafile.size;                \
+        (__oa)->u.meta.mirror_mode = (__dsa)->u.metafile.mirror_mode;  \
+        (__oa)->u.meta.stuffed = (__dsa)->u.metafile.stuffed;          \
+        (__oa)->u.meta.stuffed_size = (__dsa)->u.metafile.stuffed_size; \
+        (__oa)->u.meta.hint.flags = (__dsa)->u.metafile.hint_flags;    \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__oa)->u.data.size = (__dsa)->u.datafile.b_size;              \
         break;                                                         \
     case PVFS_TYPE_DIRECTORY :                                         \
+        (__oa)->u.dir.dirent_count =                                   \
+                (__dsa)->u.directory.dirent_count;                     \
         (__oa)->u.dir.dist_dir_attr.tree_height =                      \
                 (__dsa)->u.directory.tree_height;                      \
         (__oa)->u.dir.dist_dir_attr.dirdata_count =                    \
@@ -172,7 +179,22 @@ do {                                                                   \
                 (__dsa)->u.directory.branch_level;                     \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
-        (__oa)->u.dirdata.count = (__dsa)->u.dirdata.count;            \
+        (__oa)->u.dirdata.dirent_count =                               \
+                (__dsa)->u.dirdata.dirent_count;                       \
+        (__oa)->u.dirdata.dist_dir_attr.tree_height =                  \
+                (__dsa)->u.dirdata.tree_height;                        \
+        (__oa)->u.dirdata.dist_dir_attr.dirdata_count =                \
+                (__dsa)->u.dirdata.dirdata_count;                      \
+        (__oa)->u.dirdata.dist_dir_attr.sid_count =                    \
+                (__dsa)->u.dirdata.sid_count;                          \
+        (__oa)->u.dirdata.dist_dir_attr.bitmap_size =                  \
+                (__dsa)->u.dirdata.bitmap_size;                        \
+        (__oa)->u.dirdata.dist_dir_attr.split_size =                   \
+                (__dsa)->u.dirdata.split_size;                         \
+        (__oa)->u.dirdata.dist_dir_attr.server_no =                    \
+                (__dsa)->u.dirdata.server_no;                          \
+        (__oa)->u.dirdata.dist_dir_attr.branch_level =                 \
+                (__dsa)->u.dirdata.branch_level;                       \
         break;                                                         \
     default :                                                          \
         break;                                                         \
@@ -187,6 +209,7 @@ do {                                                                   \
     (__dsa)->ctime = (__oa)->ctime;                                    \
     (__dsa)->mtime = (__oa)->mtime;                                    \
     (__dsa)->atime = (__oa)->atime;                                    \
+    (__dsa)->ntime = (__oa)->ntime;                                    \
     (__dsa)->type = (__oa)->objtype;                                   \
     switch ((__oa)->objtype)                                           \
     {                                                                  \
@@ -194,11 +217,18 @@ do {                                                                   \
         (__dsa)->u.metafile.dfile_count = (__oa)->u.meta.dfile_count;  \
         (__dsa)->u.metafile.sid_count = (__oa)->u.meta.sid_count;      \
         (__dsa)->u.metafile.dist_size = (__oa)->u.meta.dist_size;      \
+        (__dsa)->u.metafile.size = (__oa)->u.meta.size;                \
+        (__dsa)->u.metafile.mirror_mode = (__oa)->u.meta.mirror_mode;  \
+        (__dsa)->u.metafile.stuffed = (__oa)->u.meta.stuffed;          \
+        (__dsa)->u.metafile.stuffed_size = (__oa)->u.meta.stuffed_size; \
+        (__dsa)->u.metafile.hint_flags = (__oa)->u.meta.hint.flags;    \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__dsa)->u.datafile.b_size = (__oa)->u.data.size;              \
         break;                                                         \
     case PVFS_TYPE_DIRECTORY :                                         \
+        (__dsa)->u.dirdata.dirent_count =                              \
+                (__oa)->u.dirdata.dirent_count;                        \
         (__dsa)->u.directory.tree_height =                             \
                 (__oa)->u.dir.dist_dir_attr.tree_height;               \
         (__dsa)->u.directory.dirdata_count =                           \
@@ -215,13 +245,35 @@ do {                                                                   \
                 (__oa)->u.dir.dist_dir_attr.branch_level;              \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
-        (__dsa)->u.dirdata.count = (__oa)->u.dirdata.count;            \
+        (__dsa)->u.dirdata.dirent_count =                              \
+                (__oa)->u.dirdata.dirent_count;                        \
+        (__dsa)->u.directory.tree_height =                             \
+                (__oa)->u.dir.dist_dir_attr.tree_height;               \
+        (__dsa)->u.directory.dirdata_count =                           \
+                (__oa)->u.dir.dist_dir_attr.dirdata_count;             \
+        (__dsa)->u.directory.sid_count =                               \
+                (__oa)->u.dir.dist_dir_attr.sid_count;                 \
+        (__dsa)->u.directory.bitmap_size =                             \
+                (__oa)->u.dir.dist_dir_attr.bitmap_size;               \
+        (__dsa)->u.directory.split_size =                              \
+                (__oa)->u.dir.dist_dir_attr.split_size;                \
+        (__dsa)->u.directory.server_no =                               \
+                (__oa)->u.dir.dist_dir_attr.server_no;                 \
+        (__dsa)->u.directory.branch_level =                            \
+                (__oa)->u.dir.dist_dir_attr.branch_level;              \
         break;                                                         \
     default :                                                          \
         break;                                                         \
     }                                                                  \
 } while(0)
 
+/* This is OA to OA which should not be defined here but with the
+ * definition of OA
+ */
+/* This macro copies fields from one OA to another only if the src mask
+ * indicates to do so.  This can be used to update specific fields and
+ * to "merge" contents together.  This only looks at basic fields.
+ */
 #define PVFS_object_attr_overwrite_setable(dest, src)          \
 do {                                                           \
     if ((src)->mask & PVFS_ATTR_COMMON_UID)                    \

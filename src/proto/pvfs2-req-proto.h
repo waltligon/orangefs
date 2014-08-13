@@ -142,14 +142,14 @@ typedef struct PVFS_server_control_s
 do {                                             \
     encode_uint8_t(pptr, &(x)->mode);            \
     encode_uint8_t(pptr, &(x)->type);            \
-    pptr += 2;                                   \
+    *pptr += 2;                                  \
 }  while(0)
 
 #define decode_PVFS_server_control(pptr, x)      \
 do {                                             \
     decode_uint8_t(pptr, &(x)->mode);            \
     decode_uint8_t(pptr, &(x)->type);            \
-    pptr += 2;                                   \
+    *pptr += 2;                                  \
 } while(0)
 #endif
 
@@ -295,75 +295,109 @@ endecode_fields_7a1a_struct(
 #endif
 
 /* custom encode/decode macros */
+#if 0
+
+    if ((x)->parent && !PVFS_OID_is_null((x)->parent))                     \
+    {                                                                      \
+    }                                                                      \
+    else                                                                   \
+    {                                                                      \
+        encode_PVFS_handle((pptr), &PVFS_HANDLE_NULL);                     \
+    }                                                                      \
+
+#endif
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-#define encode_PVFS_servreq_create(pptr,x) do {                           \
-   int i;                                                                 \
-   encode_PVFS_fs_id((pptr), &(x)->fs_id);                                \
-   encode_PVFS_credential((pptr), &(x)->credential);                      \
-   encode_PVFS_object_attr((pptr), &(x)->attr);                           \
-   encode_uint32_t((pptr), &(x)->sid_count);                              \
-   encode_uint32_t((pptr), &(x)->datafile_count);                         \
-   encode_uint32_t((pptr), &(x)->datafile_sid_count);                     \
-   (pptr) += 4;                                                           \
-   encode_PVFS_handle((pptr), &(x)->handle);                              \
-   for (i = 0; i < (x)->sid_count; i++)                                   \
-   {                                                                      \
-       encode_PVFS_SID((pptr), &(x)->sid_array[i]);                       \
-   }                                                                      \
-   encode_PVFS_handle((pptr), (x)->parent);                               \
-   for (i = 0; i < (x)->sid_count; i++)                                   \
-   {                                                                      \
-       encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);                \
-   }                                                                      \
-   for (i = 0; i < (x)->datafile_count; i++)                              \
-   {                                                                      \
-       encode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             \
-   }                                                                      \
-   for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  \
-   {                                                                      \
-       encode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              \
-   }                                                                      \
-} while (0)
+static inline void encode_PVFS_servreq_create(char **pptr,
+                                              struct PVFS_servreq_create *x)
+{                            
+    int i;                                                                 
+    encode_PVFS_credential((pptr), &(x)->credential);                      
+    encode_PVFS_object_attr((pptr), &(x)->attr);                           
+    encode_PVFS_fs_id((pptr), &(x)->fs_id);                                
+    encode_uint32_t((pptr), &(x)->sid_count);                              
+    encode_uint32_t((pptr), &(x)->datafile_count);                         
+    encode_uint32_t((pptr), &(x)->datafile_sid_count);                     
+    encode_PVFS_handle((pptr), &(x)->handle);                              
+    for (i = 0; i < (x)->sid_count; i++)                                   
+    {                                                                      
+        encode_PVFS_SID((pptr), &(x)->sid_array[i]);                       
+    }                                                                      
+    if ((x)->parent && !PVFS_OID_is_null((x)->parent))                     
+    {                                                                      
+        encode_PVFS_handle((pptr), (x)->parent);                           
+        for (i = 0; i < (x)->sid_count; i++)                               
+        {                                                                  
+            encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);            
+        }                                                                  
+    }                                                                      
+    else                                                                   
+    {                                                                      
+        encode_PVFS_handle((pptr), &PVFS_HANDLE_NULL);                     
+    }                                                                      
+    for (i = 0; i < (x)->datafile_count; i++)                              
+    {                                                                      
+        encode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             
+    }                                                                      
+    for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  
+    {                                                                      
+        encode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              
+    }                                                                      
+}
 
-#define decode_PVFS_servreq_create(pptr,x) do {                           \
-   int i;                                                                 \
-   decode_PVFS_fs_id((pptr), &(x)->fs_id);                                \
-   decode_PVFS_credential((pptr), &(x)->credential);                      \
-   decode_PVFS_object_attr((pptr), &(x)->attr);                           \
-   decode_uint32_t((pptr), &(x)->sid_count);                              \
-   decode_uint32_t((pptr), &(x)->datafile_count);                         \
-   decode_uint32_t((pptr), &(x)->datafile_sid_count);                     \
-   (pptr) += 4;                                                           \
-   (x)->sid_array = decode_malloc(                                        \
-                 SASZ((x)->sid_count) +                                   \
-                 OSASZ(1,(x)->sid_count) +                                \
-                 OSASZ((x)->datafile_count,(x)->datafile_sid_count));     \
-   (x)->parent = (PVFS_handle *)((x)->sid_array + SASZ((x)->sid_count));  \
-   (x)->parent_sid_array = (PVFS_SID *)((x)->parent + 1);                 \
-   (x)->datafile_handles = (PVFS_handle *)((x)->parent_sid_array +        \
-                                           SASZ((x)->sid_count));         \
-   (x)->datafile_sid_array = (PVFS_SID *)((x)->datafile_handles +         \
-                                          OASZ((x)->datafile_count));     \
-   decode_PVFS_handle((pptr), &(x)->handle);                              \
-   for (i = 0; i < (x)->sid_count; i++)                                   \
-   {                                                                      \
-       decode_PVFS_SID((pptr), &(x)->sid_array[i]);                       \
-   }                                                                      \
-   decode_PVFS_handle((pptr), (x)->parent);                               \
-   for (i = 0; i < (x)->sid_count; i++)                                   \
-   {                                                                      \
-       decode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);                \
-   }                                                                      \
-   for (i = 0; i < (x)->datafile_count; i++)                              \
-   {                                                                      \
-       decode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             \
-   }                                                                      \
-   for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  \
-   {                                                                      \
-       decode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              \
-   }                                                                      \
-} while (0)
+static inline void decode_PVFS_servreq_create(char **pptr,
+                                              struct PVFS_servreq_create *x)
+{                            
+    int i;                                                                 
+    decode_PVFS_credential((pptr), &(x)->credential);                      
+    decode_PVFS_object_attr((pptr), &(x)->attr);                           
+    decode_PVFS_fs_id((pptr), &(x)->fs_id);                                
+    decode_uint32_t((pptr), &(x)->sid_count);                              
+    decode_uint32_t((pptr), &(x)->datafile_count);                         
+    decode_uint32_t((pptr), &(x)->datafile_sid_count);                     
+
+    (x)->sid_array = decode_malloc(                                        
+                  SASZ((x)->sid_count) +                                   
+                  OSASZ(1,(x)->sid_count) +                                
+                  OSASZ((x)->datafile_count,(x)->datafile_sid_count));     
+
+    (x)->parent = (PVFS_handle *)((x)->sid_array + (x)->sid_count);        
+    (x)->parent_sid_array = (PVFS_SID *)((x)->parent + 1);                 
+    (x)->datafile_handles = (PVFS_handle *)((x)->parent_sid_array +        
+                                            (x)->sid_count);               
+
+    (x)->datafile_sid_array = (PVFS_SID *)((x)->datafile_handles +         
+                                           (x)->datafile_count);           
+
+    decode_PVFS_handle((pptr), &(x)->handle);                              
+    for (i = 0; i < (x)->sid_count; i++)                                   
+    {                                                                      
+        decode_PVFS_SID((pptr), &(x)->sid_array[i]);                       
+    }                                                                      
+    decode_PVFS_handle((pptr), (x)->parent);                               
+    if (!PVFS_OID_is_null((x)->parent))                                    
+    {                                                                      
+        for (i = 0; i < (x)->sid_count; i++)                               
+        {                                                                  
+            decode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);            
+        }                                                                  
+    }                                                                      
+    for (i = 0; i < (x)->datafile_count; i++)                              
+    {                                                                      
+        decode_PVFS_handle((pptr), &(x)->datafile_handles[i]);             
+    }                                                                      
+    for (i = 0; i < ((x)->datafile_sid_count * (x)->datafile_count); i++)  
+    {                                                                      
+        decode_PVFS_SID((pptr), &(x)->datafile_sid_array[i]);              
+    }
+}
+
+static inline void defree_PVFS_servreq_create(struct PVFS_servreq_create *x)
+{
+    defree_PVFS_credential(&(x)->credential);
+    defree_PVFS_object_attr(&(x)->attr);
+    decode_free((x)->sid_array);
+}
 #endif
 
 #define extra_size_PVFS_servreq_create \
@@ -1330,58 +1364,62 @@ endecode_fields_2_struct(
 struct PVFS_servreq_crdirent
 {
     PVFS_credential credential;
-    char *name;                /* stored with new entry */
-    PVFS_handle new_handle;    /* stored with new entry */
-    PVFS_handle handle;        /* metadata for split */
-    PVFS_handle dirent_handle; /* handle of directory bucket */
-    PVFS_fs_id fs_id;          /* file system */
-    int32_t sid_count;         /* reflexive - of bucket */
-    PVFS_SID *new_sid_array;   /* stored with new entry */
-    PVFS_SID *sid_array;       /* reflexive - of bucket */
+    char *name;                  /* stored with new entry */
+    PVFS_handle new_handle;      /* stored with new entry */
+    PVFS_handle parent_handle;   /* metadata for split */
+    PVFS_handle dirdata_handle;  /* handle of directory bucket */
+    PVFS_fs_id fs_id;            /* file system */
+    int32_t sid_count;           /* reflexive - of bucket */
+    PVFS_SID *new_sid_array;     /* stored with new entry */
+    PVFS_SID *parent_sid_array;  /* stored with new entry */
+    PVFS_SID *dirdata_sid_array; /* reflexive - of bucket */
 };
-endecode_fields_6aa_struct(
+endecode_fields_6aaa_struct(
     PVFS_servreq_crdirent,
     PVFS_credential, credential,
     string, name,
     PVFS_handle, new_handle,
-    PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
+    PVFS_handle, parent_handle,
+    PVFS_handle, dirdata_handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, new_sid_array,
-    PVFS_SID, sid_array);
+    PVFS_SID, parent_sid_array,
+    PVFS_SID, dirdata_sid_array);
 #define extra_size_PVFS_servreq_crdirent \
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
-                     (PVFS_REQ_LIMIT_SIDS_COUNT * 2 * sizeof(PVFS_SID)))
+                     (PVFS_REQ_LIMIT_SIDS_COUNT * 3 * sizeof(PVFS_SID)))
 
-#define PINT_SERVREQ_CRDIRENT_FILL(__req,                 \
-                                   __cap,                 \
-                                   __cred,                \
-                                   __name,                \
-                                   __fs_id,               \
-                                   __handle,              \
-                                   __dirent_handle,       \
-                                   __sid_count,           \
-                                   __sid_array,           \
-                                   __new_handle,          \
-                                   __new_sid_array,       \
-                                   __hints)               \
-do {                                                      \
-    memset(&(__req), 0, sizeof(__req));                   \
-    (__req).op = PVFS_SERV_CRDIRENT;                      \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;               \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                 \
-    (__req).capability = (__cap);                         \
-    (__req).u.crdirent.credential = (__cred);             \
-    (__req).hints = (__hints);                            \
-    (__req).u.crdirent.name = (__name);                   \
-    (__req).u.crdirent.new_handle = (__new_handle);       \
-    (__req).u.crdirent.handle = (__handle);               \
-    (__req).u.crdirent.dirent_handle = (__dirent_handle); \
-    (__req).u.crdirent.fs_id = (__fs_id);                 \
-    (__req).u.crdirent.sid_count = (__sid_count);         \
-    (__req).u.crdirent.new_sid_array = (__new_sid_array); \
-    (__req).u.crdirent.sid_array = (__sid_array);         \
+#define PINT_SERVREQ_CRDIRENT_FILL(__req,                         \
+                                   __cap,                         \
+                                   __cred,                        \
+                                   __fs_id,                       \
+                                   __dirdata_handle,              \
+                                   __sid_count,                   \
+                                   __dirdata_sid_array,           \
+                                   __name,                        \
+                                   __new_handle,                  \
+                                   __new_sid_array,               \
+                                   __parent_handle,               \
+                                   __parent_sid_array,            \
+                                   __hints)                       \
+do {                                                              \
+    memset(&(__req), 0, sizeof(__req));                           \
+    (__req).op = PVFS_SERV_CRDIRENT;                              \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                       \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
+    (__req).capability = (__cap);                                 \
+    (__req).u.crdirent.credential = (__cred);                     \
+    (__req).hints = (__hints);                                    \
+    (__req).u.crdirent.name = (__name);                           \
+    (__req).u.crdirent.new_handle = (__new_handle);               \
+    (__req).u.crdirent.parent_handle = (__parent_handle);         \
+    (__req).u.crdirent.dirdata_handle = (__dirdata_handle);       \
+    (__req).u.crdirent.fs_id = (__fs_id);                         \
+    (__req).u.crdirent.sid_count = (__sid_count);                 \
+    (__req).u.crdirent.new_sid_array = (__new_sid_array);         \
+    (__req).u.crdirent.dirdata_sid_array = (__dirdata_sid_array); \
+    (__req).u.crdirent.parent_sid_array = (__parent_sid_array);   \
 } while (0)
 
 /* rmdirent ****************************************************/
@@ -3101,27 +3139,22 @@ struct PVFS_server_req
 static inline void encode_PVFS_server_req(char **pptr,
                                           const struct PVFS_server_req *x)
 {
-    encode_enum(pptr, &x->op);
-#ifdef HAVE_VALGRIND_H
-    *(int32_t*) *pptr = 0;  /* else possible memcpy in BMI sees uninit */
-#endif
-    encode_PVFS_server_control(pptr, &x->ctrl);
-#if 0
-    *pptr += 4;
-#endif
-    encode_PVFS_capability(pptr, &x->capability);
-    encode_PINT_hint(pptr, x->hints);
+    encode_enum(pptr, &x->op);                    /* 4 bytes */
+    encode_PVFS_server_control(pptr, &x->ctrl);   /* 4 bytes */
+    encode_PVFS_capability(pptr, &x->capability); /* variable */
+    align8(pptr);
+    encode_PINT_hint(pptr, x->hints);             /* variable */
+    align8(pptr);
 }
 static inline void decode_PVFS_server_req(char **pptr,
                                           struct PVFS_server_req *x)
 {
     decode_enum(pptr, &x->op);
     decode_PVFS_server_control(pptr, &x->ctrl);
-#if 0
-    *pptr += 4;
-#endif
     decode_PVFS_capability(pptr, &x->capability);
+    align8(pptr);
     decode_PINT_hint(pptr, &x->hints);
+    align8(pptr);
 }
 #endif
 #define extra_size_PVFS_servreq extra_size_PVFS_capability

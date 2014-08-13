@@ -845,11 +845,14 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
             assert(attr->u.meta.dist_size > 0);
             assert(attr->u.meta.dfile_array);
             assert(attr->u.meta.dfile_count > 0);
+/* V3 remove */
+#if 0
             if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 assert(attr->u.meta.mirror_dfile_array);
                 assert(attr->u.meta.mirror_copies_count);
             }
+#endif
             break;
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = -PVFS_EISDIR;

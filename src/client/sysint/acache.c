@@ -451,6 +451,7 @@ int PINT_acache_get_cached_entry(
         }
         
         /* V3 this should go away eventually */
+#if 0
         if(tmp_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             if(attr->u.meta.mirror_dfile_array)
@@ -474,6 +475,7 @@ int PINT_acache_get_cached_entry(
             attr->u.meta.mirror_copies_count = 
                      tmp_payload->mirror_copies_count;
         }
+#endif
         
         if(tmp_payload->mask & PVFS_ATTR_META_DIST)
         {
@@ -666,6 +668,7 @@ int PINT_acache_update(
             tmp_payload->sid_count = attr->u.meta.sid_count;
         }
         /* V3 eventually this should go away */
+#if 0
         if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
            tmp_payload->mirror_dfile_array =
@@ -683,6 +686,7 @@ int PINT_acache_update(
            tmp_payload->mirror_copies_count =
                 attr->u.meta.mirror_copies_count;
         }
+#endif
         if(attr->mask & PVFS_ATTR_META_DIST)
         {
             tmp_payload->dist = PINT_dist_copy(attr->u.meta.dist);

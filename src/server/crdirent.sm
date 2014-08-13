@@ -86,7 +86,7 @@ machine pvfs2_crdirent_sm
 
     state update_dirdata_attr
     {
-        run crdirent_update_directory_attr;
+        run crdirent_update_dirdata_attr;
         success => get_dirent_count;
         default => final_response;
     }
@@ -98,133 +98,16 @@ machine pvfs2_crdirent_sm
         default => final_response;
     }
 
-    /* SPLIT */
-
     state check_for_split
     {
         run crdirent_check_for_split;
-        SPLIT_REQUIRED => retrieve_dir_entries;
+        SPLIT_REQUIRED => do_split;
         default => final_response;
     }
 
-    state retrieve_dir_entries
+    state do_split
     {
-        run crdirent_retrieve_dir_entries;
-        success => find_split_entries;
-        default => final_response;
-    }
-
-    state find_split_entries
-    {
-        run crdirent_find_split_entries;
-        SPLIT_REQUIRED => split_xfer_msgpair;
-        default => final_response;
-    }
-
-    state split_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => activate_server_setup;
-        default => split_cleanup_msgpairarray;
-    }
-
-    state activate_server_setup
-    {
-        run crdirent_activate_server_setup;
-        success => activate_server;
-        default => split_remove_entries;
-    }
-
-    state activate_server
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => update_dirdata_attrs;
-        default => split_remove_entries;
-    }
-
-    state deactivate_server_setup
-    {
-        run crdirent_deactivate_server_setup;
-        success => deactivate_server;
-        default => final_response;
-    }
-
-    state deactivate_server
-    {
-        jump pvfs2_msgpairarray_sm;
-        default => split_remove_entries;
-    }
-
-    state update_dirdata_attrs
-    {
-        run crdirent_update_dirdata_attrs;
-        success => update_metahandle_attrs;
-        default => deactivate_server_setup;
-    }
-
-    state update_metahandle_attrs
-    {
-        run crdirent_update_metahandle_attrs;
-        REMOTE_METAHANDLE => update_metahandle_xfer_msgpair;
-        success => notify_dirdata_servers_setup;
-        default => backout_dirdata_attrs;
-    }
-
-    state update_metahandle_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => notify_dirdata_servers_setup;
-        default => backout_dirdata_attrs;
-    }
-
-    state notify_dirdata_servers_setup
-    {
-        run crdirent_notify_dirdata_servers_setup;
-        success => notify_dirdata_servers_xfer;
-        default => backout_dirdata_attrs;
-    }
-
-    state notify_dirdata_servers_xfer
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => remove_local_copies;
-    }
-
-    state backout_dirdata_attrs
-    {
-        run crdirent_backout_dirdata_attrs;
-        default => deactivate_server_setup;
-    }
-
-    state remove_local_copies
-    {
-        run crdirent_remove_local_copies;
-        default => final_response;
-    }
-
-    state split_cleanup_msgpairarray
-    {
-        run crdirent_split_cleanup_msgpairarray;
-        success => final_response;
-        default => split_remove_entries;
-    }
-
-    state split_remove_entries
-    {
-        run crdirent_split_remove_entries;
-        REMOVE_ENTRIES_REQUIRED => split_remove_entries_xfer_msgpair;
-        default => final_response;
-    }
-
-    state split_remove_entries_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        default => remove_entries_cleanup;
-    }
-
-    state remove_entries_cleanup
-    {
-        run crdirent_remove_entries_cleanup;
+        jump pvfs2_dirdata_split_sm;
         default => final_response;
     }
 
@@ -868,6 +751,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+#if 0
 /*
  * ACTION HELPER FUNCTION
  *
@@ -1933,6 +1817,7 @@ static PINT_sm_action crdirent_remove_entries_cleanup(struct PINT_smcb *smcb,
     }
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 /*
  * Function: crdirent_cleanup

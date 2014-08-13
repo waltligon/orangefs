@@ -402,11 +402,11 @@ struct PINT_server_crdirent_op
     PVFS_handle parent_handle;  /* handle of dir (metadata) */
     PVFS_SID   *parent_sid;     /* sids of dir (metadata) */
     PVFS_fs_id  fs_id;
-    PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that */
+    PVFS_handle dirdata_handle; /* holds handle of dirdata dspace that */
                                 /* we'll write the dirent into */
-    PVFS_SID   *dirent_sid;     /* sids of dirdata we write dirent to */
+    PVFS_SID   *dirdata_sid;    /* sids of dirdata we write dirent to */
     PVFS_size   dirent_count;   /* number of dirents in target dirdata */
-    PVFS_size   sid_count;      /* V3 ???? */
+    PVFS_size   sid_count;      /* All should be the metadata const */
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -722,7 +722,7 @@ typedef struct PINT_server_op
     int num_pjmp_frames;
 
     /* Used just about everywhere so this is a std place to keep it */
-    uint32_t metasidcnt; /* number of sids per handle for metadata */
+    int32_t metasidcnt; /* number of sids per handle for metadata */
 
     union
     {
@@ -960,6 +960,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 
 /* nested state machines */
+extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

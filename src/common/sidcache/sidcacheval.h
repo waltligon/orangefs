@@ -23,6 +23,23 @@ struct SID_type_s
     uint32_t server_type;
 };
 
+/* These are obsolete - they were using in an early implementation */
+/* V3 remove these */
+#if 0
+/* These are the key structures for the type db */
+typedef struct SID_type_db_key_s
+{
+    uint32_t typeval;
+    PVFS_SID sid;
+} SID_type_db_key;
+
+typedef struct SID_type_index_key_s
+{
+    PVFS_SID sid;
+    uint32_t typeval;
+} SID_type_index_key;
+#endif
+
 /* Server_type flags
  * Built-in flags indicate what the server does
  * This allows us to OR these together in memory as needed

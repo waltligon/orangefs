@@ -537,8 +537,8 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
-    PVFS_object_attr *a_p = NULL;
-    PVFS_object_attr *dspace_a_p = NULL;
+    PVFS_object_attr *a_p = NULL;        /* mask from request */
+    PVFS_object_attr *dspace_a_p = NULL; /* object attr will become ds_attr */
     PVFS_ds_attributes *ds_attr = NULL;
 
     dspace_a_p = &s_op->attr;

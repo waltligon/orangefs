@@ -241,11 +241,10 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                           &task_id,
                                                           &error_code,
                                                           NULL);
-        // V3 DO WE NEED THIS???
-        // PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        // V3 replace with a gossip_debug
         /* TODO: put in more detailed error checking */
         if (submop->index != task_id - 1 ||
-            error_code != 0 ||
+            error_code < 0 ||
             (submop->count != mop->count &&
              js_p->error_code == 0))
         {
