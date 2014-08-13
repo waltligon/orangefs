@@ -44,6 +44,7 @@ int PVFS_sys_finalize()
 {
     static int finiflag = 0;
     static gen_mutex_t finimutex = GEN_MUTEX_INITIALIZER;
+    char * perf_counters_to_display = NULL;
 
     /* first time runs, other wait until completed then exit */
     if (finiflag)
@@ -63,7 +64,7 @@ int PVFS_sys_finalize()
     /* If desired, display acache/ncache perf counters
      * before they are finalized.
      */
-    char * perf_counters_to_display = getenv("PVFS2_COUNTERS_AT_FINALIZE");
+    perf_counters_to_display = getenv("PVFS2_COUNTERS_AT_FINALIZE");
     if(perf_counters_to_display)
     {
         if(PINT_ncache_get_pc() &&

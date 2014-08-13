@@ -424,10 +424,13 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      */
     if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
     {
+        PVFS_time now;
+        
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: req_attrmask has PVFS_ATTR_CAPABILITY\n",
                      __func__);
-        PVFS_time now = PINT_util_get_current_time();
+        
+        now = PINT_util_get_current_time();
         if (now > (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: cache miss due to "
@@ -798,11 +801,12 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             }
             return 0;
         case PVFS_TYPE_DIRECTORY:
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
+        {            
             uint32_t dirent_file_count_i;
             int tmp_i;
             unsigned char *c;
+
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
 
             /* dirent_count will be collected later */
             gossip_debug(GOSSIP_CLIENT_DEBUG,
