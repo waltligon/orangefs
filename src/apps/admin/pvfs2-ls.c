@@ -26,6 +26,8 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-usrint.h"
+#include "pvfs-path.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -103,6 +105,13 @@ static void print_entry(
     struct options *opts,
     char* entry_buffer);
 
+static void print_statentry(
+    char *entry_name,
+    struct stat *stat_buf,
+    int attr_error,
+    struct options *opts,
+    char *entry_buffer);
+
 static int do_list(
     char *full_path,
     char *start,
@@ -114,6 +123,12 @@ static void print_entry_attr(
     PVFS_handle handle,
     char *entry_name,
     PVFS_sys_attr *attr,
+    struct options *opts,
+    char *entry_buffer);
+
+static void print_entry_stat(
+    struct stat *stat_buf,
+    char *entry_name,
     struct options *opts,
     char *entry_buffer);
 
@@ -144,6 +159,35 @@ do {                                                        \
             printf("..\n");                                 \
         }                                                   \
     }                                                       \
+} while(0)
+
+#define print_stat_dot_and_dot_dot_info_if_required(stat_buf)   \
+do {                                                            \
+    if (opts->list_all && !opts->list_almost_all) {             \
+        /*                                                      \
+          we have to fake access to the .. handle               \
+          since our sysint lookup doesn't return that           \
+          kind of intermediate information.  we can get         \
+          this value, by manually resolving it with lookups     \
+          on base dirs, but I'm not sure it's worth it          \
+        */                                                      \
+        if (opts->list_inode && !opts->list_long) {             \
+            printf("%llu .\n",llu(stat_buf->st_ino));           \
+            printf("%llu .. (faked)\n",llu(stat_buf->st_ino);   \
+        }                                                       \
+        else if (opts->list_long) {                             \
+            print_statentry(".", stat_buf,                      \
+                        0, opts,                                \
+                        entry_buffer);                          \
+            print_statentry(".. (faked)", stat_buf,             \
+                        0, opts,                                \
+                        entry_buffer);                          \
+        }                                                       \
+        else {                                                  \
+            printf(".\n");                                      \
+            printf("..\n");                                     \
+        }                                                       \
+    }                                                           \
 } while(0)
 
 /*
@@ -212,7 +256,7 @@ static inline void format_size_string(
     }
     free(buf);
 }
-
+/* TODO: Modified this function to take stat */
 void print_entry_attr(
     PVFS_handle handle,
     char *entry_name,
@@ -440,6 +484,236 @@ void print_entry_attr(
     }
 }
 
+void print_entry_stat(
+    struct stat *stat_buf,
+    char *entry_name,
+    struct options *opts,
+    char *entry_buffer)
+{
+    char *formatted_size = NULL;
+    char *formatted_owner = NULL, *formatted_group = NULL, *formatted_time = NULL;
+#ifdef WIN32
+
+#else
+    struct group *grp = NULL;
+    struct passwd *pwd = NULL;
+#endif
+    char *empty_str = "";
+    char *owner = empty_str, *group = empty_str;
+    char *inode = empty_str;
+    time_t mtime, atime, ctime;
+    struct tm *time;
+    off_t size = 0;
+    char scratch_owner[16] = {0}, scratch_group[16] = {0}, scratch_time[MAX_TIME_LENGTH] = {0}, scratch_big_time[MAX_TIME_LENGTH] = {0};
+    char scratch_size[16] = {0}, scratch_inode[21] = {0};
+    char f_type = '-';
+    char group_x_char = '-';
+    int num_bytes = 0;
+
+    int ret = 0;
+    char target_name[PVFS_NAME_MAX+1];
+
+    if (!opts->list_all && (entry_name[0] == '.'))
+    {
+        return;
+    }
+    if (stat_buf == NULL)
+    {
+        return;
+    }
+
+    mtime = (time_t)stat_buf->st_mtime;
+    time = localtime(&mtime);
+    if(opts->list_all_times)
+    {
+        atime = (time_t)stat_buf->st_atime;
+        ctime = (time_t)stat_buf->st_ctime;
+
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%Y-%m-%d %H:%M:%S %z",time );
+#else
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%F %H:%M:%S %z",time );
+#endif
+        strncpy(scratch_big_time,scratch_time,num_bytes);
+
+        time = localtime(&atime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
+        strncat(scratch_big_time,scratch_time,num_bytes);
+
+        time = localtime(&ctime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
+        strncat(scratch_big_time,scratch_time,num_bytes);
+
+        format_size_string(scratch_big_time,strlen(scratch_big_time),&formatted_time,0,1);
+    }
+    else
+    {
+#ifdef WIN32
+        strftime( scratch_time,17,"%Y-%m-%d %H:%M",time );
+#else
+        strftime( scratch_time,17,"%F %H:%M",time );
+#endif
+        format_size_string(scratch_time,16,&formatted_time,0,1);
+    }
+
+    snprintf(scratch_owner,16,"%d",(int)stat_buf->st_uid);
+    snprintf(scratch_group,16,"%d",(int)stat_buf->st_gid);
+
+    if (opts->list_inode)
+    {
+        snprintf(scratch_inode,21,"%llu ",llu(stat_buf->st_ino));
+        inode = scratch_inode;
+    }
+
+    if (S_ISREG(stat_buf->st_mode) &&
+        (stat_buf->st_size))
+    {
+        size = stat_buf->st_size;
+    }
+    else if (S_ISLNK(stat_buf->st_mode))
+    {
+        ret = pvfs_readlink(entry_name, target_name, sizeof(target_name)-1);
+        size = (off_t)strlen(target_name);
+    }
+    else if (S_ISDIR(stat_buf->st_mode))
+    {
+        size = (off_t)4096;
+    }
+
+    if (opts->list_human_readable)
+    {
+        PVFS_util_make_size_human_readable(
+            size,scratch_size,16,opts->list_use_si_units);
+    }
+    else
+    {
+        snprintf(scratch_size,16, "%lld", lld(size));
+    }
+    format_size_string(scratch_size,11,&formatted_size,1,1);
+
+    if (!opts->list_no_owner)
+    {
+        owner = scratch_owner;
+    }
+    if (!opts->list_no_group)
+    {
+        group = scratch_group;
+    }
+
+    if (!opts->list_numeric_uid_gid)
+    {
+        if (!opts->list_no_owner)
+        {
+#ifdef WIN32
+            owner = scratch_owner;
+#else
+            pwd = getpwuid((uid_t)stat_buf->st_uid);
+            owner = (pwd ? pwd->pw_name : scratch_owner);
+#endif
+        }
+
+        if (!opts->list_no_group)
+        {
+#ifdef WIN32
+            group = scratch_group;
+#else
+            grp = getgrgid((gid_t)stat_buf->st_gid);
+            group = (grp ? grp->gr_name : scratch_group);
+#endif
+
+        }
+    }
+
+    /* for owner and group allow the fields to grow larger than 8 if
+     * necessary (set hard_limit to 0), but pad anything smaller to
+     * take up 8 spaces.
+     */
+    format_size_string(owner,8,&formatted_owner,0,0);
+    format_size_string(group,8,&formatted_group,0,0);
+
+    if (S_ISDIR(stat_buf->st_mode))
+    {
+        f_type =  'd';
+    }
+    else if (S_ISLNK(stat_buf->st_mode))
+    {
+        f_type =  'l';
+    }
+
+    /* special case to set setgid display for groups if needed */
+    /** TODO: attr->perms to stat_buf->st_mode & 777. Is this right substitute of perms? **/
+    if(stat_buf->st_mode & 777 & PVFS_G_SGID)
+    {
+        group_x_char = ((stat_buf->st_mode & 777 & PVFS_G_EXECUTE) ? 's' : 'S');
+    }
+    else
+    {
+        group_x_char = ((stat_buf->st_mode & 777 & PVFS_G_EXECUTE) ? 'x' : '-');
+    }
+
+    snprintf(entry_buffer,ENTRY_MAX,"%s %c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+             "%s %s",
+             inode,
+             f_type,
+             ((stat_buf->st_mode & S_IRUSR) ? 'r' : '-'),
+             ((stat_buf->st_mode & S_IWUSR) ? 'w' : '-'),
+             ((stat_buf->st_mode & S_IXUSR) ? 'x' : '-'),
+             ((stat_buf->st_mode & S_IRGRP) ? 'r' : '-'),
+             ((stat_buf->st_mode & S_IWGRP) ? 'w' : '-'),
+             group_x_char,
+             ((stat_buf->st_mode & S_IROTH) ? 'r' : '-'),
+             ((stat_buf->st_mode & S_IWOTH) ? 'w' : '-'),
+             ((stat_buf->st_mode & S_IXOTH) ? 'x' : '-'),
+             formatted_owner,
+             formatted_group,
+             formatted_size,
+             formatted_time,
+             entry_name);
+
+    if (formatted_size)
+    {
+        free(formatted_size);
+    }
+    if (formatted_owner)
+    {
+        free(formatted_owner);
+    }
+    if (formatted_group)
+    {
+        free(formatted_group);
+    }
+    if (formatted_time)
+    {
+        free(formatted_time);
+    }
+
+    if (S_ISLNK(stat_buf->st_mode))
+    {
+        assert(target_name);
+
+        if (opts->list_long)
+        {
+            printf("%s -> %s\n", entry_buffer, target_name);
+        }
+        else
+        {
+            printf("%s\n",entry_buffer);
+        }
+    }
+    else
+    {
+        printf("%s\n",entry_buffer);
+    }
+}
+/* TODO: Modified this to take stat */
 void print_entry(
     char *entry_name,
     PVFS_handle handle,
@@ -503,13 +777,70 @@ void print_entry(
     }
 }
 
+void print_statentry(
+    char *entry_name,
+    struct stat *stat_buf,
+    int attr_error,
+    struct options *opts,
+    char *entry_buffer)
+{
+
+    if (!opts->list_long)
+    {
+        if (opts->list_inode)
+        {
+            printf("%llu %s\n", llu(stat_buf->st_ino), entry_name);
+        }
+        else
+        {
+            printf("%s\n", entry_name);
+        }
+        return;
+    }
+
+    if (attr_error == 0)
+    {
+        if(!stat_buf)
+        {
+            /* missing attributes (possibly for . or .. entries); get them
+             * the old fashioned way
+             */
+            /* TODO: Find how to do this 
+            ref.handle = handle;
+            ref.fs_id = fs_id;
+
+            memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+            ret = PVFS_util_gen_credential_defaults(&credentials);
+            if (ret < 0)
+            {
+                PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+                return;
+            }
+
+            ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                &credentials, &getattr_response, NULL);
+            if (ret)
+            {
+                fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
+                    llu(handle),fs_id);
+                PVFS_perror("Getattr failure", ret);
+                return;
+            }
+            print_entry_attr(handle, entry_name,  &getattr_response.attr, opts, entry_buffer);*/
+        }
+        else
+        {
+            print_entry_stat(stat_buf, entry_name, opts, entry_buffer);
+        }
+    }
+}
 static double Wtime(void)
 {
     struct timeval t;
     gettimeofday(&t, NULL);
     return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
 }
-
+/* TODO */
 int do_list(
     char *full_path,
     char *start,
@@ -656,7 +987,7 @@ int do_list(
 
             cur_file = rdplus_response.dirent_array[i].d_name;
             cur_handle = rdplus_response.dirent_array[i].handle;
-
+            /**TODO: Attribute error might be possible here**/
             print_entry(cur_file, cur_handle, fs_id,
                     &rdplus_response.attr_array[i],
                     rdplus_response.stat_err_array[i],
@@ -751,6 +1082,246 @@ int do_list(
     return 0;
 }
 
+int do_list_stat(
+    char *full_path,
+    char *start,
+    int fs_id,
+    struct options *opts,
+    char *entry_buffer)
+{
+    int i = 0, printed_dot_info = 0;
+    int ret = -1;
+    char *name = NULL, *cur_file = NULL;
+    PVFS_handle cur_handle;
+    PVFS_sysresp_lookup lk_response;
+    PVFS_sysresp_readdirplus rdplus_response;
+    PVFS_sysresp_getattr getattr_response;
+    PVFS_credential credentials;
+    PVFS_object_ref ref;
+    PVFS_ds_position token;
+    uint64_t dir_version = 0;
+    double begin = 0., end;
+    subdir *current, *head = NULL, *tail = NULL;
+
+    name = start;
+
+    memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
+
+    if (opts->list_recursive || opts->num_starts > 1)
+    {
+        if(*start == '/' && *(start + 1) == '\0')
+        {
+            printf("%s%s:\n",full_path, start + 1);
+        }
+        else
+        {
+            printf("%s%s:\n",full_path,start);
+        }
+    }
+
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+    if(ret < 0)
+    {
+        PVFS_perror("PVFS_sys_lookup", ret);
+        return -1;
+    }
+
+    ref.handle = lk_response.ref.handle;
+    ref.fs_id = fs_id;
+
+    memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
+    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
+                         &credentials, &getattr_response, NULL) == 0)
+    {
+        if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
+            (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
+            ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) &&
+             (opts->list_directory)))
+        {
+            char segment[128] = {0};
+            PVFS_sysresp_getparent getparent_resp;
+            PINT_remove_base_dir(name, segment, 128);
+            if (strcmp(segment,"") == 0)
+            {
+                snprintf(segment,128,"/");
+            }
+
+            if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
+            {
+                if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
+                                       &getparent_resp, NULL) == 0)
+                {
+                    print_dot_and_dot_dot_info_if_required(
+                        getparent_resp.parent_ref);
+                }
+            }
+
+            if (opts->list_long)
+            {
+                print_entry_attr(ref.handle, segment,
+                                 &getattr_response.attr, opts, entry_buffer);
+            }
+            else
+            {
+                print_entry(segment, ref.handle, ref.fs_id, 
+                        NULL,
+                        0,
+                        opts, entry_buffer);
+            }
+            return 0;
+        }
+    }
+
+    if (do_timing)
+        begin = Wtime();
+    token = PVFS_ITERATE_START;
+    do
+    {
+        memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
+        ret = PVFS_sys_readdirplus(
+                ref, token,
+                MAX_NUM_DIRENTS, &credentials,
+                (opts->list_long) ? 
+                PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
+                &rdplus_response,
+                NULL);
+        if(ret < 0)
+        {
+            PVFS_perror("PVFS_sys_readdir", ret);
+            return -1;
+        }
+
+        if (dir_version == 0)
+        {
+            dir_version = rdplus_response.directory_version;
+        }
+        else if (opts->list_verbose)
+        {
+            if (dir_version != rdplus_response.directory_version)
+            {
+                fprintf(stderr, "*** directory changed! listing may "
+                        "not be correct\n");
+                dir_version = rdplus_response.directory_version;
+            }
+        }
+
+        if (!printed_dot_info)
+        {
+            /*
+              the list_all option prints files starting with .;
+              the almost_all option skips the '.', '..' printing
+            */
+            print_dot_and_dot_dot_info_if_required(ref);
+            printed_dot_info = 1;
+        }
+
+        for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
+        {
+            PVFS_sys_attr *attr;
+
+            cur_file = rdplus_response.dirent_array[i].d_name;
+            cur_handle = rdplus_response.dirent_array[i].handle;
+            /**TODO: Attribute error might be possible here**/
+            print_entry(cur_file, cur_handle, fs_id,
+                    &rdplus_response.attr_array[i],
+                    rdplus_response.stat_err_array[i],
+                    opts, entry_buffer);
+
+            attr = &rdplus_response.attr_array[i];
+            if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
+            {
+                int path_len = strlen(start) + strlen(cur_file) + 1;
+                current = (subdir *) malloc(sizeof(subdir));
+
+                /* Prevent duplicate slashes in path */
+                if(start[strlen(start)-1] == '/')
+                {
+                    current->path = (char *) malloc(path_len);
+                    snprintf(current->path,path_len,"%s%s",start,cur_file);
+                }
+                else
+                {
+                    current->path = (char *) malloc(path_len + 1);
+                    snprintf(current->path,path_len+1,"%s/%s",start,cur_file);
+                }
+
+                /* Update linked list of subdirectories to recurse */
+                current->next = NULL;
+                if(!head)
+                {
+                    head = current;
+                    tail = current;
+                }
+                else
+                {
+                    tail->next = current;
+                    tail = current;
+                }
+            }
+        }
+        token = rdplus_response.token;
+
+        if (rdplus_response.pvfs_dirent_outcount)
+        {
+            free(rdplus_response.dirent_array);
+            rdplus_response.dirent_array = NULL;
+            free(rdplus_response.stat_err_array);
+            rdplus_response.stat_err_array = NULL;
+            for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
+                if (rdplus_response.attr_array)
+                {
+                    PVFS_util_release_sys_attr(&rdplus_response.attr_array[i]);
+                }
+            }
+            free(rdplus_response.attr_array);
+            rdplus_response.attr_array = NULL;
+        }
+
+    } while (token != PVFS_ITERATE_END);
+    if (do_timing) {
+        end = Wtime();
+        printf("PVFS_sys_readdirplus took %g msecs\n", 
+                (end - begin));
+    }
+
+    if (rdplus_response.pvfs_dirent_outcount)
+    {
+        free(rdplus_response.dirent_array);
+        rdplus_response.dirent_array = NULL;
+        free(rdplus_response.stat_err_array);
+        rdplus_response.stat_err_array = NULL;
+        for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
+            if (rdplus_response.attr_array)
+            {
+                PVFS_util_release_sys_attr(&rdplus_response.attr_array[i]);
+            }
+        }
+        free(rdplus_response.attr_array);
+        rdplus_response.attr_array = NULL;
+    }
+
+    if (opts->list_recursive)
+    {
+        current = head;
+        while(current)
+        {
+            printf("\n");
+            do_list(full_path,current->path,fs_id,opts,entry_buffer);
+            current = current->next;
+            free(head->path);
+            free(head);
+            head = current;
+        }
+    }
+    return 0;
+}
 /* parse_args()
  *
  * parses command line arguments
@@ -1102,16 +1673,12 @@ static void usage(int argc, char** argv)
             "information and exit\n");
     return;
 }
-
+/** TODO **/ 
 int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
-    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
-    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
-    const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
-    int found_one = 0;
     char *entry_buffer = malloc(ENTRY_MAX);
 
     process_name = argv[0];
@@ -1124,18 +1691,6 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (!tab)
-    {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return(-1);
-    }
-
-    for(i = 0; i < MAX_NUM_PATHS; i++)
-    {
-        memset(pvfs_path[i],0,PVFS_NAME_MAX);
-    }
-
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
@@ -1143,67 +1698,33 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* initialize each file system that we found in the tab file */
-    for(i = 0; i < tab->mntent_count; i++)
-    {
-	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-	if (ret == 0 || ret == -PVFS_EEXIST)
-        {
-	    found_one = 1;
-        }
-    }
-
-    if (!found_one)
-    {
-	fprintf(stderr, "Error: could not initialize any file systems "
-                "from %s\n", tab->tabfile_name);
-	PVFS_sys_finalize();
-	return(-1);
-    }
-
     if (user_opts->num_starts == 0)
     {
-	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-		 tab->mntent_array[0].mnt_dir);
+	snprintf(current_dir,PVFS_NAME_MAX,".");
 	user_opts->start[0] = current_dir;
 	user_opts->num_starts = 1;
     }
 
-    for(i = 0; i < user_opts->num_starts; i++)
-    {
-	ret = PVFS_util_resolve(user_opts->start[i],
-	    &fs_id_array[i], pvfs_path[i], PVFS_NAME_MAX);
-	if ((ret == 0) && (pvfs_path[i][0] == '\0'))
-	{
-            strcpy(pvfs_path[i], "/");
-	}
-
-	if (ret < 0)
-	{
-	    fprintf(stderr, "Error: could not find file system "
-                    "for %s in pvfstab\n", user_opts->start[i]);
-	    return(-1);
-	}
-    }
 
     for(i = 0; i < user_opts->num_starts; i++)
     {
-        char *substr = strstr(user_opts->start[i],pvfs_path[i]);
+        fprintf(stderr, "New path: %s\n",PVFS_qualify_path(user_opts->start[i]));
+        usage(argc,argv);
+        return 0;
+        /*char *substr = strstr(user_opts->start[i],pvfs_path[i]);
         char *index = user_opts->start[i];
         char *search = substr; 
         int j = 0;
 
-        /* Keep the mount path info to mimic /bin/ls output */
         if( strncmp(pvfs_path[i],"/",strlen(pvfs_path[i])) )
         {
-            /* Get last matching substring */
             while (search) 
             {
                 substr = search;
                 search = strstr(++search,pvfs_path[i]);
             }
         }
-        else /* Root directory case has nothing to match */
+        else 
         {
             substr = &user_opts->start[i][strlen(user_opts->start[i])];
         }
@@ -1224,7 +1745,7 @@ int main(int argc, char **argv)
         if (user_opts->num_starts > 1)
         {
             printf("\n");
-        }
+        }*/
     }
 
     PVFS_sys_finalize();
