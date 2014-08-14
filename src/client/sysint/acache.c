@@ -607,10 +607,9 @@ int PINT_acache_update(
                      __func__);
     }
 
-    if(size_array && tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY)
+    if(size_array && tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY &&
+            tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
     {
-        assert(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT);
-
         /* NOTE: TODO for v3 
          * will eventually use num_servers value integrated with:
          *         attr.u.dir
@@ -635,7 +634,8 @@ int PINT_acache_update(
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: NOTE, size_array is NULL or "
-                     "objtype is != PVFS_TYPE_DIRECTORY. "
+                     "objtype is != PVFS_TYPE_DIRECTORY or "
+                     "PVFS_ATTR_DIR_DIRENT_COUNT is not in attr mask. "
                      "No size_array inserted with this acache payload.\n",
                      __func__);
     }
