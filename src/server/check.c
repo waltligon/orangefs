@@ -36,11 +36,6 @@ enum access_type
     EXEC_ACCESS
 };
 
-/* operations where the parent handle's permissions are checked */
-enum PVFS_server_op parent_check_ops[] = {PVFS_SERV_REMOVE,
-                                          PVFS_SERV_TREE_REMOVE};
-#define PARENT_CHECK_OP_COUNT    2
-
 static int check_mode(enum access_type access, PVFS_uid userid,
     PVFS_gid group, const PVFS_object_attr *attr);
 static int check_acls(void *acl_buf, size_t acl_size, 
@@ -220,10 +215,20 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PINT_server_req_perm_fun perm_fun;
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i;
     char op_mask[16];
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: enter\n", __func__);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: checking operation %s\n", 
+                 __func__, PINT_map_server_op_to_string(s_op->req->op));
+
+    perm_fun = PINT_server_req_get_perm_fun(s_op->req);
+    if (perm_fun == NULL)
+    {
+        gossip_err("%s: permission check for operation with no permission "
+                   "function\n", __func__);
+
+        return -PVFS_EINVAL;
+    }
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -239,90 +244,69 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
     }
 
-    if (!PINT_capability_is_null(cap))
-    {
-        int index = 0, op_i;
-
+    /* do not check handles for null caps and create operations */
+    if (!PINT_capability_is_null(cap) &&
+        s_op->req->op != PVFS_SERV_CREATE)
+    {        
         /* get object handle */
         PINT_server_req_get_object_ref(s_op->req, &fs_id, &handle);
 
+        switch (s_op->req->op)
+        {
+            /* remove ops use parent handle from hint */
+            case PVFS_SERV_REMOVE:
+            case PVFS_SERV_TREE_REMOVE:
+            /* io ops use metafile handle from hint */
+            case PVFS_SERV_SMALL_IO:
+            case PVFS_SERV_IO:
+                handle = PINT_HINT_GET_HANDLE(s_op->req->hints);
+                if (handle == PVFS_HANDLE_NULL)
+                {
+                    gossip_err("%s: could not retrieve parent/metafile handle "
+                               "from hint\n", __func__);
+                    return -PVFS_EINVAL;
+                }
+                break;
+            default:
+                break;
+        }
+
         if (handle == PVFS_HANDLE_NULL || fs_id == PVFS_FS_ID_NULL)
         {
-            gossip_err("%s: called for operation %d with no handle\n", __func__,
+            gossip_err("%s: operation %d has no handle/fs_id\n", __func__,
                        (int) s_op->req->op);
             return -PVFS_EINVAL;
         }
 
-        /* check if operation is one where parent's permissions are checked */
-        for (op_i = 0; op_i < PARENT_CHECK_OP_COUNT; op_i++)
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: using operation handle %llu\n",
+                     __func__, llu(handle));
+
+        /* ensure we have a capability for the target handle */
+        for (i = 0; i < cap->num_handles; i++)
         {
-            if (s_op->op == parent_check_ops[op_i])
+            if (cap->handle_array[i] == handle)
             {
                 break;
             }
         }
-        /* check target object permissions */
-        if (op_i == PARENT_CHECK_OP_COUNT)
-        {
-            /* ensure we have a capability for the target handle */
-            for (index = 0; index < cap->num_handles; index++)
-            {
-                if (cap->handle_array[index] == handle)
-                {
-                    break;
-                }
-            }
-        }
-        else {
-            /* check parent object permissions */
-            PVFS_handle *parent_handle = (PVFS_handle *)
-                PINT_hint_get_value_by_type(s_op->req->hints, 
-                                            PINT_HINT_HANDLE, 
-                                            NULL);
-            if (parent_handle == NULL)
-            {
-                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Could not retrieve "
-                             "parent handle for %llu from hint\n", 
-                             llu(handle));
-                return -PVFS_EACCES;
-            }
-            for (index = 0; index < cap->num_handles; index++)
-            {
-                if (cap->handle_array[index] == *parent_handle)                    
-                {
-                    break;
-                }
-            }
-        }
-        if (index == cap->num_handles)
+        if (i == cap->num_handles)
         {
             
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
-                         "an operation on target handle %llu that was "
-                         "not in the capability\n", llu(handle));
+            gossip_err("%s: attempted to perform an operation on target "
+                       "handle %llu that was not in the capability\n", 
+                       __func__, llu(handle));
             return -PVFS_EACCES;
         }
     }
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "PVFS operation \"%s\" got "
-                 "perms %o (capability mask = %s)\n",
-                 PINT_map_server_op_to_string(s_op->req->op),
-                 s_op->attr.perms, PINT_print_op_mask(cap->op_mask, op_mask));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: perms %o (capability mask = %s)\n",
+                 __func__, s_op->attr.perms, 
+                 PINT_capability_is_null(cap) ? "[null]" : 
+                     PINT_print_op_mask(cap->op_mask, op_mask));
 
-    perm_fun = PINT_server_req_get_perm_fun(s_op->req);
-    if (perm_fun)
-    {
-        ret = perm_fun(s_op);
-    }
-    else
-    {
-        ret = -PVFS_EINVAL;
-    }
+    ret = perm_fun(s_op);
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                 "Final permission check for \"%s\" set error code to %d\n", 
-                 PINT_map_server_op_to_string(s_op->req->op),
-                 ret);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: returning %d\n", __func__, ret);
 
     return ret;
 }
