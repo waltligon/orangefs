@@ -165,11 +165,14 @@ PVFS_error PVFS_mgmt_perf_mon_list(PVFS_fs_id fs_id,
     }
     else
     {
-        ret = PVFS_mgmt_wait(op_id, "perf_mon_list", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
-            error = ret;
+            ret = PVFS_mgmt_wait(op_id, "perf_mon_list", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+                error = ret;
+            }
         }
     }
 

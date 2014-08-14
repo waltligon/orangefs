@@ -232,11 +232,14 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "fs_add", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
+            ret = PVFS_sys_wait(op_id, "fs_add", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 

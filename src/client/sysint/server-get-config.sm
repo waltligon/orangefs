@@ -152,11 +152,14 @@ int PINT_server_get_config(struct server_configuration_s *config,
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "X-get_config", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
+            ret = PVFS_sys_wait(op_id, "X-get_config", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 

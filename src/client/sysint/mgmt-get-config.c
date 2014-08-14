@@ -98,11 +98,14 @@ int PVFS_mgmt_get_config(
     }
     else
     {
-        ret = PVFS_mgmt_wait(op_id, "X-get_config", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
-            error = ret;
+            ret = PVFS_mgmt_wait(op_id, "X-get_config", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+                error = ret;
+            }
         }
     }
 

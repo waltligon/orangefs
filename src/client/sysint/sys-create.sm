@@ -361,11 +361,13 @@ PVFS_error PVFS_sys_create(
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "create", &error);
-        if (ret)
-        {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
+        if(op_id != -1){
+            ret = PVFS_sys_wait(op_id, "create", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 

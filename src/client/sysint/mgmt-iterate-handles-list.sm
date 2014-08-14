@@ -160,11 +160,13 @@ PVFS_error PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     }
     else
     {
-        ret = PVFS_mgmt_wait(op_id, "iterate_handles_list", &error);
-        if (ret)
-        {
-            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
-            error = ret;
+      completed
+          ret = PVFS_mgmt_wait(op_id, "iterate_handles_list", &error);
+          if (ret)
+          {
+              PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+              error = ret;
+          }
         }
     }
 

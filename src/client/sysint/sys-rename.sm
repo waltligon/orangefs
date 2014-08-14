@@ -426,11 +426,14 @@ PVFS_error PVFS_sys_rename(char *old_entry,
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "rename", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
+            ret = PVFS_sys_wait(op_id, "rename", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 

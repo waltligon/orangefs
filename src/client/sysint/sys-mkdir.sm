@@ -285,11 +285,14 @@ PVFS_error PVFS_sys_mkdir(char *object_name,
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "mkdir", &error);
-        if (ret)
+        if(op_id != -1)
         {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
+            ret = PVFS_sys_wait(op_id, "mkdir", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 

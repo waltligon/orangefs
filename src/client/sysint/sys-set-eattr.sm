@@ -197,11 +197,14 @@ PVFS_error PVFS_sys_seteattr_list(PVFS_object_ref ref,
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "seteattr", &error);
-        if (ret)
+        if(op_id != -1)
         {
-             PVFS_perror_gossip("PVFS_sys_wait call", ret);
-             error = ret;
+            ret = PVFS_sys_wait(op_id, "seteattr", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_sys_wait call", ret);
+                error = ret;
+            }
         }
     }
 
