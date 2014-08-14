@@ -160,7 +160,7 @@ PVFS_error PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     }
     else
     {
-      completed
+        if(op_id != -1){
           ret = PVFS_mgmt_wait(op_id, "iterate_handles_list", &error);
           if (ret)
           {
