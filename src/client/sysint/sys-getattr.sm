@@ -1758,7 +1758,7 @@ static PINT_sm_action getattr_acache_insert(
             /* size_array SHOULD be valid here if the proper bit was flipped */
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: getattr should cache size array! "
-                         "handle=%llu size_array=%p dfile_count=%d\n",
+                         "handle=%llu size_array=%p num_servers=%d\n",
                          __func__,
                          llu(sm_p->getattr.object_ref.handle),
                          (void *) sm_p->getattr.size_array,
