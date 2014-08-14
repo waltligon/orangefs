@@ -263,7 +263,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
                             PVFS_sysresp_getattr *resp_p,
                             PVFS_hint hints)
 {
-    PVFS_error ret, error;
+    PVFS_error ret, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
@@ -278,26 +278,19 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_getattr call", ret);
-        return ret;
+        error = ret;
     }
-
-    if(op_id != -1)
+    else if (!ret && op_id != -1)
     {
-        /* did not complete immediately, so we wait */
-
         ret = PVFS_sys_wait(op_id, "getattr", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
-        }
-        if(error)
-        {
-            ret = error;
+            error = ret;
         }
         PINT_sys_release(op_id);
     }
-
-    return ret;
+    return error;
 }
 
 

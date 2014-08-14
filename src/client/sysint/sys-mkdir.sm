@@ -267,7 +267,7 @@ PVFS_error PVFS_sys_mkdir(
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "mkdir", &error);
         if (ret)
@@ -275,9 +275,8 @@ PVFS_error PVFS_sys_mkdir(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
