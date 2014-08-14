@@ -1681,7 +1681,7 @@ static PINT_sm_action getattr_acache_insert(
         }
 
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY &&
-            sm_p->getattr.attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+            sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
             /* size_array SHOULD be valid here if the proper bit was flipped */
             gossip_debug(GOSSIP_ACACHE_DEBUG,
