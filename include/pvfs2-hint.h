@@ -22,6 +22,8 @@
 #define PVFS_HINT_LAYOUT_NAME        "pvfs.hint.layout"
 #define PVFS_HINT_SERVERLIST_NAME    "pvfs.hint.serverlist"
 #define PVFS_HINT_CACHE_NAME         "pvfs.hint.cache"
+/* local uid hint for client capcache */
+#define PVFS_HINT_LOCAL_UID_NAME     "pvfs.hint.local_uid"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 

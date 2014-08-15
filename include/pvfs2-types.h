@@ -1112,9 +1112,12 @@ struct profiler
  * New types for robust security implementation.
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
+#define PVFS2_DEFAULT_CAPABILITY_TIMEOUT (600)
 #define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
 #define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
         "/orangefs-service-users"
+#define PVFS2_SECURITY_TIMEOUT_MIN   5
+#define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
 
 typedef unsigned char *PVFS_cert_data;
 

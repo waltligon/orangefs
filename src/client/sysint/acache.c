@@ -530,6 +530,7 @@ int PINT_acache_update(
     PVFS_size* size_array)  /**< dirent_count of every dirdata handle (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
+    uint32_t save_mask;
     int ret = -1;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -558,7 +559,11 @@ int PINT_acache_update(
     }
 
     tmp_payload->refn = refn;
+    /* copy attrs into payload, excluding capability */
+    save_mask = attr->mask;
+    attr->mask &= ~PVFS_ATTR_CAPABILITY;
     ret = PINT_copy_object_attr(&tmp_payload->attr, attr);
+    attr->mask = save_mask;
     if(ret != 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -677,7 +682,7 @@ static int PINT_acache_initialize_perf_counter(void)
     acache_pc = PINT_perf_initialize(acache_keys);
     if(!acache_pc)
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
+        gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);
         return -PVFS_ENOMEM;
     }
 

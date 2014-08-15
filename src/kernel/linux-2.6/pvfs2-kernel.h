@@ -215,7 +215,7 @@ enum pvfs2_vfs_op_states {
 #define get_op(op) \
     do {\
         atomic_inc(&(op)->aio_ref_count);\
-        gossip_debug(GOSSIP_CACHE_DEBUG, "(get) Alloced OP (%p:%llu)\n", op, llu((op)->tag));\
+        gossip_debug(GOSSIP_CACHE_DEBUG, "%s: (get) Alloced OP (%p:%llu)\n", __func__, op, llu((op)->tag));\
     } while(0)
 #define put_op(op) \
     do {\
