@@ -244,9 +244,13 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
     }
 
-    /* do not check handles for null caps and create operations */
+    /* do not check handles for null caps and certain operations */
     if (!PINT_capability_is_null(cap) &&
-        s_op->req->op != PVFS_SERV_CREATE)
+        s_op->req->op != PVFS_SERV_CREATE &&
+        s_op->req->op != PVFS_SERV_MKDIR &&
+        s_op->req->op != PVFS_SERV_MGMT_SETPARAM &&
+        s_op->req->op != PVFS_SERV_TREE_GET_FILE_SIZE &&
+        s_op->req->op != PVFS_SERV_TREE_GETATTR)
     {        
         /* get object handle */
         PINT_server_req_get_object_ref(s_op->req, &fs_id, &handle);
