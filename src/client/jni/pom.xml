@@ -17,6 +17,21 @@
         <junit.version>4.10</junit.version>
     </properties>
 
+    <!-- Fixes compile error thrown due to annotations. -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                        <source>5</source>
+                        <target>5</target>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>commons-logging</groupId>
