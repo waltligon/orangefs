@@ -49,19 +49,7 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_setup_op;
         default => get_bitmap_and_dirdata_handles;
-    /*
-        default => get_dist_dir_attr;
-     */
     }
-
-/*
-    state get_dist_dir_attr
-    {
-        run crdirent_get_dist_dir_attr;
-        success => get_bitmap_and_dirdata_handles;
-        default => final_response;
-    }
- */
 
     state get_bitmap_and_dirdata_handles
     {
@@ -80,20 +68,6 @@ machine pvfs2_crdirent_sm
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
-        success => update_dirdata_attr;
-        default => final_response;
-    }
-
-    state update_dirdata_attr
-    {
-        run crdirent_update_dirdata_attr;
-        success => get_dirent_count;
-        default => final_response;
-    }
-
-    state get_dirent_count
-    {
-        run crdirent_get_dirent_count;
         success => check_for_split;
         default => final_response;
     }
@@ -102,12 +76,18 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_check_for_split;
         SPLIT_REQUIRED => do_split;
-        default => final_response;
+        default => update_dirdata_attr;
     }
 
-    state do_split
+    state do_split /* state machine in dirent-split.sm */
     {
         jump pvfs2_dirdata_split_sm;
+        default => update_dirdata_attr;
+    }
+
+    state update_dirdata_attr
+    {
+        run crdirent_update_dirdata_attr;
         default => final_response;
     }
 
@@ -246,13 +226,21 @@ static PINT_sm_action crdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
  * V3 - size is now read with ds_attr by prelude
  */
 static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
-        struct PINT_smcb *smcb,
-        job_status_s *js_p)
+                                              struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
 {   
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr_p = NULL;
     job_id_t j_id;
+
+    /*
+     * first we translate the dirdata dspace attributes into a more convenient
+     * server use-able format.  i.e. a PVFS_object_attr
+     */
+    PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.dirdata_ds_attr,
+                                &s_op->u.crdirent.dirdata_attr);
+    s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
 
     attr_p = &s_op->attr;
 
@@ -580,6 +568,10 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
 
 /*
  * Function: crdirent_update_dirdata_attr
+ *
+ * Write dirdata metadata to dspace, with updated time stamps and dirent
+ * count and anything else modified after the crdirent and split if
+ * there is one
  */
 static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
@@ -600,6 +592,8 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
                           PVFS_ATTR_COMMON_MTIME |
                           PVFS_ATTR_COMMON_CTIME);
 
+/* V3 This is inappropriate for a dirdata object */
+#if 0
     /* map owner/group from credential if necessary */
     if ((dspace_attr->mask & (PVFS_ATTR_COMMON_UID | PVFS_ATTR_COMMON_GID)) &&
         (dspace_attr->owner == PVFS_UID_MAX ||
@@ -631,6 +625,7 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
             dspace_attr->group = group_array[0];
         }
     }
+#endif
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
     ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
@@ -654,6 +649,7 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     return ret;
 }
 
+#if 0
 /*
  * Function: crdirent_get_dirent_count
  */
@@ -677,6 +673,7 @@ static PINT_sm_action crdirent_get_dirent_count(struct PINT_smcb *smcb,
 
     return ret;
 }
+#endif
 
 /*
  * Function: crdirent_check_for_split
