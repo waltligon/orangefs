@@ -261,12 +261,12 @@ static PINT_sm_action crdirent_retrieve_dir_entries(struct PINT_smcb *smcb,
     gossip_debug(
         GOSSIP_SERVER_DEBUG, " - iterating keyvals: [%s,%d], "
         "\n\ttoken=%llu, count=%d\n",
-        PVFS_OID_str(&s_op->u.crdirent.dirdata_handle), s_op->u.crdirent.fs_id,
+        PVFS_OID_str(&s_op->req->u.crdirent.dirdata_handle), s_op->req->u.crdirent.fs_id,
         llu(PVFS_ITERATE_START),
         s_op->u.crdirent.keyval_handle_info.count);
 
-    ret = job_trove_keyval_iterate(s_op->u.crdirent.fs_id,
-                                   s_op->u.crdirent.dirdata_handle,
+    ret = job_trove_keyval_iterate(s_op->req->u.crdirent.fs_id,
+                                   s_op->req->u.crdirent.dirdata_handle,
                                    PVFS_ITERATE_START,
                                    s_op->u.crdirent.entries_key_a,
                                    s_op->u.crdirent.entries_val_a,
@@ -724,7 +724,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
         memset(msgarray_op, 0, sizeof(PINT_sm_msgarray_op));
 
         /* parameters are setup like a client except for job_context */
-        PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
+        PINT_serv_init_msgarray_params(s_op,s_op->req->u.crdirent.fs_id);
 
         /* allocate a mspair_state structure for each
          * destination handle.
@@ -751,7 +751,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
 
-        capability_handles[0] = s_op->u.crdirent.parent_handle;
+        capability_handles[0] = s_op->req->u.crdirent.parent_handle;
         memcpy(capability_handles + 1,
                s_op->attr.u.dir.dirdata_handles,
                SASZ(s_op->attr.u.dir.dist_dir_attr.dirdata_count));
@@ -842,18 +842,19 @@ static PINT_sm_action crdirent_update_metahandle_attrs(struct PINT_smcb *smcb,
 #if 0
     PINT_cached_config_get_server_name(server_name,
                                        1024,
-                                       s_op->u.crdirent.parent_handle,
-                                       s_op->u.crdirent.fs_id);
+                                       s_op->req->u.crdirent.parent_handle,
+                                       s_op->req->u.crdirent.fs_id);
     if (! strcmp(server_config->host_id, server_name))
 #endif
 
-    if (PINT_cached_config_server_local(&s_op->u.crdirent.parent_sid[0]))
+    if (PINT_cached_config_server_local(
+                           &s_op->req->u.crdirent.parent_sid_array[0]))
     {
         /* local */
         attr_p = &s_op->attr;
         ret = crdirent_save_dirdata_attrs(smcb,
                                           js_p,
-                                          s_op->u.crdirent.parent_handle,
+                                          s_op->req->u.crdirent.parent_handle,
                                           attr_p);
         return(ret);
     }
@@ -863,9 +864,9 @@ static PINT_sm_action crdirent_update_metahandle_attrs(struct PINT_smcb *smcb,
         attr_p = &s_op->attr;
         ret = crdirent_send_server_attrs(smcb,
                                          js_p,
-                                         s_op->u.crdirent.parent_handle,
+                                         s_op->req->u.crdirent.parent_handle,
                                          s_op->metasidcnt,
-                                         s_op->u.crdirent.parent_sid,
+                                         s_op->req->u.crdirent.parent_sid_array,
                                          PVFS_TYPE_DIRECTORY,
                                          attr_p);
         js_p->error_code = REMOTE_METAHANDLE;
@@ -921,7 +922,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
 /* V3 */
 #if 0
         PINT_cached_config_get_server_name(server_name, 1024,
-            attr_p->u.dir.dirdata_handles[i], s_op->u.crdirent.fs_id);
+            attr_p->u.dir.dirdata_handles[i], s_op->req->u.crdirent.fs_id);
         if (strcmp(server_config->host_id, server_name))
 #endif
 
@@ -1050,7 +1051,7 @@ static PINT_sm_action crdirent_remove_local_copies(struct PINT_smcb *smcb,
                    TROVE_KEYVAL_DIRECTORY_ENTRY;
 
     ret = job_trove_keyval_remove_list(s_op->req->u.crdirent.fs_id,
-                                       s_op->u.crdirent.dirdata_handle,
+                                       s_op->req->u.crdirent.dirdata_handle,
                                        s_op->key_a,
                                        s_op->val_a,
                                        s_op->error_a,
@@ -1158,7 +1159,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
         memset(msgarray_op, 0, sizeof(PINT_sm_msgarray_op));
 
         /*parameters are setup like a client except for job_context*/
-        PINT_serv_init_msgarray_params(s_op,s_op->u.crdirent.fs_id);
+        PINT_serv_init_msgarray_params(s_op,s_op->req->u.crdirent.fs_id);
 
         /*allocate a mspair_state structure for each message to be sent.*/
         gossip_debug(GOSSIP_SERVER_DEBUG,

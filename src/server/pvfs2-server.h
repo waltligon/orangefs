@@ -394,8 +394,11 @@ typedef struct
 
 struct PINT_server_crdirent_op
 {
+#if 0
     PVFS_credential credential;
+#endif
     PVFS_capability capability;
+#if 0
     char *name;
     PVFS_handle new_handle;     /* handle of new entry */
     PVFS_SID   *new_sid;        /* sids of new entry */
@@ -407,6 +410,7 @@ struct PINT_server_crdirent_op
     PVFS_SID   *dirdata_sid;    /* sids of dirdata we write dirent to */
     PVFS_size   dirent_count;   /* number of dirents in target dirdata */
     PVFS_size   sid_count;      /* All should be the metadata const */
+#endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
