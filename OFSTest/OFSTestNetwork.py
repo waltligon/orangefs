@@ -18,9 +18,6 @@ import os
 import OFSTestNode
 import OFSTestLocalNode 
 import OFSTestRemoteNode 
-import OFSCloudConnectionManager
-import OFSEC2ConnectionManager
-import OFSNovaConnectionManager
 import Queue
 import threading
 import time
@@ -192,6 +189,10 @@ class OFSTestNetwork(object):
     
     
     def addCloudConnection(self,cloud_config_file,key_name,key_location,cloud_type="EC2",nova_password_file=None):
+        
+        import OFSCloudConnectionManager
+        import OFSEC2ConnectionManager
+        import OFSNovaConnectionManager
         #This function initializes the cloud connection
         self.cloud_type = cloud_type
         if (cloud_type == 'EC2'):
