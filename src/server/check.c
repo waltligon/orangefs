@@ -213,7 +213,6 @@ int PINT_perm_check(struct PINT_server_op *s_op)
 {
     PVFS_capability *cap = &s_op->req->capability;
     PVFS_handle handle;
-    PVFS_fs_id fs_id;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL, i;
     char op_mask[16];
@@ -240,22 +239,13 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                                s_op->addr);
         if (ret < 0)
         {
-            return ret;
+            goto PINT_perm_check_exit;
         }
     }
 
-    /* do not check handles for null caps and certain operations */
-    if (!PINT_capability_is_null(cap) &&
-        s_op->req->op != PVFS_SERV_CREATE &&
-        s_op->req->op != PVFS_SERV_MKDIR &&
-        s_op->req->op != PVFS_SERV_BATCH_CREATE &&
-        s_op->req->op != PVFS_SERV_MGMT_SETPARAM &&
-        s_op->req->op != PVFS_SERV_TREE_GET_FILE_SIZE &&
-        s_op->req->op != PVFS_SERV_TREE_GETATTR)
-    {        
-        /* get object handle */
-        PINT_server_req_get_object_ref(s_op->req, &fs_id, &handle);
-
+    /* do not check handles for null caps */
+    if (!PINT_capability_is_null(cap))
+    {                
         switch (s_op->req->op)
         {
             /* remove ops use parent handle from hint */
@@ -269,38 +259,43 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                 {
                     gossip_err("%s: could not retrieve parent/metafile handle "
                                "from hint\n", __func__);
-                    return -PVFS_EINVAL;
+                    ret = -PVFS_EINVAL;
+                    goto PINT_perm_check_exit;
                 }
                 break;
             default:
+                handle = s_op->target_handle;
                 break;
         }
-
+/* TODO: remove
         if (handle == PVFS_HANDLE_NULL || fs_id == PVFS_FS_ID_NULL)
         {
             gossip_err("%s: operation %d has no handle/fs_id\n", __func__,
                        (int) s_op->req->op);
             return -PVFS_EINVAL;
         }
-
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: using operation handle %llu\n",
-                     __func__, llu(handle));
-
-        /* ensure we have a capability for the target handle */
-        for (i = 0; i < cap->num_handles; i++)
+*/
+        if (handle != PVFS_HANDLE_NULL)
         {
-            if (cap->handle_array[i] == handle)
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: using operation handle %llu\n",
+                         __func__, llu(handle));
+
+            /* ensure we have a capability for the target handle */
+            for (i = 0; i < cap->num_handles; i++)
             {
-                break;
+                if (cap->handle_array[i] == handle)
+                {
+                    break;
+                }
             }
-        }
-        if (i == cap->num_handles)
-        {
-            
-            gossip_err("%s: attempted to perform an operation on target "
-                       "handle %llu that was not in the capability\n", 
-                       __func__, llu(handle));
-            return -PVFS_EACCES;
+            if (i == cap->num_handles)
+            {
+                 gossip_err("%s: attempted to perform an operation on target "
+                           "handle %llu that was not in the capability\n", 
+                           __func__, llu(handle));
+                 ret = -PVFS_EACCES;
+                 goto PINT_perm_check_exit;
+            }
         }
     }
 
@@ -311,6 +306,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
 
     ret = perm_fun(s_op);
 
+PINT_perm_check_exit:
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: returning %d\n", __func__, ret);
 
     return ret;

@@ -1493,8 +1493,15 @@ DOTCONF_CB(enter_defaults_context)
 {
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
+    const char *error = NULL;
     config_s->configuration_context = CTX_DEFAULTS;
 
+    /* We initialize security defaults here also, so they are set even
+       if the <Security> context is omitted. */
+    if ((error = PINT_dotconf_set_defaults(cmd->configfile, CTX_SECURITY)))
+    {
+        return error;
+    }
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_DEFAULTS);
 }
 
@@ -1514,7 +1521,8 @@ DOTCONF_CB(enter_security_context)
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
 
-    return PINT_dotconf_set_defaults(cmd->configfile, CTX_SECURITY);
+    /* note: defaults set in enter_defaults_context */
+    return NULL;
 }
 
 DOTCONF_CB(exit_security_context)

@@ -93,16 +93,8 @@ static PINT_sm_action msgpair_retry_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    /* the capability may need to be refreshed */
-    if (s_op->u.precreate_pool_refiller.capability.timeout <=
-        PINT_util_get_current_time())
-    {
-        js_p->error_code = STATE_RESET;
-        return SM_ACTION_COMPLETE;
-    }
-
     /* signal anyone waiting on get_handles() that we are having trouble */
-    return(job_precreate_pool_fill_signal_error(
+    job_precreate_pool_fill_signal_error(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         js_p->error_code,
@@ -110,7 +102,16 @@ static PINT_sm_action msgpair_retry_fn(
         0,
         js_p,
         &tmp_id,
-        server_job_context));
+        server_job_context);
+
+    /* the capability may need to be refreshed */
+    if (s_op->u.precreate_pool_refiller.capability.timeout <=
+        PINT_util_get_current_time())
+    {
+        js_p->error_code = STATE_RESET;
+    }
+
+    return SM_ACTION_COMPLETE;
 }
 
 /* wait_for_threshold_fn()
@@ -266,10 +267,6 @@ static PINT_sm_action setup_fn(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-
-    /* TODO: temp */
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap timeout is %llu\n", __func__,
-                 llu(cap->timeout));
         
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));

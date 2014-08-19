@@ -241,6 +241,13 @@ int PINT_client_capcache_get_cached_entry(
     {
         return -PVFS_EINVAL;
     }
+
+    /* TODO: review 
+       return if not enabled */
+    if (!client_capcache->enable)
+    {
+        return -PVFS_ENOENT;
+    }
   
     gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache lookup: H=%llu "
                  "uid=%d\n", llu(refn.handle), uid);
@@ -300,6 +307,12 @@ void PINT_client_capcache_invalidate(
     struct client_capcache_key key;
     struct PINT_tcache_entry *tmp_entry;
     int tmp_status;
+
+    /* return if not enabled */
+    if (!client_capcache->enable)
+    {
+        return;
+    }
   
     gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: H=%llu uid=%d\n",
                  __func__, llu(refn.handle), uid);
@@ -351,6 +364,12 @@ int PINT_client_capcache_update(
         return -PVFS_EINVAL;
     }
 
+    /* return if not enabled */
+    if (!client_capcache->enable)
+    {
+        return 0;
+    }
+
     gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: H=%llu "
                  "uid=%d\n", llu(refn.handle), uid);
 
@@ -395,19 +414,25 @@ int PINT_client_capcache_update(
 
     if (ret == 0)
     {
+        /* TODO: remove */
         PVFS_time tmp_timeout;
 
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: entry "
                      "found\n");
-        
+
         /* only update the entry if the timeout is newer */
+/* TODO: always update */
+#if 0        
         ret = -1;
         tmp_timeout = ((struct client_capcache_payload *) 
                        tmp_entry->payload)->cap.timeout;
         if (cap->timeout > tmp_timeout)
         {
+#endif
             ret = PINT_tcache_delete(client_capcache, tmp_entry);
+#if 0
         }
+#endif
 
         if (ret == 0)
         {
