@@ -414,25 +414,11 @@ int PINT_client_capcache_update(
 
     if (ret == 0)
     {
-        /* TODO: remove */
-        PVFS_time tmp_timeout;
 
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: entry "
                      "found\n");
 
-        /* only update the entry if the timeout is newer */
-/* TODO: always update */
-#if 0        
-        ret = -1;
-        tmp_timeout = ((struct client_capcache_payload *) 
-                       tmp_entry->payload)->cap.timeout;
-        if (cap->timeout > tmp_timeout)
-        {
-#endif
-            ret = PINT_tcache_delete(client_capcache, tmp_entry);
-#if 0
-        }
-#endif
+        ret = PINT_tcache_delete(client_capcache, tmp_entry);
 
         if (ret == 0)
         {
@@ -459,6 +445,11 @@ int PINT_client_capcache_update(
             ret = PINT_tcache_insert_entry_ex(client_capcache, &key, tmp_payload,
                                               &timev, &purged);
 
+            if (ret < 0)
+            {
+                gossip_err("%s: error inserting client_capcache entry: %d\n",
+                           __func__, ret);
+            }
 
             if (ret == 0)
             {
@@ -466,14 +457,6 @@ int PINT_client_capcache_update(
                 PINT_perf_count(client_capcache_pc, PERF_CLIENT_CAPCACHE_UPDATES,
                                 1, PINT_PERF_ADD);
             }
-        }
-        else if (ret == -1)
-        {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: "
-                         "ignoring update as timeout is not later "
-                         "(%llu <= %llu)\n",
-                         llu(cap->timeout), llu(tmp_timeout));
-            ret = 0;
         }
         else
         {

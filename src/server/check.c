@@ -41,11 +41,6 @@ static int check_mode(enum access_type access, PVFS_uid userid,
 static int check_acls(void *acl_buf, size_t acl_size, 
     const PVFS_object_attr *attr, PVFS_uid uid, PVFS_gid *group_array, 
     uint32_t num_groups, int want);
-static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
-    PVFS_BMI_addr_t client_addr);
-static int permit_operation(PVFS_fs_id fsid,
-    enum PINT_server_req_access_type access_type, PVFS_BMI_addr_t client_addr);
-
 
 /* PINT_get_capabilities
  *
@@ -227,20 +222,6 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                    "function\n", __func__);
 
         return -PVFS_EINVAL;
-    }
-
-    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
-    {
-        /*
-         * if we are exporting a volume readonly, disallow any operation 
-         * that modifies the state of the file-system.
-         */
-        ret = permit_operation(s_op->target_fs_id, s_op->access_type,
-                               s_op->addr);
-        if (ret < 0)
-        {
-            goto PINT_perm_check_exit;
-        }
     }
 
     /* do not check handles for null caps */
@@ -553,70 +534,6 @@ check_perm:
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EACCES\n",
                  __func__);
     return -PVFS_EACCES;
-}
-
-/*
- * Return zero if this operation should be allowed.
- */
-static int permit_operation(PVFS_fs_id fsid,
-                            enum PINT_server_req_access_type access_type,
-                            PVFS_BMI_addr_t client_addr)
-{ 
-    int exp_flags = 0; 
-    struct server_configuration_s *serv_config = NULL;
-    struct filesystem_configuration_s * fsconfig = NULL;
-
-    if (access_type == PINT_SERVER_REQ_READONLY)
-    {
-        return 0;  /* anything that doesn't modify state is okay */
-    }
-    serv_config = PINT_get_server_config();
-    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
-
-    if (fsconfig == NULL)
-    {
-        return 0;
-    }
-    exp_flags = fsconfig->exp_flags;
-
-    /* cheap test to see if ReadOnly was even specified in the exportoptions */
-    if (!(exp_flags & TROVE_EXP_READ_ONLY))
-    {
-        return 0;
-    }
-    /* Drat. Iterate thru the list of wildcards specified in 
-     * server_configuration and see if the client address matches. 
-     * If yes, then we deny permission.
-     */
-    if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
-                     "Disallowing read-write operation on a read-only" 
-                     "exported file-system\n");
-        return -EROFS;
-    }
-
-    return 0;
-}
-
-static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
-                                PVFS_BMI_addr_t client_addr)
-{
-    int i;
-
-    for (i = 0; i < fsconfig->ro_count; i++)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
-                     lld(client_addr), fsconfig->ro_hosts[i]);
-        /* Does the client address match the wildcard specification and/or 
-           the netmask specification? */
-        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
-                fsconfig->ro_netmasks[i]) == 1)
-        {
-            return 1;
-        }
-    }
-    return 0;
 }
 
 /*

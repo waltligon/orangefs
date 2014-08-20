@@ -368,6 +368,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                  __func__,
                  llu(object_ref.handle), object_ref.fs_id);
 
+    /* TODO: debugging */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: called on behalf of %s\n",
+                 __func__, PINT_client_get_name_str(smcb->op));
+
     /* The sys attr mask request is converted to object
      * attr mask values for comparison with the cached
      */
@@ -386,6 +390,13 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
       )
     {
         sm_p->getattr.req_attrmask |= PVFS_ATTR_DISTDIR_ATTR;
+    }
+
+    /* we need dfile/distdir handles if a capability is requested */
+    if(sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        sm_p->getattr.req_attrmask |= 
+            (PVFS_ATTR_META_DFILES|PVFS_ATTR_DISTDIR_ATTR);
     }
 
 #if 0
@@ -753,11 +764,19 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     attr = &sm_p->getattr.attr;
 
+    /* TODO: debugging */
+    if (attr->mask & PVFS_ATTR_CAPABILITY)
+    {
+        PINT_debug_capability(&attr->capability, "getattr received cap:");
+    }
+
     if (sm_p->getattr.flags & PINT_SM_GETATTR_CAPCACHE_HIT)
     {
         /* add back in capability flag (already stored in attr) */
         attr->mask |= PVFS_ATTR_CAPABILITY;
+        PINT_debug_capability(&attr->capability, "getattr used cached cap:");
     }
+    /*** TODO ***/
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
