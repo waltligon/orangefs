@@ -378,6 +378,10 @@ int PINT_acache_get_cached_entry(
                                  __func__,
                                  lld(*size));
                 }
+#if 0
+/* This information needs to be updated each time we create or remove
+   a directory entry. For now just go to the server rather than using
+   the cached value. */
                 if(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
                 {
                     assert(tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY);
@@ -401,6 +405,7 @@ int PINT_acache_get_cached_entry(
 
                     *size_array_status = 0;
                 }
+#endif
             }
         }
     }
