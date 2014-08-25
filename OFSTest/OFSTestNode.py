@@ -2291,7 +2291,7 @@ class OFSTestNode(object):
         self.changeDirectory(self.ofs_installation_location)
         #print self.runSingleCommand("pwd")
         # initialize the storage
-        
+    
         '''
         Change the following shell command to python
         
@@ -2306,7 +2306,6 @@ class OFSTestNode(object):
         
         
         print "Attempting to start OFSServer for host %s" % self.hostname
-        
         self.setEnvironmentVariable("LD_LIBRARY_PATH",self.db4_lib_dir+":"+self.ofs_installation_location+"/lib:")
 
 
