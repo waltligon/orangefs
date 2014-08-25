@@ -219,11 +219,17 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
 static void pvfs2_destroy_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    char *s;
 
     if (pvfs2_inode)
     {
-        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_destroy_inode: deallocated %p destroying inode %llu\n",
-                    pvfs2_inode, llu(get_handle_from_ino(inode)));
+        s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+        gossip_debug(GOSSIP_SUPER_DEBUG,
+                     "pvfs2_destroy_inode: deallocated %p "
+                     "destroying inode %s\n",
+                     pvfs2_inode,
+                     k2s(get_khandle_from_ino(inode),s));
+        kfree(s);
 
         atomic_inc(&(PVFS2_SB(inode->i_sb)->pvfs2_inode_dealloc_count));
         pvfs2_inode_finalize(pvfs2_inode);
@@ -236,9 +242,13 @@ void pvfs2_read_inode(
 {
     int ret;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %llu | ct = %d)\n",
-                pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+    gossip_debug(GOSSIP_SUPER_DEBUG,
+                 "pvfs2_read_inode: %p (inode = %s | ct = %d)\n",
+                 pvfs2_inode,
+                 k2s(get_khandle_from_ino(inode),s),
+                 (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -259,10 +269,20 @@ void pvfs2_read_inode(
     if ((ret=pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT)) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
-        gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %di | ct = %d)\n",
-                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count),ret);
+        memset(s,0,HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_SUPER_DEBUG,
+                     "%s:%s:%d calling make bad inode - [%p] "
+                     "(inode = %s | ct = %di | ct = %d)\n",
+                     __FILE__,
+                     __func__,
+                     __LINE__,
+                     pvfs2_inode,
+                     k2s(get_khandle_from_ino(inode),s),
+                     (int)atomic_read(&inode->i_count),
+                     ret);
         pvfs2_make_bad_inode(inode);
     }
+    kfree(s);
 }
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
@@ -272,6 +292,7 @@ void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
     void *ptr = NULL;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
 #if !defined(HAVE_IGET4_LOCKED) && !defined(HAVE_IGET_LOCKED)
     if (inode->u.generic_ip)
@@ -303,31 +324,52 @@ void pvfs2_read_inode(
 #endif
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
-            gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
-                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+            gossip_debug(GOSSIP_SUPER_DEBUG,
+                         "%s:%s:%d calling make bad inode - [%p] "
+                         "(inode = %s | ct = %d)\n",
+                         __FILE__,
+                         __func__,
+                         __LINE__,
+                         pvfs2_inode,
+                         k2s(get_khandle_from_ino(inode),s),
+                         (int)atomic_read(&inode->i_count));
             pvfs2_make_bad_inode(inode);
         }
         else {
-            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: pvfs2_read_inode: allocated %p (inode = %llu | "
-                    "ct = %d)\n", pvfs2_inode, llu(get_handle_from_ino(inode)),
-                                  (int)atomic_read(&inode->i_count));
+            gossip_debug(GOSSIP_SUPER_DEBUG,
+                         "pvfs2: pvfs2_read_inode: allocated %p "
+                         "(inode = %s | ct = %d)\n",
+                         pvfs2_inode,
+                         k2s(get_khandle_from_ino(inode),s),
+                         (int)atomic_read(&inode->i_count));
         }
     }
     else
     {
-        gossip_err("%s:%s:%d Could not allocate pvfs2_inode from pvfs2_inode_cache."
-            "calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
-            __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+        gossip_err("%s:%s:%d "
+                   "Could not allocate pvfs2_inode from pvfs2_inode_cache. "
+                   "calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+                   __FILE__,
+                   __func__,
+                   __LINE__,
+                   pvfs2_inode,
+                   k2s(get_khandle_from_ino(inode),s),
+                   (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
+    kfree(s);
 }
 
 static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_clear_inode: deallocated %p, destroying inode %llu\n",
-                pvfs2_inode, llu(get_handle_from_ino(inode)));
+    gossip_debug(GOSSIP_SUPER_DEBUG,
+                 "pvfs2_clear_inode: deallocated %p, destroying inode %llu\n",
+                 pvfs2_inode,
+                 k2s(get_khandle_from_ino(inode),s));
+    kfree(s);
 
     pvfs2_inode_finalize(pvfs2_inode);
     pvfs2_inode_release(pvfs2_inode);
@@ -342,9 +384,16 @@ static void pvfs2_put_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_put_inode: pvfs2_inode: %p (inode = %llu) = %d (nlink=%d)\n",
-                pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count),
-                (int)inode->i_nlink);
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+
+    gossip_debug(GOSSIP_SUPER_DEBUG,
+                 "pvfs2_put_inode: pvfs2_inode: %p "
+                 "(inode = %s) = %d (nlink=%d)\n",
+                 pvfs2_inode,
+                 k2s(get_khandle_from_ino(inode),s),
+                 (int)atomic_read(&inode->i_count),
+                 (int)inode->i_nlink);
+    kfree(s);
 
     if (atomic_read(&inode->i_count) == 1)
     {
@@ -903,7 +952,12 @@ static void pvfs2_dirty_inode(struct inode *inode
     if (inode)
     {
         pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_dirty_inode: %llu\n", llu(get_handle_from_ino(inode)));
+        char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+
+        gossip_debug(GOSSIP_SUPER_DEBUG,
+                     "pvfs2_dirty_inode: %s\n",
+                     k2s(get_khandle_from_ino(inode),s));
+        kfree(s);
         SetAtimeFlag(pvfs2_inode);
     }
     return;
@@ -957,7 +1011,8 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     pvfs2_kernel_op_t *new_op = NULL;
     char *dev_name = NULL;
     int ret = -EINVAL;
-    PVFS_object_ref root_object;
+    PVFS_object_kref root_object;
+    char *s;
 
     if (!data || !sb)
     {
@@ -1016,31 +1071,38 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
     }
 
     if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
-        (new_op->downcall.resp.fs_mount.root_handle ==
-         PVFS_HANDLE_NULL))
+        (new_op->downcall.resp.fs_mount.root_khandle.slice[0] +
+         new_op->downcall.resp.fs_mount.root_khandle.slice[3] == 0))
     {
-        gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
+        gossip_err("ERROR: retrieved null fs_id or root_handle\n");
         ret = -EINVAL;
         goto error_exit;
     }
 
-    PVFS2_SB(sb)->root_handle = new_op->downcall.resp.fs_mount.root_handle;
+    PVFS2_SB(sb)->root_khandle = new_op->downcall.resp.fs_mount.root_khandle;
     PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
     PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
 
     sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
+#ifdef HAVE_D_SET_D_OP
+    sb->s_d_op = &pvfs2_dentry_operations;
+#endif
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = (unsigned long long) 1 << 63;
 
-    root_object.handle = PVFS2_SB(sb)->root_handle;
+    root_object.khandle = PVFS2_SB(sb)->root_khandle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
 
-    gossip_debug(GOSSIP_SUPER_DEBUG, "get inode %llu, fsid %d\n",
-                 root_object.handle, root_object.fs_id);
+    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    gossip_debug(GOSSIP_SUPER_DEBUG,
+                 "get inode %s, fsid %d\n",
+                 k2s(&(root_object.khandle),s),
+                 root_object.fs_id);
+    kfree(s);
     /* alloc and initialize our root directory inode by explicitly requesting
      * the sticky bit to be set */
     root = pvfs2_get_custom_core_inode(sb,
@@ -1064,9 +1126,7 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
         ret = -ENOMEM;
         goto error_exit;
     }
-#ifdef HAVE_D_SET_D_OP
-    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
-#else
+#ifndef HAVE_D_SET_D_OP
     root_dentry->d_op = &pvfs2_dentry_operations;
 #endif
     sb->s_root = root_dentry;
@@ -1113,20 +1173,24 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
                                   struct fid *fid,
                                   int fh_len, int fh_type)
 {
-   PVFS_object_ref refn;
+   PVFS_object_kref refn;
    struct inode *inode;
    struct dentry *dentry;
+   char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
-   if (fh_len < 3 || fh_type > 2) 
+   if (fh_len < 5 || fh_type > 2) 
    {
       return NULL;
    }
 
-   refn.handle = (u64) (fid->raw[0]) << 32;
-   refn.handle |= (u32) fid->raw[1];
-   refn.fs_id  = (u32) fid->raw[2];
-   gossip_debug(GOSSIP_SUPER_DEBUG, "fh_to_dentry: handle %llu, fs_id %d\n",
-                refn.handle, refn.fs_id);
+   PVFS_khandle_from(&(refn.khandle), fid->raw, 16);
+   refn.fs_id = (u32) fid->raw[4];
+
+   gossip_debug(GOSSIP_SUPER_DEBUG,
+                "fh_to_dentry: handle %s, fs_id %d\n",
+                k2s(&(refn.khandle),s),
+                refn.fs_id);
+   kfree(s);
 
    inode = pvfs2_iget(sb, &refn);
 
@@ -1153,11 +1217,10 @@ struct dentry *pvfs2_fh_to_dentry(struct super_block *sb,
    }
 #endif
 
-#ifdef HAVE_D_SET_D_OP
-   d_set_d_op(dentry, &pvfs2_dentry_operations);
-#else
+#ifndef HAVE_D_SET_D_OP
    dentry->d_op = &pvfs2_dentry_operations;
 #endif
+
    return dentry;
 }
 #endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
@@ -1172,30 +1235,34 @@ int pvfs2_encode_fh(struct dentry *dentry,
    struct inode *inode = dentry->d_inode;
    int len = *max_len;
    int type = 1;
-   PVFS_object_ref handle;
+   PVFS_object_kref refn;
    u32 generation;
+   char *s;
 
    /*
     * if connectable is specified, parent handle identity has to be stashed
     * as well.
     */
-   if (len < 3 || (connectable && len < 6))
+   if (len < 5 || (connectable && len < 10))
    {
       gossip_lerr("fh buffer is too small for encoding\n");
       type = 255;
       goto out;
    }
 
-   handle = PVFS2_I(inode)->refn;
+   refn = PVFS2_I(inode)->refn;
    generation = inode->i_generation;
+   s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
    gossip_debug(GOSSIP_SUPER_DEBUG,
-                "Encoding fh: handle %llu, gen %u, fsid %u\n",
-                handle.handle, generation, handle.fs_id);
+                "Encoding fh: handle %s, gen %u, fsid %u\n",
+                k2s(&(refn.khandle),s),
+                generation,
+                refn.fs_id);
+   kfree(s);
 
-   len = 3;
-   fh[0] = handle.handle >> 32;
-   fh[1] = handle.handle & 0xffffffff;
-   fh[2] = handle.fs_id;
+   len = 5;
+   PVFS_khandle_to(&refn.khandle, fh, 16);
+   fh[4] = refn.fs_id;
 
    if (connectable && !S_ISDIR(inode->i_mode))
    {
@@ -1204,18 +1271,21 @@ int pvfs2_encode_fh(struct dentry *dentry,
       spin_lock(&dentry->d_lock);
 
       parent = dentry->d_parent->d_inode;
-      handle = PVFS2_I(parent)->refn;
+      refn = PVFS2_I(parent)->refn;
       generation = parent->i_generation;
-      fh[3] = handle.handle >> 32;
-      fh[4] = handle.handle & 0xffffffff;
-      fh[5] = handle.fs_id;
+      PVFS_khandle_to(&refn.khandle, (char *) fh + 20, 16);
+      fh[9] = refn.fs_id;
 
       spin_unlock(&dentry->d_lock);
       len = 6;
       type = 2;
+      memset(s,0,HANDLESTRINGSIZE);
       gossip_debug(GOSSIP_SUPER_DEBUG,
-                   "Encoding parent: handle %llu, gen %u, fsid %u\n",
-                   handle.handle, generation, handle.fs_id);
+                   "Encoding parent: handle %s, gen %u, fsid %u\n",
+                   k2s(&(refn.khandle),s),
+                   generation,
+                   refn.fs_id);
+      kfree(s);
    }
    *max_len = len;
 
@@ -1228,9 +1298,10 @@ int pvfs2_encode_fh(struct inode *inode,
                     int *max_len,
                     struct inode *parent)
 {
-   int len = parent ? 6 : 3;
+   int len = parent ? 10 : 5;
    int type = 1;
-   PVFS_object_ref handle;
+   PVFS_object_kref refn;
+   char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
    if (*max_len < len) {
      gossip_lerr("fh buffer is too small for encoding\n");
@@ -1239,30 +1310,33 @@ int pvfs2_encode_fh(struct inode *inode,
      goto out;
    }
 
-   handle = PVFS2_I(inode)->refn;
-   gossip_debug(GOSSIP_SUPER_DEBUG,
-                "Encoding fh: handle %llu, fsid %u\n",
-                handle.handle, handle.fs_id);
+   refn = PVFS2_I(inode)->refn;
+   PVFS_khandle_to(&refn.khandle, fh, 16);
+   fh[4] = refn.fs_id;
 
-   fh[0] = handle.handle >> 32;
-   fh[1] = handle.handle & 0xffffffff;
-   fh[2] = handle.fs_id;
+   memset(s,0,HANDLESTRINGSIZE);
+   gossip_debug(GOSSIP_SUPER_DEBUG,
+                "Encoding fh: handle %s, fsid %u\n",
+                k2s(&refn.khandle,s),
+                refn.fs_id);
 
    if (parent)
    {
-      handle = PVFS2_I(parent)->refn;
-      fh[3] = handle.handle >> 32;
-      fh[4] = handle.handle & 0xffffffff;
-      fh[5] = handle.fs_id;
+      refn = PVFS2_I(parent)->refn;
+      PVFS_khandle_to(&refn.khandle, (char *) fh + 20, 16);
+      fh[9] = refn.fs_id;
 
       type = 2;
+      memset(s,0,HANDLESTRINGSIZE);
       gossip_debug(GOSSIP_SUPER_DEBUG,
-                   "Encoding parent: handle %llu, fsid %u\n",
-                   handle.handle, handle.fs_id);
+                   "Encoding parent: handle %s, fsid %u\n",
+                   k2s(&refn.khandle,s),
+                   refn.fs_id);
    }
    *max_len = len;
 
 out:
+   kfree(s);
    return type;
 }
 #endif /* PVFS_ENCODE_FS_USES_DENTRY */
@@ -1286,7 +1360,8 @@ int pvfs2_fill_sb(struct super_block *sb,
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
     pvfs2_mount_sb_info_t *mount_sb_info = (pvfs2_mount_sb_info_t *)data;
-    PVFS_object_ref root_object;
+    PVFS_object_kref root_object;
+    char *s;
 
     /* alloc and init our private pvfs2 sb info */
     sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
@@ -1297,7 +1372,7 @@ int pvfs2_fill_sb(struct super_block *sb,
     memset(sb->s_fs_info, 0, sizeof(pvfs2_sb_info_t));
     PVFS2_SB(sb)->sb = sb;
 
-    PVFS2_SB(sb)->root_handle = mount_sb_info->root_handle;
+    PVFS2_SB(sb)->root_khandle = mount_sb_info->root_khandle;
     PVFS2_SB(sb)->fs_id = mount_sb_info->fs_id;
     PVFS2_SB(sb)->id = mount_sb_info->id;
 
@@ -1327,16 +1402,23 @@ int pvfs2_fill_sb(struct super_block *sb,
 #endif
     sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
+#ifdef HAVE_D_SET_D_OP
+    sb->s_d_op = &pvfs2_dentry_operations;
+#endif
     sb->s_type = &pvfs2_fs_type;
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
-    root_object.handle = PVFS2_SB(sb)->root_handle;
+    root_object.khandle = PVFS2_SB(sb)->root_khandle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
-    gossip_debug(GOSSIP_SUPER_DEBUG, "get inode %llu, fsid %d\n",
-                 root_object.handle, root_object.fs_id);
+    s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    gossip_debug(GOSSIP_SUPER_DEBUG,
+                 "get inode %s, fsid %d\n",
+                 k2s(&(root_object.khandle),s),
+                 root_object.fs_id);
+    kfree(s);
     /* alloc and initialize our root directory inode. be explicit about sticky
      * bit */
     root = pvfs2_get_custom_core_inode(sb,
@@ -1363,11 +1445,6 @@ int pvfs2_fill_sb(struct super_block *sb,
         iput(root);
         return -ENOMEM;
     }
-#ifdef HAVE_D_SET_D_OP
-    d_set_d_op(root_dentry, &pvfs2_dentry_operations);
-#else
-    root_dentry->d_op = &pvfs2_dentry_operations;
-#endif
 
     sb->s_export_op = &pvfs2_export_ops;
     sb->s_root = root_dentry;
@@ -1433,8 +1510,8 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
         }
 
         if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
-            (new_op->downcall.resp.fs_mount.root_handle ==
-             PVFS_HANDLE_NULL))
+            (new_op->downcall.resp.fs_mount.root_khandle.slice[0] +
+             new_op->downcall.resp.fs_mount.root_khandle.slice[3] == 0))
         {
             gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
             ret = -EINVAL;
@@ -1443,7 +1520,8 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 
         /* fill in temporary structure passed to fill_sb method */
         mount_sb_info.data = data;
-        mount_sb_info.root_handle = new_op->downcall.resp.fs_mount.root_handle;
+        mount_sb_info.root_khandle =
+          new_op->downcall.resp.fs_mount.root_khandle;
         mount_sb_info.fs_id = new_op->downcall.resp.fs_mount.fs_id;
         mount_sb_info.id = new_op->downcall.resp.fs_mount.id;
 

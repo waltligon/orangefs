@@ -178,6 +178,10 @@ static PINT_sm_action small_io_setup_msgpairs(struct PINT_smcb *smcb,
             PINT_free_request_state(mem_req_state);
         }
 
+        /* send metafile handle as a hint for capability verification */
+        PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle),
+                      &sm_p->object_ref.handle);
+
         /* if this is a write operation, the appropriate offset and size
          * arrays will have been filled in by the request processing above.
          * reads don't require processing of the memory request until

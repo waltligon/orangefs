@@ -178,7 +178,6 @@ static PINT_sm_action setattr_verify_attribs(
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     /* debug request attrs */
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t");
     if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
     {
         if (req_a_p->owner == PVFS_UID_MAX)
@@ -211,10 +210,10 @@ static PINT_sm_action setattr_verify_attribs(
     {
         strcpy(gstr, "(none)");
     }
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "[owner = %s, group = %s, "
-                 "perms = %o, type = %d]\n", ostr, gstr, 
-                 (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
-                 (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t"
+        "[owner = %s, group = %s, perms = %o, type = %d]\n", ostr, gstr, 
+        (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
+        (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
 
     /*
       here we're enforcing that no one can change the type of the
@@ -488,7 +487,7 @@ static PINT_sm_action setattr_setobj_attribs(
         gossip_debug(GOSSIP_SETATTR_DEBUG, " request has dfile_count of "
                      "%d | dspace has %d\n",
                      s_op->req->u.setattr.attr.u.meta.dfile_count,
-                     s_op->attr.u.meta.dfile_count);
+                     a_p->u.meta.dfile_count);
 
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
                      "disk\n", dspace_a_p->u.meta.dfile_count);
@@ -515,7 +514,7 @@ static PINT_sm_action setattr_setobj_attribs(
         if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
-            js_p->error_code = -PVFS_EPERM;
+            js_p->error_code = -PVFS_EACCES;
             return SM_ACTION_COMPLETE;
         }
     }
@@ -998,7 +997,7 @@ static int perm_setattr(PINT_server_op *s_op)
                 gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG), 
                              "%s: no permissions to set attr 0x%x\n", __func__, 
                              perm_table[i][PERM_TABLE_ATTR]);
-                return -PVFS_EPERM;
+                return -PVFS_EACCES;
             }
         }
     }

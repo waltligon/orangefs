@@ -103,14 +103,14 @@ static int load_public_keys(const char*);
  *    
  *  returns PVFS_EALREADY if already initialized
  *  returns PVFS_EIO if key file is missing or invalid
- *  returns 0 on sucess
+ *  returns 0 on success
  */
 int PINT_security_initialize(void)
 {
     const struct server_configuration_s *config = PINT_get_server_config();
     int ret;
 #ifdef ENABLE_SECURITY_KEY
-    PINT_llist_p l;
+    PINT_llist_p host_aliases;
     host_alias_s *host_alias;
     char buf[HOST_NAME_MAX+2];
 #endif
@@ -142,6 +142,7 @@ int PINT_security_initialize(void)
         return ret;
     }    
 
+    /* check for ServerKey */
     PINT_SECURITY_CHECK_NULL(config->serverkey_path, init_error,
                              "ServerKey not defined in configuration file... "
                              "aborting\n");
@@ -176,25 +177,25 @@ int PINT_security_initialize(void)
         return -PVFS_EIO;
     }
 
-    l = config->host_aliases;
-    if (!PINT_llist_empty(l))
-        do {
-            if (PINT_llist_empty(l))
-                break;
-            host_alias = PINT_llist_head(l);
-            snprintf(buf, HOST_NAME_MAX+2, "S:%s",
-                     host_alias->host_alias);
-            if (SECURITY_lookup_pubkey(buf) == NULL) {
-                gossip_err("Could not find public key for alias "
-                           "'%s'\n", buf);
+    host_aliases = config->host_aliases;
+    while (host_aliases) {
+        host_alias = PINT_llist_head(host_aliases);
+        if (host_alias)
+        {
+            snprintf(buf, HOST_NAME_MAX+2, "S:%s", host_alias->host_alias);
+            if (SECURITY_lookup_pubkey(buf) == NULL)
+            {
+                gossip_err("Could not find public key for alias '%s'\n", buf);
                 SECURITY_hash_finalize();
                 EVP_cleanup();
                 ERR_free_strings();
                 cleanup_threading();
                 gen_mutex_unlock(&security_init_mutex);
-                return -PVFS_EIO;
+                return -PVFS_ENXIO;
             }
-        } while ((l = PINT_llist_next(l)));
+        }
+        host_aliases = PINT_llist_next(host_aliases);
+    }
 
 #elif ENABLE_SECURITY_CERT
 
@@ -420,7 +421,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     /* cap->issuer is set in get-attr.sm in the server. */
 
-    cap->timeout = PINT_util_get_current_time() + config->security_timeout;
+    cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
 
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
     {
@@ -501,9 +502,12 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
         return -PVFS_ENOMEM;
     }
 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Generating server-to-server "
+                 "capability...\n");
     capability->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (capability->issuer == NULL)
     {
+        PINT_cleanup_capability(capability);
         return -PVFS_ENOMEM;
     }
     strcpy(capability->issuer, "S:");
@@ -511,7 +515,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
 
     capability->fsid = fs_id;
     capability->timeout =
-        PINT_util_get_current_time() + config->security_timeout;
+        PINT_util_get_current_time() + config->capability_timeout;
     capability->op_mask = ~((uint32_t)0);
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
@@ -519,6 +523,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     ret = PINT_sign_capability(capability);
     if (ret < 0)
     {
+        PINT_cleanup_capability(capability);
         return -PVFS_EINVAL;
     }
     return 0;
@@ -553,6 +558,8 @@ int PINT_verify_capability(const PVFS_capability *cap)
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Verified null capability\n");
         return 1;
     }
+
+    PINT_debug_capability(cap, "Verifying");
 
     /* if capability has timed out */
     if (PINT_util_get_current_time() >= cap->timeout)
@@ -601,15 +608,9 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    if (!ret)
-    {
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
-    }
-
-    ret = EVP_VerifyUpdate(&mdctx, 
-                           cap->issuer,
-                           strlen(cap->issuer) * sizeof(char));
+    ret &= EVP_VerifyUpdate(&mdctx, 
+                            cap->issuer,
+                            strlen(cap->issuer) * sizeof(char));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -618,18 +619,18 @@ int PINT_verify_capability(const PVFS_capability *cap)
     if (cap->num_handles)
     {
         ret &= EVP_VerifyUpdate(&mdctx, 
-                               cap->handle_array,
-                               cap->num_handles * sizeof(PVFS_handle));
+                                cap->handle_array,
+                                cap->num_handles * sizeof(PVFS_handle));
     }
     if (ret)
     {
         ret = EVP_VerifyFinal(&mdctx, cap->signature, cap->sig_size, 
                               pubkey);
     }
-    else 
+
+    if (ret != 1)
     {
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
+        PINT_security_error("Capability verify", -PVFS_ESECURITY);
     }
     
     EVP_MD_CTX_cleanup(&mdctx);
@@ -729,7 +730,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     strcpy(cred->issuer, "S:");
     strcat(cred->issuer, config->server_alias);
     
-    cred->timeout = PINT_util_get_current_time() + config->security_timeout;
+    cred->timeout = PINT_util_get_current_time() + config->credential_timeout;
 
     /* If squashing is enabled, server will re-sign a credential with 
        translated uid/gid. In this case the signature must be reallocated. 
@@ -813,7 +814,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
-    char buf[256], sigbuf[16];
+    char sigbuf[16];
     int ret;
 #ifdef ENABLE_SECURITY_CERT
     X509 *cert;
@@ -919,14 +920,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    if (!ret)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure\n");
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
-    }
-
-    ret = EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
     ret &= EVP_VerifyUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {
@@ -939,19 +933,14 @@ int PINT_verify_credential(const PVFS_credential *cred)
                                 strlen(cred->issuer) * sizeof(char));
     }
     ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
-    if (!ret)
+    if (ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure\n");
-        EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
+        ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
     }
 
-    ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
-    if (ret < 0)
+    if (ret != 1)
     {
-        ERR_error_string_n(ERR_get_error(), buf, 256);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error verifying credential: "
-                     "%s\n", buf);
+        PINT_security_error("Credential verify", -PVFS_ESECURITY);
     }
 
     EVP_MD_CTX_cleanup(&mdctx);

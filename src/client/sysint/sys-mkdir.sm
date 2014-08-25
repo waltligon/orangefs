@@ -28,6 +28,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -267,7 +268,7 @@ PVFS_error PVFS_sys_mkdir(
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "mkdir", &error);
         if (ret)
@@ -275,9 +276,8 @@ PVFS_error PVFS_sys_mkdir(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -336,7 +336,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* also insert entry into attr cache */
     PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
-    PINT_acache_update(sm_p->object_ref, &attr, NULL);
+    PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",
@@ -503,21 +503,36 @@ static PINT_sm_action mkdir_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_uid local_uid;
 
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
 
-        /* setup getattr */
+        /* clear attributes */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
+        if (local_uid == (PVFS_uid) -1)
+        {
+            local_uid = PINT_util_getuid();
+
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+
+        /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_DISTDIR_ATTR,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 

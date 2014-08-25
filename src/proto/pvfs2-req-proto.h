@@ -457,7 +457,7 @@ do {                                                  \
 
 struct PVFS_servreq_tree_setattr
 {
-    PVFS_fs_id  fs_id;
+    PVFS_fs_id fs_id;
     PVFS_credential credential;
     PVFS_ds_type objtype;
     PVFS_object_attr attr;      /* new attributes */
@@ -476,7 +476,7 @@ endecode_fields_4a_struct(
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) + extra_size_PVFS_object_attr)
 
 #define PINT_SERVREQ_TREE_SETATTR_FILL(__req,                            \
-                                 __cap,                                \
+                                 __cap,                                  \
                                  __cred,                                 \
                                  __fsid,                                 \
                                  __objtype,                              \

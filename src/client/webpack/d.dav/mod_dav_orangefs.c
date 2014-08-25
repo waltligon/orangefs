@@ -3300,7 +3300,7 @@ int getLockHelper(dav_lock **lock, char *lockstr,
 
   } else {
     /* found an expired direct lock, get rid of it... */
-    orangeAttrs("remove",resource->info->Uri,resource->pool,NULL,
+    orangeAttrs("remove",resource->info->Uri,resource->pool,resource->info,
                  DAVLOCK_PROPERTY,NULL);
   }
 
@@ -4829,12 +4829,12 @@ static dav_error *orangeCopy(const dav_resource *src, dav_resource *dst) {
                               (char *)src->uri,
                               buffer,dconf->readBufSize,offset)) < 0 )
   {
-  }
 #if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER <= 2
     return dav_new_error(src->pool,HTTP_INTERNAL_SERVER_ERROR,0,NULL);
 #else
     return dav_new_error(src->pool,HTTP_INTERNAL_SERVER_ERROR,0,0,NULL);
 #endif
+  }
 
   while (bytesRead > 0) {
     if (orangeWrite(buffer,bytesRead,dst->pool,targetRef,
