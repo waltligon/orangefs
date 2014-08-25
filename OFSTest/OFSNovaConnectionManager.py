@@ -267,6 +267,10 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
             logging.info(msg) 
             self.novaapi.servers.add_floating_ip(instance,floating_ip_list[idx])
             external_addresses.append(floating_ip_list[idx].ip)
+            msg = "Waiting 60 seconds for external ip address association."
+            print msg
+            logging.info(msg) 
+            time.sleep(60)
         #external_addresses = [s.addresses[self.nova_network_name][0]['addr'] for s in instances]
         
         return external_addresses
@@ -449,7 +453,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
                 print "Instance %s has status %s" % (instance.id,instance.status)
             
         
-        print "Waiting 180 seconds for networking"            
+        print "Waiting 120 seconds for networking"            
         time.sleep(180)
         # refresh all the instances in the list.
         new_instances = self.refreshCloudInstanceList(new_instances)
