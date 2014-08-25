@@ -458,9 +458,14 @@ static int unstuff_comp_fn(
 
     assert(resp_p->op == PVFS_SERV_UNSTUFF);
 
+#if 0 /* Don't cache size_array. */
     PINT_acache_update(sm_p->object_ref,
         &resp_p->u.unstuff.attr,
         NULL,
+        NULL);
+#endif
+    PINT_acache_update(sm_p->object_ref,
+        &resp_p->u.unstuff.attr,
         NULL);
 
     /* replace attrs found by getattr */

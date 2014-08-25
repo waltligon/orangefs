@@ -349,7 +349,9 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
+#if 0 /* Don't cache size_array. */
     int size_array_status = -1;
+#endif
 
     js_p->error_code = 0;
 
@@ -414,6 +416,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+#if 0 /* Don't cache size_array. */
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -421,6 +424,12 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                                        &size_status,
                                        &sm_p->getattr.size_array,
                                        &size_array_status);
+#endif
+    ret = PINT_acache_get_cached_entry(object_ref,
+                                       &sm_p->getattr.attr,
+                                       &attr_status,
+                                       &sm_p->getattr.size,
+                                       &size_status);
     if(ret < 0 || attr_status < 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -563,6 +572,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                          __func__);
         }
 
+#if 0 /* Don't cache size_array. */
         /* Was the size_array missing? */
         if(missing_attrs & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
@@ -571,6 +581,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                          "ACACHE MISS.\n",
                          __func__);
         }
+#endif
     }
 
     /* MISS */
@@ -1777,10 +1788,15 @@ static PINT_sm_action getattr_acache_insert(
                          sm_p->getattr.attr.dist_dir_attr.num_servers);
         }
 
+#if 0 /* Don't cache size_array. */
         PINT_acache_update(sm_p->getattr.object_ref,
                            &sm_p->getattr.attr,
                            tmp_size,
                            sm_p->getattr.size_array);
+#endif
+        PINT_acache_update(sm_p->getattr.object_ref,
+                           &sm_p->getattr.attr,
+                           tmp_size);
     }
 
     return SM_ACTION_COMPLETE;
