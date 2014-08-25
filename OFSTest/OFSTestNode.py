@@ -2281,7 +2281,7 @@ class OFSTestNode(object):
         self.changeDirectory(self.ofs_installation_location)
         #print self.runSingleCommand("pwd")
         # initialize the storage
-        
+    
         '''
         Change the following shell command to python
         
@@ -2296,7 +2296,9 @@ class OFSTestNode(object):
         
         
         print "Attempting to start OFSServer for host %s" % self.hostname
-        
+
+        self.setEnvironmentVariable("LD_LIBRARY_PATH",self.db4_lib_dir+":"+self.ofs_installation_location+"/lib:")
+
 
         # need to get the alias list from orangefs.conf file
         if self.alias_list == None:
@@ -2343,7 +2345,6 @@ class OFSTestNode(object):
         self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.runSingleCommandAsRoot("ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
-        self.setEnvironmentVariable("LD_LIBRARY_PATH",self.ofs_installation_location+"/lib:$LD_LIBRARY_PATH")
        
         # set the debug mask
         self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))

@@ -232,7 +232,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             rflag = "-a "
         else:
             rflag = ""
-          
+        
         rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destination_node.ext_ip_address),source,destination_node.current_user,destination_node.ext_ip_address,destination)
         
         output = []
