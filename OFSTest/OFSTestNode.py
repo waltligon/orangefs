@@ -1079,6 +1079,8 @@ class OFSTestNode(object):
         
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             
+            print "Installing required software for Debian based system %s" % self.distro
+            
             install_commands = [
                 " bash -c 'echo 0 > /selinux/enforce'",
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
@@ -1138,6 +1140,7 @@ class OFSTestNode(object):
         elif "suse" in self.distro.lower():
             
                         # download Java 6
+            print "Installing required software for SuSE based system %s" % self.distro
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
                 logging.exception(output)
@@ -1181,7 +1184,7 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            
+            print "Installing required software for Red Hat based system %s" % self.distro
             # download Java 6
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
@@ -1224,6 +1227,8 @@ class OFSTestNode(object):
             
             # RPM installs to default location
             self.jdk6_location = "/usr/java/default"
+        else:
+            print "Unknown system %s" % self.distro
 
         # db4 is built from scratch for all systems to have a consistant version.
         batch_commands = '''
@@ -1478,7 +1483,7 @@ class OFSTestNode(object):
         output = []
         self.ofs_branch = os.path.basename(svnurl)
     
-        #export svn by default. This merely copies from SVN without allowing update
+        #export svn by default. This merely copies from SVN without allowing updatezz
         if svn_options == None:
             svn_options = ""
         svn_action = "export --force"
@@ -1899,7 +1904,11 @@ class OFSTestNode(object):
         else:
             logging.exception( "Configuration of OrangeFS at %s Failed!" % self.ofs_source_location)
             
-            
+        
+        # where is this to be mounted?
+        if self.ofs_mount_point == "":
+            self.ofs_mount_point = "/tmp/mount/orangefs"
+    
 
         return rc
     
@@ -2017,6 +2026,7 @@ class OFSTestNode(object):
             if rc != 0:
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
+
         
         return rc
 
@@ -2296,7 +2306,6 @@ class OFSTestNode(object):
         
         
         print "Attempting to start OFSServer for host %s" % self.hostname
-
         self.setEnvironmentVariable("LD_LIBRARY_PATH",self.db4_lib_dir+":"+self.ofs_installation_location+"/lib:")
 
 
@@ -2410,7 +2419,7 @@ class OFSTestNode(object):
     # @param self The object pointer
     # @param security OFS security level None,"Key","Cert"
 
-    def startOFSClient(self,security=None):
+    def startOFSClient(self,security=None,disable_acache=False):
         # Starting the OFS Client is a root task, therefore, it must be done via batch.
         # The following shell command is implimented in Python
         '''
@@ -2445,13 +2454,17 @@ class OFSTestNode(object):
         elif security.lower() == "cert":
             pass
 
+        acache_flag = ""
+        #print "disable acache is %r" % disable_acache
+        if disable_acache:
+            acache_flag =  "--acache-timeout=0"
         
         print "Starting pvfs2-client: "
-        print "sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath)
+        print "sudo LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,acache_flag,keypath)
         print ""
         
         # start the client 
-        self.runSingleCommandAsRoot("LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,keypath))
+        self.runSingleCommandAsRoot("LD_LIBRARY_PATH=%s:%s/lib PVFS2TAB_FILE=%s/etc/orangefstab  %s/sbin/pvfs2-client -p %s/sbin/pvfs2-client-core -L %s/pvfs2-client-%s.log %s %s" % (self.db4_lib_dir,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_installation_location,self.ofs_branch,acache_flag,keypath))
         # change the protection on the logfile to 644
         self.runSingleCommandAsRoot("chmod 644 %s/pvfs2-client-%s.log" % (self.ofs_installation_location,self.ofs_branch))
         
@@ -2561,7 +2574,8 @@ class OFSTestNode(object):
         #ps -ef | grep -v grep| grep pvfs2-server | awk {'print $8'}
         output = []
         pvfs2_server = self.runSingleCommandBacktick("ps -f --no-heading -C pvfs2-server | awk '{print \\$8}'")
-        
+        if pvfs2_server == '':
+            return 1
         # We have <OFS installation>/sbin/pvfs2_server. Get what we want.
         (self.ofs_installation_location,sbin) = os.path.split(os.path.dirname(pvfs2_server))
         
