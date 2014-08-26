@@ -597,13 +597,13 @@ def tail(testing_node,output=[]):
     
     # Create the file
     testing_node.runSingleCommand('%s bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,tail_file))
-    testing_node.runSingleCommand('%s bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,local_file))
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,local_file))
     
     # Create the file
     
     testing_node.runSingleCommand("tail %s > %s" % (local_file,local_output))
-    # OK should do more here
-    testing_node.runSingleCommand("tail %s > %s" % (tail_file,tail_output))
+    
+    testing_node.runSingleCommand("%s tail %s > %s" % (preload,tail_file,tail_output))
    
     # now diff it
     rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,local_output,tail_output))
