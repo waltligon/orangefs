@@ -562,7 +562,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
     PINT_debug_capability(cap, "Verifying");
 
     /* if capability has timed out */
-    if (PINT_util_get_current_time() >= cap->timeout)
+    if (PINT_util_get_current_time() > cap->timeout)
     {
         char buf[16];
 
@@ -842,7 +842,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));
 
-    if (PINT_util_get_current_time() >= cred->timeout)
+    if (PINT_util_get_current_time() > cred->timeout)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
                      "(timeout %llu)\n", 
