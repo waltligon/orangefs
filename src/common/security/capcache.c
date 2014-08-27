@@ -37,7 +37,8 @@ static uint16_t PINT_capcache_get_index(void *data,
 static int PINT_capcache_compare(void *data, void *entry);
 static void PINT_capcache_cleanup(void *entry);
 static void PINT_capcache_debug(const char *prefix,
-                                void *data);
+                               void *data);
+int PINT_capcache_remove(seccache_entry_t * entry);
 
 /* method table */
 static seccache_methods_t capcache_methods = {    
