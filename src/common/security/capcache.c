@@ -278,7 +278,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
     /* copy capability timeout & signature */
     curr_cap = (PVFS_capability *) curr_entry->data;
     /* check timeout */
-    if (PINT_util_get_current_time() >= curr_cap->timeout)
+    if (PINT_util_get_current_time() > curr_cap->timeout)
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry timed out\n",
                      __func__);
