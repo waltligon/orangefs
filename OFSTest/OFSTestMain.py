@@ -831,7 +831,7 @@ class OFSTestMain(object):
 
 
     def restartOFS(self):
-        print "Restarting all OrangeFS clients and servers"
+        
         self.ofs_network.unmountOFSFilesystemAllNodes()
         self.ofs_network.stopOFSClientAllNodes()
         self.ofs_network.stopOFSServers()
@@ -839,10 +839,11 @@ class OFSTestMain(object):
         self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache) 
         self.ofs_network.mountOFSFilesystemAllNodes()
     
-    def doPostTest(self,rc):
-        if rc == 0:
-            if self.config.cloud_delete_after_test == True:
-                self.terminateAllCloudNodes()
-            else:
-                self.restartOFS()
-
+    def doPostTest(self):
+    
+        if self.config.cloud_delete_after_test == True:
+            print "Test complete. Deleting all cloud nodes."
+            self.terminateAllCloudNodes()
+        else:
+            print "Test complete. Restarting OrangeFS clients and servers"
+            self.restartOFS()

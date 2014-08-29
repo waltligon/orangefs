@@ -483,8 +483,12 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
                 
                 # fedora 18 = cloud-user, fedora 19 = fedora
                 name = 'fedora'
-            else:
+            elif "centos7" in image_name:
+                name = 'centos'
+            elif "rhel7" in image_name:
                 name = 'cloud-user'
+            else:
+                name = 'ec2-user'
             
             new_node = OFSTestRemoteNode.OFSTestRemoteNode(username=name,ip_address=instance.ip_address,key=self.cloud_instance_key_location,local_node=local_master,is_cloud=True,ext_ip_address=ip_addresses[idx])
 

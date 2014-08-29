@@ -178,10 +178,13 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         
         server_list = [s for s in self.novaapi.servers.list() if s.addresses[self.nova_network_name][0]['addr'] == ip_address]
         
+        print "Attempting to delete server at %s" % ip_address
         if len(server_list) > 0:
+            print "Deleting server"
             server_list[0].delete()
             return 0
         else:
+            print "Could not find server"
             return 1
             
             
@@ -488,6 +491,10 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
                 
                 # fedora 18 = cloud-user, fedora 19 = fedora
                 name = 'fedora'
+            elif "centos7" in image_name:
+                name = 'centos'
+            elif "rhel7" in image_name:
+                name = 'cloud-user'
             else:
                 name = 'ec2-user'
             
