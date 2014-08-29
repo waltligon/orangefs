@@ -85,6 +85,7 @@
 #define PINT_FSTAB_OPTS(_entry) (_entry)->fs_mntops
 
 #define DEFINE_MY_GET_NEXT_FSENT
+#define PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE 2048
 static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab);
 static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry);
 
@@ -104,13 +105,11 @@ static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
 static int s_stat_tab_count = 0;
 static gen_mutex_t s_stat_tab_mutex = GEN_MUTEX_INITIALIZER;
 
-static int parse_flowproto_string(
-    const char *input,
-    enum PVFS_flowproto_type *flowproto);
+static int parse_flowproto_string(const char *input,
+                                  enum PVFS_flowproto_type *flowproto);
 
-static int parse_encoding_string(
-    const char *cp,
-    enum PVFS_encoding_type *et);
+static int parse_encoding_string(const char *cp,
+                                 enum PVFS_encoding_type *et);
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
@@ -119,9 +118,11 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
                                         unsigned int timeout, PVFS_credential *cred);
 #endif
 
-struct PVFS_sys_mntent* PVFS_util_gen_mntent(
-    char* config_server,
-    char* fs_name)
+/**
+ * PVFS_util_gen_mntent
+ */
+struct PVFS_sys_mntent* PVFS_util_gen_mntent(char* config_server,
+                                             char* fs_name)
 {
     struct PVFS_sys_mntent* tmp_ent = NULL;
 
@@ -796,13 +797,16 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
  * failure
  */
 const PVFS_util_tab *PVFS_util_parse_pvfstab(
-    const char *tabfile)
+                                     const char *tabfile)
 {
     PINT_fstab_t *mnt_fp = NULL;
     int file_count = 5;
     /* NOTE: mtab should be last for clean error logic below */
-    const char *file_list[5] =
-        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab", "/etc/mtab" };
+    const char *file_list[5] = { NULL,
+                                 "/etc/fstab",
+                                 "/etc/pvfs2tab",
+                                 "pvfs2tab",
+                                 "/etc/mtab" };
     const char *targetfile = NULL;
     PINT_fstab_entry_t *tmp_ent;
     int i, j;
@@ -814,16 +818,20 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     if((epenv = getenv("PVFS2EP")) != NULL)
     {
         struct PVFS_sys_mntent *mntent;
+
         current_tab = &s_stat_tab_array[0];
         current_tab->mntent_array = malloc(sizeof(struct PVFS_sys_mntent));
+
         mntent = &current_tab->mntent_array[0];
         strcpy(current_tab->tabfile_name, "PVFSEP");
         current_tab->mntent_count = 1;
+
         mntent->pvfs_config_servers = malloc(sizeof(char *));
         mntent->pvfs_config_servers[0] = strdup(index(epenv, '=') + 1);
         mntent->num_pvfs_config_servers = 1;
         mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
-        mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server, '/'));
+        mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server,
+                                             '/'));
         mntent->pvfs_fs_name++;
         mntent->flowproto = FLOWPROTO_DEFAULT;
         mntent->encoding = PVFS2_ENCODING_DEFAULT;
@@ -838,18 +846,18 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     if (tabfile != NULL)
     {
         /*
-          caller wants us to look in a specific location for the
-          tabfile
-        */
+         * caller wants us to look in a specific location for the
+         * tabfile
+         */
         file_list[0] = tabfile;
         file_count = 1;
     }
     else
     {
         /*
-          search the system and env vars for tab files;
-          first check for environment variable override
-        */
+         * search the system and env vars for tab files;
+         * first check for environment variable override
+         */
         file_list[0] = getenv("PVFS2TAB_FILE");
     }
 
@@ -922,15 +930,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     current_tab = &s_stat_tab_array[s_stat_tab_count];
 
     current_tab->mntent_array = (struct PVFS_sys_mntent *)malloc(
-        (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+                (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
 
     if (!current_tab->mntent_array)
     {
         gen_mutex_unlock(&s_stat_tab_mutex);
         return (NULL);
     }
-    memset(current_tab->mntent_array, 0,
+    memset(current_tab->mntent_array,
+           0,
            (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+
     for (i = 0; i < tmp_mntent_count; i++)
     {
         current_tab->mntent_array[i].fs_id = PVFS_FS_ID_NULL;
@@ -944,27 +954,36 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     i = 0;
     while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
     {
-       if(!(PINT_FSTAB_NAME(tmp_ent)) || !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+       if(!(PINT_FSTAB_NAME(tmp_ent)) ||
+          !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
        {
            PINT_fstab_entry_destroy(tmp_ent);
            continue;
-        }
+       }
 
-        if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) && (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
-        {
-            struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
-            char *cp;
-            int cur_server;
-	    char *rewrite_pointer;
+       if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) &&
+           (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
+       {
+           struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
+           char *cp;
+           int cur_server;
+	   char *rewrite_pointer;
 
-	    /* Entries in mtab may be prefixed by a process name and '#' */
-	    /* If detected, remove prefix.  */
-	    for(rewrite_pointer=cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++,rewrite_pointer++) {
-		if (*cp == '#') {
+	   /* Entries in mtab may be prefixed by a process name and '#' */
+	   /* If detected, remove prefix.  */
+	   for(rewrite_pointer = cp = PINT_FSTAB_NAME(tmp_ent);
+               *cp;
+               cp++ , rewrite_pointer++)
+           {
+		if (*cp == '#')
+                {
 		    rewrite_pointer = PINT_FSTAB_NAME(tmp_ent) - 1;
 		    continue;
 		}
-		if (rewrite_pointer == cp) continue;
+		if (rewrite_pointer == cp)
+                {
+                    continue;
+                }
 		*rewrite_pointer = *cp;
 	    }
 	    *rewrite_pointer = '\0';
@@ -973,7 +992,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
-            for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
+            for (cp = PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
             {
                 if (*cp == ',')
                 {
@@ -983,13 +1002,16 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* allocate room for our copies of the strings */
             me->pvfs_config_servers = malloc(me->num_pvfs_config_servers
-                                      * sizeof(*me->pvfs_config_servers));
+                                           * sizeof(*me->pvfs_config_servers));
             if (!me->pvfs_config_servers)
             {
                 goto error_exit;
             }
-            memset(me->pvfs_config_servers, 0, me->num_pvfs_config_servers
-                                            * sizeof(*me->pvfs_config_servers));
+            memset(me->pvfs_config_servers,
+                   0,
+                   me->num_pvfs_config_servers *
+                            sizeof(*me->pvfs_config_servers));
+
             me->mnt_dir = malloc(strlen(PINT_FSTAB_PATH(tmp_ent)) + 1);
             me->mnt_opts = malloc(strlen(PINT_FSTAB_OPTS(tmp_ent)) + 1);
 
@@ -1011,7 +1033,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 char *last_slash;
 
                 tok = strsep(&cp, ",");
-                if (!tok) break;
+                if (!tok)
+                {
+                    break;
+                }
 
                 slash = tok;
                 slashcount = 0;
@@ -1048,12 +1073,14 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 }
 
                 /* find a reference point in the string */
+                /* find the last slash in the string */
+                /* should be between server name and fs_name */
                 last_slash = rindex(tok, '/');
-                *last_slash = '\0';
 
                 /* config server and fs name are a special case, take one 
                  * string and split it in half on "/" delimiter
                  */
+                *last_slash = '\0';
                 me->pvfs_config_servers[cur_server] = strdup(tok);
                 if (!me->pvfs_config_servers[cur_server])
                 {
@@ -1062,6 +1089,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
                 ++last_slash;
 
+                /* first time through the loop save the fs_name in me
+                 * From then on make sure the fs_name in the entry is
+                 * the same as the first one
+                 */
                 if (cur_server == 0)
                 {
                     me->pvfs_fs_name = strdup(last_slash);
@@ -1086,17 +1117,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
-                                    PINT_FSTAB_PATH(tmp_ent));
+                   PINT_FSTAB_PATH(tmp_ent));
+
             strcpy(current_tab->mntent_array[i].mnt_opts,
-                                    PINT_FSTAB_OPTS(tmp_ent));
+                   PINT_FSTAB_OPTS(tmp_ent));
 
             /* find out if a particular flow protocol was specified */
             if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
             {
-                ret = parse_flowproto_string(
-                                        PINT_FSTAB_OPTS(tmp_ent),
-                                        &(current_tab->
-                                        mntent_array[i].flowproto));
+                ret = parse_flowproto_string(PINT_FSTAB_OPTS(tmp_ent),
+                                             &(current_tab->
+                                               mntent_array[i].flowproto));
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -1109,20 +1140,20 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             }
 
             /* pick an encoding to use with the server */
-            current_tab->mntent_array[i].encoding =
-                                    PVFS2_ENCODING_DEFAULT;
+            current_tab->mntent_array[i].encoding = PVFS2_ENCODING_DEFAULT;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
                 ret = parse_encoding_string(
-                                   cp, &current_tab->mntent_array[i].encoding);
+                                    cp,
+                                    &current_tab->mntent_array[i].encoding);
                 if (ret < 0)
                 {
                     goto error_exit;
                 }
             }
 
-            /* find out if a particular flow protocol was specified */
+            /* find out if a particular num dfiles was specified */
             current_tab->mntent_array[i].default_num_dfiles = 0;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "num_dfiles");
             if (cp)
@@ -1137,16 +1168,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 }
             }
 
-            /* Loop counter increment */
+            /* increment number of pvfs records found */
             i++;
 
             PINT_fstab_entry_destroy(tmp_ent);
         }
     }
     s_stat_tab_count++;
-    strcpy(s_stat_tab_array[s_stat_tab_count-1].tabfile_name, targetfile);
+    strcpy(s_stat_tab_array[s_stat_tab_count - 1].tabfile_name, targetfile);
     PINT_fstab_close(mnt_fp);
     gen_mutex_unlock(&s_stat_tab_mutex);
+
     return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
 error_exit:
@@ -1157,7 +1189,7 @@ error_exit:
         if (me->pvfs_config_servers)
         {
             int j;
-            for (j=0; j<me->num_pvfs_config_servers; j++)
+            for (j = 0; j < me->num_pvfs_config_servers; j++)
             {
                 if (me->pvfs_config_servers[j])
                 {
@@ -2506,12 +2538,12 @@ int PVFS_util_resolve_absolute(const char* local_path)
 
 static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
 {
-    char linestr[500];
+    char linestr[PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE];
     int linelen = 0;
-    char *strtok_ctx;
-    char *nexttok; 
-    PINT_fstab_entry_t *fsentry;
-    if (!fgets(linestr, 500, tab))
+    char * strtok_ctx;
+    char * nexttok; 
+    PINT_fstab_entry_t * fsentry;
+    if(!fgets(linestr, PVFS_MY_GET_NEXT_FSENT_MAX_LINESIZE, tab))
     {
         return NULL;
     }
