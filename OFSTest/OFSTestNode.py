@@ -811,7 +811,7 @@ class OFSTestNode(object):
             self.runSingleCommandAsRoot("zypper --non-interactive update")
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
-            self.runSingleCommandAsRoot("yum install -y perl")
+            self.runSingleCommandAsRoot("yum install -y perl wget")
             self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
 
             
