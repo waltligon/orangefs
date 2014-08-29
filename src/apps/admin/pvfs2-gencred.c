@@ -447,9 +447,8 @@ int allowed(const struct passwd *pwd, const struct group *grp)
     char buf[129];
     char *s, *user, *puser;
     unsigned long offset;
-    struct passwd pwd_buf;
-    struct passwd *pwd2;
-    char pwd_data_buf[128];
+    struct passwd pwd_buf, *pwd2;
+    char *pwd_data_buf;
 
     /* Verify whether the current user is allowed to generate a
        credential for pwd and grp. Return 0 if allowed.*/
@@ -496,21 +495,49 @@ int allowed(const struct passwd *pwd, const struct group *grp)
                     }
                     /* A user name has been parsed. */
                     if (s != 0) {
+                        int retry = 0, ret = 0;
+                        int bufsize = 8192;
+
+                        pwd_data_buf = (char *) malloc(bufsize);
+                        if (pwd_data_buf == NULL)
+                        {
+                            return 1;
+                        }
+
                         /* Call getpwnam_r to avoid trouble with
-                           previous call to getpwnam. */
-                        pwd2 = &pwd_buf;
-                        if (getpwnam_r(user, &pwd_buf, pwd_data_buf,
-                                       128, &pwd2) != 0)
+                           previous call to getpwnam. Increase buffer up
+                           to 512K for adequate size. */
+                        do 
                         {
-                            fprintf(stderr, "error: with getpwnam_r\n");
-                            abort();
-                        }
-                        /* User does not exist. */
-                        if (pwd2 == 0)
+                            ret = getpwnam_r(user, &pwd_buf, pwd_data_buf,
+                                      bufsize, &pwd2);
+                            if (ret == ERANGE)
+                            {
+                                free(pwd_data_buf);
+                                bufsize *= 8;
+                                pwd_data_buf = (char *) malloc(bufsize);
+                                if (pwd_data_buf)
+                                {
+                                    fprintf(stderr, "out of memory\n");
+                                    return 1;
+                                }
+                            }
+                        } while (ret == ERANGE && retry++ < 2);
+
+                        if (pwd2 == NULL)
                         {
-                            continue;
+                            if (ret == 0)
+                            {
+                                fprintf(stderr, "error: user %s not found\n", user);
+                            }
+                            else
+                            {
+                                fprintf(stderr, "error: getpwnam_r returned %d\n",
+                                        ret);
+                            }
+                            return 1;
                         }
-                        if (pwd2->pw_uid == uid)
+                        if (pwd_buf.pw_uid == uid)
                         {
                             close(fd);
                             return 0;

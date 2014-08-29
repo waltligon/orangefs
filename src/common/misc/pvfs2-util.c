@@ -403,6 +403,34 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     return ret;
 }
 #else /* ENABLE_SECURITY_MODE */
+
+/* This macro will call a user or group info function, e.g.
+   getpwuid_r, and increase the buffer size if needed, to a
+   maximum of 512K. */
+#define GET_PWD_OR_GRP_INFO(func, id, ptr, buf, size, result) \
+    do { \
+        int retry = 0; \
+        unsigned long bsize = size; \
+        do { \
+            ret = func(id, ptr, buf, bsize, result); \
+            if (ret == ERANGE) \
+            { \
+                free(buf); \
+                bsize *= 8; \
+                buf = calloc(1, bsize); \
+                if (buf == NULL) \
+                { \
+                    return -PVFS_ENOMEM; \
+                } \
+            } \
+        } while (ret == ERANGE && retry++ < 2); \
+        if (ret == ERANGE) \
+        { \
+            gossip_lerr("%s error: buffer too small (%lu)\n", #func, \
+                        bsize); \
+        } \
+    } while (0)
+
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
@@ -419,13 +447,10 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     struct group *gresult = NULL;
     char *pwdbuf, *grpbuf;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
-    int ngroups, ret, i, retry;
+    int ngroups, ret, i;
 
-    /* allocate buffer for pwd functions. lets start with 8K but don't go
-     * any higher than 512K
-     */
-    bufsize = 8192;  
-    
+    bufsize = 8192;
+
     pwdbuf = (char *) malloc(bufsize);
     if (pwdbuf == NULL)
     {
@@ -445,23 +470,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
             }
             else
             {
-               retry = 0;
-               do
-               {
-                  retry++;
-                  ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
-                  /*Did we allocate enough memory?*/
-                  if ( ret == ERANGE )
-                  {   
-                     free(pwdbuf);
-                     bufsize = bufsize * 8;
-                     pwdbuf = calloc(1,bufsize);
-                     if ( !pwdbuf )
-                     {
-                        return -PVFS_ENOMEM;
-                     }
-                  }
-               } while ( ret == ERANGE && retry < 2 );
+               GET_PWD_OR_GRP_INFO(getpwuid_r, (uid_t) uid, &pwd, pwdbuf, 
+                                   bufsize, &presult);
                if (presult == NULL)
                {
                    gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
@@ -471,23 +481,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-           retry = 0;
-           do
-           {
-              retry++;
-              ret = getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
-              /*Did we allocate enough memory?*/
-              if ( ret == ERANGE )
-              {   
-                 free(pwdbuf);
-                 bufsize = bufsize * 8;
-                 pwdbuf = calloc(1,bufsize);
-                 if ( !pwdbuf )
-                 {
-                    return -PVFS_ENOMEM;
-                 }
-              }
-           } while ( ret == ERANGE && retry < 2 );
+           GET_PWD_OR_GRP_INFO(getpwnam_r, user, &pwd, pwdbuf, 
+                               bufsize, &presult);
            if (presult == NULL)
            {
                gossip_lerr("User %s lookup error: %d (0 = not found)\n", 
@@ -498,23 +493,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         uid = getuid();
-        retry = 0;
-        do
-        {
-           retry++;
-           ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
-           /*Did we allocate enough memory?*/
-           if ( ret == ERANGE )
-           {   
-              free(pwdbuf);
-              bufsize = bufsize * 8;
-              pwdbuf = calloc(1,bufsize);
-              if ( !pwdbuf )
-              {
-                 return -PVFS_ENOMEM;
-              }
-           }
-        } while ( ret == ERANGE && retry < 2 );
+        GET_PWD_OR_GRP_INFO(getpwuid_r, (uid_t) uid, &pwd, pwdbuf, 
+                            bufsize, &presult);
         if (presult == NULL)
         {
             gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
@@ -527,13 +507,7 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         return -PVFS_EINVAL;
     }
 
-    /* allocate buffer for grp functions. lets start with 8K since 8K covers
-     * Palmetto's largest group at this time but don't go any higher than 
-     * 512K.
-     */
-    bufsize = 8192;
-
-    grpbuf = calloc(1,bufsize);
+    grpbuf = calloc(1, bufsize);
     if (grpbuf == NULL)
     {
         free(pwdbuf);
@@ -553,24 +527,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
             }
             else
             {
-                retry = 0;
-                do
-                {
-                  retry++;
-                  ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
-                  /*Did we allocate enough memory?*/
-                  if ( ret == ERANGE )
-                  {
-                     free(grpbuf);
-                     bufsize = bufsize * 8;
-                     grpbuf = calloc(1,bufsize);
-                     if ( !grpbuf )
-                     {
-                        free(pwdbuf);
-                        return -PVFS_ENOMEM;
-                     }
-                  }
-                } while ( ret == ERANGE && retry < 2 );
+                GET_PWD_OR_GRP_INFO(getgrgid_r, (gid_t) gid, &grp, grpbuf, 
+                                    bufsize, &gresult);
                 if (gresult == NULL)
                 {
                     gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
@@ -580,24 +538,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
         }
         else
         {
-           retry = 0;
-           do
-           {
-             retry++;
-             ret = getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
-             /* Did we allocate enough memory? */
-             if ( ret == ERANGE )
-             {
-                free(grpbuf);
-                bufsize = bufsize * 8;
-                grpbuf = calloc(1,bufsize);
-                if ( !grpbuf )
-                {  
-                   free(pwdbuf);
-                   return -PVFS_ENOMEM;
-                }
-             }
-            } while ( ret == ERANGE && retry < 2 );
+            GET_PWD_OR_GRP_INFO(getgrnam_r, group, &grp, grpbuf, 
+                                bufsize, &gresult);
             if (gresult == NULL)
             {
                 gossip_lerr("Group %s lookup error: %d (0 = not found)\n",
@@ -608,24 +550,8 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
     else
     {
         gid = getgid();
-        retry = 0;
-        do
-        {
-          retry++;
-          ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
-          /*Did we allocate enough memory?*/
-          if ( ret == ERANGE )
-          {
-             free(grpbuf);
-             bufsize = bufsize * 8;
-             grpbuf = calloc(1,bufsize);
-             if ( !grpbuf )
-             {
-                free(pwdbuf);
-                return -PVFS_ENOMEM;
-             }
-          }
-        } while ( ret == ERANGE && retry < 2 );
+        GET_PWD_OR_GRP_INFO(getgrgid_r, (gid_t) gid, &grp, grpbuf,
+                            bufsize, &gresult);
         if (gresult == NULL)
         {
             gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
