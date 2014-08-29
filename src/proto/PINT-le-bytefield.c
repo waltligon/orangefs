@@ -128,7 +128,7 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_CREATE:
                 zero_credential(&req.u.create.credential);
-                zero_capability(&resp.u.create.capability);
+                zero_capability(&resp.u.create.metafile_attrs.capability);
                 /* can request a range of handles */
                 reqsize = extra_size_PVFS_servreq_create;
                 respsize = extra_size_PVFS_servresp_create;
@@ -1161,9 +1161,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 
                 case PVFS_SERV_CREATE:
-                    decode_free(resp->u.create.capability.signature);
-                    decode_free(resp->u.create.capability.handle_array);
-                    decode_free(resp->u.create.datafile_handles);
+                    decode_free(resp->u.create.metafile_attrs.capability.signature);
+                    decode_free(resp->u.create.metafile_attrs.capability.handle_array);
+                    decode_free(resp->u.create.metafile_attrs.u.meta.dfile_array);
                     break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
