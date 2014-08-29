@@ -483,7 +483,9 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
                 
                 # fedora 18 = cloud-user, fedora 19 = fedora
                 name = 'fedora'
-            elif "centos7" in image_name or "rhel7" in image_name:
+            elif "centos7" in image_name:
+                name = 'centos'
+            elif "rhel7" in image_name:
                 name = 'cloud-user'
             else:
                 name = 'ec2-user'
