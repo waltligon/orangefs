@@ -76,22 +76,26 @@ nested machine pvfs2_prelude_sm
 
 %%
 
-static PINT_sm_action prelude_setup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action prelude_setup(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
 {
-
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_sm:prelude_setup...\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
-                                    ,smcb->base_frame,smcb->frame_count);
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    ret = PINT_server_req_get_object_ref(
-        s_op->req, &s_op->target_fs_id, &s_op->target_handle);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing pvfs2_prelude_sm:prelude_setup...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "\tbase frame:%d\tframe count:%d\n"
+                 ,smcb->base_frame,smcb->frame_count);
+
+    ret = PINT_server_req_get_object_ref(s_op->req,
+                                         &s_op->target_fs_id,
+                                         &s_op->target_handle);
     if( ret != 0 )
     {
         js_p->error_code = -PVFS_EINVAL;
     }
+
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
@@ -112,33 +116,44 @@ static PINT_sm_action prelude_setup(
  *
  * posts a request scheduler job
  */
-static PINT_sm_action prelude_req_sched(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
+                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
-    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE)
+    {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                     "(%p) %s (prelude sm) state: req_sched already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }   
  
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase_frame:%d\tframe_count:%d\n"
-                                    ,smcb->base_frame,smcb->frame_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "\tbase_frame:%d\tframe_count:%d\n"
+                ,smcb->base_frame,smcb->frame_count);
     gossip_debug(GOSSIP_SERVER_DEBUG,
-        "(%p) %s (prelude sm) state: req_sched\n", s_op,
-        PINT_map_server_op_to_string(s_op->req->op));
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
-    ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
-                             s_op->access_type, s_op->sched_policy,
-                             smcb, 0, js_p,
-                             &(s_op->scheduled_id), server_job_context);
+    ret = job_req_sched_post(s_op->op,
+                             s_op->target_fs_id,
+                             s_op->target_handle,
+                             s_op->access_type,
+                             s_op->sched_policy,
+                             smcb,
+                             0,
+                             js_p,
+                             &(s_op->scheduled_id),
+                             server_job_context);
 
     /* these are two different counters - one instantaneous, one cumulative */
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
@@ -151,17 +166,20 @@ static PINT_sm_action prelude_req_sched(
  * reads basic attributes of target object, if there is a particular
  * target object for the operation
  */
-static PINT_sm_action prelude_getattr_if_needed(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
-    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE)
+    {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: getattr already done... skipping.\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                     "(%p) %s (prelude sm) state: getattr already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -178,7 +196,6 @@ static PINT_sm_action prelude_getattr_if_needed(
      */
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
-
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -191,32 +208,42 @@ static PINT_sm_action prelude_getattr_if_needed(
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for handle %llu\n", llu(s_op->target_handle));
 
-    ret = job_trove_dspace_getattr(
-        s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
-        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_getattr(s_op->target_fs_id,
+                                   s_op->target_handle,
+                                   smcb,
+                                   &(s_op->ds_attr),
+                                   0,
+                                   js_p,
+                                   &tmp_id,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
 
 static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
-    PVFS_uid *uid, PVFS_gid *gid)
+                         PVFS_uid *uid,
+                         PVFS_gid *gid)
 {
     *uid = fsconfig->exp_anon_uid;
     *gid = fsconfig->exp_anon_gid;
     return;
 }
 
-static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fsconfig,
-    PVFS_BMI_addr_t client_addr)
+static int iterate_all_squash_wildcards(
+                       struct filesystem_configuration_s *fsconfig,
+                       PVFS_BMI_addr_t client_addr)
 {
     int i;
 
     for (i = 0; i < fsconfig->all_squash_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
-            lld(client_addr), fsconfig->all_squash_hosts[i]);
-        if (BMI_query_addr_range(client_addr, fsconfig->all_squash_hosts[i],
-                fsconfig->all_squash_netmasks[i]) == 1)
+                     lld(client_addr), fsconfig->all_squash_hosts[i]);
+
+        if (BMI_query_addr_range(client_addr,
+                                 fsconfig->all_squash_hosts[i],
+                                 fsconfig->all_squash_netmasks[i]) == 1)
         {
             return 1;
         }
@@ -224,19 +251,25 @@ static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fscon
     return 0;
 }
 
-static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsconfig,
-    PVFS_BMI_addr_t client_addr)
+static int iterate_root_squash_wildcards(
+                        struct filesystem_configuration_s *fsconfig,
+                        PVFS_BMI_addr_t client_addr)
 {
     int i;
 
     /* check exceptions first */
     for (i = 0; i < fsconfig->root_squash_exceptions_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
-            lld(client_addr), fsconfig->root_squash_exceptions_hosts[i],
-            fsconfig->root_squash_exceptions_netmasks[i]);
-        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_exceptions_hosts[i], 
-                fsconfig->root_squash_exceptions_netmasks[i]) == 1)
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "BMI_query_addr_range %lld, %s, netmask: %i\n",
+                     lld(client_addr),
+                     fsconfig->root_squash_exceptions_hosts[i],
+                     fsconfig->root_squash_exceptions_netmasks[i]);
+
+        if (BMI_query_addr_range(
+                           client_addr,
+                           fsconfig->root_squash_exceptions_hosts[i], 
+                           fsconfig->root_squash_exceptions_netmasks[i]) == 1)
         {
             /* in the exception list, do not squash */
             return 0;
@@ -245,11 +278,15 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
 
     for (i = 0; i < fsconfig->root_squash_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
-            lld(client_addr), fsconfig->root_squash_hosts[i],
-            fsconfig->root_squash_netmasks[i]);
-        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
-                fsconfig->root_squash_netmasks[i]) == 1)
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "BMI_query_addr_range %lld, %s, netmask: %i\n",
+                     lld(client_addr), fsconfig->root_squash_hosts[i],
+                     fsconfig->root_squash_netmasks[i]);
+
+        if (BMI_query_addr_range(
+                           client_addr,
+                           fsconfig->root_squash_hosts[i], 
+                           fsconfig->root_squash_netmasks[i]) == 1)
         {
             return 1;
         }
@@ -258,20 +295,25 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
 }
 
 /* Translate_ids will return 1 if it did some uid/gid squashing, 0 otherwise */
-static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid, 
-    PVFS_uid *translated_uid, PVFS_gid *translated_gid, PVFS_BMI_addr_t client_addr)
+static int translate_ids(PVFS_fs_id fsid,
+                         PVFS_uid uid,
+                         PVFS_gid gid,
+                         PVFS_uid *translated_uid,
+                         PVFS_gid *translated_gid,
+                         PVFS_BMI_addr_t client_addr)
 {
     int exp_flags = 0;
     struct server_configuration_s *serv_config = NULL;
     struct filesystem_configuration_s * fsconfig = NULL;
 
     serv_config = PINT_get_server_config();
-    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
 
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
     if (fsconfig == NULL)
     {
         return 0;
     }
+
     exp_flags = fsconfig->exp_flags;
     /* If all squash was set */
     if (exp_flags & TROVE_EXP_ALL_SQUASH)
@@ -279,9 +321,11 @@ static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid,
         if (iterate_all_squash_wildcards(fsconfig, client_addr) == 1)
         {
             get_anon_ids(fsconfig, translated_uid, translated_gid);
+
             gossip_debug(GOSSIP_SERVER_DEBUG,
-                "Translated ids from <%u:%u> to <%u:%u>\n",
-                uid, gid, *translated_uid, *translated_gid);
+                         "Translated ids from <%u:%u> to <%u:%u>\n",
+                         uid, gid, *translated_uid, *translated_gid);
+
             return 1;
         }
     }
@@ -293,9 +337,11 @@ static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid,
             if (iterate_root_squash_wildcards(fsconfig, client_addr) == 1)
             {
                 get_anon_ids(fsconfig, translated_uid, translated_gid);
+
                 gossip_debug(GOSSIP_SERVER_DEBUG,
-                    "Translated ids from <%u:%u> to <%u:%u>\n",
-                    uid, gid, *translated_uid, *translated_gid);
+                             "Translated ids from <%u:%u> to <%u:%u>\n",
+                             uid, gid, *translated_uid, *translated_gid);
+
                 return 1;
             }
         }
@@ -306,18 +352,22 @@ static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid,
     return 0;
 }
 
-static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVFS_BMI_addr_t client_addr)
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig,
+                                PVFS_BMI_addr_t client_addr)
 {
     int i;
 
     for (i = 0; i < fsconfig->ro_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
-            lld(client_addr), fsconfig->ro_hosts[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "BMI_query_addr_range %lld, %s\n",
+                     lld(client_addr), fsconfig->ro_hosts[i]);
+
         /* Does the client address match the wildcard specification and/or */
         /* the netmask specification?                                      */
-        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
-                fsconfig->ro_netmasks[i]) == 1)
+        if (BMI_query_addr_range(client_addr,
+                                 fsconfig->ro_hosts[i],
+                                 fsconfig->ro_netmasks[i]) == 1)
         {
             return 1;
         }
@@ -334,33 +384,34 @@ static int permit_operation(PVFS_fs_id fsid,
 { 
     int exp_flags = 0; 
     struct server_configuration_s *serv_config = NULL;
-    struct filesystem_configuration_s * fsconfig = NULL;
+    struct filesystem_configuration_s *fsconfig = NULL;
 
     if (access_type == PINT_SERVER_REQ_READONLY)
     {
         return 0;  /* anything that doesn't modify state is okay */
     }
     serv_config = PINT_get_server_config();
-    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
 
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
     if (fsconfig == NULL)
     {
         return 0;
     }
-    exp_flags = fsconfig->exp_flags;
 
+    exp_flags = fsconfig->exp_flags;
     /* cheap test to see if ReadOnly was even specified in the exportoptions */
     if (!(exp_flags & TROVE_EXP_READ_ONLY))
     {
         return 0;
     }
-    /* Drat. Iterate thru the list of wildcards specified in server_configuration and see
+    /* Drat. Iterate thru the list of wildcards specified
+     * in server_configuration and see
      * the client address matches. if yes, then we deny permission
      */
     if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "Disallowing read-write operation on a read-only exported file-system\n");
+                     "Disallowing read-write operation on a read-only exported file-system\n");
         return -EROFS;
     }
     return 0;
@@ -386,10 +437,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = &s_op->attr;
 
-    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
+    {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: perm check already done... skipping.\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                     "(%p) %s (prelude sm) state: perm check already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
         return SM_ACTION_COMPLETE;
     }
 
@@ -401,8 +454,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * if we are exporting a volume readonly, disallow any operation 
          * that modifies the state of the file-system.
          */
-        if (permit_operation(
-                s_op->target_fs_id, s_op->access_type, s_op->addr) < 0)
+        if (permit_operation(s_op->target_fs_id,
+                             s_op->access_type,
+                             s_op->addr) < 0)
         {
             js_p->error_code = -PVFS_EROFS;
             return SM_ACTION_COMPLETE;
@@ -413,10 +467,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE
-        credcache_hit = 
-            (PINT_credcache_lookup(cred) != NULL);
+        credcache_hit = (PINT_credcache_lookup(cred) != NULL);
+
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cred cache %s\n", __func__,
-                 (credcache_hit) ? "hit" : "miss");
+                     (credcache_hit) ? "hit" : "miss");
 #endif
         /* do not verify credential on credcache hit */
         ret = (credcache_hit) ? 1 : PINT_verify_credential(cred);
@@ -451,7 +505,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
-    if (s_op->target_fs_id != PVFS_FS_ID_NULL && cred != NULL)
+    if ((s_op->target_fs_id != PVFS_FS_ID_NULL) && (cred != NULL))
     {
         PVFS_uid uid, translated_uid;
         PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS], translated_gid;
@@ -470,9 +524,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * based on the export and the client address
          */
         /* TODO: testing */
-        if (translate_ids(s_op->target_fs_id, uid, 
-                          group_array[0], &translated_uid, 
-                          &translated_gid, s_op->addr) == 1)
+        if (translate_ids(s_op->target_fs_id,
+                          uid, 
+                          group_array[0],
+                          &translated_uid, 
+                          &translated_gid,
+                          s_op->addr) == 1)
         {
             /* TODO: not applicable to certificates */
             /* modify the credential. doesn't support secondary groups */
@@ -519,10 +576,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     capcache_hit = 1;
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
-        capcache_hit = 
-            (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
+        capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
-                 (capcache_hit) ? "hit" : "miss");
+                     (capcache_hit) ? "hit" : "miss");
     }
 #endif
 

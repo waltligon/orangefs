@@ -311,10 +311,10 @@ void *PINT_malloc_minimum(size_t size)
 typedef struct extra_s
 {
     void     *mem;
+    size_t   size;
 #if PVFS_MALLOC_MAGIC
     uint32_t magic;
 #endif
-    size_t   size;
 #if PVFS_MALLOC_CHECK_ALIGN
     size_t   align;
 #endif
