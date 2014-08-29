@@ -31,13 +31,13 @@ do
         D)
             admindn=$OPTARG
         ;;
-	w)
-	    adminpw=$OPTARG
+        w)
+            adminpw=$OPTARG
         ;;
-	*)
-	    usage
-	    exit 1
-	;;
+        *)
+            usage
+            exit 1
+        ;;
     esac
 done
 

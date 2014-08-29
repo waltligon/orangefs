@@ -210,8 +210,8 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
 int PINT_seccache_expired_default(void *entry1, 
                                   void *entry2)
 {
-    if (((seccache_entry_t *) entry1)->expiration >= 
-        ((seccache_entry_t *)entry2)->expiration)
+    if (((seccache_entry_t *) entry1)->expiration >
+        ((seccache_entry_t *) entry2)->expiration)
     {
         /* entry has expired */
         return 0;

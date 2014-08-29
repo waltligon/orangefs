@@ -492,7 +492,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                          cred->issuer);
 
             /* have client try again on timeout */
-            if (PINT_util_get_current_time() >= cred->timeout)
+            if (PINT_util_get_current_time() > cred->timeout)
             {
                 js_p->error_code = -PVFS_EAGAIN;
             }
@@ -601,7 +601,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                      s_op->req->capability.issuer);
 
         /* have client try again on timeout */
-        if (PINT_util_get_current_time() >= s_op->req->capability.timeout)
+        if (PINT_util_get_current_time() > s_op->req->capability.timeout)
         {
             js_p->error_code = -PVFS_EAGAIN;
         }
