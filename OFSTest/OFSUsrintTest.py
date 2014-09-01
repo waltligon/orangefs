@@ -472,7 +472,7 @@ def ltp(testing_node,output=[]):
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases runtest/" % testing_node.ofs_source_location)
     testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases %s/runtest/" % (testing_node.ofs_source_location,LTP_PREFIX))
-    testing_node.runSingleCommand("%s mkdir -p %s/ltp-tmp-usrint" % (preload,testing_node.ofs_source_location))
+    testing_node.runSingleCommand("%s mkdir -p %s/ltp-tmp-usrint" % (preload,testing_node.ofs_mount_point))
     testing_node.runSingleCommand("%s chmod 777 %s/ltp-tmp-usrint" % (preload,testing_node.ofs_mount_point))
     testing_node.runSingleCommand("umask 0")
     
