@@ -1234,7 +1234,10 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
         else:
             print "Unknown system %s" % self.distro
+        
+    
 
+    def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.
         batch_commands = '''
         
@@ -1258,16 +1261,20 @@ class OFSTestNode(object):
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
         self.runAllBatchCommands()
-        
-        # Install Hadoop. 
-        output = []
-        self.changeDirectory("/opt")
-        # Download from a helluva open source mirror.
-        self.runSingleCommand("wget --quiet  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
-        self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
-        
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
+
+        
+    def installHadoop(self):
+        # Install Hadoop. 
+        rc = self.runSingleCommand("[ -d /opt/%s ]" % self.hadoop_version)
+        if rc != 0:
+            output = []
+            self.changeDirectory("/opt")
+            
+            self.runSingleCommand("wget http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+        
 
 
 

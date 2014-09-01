@@ -280,6 +280,19 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Installing Required Software"
         self.ofs_network.installRequiredSoftware()
+        
+        # Install software required to compile and run OFS and all tests.
+        print ""
+        print "==================================================================="
+        print "Installing Berkeley DB 4.8"
+        self.ofs_network.installDB4()
+        
+        
+                # Install software required to compile and run OFS and all tests.
+        print ""
+        print "==================================================================="
+        print "Installing Hadoop"
+        self.ofs_network.installHadoop()
 
 
     ##
@@ -308,6 +321,7 @@ class OFSTestMain(object):
 
             # Add the node to the virtual cluster.
             self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_cloud=self.config.using_cloud,ext_ip_address=ext_ip_address)
+
 
 
     ##
@@ -340,11 +354,18 @@ class OFSTestMain(object):
 
         '''    
 
+        # DB4 and hadoop are required to build OrangeFS. Make sure they are installed in the proper location.
+        print ""
+        print "==================================================================="
+        print "Installing Berkeley DB 4.8"
+        self.ofs_network.installDB4()
+        
         if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
             print ""
             print "==================================================================="
-            print "Setup Hadoop"
-            self.ofs_network.setupHadoop()
+            print "Installing Hadoop"
+            self.ofs_network.installHadoop()
+
 
 
         print ""
@@ -467,7 +488,11 @@ class OFSTestMain(object):
             # Check to see if Torque is installed correctly
             self.ofs_network.checkTorque()
             '''
-
+        if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
+            print ""
+            print "==================================================================="
+            print "Setup Hadoop"
+            self.ofs_network.setupHadoop()
         
         return self.checkNetwork()
 

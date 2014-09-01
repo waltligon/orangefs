@@ -414,6 +414,37 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.network_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
+        
+        
+    ##
+    # @fn installDB4(self,node_list=None):
+    #
+    # This installs the required software on all the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
+                    
+        
+    
+    def installDB4(self,node_list=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installDB4)
+
+    ##
+    # @fn installHadoop(self,node_list=None):
+    #
+    # This installs the required software on all the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
+                    
+        
+    
+    def installHadoop(self,node_list=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installHadoop)
     
     ##
     # @fn buildOFSFromSource(
