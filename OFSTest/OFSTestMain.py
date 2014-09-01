@@ -340,6 +340,13 @@ class OFSTestMain(object):
 
         '''    
 
+        if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
+            print ""
+            print "==================================================================="
+            print "Setup Hadoop"
+            self.ofs_network.setupHadoop()
+
+
         print ""
         print "==================================================================="
         print "Downloading and building OrangeFS from %s resource %s" % (self.config.ofs_resource_type,self.config.ofs_resource_location)
@@ -461,11 +468,6 @@ class OFSTestMain(object):
             self.ofs_network.checkTorque()
             '''
 
-        if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
-            print ""
-            print "==================================================================="
-            print "Setup Hadoop"
-            self.ofs_network.setupHadoop()
         
         return self.checkNetwork()
 
